@@ -1,0 +1,401 @@
+/**
+ * Agents Directory read model (PAN-3920 W3).
+ *
+ * D1 — The directory is derived on read. It stores nothing.
+ * `GET /api/agent-directory` recomputes entries from `state.json` files, the
+ * pane inventory, the conversation list, transcript files and
+ * `remote-state.json`. Nothing it computes is written anywhere; no
+ * `agent_directory.*` event exists. The frontend refetches.
+ *
+ * Sources, in build order:
+ *   1. native agents   — `~/.overdeck/agents/<id>/state.json` (never `conv-*`)
+ *   2. pane-only       — panes with Overdeck tokens and no state.json (`pan spawn`)
+ *   3. conversations   — overdeck.db rows, enriched with liveness
+ *   4. subagents       — Claude/Codex subagents of every non-stopped parent
+ *   5. external        — Phase C registrations (none yet)
+ *
+ * State vocabulary and window rules are D3/D4 of `.pan/drafts/pan-3920.md`;
+ * docs/DASHBOARD-ARCHITECTURE.md "Agents Directory" restates them.
+ */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import type {
+  AgentDirectoryResponse,
+  BackendPane,
+  DirectoryEntry,
+  DirectoryEntryState,
+  HarnessName,
+} from '@overdeck/contracts';
+import { getHarnessBehavior } from '@overdeck/contracts';
+
+import { listAgentStatesSync, type AgentState } from '../../../lib/agents/agent-state-read.js';
+import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
+import { getEnrichedConversationList } from '../../../lib/overdeck/conversation-list.js';
+import { resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
+import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { findProjectKeyByPathSync } from '../../../lib/projects/project-key.js';
+import { SUBAGENT_WORKING_MTIME_MS, listAgentSubagents, listTranscriptSubagents } from './agent-subagents.js';
+import { getBackendPanes } from './backend-inventory.js';
+
+export const DIRECTORY_DEFAULT_WINDOW_HOURS = 24;
+export const DIRECTORY_MAX_WINDOW_HOURS = 168;
+export const DIRECTORY_MEMO_MS = 3_000;
+export const DIRECTORY_CONVERSATION_LIMIT = 300;
+export const DIRECTORY_SUBAGENT_CONCURRENCY = 8;
+export { SUBAGENT_WORKING_MTIME_MS };
+
+const UNASSIGNED_PROJECT = 'unassigned';
+const HOUR_MS = 3_600_000;
+
+/** The conversation-list fields the directory reads (conversation-list.ts enrichment). */
+export interface DirectoryConversationRow {
+  readonly name: string;
+  readonly tmuxSession: string;
+  readonly title: string | null;
+  readonly harness: string | null;
+  readonly model: string | null;
+  readonly issueId: string | null;
+  readonly projectKey: string | null;
+  readonly cwd: string;
+  readonly createdAt: string;
+  readonly endedAt: string | null;
+  readonly lastActivityAt: string | null;
+  readonly sessionAlive: boolean;
+  readonly isWorking: boolean;
+  readonly pendingInputCount: number;
+  readonly totalCost: number | null;
+}
+
+/** One subagent as a directory source reports it. */
+export interface DirectorySubagent {
+  readonly agentId: string;
+  readonly agentType: string;
+  readonly description: string;
+  readonly mtimeMs: number | null;
+}
+
+export interface AgentDirectoryDeps {
+  readonly now?: () => number;
+  readonly listAgentStates?: () => readonly AgentState[];
+  readonly getBackendPanes?: () => Promise<readonly BackendPane[]>;
+  readonly listConversations?: () => Promise<readonly unknown[]>;
+  readonly readRemoteLocation?: (agentId: string) => Promise<string | null>;
+  readonly listConversationSubagents?: (row: DirectoryConversationRow) => Promise<readonly DirectorySubagent[]>;
+  readonly listAgentSubagents?: (agentId: string, workspace: string) => Promise<readonly DirectorySubagent[]>;
+  /** Phase C (external registrations). */
+  readonly listExternalEntries?: (now: number) => Promise<readonly DirectoryEntry[]>;
+  readonly projectKeyForIssue?: (issueId: string) => string | null;
+  readonly projectKeyForPath?: (path: string) => string | null;
+}
+
+// ─── default sources ─────────────────────────────────────────────────────────
+
+async function defaultReadRemoteLocation(agentId: string): Promise<string | null> {
+  try {
+    const raw = await readFile(join(getOverdeckHome(), 'agents', agentId, 'remote-state.json'), 'utf8');
+    const parsed = JSON.parse(raw) as { location?: unknown };
+    return typeof parsed.location === 'string' ? parsed.location : null;
+  } catch {
+    return null;
+  }
+}
+
+async function defaultListConversationSubagents(row: DirectoryConversationRow): Promise<readonly DirectorySubagent[]> {
+  const kind = getHarnessBehavior(row.harness as HarnessName | null).transcriptKind;
+  const transcriptKind = kind === 'claude-jsonl' ? 'claude' : kind === 'codex-rollout-jsonl' ? 'codex' : null;
+  if (!transcriptKind) return [];
+  const path = await resolveSessionFile(row as unknown as Parameters<typeof resolveSessionFile>[0]);
+  if (!path) return [];
+  return listTranscriptSubagents({ kind: transcriptKind, path });
+}
+
+function defaultProjectKeyForIssue(issueId: string): string | null {
+  try {
+    return resolveProjectFromIssueSync(issueId)?.projectKey ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function defaultProjectKeyForPath(path: string): string | null {
+  try {
+    return findProjectKeyByPathSync(path);
+  } catch {
+    return null;
+  }
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function isConversationRow(value: unknown): value is DirectoryConversationRow {
+  if (typeof value !== 'object' || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.name === 'string' && typeof row.tmuxSession === 'string' && typeof row.createdAt === 'string';
+}
+
+/** Live entries are always in the directory; the rest only inside the window (D4). */
+export function isLiveDirectoryState(state: DirectoryEntryState): boolean {
+  return state !== 'stopped' && state !== 'done';
+}
+
+function paneState(pane: BackendPane | undefined): DirectoryEntryState {
+  if (!pane) return 'stopped';
+  return pane.state === 'exited' ? 'stopped' : pane.state;
+}
+
+function conversationState(row: DirectoryConversationRow): DirectoryEntryState {
+  if (!row.sessionAlive) return 'stopped';
+  if (row.pendingInputCount > 0) return 'blocked';
+  return row.isWorking ? 'working' : 'idle';
+}
+
+function isoFromMs(ms: number | null | undefined): string | null {
+  return typeof ms === 'number' && Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
+function timeOf(iso: string | null): number {
+  const ms = iso ? Date.parse(iso) : Number.NaN;
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function truncate(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+}
+
+function nativeLabel(state: AgentState): string {
+  const role = state.role === 'review' && state.reviewSubRole ? `review/${state.reviewSubRole}` : state.role;
+  return state.issueId ? `${role} · ${state.issueId.toUpperCase()}` : `${role} · ${state.id}`;
+}
+
+/** Candidate plus the path used for the D5 project fallback; `cwd` never leaves the server. */
+interface Candidate {
+  entry: DirectoryEntry;
+  cwd: string | null;
+  explicitProjectKey: string | null;
+}
+
+// ─── build ───────────────────────────────────────────────────────────────────
+
+export function clampWindowHours(windowHours: number): number {
+  if (!Number.isFinite(windowHours)) return DIRECTORY_DEFAULT_WINDOW_HOURS;
+  return Math.min(DIRECTORY_MAX_WINDOW_HOURS, Math.max(1, Math.floor(windowHours)));
+}
+
+export async function buildAgentDirectory(
+  windowHours: number,
+  deps: AgentDirectoryDeps = {},
+): Promise<AgentDirectoryResponse> {
+  const now = (deps.now ?? Date.now)();
+  const hours = clampWindowHours(windowHours);
+  const windowMs = hours * HOUR_MS;
+  const readRemoteLocation = deps.readRemoteLocation ?? defaultReadRemoteLocation;
+  const projectKeyForIssue = deps.projectKeyForIssue ?? defaultProjectKeyForIssue;
+  const projectKeyForPath = deps.projectKeyForPath ?? defaultProjectKeyForPath;
+
+  const [states, panes, conversationRows] = await Promise.all([
+    Promise.resolve((deps.listAgentStates ?? listAgentStatesSync)()),
+    (deps.getBackendPanes ?? getBackendPanes)().catch(() => [] as readonly BackendPane[]),
+    (deps.listConversations ?? (() => getEnrichedConversationList(DIRECTORY_CONVERSATION_LIMIT, 0)))()
+      .catch(() => [] as readonly unknown[]),
+  ]);
+
+  const candidates: Candidate[] = [];
+  const claimedPanes = new Set<BackendPane>();
+  const nativeParents: Array<{ entry: DirectoryEntry; workspace: string }> = [];
+
+  // 1. Native agents (never conversation agent dirs).
+  const natives = states.filter((state) => !state.id.startsWith('conv-'));
+  const locations = await Promise.all(natives.map((state) => readRemoteLocation(state.id)));
+  natives.forEach((state, index) => {
+    const matching = panes.filter((pane) => pane.agentId === state.id || (!pane.agentId && pane.id === state.id));
+    const pane = matching.find((candidate) => candidate.state !== 'exited') ?? matching[0];
+    for (const claimed of matching) claimedPanes.add(claimed);
+    const remote = locations[index] === 'remote';
+    const entry: DirectoryEntry = {
+      id: state.id,
+      kind: 'agent',
+      label: nativeLabel(state),
+      location: remote ? 'remote' : 'local',
+      projectKey: UNASSIGNED_PROJECT,
+      issueId: state.issueId ? state.issueId.toUpperCase() : null,
+      parentId: (state as { parentId?: string }).parentId ?? null,
+      role: state.role,
+      harness: state.harness ?? pane?.harness ?? 'unknown',
+      model: state.model || pane?.model || 'unknown',
+      state: remote ? 'unknown' : paneState(pane),
+      startedAt: state.startedAt ?? null,
+      lastActivityAt: state.lastActivity ?? state.stoppedAt ?? state.startedAt ?? null,
+      costUsd: null,
+      source: 'overdeck',
+      transcript: { route: 'agent', agentId: state.id },
+    };
+    candidates.push({ entry, cwd: state.workspace || null, explicitProjectKey: null });
+    if (entry.state !== 'stopped') nativeParents.push({ entry, workspace: state.workspace ?? '' });
+  });
+
+  // 2. Pane-only agents: Overdeck-tokened panes with no state.json (`pan spawn`).
+  for (const pane of panes) {
+    if (claimedPanes.has(pane)) continue;
+    const key = pane.agentId ?? pane.id;
+    if (key.startsWith('conv-')) continue;
+    if (!pane.agentId && !pane.issue) continue; // an operator shell Overdeck never stamped
+    const since = isoFromMs(pane.stateSince);
+    candidates.push({
+      entry: {
+        id: pane.agentId ?? `pane:${pane.id}`,
+        kind: 'agent',
+        label: pane.issue ? `${pane.role} · ${pane.issue.toUpperCase()}` : key,
+        location: 'local',
+        projectKey: UNASSIGNED_PROJECT,
+        issueId: pane.issue ? pane.issue.toUpperCase() : null,
+        parentId: null,
+        role: pane.role,
+        harness: pane.harness,
+        model: pane.model,
+        state: paneState(pane),
+        startedAt: since,
+        lastActivityAt: since,
+        costUsd: null,
+        source: 'pane',
+        transcript: pane.agentId ? { route: 'agent', agentId: pane.agentId } : null,
+      },
+      cwd: pane.workspace ?? null,
+      explicitProjectKey: null,
+    });
+  }
+
+  // 3. Conversations.
+  const conversationParents: Array<{ entry: DirectoryEntry; row: DirectoryConversationRow }> = [];
+  for (const row of conversationRows.filter(isConversationRow)) {
+    const entry: DirectoryEntry = {
+      id: `conv:${row.name}`,
+      kind: 'conversation',
+      label: row.title || row.name,
+      location: 'local',
+      projectKey: UNASSIGNED_PROJECT,
+      issueId: row.issueId ? row.issueId.toUpperCase() : null,
+      parentId: null,
+      role: null,
+      harness: row.harness ?? 'unknown',
+      model: row.model ?? 'unknown',
+      state: conversationState(row),
+      startedAt: row.createdAt,
+      lastActivityAt: row.lastActivityAt ?? row.endedAt ?? row.createdAt,
+      costUsd: typeof row.totalCost === 'number' ? row.totalCost : null,
+      source: 'conversation',
+      transcript: { route: 'conversation', conversationName: row.name },
+    };
+    candidates.push({ entry, cwd: row.cwd || null, explicitProjectKey: row.projectKey });
+    if (entry.state !== 'stopped') conversationParents.push({ entry, row });
+  }
+
+  // 4. Subagents of every non-stopped parent.
+  const listConversationSubagents = deps.listConversationSubagents ?? defaultListConversationSubagents;
+  const listNativeSubagents = deps.listAgentSubagents ?? listAgentSubagents;
+  const subagentTasks: Array<() => Promise<Candidate[]>> = [
+    ...conversationParents.map(({ entry, row }) => () => listConversationSubagents(row)
+      .then((subs) => subagentCandidates(entry, subs, 'conversation', row.name, row.cwd, now))),
+    ...nativeParents.map(({ entry, workspace }) => () => listNativeSubagents(entry.id, workspace)
+      .then((subs) => subagentCandidates(entry, subs, 'agent', entry.id, workspace, now))),
+  ].map((task) => () => task().catch(() => [] as Candidate[]));
+  for (const batch of await withConcurrencyLimitPromise(subagentTasks, DIRECTORY_SUBAGENT_CONCURRENCY)) {
+    candidates.push(...batch);
+  }
+
+  // 5. External entries (Phase C).
+  const external = deps.listExternalEntries ? await deps.listExternalEntries(now).catch(() => []) : [];
+
+  // 6. Project keys (D5): issue → the row's own project → cwd → unassigned.
+  //    A subagent inherits its parent's key (parents precede their subagents).
+  const projectKeys = new Map<string, string>();
+  const all: DirectoryEntry[] = candidates.map(({ entry, cwd, explicitProjectKey }) => {
+    const inherited = entry.kind === 'subagent' && entry.parentId ? projectKeys.get(entry.parentId) : undefined;
+    const projectKey = inherited
+      ?? (entry.issueId ? projectKeyForIssue(entry.issueId) : null)
+      ?? explicitProjectKey
+      ?? (cwd ? projectKeyForPath(cwd) : null)
+      ?? UNASSIGNED_PROJECT;
+    projectKeys.set(entry.id, projectKey);
+    return { ...entry, projectKey };
+  });
+  all.push(...external);
+
+  // 7. Window (D4), then re-add every ancestor of a kept entry.
+  const byId = new Map(all.map((entry) => [entry.id, entry]));
+  const kept = new Set<string>();
+  for (const entry of all) {
+    const inWindow = entry.lastActivityAt !== null && now - timeOf(entry.lastActivityAt) <= windowMs;
+    if (isLiveDirectoryState(entry.state) || inWindow) kept.add(entry.id);
+  }
+  for (const id of [...kept]) {
+    let parentId = byId.get(id)?.parentId ?? null;
+    while (parentId && byId.has(parentId) && !kept.has(parentId)) {
+      kept.add(parentId);
+      parentId = byId.get(parentId)?.parentId ?? null;
+    }
+  }
+
+  // 8. Sort: live first, then last activity descending, then id.
+  const entries = all.filter((entry) => kept.has(entry.id)).sort((a, b) =>
+    Number(isLiveDirectoryState(b.state)) - Number(isLiveDirectoryState(a.state))
+    || timeOf(b.lastActivityAt) - timeOf(a.lastActivityAt)
+    || a.id.localeCompare(b.id));
+
+  return { generatedAt: new Date(now).toISOString(), windowHours: hours, entries };
+}
+
+function subagentCandidates(
+  parent: DirectoryEntry,
+  subagents: readonly DirectorySubagent[],
+  route: 'conversation' | 'agent',
+  parentKey: string,
+  cwd: string | null,
+  now: number,
+): Candidate[] {
+  return subagents.map((sub) => {
+    const working = parent.state !== 'stopped' && sub.mtimeMs !== null && now - sub.mtimeMs <= SUBAGENT_WORKING_MTIME_MS;
+    const activity = isoFromMs(sub.mtimeMs);
+    return {
+      entry: {
+        id: `sub:${parent.id}:${sub.agentId}`,
+        kind: 'subagent',
+        label: truncate(`${sub.agentType} · ${sub.description}`, 80),
+        location: parent.location,
+        projectKey: UNASSIGNED_PROJECT,
+        issueId: parent.issueId,
+        parentId: parent.id,
+        role: null,
+        harness: parent.harness,
+        model: 'unknown',
+        state: working ? 'working' : 'done',
+        startedAt: null,
+        lastActivityAt: activity,
+        costUsd: null,
+        source: getHarnessBehavior(parent.harness as HarnessName).transcriptKind === 'codex-rollout-jsonl'
+          ? 'codex-subagent'
+          : 'claude-subagent',
+        transcript: route === 'conversation'
+          ? { route: 'conversation-subagent', conversationName: parentKey, subagentId: sub.agentId }
+          : { route: 'agent-subagent', agentId: parentKey, subagentId: sub.agentId },
+      },
+      cwd,
+      explicitProjectKey: null,
+    };
+  });
+}
+
+// ─── memoized read door ──────────────────────────────────────────────────────
+
+let memo = createSettledTtlPromiseCache<number, AgentDirectoryResponse>(DIRECTORY_MEMO_MS);
+
+/** The directory for a window, memoized for 3 s; concurrent callers share one build. */
+export function getAgentDirectory(windowHours: number, deps?: AgentDirectoryDeps): Promise<AgentDirectoryResponse> {
+  const hours = clampWindowHours(windowHours);
+  return memo(hours, () => buildAgentDirectory(hours, deps));
+}
+
+export function _resetAgentDirectoryForTests(): void {
+  memo = createSettledTtlPromiseCache<number, AgentDirectoryResponse>(DIRECTORY_MEMO_MS);
+}

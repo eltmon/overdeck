@@ -41,16 +41,15 @@ export function isSafeSubagentId(id: string): boolean {
   return SAFE_SUBAGENT_ID.test(id);
 }
 
-/** Every subagent the agent's current transcript spawned; `[]` for harnesses without subagents. */
-export async function listAgentSubagents(
-  agentId: string,
-  workspace: string,
-  options: AgentSubagentOptions = {},
+/**
+ * Every subagent a parent transcript spawned: Claude `subagents/agent-*.jsonl`
+ * beside the session file, or Codex child threads of the rollout. Other
+ * transcript kinds have no subagents and answer `[]`.
+ */
+export async function listTranscriptSubagents(
+  parent: { readonly kind: string; readonly path: string },
+  now: number = Date.now(),
 ): Promise<AgentSubagent[]> {
-  const now = (options.now ?? Date.now)();
-  const parent = await resolveAgentTranscriptCandidate(agentId, workspace, options.resolveOptions);
-  if (!parent) return [];
-
   if (parent.kind === 'claude') {
     const subagents: AgentSubagent[] = [];
     for (const meta of await listSubagentMetas(parent.path)) {
@@ -74,6 +73,17 @@ export async function listAgentSubagents(
   }
 
   return [];
+}
+
+/** Every subagent the agent's current transcript spawned; `[]` for harnesses without subagents. */
+export async function listAgentSubagents(
+  agentId: string,
+  workspace: string,
+  options: AgentSubagentOptions = {},
+): Promise<AgentSubagent[]> {
+  const parent = await resolveAgentTranscriptCandidate(agentId, workspace, options.resolveOptions);
+  if (!parent) return [];
+  return listTranscriptSubagents(parent, (options.now ?? Date.now)());
 }
 
 /** The transcript of one subagent of an agent, or null when it is not that agent's subagent. */
