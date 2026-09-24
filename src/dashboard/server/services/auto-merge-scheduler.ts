@@ -146,7 +146,7 @@ export function latestAutoMergeAllowsSchedule(
 
 async function defaultMergeGate(issueId: string): Promise<GateAnswer> {
   const { evaluateIssueMergeGate } = await import('../../../lib/cloister/merge-gate.js');
-  return evaluateIssueMergeGate(issueId);
+  return evaluateIssueMergeGate(issueId, {}, { requireApprovalAtHead: true });
 }
 
 async function defaultPolicyRefusal(): Promise<(issueId: string) => DoorResult | null> {

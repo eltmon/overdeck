@@ -59,6 +59,7 @@ const READY_FACTS: PrFacts = {
   headBranch: 'feature/pan-42',
   reviewDecision: 'APPROVED',
   approved: true,
+  approvedAtHead: true,
   changesRequested: false,
   mergeable: true,
   mergeableState: 'mergeable',
@@ -110,7 +111,12 @@ function world(options: WorldOptions = {}) {
     isRequireUatBeforeMerge: () => globalRequireUat,
     isMergeTrainEnabled: () => trainEnabled,
   };
-  const mergeGate = (issueId: string) => evaluateIssueMergeGate(issueId, { getFacts: factsReads, ciTestsRequired: () => false });
+  // As in production: the automatic path needs an approval bound to the head.
+  const mergeGate = (issueId: string) => evaluateIssueMergeGate(
+    issueId,
+    { getFacts: factsReads, ciTestsRequired: () => false },
+    { requireApprovalAtHead: true },
+  );
 
   const deps = {
     listProjects: () => [OVERDECK],
@@ -155,8 +161,10 @@ function row(status: PendingAutoMerge['status'], overrides: Partial<PendingAutoM
   };
 }
 
+const MARKER_HEAD = 'a7b64f7c0000000000000000000000000000abcd';
+
 /** A `gh pr view` payload: approved only by a trusted verdict marker comment. */
-function markerApprovedPr(): IssuePullRequestData {
+function markerApprovedPr(marker = `<!-- overdeck-verdict: APPROVED sha=${MARKER_HEAD} -->`): IssuePullRequestData {
   return {
     number: 42,
     title: 'feat: forty-two',
@@ -165,7 +173,7 @@ function markerApprovedPr(): IssuePullRequestData {
     isDraft: false,
     baseRefName: 'main',
     headRefName: 'feature/pan-42',
-    headRefOid: 'abc123',
+    headRefOid: MARKER_HEAD,
     author: { login: 'eltmon' },
     createdAt: '2026-09-24T09:00:00Z',
     updatedAt: '2026-09-24T11:00:00Z',
@@ -181,12 +189,12 @@ function markerApprovedPr(): IssuePullRequestData {
     mergeable: 'MERGEABLE',
     body: 'Closes #42',
     comments: [{
-      body: '<!-- overdeck-verdict: APPROVED -->\nLooks good.',
+      body: `${marker}\nLooks good.`,
       createdAt: '2026-09-24T11:00:00Z',
       author: { login: 'eltmon' },
       authorAssociation: 'OWNER',
     }],
-    commits: [{ oid: 'abc123', committedDate: '2026-09-24T10:00:00Z' }],
+    commits: [{ oid: MARKER_HEAD, committedDate: '2026-09-24T10:00:00Z' }],
   };
 }
 
@@ -229,7 +237,7 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     expect(insert).toHaveBeenCalledTimes(1);
   });
 
-  it('schedules a PR approved only by a trusted verdict marker comment', async () => {
+  it('schedules a PR approved only by a trusted verdict marker that names its head', async () => {
     const { deps, insert } = world({
       labels: ['auto-merge'],
       getFacts: (issueId) => getPrFacts(issueId, {
@@ -239,6 +247,32 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     const outcomes = await scheduleReadyAutoMerges(deps);
     expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
     expect(insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not schedule a PR whose marker approval names no head (#3983)', async () => {
+    const { deps, insert } = world({
+      labels: ['auto-merge'],
+      getFacts: (issueId) => getPrFacts(issueId, {
+        fetchGitHubPr: async () => ({ issueId, pr: markerApprovedPr('<!-- overdeck-verdict: APPROVED -->') }),
+      }),
+    });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
+    expect(outcomes[0]).toMatchObject({ scheduled: false, reason: `PR approval does not name PR HEAD ${MARKER_HEAD}` });
+  });
+
+  it('does not schedule a PR whose marker approves an older head (#3983)', async () => {
+    const { deps, insert } = world({
+      labels: ['auto-merge'],
+      getFacts: (issueId) => getPrFacts(issueId, {
+        fetchGitHubPr: async () => ({
+          issueId,
+          pr: markerApprovedPr('<!-- overdeck-verdict: APPROVED sha=b1b2b3b40000000000000000000000000000ffff -->'),
+        }),
+      }),
+    });
+    await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it('does not schedule a PR nothing opts in, and reads no forge for it', async () => {

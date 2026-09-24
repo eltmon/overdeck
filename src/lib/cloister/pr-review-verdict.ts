@@ -166,7 +166,9 @@ export async function postReviewVerdict(
       try {
         await runGh([
           'pr', 'comment', String(ref.number), '--repo', repo,
-          '--body', `${formatVerdictMarker(marker)}\n\n${input.body}`,
+          // #3983: the marker names the head it was given for, so the
+          // approval is void the moment another commit lands.
+          '--body', `${formatVerdictMarker(marker, facts.headSha)}\n\n${input.body}`,
         ], options);
       } catch (commentCause) {
         return {

@@ -22,6 +22,7 @@ function readyFacts(overrides: Partial<PrFacts> = {}): PrFacts {
     headBranch: 'feature/pan-1486',
     reviewDecision: 'APPROVED',
     approved: true,
+    approvedAtHead: true,
     mergeable: true,
     mergeableState: 'mergeable',
     checks: 'green',
@@ -74,6 +75,11 @@ describe('auto-merge eligibility', () => {
     await expect(isAutoMergeEligible('PAN-1486', d))
       .resolves.toEqual({ eligible: false, reason: 'PR is not approved' });
     expect(d.getIssueLabels).not.toHaveBeenCalled();
+  });
+
+  it('rejects an approval that does not name the PR head (#3983)', async () => {
+    await expect(isAutoMergeEligible('PAN-1486', deps(readyFacts({ approvedAtHead: false }))))
+      .resolves.toEqual({ eligible: false, reason: 'PR approval does not name PR HEAD abc1234' });
   });
 
   it('rejects a PR whose latest review requested changes', async () => {

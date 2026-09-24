@@ -581,7 +581,8 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   const refusal = autoMergePolicyRefusal(issueId, deps);
   if (refusal) return refusal;
 
-  const gate = await (deps.mergeGate ?? evaluateIssueMergeGate)(issueId);
+  // #3983: the automatic path needs an approval bound to the PR head.
+  const gate = await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id, {}, { requireApprovalAtHead: true })))(issueId);
   if (!gate.ready) {
     return { status: 422, body: { error: `${issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}` } };
   }

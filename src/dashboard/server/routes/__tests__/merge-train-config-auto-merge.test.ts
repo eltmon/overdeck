@@ -63,6 +63,7 @@ const READY_FACTS: PrFacts = {
   headBranch: 'feature/pan-3917',
   reviewDecision: 'APPROVED',
   approved: true,
+  approvedAtHead: true,
   changesRequested: false,
   mergeable: true,
   mergeableState: 'mergeable',

@@ -139,6 +139,8 @@ export async function isAutoMergeEligible(
   // UAT is never auto-merged, so a failed UAT verdict (#4036) cannot reach here.
   const readiness = evaluateMergeReadiness(facts, {
     ciTestsRequired: facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId),
+    // #3983: auto-merge needs an approval bound to the head.
+    requireApprovalAtHead: true,
   });
   if (!readiness.ready) {
     return { eligible: false, reason: readiness.reason ?? 'PR is not ready to merge' };

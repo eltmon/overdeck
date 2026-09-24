@@ -77,6 +77,12 @@ export interface PrFacts {
    * applies to this head (none was posted, or the head moved since).
    */
   uatVerdict?: UatVerdict | null;
+  /**
+   * #3983: the approval is bound to the current head — a forge review
+   * approval, or a verdict marker whose `sha=` is the head. A legacy marker
+   * without a SHA sets `approved` but not this. Auto-merge requires it.
+   */
+  approvedAtHead?: boolean;
   /** Set when the forge lookup itself failed; every flag is then conservative. */
   error?: string;
 }
@@ -146,16 +152,33 @@ export interface GitLabMrView {
  */
 export type MarkerVerdict = 'APPROVED' | 'CHANGES_REQUESTED';
 
-export function formatVerdictMarker(verdict: MarkerVerdict): string {
-  return `<!-- overdeck-verdict: ${verdict} -->`;
+/**
+ * #3983: the marker names the PR head the verdict was given for
+ * (`<!-- overdeck-verdict: APPROVED sha=<40 hex> -->`), so an approval binds to
+ * that commit and not to a comment timestamp. `sha` is omitted only when the
+ * head could not be read.
+ */
+export function formatVerdictMarker(verdict: MarkerVerdict, sha?: string | null): string {
+  return sha ? `<!-- overdeck-verdict: ${verdict} sha=${sha.toLowerCase()} -->` : `<!-- overdeck-verdict: ${verdict} -->`;
 }
 
-const VERDICT_MARKER_RE = /^[ \t]*<!--[ \t]*overdeck-verdict:[ \t]*(APPROVED|CHANGES_REQUESTED)[ \t]*-->[ \t]*(?:\r?\n|$)/i;
+const VERDICT_MARKER_RE = /^[ \t]*<!--[ \t]*overdeck-verdict:[ \t]*(APPROVED|CHANGES_REQUESTED)(?:[ \t]+sha=([0-9a-f]{7,40}))?[ \t]*-->[ \t]*(?:\r?\n|$)/i;
+
+/** A verdict marker read back: the verdict and the head it names, if any. */
+interface VerdictMarker {
+  verdict: MarkerVerdict;
+  sha: string | null;
+}
+
+/** The verdict marker a comment body declares as its whole first line, or null. */
+function parseVerdictMarkerDetail(body: string | null | undefined): VerdictMarker | null {
+  const match = body?.match(VERDICT_MARKER_RE);
+  return match ? { verdict: match[1].toUpperCase() as MarkerVerdict, sha: match[2]?.toLowerCase() ?? null } : null;
+}
 
 /** The verdict a comment body declares as its whole first line, or null. */
 export function parseVerdictMarker(body: string | null | undefined): MarkerVerdict | null {
-  const match = body?.match(VERDICT_MARKER_RE);
-  return match ? (match[1].toUpperCase() as MarkerVerdict) : null;
+  return parseVerdictMarkerDetail(body)?.verdict ?? null;
 }
 
 export function emptyPrFacts(issueId: string, error?: string): PrFacts {
@@ -289,24 +312,49 @@ function carriesMarker(comment: PrComment | undefined): boolean {
 }
 
 /**
+ * Epoch ms of the PR's head commit as the approval marker dates it: the head
+ * must be in the fetched commit list. No fallback to the last listed commit
+ * (#3983): an unlisted head cannot be dated, and an undatable approval is stale.
+ */
+function listedHeadCommitTime(pr: IssuePullRequestData): number | null {
+  if (!pr.headRefOid) return null;
+  const head = (pr.commits ?? []).find((commit) => commit.oid === pr.headRefOid);
+  const parsed = Date.parse(head?.committedDate ?? head?.authoredDate ?? '');
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/** The newest marker verdict, and whether an approval names the current head. */
+interface MarkerDecision {
+  verdict: MarkerVerdict;
+  /** True only for an APPROVED marker whose `sha=` is the PR head (#3983). */
+  atHead: boolean;
+}
+
+/**
  * The verdict declared by the newest marker comment on the PR.
  *
- * An APPROVED marker older than the PR's head commit does not count: a stale
- * approval must never merge commits it never saw. A stale CHANGES_REQUESTED
- * still counts — rework stays owed until a newer verdict says otherwise.
+ * An APPROVED marker that names a commit counts only when that commit is the
+ * PR head (#3983). A legacy marker without a SHA is dated instead: it counts
+ * when it is newer than the head commit, which must be in the commit list. That
+ * dating reads the commit's own date, not when it was pushed, so only a
+ * SHA-bound approval is `atHead`, and only that one lets auto-merge through.
+ * A stale CHANGES_REQUESTED still counts — rework stays owed until a newer
+ * verdict says otherwise.
  */
-function markerVerdictFromComments(pr: IssuePullRequestData, trusted: TrustedAuthors): MarkerVerdict | null {
+function markerVerdictFromComments(pr: IssuePullRequestData, trusted: TrustedAuthors): MarkerDecision | null {
   const comments = pr.comments ?? [];
   for (let index = comments.length - 1; index >= 0; index -= 1) {
     if (!isTrustedComment(comments[index], trusted)) continue;
-    const verdict = parseVerdictMarker(comments[index]?.body);
-    if (!verdict) continue;
-    if (verdict === 'APPROVED') {
-      const headAt = headCommitTime(pr);
-      const commentAt = Date.parse(comments[index]?.createdAt ?? '');
-      if (headAt !== null && (Number.isNaN(commentAt) || commentAt < headAt)) return null;
+    const marker = parseVerdictMarkerDetail(comments[index]?.body);
+    if (!marker) continue;
+    if (marker.verdict !== 'APPROVED') return { verdict: marker.verdict, atHead: false };
+    if (marker.sha) {
+      return pr.headRefOid && sameCommit(marker.sha, pr.headRefOid) ? { verdict: 'APPROVED', atHead: true } : null;
     }
-    return verdict;
+    const headAt = listedHeadCommitTime(pr);
+    const commentAt = Date.parse(comments[index]?.createdAt ?? '');
+    if (headAt === null || Number.isNaN(commentAt) || commentAt < headAt) return null;
+    return { verdict: 'APPROVED', atHead: false };
   }
   return null;
 }
@@ -355,8 +403,9 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
   const decision = normalize(pr.reviewDecision);
   const forgeDecision = decision === 'APPROVED' || decision === 'CHANGES_REQUESTED' ? decision : null;
   // Only consult the marker when the forge itself reached no decision.
+  const marker = forgeDecision ? null : markerVerdictFromComments(pr, trusted);
   const effective: PrReviewDecision = forgeDecision
-    ?? markerVerdictFromComments(pr, trusted)
+    ?? marker?.verdict
     ?? (decision === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : null);
   return {
     issueId: issueId.toUpperCase(),
@@ -372,6 +421,9 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
     headBranch: pr.headRefName ?? null,
     reviewDecision: effective,
     approved: effective === 'APPROVED',
+    // A forge approval is the forge's to keep current; a marker approval must
+    // name this head (#3983).
+    approvedAtHead: forgeDecision === 'APPROVED' || marker?.atHead === true,
     changesRequested: effective === 'CHANGES_REQUESTED',
     mergeable: mergeable === 'MERGEABLE' ? true : mergeable === 'CONFLICTING' ? false : null,
     mergeableState: pr.mergeable ? pr.mergeable.toLowerCase() : null,
@@ -438,6 +490,8 @@ function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMr
     headBranch: view?.source_branch ?? row.source_branch ?? null,
     reviewDecision: approved ? 'APPROVED' : 'REVIEW_REQUIRED',
     approved,
+    // A GitLab approval is the forge's own, which it resets per its project rules.
+    approvedAtHead: approved,
     changesRequested: false,
     mergeable,
     mergeableState: detailed ?? view?.merge_status ?? null,
@@ -612,6 +666,12 @@ export interface MergeReadinessPolicy {
    * so a failed UAT verdict at the current head blocks the merge.
    */
   uatRequired?: boolean;
+  /**
+   * #3983: the automatic merge path (the auto-merge scheduler, schedule door
+   * and executor) needs an approval bound to the head (`approvedAtHead`). The
+   * manual Merge button keeps accepting a dated legacy marker.
+   */
+  requireApprovalAtHead?: boolean;
 }
 
 /**
@@ -628,6 +688,9 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
   if (!facts.approved) return { ready: false, reason: 'PR is not approved' };
+  if (policy.requireApprovalAtHead && facts.approvedAtHead !== true) {
+    return { ready: false, reason: `PR approval does not name PR HEAD ${head}` };
+  }
   // FR-9 is a positive test on both: `none` (no checks reported for the head
   // commit) and `null` (the forge has not computed mergeability yet) are the
   // absence of evidence, not evidence of readiness. Merging on either is how a

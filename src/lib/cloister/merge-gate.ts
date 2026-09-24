@@ -22,6 +22,7 @@ import {
   evaluateMergeReadiness,
   getPrFacts,
   type MergeReadiness,
+  type MergeReadinessPolicy,
   type PrFacts,
   type PrFactsOptions,
 } from './pr-facts.js';
@@ -82,11 +83,12 @@ export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps 
 export async function evaluateIssueMergeGate(
   issueId: string,
   deps: MergeGateDeps = {},
-  options: PrFactsOptions = {},
+  options: PrFactsOptions & Pick<MergeReadinessPolicy, 'requireApprovalAtHead'> = {},
 ): Promise<MergeGateResult> {
+  const { requireApprovalAtHead, ...factsOptions } = options;
   const facts = deps.getFacts
-    ? await deps.getFacts(issueId, options)
-    : await getPrFacts(issueId, {}, options);
+    ? await deps.getFacts(issueId, factsOptions)
+    : await getPrFacts(issueId, {}, factsOptions);
   const ciTestsRequired = facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId);
   let uatRequired = false;
   if (facts.uatVerdict?.status === 'failed') {
@@ -97,5 +99,8 @@ export async function evaluateIssueMergeGate(
       uatRequired = true;
     }
   }
-  return { ...evaluateMergeReadiness(facts, { ciTestsRequired, uatRequired }), facts };
+  return {
+    ...evaluateMergeReadiness(facts, { ciTestsRequired, uatRequired, ...(requireApprovalAtHead ? { requireApprovalAtHead } : {}) }),
+    facts,
+  };
 }
