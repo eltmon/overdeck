@@ -438,7 +438,10 @@ observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
    unpushed commits.
-2. `checkApiErrorAgents` — nudges an agent wedged on an API error.
+2. `checkApiErrorAgents` — nudges a work, specialist, or planning agent wedged
+   on a provider error (including Claude Code's "API Error: Connection lost
+   mid-response"), once per 5 minutes, and only when liveness.ts `isIdle`
+   says its work activity has been stale for 2 minutes.
 3. `reconcileAgentLiveness` — corrects the dashboard's in-memory cache against
    the selected backend's inventory.
 4. `reapClosedIssueAgents` — reaps agents for issues the tracker has closed.
