@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, utimesSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the conversations-db module
 const mockListConversations = vi.fn();
@@ -77,6 +77,21 @@ vi.mock('../../../../lib/runtime-census.js', () => ({
     mockIsHarnessProcessAlive(sessionName),
 }));
 
+// PAN-3921: the poller reads Herdr's inventory on a Herdr host. Every other
+// case runs as a tmux host.
+const mockHostBackend = vi.fn(async (): Promise<'herdr' | 'tmux'> => 'tmux');
+const mockListHerdrAgents = vi.fn();
+const mockConversationHarnessAlive = vi.fn(async (_name: string) => true);
+vi.mock('../../../../lib/terminal-backends/select.js', () => ({
+  hostTerminalBackendName: mockHostBackend,
+}));
+vi.mock('../../../../lib/terminal-backends/herdr.js', () => ({
+  listHerdrAgents: mockListHerdrAgents,
+}));
+vi.mock('../../../../lib/overdeck/conversation-liveness.js', () => ({
+  conversationHarnessAlive: mockConversationHarnessAlive,
+}));
+
 const mockIsRespawnPending = vi.fn();
 vi.mock('../pending-respawn.js', () => ({
   isRespawnPending: mockIsRespawnPending,
@@ -103,6 +118,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     mockListPaneValues.mockResolvedValue([]);
     mockGetRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
     mockRefreshRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
+    mockHostBackend.mockResolvedValue('tmux');
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
@@ -851,5 +867,119 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
     const peerLookups = mockGetConversationByClaudeSessionId.mock.calls.filter(([id]) => id === peer);
     expect(peerLookups).toHaveLength(1);
     expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConversationLifecycleService — pollConversations on a Herdr host (PAN-3921)', () => {
+  const secondsAgo = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
+  const noTmuxServer = async () => ({
+    sampledAt: Date.now(),
+    available: false,
+    sessionNames: new Set<string>(),
+    panesBySession: new Map(),
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetConversationByName.mockReset();
+    mockHostBackend.mockResolvedValue('herdr');
+    mockIsRespawnPending.mockReturnValue(false);
+    mockIsHarnessProcessAlive.mockResolvedValue(true);
+    mockConversationHarnessAlive.mockResolvedValue(true);
+    mockGetRuntimeCensus.mockImplementation(noTmuxServer);
+    mockRefreshRuntimeCensus.mockImplementation(noTmuxServer);
+  });
+
+  afterEach(() => {
+    mockHostBackend.mockResolvedValue('tmux');
+  });
+
+  it('ends a conversation Herdr no longer holds once it is past the 90s grace', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'gone', tmuxSession: 'conv-gone', status: 'active', cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(120) },
+    ]);
+    mockListHerdrAgents.mockResolvedValue([]);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
+  });
+
+  it('leaves a conversation absent from Herdr alone inside the 90s grace', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'young', tmuxSession: 'conv-young', status: 'active', cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(45) },
+    ]);
+    mockListHerdrAgents.mockResolvedValue([]);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  it('ends a conversation whose Herdr agent exited', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'corpse', tmuxSession: 'conv-corpse', status: 'active', cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(300) },
+    ]);
+    mockListHerdrAgents.mockResolvedValue([{ agentId: 'conv-corpse', state: 'exited' }]);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('corpse');
+  });
+
+  it('keeps an active conversation whose Herdr agent is idle, and resurrects an ended one', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'live', tmuxSession: 'conv-live', status: 'active', cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(300) },
+      { name: 'latched', tmuxSession: 'conv-latched', status: 'ended', endedAt: secondsAgo(200), cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(300) },
+    ]);
+    mockGetConversationByName.mockImplementation((name: string) => (name === 'latched'
+      ? { name: 'latched', tmuxSession: 'conv-latched', status: 'ended', endedAt: secondsAgo(200), clearedToConvId: null }
+      : undefined));
+    mockListHerdrAgents.mockResolvedValue([
+      { agentId: 'conv-live', state: 'idle' },
+      { agentId: 'conv-latched', state: 'idle' },
+    ]);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+    expect(mockMarkConversationRunning).toHaveBeenCalledWith('latched');
+    expect(mockMarkConversationRunning).not.toHaveBeenCalledWith('live');
+  });
+
+  it('keeps a pre-Herdr conversation whose tmux session is still alive', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'legacy', tmuxSession: 'conv-legacy', status: 'active', cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(300) },
+    ]);
+    mockListHerdrAgents.mockResolvedValue([]);
+    const legacyCensus = async () => ({
+      sampledAt: Date.now(),
+      available: true,
+      sessionNames: new Set(['conv-legacy']),
+      panesBySession: new Map(),
+    });
+    mockGetRuntimeCensus.mockImplementation(legacyCensus);
+    mockRefreshRuntimeCensus.mockImplementation(legacyCensus);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  it('marks nothing when Herdr does not answer', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'gone', tmuxSession: 'conv-gone', status: 'active', cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(300) },
+    ]);
+    mockListHerdrAgents.mockRejectedValue(new Error('socket down'));
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
   });
 });
