@@ -266,18 +266,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           });
           console.log(`[specialists/done] Cleared registry lock for ${registryKey} (${projectKey})`);
         }
-
-        // Update specialist handoff log so success-rate metrics reflect actual outcome
-        const { updateSpecialistHandoffStatus } = await import('../../../../lib/cloister/specialist-handoff-logger.js');
-        const updated = await updateSpecialistHandoffStatus(
-          normalizedIssueId,
-          `${specialist}-agent`,
-          status === 'passed' ? 'completed' : 'failed',
-          status === 'passed' ? 'success' : 'failure',
-        );
-        if (updated) {
-          console.log(`[specialists/done] Updated handoff log: ${specialist}-agent ${normalizedIssueId} → ${status}`);
-        }
       } catch (err) {
         console.error(`[specialists/done] Error managing specialist state:`, err);
       }
@@ -458,25 +446,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       // `currentStatus` used to be the whole review-status row. The issue's
       // position is derived now (PAN-3917 FR-6).
       state: (yield* Effect.promise(() => getDerivedIssueState(normalizedIssueId))).state,
-    });
-  })),
-);
-
-// ─── Route: POST /api/specialists/logs/cleanup-all ────────────────────────────
-// NOTE: Must be registered before /:project/:type routes.
-
-const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/logs/cleanup-all',
-  httpHandler(Effect.gen(function* () {
-    const { cleanupAllLogs } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-    const results = cleanupAllLogs();
-
-    return jsonResponse({
-      success: true,
-      totalDeleted: results.totalDeleted,
-      byProject: results.byProject,
-      message: `Cleaned up ${results.totalDeleted} old logs`,
     });
   })),
 );
@@ -680,7 +649,6 @@ export const specialistsLegacyRouteLayer = Layer.mergeAll(
   getSpecialistsProjectsRoute,
   postSpecialistsResetAllRoute,
   postSpecialistsDoneRoute,
-  postSpecialistsLogsCleanupAllRoute,
   postSpecialistWakeRoute,
   postSpecialistResetRoute,
   postSpecialistInitRoute,

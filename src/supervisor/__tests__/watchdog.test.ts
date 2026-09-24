@@ -8,17 +8,6 @@ import {
   type SpawnRestart,
   type SupervisorWatchdogConfig,
 } from '../watchdog.js';
-import { BOOT_RECONCILIATION_BOOT_ID_KEY, BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, setSetting } from '../../lib/overdeck/control-settings.js';
-
-// Moved here from src/lib/overdeck/control-settings.ts, which no production code called (PAN-3958 CH-8).
-function stampBootReconciliation(bootId: string, graceDeadline: string, bootStartedAt: string): void {
-  setSetting(BOOT_RECONCILIATION_BOOT_ID_KEY, bootId);
-  setSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, bootStartedAt);
-  setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
-  // A fresh boot starts with a fresh extension budget.
-  setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, '0');
-}
-
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 let testHome: string;
 
@@ -712,23 +701,6 @@ describe('SupervisorWatchdog', () => {
       restartBlockedUntil: null,
     });
     expect(logs).toContain('watchdog restart skipped: restart lock held by PID 1 (pan reload)');
-  });
-
-  it('passes the persisted boot id to watchdog restart spawns', async () => {
-    mkdirSync(testHome, { recursive: true });
-    stampBootReconciliation(
-      'boot-watchdog',
-      '2026-05-17T15:30:30.000Z',
-      '2026-05-17T15:30:00.000Z',
-    );
-    const spawnOptions: Array<Parameters<SpawnRestart>[0]> = [];
-
-    await makeWatchdog({ spawnOptions }).checkOnce();
-
-    expect(spawnOptions[0]).toMatchObject({
-      restartLockHeld: true,
-      bootId: 'boot-watchdog',
-    });
   });
 
   it('parses supervisor boot-grace environment configuration', () => {

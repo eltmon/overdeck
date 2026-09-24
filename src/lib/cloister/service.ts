@@ -16,7 +16,8 @@ import {
 } from '../overdeck/control-settings.js';
 import type { TriggerDetection } from './triggers.js';
 import type { HandoffResult } from './handoff.js';
-import { getCostSummary, type CostAlert } from './cost-monitor.js';
+import type { CostAlert } from './cost-monitor.js';
+import { getTodayCostSummary } from '../overdeck/cost-sync.js';
 import type { SessionRotationResult } from './session-rotation.js';
 // PAN-3917 W4: deacon.ts (~60 patrol routines, record-plane writes) is
 // deleted. Its patrol loop is replaced by deacon-lite's four
@@ -617,10 +618,10 @@ export class CloisterService {
   }
 
   /**
-   * Get cost summary
+   * Today's (UTC) cost summary, read from cost_events (PAN-4052).
    */
   getCostSummary() {
-    return getCostSummary();
+    return getTodayCostSummary();
   }
 
   /**
