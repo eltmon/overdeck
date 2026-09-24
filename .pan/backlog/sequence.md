@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:22:26.087Z · model: claude-opus-5 · open: 809_
+_Last sequenced: 2026-09-24T22:27:36.526Z · model: claude-opus-5 · open: 809_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -91,7 +91,6 @@ _Last sequenced: 2026-09-24T22:22:26.087Z · model: claude-opus-5 · open: 809_
 | 115 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
 | 116 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
 | 117 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
-| 118 | PAN-3948 | S | medium | ok |  |  | pan tell says "not running" for a live tmux planning agent; planners idle forever after "Connection lost mid-response" |
 | 119 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
 | 120 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
 | 121 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
@@ -140,6 +139,7 @@ _Last sequenced: 2026-09-24T22:22:26.087Z · model: claude-opus-5 · open: 809_
 | 168 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
+| 172 | PAN-3948 | XS | medium | ok |  |  | Residual only: an agent idle after "Connection lost mid-response" is never nudged; deacon-api-recovery.ts patterns miss it |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 174 | PAN-3022 | S | high | needs-refinement |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
@@ -1124,7 +1124,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:22:26.087Z",
+  "generatedAt": "2026-09-24T22:27:36.526Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 809,
@@ -2213,14 +2213,14 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
     },
     {
       "issue": "PAN-3948",
-      "rank": 118,
-      "size": "S",
+      "rank": 172,
+      "size": "XS",
       "importance": "medium",
-      "score": 60,
+      "score": 52,
       "condition": "ok",
       "dependsOn": [],
-      "why": "pan tell says \"not running\" for a live tmux planning agent; planners idle forever after \"Connection lost mid-response\"",
-      "rationale": "Rank unchanged: the closure of PAN-3960 removes the blocker, not the residual work. The backend-split half — planners on tmux while the liveness oracle reads Herdr — is fixed by PAN-3960 (merged via PR #3992), which routes planning spawns through launchAgentPane. What remains is the second half: nothing nudges a planner stuck after \"Connection lost mid-response\". Re-verify pan tell against the merged behaviour before planning, and scope this to the watchdog alone.",
+      "why": "Residual only: an agent idle after \"Connection lost mid-response\" is never nudged; deacon-api-recovery.ts patterns miss it",
+      "rationale": "Demoted from 118: the operator verified on 2026-09-24 that the pan tell half landed on main in 9857ddec289 (#4018) - isAlive now probes the legacy tmux session on -L overdeck when Herdr answers absent, and delivery falls through to tmux - so what is left is an XS error-pattern addition to deacon-api-recovery.ts that the operator reports is already in progress outside the pipeline, which no longer earns a top-120 slot.",
       "gate": "auto",
       "planning": "auto"
     },
