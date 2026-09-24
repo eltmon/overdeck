@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:38:22.233Z · model: claude-opus-5 · open: 805_
+_Last sequenced: 2026-09-24T22:46:23.199Z · model: claude-opus-5 · open: 804_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -136,7 +136,6 @@ _Last sequenced: 2026-09-24T22:38:22.233Z · model: claude-opus-5 · open: 805_
 | 168 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
-| 172 | PAN-3948 | XS | medium | ok |  |  | Residual only: an agent idle after "Connection lost mid-response" is never nudged; deacon-api-recovery.ts patterns miss it |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 174 | PAN-3022 | S | high | needs-refinement |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
@@ -1120,10 +1119,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:38:22.233Z",
+  "generatedAt": "2026-09-24T22:46:23.199Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 805,
+  "openCount": 804,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -2808,19 +2807,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "dependsOn": [],
       "why": "Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT",
       "rationale": "The test role's browser UAT runs against the workspace stack; without session bootstrap every mutation AC is unprovable. Likely missing trusted-origin/Traefik env in the feature stack.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3948",
-      "rank": 172,
-      "size": "XS",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Residual only: an agent idle after \"Connection lost mid-response\" is never nudged; deacon-api-recovery.ts patterns miss it",
-      "rationale": "Demoted from 118: the operator verified on 2026-09-24 that the pan tell half landed on main in 9857ddec289 (#4018) - isAlive now probes the legacy tmux session on -L overdeck when Herdr answers absent, and delivery falls through to tmux - so what is left is an XS error-pattern addition to deacon-api-recovery.ts that the operator reports is already in progress outside the pipeline, which no longer earns a top-120 slot.",
       "gate": "auto",
       "planning": "auto"
     },
