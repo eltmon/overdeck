@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:27:36.526Z · model: claude-opus-5 · open: 809_
+_Last sequenced: 2026-09-24T22:29:27.611Z · model: claude-opus-5 · open: 807_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
-| 4 | PAN-4169 | M | critical | ok |  |  | Herdr reaps only claude-code panes, so finished codex/GPT, kimi, pi and ACP role runs are refused 'already running' on every re-dispatch |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
@@ -15,7 +14,6 @@ _Last sequenced: 2026-09-24T22:27:36.526Z · model: claude-opus-5 · open: 809_
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
-| 29 | PAN-4155 | M | critical | ok |  |  | Refused post-planning auto-spawns are never retried, so planned issues sit with no work agent until an operator runs pan start by hand |
 | 30 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
 | 31 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
 | 32 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
@@ -821,10 +819,6 @@ _Last sequenced: 2026-09-24T22:27:36.526Z · model: claude-opus-5 · open: 809_
 
 In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.
 
-### PAN-4169 (rank 4)
-
-Delta this run: PR #4162 merged as 35ad688c232 and PAN-3923 closed completed, so the sole dependency is satisfied — dependsOn cleared, rank held at 4. Filed as the residual gap after PAN-3966 closed and PR #4162 went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. With its parent landed, this is now the highest-ranked startable issue behind in-pipeline PAN-3921; ranks 2 and 3 stay vacant rather than shifting the rest of the tier. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.
-
 ### PAN-3930 (rank 15)
 
 In pipeline — rank pinned.
@@ -856,10 +850,6 @@ On the default backend the harness TUI renders into a one-line terminal until an
 ### PAN-3285 (rank 28)
 
 New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.
-
-### PAN-4155 (rank 29)
-
-New this run (filed 2026-09-24, minutes before the manifest). This is the remaining half of the post-planning auto-handoff gap that PAN-3977 opened: 3977 covers the case where stateToRole(todo) is null so no work agent is ever requested, while 4155 covers the case where the request IS made and the spawn guardrail refuses it. On a 409, or a 429/503 carrying blocked, completePlanningAutoSpawn records planning.failed stage=auto-handoff and stops; nothing retries. The refusal lands before claimAutoSpawnConsentForWorkStart, so the operator consent stays granted and the issue sits planned with no work agent indefinitely - the reactive dispatchers planning-consent release source cannot pick it up because it only fires on work-role state events and demands the ready label, which a todo issue never carries. That is a silent pipeline stall on the paved road, which is why it ranks critical despite the unlabelled P3 signal. The proposal is well-specified (record planning.autoHandoffDeferred, add a deacon-lite tick that re-POSTs /api/agents with no guardrail acknowledgement while consent is granted and the spec is promoted, give up after a bounded window with a needs-you signal) and it preserves the rule that machines never waive a health warning. It also carries a verified docs correction: PIPELINE-GATES.md claims the PAN-2500 resource governor gates every autonomous dispatch path, but no spawn path consults getCachedMemoryVerdict. Rank held at 29 this run: PAN-3977 closed COMPLETED at 2026-09-24T21:03:30Z, which removes the sibling it was sequenced behind but does not unblock it — the link was informs, not a dependency — so nothing above it moved. With 3977 landed, 4155 is the sole remaining half of the post-planning auto-handoff gap, and it must rebase onto main before planning: 3977's fix just changed completePlanningAutoSpawn, the exact function it edits.
 
 ### PAN-3524 (rank 30)
 
@@ -1117,6 +1107,14 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 
 Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
 
+### PAN-3916 (rank 112)
+
+Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
+
+### PAN-3900 (rank 113)
+
+patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1124,10 +1122,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:27:36.526Z",
+  "generatedAt": "2026-09-24T22:29:27.611Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 809,
+  "openCount": 807,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1230,19 +1228,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "dependsOn": [],
       "why": "A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures.",
       "rationale": "New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4155",
-      "rank": 29,
-      "size": "M",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Refused post-planning auto-spawns are never retried, so planned issues sit with no work agent until an operator runs pan start by hand",
-      "rationale": "New this run (filed 2026-09-24, minutes before the manifest). This is the remaining half of the post-planning auto-handoff gap that PAN-3977 opened: 3977 covers the case where stateToRole(todo) is null so no work agent is ever requested, while 4155 covers the case where the request IS made and the spawn guardrail refuses it. On a 409, or a 429/503 carrying blocked, completePlanningAutoSpawn records planning.failed stage=auto-handoff and stops; nothing retries. The refusal lands before claimAutoSpawnConsentForWorkStart, so the operator consent stays granted and the issue sits planned with no work agent indefinitely - the reactive dispatchers planning-consent release source cannot pick it up because it only fires on work-role state events and demands the ready label, which a todo issue never carries. That is a silent pipeline stall on the paved road, which is why it ranks critical despite the unlabelled P3 signal. The proposal is well-specified (record planning.autoHandoffDeferred, add a deacon-lite tick that re-POSTs /api/agents with no guardrail acknowledgement while consent is granted and the spec is promoted, give up after a bounded window with a needs-you signal) and it preserves the rule that machines never waive a health warning. It also carries a verified docs correction: PIPELINE-GATES.md claims the PAN-2500 resource governor gates every autonomous dispatch path, but no spawn path consults getCachedMemoryVerdict. Rank held at 29 this run: PAN-3977 closed COMPLETED at 2026-09-24T21:03:30Z, which removes the sibling it was sequenced behind but does not unblock it — the link was informs, not a dependency — so nothing above it moved. With 3977 landed, 4155 is the sole remaining half of the post-planning auto-handoff gap, and it must rebase onto main before planning: 3977's fix just changed completePlanningAutoSpawn, the exact function it edits.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11102,19 +11087,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "dependsOn": [],
       "why": "write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main",
       "rationale": "New issue (2026-09-24), the only delta since the prior run. pushPlanArtifacts replays the whole local range through git merge-tree, so one superseded rendering of .pan/backlog/sequence.md aborts the push and origin keeps serving a stale ranked order that the Flywheel reads for pickup; the silent reset --keep refusal then adds another unpushed commit every run, so the failure compounds. Ranked 31 rather than into the vacated top slots: the acute incident was hand-repaired (main is level with origin, the identical untracked drafts removed), so the bug is latent until the next untracked-draft collision, and it ranks behind the actively-biting pipeline blockers at 19-30 while staying in the critical band because a stale sequence misdirects every Flywheel pickup. Root cause is verified in the body with a named file, a proposed fix, and three mechanical acceptance criteria.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4169",
-      "rank": 4,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr reaps only claude-code panes, so finished codex/GPT, kimi, pi and ACP role runs are refused 'already running' on every re-dispatch",
-      "rationale": "Delta this run: PR #4162 merged as 35ad688c232 and PAN-3923 closed completed, so the sole dependency is satisfied — dependsOn cleared, rank held at 4. Filed as the residual gap after PAN-3966 closed and PR #4162 went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. With its parent landed, this is now the highest-ranked startable issue behind in-pipeline PAN-3921; ranks 2 and 3 stay vacant rather than shifting the rest of the tier. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.",
       "gate": "auto",
       "planning": "auto"
     },
