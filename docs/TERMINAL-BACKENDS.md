@@ -302,6 +302,12 @@ In `src/lib/cloister/service-crash.ts`:
 - `pokeAgentWithEscalation` asks `isAlive` itself. It pokes only a confirmed-alive agent. When the
   backend does not answer (`runtime-indeterminate`), it neither pokes nor changes the no-progress
   streak.
+- `progressFingerprint`, which judges whether a poke did anything, reads the pane with
+  `readAgentPaneText` (#4121). It combines the workspace HEAD, the pane tail, and the runtime
+  heartbeat (the transcript mtime for claude-code). When the pane read throws or returns no text, the
+  fingerprint is unknown, and the poke is skipped without changing the streak. A fingerprint that
+  moved since the last poke counts as progress, so that agent is not poked either. Only an unchanged
+  fingerprint counts toward the tier-3 `idle-alive` pause.
 - `handleAgentCrash` counts a crash and emits `agent.heartbeat_dead` only when `isConfirmedDead`
   holds.
 
