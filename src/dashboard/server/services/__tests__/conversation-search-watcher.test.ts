@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NormalizedConversationSearchConfig } from '../../../../lib/config-yaml.js';
 import { getConversationSearchHealth, resetConversationSearchHealthForTests } from '../../../../lib/conversation-search/health.js';
 import { ConversationDirectoryWatcher } from '../conversation-directory-watcher.js';
-import { ConversationSearchWatcher, startConversationSearchWatcher, stopConversationSearchWatcher } from '../conversation-search-watcher.js';
+import { ConversationSearchWatcher, startConversationSearchWatcher, stopConversationSearchWatcher, type ConversationSearchWatcherOptions } from '../conversation-search-watcher.js';
 
 class FakeWatcher {
   handlers = new Map<string, Array<(arg: string) => void>>();
@@ -22,6 +22,37 @@ class FakeWatcher {
   emit(event: 'add' | 'change' | 'unlink', filePath: string): void {
     for (const handler of this.handlers.get(event) ?? []) handler(filePath);
   }
+
+  emitError(error: unknown): void {
+    for (const handler of this.handlers.get('error') ?? []) (handler as (arg: unknown) => void)(error);
+  }
+}
+
+const EMPTY_INDEX_RESULT = { filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false };
+
+function restartableWatcher(overrides: ConversationSearchWatcherOptions = {}) {
+  const watchers: FakeWatcher[] = [];
+  const watchFactory = vi.fn(() => {
+    const fake = new FakeWatcher();
+    watchers.push(fake);
+    return fake;
+  });
+  const indexAll = vi.fn(async () => EMPTY_INDEX_RESULT);
+  const indexFile = vi.fn(async () => ({ ...EMPTY_INDEX_RESULT, filesScanned: 1 }));
+  const watcher = new ConversationSearchWatcher({
+    config: config(),
+    roots: ['/tmp/conversations'],
+    debounceMs: 25,
+    watchFactory,
+    indexAll,
+    indexFile,
+    removeFile: vi.fn(async () => undefined),
+    restartBaseDelayMs: 1_000,
+    restartMaxDelayMs: 4_000,
+    log: { log: vi.fn(), warn: vi.fn() },
+    ...overrides,
+  });
+  return { watcher, watchers, watchFactory, indexAll, indexFile };
 }
 
 function config(overrides: Partial<NormalizedConversationSearchConfig> = {}): NormalizedConversationSearchConfig {
@@ -243,5 +274,114 @@ describe('conversation search watcher', () => {
     await stopConversationSearchWatcher();
 
     expect(fakeWatcher.close).toHaveBeenCalledTimes(1);
+  });
+
+  describe('watcher restart after an error (PAN-3915)', () => {
+    it('closes the failed watcher, re-arms it after the backoff, and runs a catch-up index', async () => {
+      const { watcher, watchers, watchFactory, indexAll } = restartableWatcher();
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(getConversationSearchHealth().watcher).toMatchObject({ state: 'running', restarts: 0 });
+
+      watchers[0]!.emitError(new Error('Unable to poll: Interrupted system call'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(watchers[0]!.close).toHaveBeenCalledTimes(1);
+      expect(getConversationSearchHealth().watcher).toMatchObject({
+        state: 'restarting',
+        lastErrorReason: 'Unable to poll: Interrupted system call',
+      });
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(watchFactory).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(watchFactory).toHaveBeenCalledTimes(2);
+      expect(indexAll).toHaveBeenCalledTimes(2);
+      expect(getConversationSearchHealth().watcher).toMatchObject({
+        state: 'running',
+        restarts: 1,
+        lastErrorReason: 'Unable to poll: Interrupted system call',
+        nextRestartAt: null,
+      });
+
+      await watcher.stop();
+    });
+
+    it('re-armed watcher delivers events; errors from the closed watcher are ignored', async () => {
+      const { watcher, watchers, watchFactory, indexFile } = restartableWatcher();
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      watchers[0]!.emitError(new Error('boom'));
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      watchers[0]!.emitError(new Error('late error from the old watcher'));
+      watchers[0]!.emit('change', '/tmp/conversations/old.jsonl');
+      watchers[1]!.emit('change', '/tmp/conversations/session-a.jsonl');
+      await vi.advanceTimersByTimeAsync(25);
+
+      expect(watchFactory).toHaveBeenCalledTimes(2);
+      expect(getConversationSearchHealth().watcher?.state).toBe('running');
+      expect(indexFile).toHaveBeenCalledTimes(1);
+      expect(indexFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/tmp/conversations/session-a.jsonl' }));
+
+      await watcher.stop();
+    });
+
+    it('backs off exponentially up to the cap, and a delivered event resets the backoff', async () => {
+      const { watcher, watchers, watchFactory } = restartableWatcher();
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+
+      const expectedDelays = [1_000, 2_000, 4_000, 4_000];
+      for (const [attempt, delay] of expectedDelays.entries()) {
+        watchers[attempt]!.emitError(new Error(`error ${attempt}`));
+        await vi.advanceTimersByTimeAsync(delay - 1);
+        expect(watchFactory).toHaveBeenCalledTimes(attempt + 1);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(watchFactory).toHaveBeenCalledTimes(attempt + 2);
+      }
+
+      watchers[4]!.emit('change', '/tmp/conversations/session-a.jsonl');
+      watchers[4]!.emitError(new Error('after recovery'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(watchFactory).toHaveBeenCalledTimes(6);
+
+      await watcher.stop();
+    });
+
+    it('clears a stale failure once the catch-up index after a restart succeeds', async () => {
+      const indexAll = vi
+        .fn()
+        .mockResolvedValueOnce({ ...EMPTY_INDEX_RESULT, filesScanned: 1, errors: [{ filePath: '/tmp/conversations/a.jsonl', message: 'network down' }] })
+        .mockResolvedValue(EMPTY_INDEX_RESULT);
+      const { watcher, watchers } = restartableWatcher({ indexAll });
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      const failing = getConversationSearchHealth();
+      expect(failing.lastErrorReason).toBe('network down');
+      expect(failing.lastSuccessAt).toBeNull();
+
+      watchers[0]!.emitError(new Error('Unable to poll: Interrupted system call'));
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      const recovered = getConversationSearchHealth();
+      expect(recovered.lastSuccessAt).not.toBeNull();
+      expect(recovered.lastSuccessAt! > recovered.lastErrorAt!).toBe(true);
+
+      await watcher.stop();
+    });
+
+    it('stop() cancels a pending restart and clears the watcher health', async () => {
+      const { watcher, watchers, watchFactory } = restartableWatcher();
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      watchers[0]!.emitError(new Error('boom'));
+
+      await watcher.stop();
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(watchFactory).toHaveBeenCalledTimes(1);
+      expect(getConversationSearchHealth().watcher).toBeNull();
+    });
   });
 });

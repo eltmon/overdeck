@@ -4,6 +4,10 @@ import {
   getConversationSearchHealth,
   recordConversationSearchFailure,
   recordConversationSearchSuccess,
+  recordConversationSearchWatcherError,
+  recordConversationSearchWatcherRestarted,
+  recordConversationSearchWatcherStarted,
+  recordConversationSearchWatcherStopped,
   resetConversationSearchHealthForTests,
 } from '../health.js';
 
@@ -21,6 +25,7 @@ describe('conversation-search health tracking', () => {
       lastErrorAt: null,
       lastErrorReason: null,
       lastSuccessAt: null,
+      watcher: null,
     });
   });
 
@@ -52,5 +57,24 @@ describe('conversation-search health tracking', () => {
     const snapshot = getConversationSearchHealth();
     recordConversationSearchFailure(new Error('second'));
     expect(snapshot.lastErrorReason).toBe('first');
+  });
+
+  it('tracks the transcript watcher through error, restart, and stop (PAN-3915)', () => {
+    recordConversationSearchWatcherStarted();
+    expect(getConversationSearchHealth().watcher).toEqual({ state: 'running', restarts: 0, lastErrorAt: null, lastErrorReason: null, nextRestartAt: null });
+
+    recordConversationSearchWatcherError(new Error('Unable to poll: Interrupted system call'), 1_000);
+    const failed = getConversationSearchHealth().watcher;
+    expect(failed?.state).toBe('restarting');
+    expect(failed?.lastErrorReason).toBe('Unable to poll: Interrupted system call');
+    expect(new Date(failed!.nextRestartAt!).getTime() - new Date(failed!.lastErrorAt!).getTime()).toBe(1_000);
+    // A watcher error is not an embed failure.
+    expect(getConversationSearchHealth().lastErrorAt).toBeNull();
+
+    recordConversationSearchWatcherRestarted();
+    expect(getConversationSearchHealth().watcher).toMatchObject({ state: 'running', restarts: 1, nextRestartAt: null, lastErrorReason: 'Unable to poll: Interrupted system call' });
+
+    recordConversationSearchWatcherStopped();
+    expect(getConversationSearchHealth().watcher).toBeNull();
   });
 });

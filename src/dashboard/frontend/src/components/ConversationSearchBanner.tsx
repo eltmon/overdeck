@@ -17,11 +17,17 @@ export function ConversationSearchBanner() {
   const recentlyFailing =
     health?.lastErrorAt != null &&
     (health.lastSuccessAt == null || health.lastErrorAt > health.lastSuccessAt);
-  if (status.available && !recentlyFailing) return null;
+  // PAN-3915: a dead transcript watcher is shown only while it is waiting to
+  // restart; once re-armed, its last error is history, not current state.
+  const watcherRestarting = health?.watcher?.state === 'restarting';
+  if (status.available && !recentlyFailing && !watcherRestarting) return null;
 
-  const reason = status.available
-    ? health?.lastErrorReason ?? 'recent embedding failures'
-    : status.unavailableReason ?? 'embedding provider unavailable';
+  const watcherOnly = status.available && !recentlyFailing;
+  const reason = !status.available
+    ? status.unavailableReason ?? 'embedding provider unavailable'
+    : watcherOnly
+      ? `transcript watcher failed (${health?.watcher?.lastErrorReason ?? 'unknown error'}), restarting`
+      : health?.lastErrorReason ?? 'recent embedding failures';
   const creditRelated = /credit|billing|quota|insufficient/i.test(reason);
 
   return (
@@ -30,7 +36,9 @@ export function ConversationSearchBanner() {
       <p className="text-warning-foreground text-sm font-semibold flex-1 min-w-0 [&_span]:break-words">
         Conversation search is not working: <span className="font-normal">{reason}</span>
         <span className="font-normal ml-1 opacity-80">
-          — Ctrl+K conversation hits and transcript indexing are unavailable until this is fixed.
+          {watcherOnly
+            ? '— new transcripts are not indexed until the watcher is back.'
+            : '— Ctrl+K conversation hits and transcript indexing are unavailable until this is fixed.'}
         </span>
       </p>
       {creditRelated && (

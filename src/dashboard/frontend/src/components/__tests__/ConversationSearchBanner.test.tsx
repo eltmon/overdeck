@@ -83,4 +83,47 @@ describe('ConversationSearchBanner', () => {
     const { container } = render(<ConversationSearchBanner />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('shows a watcher that is waiting to restart (PAN-3915)', () => {
+    mockUseStatus.mockReturnValue({
+      data: makeStatus({
+        health: {
+          lastErrorAt: null,
+          lastErrorReason: null,
+          lastSuccessAt: '2026-09-24T12:00:00.000Z',
+          watcher: {
+            state: 'restarting',
+            restarts: 0,
+            lastErrorAt: '2026-09-24T12:05:00.000Z',
+            lastErrorReason: 'Unable to poll: Interrupted system call',
+            nextRestartAt: '2026-09-24T12:05:01.000Z',
+          },
+        },
+      }),
+    } as ReturnType<typeof useConversationSearchStatus>);
+    render(<ConversationSearchBanner />);
+    expect(screen.getByText(/transcript watcher failed \(Unable to poll: Interrupted system call\), restarting/)).toBeInTheDocument();
+    expect(screen.getByText(/new transcripts are not indexed/)).toBeInTheDocument();
+  });
+
+  it('stays hidden once a failed watcher has been restarted (PAN-3915)', () => {
+    mockUseStatus.mockReturnValue({
+      data: makeStatus({
+        health: {
+          lastErrorAt: null,
+          lastErrorReason: null,
+          lastSuccessAt: '2026-09-24T12:06:00.000Z',
+          watcher: {
+            state: 'running',
+            restarts: 1,
+            lastErrorAt: '2026-09-24T12:05:00.000Z',
+            lastErrorReason: 'Unable to poll: Interrupted system call',
+            nextRestartAt: null,
+          },
+        },
+      }),
+    } as ReturnType<typeof useConversationSearchStatus>);
+    const { container } = render(<ConversationSearchBanner />);
+    expect(container).toBeEmptyDOMElement();
+  });
 });
