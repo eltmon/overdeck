@@ -2,6 +2,8 @@
 import { Effect } from 'effect';
 import { getAgentState, listRunningAgents } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
+import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
 import type { HealthState } from '../runtimes/types.js';
 import { writeHealthEvent } from '../overdeck/health-events.js';
 import type { CloisterConfig } from './config.js';
@@ -51,22 +53,42 @@ export interface HealthHost {
  */
 export async function performHealthCheck(host: HealthHost): Promise<void> {
     try {
-      const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
+      // Live = present in the selected backend's inventory (#4109), not the
+      // tmux-only `tmuxActive` flag, which is false for every Herdr agent. An
+      // unreadable inventory is unknown liveness: skip this round and keep
+      // previousRunningAgents, so an outage never reads as every agent crashing
+      // (auto-restart) and the next readable round still diffs correctly.
+      const liveIds = await listLiveAgentIds();
+      if (liveIds === null) {
+        console.warn('[cloister] Terminal backend inventory unreadable — skipping this health check (liveness unknown)');
+        host.lastCheck = new Date();
+        return;
+      }
+      const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => liveIds.has(a.id));
       const agentIds = runningAgents.map((a) => a.id);
       const currentRunningSet = new Set(agentIds);
 
-      // Detect crashed agents (were running before, not running now)
+      // Detect crashed agents (were running before, not running now). Absence
+      // from the inventory is not proof of death (#4109 review): the oracle
+      // must confirm it. An agent it cannot confirm dead is carried into the
+      // next round's set and re-checked, never handed to handleAgentCrash.
+      const nextRunningSet = new Set(currentRunningSet);
       if (host.previousRunningAgents.size > 0 && host.config.auto_restart?.enabled) {
         for (const previousAgentId of host.previousRunningAgents) {
-          if (!currentRunningSet.has(previousAgentId)) {
-            // Agent crashed!
+          if (currentRunningSet.has(previousAgentId)) continue;
+          const verdict = await isAlive(previousAgentId).catch(
+            (): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }),
+          );
+          if (isConfirmedDead(verdict)) {
             await host.handleAgentCrash(previousAgentId);
+          } else {
+            nextRunningSet.add(previousAgentId);
           }
         }
       }
 
       // Update the set of running agents for next check
-      host.previousRunningAgents = currentRunningSet;
+      host.previousRunningAgents = nextRunningSet;
 
       // PAN-3917: the completion-marker fallback scan is deleted with the rest
       // of Appendix A — `pan done` opens the PR, and the PR is the completion

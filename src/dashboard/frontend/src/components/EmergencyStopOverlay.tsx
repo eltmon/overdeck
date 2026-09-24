@@ -25,11 +25,11 @@ export function triggerEmergencyStop(): void {
   window.dispatchEvent(new CustomEvent(EMERGENCY_STOP_EVENT));
 }
 
-async function fireEmergencyStop(): Promise<string[]> {
+async function fireEmergencyStop(): Promise<{ killed: string[]; unconfirmed: string[] }> {
   const res = await fetch('/api/cloister/emergency-stop', { method: 'POST' });
   if (!res.ok) throw new Error('Emergency stop request failed');
-  const data = (await res.json()) as { killedAgents?: string[] };
-  return data.killedAgents ?? [];
+  const data = (await res.json()) as { killedAgents?: string[]; unconfirmedAgents?: string[] };
+  return { killed: data.killedAgents ?? [], unconfirmed: data.unconfirmedAgents ?? [] };
 }
 
 export function EmergencyStopOverlay() {
@@ -60,11 +60,17 @@ export function EmergencyStopOverlay() {
   const confirm = useCallback(async () => {
     setBusy(true);
     try {
-      const killed = await fireEmergencyStop();
-      toast.success(
-        `Emergency STOP: killed ${killed.length} agent${killed.length === 1 ? '' : 's'}. ` +
-        'Auto-resume frozen — clear the Deacon / flywheel pause when you want agents to run again.',
-      );
+      const { killed, unconfirmed } = await fireEmergencyStop();
+      const frozen = 'Auto-resume frozen — clear the Deacon / flywheel pause when you want agents to run again.';
+      if (unconfirmed.length > 0) {
+        // A stop whose pane is not confirmed gone is not a success (#4109).
+        toast.warning(
+          `Emergency STOP: stopped ${killed.length}; ${unconfirmed.length} could not be confirmed stopped: ` +
+          `${unconfirmed.join(', ')}. ${frozen}`,
+        );
+      } else {
+        toast.success(`Emergency STOP: killed ${killed.length} agent${killed.length === 1 ? '' : 's'}. ${frozen}`);
+      }
       setOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Emergency stop failed');

@@ -30,6 +30,7 @@ import { operatorInterventionEvent } from '../../../../lib/operator-intervention
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { killSession } from '../../../../lib/tmux.js';
+import { listLiveAgentIds } from '../../../../lib/terminal-backends/inventory.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -645,7 +646,10 @@ export const postAgentsRestartAllRoute = HttpRouter.add(
     const { force = false } = body as { force?: boolean };
     return yield* Effect.promise(async () => {
       try {
-        const running = (await Effect.runPromise(listRunningAgents())).filter(a => a.tmuxActive);
+        // Live = in the backend inventory, not tmux-only tmuxActive (#4109); unreadable restarts nothing.
+        const liveIds = await listLiveAgentIds();
+        if (liveIds === null) return jsonResponse({ error: 'Terminal backend inventory unreadable; nothing restarted' }, { status: 503 });
+        const running = (await Effect.runPromise(listRunningAgents())).filter(a => liveIds.has(a.id));
         const results: Array<{
           id: string;
           issueId: string;
@@ -783,17 +787,12 @@ export interface RestartConfigChangeItem {
 }
 
 async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]> {
-  const agents = await Effect.runPromise(listRunningAgents());
-
+  const [agents, liveIds] = await Promise.all([Effect.runPromise(listRunningAgents()), listLiveAgentIds()]);
   const items: RestartConfigChangeItem[] = [];
 
   for (const agent of agents) {
-    if (!agent.issueId) continue;
-
-    // Only include actually running agents with active tmux sessions
-    if (!((agent as any).tmuxActive === true)) {
-      continue;
-    }
+    // Only agents live in the backend inventory (#4109); unreadable lists none (this list gates restarts).
+    if (!agent.issueId || !liveIds?.has(agent.id)) continue;
 
     // Skip paused/troubled agents (their gates stand)
     if ((agent as any).paused || (agent as any).troubled) {

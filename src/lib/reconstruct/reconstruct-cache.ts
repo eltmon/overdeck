@@ -18,6 +18,7 @@ import type {
 import { listAgentStatesSync } from '../agents/agent-state.js';
 import { listRunningAgents, type AgentState } from '../agents.js';
 import { listProjectsSync, type ProjectConfig } from '../projects.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { enumerateInFlightIssuesFromSources } from './enumerate-in-flight.js';
 import { derivePipelinePhase, type PipelinePhase } from './derive-phase.js';
 
@@ -61,7 +62,11 @@ function toAgentRole(role: string): AgentSnapshot['role'] | undefined {
   return undefined;
 }
 
-function toAgentSnapshot(state: AgentState & { tmuxActive?: boolean }): AgentSnapshot {
+/**
+ * `hasLivePane` comes from the selected backend's inventory (#4109), not the
+ * tmux-only `tmuxActive` flag; `undefined` when the inventory is unreadable.
+ */
+function toAgentSnapshot(state: AgentState, hasLivePane: boolean | undefined): AgentSnapshot {
   return {
     id: state.id,
     issueId: state.issueId,
@@ -78,9 +83,10 @@ function toAgentSnapshot(state: AgentState & { tmuxActive?: boolean }): AgentSna
     phase: state.phase || undefined,
     workType: state.workType || undefined,
     roleRunHead: state.roleRunHead || undefined,
-    hasLivePane: state.tmuxActive,
+    // Both from the backend inventory (#4109), never the tmux-only `tmuxActive`.
+    hasLivePane,
     // Deprecated alias of `hasLivePane` (#4105).
-    hasLiveTmuxSession: state.tmuxActive,
+    hasLiveTmuxSession: hasLivePane,
     stoppedByUser: state.stoppedByUser,
     paused: state.paused,
     pausedReason: state.pausedReason,
@@ -201,10 +207,11 @@ export async function reconstructCache(
     runningAgents = listAgentStatesSync().map((state) => ({ ...state, tmuxActive: false }));
   }
 
+  const liveIds = await listLiveAgentIds().catch(() => null);
   const agentsById: Record<string, AgentSnapshot> = {};
   const agentRuntimeById: Record<string, AgentRuntimeSnapshot> = {};
   for (const a of runningAgents) {
-    agentsById[a.id] = toAgentSnapshot(a);
+    agentsById[a.id] = toAgentSnapshot(a, liveIds === null ? undefined : liveIds.has(a.id));
     agentRuntimeById[a.id] = toAgentRuntimeSnapshot(a);
   }
 

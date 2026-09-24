@@ -1,4 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { Effect } from 'effect';
+import { describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  listRunningAgents: vi.fn((): unknown[] => []),
+  listLiveAgentIds: vi.fn(async (): Promise<ReadonlySet<string> | null> => new Set<string>()),
+}));
+
+vi.mock('../../../src/lib/agents.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/agents.js')>(),
+  listRunningAgents: () => Effect.sync(() => mocks.listRunningAgents()),
+}));
+
+// Fake terminal backend: the live inventory the default agent lister reads (#4109).
+vi.mock('../../../src/lib/terminal-backends/inventory.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/terminal-backends/inventory.js')>(),
+  listLiveAgentIds: mocks.listLiveAgentIds,
+}));
 import {
   ClaudeCodeTranscriptSource,
   PiTranscriptSource,
@@ -8,7 +25,7 @@ import {
 } from '../../../src/lib/memory/transcript-source.js';
 import type { AgentState } from '../../../src/lib/agents.js';
 
-function agent(overrides: Partial<AgentState & { tmuxActive: boolean }> = {}): AgentState & { tmuxActive: boolean } {
+function agent(overrides: Partial<AgentState & { hasLivePane: boolean }> = {}): AgentState & { hasLivePane: boolean } {
   return {
     id: 'agent-pan-1052',
     issueId: 'PAN-1052',
@@ -20,7 +37,7 @@ function agent(overrides: Partial<AgentState & { tmuxActive: boolean }> = {}): A
     startedAt: '2026-05-16T20:00:00.000Z',
     sessionId: 'session-from-state',
     branch: 'feature/pan-1052',
-    tmuxActive: true,
+    hasLivePane: true,
     ...overrides,
   };
 }
@@ -71,7 +88,7 @@ describe('ClaudeCodeTranscriptSource', () => {
   it('ignores inactive, missing, non-Claude, and subagent sessions', async () => {
     const source = new ClaudeCodeTranscriptSource({
       listAgents: async () => [
-        agent({ id: 'agent-inactive', tmuxActive: false }),
+        agent({ id: 'agent-inactive', hasLivePane: false }),
         agent({ id: 'agent-stopped', status: 'stopped' }),
         agent({ id: 'agent-pi', harness: 'ohmypi' }),
         agent({ id: 'agent-review', role: 'review' }),
@@ -109,6 +126,37 @@ describe('ClaudeCodeTranscriptSource', () => {
       eventsConsumed: 1,
       lastFullLineOffset: 100 + Buffer.byteLength(line, 'utf8'),
     }]);
+  });
+});
+
+describe('default agent lister liveness (#4109)', () => {
+  const herdrAgent = { ...agent({ id: 'agent-herdr' }), hasLivePane: undefined, tmuxActive: false };
+  const source = () => new ClaudeCodeTranscriptSource({
+    resolveSessionId: (candidate) => candidate.sessionId ?? null,
+    resolveTranscriptPath: (workspace, sessionId) => `${workspace}/${sessionId}.jsonl`,
+    statTranscript: async () => ({ size: 1, mtimeMs: 2 }),
+    isSubagentSession: () => false,
+  });
+
+  it('includes a live Herdr agent (tmuxActive false) the backend inventory lists', async () => {
+    mocks.listRunningAgents.mockReturnValue([herdrAgent]);
+    mocks.listLiveAgentIds.mockResolvedValue(new Set(['agent-herdr']));
+
+    expect((await source().getActiveTranscripts()).map((entry) => entry.agentId)).toEqual(['agent-herdr']);
+  });
+
+  it('excludes an agent absent from the backend inventory', async () => {
+    mocks.listRunningAgents.mockReturnValue([{ ...herdrAgent, tmuxActive: true }]);
+    mocks.listLiveAgentIds.mockResolvedValue(new Set());
+
+    expect(await source().getActiveTranscripts()).toEqual([]);
+  });
+
+  it('falls back to running rows when the backend inventory is unreadable', async () => {
+    mocks.listRunningAgents.mockReturnValue([herdrAgent]);
+    mocks.listLiveAgentIds.mockResolvedValue(null);
+
+    expect((await source().getActiveTranscripts()).map((entry) => entry.agentId)).toEqual(['agent-herdr']);
   });
 });
 
