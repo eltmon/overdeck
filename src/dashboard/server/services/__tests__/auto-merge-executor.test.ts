@@ -20,7 +20,7 @@ vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', () => ({
 }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
 vi.mock('../../../../lib/cloister/merge-gate.js', () => ({
-  evaluateIssueMergeGate: vi.fn(async () => ({ ready: true })),
+  evaluateIssueMergeGate: vi.fn(async () => ({ ready: true, facts: { headSha: null } })),
 }));
 
 import {
@@ -32,6 +32,31 @@ import {
   tickAutoMergeExecutor,
 } from '../auto-merge-executor.js';
 import type { PendingAutoMerge } from '../../../../lib/overdeck/merge-types.js';
+import { emptyPrFacts, type PrFacts } from '../../../../lib/cloister/pr-facts.js';
+import type { MergeGateResult } from '../../../../lib/cloister/merge-gate.js';
+
+/** What the real merge gate answers: a verdict plus the PR facts it read. */
+function gate(ready = true, facts: Partial<PrFacts> = {}, reason?: string): MergeGateResult {
+  return {
+    ready,
+    ...(reason ? { reason } : {}),
+    facts: {
+      ...emptyPrFacts('PAN-1486'),
+      forge: 'github',
+      url: 'https://github.com/eltmon/overdeck/pull/1486',
+      number: 1486,
+      exists: true,
+      open: true,
+      headSha: 'aaaaaaaaaaaaaaaa',
+      reviewDecision: 'APPROVED',
+      approved: true,
+      approvedAtHead: true,
+      mergeable: true,
+      checks: 'green',
+      ...facts,
+    },
+  };
+}
 
 const NOW = new Date('2026-05-25T10:00:00.000Z');
 
@@ -42,6 +67,7 @@ function pendingEntry(overrides: Partial<PendingAutoMerge> = {}): PendingAutoMer
     prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
     prNumber: 1486,
     projectKey: 'overdeck',
+    forge: 'github',
     status: 'pending',
     scheduledMergeAt: '2026-05-25T09:59:59.000Z',
     scheduledAt: '2026-05-25T09:54:59.000Z',
@@ -75,7 +101,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry({ scheduledMergeAt: '2026-05-25T10:00:01.000Z' })],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       transition,
       mergeIssue,
@@ -112,7 +138,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry(), pendingEntry({ id: 2, issueId: 'PAN-1487' })],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => deployQueued,
       isEligible,
       transition,
@@ -144,7 +170,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD abc123' }),
       markBlocked,
@@ -163,7 +189,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => false,
@@ -184,7 +210,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -209,7 +235,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -243,7 +269,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -280,7 +306,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -311,7 +337,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -340,7 +366,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -366,7 +392,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -430,7 +456,7 @@ describe('auto-merge executor', () => {
       isEligible: async () => ({ eligible: true }),
       // A push landed between scheduling and the cooldown expiring, so checks
       // went back to pending — the forge, not a stored row, decides.
-      mergeGate: async () => ({ ready: false, reason: 'CI checks still pending on PR HEAD abc123' }),
+      mergeGate: async () => gate(false, { checks: 'pending' }, 'CI checks still pending on PR HEAD abc123'),
       markBlocked,
       transition,
       mergeIssue,
@@ -452,7 +478,7 @@ describe('auto-merge executor', () => {
       isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
-      mergeGate: async () => ({ ready: true, facts: { headSha: 'bbbbbbbbbbbbbbbb' } }),
+      mergeGate: async () => gate(true, { headSha: 'bbbbbbbbbbbbbbbb' }),
       markBlocked,
       transition,
       mergeIssue,
@@ -473,7 +499,7 @@ describe('auto-merge executor', () => {
       isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
-      mergeGate: async () => ({ ready: true, facts: { headSha: 'aaaaaaaaaaaaaaaa' } }),
+      mergeGate: async () => gate(true, { headSha: 'aaaaaaaaaaaaaaaa' }),
       transition: () => true,
       mergeIssue,
       markMerged,
@@ -492,7 +518,7 @@ describe('auto-merge executor', () => {
       isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true as const }),
-      mergeGate: async () => ({ ready: true }),
+      mergeGate: async () => gate(),
       transition: () => true,
       mergeIssue: async () => ({ success: false, retryable: true, error: 'transient' }),
       requeueToPending,

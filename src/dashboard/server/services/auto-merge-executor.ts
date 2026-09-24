@@ -13,7 +13,7 @@ import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/clo
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 import { isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
-import type { MergeReadiness } from '../../../lib/cloister/pr-facts.js';
+import type { MergeReadiness, PrFacts } from '../../../lib/cloister/pr-facts.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
 
@@ -64,7 +64,7 @@ export interface AutoMergeExecutorDeps {
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
   /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
-  mergeGate?: (issueId: string) => Promise<MergeReadiness & { facts?: { headSha: string | null } }>;
+  mergeGate?: (issueId: string) => Promise<MergeReadiness & { facts: Pick<PrFacts, 'headSha'> }>;
   hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
@@ -160,7 +160,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     const gate = await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id, {}, { requireApprovalAtHead: true })))(entry.issueId);
     // #3983: the cooldown covered the head that was scheduled. A new head gets
     // its own cooldown: blocking this row lets the scheduler re-arm it.
-    const liveHead = gate.facts?.headSha ?? null;
+    const liveHead = gate.facts.headSha;
     const headMoved = Boolean(entry.headSha && liveHead && !sameCommit(entry.headSha, liveHead));
     if (!gate.ready || headMoved) {
       const reason = headMoved
