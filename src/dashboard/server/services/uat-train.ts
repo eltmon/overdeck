@@ -480,18 +480,36 @@ export async function runUatTrainReconcileAllProjects(
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
 
-export function startUatTrainReconciler(): boolean {
+export interface UatTrainReconcilerOptions {
+  /**
+   * #3983: extra work for the same tick, run at start and every interval. The
+   * dashboard passes the auto-merge scheduler here (nothing else writes a
+   * pending auto-merge since the flywheel loop was cut). It runs independently
+   * of the batch reconcile, so one failing never skips the other.
+   */
+  onTick?: () => Promise<unknown>;
+}
+
+export function startUatTrainReconciler(options: UatTrainReconcilerOptions = {}): boolean {
   if (!canStartUatTrainReconciler()) return false;
   if (reconcilerTimer) return true;
+  const runOnTick = (label: string) => {
+    if (!options.onTick) return;
+    void options.onTick().catch((err) => {
+      console.warn(`[uat-train] ${label} tick hook failed:`, err instanceof Error ? err.message : err);
+    });
+  };
   reconcilerTimer = setInterval(() => {
     void runUatTrainReconcileAllProjects().catch((err) => {
       console.warn('[uat-train] reconcile tick failed:', err instanceof Error ? err.message : err);
     });
+    runOnTick('interval');
   }, RECONCILE_INTERVAL_MS);
   reconcilerTimer.unref?.();
   void runUatTrainReconcileAllProjects().catch((err) => {
     console.warn('[uat-train] initial reconcile failed:', err instanceof Error ? err.message : err);
   });
+  runOnTick('initial');
   return true;
 }
 

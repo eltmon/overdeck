@@ -27,6 +27,7 @@ import { startConversationLifecycleService, stopConversationLifecycleService } f
 import { startCodexPluginImporter, stopCodexPluginImporter } from './services/codex-plugin-importer.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
+import { runAutoMergeSchedulerTick } from './services/auto-merge-scheduler.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
 import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
@@ -510,8 +511,9 @@ if (!isPeerDashboard && startCodexPluginImporter()) {
 
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times. Gated per-tick on the merge-train setting; there is no flywheel run
-// to wait for (PAN-3917 D12).
-if (startUatTrainReconciler()) {
+// to wait for (PAN-3917 D12). #3983: the same tick schedules auto-merges for
+// ready, opted-in PRs; the auto-merge executor then merges them.
+if (startUatTrainReconciler({ onTick: () => runAutoMergeSchedulerTick() })) {
   console.log('[overdeck] UAT batch-train reconciler started');
 } else {
   console.log('[overdeck] UAT batch-train reconciler skipped — non-primary dashboard process');

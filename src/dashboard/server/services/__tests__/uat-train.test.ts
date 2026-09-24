@@ -10,6 +10,8 @@ import {
   postUatGenerationPromotePayload,
   resolveUatProjectRoot,
   runUatTrainReconcile,
+  startUatTrainReconciler,
+  stopUatTrainReconciler,
 } from '../uat-train.js';
 import type { UatReconcilerDeps } from '../../../../lib/cloister/uat-reconciler.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
@@ -36,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   resolveProjectReposFromResolvedIssue: vi.fn(),
   hasUncleanedTerminalUatGeneration: vi.fn(),
+  runAutoMergeSchedulerTick: vi.fn(),
 }));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
@@ -426,6 +429,32 @@ describe('UAT train project root and startup gate', () => {
 
     mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'peer' });
     expect(canStartUatTrainReconciler()).toBe(false);
+  });
+
+  it('runs its tick hook at start and on every reconciler tick (#3983)', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.findProjectByPath.mockReturnValue({ path: '/repo' });
+      mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
+      mocks.runAutoMergeSchedulerTick.mockResolvedValue([]);
+
+      expect(startUatTrainReconciler({ onTick: mocks.runAutoMergeSchedulerTick })).toBe(true);
+      expect(mocks.runAutoMergeSchedulerTick).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(mocks.runAutoMergeSchedulerTick).toHaveBeenCalledTimes(2);
+    } finally {
+      stopUatTrainReconciler();
+      vi.useRealTimers();
+    }
+  });
+
+  it('runs no tick hook from a peer dashboard (#3983)', () => {
+    mocks.findProjectByPath.mockReturnValue({ path: '/repo' });
+    mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'peer' });
+
+    expect(startUatTrainReconciler({ onTick: mocks.runAutoMergeSchedulerTick })).toBe(false);
+    expect(mocks.runAutoMergeSchedulerTick).not.toHaveBeenCalled();
   });
 });
 

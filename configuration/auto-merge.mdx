@@ -39,8 +39,20 @@ pan flywheel config --get
 The same toggle is exposed in the dashboard's Flywheel header as a checkbox.
 The default is `true` (auto-merge OFF — operator UAT required before merge).
 
-When the toggle is `false`, the Flywheel orchestrator may schedule auto-merge
-for any issue that satisfies the eligibility predicate.
+When the toggle is `false`, the dashboard schedules auto-merge for any issue
+that satisfies the eligibility predicate. No flywheel run is needed: every
+60 seconds, on the UAT batch-train reconciler tick, the primary dashboard walks
+each project whose merge train is on, takes the PRs the forge reports as
+approved, green, and mergeable, and schedules each one that passes the merge
+gate (`evaluateIssueMergeGate`) and is opted in to auto-merge (its `auto-merge`
+/ `hold-for-uat` label, then the project default, then this toggle). It
+schedules through the same door as `POST /api/merge-train/auto-merge/schedule`.
+
+The scheduler schedules each issue once. It leaves alone an issue whose latest
+auto-merge is still pending or merging, or was cancelled, blocked, or failed:
+a cancel sticks, and a blocked or failed entry waits for the operator, who can
+re-schedule it through the endpoint. Only a merged entry makes room for a new
+one.
 
 ## Per-project default
 
@@ -87,7 +99,7 @@ merged.
 ## Cooldown
 
 Cooldown is fixed at **5 minutes** of wall-clock time from when the
-orchestrator schedules the merge to when the executor fires. The countdown is
+scheduler schedules the merge to when the executor fires. The countdown is
 persisted in SQLite, so it survives dashboard restarts — if the dashboard
 sleeps through the deadline, the executor still picks the entry up on the
 next tick and re-validates eligibility before firing.

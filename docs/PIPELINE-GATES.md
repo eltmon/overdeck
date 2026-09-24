@@ -230,8 +230,10 @@ the forge (`cloister/pr-facts.ts`) and judges them with
 `evaluateMergeReadiness`. Every merge door asks it: the merge-ready set
 (`getMergeReadyIssues`, which feeds the Flywheel merge order and the merge
 train), the dashboard Merge button, the auto-merge executor and the merge
-train's merge-next (all through `triggerMerge`), and the per-project merge
-queue.
+train's merge-next (all through `triggerMerge`), the per-project merge
+queue, and the auto-merge scheduler (#3983,
+`dashboard/server/services/auto-merge-scheduler.ts`), which asks it before it
+schedules a ready, opted-in PR on the merge-train reconciler tick.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 

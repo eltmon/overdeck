@@ -236,6 +236,19 @@ export function getActionableAutoMerge(issueId: string): PendingAutoMerge | null
   return row ? rowToPendingAutoMerge(row) : null;
 }
 
+/**
+ * #3983: the issue's newest auto-merge row in any status, cancelled and merged
+ * included. The scheduler reads it so an operator's cancel, or a row the
+ * executor blocked or failed, is not silently replaced by a fresh schedule.
+ */
+export function getLatestAutoMerge(issueId: string): PendingAutoMerge | null {
+  const db = getOverdeckDatabase();
+  const row = db.prepare(
+    'SELECT * FROM pending_auto_merges WHERE issue_id = ? ORDER BY id DESC LIMIT 1',
+  ).get(issueId) as OverdeckPendingAutoMergeRow | undefined;
+  return row ? rowToPendingAutoMerge(row) : null;
+}
+
 export function countActionableAutoMerges(issueId: string): number {
   const db = getOverdeckDatabase();
   const row = db.prepare(
