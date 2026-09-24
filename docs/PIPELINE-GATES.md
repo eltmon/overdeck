@@ -245,7 +245,9 @@ read when the question is asked. The PR is merge-ready when, in order:
 
 1. it exists, is open, is not a draft, and is approved (a forge review
    decision, else a trusted verdict marker comment, below) with no changes
-   requested;
+   requested. The automatic path (the auto-merge scheduler, schedule endpoint
+   and executor) also requires the approval to name the PR head: a forge
+   approval, or a marker whose `sha=` is the head (#3983);
 2. its checks on the head are all green (`none` and `pending` are not green;
    a GitLab pipeline that `skipped` is green, as the board reads it);
 3. **the CI test job passed on the head** when the project runs

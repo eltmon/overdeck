@@ -50,17 +50,23 @@ decision. `postReviewVerdict` therefore tries two identities, in order:
    whose first line is a machine marker:
 
    ```
-   <!-- overdeck-verdict: CHANGES_REQUESTED -->
+   <!-- overdeck-verdict: CHANGES_REQUESTED sha=<PR head> -->
    ```
 
-   (or `APPROVED`), followed by the verdict body. The result carries
-   `via: 'comment'` so the CLI can say which path was used.
+   (or `APPROVED`), followed by the verdict body. `sha=` is the PR head the
+   verdict was posted for (#3983); it is left out only when the head could not
+   be read. The result carries `via: 'comment'` so the CLI can say which path
+   was used.
 
 `pr-facts` reads both. A real forge `reviewDecision` always wins; only when the
 forge reached no decision does it take the newest marker comment. An `APPROVED`
-marker older than the PR's head commit does **not** count — a stale approval
-must never merge commits it never saw — while a stale `CHANGES_REQUESTED` still
-counts, because rework stays owed until a newer verdict says otherwise.
+marker counts only for the head it names: once another commit lands it is
+stale, however recent the comment — a stale approval must never merge commits
+it never saw. A legacy marker without `sha=` is dated against the head commit
+instead (and is stale when the head is not in the PR's commit list); it still
+counts for the manual Merge button, but auto-merge accepts only a head-bound
+approval (`approvedAtHead`). A stale `CHANGES_REQUESTED` still counts, because
+rework stays owed until a newer verdict says otherwise.
 
 GitLab is unchanged: approval is `glab mr approve`, a rejection is an MR note,
 and there is no marker.

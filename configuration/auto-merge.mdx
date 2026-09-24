@@ -46,11 +46,13 @@ each project whose merge train is on and takes its open PRs with green checks
 on the branches the merge gate links to an issue (`feature/<id>`,
 `strike/<id>`). For each one it checks, in order:
 
-1. the issue is opted in to auto-merge: its `auto-merge` / `hold-for-uat`
-   label, then the project default, then this toggle (no forge read);
+1. the issue is open in the tracker (the cached tracker row) and opted in to
+   auto-merge: its `auto-merge` / `hold-for-uat` label, then the project
+   default, then this toggle (no forge read);
 2. the merge gate (`evaluateIssueMergeGate`) says the PR is ready. Approval is
-   a forge review or a trusted `overdeck-verdict` marker comment, so a repo
-   without branch protection still qualifies;
+   a forge review or a trusted `overdeck-verdict` marker comment that names the
+   PR head (`sha=`), so a repo without branch protection still qualifies, but
+   an approval of an older commit never does;
 3. the issue's latest auto-merge entry allows a new one.
 
 It schedules through the same door as `POST /api/merge-train/auto-merge/schedule`.
@@ -58,12 +60,21 @@ GitLab projects are skipped, with one log line. `OVERDECK_DISABLE_AUTO_MERGE=1`
 stops the scheduler as well as the executor.
 
 Each entry records the PR head it was scheduled for. A pending or merging entry
-is left alone. A cancelled entry, or a failed one (the merge was attempted,
-including the retry circuit breaker), holds for that PR head only: a new push
-re-arms the issue. A blocked entry (the executor refused it before merging,
-for example because checks went red or the head moved during the cooldown)
-re-arms as soon as the merge gate passes again. The insert re-checks the latest
-entry, so a cancel that lands while the scheduler is reading the forge sticks.
+is left alone. A cancelled entry stops the issue for good, whatever it is
+pushed next: only re-scheduling it through the endpoint starts it again. A
+failed entry (the merge was attempted, including the retry circuit breaker)
+holds for that PR head only: a new push re-arms the issue. A blocked entry (the
+executor refused it before merging, for example because checks went red or the
+head moved during the cooldown) re-arms as soon as the merge gate passes again.
+An entry written before heads were recorded never re-arms by itself. The insert
+re-checks the latest entry, so a cancel that lands while the scheduler is
+reading the forge sticks.
+
+When the cooldown ends, the executor reads the tracker live and blocks the
+entry if the issue was closed, and blocks it if the PR head moved. The merge
+itself is pinned (`gh pr merge --match-head-commit`) to the commit the server
+verified: the scheduled head, or the server's own rebase of it. A push after
+that fails the merge instead of landing code nobody approved.
 
 ## Per-project default
 
