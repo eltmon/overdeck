@@ -272,6 +272,10 @@ and pi runtimes, reached only from Cloister's session rotation and crash respawn
 is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
 commands, plain dashboard terminals and the codex auth login are not agents.
 
+`GET /api/agents/:id/output` reads the pane through `readAgentPaneText` (Herdr `pane.read`, tmux
+`capture-pane`). On a Herdr host a miss tries the legacy tmux session once, then the saved
+`output.log` (#4097).
+
 A graceful restart's 60-second warning reaches a Herdr agent through `deliverAgentMessage`; on tmux
 it is still Escape twice and a tmux paste (`src/lib/graceful-restart.ts`).
 
