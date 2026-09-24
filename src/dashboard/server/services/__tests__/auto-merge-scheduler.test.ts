@@ -236,6 +236,34 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
 });
 
 describe('runAutoMergeSchedulerTick (#3983)', () => {
+  it('abandons a hung pass with a log line so the next tick runs', async () => {
+    vi.useFakeTimers();
+    try {
+      const log = vi.fn();
+      const listProjects = vi.fn(() => [{ key: 'overdeck', config: { name: 'Overdeck', path: '/repos/overdeck' } as ProjectConfig }]);
+      const deps = {
+        listProjects,
+        isTrainEnabledForProject: () => true,
+        latestAutoMerge: () => null,
+        listReady: () => new Promise<never>(() => {}),
+        log,
+        env: {},
+      };
+      const hung = runAutoMergeSchedulerTick(deps, 1_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(hung).resolves.toEqual([]);
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('abandoning it'));
+
+      const next = runAutoMergeSchedulerTick(deps, 1_000);
+      expect(next).not.toBe(hung);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await next;
+      expect(listProjects).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('joins a pass already in flight instead of starting a second one', async () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
@@ -246,6 +274,7 @@ describe('runAutoMergeSchedulerTick (#3983)', () => {
       latestAutoMerge: () => null,
       listReady: async () => { await gate; return []; },
       log: vi.fn(),
+      env: {},
     };
     const first = runAutoMergeSchedulerTick(deps);
     const second = runAutoMergeSchedulerTick(deps);

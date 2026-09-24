@@ -25,6 +25,9 @@ import { issueRunsTestsOnCi } from './verification-tests-mode.js';
 
 const execFileAsync = promisify(execFile);
 
+/** #3983: a hung `gh issue view` must fail the read, not stall its caller. */
+const LABEL_READ_TIMEOUT_MS = 15_000;
+
 export const BLOCKER_LABELS = ['needs-design', 'needs-discussion', 'do-not-merge'] as const;
 
 /** Labels that carry the per-issue auto-merge decision. */
@@ -77,7 +80,7 @@ async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
     'labels',
     '--jq',
     '.labels[].name',
-  ], { encoding: 'utf-8' });
+  ], { encoding: 'utf-8', timeout: LABEL_READ_TIMEOUT_MS });
 
   return stdout.trim().split('\n').filter(Boolean);
 }

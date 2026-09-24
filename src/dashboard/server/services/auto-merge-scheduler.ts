@@ -138,15 +138,39 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
   return outcomes;
 }
 
+/**
+ * A pass that runs longer than this is abandoned: the tick logs it and releases
+ * the single-flight slot, so a hung forge read cannot stop scheduling silently.
+ * An abandoned pass that later resumes is harmless: the insert re-checks the
+ * issue's latest row.
+ */
+export const AUTO_MERGE_SCHEDULER_PASS_TIMEOUT_MS = 5 * 60_000;
+
 let activePass: Promise<AutoMergeScheduleOutcome[]> | null = null;
 
 /**
  * Single-flight: a tick that lands while the previous pass is still reading the
  * forge joins that pass instead of starting a second one.
  */
-export function runAutoMergeSchedulerTick(deps: AutoMergeSchedulerDeps = {}): Promise<AutoMergeScheduleOutcome[]> {
-  activePass ??= scheduleReadyAutoMerges(deps).finally(() => {
-    activePass = null;
+export function runAutoMergeSchedulerTick(
+  deps: AutoMergeSchedulerDeps = {},
+  timeoutMs = AUTO_MERGE_SCHEDULER_PASS_TIMEOUT_MS,
+): Promise<AutoMergeScheduleOutcome[]> {
+  if (activePass) return activePass;
+  const log = deps.log ?? console.log;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<AutoMergeScheduleOutcome[]>((resolveTimeout) => {
+    timer = setTimeout(() => {
+      log(`[auto-merge-scheduler] pass still running after ${timeoutMs}ms; abandoning it so the next tick can run`);
+      resolveTimeout([]);
+    }, timeoutMs);
+    timer.unref?.();
   });
-  return activePass;
+  const pass: Promise<AutoMergeScheduleOutcome[]> = Promise.race([scheduleReadyAutoMerges(deps), timedOut])
+    .finally(() => {
+      clearTimeout(timer);
+      if (activePass === pass) activePass = null;
+    });
+  activePass = pass;
+  return pass;
 }
