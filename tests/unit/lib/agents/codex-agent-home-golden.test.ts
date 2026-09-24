@@ -67,7 +67,7 @@ describe('golden per-agent codex home (PAN-4013)', () => {
     const source = new CodexTranscriptSource({
       listAgents: async () => [{
         id: 'agent-golden-b', issueId: 'PAN-4013', workspace: '/work/space/codex', harness: 'codex', role: 'work',
-        status: 'running', tmuxActive: true,
+        status: 'running', hasLivePane: true,
       } as never],
       readThreadId: async () => threadId,
     });

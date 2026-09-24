@@ -186,6 +186,11 @@ door that does not exist; a real record read door would be a separate change.
   `src/lib/memory/checkpoint-client.ts` resolves `dist/dashboard/checkpoint-worker.js`
   from dashboard chunks and `dist/lib/memory/checkpoint-worker.js` (a root
   `tsdown.config.ts` entry) from CLI chunks such as `pan memory backfill`.
+- The memory FTS worker uses it as well. `src/lib/memory/fts-db.ts` resolves
+  `dist/dashboard/memory-fts-worker.js` from dashboard chunks and
+  `dist/lib/memory/fts-worker.js` from CLI chunks. From source, only Vitest runs FTS
+  statements inline (memory tests mock modules and change `OVERDECK_HOME` per test,
+  and neither reaches a worker thread). A `tsx` run uses the worker.
 - Jobs that wait or run for more than one second emit
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.

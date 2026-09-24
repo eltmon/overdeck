@@ -272,11 +272,20 @@ The planner's stop and status paths follow the same backend: finalize (`planning
 abort (`planning-sessions.ts`), and the dashboard's planning status, message and Stop routes use
 `closeAgentPane`, `agentPaneExists` and `deliverAgentMessage` rather than tmux calls.
 
+The runtime-class `spawnAgent` of the muse and kimi-code runtimes, reached only from Cloister's
+session rotation and crash respawn (`session-rotation.ts`, `service-crash.ts`), launches through
+`launchRuntimePane` (`src/lib/runtimes/runtime-pane-launch.ts`, #3936): `launchAgentPane` on the
+host's backend with the same four tokens and the pane recorded on the agent state. Both keep the
+PTY supervisor on Herdr too (`runtimeUsesSupervisor`, the rule conversations follow): they are
+pane-bound, so Herdr holds no agent record `agent.prompt` could reach and tmux `send-keys` cannot
+reach a Herdr pane — the supervisor socket is their delivery path. A failed start closes the Herdr pane with `closeBackendPane`. kimi-code's
+readiness is the new session directory under the kimi home, which does not depend on pane text.
+muse's is its prompt scan; on Herdr, where a TUI on the alternate screen reads back empty, a pane
+that is still present and has written its session log counts as started once the 60 s scan ends.
+
 **Not yet routed** (tracked elsewhere): operator conversations and `pan handoff` (#3921); the
-runtime-class `spawnAgent` of the muse and kimi-code runtimes (#3936) and of the codex, acp, ohmypi
-and pi runtimes, reached only from Cloister's session rotation and crash respawn
-(`session-rotation.ts`, `service-crash.ts`) — the claude-code runtime delegates to `spawnAgent` and
-is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
+runtime-class `spawnAgent` of the codex, acp, ohmypi and pi runtimes — the claude-code runtime
+delegates to `spawnAgent` and is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
 commands, plain dashboard terminals and the codex auth login are not agents.
 
 `GET /api/agents/:id/output` reads the pane through `readAgentPaneText` (Herdr `pane.read`, tmux
@@ -291,6 +300,29 @@ session presence only and is always `false` for a Herdr agent (#4097).
 A graceful restart's 60-second warning reaches a Herdr agent through `deliverAgentMessage`; on tmux
 it is still Escape twice and a tmux paste (`src/lib/graceful-restart.ts`).
 
+**Every runtime's `isRunning` asks `isAlive`, and Cloister's pokes and crash handling never act on
+unknown liveness** (#4116). Runtime modules cannot import `liveness.ts` directly, because that closes
+an import cycle through `agents.ts`. Instead, `src/lib/runtimes/index.ts` registers the oracle in
+`src/lib/runtimes/runtime-liveness.ts`, and every runtime's `isRunning` asks it. `isRunning` is `true`
+only when the oracle confirms the agent alive.
+
+In `src/lib/cloister/service-crash.ts`:
+
+- `pokeAgentWithEscalation` asks `isAlive` itself. It pokes only a confirmed-alive agent. When the
+  backend does not answer (`runtime-indeterminate`), it neither pokes nor changes the no-progress
+  streak.
+- `progressFingerprint`, which judges whether a poke did anything, reads the pane with
+  `readAgentPaneText` (#4121). It combines the workspace HEAD, the pane tail, and the runtime
+  heartbeat (the transcript mtime for claude-code). When the pane read throws or returns no text, the
+  fingerprint is unknown, and the poke is skipped without changing the streak. A fingerprint that
+  moved since the last poke counts as progress, so that agent is not poked either. Only an unchanged
+  fingerprint counts toward the tier-3 `idle-alive` pause.
+- `handleAgentCrash` counts a crash and emits `agent.heartbeat_dead` only when `isConfirmedDead`
+  holds.
+
+`getAgentHealth` (`src/lib/cloister/health.ts`) is synchronous. It treats only a synchronous `false`
+as a dead agent, never a pending answer, and the health loop decides which agents are live.
+
 **Crash detection and the start conflict check ask `isAlive`** (#4105). `detectCrashedAgents`
 (`pan recover`, `pan recover --all`, `autoRecoverAgents`) lists a `running` agent as crashed only
 when `isConfirmedDead` holds, so a live Herdr agent is not crashed and a `runtime-indeterminate`
@@ -302,6 +334,36 @@ alias with the same value, true for a live pane on either backend. The same pair
 read-model `AgentSnapshot`, the `agent.status_changed` payload and the work-agent lifecycle
 object. The shared reducer fills whichever name an event omits, so stored events that carry only
 `hasLiveTmuxSession` still set `hasLivePane`. Readers use `hasLivePane`.
+
+**No reader filters on `tmuxActive`** (#4109). `listRunningAgents()` still returns the flag, but it
+is tmux session presence only, so it is `false` for every Herdr agent. The former readers now read
+the selected backend's live inventory (`listLiveAgentIds` / `listLiveAgentPanes` in
+`src/lib/terminal-backends/inventory.ts`) or await `isAlive`, and `scripts/lint-liveness.sh` bans
+`.tmuxActive` reads in them. What each does when the inventory is unreadable (`null`) depends on
+whether it acts:
+
+- **Does not act on unknown:** the memory governor pauses only agents the inventory lists, and
+  none when it is unreadable. The Cloister health loop skips a round whose inventory is
+  unreadable and keeps its previous running set. An agent missing from a readable inventory is a
+  crash only when `isConfirmedDead(await isAlive(id))` holds; otherwise it is re-checked next round.
+  `POST /api/agents/restart-all` answers 503 and restarts nothing, and the
+  restart-with-current-config list is empty.
+- **Treats unknown as live:** the governor still sheds merged stacks, but any agent for the issue
+  that the inventory lists or that has a `running` row protects its stack. `pan workspace update`
+  (`findLiveAgentInWorkspace`, via `isAlive`) refuses to run under a probe that did not answer.
+  `pan show --health ping|check` (`lib/health.ts`) reports an unanswered probe as a `warning` that
+  neither increments nor resets the force-kill counter. Cloister `emergencyStop` stops every agent
+  the inventory lists plus every `running` row, through `stopAgent` (which closes Herdr panes), and
+  reports a stop whose pane is not confirmed gone as `unconfirmedAgents`, apart from `killedAgents`.
+
+The tmux adapter's inventory reports a failed ps/pgrep probe (`runtime-indeterminate`) as
+`unknown`, never `exited`, so a live agent does not drop out of a readable inventory.
+- **Displays and read-only feeds fall back to the `running` rows** (`isListedOrRunning`): the
+  Cloister agent-health lists, the memory transcript sources and the boot telemetry count. The
+  all-output feed discovers nothing and still captures explicit subscriptions; it reads panes
+  through `captureLiveAgentPaneText`. `GET /api/health/agents` combines the inventory with the tmux
+  census and answers unavailable when the inventory is unreadable; its snapshots carry
+  `hasLivePane`, with `tmuxActive` kept as a deprecated alias.
 
 **Known gaps on Herdr** (readers, not spawners): the Claude resume-summary gate crossing
 (`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the
@@ -564,10 +626,10 @@ the same way `countRunningAgents` does. An unreadable inventory (`null`) fails o
 `running` row counts. The brake stops agents through the async `stopAgent`, so on Herdr it closes
 the pane.
 
-`runtimes/muse.ts`, `runtimes/kimi-code.ts` and `overdeck/conversation-runtime.ts` still hardcode
-`useSupervisor: true`, but that is no longer a launch failure: those harnesses are launched
-pane-bound, so nothing waits for a detection the supervisor's second pty would have hidden, and
-their delivery already goes through the supervisor socket. Only `claude-code` needs the supervisor
+`overdeck/conversation-runtime.ts` still hardcodes `useSupervisor: true` (the muse and kimi-code
+runtime adapters decide it with `runtimeUsesSupervisor` since #3936, and keep it), but that is no
+longer a launch failure: those harnesses are launched pane-bound, so nothing waits for a detection the supervisor's second pty
+would have hidden, and their delivery already goes through the supervisor socket. Only `claude-code` needs the supervisor
 refused on Herdr, and `decideSupervisorForWorkAgent` does that.
 
 A detection failure now carries the pane's foreground process and its last 20 lines of output, so

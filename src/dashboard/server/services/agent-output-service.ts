@@ -1,14 +1,19 @@
 /**
  * Agent Output Service (PAN-1221 F3)
  *
- * Captures tmux pane output only for agents with an active output subscriber.
+ * Captures pane output only for agents with an active output subscriber. Panes
+ * come from the selected terminal backend's live inventory (Herdr or tmux,
+ * #4109); an agent the inventory does not list falls back to a tmux capture.
  * Explicit agent subscriptions and the public all-output SSE feed share one
  * reference-counted poller, so zero interest means zero pane captures.
  */
 
-import { Effect } from 'effect'
-import { listRunningAgents } from '../../../lib/agents.js'
 import { capturePane } from '../../../lib/tmux.js'
+import {
+  captureLiveAgentPaneText,
+  listLiveAgentPanes,
+  type LiveAgentPane,
+} from '../../../lib/terminal-backends/inventory.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
 import type { AgentOutputReceivedEvent } from '@overdeck/contracts'
@@ -58,9 +63,15 @@ function hasAgentInterest(state: AgentOutputServiceState, agentId: string): bool
   return state.allInterestCount > 0 || (state.interestCounts.get(agentId) ?? 0) > 0
 }
 
+async function captureAgentPane(agentId: string, pane: LiveAgentPane | undefined): Promise<string> {
+  if (pane) return (await captureLiveAgentPaneText(pane, 50)) ?? ''
+  return capturePane(agentId, 50)
+}
+
 async function captureInterestedAgent(
   state: AgentOutputServiceState,
   agentId: string,
+  pane?: LiveAgentPane,
 ): Promise<void> {
   if (!hasAgentInterest(state, agentId) || state.inFlight.has(agentId)) return
   state.inFlight.add(agentId)
@@ -77,10 +88,10 @@ async function captureInterestedAgent(
         const { getRemoteAgentOutput } = await import('../../../lib/remote/remote-agents.js')
         stdout = await getRemoteAgentOutput(agentId, remoteState.vmName, 50)
       } else {
-        stdout = await capturePane(agentId, 50)
+        stdout = await captureAgentPane(agentId, pane)
       }
     } catch {
-      stdout = await capturePane(agentId, 50).catch(() => '')
+      stdout = await captureAgentPane(agentId, pane).catch(() => '')
     }
 
     if (!hasAgentInterest(state, agentId)) return
@@ -112,21 +123,21 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
   state.polling = true
   try {
     const interestedIds = new Set(state.interestCounts.keys())
+    if (interestedIds.size === 0 && state.allInterestCount === 0) return
 
+    // Fleet discovery reads the selected backend's live inventory (#4109), not
+    // the tmux-only tmuxActive flag, which is false for every Herdr agent. An
+    // unreadable inventory (null) discovers nothing; explicit subscriptions
+    // still capture.
+    const panes = await listLiveAgentPanes().catch(() => null)
+    const paneById = new Map((panes ?? []).map((pane) => [pane.agentId, pane]))
     if (state.allInterestCount > 0) {
-      try {
-        const runningAgents = await Effect.runPromise(listRunningAgents())
-        for (const agent of runningAgents) {
-          if (agent.tmuxActive) interestedIds.add(agent.id)
-        }
-      } catch {
-        // Explicit subscriptions can still capture when fleet discovery fails.
-      }
+      for (const agentId of paneById.keys()) interestedIds.add(agentId)
     }
 
     if (interestedIds.size === 0) return
     await withConcurrencyLimit(
-      [...interestedIds].map((agentId) => () => captureInterestedAgent(state, agentId)),
+      [...interestedIds].map((agentId) => () => captureInterestedAgent(state, agentId, paneById.get(agentId))),
       4,
     )
   } finally {
@@ -168,7 +179,10 @@ export function retainAgentOutputInterest(agentId: string): () => void {
   serviceState.interestCounts.set(agentId, previousCount + 1)
   ensurePolling()
   if (serviceState.started && previousCount === 0) {
-    void captureInterestedAgent(serviceState, agentId).catch(() => undefined)
+    void listLiveAgentPanes()
+      .catch(() => null)
+      .then((panes) => captureInterestedAgent(serviceState, agentId, panes?.find((pane) => pane.agentId === agentId)))
+      .catch(() => undefined)
   }
 
   let released = false

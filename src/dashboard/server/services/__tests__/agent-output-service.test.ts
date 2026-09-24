@@ -13,7 +13,11 @@ vi.mock('../../../../lib/tmux.js', () => ({  // PAN-3917 (W6): the backend inven
   listPaneValuesSync: () => [],
   listPaneValues: async () => [],
  capturePane: vi.fn() }))
-vi.mock('../../../../lib/agents.js', () => ({ listRunningAgents: vi.fn() }))
+// Fake terminal backend: the live pane inventory and its pane reader (#4109).
+vi.mock('../../../../lib/terminal-backends/inventory.js', () => ({
+  listLiveAgentPanes: vi.fn(async () => []),
+  captureLiveAgentPaneText: vi.fn(async () => null),
+}))
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(() => Promise.reject(new Error('no remote state'))),
 }))
@@ -29,10 +33,15 @@ import {
   type AgentOutputServiceState,
 } from '../agent-output-service.js'
 import { capturePane } from '../../../../lib/tmux.js'
-import { listRunningAgents } from '../../../../lib/agents.js'
+import { captureLiveAgentPaneText, listLiveAgentPanes, type LiveAgentPane } from '../../../../lib/terminal-backends/inventory.js'
 
 const mockCapturePane = vi.mocked(capturePane)
-const mockListRunningAgents = vi.mocked(listRunningAgents)
+const mockListLiveAgentPanes = vi.mocked(listLiveAgentPanes)
+const mockCaptureLiveAgentPaneText = vi.mocked(captureLiveAgentPaneText)
+
+function herdrPane(agentId: string): LiveAgentPane {
+  return { backend: 'herdr', agentId, paneId: `w1:${agentId}`, terminalId: `t-${agentId}`, state: 'working' } as LiveAgentPane
+}
 
 function createState(agentIds: string[] = []): AgentOutputServiceState {
   return {
@@ -83,8 +92,10 @@ describe('AgentOutputService', () => {
     mockEmitOnly.mockClear()
     mockAppendAsync.mockClear()
     mockCapturePane.mockReset()
-    mockListRunningAgents.mockReset()
-    mockListRunningAgents.mockReturnValue(Effect.succeed([]))
+    mockListLiveAgentPanes.mockReset()
+    mockListLiveAgentPanes.mockResolvedValue([])
+    mockCaptureLiveAgentPaneText.mockReset()
+    mockCaptureLiveAgentPaneText.mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -95,22 +106,22 @@ describe('AgentOutputService', () => {
   it('does no fleet discovery or pane capture with zero interest', async () => {
     await pollOnce(createState())
 
-    expect(mockListRunningAgents).not.toHaveBeenCalled()
+    expect(mockListLiveAgentPanes).not.toHaveBeenCalled()
     expect(mockCapturePane).not.toHaveBeenCalled()
     expect(mockEmitOnly).not.toHaveBeenCalled()
   })
 
   it('coalesces overlapping wildcard polls into one fleet discovery', async () => {
-    let resolveAgents!: (agents: never[]) => void
-    mockListRunningAgents.mockReturnValue(Effect.promise(() => new Promise((resolve) => {
+    let resolveAgents!: (panes: LiveAgentPane[]) => void
+    mockListLiveAgentPanes.mockReturnValue(new Promise((resolve) => {
       resolveAgents = resolve
-    })))
+    }))
     const state = createState()
     state.allInterestCount = 1
 
     const first = pollOnce(state)
     const overlapping = pollOnce(state)
-    expect(mockListRunningAgents).toHaveBeenCalledOnce()
+    expect(mockListLiveAgentPanes).toHaveBeenCalledOnce()
 
     resolveAgents([])
     await Promise.all([first, overlapping])
@@ -125,7 +136,6 @@ describe('AgentOutputService', () => {
     await pollOnce(state)
     await pollOnce(state)
 
-    expect(mockListRunningAgents).not.toHaveBeenCalled()
     expect(mockCapturePane).toHaveBeenCalledTimes(2)
     expect(mockEmitOnly).toHaveBeenCalledTimes(2)
     expect(mockEmitOnly.mock.calls[0]![0]).toMatchObject({
@@ -203,21 +213,44 @@ describe('AgentOutputService', () => {
   })
 
   it('preserves the public all-agent SSE output surface only while subscribed', async () => {
-    mockListRunningAgents.mockReturnValue(Effect.succeed([
-      { id: 'agent-one', tmuxActive: true },
-      { id: 'agent-stopped', tmuxActive: false },
-    ] as never))
-    mockCapturePane.mockResolvedValue('output')
+    mockListLiveAgentPanes.mockResolvedValue([herdrPane('agent-one')])
+    mockCaptureLiveAgentPaneText.mockResolvedValue('output')
     startAgentOutputService()
 
     const release = retainAllAgentOutputInterest()
     await vi.advanceTimersByTimeAsync(0)
-    expect(mockListRunningAgents).toHaveBeenCalledOnce()
-    expect(mockCapturePane).toHaveBeenCalledWith('agent-one', 50)
-    expect(mockCapturePane).not.toHaveBeenCalledWith('agent-stopped', 50)
+    expect(mockListLiveAgentPanes).toHaveBeenCalledOnce()
+    expect(mockCaptureLiveAgentPaneText).toHaveBeenCalledWith(herdrPane('agent-one'), 50)
+    expect(mockCapturePane).not.toHaveBeenCalled()
 
     release()
     await vi.advanceTimersByTimeAsync(3_000)
-    expect(mockListRunningAgents).toHaveBeenCalledOnce()
+    expect(mockListLiveAgentPanes).toHaveBeenCalledOnce()
+  })
+
+  it('#4109: discovers and captures a live Herdr agent through the backend inventory', async () => {
+    mockListLiveAgentPanes.mockResolvedValue([herdrPane('agent-herdr')])
+    mockCaptureLiveAgentPaneText.mockResolvedValue('herdr output')
+    const state = createState()
+    state.allInterestCount = 1
+
+    await pollOnce(state)
+
+    expect(mockCaptureLiveAgentPaneText).toHaveBeenCalledWith(herdrPane('agent-herdr'), 50)
+    expect(mockEmitOnly.mock.calls[0]![0]).toMatchObject({
+      payload: { agentId: 'agent-herdr', lines: ['herdr output'] },
+    })
+  })
+
+  it('#4109: an unreadable inventory discovers nothing but explicit subscriptions still capture', async () => {
+    mockListLiveAgentPanes.mockResolvedValue(null)
+    mockCapturePane.mockResolvedValue('explicit output')
+    const state = createState(['agent-explicit'])
+    state.allInterestCount = 1
+
+    await pollOnce(state)
+
+    expect(mockCapturePane).toHaveBeenCalledTimes(1)
+    expect(mockCapturePane).toHaveBeenCalledWith('agent-explicit', 50)
   })
 })

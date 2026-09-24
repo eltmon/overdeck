@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { invalidateAgentsCache } from '../../dashboard/server/routes/agents.js';
+import { AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT } from '../../dashboard/server/routes/agents/shared.js';
 import { validateOrigin } from '../../dashboard/server/routes/origin-validation.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
@@ -327,6 +328,9 @@ export async function recordPlanningAutoHandoffFailure(options: {
     workAgentSkipReason: skipReason,
     workAgentError: error,
   };
+  // PAN-3977: say it in dashboard.log too. The event store alone left the
+  // failure invisible there, and the issue was misdiagnosed from the log.
+  console.error(`[complete-planning] ${options.issueId} auto-handoff failed (${skipReason}): ${error}`);
 
   await Effect.runPromise(options.eventStore.append({
     type: 'planning.failed',
@@ -374,11 +378,18 @@ export async function completePlanningAutoSpawn(options: {
         origin: dashboardOrigin,
         ...internalTokenHeaders,
       },
+      // PAN-3977: the operator consented to the work agent when they launched
+      // planning with auto-start. Without an acknowledgement every finalize
+      // under tight RAM or a high agent count got a 409 and no work agent.
+      // Nobody is watching this request, so it acknowledges those two warning
+      // kinds only. The agent ceiling and leaked specialists still refuse it,
+      // and critical warnings refuse every request.
       body: JSON.stringify({
         issueId: options.issueId,
         role: 'work',
         startedBy: 'planning-auto-handoff',
         autoSpawnConsentRequired: true,
+        guardrailAcknowledgedWarnings: AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT,
       }),
     });
 
@@ -650,7 +661,7 @@ export async function completePlanningForIssue(options: {
     }
 
     // Git operations: write planning marker, commit, push (complex nested async — kept as async block)
-    const { pushed: gitPushed, taskWarning } = await (async (): Promise<{ pushed: boolean; taskWarning: string | null }> => {
+    const { pushed: gitPushed, taskWarning, specPath } = await (async (): Promise<{ pushed: boolean; taskWarning: string | null; specPath: string }> => {
       if (!projectPath) {
         throw new Error(`Cannot complete planning for ${id}: project path could not be resolved`);
       }
@@ -665,7 +676,8 @@ export async function completePlanningForIssue(options: {
       // PAN-3917: the spec is promoted into the workspace's own `.pan/` and
       // committed on the feature branch below — there is no separate commit on
       // main, and no state branch to flush.
-      return commitCompletePlanningWorkspaceGit(gitRoot, id, taskWarning);
+      const committed = await commitCompletePlanningWorkspaceGit(gitRoot, id, taskWarning);
+      return { ...committed, specPath: proposed.path };
     })();
 
     // Update Linear/GitHub issue state
@@ -698,9 +710,15 @@ export async function completePlanningForIssue(options: {
 
     if (!skipStateUpdate) {
       if (githubCheck.isGitHub) {
-        // GitHub: remove 'planning' label, add 'planned' label
+        // GitHub: remove 'planning' label, add 'planned' label. PAN-3953:
+        // `planned` means a finalized spec exists, so it is applied only here,
+        // after the spec was written and committed, and only if it is on disk.
         await Effect.runPromise(lifecycle.removeLabel(id, 'planning').pipe(Effect.catch(() => Effect.void)));
-        await Effect.runPromise(lifecycle.addLabel(id, 'planned').pipe(Effect.catch(() => Effect.void)));
+        if (existsSync(specPath)) {
+          await Effect.runPromise(lifecycle.addLabel(id, 'planned').pipe(Effect.catch(() => Effect.void)));
+        } else {
+          console.warn(`[complete-planning] Spec ${specPath} not found for ${id.toUpperCase()} — not applying the planned label`);
+        }
       } else {
         // Linear: transition to 'open' (maps to unstarted — Planned/Todo/Ready)
         const updatedIssue = await Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))) as any;

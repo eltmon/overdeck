@@ -52,10 +52,10 @@ export KIMI_API_KEY="sk-kimi-YOUR_KEY_HERE"
 # Spawn an agent with Kimi via Claude Code
 pan start PAN-999 --model kimi-k2.5
 
-# Verify env in tmux session
-tmux -L overdeck show-environment -t agent-pan-999 | grep ANTHROPIC
-# Expected: ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic (or api.kimi.com/coding for sk-kimi-* keys)
-# Expected: ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
+# Verify the provider env the launcher exports (either terminal backend)
+grep '^export ANTHROPIC' ~/.overdeck/agents/agent-pan-999/launcher.sh
+# Expected: export ANTHROPIC_BASE_URL="https://api.moonshot.ai/anthropic" (or api.kimi.com/coding for sk-kimi-* keys)
+# Expected: export ANTHROPIC_AUTH_TOKEN="sk-kimi-YOUR_KEY_HERE"
 ```
 
 **Test Pi harness:**
@@ -63,9 +63,9 @@ tmux -L overdeck show-environment -t agent-pan-999 | grep ANTHROPIC
 # Spawn an agent with Kimi via Pi
 pan start PAN-999 --harness pi --model kimi-k2.5
 
-# Verify env in tmux session
-tmux -L overdeck show-environment -t agent-pan-999 | grep KIMI_API_KEY
-# Expected: KIMI_API_KEY=sk-kimi-YOUR_KEY_HERE
+# Verify the provider env the launcher exports (either terminal backend)
+grep '^export KIMI_API_KEY' ~/.overdeck/agents/agent-pan-999/launcher.sh
+# Expected: export KIMI_API_KEY="sk-kimi-YOUR_KEY_HERE"
 ```
 
 **Expected Result:** Agent responds using Kimi's API regardless of harness.
@@ -149,9 +149,9 @@ pan doctor
 # Spawn a Pi work agent with Kimi
 pan start PAN-995 --harness pi --model kimi-k2.5
 
-# Attach to tmux session and inspect env
-tmux -L overdeck show-environment -t agent-pan-995
-# Should contain: KIMI_API_KEY=...
+# Inspect the provider env the launcher exports (either terminal backend)
+grep '^export' ~/.overdeck/agents/agent-pan-995/launcher.sh
+# Should contain: export KIMI_API_KEY=...
 ```
 
 ### Pi with subscription providers
@@ -226,7 +226,7 @@ pan start PAN-995 --model gpt-5.4
 **Problem:** "No API key found for kimi-coding" (Pi)
 - Verify `KIMI_API_KEY` is set in `~/.overdeck.env` or dashboard Settings
 - Verify the agent was spawned with `--harness pi`
-- Check `tmux -L overdeck show-environment -t agent-<id>` for `KIMI_API_KEY`
+- Check `~/.overdeck/agents/agent-<id>/launcher.sh` for an `export KIMI_API_KEY` line
 
 ### CLIProxy Provider Issues
 

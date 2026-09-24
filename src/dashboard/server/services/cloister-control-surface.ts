@@ -6,6 +6,7 @@ import { generateHealthSummary, getAgentHealth, getAgentsNeedingAttention } from
 import { readCloisterStateFile, type CloisterStatus } from '../../../lib/cloister/service.js';
 import { isCloisterSpawnsPaused, setCloisterSpawnsPaused } from '../../../lib/overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
+import { isListedOrRunning, listLiveAgentIds } from '../../../lib/terminal-backends/inventory.js';
 import {
   isChildRunning,
   lastPatrolReport,
@@ -47,8 +48,11 @@ export function readRelayedDeaconLiteStatus(deps: CloisterControlDeps = {}): Dea
 export async function readDurableCloisterStatus(deps: CloisterControlDeps = {}): Promise<CloisterStatus> {
   const cloisterState = (deps.readCloisterStateFile ?? readCloisterStateFile)();
   const deaconLite = deps.readDeaconLiteStatus ? deps.readDeaconLiteStatus() : readRelayedDeaconLiteStatus(deps);
-  const agentHealths = (await Effect.runPromise(listRunningAgents()))
-    .filter((agent) => agent.tmuxActive)
+  // Live = in the selected backend's inventory, not the tmux-only tmuxActive
+  // flag (#4109). A display: an unreadable inventory shows the running rows.
+  const [agents, liveIds] = await Promise.all([Effect.runPromise(listRunningAgents()), listLiveAgentIds()]);
+  const agentHealths = agents
+    .filter((agent) => isListedOrRunning(agent, liveIds))
     .flatMap((agent) => {
       const runtime = getRuntimeForAgent(agent.id);
       return runtime ? [getAgentHealth(agent.id, runtime)] : [];

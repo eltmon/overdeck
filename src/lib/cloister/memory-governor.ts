@@ -8,6 +8,7 @@ import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
 import { listRunningAgents } from '../agents/queries.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
 import { setAgentPaused, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
 import { stopAgent } from '../agents/termination.js';
@@ -328,6 +329,9 @@ interface ShedCandidateAgent {
 
 export interface ShedAgentLike {
   issueId?: string | null;
+  /** The agent has a live pane on the selected terminal backend (Herdr or tmux). */
+  hasLivePane?: boolean;
+  /** @deprecated tmux-only name; read as a fallback when `hasLivePane` is unset. */
   hasLiveTmuxSession?: boolean;
 }
 
@@ -350,7 +354,7 @@ export function selectStackShedCandidates(
 ): ResourceStack[] {
   const liveIssueIds = new Set(
     runningAgents
-      .filter((agent) => agent.hasLiveTmuxSession === true)
+      .filter((agent) => (agent.hasLivePane ?? agent.hasLiveTmuxSession) === true)
       .map((agent) => agent.issueId?.toUpperCase())
       .filter((issueId): issueId is string => Boolean(issueId)),
   );
@@ -398,8 +402,28 @@ export async function shed(): Promise<ShedResult> {
 
   const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
   const stacks = await getResourceStacks(containers);
-  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
-  const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLiveTmuxSession: a.tmuxActive }));
+  // Live = present in the selected backend's inventory (#4109), not the
+  // tmux-only `tmuxActive` flag, which is false for every Herdr agent.
+  //
+  // Stack shed: a merged stack is protected when any agent for its issue is
+  // listed by the inventory OR has a `running` row. The row covers what the
+  // inventory cannot vouch for (backend unreadable, a legacy tmux agent on a
+  // Herdr host), so unknown liveness protects and reclaim keeps working under
+  // pressure (#4114 review).
+  //
+  // Agent pause: only agents the inventory lists. An unreadable inventory
+  // pauses nothing — a Herdr stop whose pane close fails rewrites state while
+  // the harness keeps running (PAN-3966).
+  const liveIds = await listLiveAgentIds();
+  if (liveIds === null) {
+    console.warn('[memory-governor] Terminal backend inventory unreadable — running rows protect stacks; the agent pause is skipped (liveness unknown)');
+  }
+  const allAgents = await Effect.runPromise(listRunningAgents());
+  const agentsLike: ShedAgentLike[] = allAgents.map((a) => ({
+    issueId: a.issueId,
+    hasLivePane: a.status === 'running' || liveIds?.has(a.id) === true,
+  }));
+  const runningAgents = liveIds === null ? [] : allAgents.filter((a) => liveIds.has(a.id));
 
   for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
     await stopStackContainers(stack);

@@ -448,10 +448,65 @@ async function getGitStatusAsync(issueId: string, workspacePath: string): Promis
   }
 }
 
+/**
+ * PAN-3977: the warning kinds a start request can acknowledge one by one.
+ * Critical warnings have no kind: nothing acknowledges them.
+ */
+export const SPAWN_GUARDRAIL_WARNING_KINDS = [
+  'memory_tight',
+  'agent_count_high',
+  'agent_count_ceiling',
+  'leaked_specialists',
+] as const;
+export type SpawnGuardrailWarningKind = typeof SPAWN_GUARDRAIL_WARNING_KINDS[number];
+
+/**
+ * PAN-3977: what an unattended caller (the planning auto-handoff) may
+ * acknowledge. Tight RAM and a high agent count below the ceiling only. The
+ * ceiling and leaked specialists need an operator.
+ */
+export const AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT: readonly SpawnGuardrailWarningKind[] = [
+  'memory_tight',
+  'agent_count_high',
+];
+
 interface SpawnGuardrailAdvisory {
   severity: 'warning' | 'critical';
   code: 'memory_pressure' | 'agent_capacity' | 'leaked_specialists' | 'health_snapshot_unavailable';
+  /** Set on acknowledgeable (warning-severity) advisories only. */
+  kind?: SpawnGuardrailWarningKind;
   message: string;
+}
+
+/**
+ * The acknowledgement a start request carries. `guardrailAcknowledged: true`
+ * is the operator's confirm dialog and covers every warning.
+ * `guardrailAcknowledgedWarnings` names the kinds an unattended caller
+ * accepts; unknown names are dropped, so a typo fails closed.
+ */
+export interface SpawnGuardrailAcknowledgement {
+  all: boolean;
+  kinds: SpawnGuardrailWarningKind[];
+}
+
+export function parseSpawnGuardrailAcknowledgement(body: unknown): SpawnGuardrailAcknowledgement {
+  const record = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const requested = Array.isArray(record['guardrailAcknowledgedWarnings'])
+    ? record['guardrailAcknowledgedWarnings']
+    : [];
+  return {
+    all: record['guardrailAcknowledged'] === true,
+    kinds: SPAWN_GUARDRAIL_WARNING_KINDS.filter((kind) => requested.includes(kind)),
+  };
+}
+
+/** Warnings in `decision` that `acknowledgement` does not cover. */
+export function unacknowledgedSpawnGuardrailWarnings(
+  decision: SpawnGuardrailDecision,
+  acknowledgement: SpawnGuardrailAcknowledgement,
+): SpawnGuardrailAdvisory[] {
+  if (acknowledgement.all) return [];
+  return decision.warnings.filter((warning) => !warning.kind || !acknowledgement.kinds.includes(warning.kind));
 }
 
 export interface SpawnGuardrailDecision {
@@ -583,6 +638,7 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
     warnings.push({
       severity: 'warning',
       code: 'memory_pressure',
+      kind: 'memory_tight',
       message: `Available RAM is tight (${availableGb} GB).`,
     });
   }
@@ -591,20 +647,24 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
     warnings.push({
       severity: 'warning',
       code: 'agent_capacity',
+      kind: 'agent_count_ceiling',
       message: `Work agent count is at the configured ceiling (${workAgentCount}/${hardWorkAgentLimit}).`,
     });
   } else if (workAgentCount >= warnWorkAgentLimit) {
     warnings.push({
       severity: 'warning',
       code: 'agent_capacity',
+      kind: 'agent_count_high',
       message: `Work agent count is high (${workAgentCount}/${hardWorkAgentLimit}).`,
     });
   }
 
   if (leakedSpecialists.length > 0) {
+    const leakedCritical = health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes;
     warnings.push({
-      severity: health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes ? 'critical' : 'warning',
+      severity: leakedCritical ? 'critical' : 'warning',
       code: 'leaked_specialists',
+      ...(leakedCritical ? {} : { kind: 'leaked_specialists' as const }),
       message: `Leaked specialist sessions detected: ${formatLeakedSpecialistSummary(leakedSpecialists)}${leakedSpecialists.length > 3 ? `, +${leakedSpecialists.length - 3} more` : ''}.`,
     });
   }

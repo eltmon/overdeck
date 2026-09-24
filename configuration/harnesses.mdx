@@ -249,9 +249,15 @@ binary or saved authentication is missing; it never falls back to Claude Code.
 
 Each session runs through the authenticated `acp-host` process, with its socket,
 token, ACP session id, and append-only transcript stored under
-`~/.overdeck/agents/<agentId>/`. The runtime adapter is
+`~/.overdeck/agents/<agentId>/`. The transcript records agent reasoning
+(`agent_thought_chunk` updates) under a separate `thought` role, and the
+conversation feed renders it as thinking rows, as it does for Claude Code
+thinking blocks. The runtime adapter is
 `src/lib/runtimes/acp.ts`; Kimi-specific launch and authentication behavior is
-in `src/lib/acp/kimi.ts`.
+in `src/lib/acp/kimi.ts`. When the agent rejects a prompt (for example an
+OpenCode provider error such as `Rate limit exceeded`), the host records a
+`prompt_failed` transcript entry and the conversation feed shows it as a red
+**Prompt failed** row carrying the provider's message.
 
 ### Kimi Code CLI, native (alternative)
 
@@ -461,6 +467,26 @@ The same port file and `acp-session-id` drive the native CLI in Terminal. A
 conversation without `opencode-port` shows a restart-required message there;
 stop and resume it to record the port.
 
+#### Stalled turn detection
+
+OpenCode retries a provider error such as a `429 Rate limit exceeded`
+internally, so the ACP prompt call does not return and nothing reaches the
+transcript. While a prompt is running and no ACP runtime event has arrived for
+30 seconds, the host polls `GET /session/status` on the same loopback port
+every 30 seconds. When a session reports `{"type":"retry"}`, the host writes one
+`prompt_stalled` entry to `acp-session.jsonl` with OpenCode's retry message
+(for example `opencode is retrying the turn (attempt 4): Rate limit exceeded.`)
+and prints it in the pane. The conversation feed shows it as a red **Prompt
+stalled** row. The turn keeps running: the host does not cancel it, and a later
+completion still records `turn_completed`.
+
+Every ACP provider, Kimi included, also has an inactivity check. A turn with no
+runtime event for 10 minutes gets the same `prompt_stalled` entry. Set
+`OVERDECK_ACP_TURN_STALL_MS` in the `acp-host` process environment (it inherits
+the terminal backend's environment) to change the timeout, in milliseconds. `0` turns the inactivity check off, but
+the OpenCode status check still runs. Each prompt gets at most one
+`prompt_stalled` entry.
+
 ## Installing oh-my-pi
 
 oh-my-pi is **not** auto-installed. Install it once, then run `pan doctor` to confirm.
@@ -649,8 +675,9 @@ Check `~/.overdeck/agents/<id>/ready.json` — the vendored extension writes thi
 on `session_start`. If it never appears:
 
 1. Confirm `packages/ohmypi-extension/dist/index.js` exists (`pan doctor` will warn).
-2. Tail the tmux session: `tmux -L overdeck attach -t agent-<id>`. omp prints
-   stdout to the pane; structural errors show up there.
+2. Watch the agent's pane: open it in the dashboard, or run the `Attach:`
+   command `pan start <id>` prints (Herdr or tmux, whichever backend launched
+   it). omp prints stdout to the pane; structural errors show up there.
 3. Verify the named pipe exists at `~/.overdeck/agents/<id>/rpc.in`. If a stale
    regular file is in its place, `createOhmypiFifo` replaces it on next spawn.
 

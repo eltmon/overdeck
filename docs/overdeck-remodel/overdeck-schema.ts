@@ -29,6 +29,8 @@ import { sql } from "drizzle-orm";
  * replaces 8 status axes; gate outcomes are the durable verdict.
  * Gates kept (from the gates audit): review + test + verification on the merge
  * path. Inspect is NOT a merge gate (opt-in WORK-phase only, lives per-bead).
+ * (Since dropped: the inspection gate and `pan inspect` are deleted outright;
+ * see docs/THE-CUT.md.)
  * GitHub CI/mergeable state and blocker-labels are read live from GitHub, not
  * stored as columns; their effect lands in `blockers`.
  */

@@ -92,6 +92,19 @@ export async function listLiveAgentIds(): Promise<ReadonlySet<string> | null> {
   return panes === null ? null : new Set(panes.map((pane) => pane.agentId));
 }
 
+/**
+ * Fail-open membership for readers and displays (#4109): an agent is live when
+ * the inventory lists it; when the inventory is unreadable (`null`), a
+ * `running` row counts. Never use it to pick agents to kill, restart or pause —
+ * those callers must treat `null` as "do not act".
+ */
+export function isListedOrRunning(
+  agent: { readonly id: string; readonly status?: string },
+  liveIds: ReadonlySet<string> | null,
+): boolean {
+  return liveIds === null ? agent.status === 'running' : liveIds.has(agent.id);
+}
+
 /** Recent terminal text from one live pane, or `null` when it cannot be read. */
 export async function captureLiveAgentPaneText(
   pane: LiveAgentPane,

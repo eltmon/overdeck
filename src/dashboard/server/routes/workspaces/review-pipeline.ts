@@ -553,6 +553,9 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               workspace: workspacePath,
               ...(artifactUrl ? { prUrl: artifactUrl } : {}),
               force: forceReview,
+              // The Full/Quick/None menu choice applies to this run only and
+              // is not persisted; later dispatches read `roles.review.mode`.
+              ...(requestedReviewMode.mode ? { reviewMode: requestedReviewMode.mode } : {}),
             }));
 
             if (!reviewResult.success) {
