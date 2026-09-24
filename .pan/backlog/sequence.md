@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T21:02:15.922Z · model: claude-opus-5 · open: 819_
+_Last sequenced: 2026-09-24T21:09:24.694Z · model: claude-opus-5 · open: 819_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -12,7 +12,7 @@ _Last sequenced: 2026-09-24T21:02:15.922Z · model: claude-opus-5 · open: 819_
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
 | 23 | PAN-4134 | S | critical | ok |  |  | All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges |
-| 25 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
+| 25 | PAN-4171 | S | critical | ok |  |  | An aborted createWorkspace leaves the worktree on disk; the retry's existence guard then starts an agent in it with no deps or hooks |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -855,9 +855,9 @@ Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked eve
 
 New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where "unknown" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two. PAN-3914 closed this pass when PR #4133 merged, so its informs edge drops and the false review.redispatched journaling it caused is gone; the synthesis-recovery gap described here is untouched, so rank, score and condition hold.
 
-### PAN-3977 (rank 25)
+### PAN-4171 (rank 25)
 
-Rank unchanged: PAN-3960 merged (PR #3992) since the last run, which settles the sequencing note but not the defect. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice with ~3h of dead time on PAN-3968. Pipeline-blocking on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). It touches the planning-spawn path PAN-3960 just rerouted through launchAgentPane — rebase onto main before planning.
+New this run (filed 2026-09-24T21:07:04Z, in the review of #4163/PAN-3905), and it takes the rank-25 slot PAN-3977 vacated when that issue closed. Since #4163, createWorkspace returns success:false when setup aborts after the worktree exists — a failed dependency install, pre-rebase hook install or workspace package build — but the rollback in src/lib/workspace-manager/create.ts deletes the workspace row only when !worktreeCreated, so the half-built worktree stays on disk. Every caller then guards on the directory existing rather than re-calling createWorkspace (workspace-service.ts, swarm.ts, swarm-gates.ts, remote-completion.ts, spawn-planning-session.ts, where any non-.pan file counts as created), so the first pan start fails loudly and the second one starts a work agent in a worktree with no dependencies, no pre-rebase hook and no synced skills. That is worse than the stall it replaces: a stall is visible, whereas this agent runs, burns tokens and produces failing work that looks real. It sits on the paved road (pan start), which is why it ranks critical despite the unlabelled P3 signal. The fix is small and the issue states both options (delete the worktree and its branch on abort, or write an incomplete-setup marker the existence guards check and resume from), with mechanically checkable acceptance criteria and a named test, so size S, condition ok.
 
 ### PAN-3566 (rank 26)
 
@@ -873,7 +873,7 @@ New this pass, labelled critical. A supervisor unit pinned to a pan reload gener
 
 ### PAN-4155 (rank 29)
 
-New this run (filed 2026-09-24, minutes before the manifest). This is the remaining half of the post-planning auto-handoff gap that PAN-3977 opened: 3977 covers the case where stateToRole(todo) is null so no work agent is ever requested, while 4155 covers the case where the request IS made and the spawn guardrail refuses it. On a 409, or a 429/503 carrying blocked, completePlanningAutoSpawn records planning.failed stage=auto-handoff and stops; nothing retries. The refusal lands before claimAutoSpawnConsentForWorkStart, so the operator consent stays granted and the issue sits planned with no work agent indefinitely - the reactive dispatchers planning-consent release source cannot pick it up because it only fires on work-role state events and demands the ready label, which a todo issue never carries. That is a silent pipeline stall on the paved road, which is why it ranks critical despite the unlabelled P3 signal. The proposal is well-specified (record planning.autoHandoffDeferred, add a deacon-lite tick that re-POSTs /api/agents with no guardrail acknowledgement while consent is granted and the spec is promoted, give up after a bounded window with a needs-you signal) and it preserves the rule that machines never waive a health warning. It also carries a verified docs correction: PIPELINE-GATES.md claims the PAN-2500 resource governor gates every autonomous dispatch path, but no spawn path consults getCachedMemoryVerdict. Ranked at 29, immediately behind PAN-3977 at 25, because the two share completePlanningAutoSpawn and should be sequenced together.
+New this run (filed 2026-09-24, minutes before the manifest). This is the remaining half of the post-planning auto-handoff gap that PAN-3977 opened: 3977 covers the case where stateToRole(todo) is null so no work agent is ever requested, while 4155 covers the case where the request IS made and the spawn guardrail refuses it. On a 409, or a 429/503 carrying blocked, completePlanningAutoSpawn records planning.failed stage=auto-handoff and stops; nothing retries. The refusal lands before claimAutoSpawnConsentForWorkStart, so the operator consent stays granted and the issue sits planned with no work agent indefinitely - the reactive dispatchers planning-consent release source cannot pick it up because it only fires on work-role state events and demands the ready label, which a todo issue never carries. That is a silent pipeline stall on the paved road, which is why it ranks critical despite the unlabelled P3 signal. The proposal is well-specified (record planning.autoHandoffDeferred, add a deacon-lite tick that re-POSTs /api/agents with no guardrail acknowledgement while consent is granted and the spec is promoted, give up after a bounded window with a needs-you signal) and it preserves the rule that machines never waive a health warning. It also carries a verified docs correction: PIPELINE-GATES.md claims the PAN-2500 resource governor gates every autonomous dispatch path, but no spawn path consults getCachedMemoryVerdict. Rank held at 29 this run: PAN-3977 closed COMPLETED at 2026-09-24T21:03:30Z, which removes the sibling it was sequenced behind but does not unblock it — the link was informs, not a dependency — so nothing above it moved. With 3977 landed, 4155 is the sole remaining half of the post-planning auto-handoff gap, and it must rebase onto main before planning: 3977's fix just changed completePlanningAutoSpawn, the exact function it edits.
 
 ### PAN-3524 (rank 30)
 
@@ -1138,7 +1138,7 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T21:02:15.922Z",
+  "generatedAt": "2026-09-24T21:09:24.694Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 819,
@@ -1222,19 +1222,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-3977",
-      "rank": 25,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts",
-      "rationale": "Rank unchanged: PAN-3960 merged (PR #3992) since the last run, which settles the sequencing note but not the defect. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice with ~3h of dead time on PAN-3968. Pipeline-blocking on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). It touches the planning-spawn path PAN-3960 just rerouted through launchAgentPane — rebase onto main before planning.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3566",
       "rank": 26,
       "size": "XS",
@@ -1282,7 +1269,7 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "condition": "ok",
       "dependsOn": [],
       "why": "Refused post-planning auto-spawns are never retried, so planned issues sit with no work agent until an operator runs pan start by hand",
-      "rationale": "New this run (filed 2026-09-24, minutes before the manifest). This is the remaining half of the post-planning auto-handoff gap that PAN-3977 opened: 3977 covers the case where stateToRole(todo) is null so no work agent is ever requested, while 4155 covers the case where the request IS made and the spawn guardrail refuses it. On a 409, or a 429/503 carrying blocked, completePlanningAutoSpawn records planning.failed stage=auto-handoff and stops; nothing retries. The refusal lands before claimAutoSpawnConsentForWorkStart, so the operator consent stays granted and the issue sits planned with no work agent indefinitely - the reactive dispatchers planning-consent release source cannot pick it up because it only fires on work-role state events and demands the ready label, which a todo issue never carries. That is a silent pipeline stall on the paved road, which is why it ranks critical despite the unlabelled P3 signal. The proposal is well-specified (record planning.autoHandoffDeferred, add a deacon-lite tick that re-POSTs /api/agents with no guardrail acknowledgement while consent is granted and the spec is promoted, give up after a bounded window with a needs-you signal) and it preserves the rule that machines never waive a health warning. It also carries a verified docs correction: PIPELINE-GATES.md claims the PAN-2500 resource governor gates every autonomous dispatch path, but no spawn path consults getCachedMemoryVerdict. Ranked at 29, immediately behind PAN-3977 at 25, because the two share completePlanningAutoSpawn and should be sequenced together.",
+      "rationale": "New this run (filed 2026-09-24, minutes before the manifest). This is the remaining half of the post-planning auto-handoff gap that PAN-3977 opened: 3977 covers the case where stateToRole(todo) is null so no work agent is ever requested, while 4155 covers the case where the request IS made and the spawn guardrail refuses it. On a 409, or a 429/503 carrying blocked, completePlanningAutoSpawn records planning.failed stage=auto-handoff and stops; nothing retries. The refusal lands before claimAutoSpawnConsentForWorkStart, so the operator consent stays granted and the issue sits planned with no work agent indefinitely - the reactive dispatchers planning-consent release source cannot pick it up because it only fires on work-role state events and demands the ready label, which a todo issue never carries. That is a silent pipeline stall on the paved road, which is why it ranks critical despite the unlabelled P3 signal. The proposal is well-specified (record planning.autoHandoffDeferred, add a deacon-lite tick that re-POSTs /api/agents with no guardrail acknowledgement while consent is granted and the spec is promoted, give up after a bounded window with a needs-you signal) and it preserves the rule that machines never waive a health warning. It also carries a verified docs correction: PIPELINE-GATES.md claims the PAN-2500 resource governor gates every autonomous dispatch path, but no spawn path consults getCachedMemoryVerdict. Rank held at 29 this run: PAN-3977 closed COMPLETED at 2026-09-24T21:03:30Z, which removes the sibling it was sequenced behind but does not unblock it — the link was informs, not a dependency — so nothing above it moved. With 3977 landed, 4155 is the sole remaining half of the post-planning auto-handoff gap, and it must rebase onto main before planning: 3977's fix just changed completePlanningAutoSpawn, the exact function it edits.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11278,6 +11265,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "New this run, filed as the residual gap after PAN-3966 closed and PR #4162 (PAN-3923) went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. Ranked 4, immediately behind its parent PAN-3923 at rank 3, and marked dependsOn PAN-3923 because PR #4162 is still open: the reap path this work extends has not landed yet. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4171",
+      "rank": 25,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "An aborted createWorkspace leaves the worktree on disk; the retry's existence guard then starts an agent in it with no deps or hooks",
+      "rationale": "New this run (filed 2026-09-24T21:07:04Z, in the review of #4163/PAN-3905), and it takes the rank-25 slot PAN-3977 vacated when that issue closed. Since #4163, createWorkspace returns success:false when setup aborts after the worktree exists — a failed dependency install, pre-rebase hook install or workspace package build — but the rollback in src/lib/workspace-manager/create.ts deletes the workspace row only when !worktreeCreated, so the half-built worktree stays on disk. Every caller then guards on the directory existing rather than re-calling createWorkspace (workspace-service.ts, swarm.ts, swarm-gates.ts, remote-completion.ts, spawn-planning-session.ts, where any non-.pan file counts as created), so the first pan start fails loudly and the second one starts a work agent in a worktree with no dependencies, no pre-rebase hook and no synced skills. That is worse than the stall it replaces: a stall is visible, whereas this agent runs, burns tokens and produces failing work that looks real. It sits on the paved road (pan start), which is why it ranks critical despite the unlabelled P3 signal. The fix is small and the issue states both options (delete the worktree and its branch on abort, or write an incomplete-setup marker the existence guards check and resume from), with mechanically checkable acceptance criteria and a named test, so size S, condition ok.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12388,13 +12388,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 0.9
     },
     {
-      "from": "PAN-3977",
-      "to": "PAN-4155",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4131",
       "to": "PAN-4160",
       "type": "informs",
@@ -12421,6 +12414,13 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
+    },
+    {
+      "from": "PAN-3905",
+      "to": "PAN-4171",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
