@@ -59,7 +59,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { doneCommand } from '../../../../src/cli/commands/specialists/done.js';
+import { doneCommand, UAT_ANCHOR_LOOKUP_TIMEOUT_MS } from '../../../../src/cli/commands/specialists/done.js';
 import { readPipelineJournal } from '../../../../src/lib/cloister/pipeline-journal.js';
 
 const FEEDBACK_PATH = '/project/workspaces/feature-pan-4030/.pan/feedback/001-uat-agent-failed.md';
@@ -151,6 +151,33 @@ describe('PAN-4030: UAT failure feedback reaches the work agent', () => {
     expect(outcomes).toHaveLength(2);
     expect(outcomes.filter((o: { deduplicated?: boolean }) => o.deduplicated)).toHaveLength(0);
     expect(mocks.messageAgent.mock.calls[1][1]).toContain('MUST READ');
+  });
+
+  it('bounds a stalled PR-head lookup: the verdict posts unanchored and the notes still relay', async () => {
+    // The GitHub App lookup's fetch has no timeout of its own (CodeRabbit on #4033).
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let lookupStarted!: () => void;
+      const started = new Promise<void>((resolve) => { lookupStarted = resolve; });
+      mocks.getPrFacts.mockImplementationOnce(() => {
+        lookupStarted();
+        return new Promise(() => {});
+      });
+
+      const run = reportUat('failed', 'criterion 3 unmet');
+      await started;
+      await vi.advanceTimersByTimeAsync(UAT_ANCHOR_LOOKUP_TIMEOUT_MS);
+      await run;
+
+      const { commentOnArtifact } = await import('../../../../src/lib/forge.js');
+      const body = vi.mocked(commentOnArtifact).mock.calls[0]?.[1]?.body ?? '';
+      expect(body).toContain('<!-- overdeck-uat: failed -->');
+      expect(mocks.messageAgent).toHaveBeenCalledTimes(1);
+      expect(mocks.messageAgent.mock.calls[0][1]).toContain(`MUST READ: ${FEEDBACK_PATH}`);
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(`exceeded ${UAT_ANCHOR_LOOKUP_TIMEOUT_MS}ms`));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   describe.each([

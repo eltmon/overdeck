@@ -21,6 +21,13 @@ export interface ResolveIssueFeedbackTargetOptions {
    * Also a test hook.
    */
   revivePipelinePausedAgent?: (agentId: string, issueId: string) => Promise<boolean>;
+  /**
+   * A pipeline pause the default resurrection must leave in place, checked
+   * against the pause reason read at the moment of resurrection (not when the
+   * caller started). The verification door passes its stuck pause, so an
+   * escalation that lands while this delivery is resolving is still honored.
+   */
+  keepPause?: (pausedReason: string) => boolean;
 }
 
 // PAN-3849 (W32): liveness is the single oracle, not a bare has-session. A
@@ -110,7 +117,7 @@ export async function resolveIssueFeedbackTarget(
   // mailbox-style deferred delivery, PAN-2255) is strictly the last resort after
   // resurrection of every candidate has failed.
   const revive = opts.revivePipelinePausedAgent
-    ?? ((agentId, reviveIssueId) => resurrectAgentForFeedback(agentId, reviveIssueId, workspacePath));
+    ?? ((agentId, reviveIssueId) => resurrectAgentForFeedback(agentId, reviveIssueId, workspacePath, opts.keepPause));
   const candidates: string[] = [wholeIssueAgentId];
   if (requestedItemId) {
     const assigned = assignments.find(a => a.itemId === requestedItemId);
@@ -146,7 +153,8 @@ export async function resolveIssueFeedbackTarget(
  *   cannot loop unboundedly.
  * - Plain stopped/completed/crashed → resume, then canonical start if resume fails.
  * - Missing registry row + healthy workspace continue state → canonical start.
- * - OPERATOR pauses (pan pause, any non-pipeline pausedReason) are never overridden.
+ * - OPERATOR pauses (pan pause, any non-pipeline pausedReason) are never overridden,
+ *   nor is a pipeline pause the caller's `keepPause` names.
  */
 async function startAgentForFeedback(
   agentId: string,
@@ -190,6 +198,7 @@ async function resurrectAgentForFeedback(
   agentId: string,
   issueId: string,
   workspacePath: string | undefined,
+  keepPause?: (pausedReason: string) => boolean,
 ): Promise<boolean> {
   try {
     const { getAgentStateSync, clearAgentPausedSync, clearAgentTroubledSync } = await import('../agents/agent-state.js');
@@ -206,6 +215,12 @@ async function resurrectAgentForFeedback(
         || state.yieldedByScheduler === true;
       if (!pipelinePause) {
         console.log(`[feedback-target] ${agentId} is operator-paused (${reason || 'no reason'}) — not overriding to deliver ${issueId} feedback`);
+        return false;
+      }
+      // Read and cleared with no await between, so a pause the caller must
+      // keep cannot slip past this check.
+      if (keepPause?.(reason)) {
+        console.log(`[feedback-target] ${agentId} holds a pause this delivery must keep (${reason}) — not resuming it for ${issueId} feedback`);
         return false;
       }
       console.log(`[feedback-target] ${agentId} is pipeline-paused (${reason || 'scheduler yield'}) — unpausing to deliver feedback for ${issueId}`);

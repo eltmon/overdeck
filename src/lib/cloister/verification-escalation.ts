@@ -131,10 +131,15 @@ export async function deliverVerificationFeedback(
   // un-pause the agent it just paused. While the stuck pause holds, nothing is
   // revived: a live target gets the notice (a paused agent's messageAgent
   // queues it to mail without resuming), and the operator is told either way.
+  // The CI relay and the local gate deliver independently, so the other one
+  // may escalate while this delivery is resolving its target: `keepPause`
+  // re-checks the reason at the moment of resurrection.
   const stuckPaused = isVerificationStuckPaused(issueId);
   const target = await resolveIssueFeedbackTarget(
     issueId,
-    stuckPaused ? { revivePipelinePausedAgent: async () => false } : {},
+    stuckPaused
+      ? { revivePipelinePausedAgent: async () => false }
+      : { keepPause: (reason) => reason.startsWith(VERIFICATION_STUCK_PAUSE_PREFIX) },
   );
   if (await skipMergedVerification(issueId, logPrefix)) return false;
 

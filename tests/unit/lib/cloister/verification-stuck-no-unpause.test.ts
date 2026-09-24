@@ -20,6 +20,8 @@ const h = vi.hoisted(() => ({
   resumeAgent: vi.fn(),
   messageAgent: vi.fn(),
   emitActivity: vi.fn(),
+  /** Runs on each liveness probe: lets a test land a concurrent escalation mid-resolution. */
+  onProbe: undefined as undefined | ((id: string) => void),
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
@@ -51,7 +53,10 @@ vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
 vi.mock('../../../../src/lib/agents/resume.js', () => ({ resumeAgent: h.resumeAgent }));
 
 vi.mock('../../../../src/lib/agents/liveness.js', () => ({
-  isAlive: (id: string) => Promise.resolve(h.live.has(id) ? { alive: true } : { alive: false, reason: 'no-session' }),
+  isAlive: (id: string) => {
+    h.onProbe?.(id);
+    return Promise.resolve(h.live.has(id) ? { alive: true } : { alive: false, reason: 'no-session' });
+  },
   isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
     !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
@@ -96,6 +101,7 @@ describe('#4019: the stuck notice never un-pauses the agent escalation paused', 
     vi.clearAllMocks();
     h.states.clear();
     h.live.clear();
+    h.onProbe = undefined;
     h.states.set(AGENT, { id: AGENT, status: 'running' });
     h.live.add(AGENT);
     h.messageAgent.mockImplementation(transportHonoringPause);
@@ -149,6 +155,35 @@ describe('#4019: the stuck notice never un-pauses the agent escalation paused', 
 
     expect(h.resumeAgent).toHaveBeenCalledWith(AGENT);
     expect(delivered).toBe(true);
+  });
+
+  it('a stuck pause that lands while the delivery resolves its target is not lifted (CodeRabbit on #4039)', async () => {
+    // The CI relay's delivery read "not stuck", then the local gate escalated
+    // the same issue while this delivery probed liveness.
+    let escalated = false;
+    h.onProbe = (id) => {
+      if (escalated || id !== AGENT) return;
+      escalated = true;
+      h.states.set(AGENT, {
+        ...(h.states.get(AGENT) ?? { id: AGENT }),
+        status: 'stopped',
+        paused: true,
+        pausedReason: `${VERIFICATION_STUCK_PAUSE_PREFIX} after 3/3 attempts (test)`,
+      });
+      h.live.delete(AGENT);
+    };
+
+    const delivered = await deliverVerificationFeedback('PAN-4019', 'VERIFICATION FAILED for PAN-4019.', {}, 'verification');
+
+    expect(escalated).toBe(true);
+    expect(delivered).toBe(false);
+    expect(h.clearPaused).not.toHaveBeenCalled();
+    expect(h.resumeAgent).not.toHaveBeenCalled();
+    expect(h.states.get(AGENT)).toEqual(expect.objectContaining({
+      paused: true,
+      pausedReason: expect.stringMatching(new RegExp(`^${VERIFICATION_STUCK_PAUSE_PREFIX}`)),
+    }));
+    expect(needsYouMessages()).toHaveLength(1);
   });
 
   it('a verification pass lifts the stuck pause; later feedback then reaches the agent normally', async () => {

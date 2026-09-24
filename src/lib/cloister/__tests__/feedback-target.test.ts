@@ -149,6 +149,37 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
     expect(target).toMatchObject({ needsYou: true });
   });
 
+  it('keeps a pipeline pause the caller names, read at resurrection time (CodeRabbit on #4039)', async () => {
+    // The verification door read "not stuck" before a concurrent escalation
+    // paused the agent; the pause it finds when resurrecting is the stuck one.
+    agentState.states.set(AGENT, {
+      id: AGENT, status: 'stopped', paused: true,
+      pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
+    });
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999', {
+      keepPause: (reason) => reason.startsWith('needs-you: verification stuck'),
+    });
+
+    expect(agentState.clearPaused).not.toHaveBeenCalled();
+    expect(resume.resumeAgent).not.toHaveBeenCalled();
+    expect(spawn.workAgent).not.toHaveBeenCalled();
+    expect(target).toMatchObject({ needsYou: true });
+  });
+
+  it('still lifts a pipeline pause that keepPause does not name', async () => {
+    agentState.states.set(AGENT, {
+      id: AGENT, status: 'stopped', paused: true, pausedReason: 'needs-you: verification failed 3x',
+    });
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999', {
+      keepPause: (reason) => reason.startsWith('needs-you: verification stuck'),
+    });
+
+    expect(agentState.clearPaused).toHaveBeenCalledWith(AGENT);
+    expect(target).toEqual({ agentId: AGENT });
+  });
+
   it('clears a troubled gate for one resurrection attempt', async () => {
     agentState.states.set(AGENT, { id: AGENT, status: 'stopped', troubled: true, consecutiveFailures: 3 });
 
