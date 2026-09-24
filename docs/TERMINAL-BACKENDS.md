@@ -170,7 +170,7 @@ The primitives live in `src/lib/terminal-backends/launch.ts` and go through the 
 | Primitive | Herdr | tmux |
 | --- | --- | --- |
 | `closeAgentPane(agentId)` | `pane.close` on every pane the agent occupies: the live agent's pane, every pane stamped with its `agentId` token, and the pane its `state.json` recorded (`backend: herdr`, `paneId`), per `herdr-agent-terminals.ts` — **with no liveness check**, so a residue pane whose shell is back at `$` closes too. The recorded pane is the fallback once a Herdr restore has dropped every pane's tokens (PAN-3966); it is skipped when another agent's `agentId` token, or a detected harness under another name, sits in it. A workspace the agent owns alone (its label or `issue` token is the agent id: a role run such as `sequencer-runner`) closes whole with `workspace.close`, root shell included. An issue workspace is shared by the issue's agents (`launchAgentPane` splits every role's pane into it), so a stop never closes it. A same-name tmux session left from before the host moved to Herdr is killed as well. | `kill-session` through the tmux adapter, when the session exists. |
-| `closeIssuePanes(issueId, { roles? })` | `pane.close` on every inventory pane whose `issue` token matches, optionally filtered by `role` — never an operator conversation pane (`conv-*`). | No-op — the callers' session-name scans already reach every tmux session, and a tmux pane carries no tokens. |
+| `closeIssuePanes(issueId, { roles? })` | `pane.close` on every inventory pane whose `issue` token matches, optionally filtered by `role` — never an operator conversation pane (`conv-*`). Without `roles` (close-out) the issue's workspaces close whole with `workspace.close`, root shell and untagged residue included. They are found by `issue` token, or by label once a Herdr restore has dropped the token (#4096). A workspace holding a pane that names another owner (another issue's token, or a `conv-*` agent) is not closed whole; only the issue's and untagged panes in it are closed. With `roles`, an untagged pane is left alone. | No-op — the callers' session-name scans already reach every tmux session, and a tmux pane carries no tokens. |
 
 Both never throw; a Herdr socket failure closes nothing and the stop still completes.
 
@@ -210,6 +210,13 @@ the Overdeck agent id. `role` is one of
 `work`, `worker`, `review`, `test`, `uat`, `strike`, `plan`. An operator conversation carries **no**
 `issue` token — that absence is also how the prompt guard recognizes an operator sender.
 Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
+
+An issue workspace is created with `label: <issueId>` and stamped with the `issue` token. A Herdr
+session restore drops every workspace and pane token and keeps the labels (seen live on 2026-09-24:
+16 of 17 workspaces untagged, all 17 labels intact). `workspaceFor` therefore looks up the `issue`
+token first, then the label of a workspace that carries no `issue` token, and re-stamps the token on
+the workspace it re-adopts (`herdr-workspaces.ts`, #4096). A token-only lookup created a duplicate
+workspace on every launch after a restore.
 
 `BackendPane.agentId` (PAN-3920) carries the Overdeck agent id into the dashboard's pane
 inventory: on Herdr it is the pane's `agentId` token, else Herdr's live agent name — but only on
