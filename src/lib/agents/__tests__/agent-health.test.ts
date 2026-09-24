@@ -57,6 +57,11 @@ describe('classifyAgentHealth', () => {
     });
   });
 
+  it('#4109: reports hasLivePane, keeping tmuxActive as its alias', () => {
+    expect(classifyAgentHealth(input())).toMatchObject({ hasLivePane: true, tmuxActive: true });
+    expect(classifyAgentHealth(input({ liveSessions: new Set() }))).toMatchObject({ hasLivePane: false, tmuxActive: false });
+  });
+
   it('classifies context saturation before missing tmux', () => {
     const snapshot = classifyAgentHealth(input({
       runtime: {
