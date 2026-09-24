@@ -210,18 +210,15 @@ async function stopDockerImpl(
  * the workspace directory no longer exists (PAN-3900).
  */
 function teardownDockerByName(issueLower: string): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: async () => {
+  return Effect.promise(async () => {
+    try {
       const { teardownWorkspaceDockerByName } = await import('../workspace-manager/docker.js');
       const result = await teardownWorkspaceDockerByName(issueLower);
       return stepOk('teardown:docker', result.steps);
-    },
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch(() =>
-      Effect.succeed(stepSkipped('teardown:docker', ['Docker teardown by name skipped (not running or failed)'])),
-    ),
-  );
+    } catch {
+      return stepSkipped('teardown:docker', ['Docker teardown by name skipped (not running or failed)']);
+    }
+  });
 }
 
 /**
