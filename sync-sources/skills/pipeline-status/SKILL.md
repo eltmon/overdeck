@@ -29,7 +29,7 @@ allowed-tools:
 Produces a single dense table for every issue returned by the authoritative
 pipeline-membership read door (plus active planning sessions), with one column
 per workflow phase. This includes exception-queue drift such as `zombie_pr`
-and `post_merge_limbo`, even when tracker or review-status state is stale.
+and `post_merge_limbo`, even when the tracker lags the PR.
 
 This is the **first thing** to show when the user asks for status. Anything
 more detailed (`pan status`, `agent-status`) goes underneath.
@@ -137,7 +137,7 @@ def has_session(name):
 def derived(issue_id):
     try:
         out = subprocess.check_output(['pan','show',issue_id,'--json'],
-                                       stderr=subprocess.DEVNULL, timeout=10)
+                                       stderr=subprocess.DEVNULL, timeout=60)
         return json.loads(out)
     except Exception:
         return None
