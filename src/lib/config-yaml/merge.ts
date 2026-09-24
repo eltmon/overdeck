@@ -125,8 +125,8 @@ function warnInvalidClaudePermissionMode(raw: unknown, effective: string): void 
 }
 
 // `models.overrides` belonged to the work-type router that PAN-1048 deleted;
-// nothing reads it. A config that still carries it loads, the key is ignored,
-// and the operator is told once per process (#4131).
+// nothing reads it. A config that still carries entries in it loads, the key
+// is ignored, and the operator is told once per process (#4131).
 let warnedRetiredModelOverrides = false;
 function warnRetiredModelOverrides(): void {
   if (warnedRetiredModelOverrides) return;
@@ -649,7 +649,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
-    if (config.models && Object.prototype.hasOwnProperty.call(config.models, 'overrides')) {
+    // An empty map (pan admin migrate-config wrote `overrides: {}` into every
+    // config it created) carries nothing to tell the operator about.
+    const retiredOverrides = (config.models as Record<string, unknown> | undefined)?.overrides;
+    if (
+      retiredOverrides != null &&
+      !(typeof retiredOverrides === 'object' && Object.keys(retiredOverrides).length === 0)
+    ) {
       warnRetiredModelOverrides();
     }
 
