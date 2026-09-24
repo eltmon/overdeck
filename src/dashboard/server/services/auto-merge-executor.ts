@@ -73,6 +73,13 @@ export interface AutoMergeExecutorDeps {
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
   mergeIssue?: (issueId: string, headSha?: string) => Promise<MergeResult>;
+  /**
+   * #3983: the tracker's live answer for the issue; null when no tracker
+   * answered. `readIssueFromTracker` by default.
+   */
+  readTrackerIssue?: (issueId: string) => Promise<{ open: boolean } | null>;
+  /** The cached tracker row, consulted when the live read gets no answer. */
+  cachedTrackerIssue?: (issueId: string) => Promise<{ open: boolean } | null> | { open: boolean } | null;
   getMergeRetryCount?: (issueId: string) => number;
   setMergeRetryCount?: (issueId: string, count: number) => void;
   announceFailure?: (issueId: string, reason: string) => void;
@@ -89,6 +96,36 @@ function sameCommit(a: string, b: string): boolean {
   const x = a.toLowerCase();
   const y = b.toLowerCase();
   return x.startsWith(y) || y.startsWith(x);
+}
+
+async function defaultReadTrackerIssue(issueId: string): Promise<{ open: boolean } | null> {
+  const { readIssueFromTracker } = await import('./derived-issue-state.js');
+  return readIssueFromTracker(issueId);
+}
+
+async function defaultCachedTrackerIssue(issueId: string): Promise<{ open: boolean } | null> {
+  try {
+    const { getSharedIssueService } = await import('./issue-service-singleton.js');
+    return getSharedIssueService().getTrackerIssue(issueId);
+  } catch {
+    return null;
+  }
+}
+
+/** True when the tracker (live, else cached) says the issue is closed. */
+async function trackerIssueClosed(
+  issueId: string,
+  deps: AutoMergeExecutorDeps,
+  log: (message: string) => void,
+): Promise<boolean> {
+  let live: { open: boolean } | null = null;
+  try {
+    live = await (deps.readTrackerIssue ?? defaultReadTrackerIssue)(issueId);
+  } catch (error) {
+    log(`[auto-merge] live tracker read for ${issueId} failed: ${errorMessage(error)}`);
+  }
+  if (live) return !live.open;
+  return (await (deps.cachedTrackerIssue ?? defaultCachedTrackerIssue)(issueId))?.open === false;
 }
 
 function errorMessage(error: unknown): string {
@@ -168,6 +205,15 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
         ? `${entry.issueId} PR head moved from ${entry.headSha!.slice(0, 12)} to ${liveHead!.slice(0, 12)} since the auto-merge was scheduled`
         : `${entry.issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}`;
       if (!(deps.markBlocked ?? markBlocked)(entry.id, reason)) {
+        log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+      }
+      continue;
+    }
+
+    // #3983: the merge gate never reads the tracker. A closed issue is not
+    // merged: ask the tracker itself, falling back to the cached row.
+    if (await trackerIssueClosed(entry.issueId, deps, log)) {
+      if (!(deps.markBlocked ?? markBlocked)(entry.id, `${entry.issueId} is closed in the tracker`)) {
         log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
       }
       continue;

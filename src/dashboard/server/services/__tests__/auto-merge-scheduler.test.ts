@@ -82,6 +82,8 @@ interface WorldOptions {
   latest?: PendingAutoMerge | null;
   /** The latest row as the insert transaction sees it; `latest` by default. */
   latestAtInsert?: PendingAutoMerge | null;
+  /** The cached tracker row says the issue is closed. */
+  closed?: boolean;
 }
 
 /**
@@ -110,6 +112,7 @@ function world(options: WorldOptions = {}) {
     getProjectAutoMergeDefault: projectDefault,
     isRequireUatBeforeMerge: () => globalRequireUat,
     isMergeTrainEnabled: () => trainEnabled,
+    isIssueClosed: () => options.closed ?? false,
   };
   // As in production: the automatic path needs an approval bound to the head.
   const mergeGate = (issueId: string) => evaluateIssueMergeGate(
@@ -273,6 +276,14 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     });
     await scheduleReadyAutoMerges(deps);
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule a PR whose tracker issue is closed, and reads no forge for it', async () => {
+    const { deps, insert, factsReads } = world({ labels: ['auto-merge'], closed: true });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
+    expect(factsReads).not.toHaveBeenCalled();
+    expect(outcomes[0]).toMatchObject({ scheduled: false, reason: 'PAN-42 is closed in the tracker' });
   });
 
   it('does not schedule a PR nothing opts in, and reads no forge for it', async () => {

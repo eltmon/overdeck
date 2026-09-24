@@ -493,6 +493,8 @@ export interface AutoMergeScheduleDeps {
   getProjectAutoMergeDefault?: (issueId: string) => ProjectAutoMergeDefault;
   /** The issue's tracker labels; defaults to the dashboard's cached tracker row. */
   getIssueLabels?: (issueId: string) => readonly string[];
+  /** #3983: true when the cached tracker row says the issue is closed. */
+  isIssueClosed?: (issueId: string) => boolean;
 }
 
 /**
@@ -505,6 +507,19 @@ function cachedIssueLabels(issueId: string): readonly string[] {
     return getSharedIssueService().getTrackerIssue(issueId)?.labels ?? [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * #3983: whether the cached tracker row says the issue is closed. An issue the
+ * cache does not know reads as open here; the executor reads the tracker live
+ * before it merges.
+ */
+function cachedIssueClosed(issueId: string): boolean {
+  try {
+    return getSharedIssueService().getTrackerIssue(issueId)?.open === false;
+  } catch {
+    return false;
   }
 }
 
@@ -538,19 +553,23 @@ function announceAutoMergeCancelled(issueId: string): void {
 
 type AutoMergePolicyDeps = Pick<
   AutoMergeScheduleDeps,
-  'getIssueLabels' | 'getProjectAutoMergeDefault' | 'isRequireUatBeforeMerge' | 'isMergeTrainEnabled'
+  'getIssueLabels' | 'getProjectAutoMergeDefault' | 'isRequireUatBeforeMerge' | 'isMergeTrainEnabled' | 'isIssueClosed'
 >;
 
 /**
  * The schedule door's policy check, which reads no forge: the issue's UAT hold
  * (its `auto-merge` / `hold-for-uat` label (PAN-3932), then the project
- * default, then global) and the merge-train switch. The scheduler (#3983) asks
- * it first, so a held PR costs no forge read per tick.
+ * default, then global), the merge-train switch, and a closed tracker issue
+ * (from the cached tracker row). The scheduler (#3983) asks it first, so a held
+ * PR costs no forge read per tick.
  */
 export function autoMergePolicyRefusal(
   issueId: string,
   deps: AutoMergePolicyDeps = {},
-): { status: 412; body: { error: string } } | null {
+): { status: 412 | 422; body: { error: string } } | null {
+  if ((deps.isIssueClosed ?? cachedIssueClosed)(issueId)) {
+    return { status: 422, body: { error: `${issueId} is closed in the tracker` } };
+  }
   const labels = (deps.getIssueLabels ?? cachedIssueLabels)(issueId);
   const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
   const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();

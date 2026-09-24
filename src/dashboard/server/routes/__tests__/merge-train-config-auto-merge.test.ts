@@ -85,6 +85,7 @@ const baseDeps = {
   isEligible: async () => ({ eligible: true }) as const,
   getProjectAutoMergeDefault: () => null,
   getIssueLabels: () => [],
+  isIssueClosed: () => false,
   resolveProject: () => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/repos/overdeck' }),
   announce: vi.fn(),
 };
@@ -153,6 +154,18 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
     });
     expect(result.status).toBe(412);
     expect(result.body).toEqual({ error: 'UAT is still required before merge' });
+  });
+
+  it('refuses an issue the tracker has closed (#3983)', async () => {
+    const schedule = vi.fn();
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
+      ...baseDeps,
+      isIssueClosed: () => true,
+      mergeGate: async () => gate(),
+      schedule: schedule as never,
+    });
+    expect(result).toEqual({ status: 422, body: { error: 'PAN-3917 is closed in the tracker' } });
+    expect(schedule).not.toHaveBeenCalled();
   });
 
   it('refuses while the merge train is disabled', async () => {

@@ -19,6 +19,14 @@ vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', () => ({
   isAutoMergeEligible: vi.fn(async () => ({ eligible: true })),
 }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
+// #3983: the executor reads the tracker live before it merges.
+const tracker = vi.hoisted(() => ({ open: true as boolean | null }));
+vi.mock('../derived-issue-state.js', () => ({
+  readIssueFromTracker: vi.fn(async () => (tracker.open === null ? null : { open: tracker.open, labels: [] })),
+}));
+vi.mock('../issue-service-singleton.js', () => ({
+  getSharedIssueService: () => ({ getTrackerIssue: () => null }),
+}));
 vi.mock('../../../../lib/cloister/merge-gate.js', () => ({
   evaluateIssueMergeGate: vi.fn(async () => ({ ready: true, facts: { headSha: null } })),
 }));
@@ -81,6 +89,7 @@ describe('auto-merge executor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     delete process.env.OVERDECK_DISABLE_AUTO_MERGE;
+    tracker.open = true;
   });
 
   afterEach(() => {
@@ -486,6 +495,51 @@ describe('auto-merge executor', () => {
 
     expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 PR head moved from aaaaaaaaaaaa to bbbbbbbbbbbb since the auto-merge was scheduled');
     expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('blocks a scheduled merge whose tracker issue was closed, read live (#3983)', async () => {
+    tracker.open = false;
+    const markBlocked = vi.fn(() => true);
+    const transition = vi.fn(() => true);
+    const mergeIssue = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      mergeGate: async () => gate(),
+      markBlocked,
+      transition,
+      mergeIssue,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is closed in the tracker');
+    expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the cached tracker row when the live read gets no answer (#3983)', async () => {
+    tracker.open = null;
+    const markBlocked = vi.fn(() => true);
+    const mergeIssue = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      mergeGate: async () => gate(),
+      cachedTrackerIssue: () => ({ open: false }),
+      markBlocked,
+      transition: () => true,
+      mergeIssue,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is closed in the tracker');
     expect(mergeIssue).not.toHaveBeenCalled();
   });
 
