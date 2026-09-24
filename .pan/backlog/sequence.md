@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:04:12.283Z · model: claude-opus-5 · open: 820_
+_Last sequenced: 2026-09-24T20:10:04.567Z · model: claude-opus-5 · open: 819_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -404,7 +404,6 @@ _Last sequenced: 2026-09-24T20:04:12.283Z · model: claude-opus-5 · open: 820_
 | 444 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 445 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 447 | PAN-4123 | S | medium | ok |  |  | Reviewer tree shows convoy lanes from roles.review.mode, so a per-run Full hides its four lanes and a per-run Quick shows four dead ones |
 | 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 449 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
 | 450 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
@@ -1135,10 +1134,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:04:12.283Z",
+  "generatedAt": "2026-09-24T20:10:04.567Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 820,
+  "openCount": 819,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11233,19 +11232,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-4123",
-      "rank": 447,
-      "size": "S",
-      "importance": "medium",
-      "score": 59,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Reviewer tree shows convoy lanes from roles.review.mode, so a per-run Full hides its four lanes and a per-run Quick shows four dead ones",
-      "rationale": "Its only blocker, PAN-4118 (the Request review menu Full/Quick/None choice), merged and closed at 2026-09-24T19:50:53Z, so the dependency is dropped and the issue is actionable now. Rank 447 and score 59 are held deliberately: nothing about the bug itself changed, and its fix PR #4126 is already open against the PAN-4118 branch and only needs retargeting to main once that lands — so pickup order is moot for it. PAN-4127 is the sibling bug in the same file found during that PR; it is ranked on its own merit rather than chained behind this one, because its fix (read reviewRunId from the review parent state row) stands alone.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4127",
       "rank": 220,
       "size": "S",
@@ -12384,13 +12370,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4123",
-      "to": "PAN-4127",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
     },
     {
       "from": "PAN-4131",
