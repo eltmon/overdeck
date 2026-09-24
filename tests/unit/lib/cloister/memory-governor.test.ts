@@ -687,22 +687,37 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-5');
   });
 
-  it('stops no stack and pauses no agent when the backend inventory is unreadable (#4109)', async () => {
-    const stacks = [mergedStack('PAN-7', 1 * GIB, 'pan-7-svc')];
+  it('with an unreadable inventory, still sheds unprotected merged stacks, protects running rows, and pauses nothing (#4109)', async () => {
+    const stacks = [mergedStack('PAN-7', 1 * GIB, 'pan-7-svc'), mergedStack('PAN-8', 1 * GIB, 'pan-8-svc')];
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
     listLiveAgentIdsMock.mockResolvedValue(null);
     listRunningAgentsMock.mockReturnValue([
-      { id: 'agent-pan-7', issueId: 'PAN-7', role: 'work', tmuxActive: true, flywheelRunId: 'run-7' },
+      { id: 'agent-pan-7', issueId: 'PAN-7', role: 'work', status: 'running', tmuxActive: true, flywheelRunId: 'run-7' },
+      { id: 'agent-pan-8', issueId: 'PAN-8', role: 'work', status: 'stopped', tmuxActive: false, flywheelRunId: 'run-8' },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
     readProcMemoryMock.mockResolvedValue(procMemory(1 * GIB)); // stays hard
 
     const result = await shed();
 
-    expect(result.stoppedStacks).toEqual([]);
-    expect(execFileMock).not.toHaveBeenCalledWith('docker', expect.arrayContaining(['stop']), expect.anything(), expect.anything());
+    expect(result.stoppedStacks).toEqual(['PAN-8']);
+    expect(execFileMock).not.toHaveBeenCalledWith('docker', ['stop', '--time', '30', 'pan-7-svc'], expect.anything(), expect.anything());
     expect(result.pausedAgents).toEqual([]);
     expect(setAgentPausedMock).not.toHaveBeenCalled();
     expect(stopAgentMock).not.toHaveBeenCalled();
+  });
+
+  it('protects the stack of a running row the readable inventory does not list (legacy tmux agent) (#4109)', async () => {
+    const stacks = [mergedStack('PAN-9', 1 * GIB, 'pan-9-svc')];
+    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
+    listLiveAgentIdsMock.mockResolvedValue(new Set());
+    listRunningAgentsMock.mockReturnValue([
+      { id: 'agent-pan-9', issueId: 'PAN-9', role: 'work', status: 'running', tmuxActive: true, flywheelRunId: 'run-9' },
+    ]);
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
+
+    const result = await shed();
+
+    expect(result.stoppedStacks).toEqual([]);
   });
 });

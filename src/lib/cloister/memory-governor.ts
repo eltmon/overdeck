@@ -403,24 +403,31 @@ export async function shed(): Promise<ShedResult> {
   const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
   const stacks = await getResourceStacks(containers);
   // Live = present in the selected backend's inventory (#4109), not the
-  // tmux-only `tmuxActive` flag, which is false for every Herdr agent. A `null`
-  // inventory (backend unreadable) is unknown, never "nothing is running": the
-  // stack shed and the work-agent pause below are skipped rather than risk
-  // stopping a live agent's stack or pausing an agent we cannot see.
+  // tmux-only `tmuxActive` flag, which is false for every Herdr agent.
+  //
+  // Stack shed: a merged stack is protected when any agent for its issue is
+  // listed by the inventory OR has a `running` row. The row covers what the
+  // inventory cannot vouch for (backend unreadable, a legacy tmux agent on a
+  // Herdr host), so unknown liveness protects and reclaim keeps working under
+  // pressure (#4114 review).
+  //
+  // Agent pause: only agents the inventory lists. An unreadable inventory
+  // pauses nothing — a Herdr stop whose pane close fails rewrites state while
+  // the harness keeps running (PAN-3966).
   const liveIds = await listLiveAgentIds();
   if (liveIds === null) {
-    console.warn('[memory-governor] Terminal backend inventory unreadable — skipping the stack shed and agent pause (liveness unknown)');
+    console.warn('[memory-governor] Terminal backend inventory unreadable — running rows protect stacks; the agent pause is skipped (liveness unknown)');
   }
-  const runningAgents = liveIds === null
-    ? []
-    : (await Effect.runPromise(listRunningAgents())).filter((a) => liveIds.has(a.id));
-  const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLivePane: true }));
+  const allAgents = await Effect.runPromise(listRunningAgents());
+  const agentsLike: ShedAgentLike[] = allAgents.map((a) => ({
+    issueId: a.issueId,
+    hasLivePane: a.status === 'running' || liveIds?.has(a.id) === true,
+  }));
+  const runningAgents = liveIds === null ? [] : allAgents.filter((a) => liveIds.has(a.id));
 
-  if (liveIds !== null) {
-    for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
-      await stopStackContainers(stack);
-      if (stack.issueId) result.stoppedStacks.push(stack.issueId);
-    }
+  for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
+    await stopStackContainers(stack);
+    if (stack.issueId) result.stoppedStacks.push(stack.issueId);
   }
 
   let verdict = await assessMemoryPressure();
