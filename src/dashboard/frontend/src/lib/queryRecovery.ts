@@ -17,6 +17,10 @@
  * - Refetch on backend reconnect: when EventRouter re-bootstraps after the
  *   RPC websocket reconnects, in-flight fetches are cancelled and the queries
  *   refetched against the new server instance.
+ *
+ * The pipeline-membership banner (`project-pipeline-membership`) shares the
+ * reconnect refetch but keeps its own retry policy: it retries only transient
+ * failures, honoring the server's Retry-After (ProjectMembershipBoundary).
  */
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { BACKEND_RECONNECTED_EVENT } from './backendConnectionEvents';
@@ -30,6 +34,9 @@ export const RECOVERING_QUERY_KEYS: readonly QueryKey[] = [
   ['command-deck-projects'],
   ['registered-projects'],
   ['conversations'],
+  // The membership banner retries its own transient failures (its observer
+  // overrides this retry policy); it shares the reconnect refetch.
+  ['project-pipeline-membership'],
 ];
 
 export function recoveryRetryDelayMs(failureCount: number): number {

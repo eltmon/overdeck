@@ -1,8 +1,26 @@
 import type { ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { CircleAlert } from 'lucide-react';
-import { fetchProjectPipelineMembership, refreshProjectPipelineMembership, NO_PROJECT_KEY } from './projectsData';
+import { recoveryRetryDelayMs } from '../../lib/queryRecovery';
+import {
+  fetchProjectPipelineMembership,
+  isMembershipTransientError,
+  refreshProjectPipelineMembership,
+  NO_PROJECT_KEY,
+} from './projectsData';
 import styles from './styles/command-deck.module.css';
+
+/**
+ * PAN-3527 — delay before re-reading membership after a transient failure:
+ * exponential backoff capped at 30s, never sooner than the server's
+ * Retry-After hint.
+ */
+export function membershipRetryDelayMs(failureCount: number, error: unknown): number {
+  const backoff = recoveryRetryDelayMs(failureCount);
+  return isMembershipTransientError(error) && error.retryAfterMs !== undefined
+    ? Math.max(backoff, error.retryAfterMs)
+    : backoff;
+}
 
 interface ProjectMembershipBoundaryProps {
   selectedProject: string | null;
@@ -23,10 +41,20 @@ export function ProjectMembershipBoundary({
 }: ProjectMembershipBoundaryProps) {
   const membership = useQuery({
     queryKey: ['project-pipeline-membership', projectKey],
-    queryFn: () => fetchProjectPipelineMembership(projectKey!),
+    queryFn: ({ signal }) => fetchProjectPipelineMembership(projectKey!, signal),
     enabled: Boolean(projectKey && selectedProject !== NO_PROJECT_KEY && !disabled),
-    retry: false,
+    // PAN-3527: a transient failure (snapshot still loading after a restart,
+    // request never answered, proxy error) is not an answer about the project.
+    // Keep retrying it with backoff instead of settling it as the error
+    // banner; while it retries the query keeps its last good result. A settled
+    // answer (typed `unavailable`, other HTTP errors) surfaces at once.
+    // A backend reconnect also refetches this key (lib/queryRecovery.ts).
+    retry: (_failureCount, error) => isMembershipTransientError(error),
+    retryDelay: membershipRetryDelayMs,
   });
+  const transientFailure = isMembershipTransientError(membership.failureReason)
+    ? membership.failureReason
+    : null;
 
   // PAN-2972 — the GET above only reads the server's snapshot, so on a cold
   // cache a plain refetch can never succeed. Retry forces a server-side
@@ -52,7 +80,11 @@ export function ProjectMembershipBoundary({
 
   return (
     <>
-      {membership.isLoading && (
+      {transientFailure ? (
+        <div className={styles.membershipStatus} role="status">
+          Pipeline membership is temporarily unavailable ({transientFailure.message}). Retrying automatically…
+        </div>
+      ) : membership.isLoading && (
         <div className={styles.membershipStatus} role="status">
           Refreshing pipeline membership…
         </div>
