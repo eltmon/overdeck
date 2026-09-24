@@ -249,7 +249,10 @@ binary or saved authentication is missing; it never falls back to Claude Code.
 
 Each session runs through the authenticated `acp-host` process, with its socket,
 token, ACP session id, and append-only transcript stored under
-`~/.overdeck/agents/<agentId>/`. The runtime adapter is
+`~/.overdeck/agents/<agentId>/`. The transcript records agent reasoning
+(`agent_thought_chunk` updates) under a separate `thought` role, and the
+conversation feed renders it as thinking rows, as it does for Claude Code
+thinking blocks. The runtime adapter is
 `src/lib/runtimes/acp.ts`; Kimi-specific launch and authentication behavior is
 in `src/lib/acp/kimi.ts`.
 
