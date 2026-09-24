@@ -6,8 +6,9 @@ import { getCloisterEventStore, type CloisterEventStore } from './event-store-pr
 import { loadCloisterConfigSync } from './config.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
-import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgentsSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
+import { getGlobalRegistry } from '../runtimes/index.js';
+import { listRunningAgents, stopAgent, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import {
   isCloisterSpawnsPaused,
   setCloisterSpawnsPaused,
@@ -461,7 +462,7 @@ export class CloisterService {
    *
    * This is the nuclear option. Use with caution.
    */
-  emergencyStop(): string[] {
+  async emergencyStop(): Promise<string[]> {
     console.log('🚨 EMERGENCY STOP - Killing all agents');
 
     // Freeze auto-resume FIRST, before killing — otherwise the deacon patrol or a
@@ -477,21 +478,26 @@ export class CloisterService {
       console.error('  ✗ Failed to set global pause flags:', error);
     }
 
-    const runningAgents = listRunningAgentsSync();
+    // Live = present in the selected backend's inventory (#4109), not the
+    // tmux-only `tmuxActive` flag, which is false for every Herdr agent. When
+    // the inventory is unreadable, every `running` row is a target: stopping is
+    // what the operator asked for, and stopping an already-dead row is harmless.
+    // The stop goes through the terminal backend, so it closes Herdr panes too
+    // (the claude-code runtime's own killAgent is tmux-only).
+    const [agents, liveIds] = await Promise.all([
+      Effect.runPromise(listRunningAgents()),
+      listLiveAgentIds(),
+    ]);
+    const targets = agents.filter((agent) => liveIds === null ? agent.status === 'running' : liveIds.has(agent.id));
     const killedAgents: string[] = [];
 
-    for (const agent of runningAgents) {
-      if (agent.tmuxActive) {
-        try {
-          const runtime = getRuntimeForAgent(agent.id);
-          if (runtime) {
-            runtime.killAgent(agent.id); // killAgent already resets runtime.json to idle
-            killedAgents.push(agent.id);
-            console.log(`  ✓ Killed ${agent.id}`);
-          }
-        } catch (error) {
-          console.error(`  ✗ Failed to kill ${agent.id}:`, error);
-        }
+    for (const agent of targets) {
+      try {
+        await Effect.runPromise(stopAgent(agent.id));
+        killedAgents.push(agent.id);
+        console.log(`  ✓ Killed ${agent.id}`);
+      } catch (error) {
+        console.error(`  ✗ Failed to kill ${agent.id}:`, error);
       }
     }
 

@@ -92,7 +92,7 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
   'POST',
   '/api/cloister/emergency-stop',
   httpHandler(Effect.gen(function* () {
-    const killedAgents = yield* Effect.try({
+    const killedAgents = yield* Effect.tryPromise({
       try: () => getCloisterService().emergencyStop(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
