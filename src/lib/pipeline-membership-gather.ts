@@ -1,3 +1,10 @@
+/**
+ * Pipeline-membership gatherer: collects the durable lens signals for one
+ * project (tracker issues, open PRs/MRs, branch refs, xBRIEF specs, then the
+ * batched GitHub GraphQL oracles). GraphQL subprocess handling (stderr capture,
+ * retry-once) lives in ./github-graphql-run.ts (PAN-3924). Never import
+ * disposable-state or sync-process modules here; see the import-graph test.
+ */
 import { execFile } from 'node:child_process';
 import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -23,6 +30,7 @@ import { getRepoForge, inferProjectForge } from './project-repos.js';
 import { parseIssueIdFromText } from './resource-utils.js';
 import { createTracker } from './tracker/factory.js';
 import type { Issue, TrackerType } from './tracker/interface.js';
+import { issueIdFromTrackerIssue } from './tracker/issue-id.js';
 
 const execFileAsync = promisify(execFile);
 const GRAPHQL_ALIAS_CHUNK_SIZE = 50;
@@ -209,9 +217,23 @@ async function listProjectTrackerIssues(project: ProjectConfig): Promise<Project
     includeClosed: true,
   }));
 
-  return issues.flatMap((issue: Issue) => {
-    const issueId = issue.ref.toUpperCase();
-    if (!issueId.startsWith(`${issuePrefix}-`)) return [];
+  return projectTrackerIssueRows(issues, trackerType, issuePrefix);
+}
+
+/**
+ * Pure row mapping for the tracker lens. GitHub's `ref` is a bare `#<n>`;
+ * `issueIdFromTrackerIssue` prefixes it, so GitHub-tracked projects are no
+ * longer filtered to nothing (PAN-3924).
+ */
+export function projectTrackerIssueRows(
+  issues: readonly Issue[],
+  trackerType: TrackerType,
+  issuePrefix: string,
+): ProjectTrackerIssueRow[] {
+  const prefix = issuePrefix.toUpperCase();
+  return issues.flatMap((issue) => {
+    const issueId = issueIdFromTrackerIssue(issue, trackerType, prefix);
+    if (!issueId.startsWith(`${prefix}-`)) return [];
     return [{
       issueId,
       state: issue.state === 'closed' ? 'closed' as const : 'open' as const,
