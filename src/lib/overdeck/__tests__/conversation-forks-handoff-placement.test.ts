@@ -30,6 +30,7 @@ vi.mock('../conversation-runtime.js', async (importOriginal) => ({
 
 const { handleConversationSummaryFork } = await import('../conversation-forks.js');
 const { sessionFilePath } = await import('../../runtimes/storage/claude-code.js');
+const { generateSummaryForFork } = await import('../../conversations/summary-fork.js');
 
 let testHome: string;
 let originalHome: string | undefined;
@@ -41,6 +42,10 @@ async function readBody(response: HttpServerResponse.HttpServerResponse): Promis
 
 async function fork(body: Record<string, unknown>) {
   const response = await handleConversationSummaryFork('parent-conv', body);
+  // An accepted fork starts its pipeline in the background, and the pipeline
+  // reads the database before it parks in the summary step. Wait for it to
+  // park, so teardown never races it into the real home.
+  if (response.status === 200) await vi.waitFor(() => expect(generateSummaryForFork).toHaveBeenCalledTimes(1));
   return { status: response.status, body: await readBody(response) };
 }
 
@@ -71,6 +76,7 @@ beforeEach(async () => {
     harness: 'claude-code',
   });
   workspacePath.current = null;
+  vi.mocked(generateSummaryForFork).mockClear();
 });
 
 afterEach(async () => {
