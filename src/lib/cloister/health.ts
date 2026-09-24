@@ -74,8 +74,8 @@ export function getAgentHealth(
   // Only a synchronous `false` marks the agent dead here. Every shipped
   // runtime answers asynchronously through the backend-aware liveness oracle
   // (#4116), and this evaluator is sync, so for them liveness is the caller's
-  // job: the health loop only evaluates agents in the backend's live set. A
-  // pending Promise must never read as a death.
+  // job: the health loop chooses which live agents it evaluates. A pending
+  // Promise must never read as a death.
   const isRunning = runtime.isRunning(agentId);
 
   if (isRunning === false) {
