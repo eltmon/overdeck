@@ -49,9 +49,21 @@ The existing conversation transport carries subagent data:
 
 - A parent `pan.subscribeConversationMessages` stream emits `{ kind: "subagents", subagents }` after its initial message snapshot. A two-second poll emits a replacement list only when the list or a status changes.
 - The subscription payload accepts an optional `agentId`. When present, the same RPC streams the matching subagent JSONL through the existing snapshot and tail pipeline. Subagent transcript streams do not emit nested subagent-list events.
-- `GET /api/conversations/:name/messages` includes `subagents` for the parent response. `?agentId=<id>` returns one subagent transcript for ended conversations and other one-shot reads.
+- `GET /api/conversations/:name/messages` includes `subagents` for the parent response. `?agentId=<id>` returns one subagent transcript for ended conversations and other one-shot reads. `GET /api/conversations/:name/message-locator?byteOffset=N` accepts the same `?agentId=<id>` and resolves the offset against that subagent's transcript.
 
 The frontend keeps parent and subagent transcripts in separate React Query cache keys, so opening a subagent cannot replace the parent timeline.
+
+## Opening a subagent from search
+
+Conversation search indexes subagent transcripts too. Their chunks keep `session_id = agent-<id>` (the file basename) and also store `chunks.parent_session_id`, the parent session UUID taken from the `<parent-uuid>/subagents/` path. Schema v2 of the embeddings DB added the column and backfilled it once at open from `file_cursors`, with no re-embedding.
+
+A palette hit on a subagent chunk reports `conversationId` as the parent conversation's name (or the parent UUID when the parent has no conversation row), plus `parentSessionId` and the bare `subagentId`. The palette labels it `Subagent of …` and shows a distinct icon. Opening it:
+
+1. fetches `GET /api/conversations/:name/message-locator?byteOffset=N&agentId=<bare id>`, which resolves the offset inside the subagent transcript;
+2. opens the parent conversation pane with `targetSubagentId` beside the usual message target;
+3. `ConversationPanel` selects the rail row via `?subagent=<id>` once the subagent list contains it, and only `SubagentTranscript` receives the message target, so the main timeline never consumes it.
+
+Codex child threads are not indexed, so they never appear as search hits (PAN-3982).
 
 ## Status derivation
 

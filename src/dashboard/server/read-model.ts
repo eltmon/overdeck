@@ -254,6 +254,63 @@ export function agentSnapshotFromOverdeck(agent: OverdeckAgent): AgentSnapshot {
   };
 }
 
+// ─── Served agent status: derived from the backend inventory (#4098) ─────────
+//
+// `agentsById` holds each agent's last stored status, copied at boot, so a dead
+// agent kept `running` in every snapshot. Overdeck stores no status it can
+// derive: at serve time a row that CLAIMS to be live (`running`/`starting`)
+// keeps the claim only while the terminal backend hosts a non-exited pane for
+// it. Downgrade only — a stored `stopped`/`error` is operator or supervisor
+// intent (on Herdr a stopped agent's pane can outlive the stop), and `paused`
+// / `stoppedByUser` are separate fields that pass through untouched.
+
+/** Stored statuses that claim a live agent; only these are checked against the inventory. */
+const CLAIMED_LIVE_STATUSES: ReadonlySet<AgentStatus> = new Set(['running', 'starting']);
+
+/**
+ * The managed agent ids the backend inventory can answer for — the same
+ * filter `GET /api/agents` applies. Other rows (e.g. `sequencer-runner`) are
+ * absent from the tmux inventory by design, so their stored status is served.
+ */
+function isInventoryAnsweredAgentId(id: string): boolean {
+  return id.startsWith('agent-') || id.startsWith('planning-') || id.startsWith('strike-');
+}
+
+/**
+ * `trusted`: the inventory has been read successfully at least once, so
+ * `backendPanesById` is a real answer (current, or the last good one while the
+ * backend is briefly unreadable). `unavailable`: no read has ever succeeded —
+ * the dashboard booted before Herdr — so absence of a pane proves nothing.
+ */
+export type PaneInventoryTrust = 'trusted' | 'unavailable';
+
+/**
+ * Agent rows as the terminal backend sees them. A row claiming to be live with
+ * no live pane reads `stopped` (or `unknown` while the inventory has never
+ * answered). Panes match the way `GET /api/agents` matches them — the pane's
+ * terminal id (or pane id) is the agent id — plus the pane's `agentId` token.
+ * There is no issue+role fallback: a dead and a live agent of one issue share
+ * issue and role, and the fallback would report the dead one running.
+ */
+export function deriveServedAgentStatuses(
+  agents: readonly AgentSnapshot[],
+  panesById: Readonly<Record<string, BackendPane>>,
+  inventory: PaneInventoryTrust,
+): AgentSnapshot[] {
+  const livePaneAgentIds = new Set<string>();
+  for (const pane of Object.values(panesById)) {
+    if (pane.state === 'exited') continue;
+    livePaneAgentIds.add(pane.terminalId ?? pane.id);
+    if (pane.agentId) livePaneAgentIds.add(pane.agentId);
+  }
+  return agents.map((agent) => {
+    if (!CLAIMED_LIVE_STATUSES.has(agent.status)) return agent;
+    if (!isInventoryAnsweredAgentId(agent.id)) return agent;
+    if (livePaneAgentIds.has(agent.id)) return agent;
+    return { ...agent, status: inventory === 'trusted' ? 'stopped' as const : 'unknown' as const };
+  });
+}
+
 export class ReadModelService extends Context.Service<
   ReadModelService,
   ReadModelServiceShape
@@ -265,6 +322,9 @@ export const ReadModelServiceLive = Layer.effect(
   ReadModelService,
   Effect.gen(function* () {
     let state: ReadModelState = { ...INITIAL_READ_MODEL_STATE };
+    // #4098: becomes `trusted` after the first non-degraded inventory read and
+    // stays so — a later failed read serves the last-good panes, never `[]`.
+    let paneInventory: PaneInventoryTrust = 'unavailable';
 
     function cloneTurnDiffSummaries(summaries: TurnDiffSummary[] | undefined): TurnDiffSummary[] {
       if (!summaries || summaries.length === 0) return [];
@@ -288,7 +348,8 @@ export const ReadModelServiceLive = Layer.effect(
       // fetch it only for the agent the user is actually viewing.
       return {
         sequence: state.sequence,
-        agents: Object.values(state.agentsById),
+        // #4098: status is derived from the backend inventory, not the stored copy.
+        agents: deriveServedAgentStatuses(Object.values(state.agentsById), state.backendPanesById, paneInventory),
         // PAN-1048 — specialistsByName projection retired. The DashboardSnapshot
         // schema still has a `specialists` field for backward compat with the
         // wire format; we always send an empty array and clients derive the
@@ -363,7 +424,7 @@ export const ReadModelServiceLive = Layer.effect(
       // both maps from their owners so a fresh connect sees current facts even
       // before the next change event.
       try {
-        const [{ getSharedIssueService }, { getBackendPanes }] = yield* Effect.promise(() => Promise.all([
+        const [{ getSharedIssueService }, { getBackendPanes, isBackendInventoryDegraded }] = yield* Effect.promise(() => Promise.all([
           import('./services/issue-service-singleton.js'),
           import('./services/backend-inventory.js'),
         ]));
@@ -375,6 +436,7 @@ export const ReadModelServiceLive = Layer.effect(
         for (const pane of yield* Effect.promise(() => getBackendPanes())) {
           backendPanesById[pane.id] = pane;
         }
+        if (!isBackendInventoryDegraded()) paneInventory = 'trusted';
         state = { ...state, derivedIssueStateByIssueId, backendPanesById };
       } catch (err) {
         console.error('[ReadModel] Failed to refresh the derived read model for snapshot:', err);

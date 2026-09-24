@@ -22,7 +22,7 @@ import { homedir } from 'node:os';
 
 import { Effect } from 'effect';
 
-import { AGENT_ID_TOKEN } from './herdr.js';
+import { AGENT_ID_TOKEN, HerdrBackend } from './herdr.js';
 import './tmux.js';
 import { resolveTerminalBackend } from './registry.js';
 import { hostTerminalBackendName, probeHerdrAvailability } from './select.js';
@@ -373,6 +373,14 @@ export interface CloseIssuePanesOptions {
  * nothing and every pane survives. This reads the backend's live inventory and
  * closes the panes whose `issue` token matches (optionally filtered by `role`).
  *
+ * Without a role filter (close-out) the issue's workspaces go whole, root shell
+ * and residue with them. They are found by `issue` token or, when a Herdr
+ * restore dropped it, by label, and every untagged pane in them counts as the
+ * issue's: a restore drops pane tokens too (#4096). A workspace holding a pane
+ * that names another owner (another issue, or an operator conversation) is not
+ * closed whole; only the issue's and untagged panes in it are. With a role
+ * filter an untagged pane is left alone, since nothing says what role it had.
+ *
  * Herdr only: on tmux the callers' existing session-name scans already reach
  * every session, and a tmux pane carries no stamped tokens. Operator
  * conversation panes (`conv-*`) are never closed. Returns the agent id
@@ -393,14 +401,36 @@ export async function closeIssuePanes(
     return [];
   }
   const wanted = issueId.toLowerCase();
+  const agentNameOf = (pane: BackendAgentSnapshot): string =>
+    (pane.tokens as Record<string, string | undefined>)[AGENT_ID_TOKEN] ?? pane.paneId;
+  // An operator conversation is never an issue's agent, even if a pane were
+  // ever stamped with an issue: the tmux sweeps this mirrors never match `conv-*`.
+  const isConversation = (pane: BackendAgentSnapshot): boolean => agentNameOf(pane).toLowerCase().startsWith('conv-');
+  const namesOtherOwner = (pane: BackendAgentSnapshot): boolean =>
+    isConversation(pane) || (!!pane.tokens.issue && pane.tokens.issue.toLowerCase() !== wanted);
+
+  const issueWorkspaces = new Set<string>();
+  if (!options.roles && resolved instanceof HerdrBackend) {
+    for (const id of await resolved.issueWorkspaceIds(issueId).catch(() => [])) issueWorkspaces.add(id);
+  }
   const closed: string[] = [];
+  const closedWorkspaces = new Set<string>();
+  for (const workspaceId of issueWorkspaces) {
+    const members = inventory.filter((pane) => pane.workspaceId === workspaceId);
+    if (members.some(namesOtherOwner)) continue;
+    if (!(await closeThrough(resolved, { backend: resolved.name, workspaceId, cwd: '' }))) continue;
+    closedWorkspaces.add(workspaceId);
+    closed.push(...members.map(agentNameOf));
+  }
+
   for (const pane of inventory) {
-    if (pane.tokens.issue?.toLowerCase() !== wanted) continue;
+    if (closedWorkspaces.has(pane.workspaceId)) continue;
+    const ownPane = pane.tokens.issue?.toLowerCase() === wanted
+      || (issueWorkspaces.has(pane.workspaceId) && !namesOtherOwner(pane));
+    if (!ownPane) continue;
     if (options.roles && (!pane.tokens.role || !options.roles.includes(pane.tokens.role))) continue;
-    const agentName = (pane.tokens as Record<string, string | undefined>)[AGENT_ID_TOKEN] ?? pane.paneId;
-    // An operator conversation is never an issue's agent, even if a pane were
-    // ever stamped with an issue: the tmux sweeps this mirrors never match `conv-*`.
-    if (agentName.toLowerCase().startsWith('conv-')) continue;
+    const agentName = agentNameOf(pane);
+    if (isConversation(pane)) continue;
     const ok = await closeThrough(resolved, {
       backend: resolved.name,
       workspaceId: pane.workspaceId,

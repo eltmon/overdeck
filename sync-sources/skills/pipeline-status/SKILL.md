@@ -65,8 +65,8 @@ PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-
 | ISSUE | `/api/pipeline/membership` `issueId` | PAN-NNNN; the membership endpoint defines the row universe |
 | BUCKET | `/api/pipeline/membership` `bucket` | `in_flight`, `zombie_pr`, `post_merge_limbo`, or `planned_backlog` |
 | TITLE | `/api/issues` `title` | truncated to ~52 chars |
-| MODEL | `~/.overdeck/agents/agent-pan-NNN/state.json` `.model` | Which model the work agent is using |
-| AGENT | tmux + `state.json` `.status` | `✓` if agent tmux session is alive AND `status: running` |
+| MODEL | `/api/agents` `.model` for `agent-pan-NNN` | Which model the work agent is using |
+| AGENT | `/api/agents` `.hasLiveTmuxSession` + `.paneState` | `✓` live pane that is `working`, `◐` live pane that is idle/blocked/done, `·` no live pane |
 | STATE | `/api/issues/resource-allocated` `.state` | derived pipeline state: `backlog`, `parked`, `planned`, `working`, `in-review`, `changes-requested`, `ready`, `merged`, `closed`, or `·` if unknown |
 | NEEDS | `pan show <id> --json` `.attention` (fetched only when STATE is `in-review`, `changes-requested`, or `ready`) | `needs-you`, `stuck`, `api-error`, or `·` |
 | PR-REVIEW | `pan show <id> --json` `.pr.reviewState` (same fetch as NEEDS) | `approved`, `changes-requested`, `review-requested`, `commented`, `none`, or `·` if there's no PR |
@@ -76,16 +76,27 @@ PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-
 Always sort by priority: P0 hotfix → P1 bug → P2 enhancement → others. Within
 each tier, sort by issue ID descending (newest first).
 
-Show a separate **PLANNING** section beneath the in-flight table for any
-`planning-pan-NNN` tmux session — those are not yet on the kanban so they
-don't appear via `/api/issues` filtering.
+Show a separate **PLANNING** section beneath the in-flight table for any live
+`planning-pan-NNN` agent — those are not yet on the kanban so they don't
+appear via `/api/issues` filtering.
+
+Agent liveness comes from `GET /api/agents`, which reads the host's terminal
+backend (Herdr by default, tmux only under `terminal.backend: tmux`). Never
+probe `tmux -L overdeck` directly: on a Herdr host it sees no agents. Despite
+its name, `hasLiveTmuxSession` is true for any live pane on either backend.
+
+The membership endpoint takes the **registered project key**, which is not
+always the repo name (this repo is registered as `panopticon-cli`). The script
+resolves it by matching the current git repository against
+`pan project list --json` (by path, then by `github_repo`); it never
+hardcodes a key.
 
 ## Steps
 
 ### 1. Generate the table
 
 Run this script. It gets the row universe from `GET /api/pipeline/membership`,
-then joins issue titles, derived state, tmux, and agent state as annotations. A
+then joins issue titles, derived state, and live agents as annotations. A
 bare array is a successful answer. An HTTP 200 object with
 `status: "unavailable"` is a typed blind spot; show its `projectKey`, `reason`,
 and `message`, then stop instead of deriving membership from another source.
@@ -93,16 +104,38 @@ HTTP 503 means the first snapshot is still loading and may be retried later.
 
 ```bash
 python3 - <<'PY'
-import json, subprocess
-from pathlib import Path
+import json, os, subprocess
+from urllib.parse import quote
 
-AGENTS = Path.home() / ".overdeck" / "agents"
 PR_STATES = {'in-review', 'changes-requested', 'ready'}
 
+def git(*args):
+    try:
+        return subprocess.check_output(['git', *args], stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return ''
+
+def project_key():
+    # The registered key, not the repo name. Match this repo (worktrees resolve
+    # to their main checkout) against the registry, then fall back to origin.
+    projects = json.loads(subprocess.check_output(['pan','project','list','--json']))
+    common = git('rev-parse','--path-format=absolute','--git-common-dir')
+    repo = os.path.realpath(os.path.dirname(common)) if common else ''
+    for key, p in projects.items():
+        if repo and os.path.realpath(os.path.expanduser(p.get('path',''))) == repo: return key
+    origin = git('remote','get-url','origin').removesuffix('.git')
+    for key, p in projects.items():
+        if origin and p.get('github_repo') and origin.endswith('/' + p['github_repo']): return key
+    raise SystemExit(f"No registered project matches {repo or os.getcwd()}; known keys: {', '.join(projects)}")
+
+PROJECT = project_key()
+print(f"project: {PROJECT}")
 issues_data = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues']))
 membership = json.loads(subprocess.check_output([
-    'curl','-s','http://localhost:3011/api/pipeline/membership?project=overdeck'
+    'curl','-s',f'http://localhost:3011/api/pipeline/membership?project={quote(PROJECT)}'
 ]))
+if isinstance(membership, dict) and 'error' in membership:
+    raise SystemExit(f"PIPELINE MEMBERSHIP ERROR for project {PROJECT}: {membership['error']}")
 if isinstance(membership, dict) and membership.get('status') == 'unavailable':
     raise SystemExit(
         'PIPELINE MEMBERSHIP UNAVAILABLE: '
@@ -110,6 +143,8 @@ if isinstance(membership, dict) and membership.get('status') == 'unavailable':
     )
 resource = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues/resource-allocated']))
 state_by_id = {(r.get('issueId') or '').upper(): r.get('state') for r in resource}
+# Backend-agnostic agent inventory (Herdr or tmux, whichever the host runs).
+agents = {a['id']: a for a in json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/agents']))}
 
 issues_by_id = {(i.get('identifier') or '').upper(): i for i in issues_data}
 panissues = []
@@ -121,18 +156,9 @@ for member in membership:
     issue['pipelineBucket'] = member['bucket']
     panissues.append(issue)
 
-def state_json(name):
-    p = AGENTS / name / "state.json"
-    if not p.exists(): return None
-    try: return json.loads(p.read_text())
-    except: return None
-
-def has_session(name):
-    try:
-        subprocess.check_output(['tmux','-L','overdeck','has-session','-t',name],
-                                stderr=subprocess.DEVNULL)
-        return True
-    except: return False
+def agent_cell(a):
+    if not a or not a.get('hasLiveTmuxSession'): return '·'
+    return '✓' if a.get('paneState') == 'working' else '◐'
 
 def derived(issue_id):
     try:
@@ -173,30 +199,32 @@ for i in panissues:
     d = derived(iid) if state in PR_STATES else None
     pr = (d.get('pr') or {}) if d else {}
     attention = (d.get('attention') if d else None) or '·'
-    agent_alive = has_session(f"agent-{iid.lower()}")
-    sj = state_json(f"agent-{iid.lower()}")
-    astatus = (sj or {}).get('status','-')
-    amodel = (sj or {}).get('model','-')
+    agent = agents.get(f"agent-{iid.lower()}")
+    amodel = (agent or {}).get('model') or '-'
     title = i['title']
     if len(title) > W['title']: title = title[:W['title']-1] + '…'
     if len(amodel) > W['model']: amodel = amodel[:W['model']-1] + '…'
-    agent_cell = '✓' if agent_alive and astatus=='running' else ('◐' if astatus=='running' else '·')
     review_cell = pr.get('reviewState') or '·'
     print(f"{iid:<{W['id']}}  {i['pipelineBucket']:<{W['bucket']}}  {title:<{W['title']}}  {amodel:<{W['model']}}  "
-          f"{agent_cell:<{W['agent']}}  {(state or '·'):<{W['state']}}  {attention:<{W['needs']}}  "
+          f"{agent_cell(agent):<{W['agent']}}  {(state or '·'):<{W['state']}}  {attention:<{W['needs']}}  "
           f"{review_cell:<{W['review']}}  {checks_cell(pr):<{W['checks']}}  {mergeable_cell(pr)}")
 
 print()
 print("PLANNING SESSIONS (Opus drafting xBRIEFs)")
 print('─' * 150)
-sessions = subprocess.check_output(['tmux','-L','overdeck','list-sessions','-F','#{session_name}']).decode().split('\n')
-for ps in sorted(s for s in sessions if s.startswith('planning-pan-')):
+for ps in sorted(n for n, a in agents.items() if n.startswith('planning-pan-') and a.get('hasLiveTmuxSession')):
     iid = 'PAN-' + ps.replace('planning-pan-','').upper()
-    sj = state_json(ps)
-    model = (sj or {}).get('model','?')
+    model = agents[ps].get('model') or '?'
     title = next((i['title'] for i in issues_data if (i.get('identifier','') or '').upper()==iid), '(unknown)')
     if len(title) > W['title']: title = title[:W['title']-1] + '…'
     print(f"{iid:<{W['id']}}  {title:<{W['title']}}  {model:<{W['model']}}  ◐ planning")
+
+member_ids = {m['issueId'].upper() for m in membership if m.get('inPipeline') is True}
+ready = [r for r in resource
+         if (r.get('issueId') or '').upper() in member_ids and r.get('state') == 'ready']
+print(f"\nAwaiting Merge: {len(ready)} issue(s) ready for human approval")
+for r in ready:
+    print(f"  → {r['issueId']}  {(r.get('title') or '')[:80]}")
 
 print()
 print("✓ done/passing  ◐ in-progress  ✗ failed/blocked  · pending/n-a")
@@ -204,27 +232,11 @@ print("Columns: AGENT (work agent alive) → STATE → NEEDS → PR-REVIEW → C
 PY
 ```
 
-### 2. Add an Awaiting Merge summary line
+### 2. Read the Awaiting Merge summary line
 
-After the main table, count and list canonical pipeline members whose derived
-`state` is `ready`:
-
-```bash
-python3 -c "
-import json, subprocess
-resource = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues/resource-allocated']))
-membership = json.loads(subprocess.check_output([
-    'curl','-s','http://localhost:3011/api/pipeline/membership?project=overdeck'
-]))
-member_ids = {m['issueId'].upper() for m in membership if m.get('inPipeline') is True}
-ready = [r for r in resource
-         if (r.get('issueId') or '').upper() in member_ids
-         and r.get('state') == 'ready']
-print(f'\\nAwaiting Merge: {len(ready)} issue(s) ready for human approval')
-for r in ready:
-    print(f'  → {r[\"issueId\"]}  {r[\"title\"][:80]}')
-"
-```
+The step 1 script also prints an **Awaiting Merge** line: the count and list of
+canonical pipeline members whose derived `state` is `ready`. Surface it
+directly under the table.
 
 ### 3. (Optional) Defer to other status skills if user wants more detail
 
@@ -236,7 +248,7 @@ is the headline; everything else is the appendix.
 For deeper detail beyond the pipeline view:
   • pan status         — running agents overview + system health
   • pan resources      — RAM/swap by agent
-  • agent-status       — per-tmux-session capture of recent output
+  • pan-agent-activity — read each live agent's recent output
 ```
 
 ## When to surface this
@@ -257,7 +269,7 @@ For deeper detail beyond the pipeline view:
 ## Notes
 
 - The table's issue universe comes only from `/api/pipeline/membership`; it uses
-  `/api/issues`, derived state, tmux, and agent files only to annotate those
+  `/api/issues`, derived state, and `/api/agents` only to annotate those
   members. If the dashboard is down, fall back to `pan status` text.
 - This skill is **read-only**. It does not change agent state, merge anything,
   or write to the DB. Pure observation.

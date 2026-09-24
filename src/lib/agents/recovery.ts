@@ -36,12 +36,12 @@ import {
 } from './agent-state.js';
 import { deliverAgentMessage, deliverInitialPromptWithRetry, resilientDeliveryMethod } from './delivery.js';
 import { clearReadySignal, normalizeAgentId } from './identity.js';
-import { isAlive } from './liveness.js';
+import { isAlive, isConfirmedDead, type LivenessAsyncDeps } from './liveness.js';
 import {
   detectPendingOperatorDecision,
   type PendingOperatorDecision,
 } from './pending-decision-gate.js';
-import { listRunningAgentsSync } from './queries.js';
+import { listAgentStates } from './queries.js';
 import { getProviderEnvForModel, getProviderExportsForModel } from './provider-env.js';
 import { saveAgentRuntimeState } from './runtime-state.js';
 import {
@@ -409,13 +409,21 @@ export async function restartAgent(
 
 
 /**
- * Detect crashed agents (state shows running but tmux session is gone)
+ * Detect crashed agents: state says `running` but the liveness oracle confirms
+ * the harness is gone. The oracle is backend-aware, so a live Herdr agent (which
+ * has no tmux session) is not crashed. A probe that could not answer
+ * (`runtime-indeterminate`, e.g. the Herdr socket is down) is not a death
+ * either: an outage must not list the whole fleet as crashed.
  */
-export function detectCrashedAgents(): AgentState[] {
-  const agents = listRunningAgentsSync();
-  return agents.filter(
-    (agent) => agent.status === 'running' && !agent.tmuxActive
-  );
+export async function detectCrashedAgents(
+  agents: AgentState[] = listAgentStates({ status: 'running' }),
+  livenessDeps: LivenessAsyncDeps = {},
+): Promise<AgentState[]> {
+  const running = agents
+    .filter((agent) => agent.status === 'running')
+    .map((agent) => ({ ...agent, id: normalizeAgentId(agent.id) }));
+  const verdicts = await Promise.all(running.map((agent) => isAlive(agent.id, livenessDeps)));
+  return running.filter((_, index) => isConfirmedDead(verdicts[index]!));
 }
 
 /**
@@ -832,7 +840,7 @@ function generateRecoveryPrompt(state: AgentState): string {
  * Auto-recover all crashed agents
  */
 export async function autoRecoverAgents(): Promise<{ recovered: string[]; failed: string[] }> {
-  const crashed = detectCrashedAgents();
+  const crashed = await detectCrashedAgents();
   const recovered: string[] = [];
   const failed: string[] = [];
 

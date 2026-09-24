@@ -198,6 +198,16 @@ async function resolveBackend(deps: BackendInventoryDeps): Promise<TerminalBacke
 let inventoryDegraded = false;
 
 /**
+ * True while the Herdr inventory is failing: the panes served are the
+ * last-known list (or `[]` when there is none), not a fresh answer. The read
+ * model uses this to tell "no panes" from "no answer" (#4098), so a Herdr that
+ * is not up yet at dashboard boot never reads as every agent dead.
+ */
+export function isBackendInventoryDegraded(): boolean {
+  return inventoryDegraded;
+}
+
+/**
  * Every live agent pane. Under a Herdr policy the adapter is the only source:
  * a failed read serves the last-known panes, never tmux (PAN-3956 D8). Under a
  * tmux policy (or with no adapter registered) the tmux probe is the inventory.

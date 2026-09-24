@@ -146,6 +146,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
     case 'merge.completed':
     case 'merge.failed':
       return typeof data.reason === 'string' ? data.reason : '';
+    case 'strike.landed':
+      return `worktree ${data.worktreeRemoved ? 'removed' : 'kept'}, branch ${data.branchDeleted ? 'deleted' : 'kept'}`;
     default:
       return '';
   }

@@ -170,7 +170,7 @@ The primitives live in `src/lib/terminal-backends/launch.ts` and go through the 
 | Primitive | Herdr | tmux |
 | --- | --- | --- |
 | `closeAgentPane(agentId)` | `pane.close` on every pane the agent occupies: the live agent's pane, every pane stamped with its `agentId` token, and the pane its `state.json` recorded (`backend: herdr`, `paneId`), per `herdr-agent-terminals.ts` — **with no liveness check**, so a residue pane whose shell is back at `$` closes too. The recorded pane is the fallback once a Herdr restore has dropped every pane's tokens (PAN-3966); it is skipped when another agent's `agentId` token, or a detected harness under another name, sits in it. A workspace the agent owns alone (its label or `issue` token is the agent id: a role run such as `sequencer-runner`) closes whole with `workspace.close`, root shell included. An issue workspace is shared by the issue's agents (`launchAgentPane` splits every role's pane into it), so a stop never closes it. A same-name tmux session left from before the host moved to Herdr is killed as well. | `kill-session` through the tmux adapter, when the session exists. |
-| `closeIssuePanes(issueId, { roles? })` | `pane.close` on every inventory pane whose `issue` token matches, optionally filtered by `role` — never an operator conversation pane (`conv-*`). | No-op — the callers' session-name scans already reach every tmux session, and a tmux pane carries no tokens. |
+| `closeIssuePanes(issueId, { roles? })` | `pane.close` on every inventory pane whose `issue` token matches, optionally filtered by `role` — never an operator conversation pane (`conv-*`). Without `roles` (close-out) the issue's workspaces close whole with `workspace.close`, root shell and untagged residue included. They are found by `issue` token, or by label once a Herdr restore has dropped the token (#4096). A workspace holding a pane that names another owner (another issue's token, or a `conv-*` agent) is not closed whole; only the issue's and untagged panes in it are closed. With `roles`, an untagged pane is left alone. | No-op — the callers' session-name scans already reach every tmux session, and a tmux pane carries no tokens. |
 
 Both never throw; a Herdr socket failure closes nothing and the stop still completes.
 
@@ -210,6 +210,13 @@ the Overdeck agent id. `role` is one of
 `work`, `worker`, `review`, `test`, `uat`, `strike`, `plan`. An operator conversation carries **no**
 `issue` token — that absence is also how the prompt guard recognizes an operator sender.
 Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
+
+An issue workspace is created with `label: <issueId>` and stamped with the `issue` token. A Herdr
+session restore drops every workspace and pane token and keeps the labels (seen live on 2026-09-24:
+16 of 17 workspaces untagged, all 17 labels intact). `workspaceFor` therefore looks up the `issue`
+token first, then the label of a workspace that carries no `issue` token, and re-stamps the token on
+the workspace it re-adopts (`herdr-workspaces.ts`, #4096). A token-only lookup created a duplicate
+workspace on every launch after a restore.
 
 `BackendPane.agentId` (PAN-3920) carries the Overdeck agent id into the dashboard's pane
 inventory: on Herdr it is the pane's `agentId` token, else Herdr's live agent name — but only on
@@ -272,13 +279,28 @@ and pi runtimes, reached only from Cloister's session rotation and crash respawn
 is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
 commands, plain dashboard terminals and the codex auth login are not agents.
 
+`GET /api/agents/:id/output` reads the pane through `readAgentPaneText` (Herdr `pane.read`, tmux
+`capture-pane`). On a Herdr host a miss tries the legacy tmux session once, then the saved
+`output.log` (#4097).
+
+`pan status` reports each agent's `alive` from `isAlive` (`src/lib/agents/liveness.ts`), plus
+`livenessReason` when it is not alive; `runtime-indeterminate` prints as `unknown`, not `stopped`.
+`pan status --json` still carries `tmuxActive` for compatibility, but it is deprecated: it is tmux
+session presence only and is always `false` for a Herdr agent (#4097).
+
 A graceful restart's 60-second warning reaches a Herdr agent through `deliverAgentMessage`; on tmux
 it is still Escape twice and a tmux paste (`src/lib/graceful-restart.ts`).
 
-**Known gaps on Herdr** (readers, not spawners): `detectCrashedAgents` (`pan recover --all`,
-`autoRecoverAgents`) still filters on the sync, tmux-only `tmuxActive`, so on Herdr it lists live
-agents as crashed — `recoverAgent`'s `isAlive` gate then answers `already-running` for them, so
-nothing is double-spawned, but they are reported as failed. The Claude resume-summary gate crossing
+**Crash detection and the start conflict check ask `isAlive`** (#4105). `detectCrashedAgents`
+(`pan recover`, `pan recover --all`, `autoRecoverAgents`) lists a `running` agent as crashed only
+when `isConfirmedDead` holds, so a live Herdr agent is not crashed and a `runtime-indeterminate`
+answer (backend unreachable) is never a crash. `findConflictingWorkAgents` (the `pan start` "other
+work sessions are still live" refusal) counts every other work agent for the issue that is not
+confirmed dead, so an unanswered probe blocks the start. Neither reads the tmux-only `tmuxActive`.
+`GET /api/agents` reports pane liveness as `hasLivePane`; `hasLiveTmuxSession` is a deprecated
+alias with the same value, true for a live pane on either backend.
+
+**Known gaps on Herdr** (readers, not spawners): the Claude resume-summary gate crossing
 (`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the
 tmux pane, so on Herdr they see no menu and fall through (the AskUserQuestion transcript check
 still runs).

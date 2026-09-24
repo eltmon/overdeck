@@ -154,6 +154,7 @@ interface CommandDeckProps {
     messageIndex: number;
     nonce: number;
     label: string;
+    subagentId?: string;
   } | null;
   onPendingConversationTargetConsumed?: () => void;
   /** Called when the selected conversation changes so App can sync the URL */
@@ -547,6 +548,7 @@ export function CommandDeck({
     messageId: string;
     messageIndex: number;
     nonce: number;
+    subagentId?: string;
   }, viewMode?: ViewMode) => {
     const store = usePanesStore.getState();
     store.ensureHome(projectKey);
@@ -559,6 +561,7 @@ export function CommandDeck({
         targetMessageId: target.messageId,
         targetMessageIndex: target.messageIndex,
         targetMessageNonce: target.nonce,
+        targetSubagentId: target.subagentId,
       });
     }
   }, []);
@@ -596,6 +599,7 @@ export function CommandDeck({
           messageId: pendingConversationTarget.messageId,
           messageIndex: pendingConversationTarget.messageIndex,
           nonce: pendingConversationTarget.nonce,
+          subagentId: pendingConversationTarget.subagentId,
         }
       : undefined;
     // Opening a conversation: the /conv/<id> route owns the URL, so switch the

@@ -54,6 +54,15 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
+- The snapshot's agent `status` is derived when it is served, not copied from the stored
+  record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
+  backend inventory (matched by terminal id, pane id or the `agentId` token, the way
+  `GET /api/agents` matches) is served `stopped`. Before the inventory has answered even
+  once (Herdr not up at dashboard boot), such rows are served `unknown`, never dead; after
+  that, a failed read keeps the last-good panes. Stored `stopped`/`error` and the `paused`
+  / `stoppedByUser` intent fields pass through unchanged. Only `agent-`, `planning-` and
+  `strike-` ids are derived, the set the inventory answers for
+  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`).
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 - The Command Deck project list (`command-deck-projects`), project registry
@@ -170,6 +179,11 @@ door that does not exist; a real record read door would be a separate change.
   bootstrap that registers `tsx`'s resolver and then imports `dashboard-db-worker.ts`
   (PAN-3930). Bun runs the `.ts` worker directly. Tests that boot the real worker call
   `__testInternals.terminateWorkers()` in `afterEach`.
+- That bootstrap is `spawnModuleWorker` in `src/lib/module-worker.ts`; start any new
+  worker thread through it. The memory checkpoint worker uses it too:
+  `src/lib/memory/checkpoint-client.ts` resolves `dist/dashboard/checkpoint-worker.js`
+  from dashboard chunks and `dist/lib/memory/checkpoint-worker.js` (a root
+  `tsdown.config.ts` entry) from CLI chunks such as `pan memory backfill`.
 - Jobs that wait or run for more than one second emit
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.
@@ -221,8 +235,12 @@ door that does not exist; a real record read door would be a separate change.
   exist yet) is retried on the next event fired by a surviving watcher — there is no
   timer or poll. If every watch attempt fails, the stream stays in `discovering`
   until an operator or later launch creates one of the watched roots.
-- `GET /api/conversations/:name/messages` serves registered conversations only. It
-  never scans agent directories or global session UUIDs to resolve an agent-backed row.
+- `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
+  rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
+  indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
+  lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
+  names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
+  subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
