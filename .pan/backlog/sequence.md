@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:50:07.099Z · model: claude-opus-5 · open: 820_
+_Last sequenced: 2026-09-24T20:57:53.345Z · model: claude-opus-5 · open: 818_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -131,6 +131,7 @@ _Last sequenced: 2026-09-24T20:50:07.099Z · model: claude-opus-5 · open: 820_
 | 155 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
 | 156 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
 | 157 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
+| 158 | PAN-4167 | XS | high | ok |  |  | Fork spawn-pending test sleeps 10ms instead of awaiting the mock: a false CI red that stalls the merge gate; fix is a vi.waitFor |
 | 159 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
 | 160 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
 | 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
@@ -189,7 +190,6 @@ _Last sequenced: 2026-09-24T20:50:07.099Z · model: claude-opus-5 · open: 820_
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 220 | PAN-4127 | S | high | ok |  |  | findLatestReviewRunDir scans for the retired review-<issue>-<millis> folder, so no current run ever marks a lane mid-round or done |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 228 | PAN-4145 | S | medium | ok |  |  | restart-fresh, restartAgent and resume relaunch fall back to literal model IDs, so harness policy checks a model pan start will not staff |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
@@ -355,7 +355,6 @@ _Last sequenced: 2026-09-24T20:50:07.099Z · model: claude-opus-5 · open: 820_
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
-| 396 | PAN-3915 | S | medium | ok |  |  | resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -787,7 +786,6 @@ _Last sequenced: 2026-09-24T20:50:07.099Z · model: claude-opus-5 · open: 820_
 | 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 835 | PAN-3914 | S | low | needs-refinement |  |  | Live, not dead: PR #4133 fixes its false review.redispatched journaling and PAN-4134 split off the synthesis gap; rest still needs re-triage |
 | 836 | PAN-3868 | XS | low | stale |  |  | Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists |
 | 837 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
 | 838 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
@@ -850,7 +848,7 @@ Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked eve
 
 ### PAN-4134 (rank 23)
 
-New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where "unknown" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two.
+New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where "unknown" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two. PAN-3914 closed this pass when PR #4133 merged, so its informs edge drops and the false review.redispatched journaling it caused is gone; the synthesis-recovery gap described here is untouched, so rank, score and condition hold.
 
 ### PAN-3977 (rank 25)
 
@@ -1135,10 +1133,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:50:07.099Z",
+  "generatedAt": "2026-09-24T20:57:53.345Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 820,
+  "openCount": 818,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1214,7 +1212,7 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "condition": "ok",
       "dependsOn": [],
       "why": "All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges",
-      "rationale": "New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where \"unknown\" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two.",
+      "rationale": "New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where \"unknown\" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two. PAN-3914 closed this pass when PR #4133 merged, so its informs edge drops and the false review.redispatched journaling it caused is gone; the synthesis-recovery gap described here is untouched, so rank, score and condition hold.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3477,19 +3475,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-4127",
-      "rank": 220,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "findLatestReviewRunDir scans for the retired review-<issue>-<millis> folder, so no current run ever marks a lane mid-round or done",
-      "rationale": "New since the prior pass, and a silent regression rather than a missing feature: findLatestReviewRunDir in reviewer-tree.ts still looks for directories named review-<ISSUE>-<unixMillis>, a naming scheme review-agent.ts stopped writing when runs moved to agent-<issue>-review-<head8>. It therefore returns null on every current run, which switches off two behaviours that already shipped — the PAN-915 mid-round check and the PAN-1048 lane-done check. The operator reads the reviewer tree to know where a convoy stands, so the cost is a status lie in both directions: a live reviewer working the new round renders as a stopped zombie and invites a kill, and a finished lane keeps showing as working until the synthesiser exits. The existing tests pass only because their fixtures still use the retired directory name, so the suite cannot catch it. Ranked high at 74 rather than critical because nothing wedges — dispatch, convoy and synthesis all run correctly and only the view is wrong — and placed in the score-72-to-76 band at a free rank, with no renumbering. Size S: the body carries a verified fix (read reviewRunId from the review parent state row instead of scanning, with no fallback needed since buildReviewerNodes already returns no lanes when reviewRunId is absent) plus acceptance criteria that fail before it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2874",
       "rank": 222,
       "size": "M",
@@ -5506,19 +5491,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify",
       "rationale": "Triage: review-convoy re-dispatch is now one deacon-lite routine (recoverStalledReviews); verify pan pause against it specifically. Still a real token-spend hole; rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3915",
-      "rank": 396,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health",
-      "rationale": "New this run: medium/58 — resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10802,19 +10774,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "skip"
     },
     {
-      "issue": "PAN-3914",
-      "rank": 835,
-      "size": "S",
-      "importance": "low",
-      "score": 18,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Live, not dead: PR #4133 fixes its false review.redispatched journaling and PAN-4134 split off the synthesis gap; rest still needs re-triage",
-      "rationale": "Rank, score, gate and planning held verbatim; only the verdict text moves. The prior why read \"stale, re-triage or close\" because the PAN-3917 cut deleted checkOrphanedCompletions and deacon.ts, but open PR #4133 (fix(cloister): stop recoverStalledReviews journaling no-op re-dispatches) is an active fix against this issue and PAN-4134 was carved out of it while that work was in flight, so calling it a candidate for closure is wrong. What remains after #4133 lands is the original claim -- a patrol looping nine times on PAN-3842 despite its panDoneRecoveredAt tombstone -- which still has to be re-verified against the two surviving deacon-lite routines before pickup, so the condition stays needs-refinement.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3868",
       "rank": 836,
       "size": "XS",
@@ -11285,6 +11244,20 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "New issue (2026-09-24), the only delta since the prior run. pushPlanArtifacts replays the whole local range through git merge-tree, so one superseded rendering of .pan/backlog/sequence.md aborts the push and origin keeps serving a stale ranked order that the Flywheel reads for pickup; the silent reset --keep refusal then adds another unpushed commit every run, so the failure compounds. Ranked 31 rather than into the vacated top slots: the acute incident was hand-repaired (main is level with origin, the identical untracked drafts removed), so the bug is latent until the next untracked-draft collision, and it ranks behind the actively-biting pipeline blockers at 19-30 while staying in the critical band because a stale sequence misdirects every Flywheel pickup. Root cause is verified in the body with a named file, a proposed fix, and three mechanical acceptance criteria.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4167",
+      "rank": 158,
+      "size": "XS",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fork spawn-pending test sleeps 10ms instead of awaiting the mock: a false CI red that stalls the merge gate; fix is a vi.waitFor",
+      "rationale": "Inserted at 158, in the high test-reliability band beside PAN-2421 (route-test flake) and PAN-2656: a single-file, fully specified fix — clear the mock history and await vi.waitFor on authorHandoffExternal instead of a 10ms real sleep — for a flake that already reported a false red on PR #4141 and burned its retry on a timeout.",
+      "gate": "auto",
+      "planning": "skip",
+      "isEpic": false
     }
   ],
   "edges": [
@@ -12374,13 +12347,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 1
     },
     {
-      "from": "PAN-3914",
-      "to": "PAN-4134",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3022",
       "to": "PAN-4145",
       "type": "informs",
@@ -12418,6 +12384,13 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
     {
       "from": "PAN-3923",
       "to": "PAN-4166",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-1824",
+      "to": "PAN-4167",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5

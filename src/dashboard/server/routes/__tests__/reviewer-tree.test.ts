@@ -376,7 +376,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
     // not inherit the orchestrator's "running" status (which left it showing
     // "working" with no terminal). The report .md is the authoritative signal.
     const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
-    const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+    const reviewRunDir = join(workspacePath, '.pan', 'review', RUN_ID);
     await mkdir(reviewRunDir, { recursive: true });
     await writeFile(join(reviewRunDir, 'correctness.md'), '# correctness review');
 
@@ -579,7 +579,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
 
   // ─── PAN-915: in-progress round disambiguates from completed-zombie ─────
   describe('PAN-915 in-progress round detection', () => {
-    it('reports running when session is alive, prior round archived as completed, AND a newer review-run dir exists with no output file yet', async () => {
+    it('reports running when session is alive, prior round archived as completed, AND the current run dir exists with no output file yet', async () => {
       const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
       await seedStateRow('correctness');
       // Archive a prior round as completed (would normally trigger zombie)
@@ -589,9 +589,9 @@ describe('buildReviewerNodes (PAN-830)', () => {
         JSON.stringify({ round: 1, status: 'completed', success: true }),
       );
 
-      // Spin up a workspace dir with a NEW round folder but no <role>.md yet
+      // The current run's folder (the parent's reviewRunId) exists, but no <role>.md yet
       const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
-      const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+      const reviewRunDir = join(workspacePath, '.pan', 'review', RUN_ID);
       await mkdir(reviewRunDir, { recursive: true });
 
       const liveSet = new Set<string>([correctness]);
@@ -612,7 +612,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
       expect(node.tmuxSession).toBe(correctness);
     });
 
-    it('reports zombie (idle) when session alive, prior round completed, AND output file already exists in latest run dir', async () => {
+    it('reports zombie (idle) when session alive, prior round completed, AND output file already exists in the current run dir', async () => {
       const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
       await seedStateRow('correctness');
       await mkdir(join(agentsDir, correctness), { recursive: true });
@@ -622,7 +622,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
       );
 
       const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
-      const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+      const reviewRunDir = join(workspacePath, '.pan', 'review', RUN_ID);
       await mkdir(reviewRunDir, { recursive: true });
       // Output file exists — round done, session is a zombie
       await writeFile(join(reviewRunDir, 'correctness.md'), '# done');
@@ -644,6 +644,35 @@ describe('buildReviewerNodes (PAN-830)', () => {
       expect(node.status).toBe('stopped');
       expect(node.presence).toBe('idle');
       expect(node.tmuxSession).toBeUndefined();
+    });
+
+    it('ignores a report in an old-named review-<ISSUE>-<millis> dir: only the current run counts', async () => {
+      const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+      await seedStateRow('correctness');
+      await writeFile(
+        join(agentsDir, correctness, 'round-1.json'),
+        JSON.stringify({ round: 1, status: 'completed', success: true }),
+      );
+
+      const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
+      await mkdir(join(workspacePath, '.pan', 'review', RUN_ID), { recursive: true });
+      const legacyDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+      await mkdir(legacyDir, { recursive: true });
+      await writeFile(join(legacyDir, 'correctness.md'), '# stale');
+
+      const nodes = await buildReviewerNodes({
+        issueId: ISSUE_ID,
+        projectKey: PROJECT_KEY,
+        workspacePath,
+        tmuxSessionNames: new Set<string>([correctness]),
+        startedAt: '2026-01-01T00:00:00Z',
+        status: 'completed',
+        agentsDirOverride: agentsDir,
+      });
+
+      const node = nodes.find(n => n.role === 'correctness')!;
+      expect(node.status).toBe('running');
+      expect(node.presence).toBe('active');
     });
 
     it('falls back to legacy zombie detection when no review-run dir exists in workspace', async () => {
