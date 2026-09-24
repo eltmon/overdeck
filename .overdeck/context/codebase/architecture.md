@@ -12,7 +12,7 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 | `src/dashboard/server/` | Effect.js HTTP server + raw WebSocket terminal streaming. Entry `main.ts`, routes in `routes/`, services in `services/`. Runs ONLY as built `dist/dashboard/server.js` under Node 22. |
 | `src/dashboard/frontend/` | React + Zustand + Vite SPA. Components under `src/components/`. |
 | `packages/contracts/` | Shared types/schemas (`@overdeck/contracts`) used by server + frontend (e.g. `Harness` union at `src/types.ts:49`). |
-| `sync-sources/skills/` | Bundled skills (wrapper skills for `pan` verbs, lint-enforced vs `--help`), distributed by `pan sync`. There is no top-level `skills/`. |
+| `skills/` | Claude Code wrapper skills for `pan` verbs (lint-enforced vs `--help`). |
 | `roles/` | Prompt sources for pipeline roles (plan/work/review/test + review sub-roles). |
 | `sync-sources/rules/` | Bundled context rules distributed by `pan sync`. |
 
@@ -107,4 +107,4 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
 
-<!-- last-verified: 2026-09-19 -->
+<!-- last-verified: 2026-09-16 -->
