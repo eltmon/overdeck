@@ -8,7 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { appendCostEventSync, CostEvent, eventsFileExists, getLastEventMetadataSync } from './events.js';
 import { getPricingSync, calculateCostSync, TokenUsage } from '../cost.js';
 
@@ -48,7 +48,7 @@ function getAgentsDir(): string {
 }
 
 function getClaudeProjectsDir(): string {
-  return join(process.env.HOME || homedir(), '.claude', 'projects');
+  return claudeProjectsRoot(process.env.HOME || homedir());
 }
 
 function getProjectsYamlPath(): string {

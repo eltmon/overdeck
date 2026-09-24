@@ -1,4 +1,4 @@
-import { museDataHome } from './runtimes/muse-session.js';
+import { museDataHome } from './runtimes/storage/muse.js';
 import { prepareClaudeContext } from './launcher-context.js';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';

@@ -43,7 +43,7 @@ import {
   summarizeSerializedText as mockedSummarize,
 } from '../smart-compaction.js';
 import { getTranscriptAdapter } from '../transcript-adapter.js';
-import { kimiSessionsRoot } from '../../runtimes/kimi-code.js';
+import { kimiSessionsRoot } from '../../runtimes/storage/kimi-code.js';
 import {
   resolveAcpTranscriptPath,
   resolveCodexRolloutPath,

@@ -14,7 +14,6 @@ vi.mock('fs', async () => {
 });
 
 import {
-  claudeSessionTranscriptExists,
   getDocsBudgetStatePath,
   getDocsDir,
   getDocsDisableStatePath,
@@ -24,8 +23,8 @@ import {
   packageRoot,
   piExtensionCandidates,
   resolvePackageRootForDir,
-  sessionFilePath,
 } from '../paths.js';
+import { claudeSessionTranscriptExists, sessionFilePath } from '../runtimes/storage/claude-code.js';
 
 describe('Claude session transcript paths', () => {
   it.effect('reports a present transcript', () =>

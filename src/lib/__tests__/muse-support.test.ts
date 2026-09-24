@@ -13,7 +13,7 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getAvailableModelsApi } from '../settings-api.js';
 import { mergeConfigs } from '../config-yaml/merge.js';
 import { parseMuseRecords, summarizeMuseRecords } from '../cost-parsers/muse-parser.js';
-import { museDataHome, resolveMuseSessionPath } from '../runtimes/muse-session.js';
+import { museDataHome, resolveMuseSessionPath } from '../runtimes/storage/muse.js';
 import { renderForHarness } from '../context-layers/harness.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
 import { readSessionIndexSync } from '../session-history.js';

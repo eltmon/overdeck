@@ -61,7 +61,8 @@ import {
 } from './review-convoy.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
+import { AGENTS_DIR, packageRoot } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { withReviewLifecycleGuard } from '../review-lifecycle-guard.js';

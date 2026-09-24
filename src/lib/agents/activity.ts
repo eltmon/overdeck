@@ -1,10 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { getAgentDir, getAgentStateSync } from './agent-state-read.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
-import { encodeClaudeProjectDir } from '../paths.js';
-import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex.js';
+import { claudeProjectDir } from '../runtimes/storage/claude-code.js';
+import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { readLatestAgentClaudeSessionIdEventSync } from '../overdeck/event-reads.js';
@@ -134,10 +133,6 @@ export interface ClaudeSessionRecoveryDeps {
   readEventSessionId: typeof readLatestAgentClaudeSessionIdEventSync;
   transcriptExists: (workspace: string, sessionId: string) => boolean;
   log: (message: string) => void;
-}
-
-function claudeProjectDir(workspace: string): string {
-  return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspace));
 }
 
 function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {

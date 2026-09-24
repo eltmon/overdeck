@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import * as forksModule from '../../../../../src/lib/overdeck/conversation-forks.js';
-import { sessionFilePath } from '../../../../../src/lib/paths.js';
+import { sessionFilePath } from '../../../../../src/lib/runtimes/storage/claude-code.js';
 
 vi.mock('../../../../../src/lib/conversations/summary-fork.js', async () => {
   const { vi } = await import('vitest');

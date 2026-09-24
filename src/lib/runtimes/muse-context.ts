@@ -7,7 +7,7 @@ import { renderGlobalLayer, renderProjectLayer } from '../context-layers/render.
 import { resolveWorkspaceContextFile } from '../context-layers/layers.js';
 import { renderForHarness } from '../context-layers/harness.js';
 import { workspaceContextWithoutProjectLayer } from '../context-layers/assemble.js';
-import { museDataHome } from './muse-session.js';
+import { museDataHome } from './storage/muse.js';
 
 export async function materializeMuseContext(agentId: string, workspace: string, roleFile?: string): Promise<string> {
   museDataHome(agentId); // Validate identity before forming artifact paths.

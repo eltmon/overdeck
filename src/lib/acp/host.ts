@@ -38,6 +38,7 @@ import {
   type AcpSessionRuntimeStartResult,
 } from "./session-runtime.js";
 import { AcpTranscriptWriter, readOwedAcpPrompts } from "./transcript.js";
+import { ACP_TRANSCRIPT_FILE } from "../runtimes/storage/acp.js";
 
 const FILE_MODE = 0o600;
 export const OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS = 60_000;
@@ -596,7 +597,7 @@ export class AcpHost {
   }
 
   private transcriptPath(): string {
-    return join(this.agentDir(), "acp-session.jsonl");
+    return join(this.agentDir(), ACP_TRANSCRIPT_FILE);
   }
 }
 

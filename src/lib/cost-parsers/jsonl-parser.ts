@@ -7,8 +7,7 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, basename } from 'path';
-import { homedir } from 'os';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { TokenUsage, calculateCostSync, getPricingSync, AIProvider, logCostSync, CostEntry } from '../cost.js';
 
 // Claude Code JSONL message format
@@ -72,7 +71,7 @@ export interface SessionUsage {
 
 // Claude projects directory
 function getClaudeProjectsDir(): string {
-  return process.env.CLAUDE_PROJECTS_DIR || join(homedir(), '.claude', 'projects');
+  return process.env.CLAUDE_PROJECTS_DIR || claudeProjectsRoot();
 }
 
 /**

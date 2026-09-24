@@ -16,7 +16,7 @@ import { promises as fs } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { listProjectsSync } from '../projects.js';
 import { FsError } from '../errors.js';
 

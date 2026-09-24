@@ -32,6 +32,7 @@ import { classifySessionBucket, type ConversationSessionLookup } from './attribu
 import type { CostEvent } from './events.js';
 import { lookupSkipVerdict, recordSkipVerdict } from './skip-cache.js';
 import { readSessionIndexWithLegacySync } from '../session-history.js';
+import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
 
 // ============== Types ==============
 
@@ -127,7 +128,7 @@ function getAgentsDir(): string {
 }
 
 function getClaudeProjectsDir(): string {
-  return join(process.env.HOME || homedir(), '.claude', 'projects');
+  return claudeProjectsRoot(process.env.HOME || homedir());
 }
 
 /**

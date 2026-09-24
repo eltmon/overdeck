@@ -12,7 +12,7 @@ import { access } from 'node:fs/promises';
 import { Effect } from 'effect';
 import { getAgentStateSync, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, normalizeAgentId } from './agents.js';
 import { hasCompletionMarkerForAgent } from './agents/supervisor-channels.js';
-import { claudeSessionTranscriptExists } from './paths.js';
+import { claudeSessionTranscriptExists } from './runtimes/storage/claude-code.js';
 import { getPrFacts } from './cloister/pr-facts.js';
 import { isAlive, isAliveSync, isConfirmedDead } from './agents/liveness.js';
 

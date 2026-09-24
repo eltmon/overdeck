@@ -25,7 +25,6 @@ vi.mock('../../paths.js', async (importOriginal) => ({
   COSTS_DIR: '/tmp/pan-test-runtime-dispatch/costs',
   HEARTBEATS_DIR: '/tmp/pan-test-runtime-dispatch/heartbeats',
   ARCHIVES_DIR: '/tmp/pan-test-runtime-dispatch/archives',
-  encodeClaudeProjectDir: (p: string) => p,
 }))
 
 import {

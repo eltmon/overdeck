@@ -18,7 +18,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 
 export interface ReservedForkSession {
   sessionId: string;
@@ -29,7 +29,7 @@ export interface ReservedForkSession {
 export async function reserveForkSession(cwd: string): Promise<ReservedForkSession> {
   const sessionId = randomUUID();
   const encodedDir = encodeClaudeProjectDir(cwd);
-  const sessionsDir = join(process.env.HOME ?? '', '.claude', 'projects', encodedDir);
+  const sessionsDir = join(claudeProjectsRoot(process.env.HOME ?? ''), encodedDir);
   await mkdir(sessionsDir, { recursive: true });
   return { sessionId, sessionFile: join(sessionsDir, `${sessionId}.jsonl`) };
 }

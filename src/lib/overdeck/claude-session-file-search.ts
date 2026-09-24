@@ -12,8 +12,8 @@
  */
 import { existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
 
 const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
@@ -66,7 +66,7 @@ export async function findClaudeSessionFileById(sessionId: string): Promise<stri
   const cached = cachedLookup(sessionId);
   if (cached !== undefined) return cached;
   try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const claudeProjects = claudeProjectsRoot();
     const dirs = await readdir(claudeProjects);
     const candidates = dirs
       .filter((dir) => SAFE_DIR_PATTERN.test(dir))
@@ -95,7 +95,7 @@ export async function findSubagentTranscriptById(agentId: string): Promise<strin
   const cached = cachedLookup(agentId);
   if (cached !== undefined) return cached;
   try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const claudeProjects = claudeProjectsRoot();
     const projectDirs = (await readdir(claudeProjects)).filter((dir) => SAFE_DIR_PATTERN.test(dir));
     for (const projectDir of projectDirs) {
       let sessionDirs: string[];

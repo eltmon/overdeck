@@ -10,7 +10,7 @@ import { getClaudePermissionFlagsStringSync } from '../../../../lib/claude-permi
 import { normalizeModelName } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../../lib/cost.js';
 import { loadConfigSync, resolveModel } from '../../../../lib/config-yaml.js';
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
+import { encodeClaudeProjectDir } from '../../../../lib/runtimes/storage/claude-code.js';
 import { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } from '../../../../lib/project-repos.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getAgentCommandSync } from '../../../../lib/settings.js';

@@ -25,7 +25,8 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
-import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
+import { packageRoot } from '../paths.js';
+import { encodeClaudeProjectDir, sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';
 import { runModelSummary } from './smart-compaction.js';

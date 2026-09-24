@@ -1,4 +1,12 @@
-/** Muse Code 1.0.2 durable sessions, isolated by Overdeck agent identity. */
+/**
+ * Muse transcript storage (PAN-3958 CH-7, D11): the only place that knows where
+ * Muse Code 1.0.2 keeps its durable sessions, isolated by Overdeck agent identity —
+ * `<agentsRoot>/<agentId>/muse-data/muse/sessions/YYYY/MM/DD/<session-id>/session.jsonl`.
+ *
+ * Leaf module: imports only `node:*` and `../../paths.js`, so any layer can import
+ * it without creating a cycle. `npm run lint:harness-storage` keeps these paths from
+ * being rebuilt anywhere else.
+ */
 
 /**
  * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
@@ -11,7 +19,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { readdirSync, statSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
-import { getOverdeckHome } from '../paths.js';
+import { getOverdeckHome } from '../../paths.js';
 
 export function museDataHome(agentId: string, agentsRoot = join(getOverdeckHome(), 'agents')): string {
   if (!/^[a-zA-Z0-9_-]+$/.test(agentId)) throw new Error('Invalid Muse agent identity');
@@ -20,6 +28,11 @@ export function museDataHome(agentId: string, agentsRoot = join(getOverdeckHome(
 
 export function museSessionsRoot(agentId: string, agentsRoot?: string): string {
   return join(museDataHome(agentId, agentsRoot), 'muse', 'sessions');
+}
+
+/** Whether `path` is a Muse session transcript (`…/muse-data/muse/sessions/<id>/session.jsonl`). */
+export function isMuseSessionPath(path: string): boolean {
+  return path.includes('/muse-data/muse/sessions/') && path.endsWith('/session.jsonl');
 }
 
 export function museSessionId(path: string): string {

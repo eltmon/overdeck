@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { saveAgentRuntimeState, saveAgentStateSync, saveSessionId } from '../../../../src/lib/agents.js';
-import { encodeClaudeProjectDir } from '../../../../src/lib/paths.js';
+import { encodeClaudeProjectDir } from '../../../../src/lib/runtimes/storage/claude-code.js';
 import { setReviewStatusSync } from '../../../../src/lib/review-status.js';
 import type { OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 

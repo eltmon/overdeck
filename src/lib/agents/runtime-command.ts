@@ -30,6 +30,7 @@ import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
 import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
 import { getClaudeCodeLaunchModelSync } from '../kimi-claude-routing.js';
+import { codexSessionsRoot } from '../runtimes/storage/codex.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -234,7 +235,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
     codexMode: codexConfig?.transport === 'tui' ? 'work-tui' : 'app-server',
     codexEffort: effort ?? 'high',
     codexHome,
-    codexSessionDir: join(codexHome, 'sessions'),
+    codexSessionDir: codexSessionsRoot(codexHome),
     model,
   };
 }

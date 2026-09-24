@@ -1,5 +1,5 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
-import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
 import { Effect } from 'effect';

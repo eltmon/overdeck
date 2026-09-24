@@ -14,7 +14,7 @@
 
 import { promises as fs } from 'fs';
 import { basename, join, relative, resolve } from 'path';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { homedir } from 'os';
 
 import {

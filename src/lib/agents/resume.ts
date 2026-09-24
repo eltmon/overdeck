@@ -7,7 +7,7 @@ import { buildCompactRecoverySeedMessage } from '../context-overflow.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
-import { claudeSessionTranscriptExists, sessionFilePath } from '../paths.js';
+import { claudeSessionTranscriptExists, sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';

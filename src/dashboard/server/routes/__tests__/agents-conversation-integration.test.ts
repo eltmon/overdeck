@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
+import { encodeClaudeProjectDir } from '../../../../lib/runtimes/storage/claude-code.js';
 import { buildAgentConversationResult } from '../agents.js';
 
 describe('agent conversation resolver integration', () => {

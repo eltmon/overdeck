@@ -29,7 +29,7 @@ import {
   getConversationByName,
   recordConversationHandoff,
 } from '../conversations.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 import * as forks from '../conversation-forks.js';
 
 const conversation = {

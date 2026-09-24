@@ -1,4 +1,4 @@
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { parseRelativeTime } from '../conversations/search.js';
 import {
   archiveConversation,

@@ -22,8 +22,8 @@ vi.mock('../../../src/lib/agents/supervisor-channels.js', () => ({
   hasCompletionMarkerForAgent: mocks.hasCompletionMarkerForAgent,
 }));
 
-vi.mock('../../../src/lib/paths.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../src/lib/paths.js')>()),
+vi.mock('../../../src/lib/runtimes/storage/claude-code.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/runtimes/storage/claude-code.js')>()),
   claudeSessionTranscriptExists: mocks.claudeSessionTranscriptExists,
 }));
 

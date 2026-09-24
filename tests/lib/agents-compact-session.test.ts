@@ -37,7 +37,7 @@ let sessionFilePath: (workspace: string, sessionId: string) => string;
 
 beforeAll(async () => {
   ({ buildCompactRecoverySeed } = await import('../../src/lib/agents.js'));
-  ({ sessionFilePath } = await import('../../src/lib/paths.js'));
+  ({ sessionFilePath } = await import('../../src/lib/runtimes/storage/claude-code.js'));
 });
 
 function writeAgent(opts: { workspace?: string; sessionId?: string }): void {

@@ -8,10 +8,12 @@ import {
   type AgentState,
 } from '../agents.js';
 import { resolveLatestSessionIdSync } from '../agents/activity.js';
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { extractPiTranscript, extractCodexTranscript } from '../session-format-converter.js';
-import { findRolloutPath, writeThreadId as _writeThreadId } from '../runtimes/codex.js';
+import { writeThreadId as _writeThreadId } from '../runtimes/codex.js';
+import { findRolloutPath } from '../runtimes/storage/codex.js';
 import { compressJsonlBuffer } from './compress.js';
+import { piSessionsRoot } from '../runtimes/storage/pi.js';
 
 export interface TranscriptEntry {
   agentId: string;
@@ -303,7 +305,7 @@ async function readPiSessionId(agent: RunningAgent): Promise<string | null> {
 }
 
 async function resolvePiTranscriptPath(agent: RunningAgent, sessionId: string): Promise<string | null> {
-  const sessionDir = join(getAgentDir(agent.id), 'sessions');
+  const sessionDir = piSessionsRoot(getAgentDir(agent.id));
   let entries: string[];
   try {
     entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl')).sort();

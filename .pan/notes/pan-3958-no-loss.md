@@ -1165,3 +1165,98 @@ still calls both twins (`concurrency.ts`), tests mock both.
 - `runtime.json`: `stopAgentSync`'s `saveAgentRuntimeState(id, { state: 'stopped' })` writes no file any more; it only
   emits the `activity: stopped` heartbeat, which `stopAgent` already emits (detached). The two paths match; no change.
 
+
+## CH-7: one owner per harness for transcript/session/home paths (#4013)
+
+PRD W9, D11, FR-9, W11 part 4. Every function that knows where a harness keeps its transcripts moves, body unchanged,
+into `src/lib/runtimes/storage/<harness>.ts`, and every place that rebuilt one of those paths from a literal now asks
+that module. The modules import only `node:*` and `src/lib/paths.ts`; there are no re-export shims, and
+`scripts/lint-circular-deps.sh` reports no new cycle (64 baselined). `npm run lint:harness-storage` now fails on a
+storage literal anywhere else in `src/`.
+
+Behaviour is unchanged. `tests/unit/lib/agents/transcript-resolution-golden.test.ts` was committed first, against the
+unmoved code, and passes unchanged at the end: for claude-code, codex, kimi-code, pi, acp (OpenCode) and muse it pins
+(a) a `sessions.json` entry with a recorded absolute `path` resolving to that path, (b) a pre-PAN-3959 entry resolving
+through the harness formula, the watch roots, and the conversation-side `resolveSessionFile`. The resolver's
+`if (entry.path)` branch is untouched.
+
+Ratchets: façades A 1, B 4, C 35 (unchanged; the muse C row follows the rename
+`runtimes/muse-session.ts` → `runtimes/storage/muse.ts`). File-size caps lowered for `runtimes/codex.ts` (865 → 762),
+`ws-rpc.ts` (both rows → 1214) and `launcher-generator.ts` (1032 → 1021).
+
+### Moved exports (bodies and doc comments unchanged)
+
+| Old home | Export | New home |
+| --- | --- | --- |
+| `paths.ts` | `encodeClaudeProjectDir`, `claudeProjectDir`, `sessionFilePath`, `claudeSessionTranscriptExists`, `sessionIdFromFile` | `runtimes/storage/claude-code.ts` |
+| `runtimes/codex.ts` | `codexHome`, `extractThreadIdFromRollout`, `findLatestRollout` (+ private `readRolloutMetaLine`, `isSubagentRollout`) | `runtimes/storage/codex.ts` |
+| `runtimes/codex.ts` | `findRolloutPath` (was a re-export) | `runtimes/storage/codex.ts` |
+| `runtimes/codex-rollout-path.ts` (deleted) | `findRolloutPath`, `walkForThread`, the rollout path and miss caches | `runtimes/storage/codex.ts` |
+| `agents/external-paths.ts` | `codexHomeDir` | `runtimes/storage/codex.ts` |
+| `runtimes/kimi-code.ts` | `findKimiWirePath`, `findLatestKimiSession`, `kimiHomeDefault` (was private) | `runtimes/storage/kimi-code.ts` |
+| `runtimes/kimi-context-envelope.ts` | `kimiWorkDirKey`, `kimiSessionsRoot`, `findKimiWirePathAsync`, `findLatestKimiSessionAsync` | `runtimes/storage/kimi-code.ts` |
+| `runtimes/kimi-code.ts` | re-export of the four above | dropped (importers point at storage) |
+| `runtimes/pi.ts` | `piSessionsRoot`, `findPiTranscriptPath` (+ private `NON_TRANSCRIPT_JSONL`) | `runtimes/storage/pi.ts` |
+| `acp/transcript.ts` | `acpTranscriptPath` | `runtimes/storage/acp.ts` |
+| `runtimes/acp.ts` | re-export of `acpTranscriptPath` | dropped |
+| `runtimes/muse-session.ts` (renamed) | whole module | `runtimes/storage/muse.ts` |
+
+All paths are relative to `src/lib/`. The "Async twin" doc comment sat on `kimiHomeDefault` in `runtimes/kimi-code.ts`,
+left behind when the async pair moved to `kimi-context-envelope.ts`; it now sits on `findKimiWirePathAsync`, and
+`kimiHomeDefault` gets a one-line doc of its own.
+
+### New accessors (named forms of literals that were repeated)
+
+| Module | Accessor | Replaces |
+| --- | --- | --- |
+| `storage/claude-code.ts` | `claudeProjectsRoot(home = homedir())` | `join(<home>, '.claude', 'projects')`; callers that read `process.env.HOME` first pass it, so the resolved home is unchanged |
+| `storage/codex.ts` | `codexDefaultHome()` | `join(homedir(), '.codex')` where `$CODEX_HOME` was deliberately ignored (conversation discovery) |
+| `storage/codex.ts` | `codexSessionsRoot(home)` | `join(<codex home>, 'sessions')` |
+| `storage/kimi-code.ts` | `kimiHomeDefault()` (now exported) | `join(homedir(), '.kimi-code')` |
+| `storage/kimi-code.ts` | `kimiWirePath(home, workDir, sessionId)` | `join(kimiSessionsRoot(...), id, 'agents', 'main', 'wire.jsonl')` |
+| `storage/kimi-code.ts` | `isKimiWirePath(path)` | `endsWith('/agents/main/wire.jsonl')` |
+| `storage/pi.ts` | `piUserAgentDir()` | `join(homedir(), '.pi', 'agent')` (with `piSessionsRoot` for `…/sessions`) |
+| `storage/acp.ts` | `ACP_TRANSCRIPT_FILE` | the `'acp-session.jsonl'` literal |
+| `storage/muse.ts` | `isMuseSessionPath(path)` | the `/muse-data/muse/sessions/…/session.jsonl` test in `overdeck/conversation-reads.ts` |
+
+`codexHome()` (`$CODEX_HOME ?? ~/.codex`) and `codexHomeDir()` (`$CODEX_HOME?.trim() || ~/.codex`) differ on an empty or
+whitespace `CODEX_HOME`; both are kept as they were.
+
+### Literal sites rewritten
+
+Claude: `agent-enrichment.ts`, `agents/activity.ts` (private `claudeProjectDir` copy removed), `runtimes/claude-code.ts`,
+`agents/external-paths.ts`, `agents/transcript-resolver.ts`, `conversations/transcript-path.ts`,
+`conversations/harness-discovery.ts`, `overdeck/conversation-forks.ts`, `overdeck/claude-session-file-search.ts`,
+`conversation-search/indexer.ts`, `dashboard/server/services/conversation-search-watcher.ts`,
+`dashboard/server/services/conversation-lifecycle.ts`, `dashboard/server/services/conversation/session-files.ts`,
+`dashboard/server/routes/agents/control.ts`, `costs/migration.ts`, `costs/reconciler.ts`,
+`conversations/session-fork.ts`, `cost-parsers/jsonl-parser.ts`. Kimi: `runtimes/kimi-code.ts`, `agents/recovery.ts`,
+`agents/transcript-resolver.ts`, `overdeck/conversation-runtime.ts`, `overdeck/conversation-reads.ts`. Codex:
+`cli/commands/cost.ts`, `conversations/harness-discovery.ts`, `runtimes/codex.ts`, `agents/runtime-command.ts`,
+`overdeck/conversation-runtime.ts`, `dashboard/server/services/codex-plugin-importer.ts`. Pi: `cli/commands/cost.ts`,
+`conversations/harness-discovery.ts`, `overdeck/conversation-runtime.ts`, `memory/transcript-source.ts`. ACP:
+`acp/host.ts`, `conversations/harness-discovery.ts`, `overdeck/conversation-reads.ts`. Muse:
+`overdeck/conversation-reads.ts`.
+
+### Left in place, with the reason
+
+| Site | Why |
+| --- | --- |
+| `claude-settings-overlay.ts:73-75,93-94` | permission deny rules that protect transcripts from `rm`; allowlisted in the lint |
+| `remote/remote-completion.ts:198` | a shell glob run on a remote Fly VM, not a local path; allowlisted |
+| `harness-binary.ts:193` | Kimi's binary install dir, not transcript storage; allowlisted |
+| `cli/commands/conversations/index.ts:31,33` | CLI help text; allowlisted |
+| `.codex/auth.json`, `~/.pi/agent/auth.json`, `~/.pi/agent/settings.json`, context-layer `AGENTS.md`, `paths.ts` `LEGACY_RUNTIME_DIRS` | auth and config, not transcript storage; out of scope |
+| `runtimes/ohmypi.ts`, `ohmypi-models.ts`, the `.omp` discovery root | Oh My Pi is #4003 |
+| `overdeck/conversation-reads.ts` `isCodexSessionFile`, `memory/reconciliation.ts`, `runtimes/codex-subagents.ts`, `runtimes/codex.ts` rollout recognizers | classify a path already in hand by its `codex-home/sessions` or `rollout-*.jsonl` shape; no storage literal the lint names |
+| `palette.ts` project encoding | a different encoding scheme, not Claude's project dir |
+
+OpenCode has no `opencode.db` code in this repo: it runs over ACP and its transcript is Overdeck's
+`acp-session.jsonl`, owned by `storage/acp.ts`. There is no `storage/ohmypi.ts` (#4003).
+
+### Tests
+
+None are deleted. The golden test and `tests/unit/scripts/lint-harness-storage.test.ts` are new. Imports, `vi.mock`
+factories, namespace spies (`vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists')`) and dynamic imports in tests
+follow the moved exports to their storage module; `registry-dispatch.test.ts` drops an `encodeClaudeProjectDir` entry
+from its `paths.js` mock, which no longer exports it.

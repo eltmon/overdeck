@@ -11,8 +11,8 @@ C 1 src/lib/agents/termination.ts
 C 1 src/lib/config.ts
 C 1 src/lib/prd-locations.ts
 C 1 src/lib/projects-config-lock.ts
-C 1 src/lib/runtimes/muse-session.ts
 C 1 src/lib/runtimes/ohmypi.ts
+C 1 src/lib/runtimes/storage/muse.ts
 C 1 src/lib/ui-theme.ts
 C 1 src/lib/work-agent-lifecycle.ts
 C 2 src/lib/agents/agent-state.ts

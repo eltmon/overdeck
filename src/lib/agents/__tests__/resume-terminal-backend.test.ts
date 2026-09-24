@@ -132,7 +132,7 @@ import { resumeAgent } from '../resume.js';
 import { registerTerminalBackend } from '../../terminal-backends/registry.js';
 import { getAgentDir, getAgentStateSync, saveAgentStateSync } from '../agent-state.js';
 import { appendSessionIdToHistory } from '../../session-history.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 
 let herdr: FakeTerminalBackend;
 let tmux: FakeTerminalBackend;

@@ -33,12 +33,8 @@ import { readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  checkRegularFileUnder,
-  checkTranscriptPath,
-  codexHomeDir,
-  readRegularFile,
-} from '../../../lib/agents/external-paths.js';
+import { checkRegularFileUnder, checkTranscriptPath, readRegularFile } from '../../../lib/agents/external-paths.js';
+import { codexHomeDir, codexSessionsRoot } from '../../../lib/runtimes/storage/codex.js';
 import {
   EXTERNAL_AGENT_PREFIX,
   externalAgentId,
@@ -220,7 +216,7 @@ export async function walkForRollout(sessionsRoot: string, threadId: string): Pr
  * a running job's rollout may not exist yet).
  */
 async function defaultFindRollout(codexHome: string, threadId: string, createdAt: string | null): Promise<string | null> {
-  const sessionsRoot = join(codexHome, 'sessions');
+  const sessionsRoot = codexSessionsRoot(codexHome);
   const created = createdAt ? Date.parse(createdAt) : Number.NaN;
   if (Number.isFinite(created)) {
     for (const ms of [created, created - DAY_MS, created + DAY_MS]) {

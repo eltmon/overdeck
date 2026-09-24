@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, probeTranscriptSince } from '../transcript-landing.js';
 
 let tmpHome: string;

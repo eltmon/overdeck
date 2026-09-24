@@ -103,7 +103,7 @@
     "typecheck:acp": "tsc --noEmit -p packages/effect-acp/tsconfig.json",
     "typecheck:hooks": "tsc --noEmit -p tsconfig.hooks.json",
     "typecheck:evals": "tsc --noEmit -p tsconfig.evals.json",
-    "lint": "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:no-state-layer && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:liveness && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit && npm run lint:effect-facades && npm run lint:effect-diagnostics",
+    "lint": "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:no-state-layer && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:liveness && npm run lint:harness-storage && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit && npm run lint:effect-facades && npm run lint:effect-diagnostics",
     "lint:effect-diagnostics": "bash scripts/lint-effect-diagnostics.sh",
     "lint:effect-facades": "bash scripts/lint-effect-facades.sh",
     "lint:pipeline-membership": "bash scripts/lint-pipeline-membership.sh",
@@ -143,6 +143,7 @@
     "prepare": "husky && effect-language-service patch",
     "typecheck:dashboard": "bash scripts/lint-dashboard-types.sh",
     "typecheck:frontend": "bash scripts/lint-frontend-types.sh",
+    "lint:harness-storage": "bash scripts/lint-harness-storage.sh",
     "lint:liveness": "bash scripts/lint-liveness.sh"
   },
   "dependencies": {

@@ -20,7 +20,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getEventStore } from '../event-store.js';
 import { getAgentRuntimeState, getAgentStateSync, listRunningAgents, type AgentState } from '../../../lib/agents.js';
-import { sessionFilePath } from '../../../lib/paths.js';
+import { sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
 import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { ReadModelService } from '../read-model.js';

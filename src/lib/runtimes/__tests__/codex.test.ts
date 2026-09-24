@@ -3,7 +3,8 @@ import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, writeFileS
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CodexRuntimeSync, findRolloutPath, writeThreadId, recordCodexRolloutSession, initCodexHome, extractThreadIdFromRollout, findLatestRollout, toCodexSandboxValue } from '../codex.js'
+import { CodexRuntimeSync, writeThreadId, recordCodexRolloutSession, initCodexHome, toCodexSandboxValue } from '../codex.js'
+import { findRolloutPath, extractThreadIdFromRollout, findLatestRollout } from '../storage/codex.js'
 import { readSessionIndexSync } from '../../session-history.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
