@@ -36,6 +36,7 @@ import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitM
 import { MarkdownFileLink } from './MarkdownFileLink';
 import { useFilePathExists } from '../../hooks/useFilePathExists';
 import { LRUCache } from '../../lib/lruCache';
+import { TranscriptLink } from './TranscriptPullRequestLink';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── LRU Cache for syntax highlighting ───────────────────────────────────────
@@ -427,16 +428,8 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: 
         !/^(javascript|data|vbscript):/i.test(href.trim())
           ? href
           : undefined;
-      return (
-        <a
-          href={safeHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.mdLink}
-        >
-          {children}
-        </a>
-      );
+      // PAN-3822: a PR/MR URL inside a conversation gets a link/unlink context menu.
+      return <TranscriptLink href={safeHref} className={styles.mdLink}>{children}</TranscriptLink>;
     },
   };
 }

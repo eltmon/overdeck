@@ -135,6 +135,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
     }
     case 'review.verdict':
       return `${data.verdict ?? 'unknown'}${data.subRole ? ` (${data.subRole})` : ''}`;
+    case 'review.verdict-refused':
+      return `${data.status ?? 'unknown'} refused${typeof data.caller === 'string' ? ` (${data.caller})` : ''}`;
     case 'uat.verdict':
       return `${data.status ?? 'unknown'}${typeof data.anchor === 'string' ? ` head=${shortSha(data.anchor)}` : ''}`;
     case 'feedback.delivered':

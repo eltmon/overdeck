@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import { usePrQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
+import { LinkedConversations } from './LinkedConversations'
 
 function fileStatTone(additions: number, deletions: number): { mark: string; cls: string } {
   if (deletions > 0 && additions === 0) return { mark: 'D', cls: 'text-destructive-foreground' }
@@ -91,6 +92,7 @@ export function CodeCard({ issueId }: { issueId: string }) {
           {rest > 0 && <div className="pl-[22px] text-[11px] text-muted-foreground">+ {rest} more files</div>}
         </div>
       )}
+      {pr.url && <LinkedConversations prUrl={pr.url} />}
     </CockpitCard>
   )
 }

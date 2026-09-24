@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:54:34.002Z · model: claude-opus-5 · open: 804_
+_Last sequenced: 2026-09-24T23:10:45.655Z · model: claude-opus-5 · open: 805_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -88,6 +88,7 @@ _Last sequenced: 2026-09-24T22:54:34.002Z · model: claude-opus-5 · open: 804_
 | 115 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
 | 116 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
 | 117 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
+| 118 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
 | 119 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
 | 120 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
 | 121 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
@@ -1119,10 +1120,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:54:34.002Z",
+  "generatedAt": "2026-09-24T23:10:45.655Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 804,
+  "openCount": 805,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11062,6 +11063,19 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "rationale": "New since the prior pass and the second half of the work PR #4180 (PAN-3939) landed, so it takes the rank that issue vacated and nothing renumbers. #4180 made the synthesis dispatch guard and the per-issue killAllReviewerSessions ask the host's terminal backend, but two teardown paths in src/lib/cloister/review-agent.ts were left on the tmux door: killAllReviewSessions (~L734-772, called only by pan down at src/cli/index.ts:1155) builds its candidate list from listSessionNames() and kills through killSession, and the PAN-3674 failed-spawn catch block (~L641-644) checks listSessionNames().includes(reviewSessionName) before calling killSession and swallows every error. Herdr is the default backend, so on a normal host neither path finds anything: pan down prints 'No review sessions running' while reviewer panes and their idle harnesses survive the shutdown, and because #4180 made the dispatch guard isAlive-based, the next boot reads those survivors as live reviewers and refuses to dispatch review. That is the same wedge PAN-3674 was written to prevent, reintroduced from the close side, which is why this is critical rather than cleanup: a wedged review never reaches the merge gate, and the operator's only signal is a shutdown message that claims success. It is small and fully specified: route both paths through closeAgentPaneDetailed and stopAgent as killAllReviewerSessions already does, surface a failed close in the returned failed list or the dispatch error instead of swallowing it, leave that reviewer's row alone when the close fails, and scope the sweep to review agents only (agent-<issue>-review[-<lane>] rows with role review, legacy review tmux names, and Herdr panes whose agentId matches that pattern) so it can never touch a work agent or a conv-* pane. It shares the backend-abstraction door with PAN-3921 (rank 1) and the liveness read with PAN-4134 (rank 23), so landing it alongside them keeps one guard instead of three.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4184",
+      "rank": 118,
+      "size": "S",
+      "importance": "high",
+      "score": 81,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "--no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked",
+      "rationale": "New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified (\"very likely\"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12093,6 +12107,13 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-3899",
+      "to": "PAN-4184",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
     }
   ]
 }

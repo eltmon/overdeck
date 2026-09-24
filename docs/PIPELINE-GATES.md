@@ -330,6 +330,49 @@ requires checking prior fixes first and explaining newly discovered
 blockers. It never suppresses a confirmed blocker solely because a previous
 round missed it.
 
+## The override door is the operator's (#3853)
+
+`pan admin specialists done review` is both the review agent's verdict and
+the operator's override, so the command checks who is calling. The caller is
+read from `OVERDECK_AGENT_ID`, which every managed pane carries on Herdr and
+tmux alike (`cloister/verdict-caller.ts`): no id is an operator shell, a
+`conv-*` id is an operator conversation, and anything else is an agent
+session. An operator may record any review verdict. An agent session may
+record one only as the issue's own review session (`agent-<issue>-review` or
+its convoy).
+
+That review session's `blocked`/`failed` verdict is refused only when it is
+proven that the exact head commit carries an approval: with no new commit
+there is nothing new to review. Proof is a commit sha, never a date. It is
+either a GitHub review whose `commit.oid` is the PR's `headRefOid`, or a
+trusted `overdeck-verdict: APPROVED` marker whose `sha=` names the head. A
+marker's `sha=` is the commit the review run reviewed, taken from its run id
+(`agent-<issue>-review-<head8>`, or the review parent's current run when
+`--run-id` is absent), and it is written only when the PR head is still that
+commit. A head that moved during the review gets a marker without `sha=`, so a
+later cycle can block the new head. A forge review posted with `gh pr review`
+still attaches to the head at submit time (follow-up: post it through the
+reviews API with `commit_id`). The
+reviews are read only on this path (`forgeApprovalAtHead` in `pr-facts`), for
+an agent's rejection of an approved PR, so the shared PR read stays small.
+Anything short of proof lets the verdict through: a GitLab MR (GitLab ties no
+approval to a sha, and `mergeable` is not an approval), an approval of an
+older commit, an empty review list, a marker without `sha=`, or a failed
+read. Turning a real blocker into a pass is the worse failure.
+
+A run the operator asked for may always block. The dashboard's Request review
+and Re-run review (`/api/review/:id/trigger`, including the Full/Quick/None
+choice), a forced re-review of an approved PR, and the dashboard's review
+restart mark the review parent's state `reviewOperatorRequested`. `pan review
+restart` sends its caller kind; run from an agent pane (the flywheel, stall
+recovery) it grants nothing. Every dispatch rewrites that flag, so an automatic
+re-review (the PAN-3836 redundant cycle, `pan done`'s request) runs without it
+and is still refused. A refused verdict posts nothing and delivers no rework.
+It is journaled as `review.verdict-refused` (with the reason, caller, run id
+and notes) and raised as a warning in the activity feed. The agent is told to
+record no verdict, post its findings as a plain PR comment for the operator,
+and exit.
+
 ## Agent Auto-Resume Gates
 
 Auto-resume is intentionally suppressible:

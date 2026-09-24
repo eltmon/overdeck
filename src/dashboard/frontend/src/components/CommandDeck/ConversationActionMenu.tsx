@@ -9,6 +9,7 @@ import { fetchRegisteredProjects } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { useConfirm } from '../DialogProvider';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
+import { PullRequestMenuItems } from './PullRequestMenuItems';
 import styles from './styles/command-deck.module.css';
 
 interface ConversationActionMenuProps {
@@ -215,6 +216,8 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                 )}
               </span>
             )}
+
+            <PullRequestMenuItems conversation={conversation} mutations={mutations} onClose={onClose} />
 
             {/* Tab conveniences (PAN-1591): pop out + multi-close. Only rendered
                 when this menu was opened from a pane tab (onCloseTab present). */}
