@@ -63,6 +63,35 @@ describe('waitForConversationRuntimeReady — Claude Code exits before its promp
     await settled;
   });
 
+  // Review of #4137 (finding 3): the 84-character marker soft-wraps in a pane
+  // narrower than that, and capture-pane returns it split across two lines.
+  it('recognizes the marker when a narrow pane wraps it, and keeps its fragments out of the reason', async () => {
+    const wrapped = [
+      CONVERSATION_SESSION_ENDED_MARKER.slice(0, 40),
+      CONVERSATION_SESSION_ENDED_MARKER.slice(40, 80),
+      CONVERSATION_SESSION_ENDED_MARKER.slice(80),
+    ];
+    capturePane.mockResolvedValue(['Error: unknown model claude-nope', '', ...wrapped].join('\n'));
+
+    const ready = waitForConversationRuntimeReady('conv-narrow', 'claude-code', 'spawn');
+    const settled = expect(ready).rejects.toThrow(/exited before .*\. Last output: Error: unknown model claude-nope$/);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await settled;
+  });
+
+  it('reports the exit when the marker and a dialog ❯ share the capture', async () => {
+    capturePane.mockResolvedValue([
+      '❯ 1. Yes, I trust this folder',
+      'Error: model claude-nope is not available',
+      CONVERSATION_SESSION_ENDED_MARKER,
+    ].join('\n'));
+
+    const ready = waitForConversationRuntimeReady('conv-dialog-exit', 'claude-code', 'spawn');
+    const settled = expect(ready).rejects.toThrow('Last output: ❯ 1. Yes, I trust this folder | Error: model claude-nope is not available');
+    await vi.advanceTimersByTimeAsync(1_000);
+    await settled;
+  });
+
   it('throws on timeout when the process table shows no harness left in the pane', async () => {
     capturePane.mockResolvedValue('');
     readProcessTable.mockResolvedValue('100 1 bash\n130 100 sleep\n');

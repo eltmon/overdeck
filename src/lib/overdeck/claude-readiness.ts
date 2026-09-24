@@ -4,15 +4,25 @@ import { capturePane, exactPaneTarget, tmuxExecAsync } from '../tmux.js';
 import { paneTreeHasHarnessProcess, readProcessTable } from '../tmux-process-tree.js';
 
 /**
+ * The head of the launcher's "session ended" line. The full marker is 84
+ * characters and soft-wraps in a narrower pane (a dashboard client attached
+ * during the wait resizes it), so the match uses this prefix, which fits on
+ * one line at any usable width (review of #4137).
+ */
+const SESSION_ENDED_PREFIX = CONVERSATION_SESSION_ENDED_MARKER.slice(0, CONVERSATION_SESSION_ENDED_MARKER.indexOf('.') + 1);
+
+/**
  * The error for a harness that exited before its conversation started, with
  * the last pane lines the harness printed (its exit reason, when it gave one).
- * The launcher's own "session ended" line is not part of the reason.
+ * The launcher's own "session ended" line, wrapped or not, is not part of the
+ * reason: everything from its prefix on is dropped.
  */
 function harnessEarlyExitError(paneText: string): Error {
-  const lines = paneText
+  const markerAt = paneText.lastIndexOf(SESSION_ENDED_PREFIX);
+  const lines = (markerAt === -1 ? paneText : paneText.slice(0, markerAt))
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line && line !== CONVERSATION_SESSION_ENDED_MARKER);
+    .filter(Boolean);
   const tail = lines.slice(-5).join(' | ').slice(-500);
   return new Error(
     tail
@@ -72,7 +82,7 @@ export async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   let output = '';
   while (Date.now() < deadline) {
     output = await capturePane(tmuxSession, 200);
-    if (output.includes(CONVERSATION_SESSION_ENDED_MARKER)) throw harnessEarlyExitError(output);
+    if (output.includes(SESSION_ENDED_PREFIX)) throw harnessEarlyExitError(output);
     if (output.includes('❯')) {
       console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
       return;
