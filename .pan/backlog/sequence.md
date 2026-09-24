@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T18:51:20.491Z · model: claude-opus-5 · open: 822_
+_Last sequenced: 2026-09-24T19:16:40.169Z · model: claude-opus-5 · open: 820_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,7 @@ _Last sequenced: 2026-09-24T18:51:20.491Z · model: claude-opus-5 · open: 822_
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
 | 9 | PAN-4109 | M | critical | ok |  |  | Nine readers still filter on tmuxActive: on Herdr the health loop, emergencyStop and the memory governor's shed all see zero agents |
-| 11 | PAN-4108 | XS | high | ok |  |  | Every pan orders write commits .pan/orders on main and never pushes, so local main drifts ahead of origin before the next pipeline merge |
+| 10 | PAN-4116 | M | critical | ok |  |  | Every runtime's isRunning asks tmux only, so on the default Herdr backend live agents read stuck, pokes never fire and crashes miscount |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
@@ -97,7 +97,6 @@ _Last sequenced: 2026-09-24T18:51:20.491Z · model: claude-opus-5 · open: 822_
 | 120 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
 | 121 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
 | 122 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 123 | PAN-3954 | XS | medium | ok |  |  | pan merge cancel still DELETEs the dead /api/flywheel/auto-merge/:id route; 404s against a live dashboard; untested |
 | 124 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
 | 125 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
 | 126 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
@@ -558,7 +557,6 @@ _Last sequenced: 2026-09-24T18:51:20.491Z · model: claude-opus-5 · open: 822_
 | 599 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 600 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 601 | PAN-3157 | XS | medium | needs-refinement |  |  | Flywheel is now a plain conversation; re-scope as conversation-labeling UX so the Awareness feed names it instead of "No messages yet" |
-| 602 | PAN-3955 | XS | low | ok |  |  | configuration/auto-merge.mdx documents the dead pan flywheel config CLI and /api/flywheel/* endpoints; sweep to /api/merge-train/* |
 | 603 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 604 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 605 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -842,9 +840,9 @@ In pipeline — rank pinned. The sequencer half landed on main (reap through the
 
 Filed 2026-09-24, placed at rank 9 — freed when PAN-4097 closed — so it inherits its predecessor's slot in the same Herdr-blindness wave and no existing rank moves. PRs #4088, #4103 and #4107 moved the lifecycle guards, the output route and crash detection onto the backend-aware door (isAlive in src/lib/agents/liveness.ts plus the backend inventory), but nine readers still take liveness from the tmuxActive flag on listRunningAgents(), which reports tmux session presence on the overdeck socket alone and is therefore false for every agent on Herdr, the default backend. This is critical rather than high because two of those sites are protections, not reports: memory-governor.ts shed() never pauses a Herdr agent under HARD pressure and cannot protect a live agent's stack from the merged-stack shed, and service.ts emergencyStop() kills nothing — so the OOM defences the host relies on are inert on the default backend, while service-health.ts silently skips crash detection, pokes and stuck handling for the whole fleet. The body enumerates every site with the grep that finds them, states the safety rule (an unreachable backend must never read as dead where that drives a kill, restart, pause or stack stop), keeps tmuxActive where it is part of an API shape, and asks for scripts/lint-liveness.sh to be extended so the sites cannot regress. M rather than S because it is nine modules across CLI, Cloister and the dashboard server plus a lint ratchet.
 
-### PAN-4108 (rank 11)
+### PAN-4116 (rank 10)
 
-Filed 2026-09-24, slotted into rank 11 — freed when PAN-4105 closed — so no existing rank moves. It is the last un-migrated caller of the push door PR #4084 built for pan backlog write-sequence under PAN-3923: pushPlanArtifacts in src/lib/overdeck/plan-artifact-commit.ts pushes only unpushed commits that touch .pan/ alone and replays them onto a moved origin without forcing. commitOrders in src/cli/commands/orders.ts commits on main for all five write verbs (create, add, remove, move, queue) and stops there, so every Flywheel order-book edit leaves an unpushed commit on main — the divergence hazard CLAUDE.md names explicitly, paid back as reconciliation work at the next release or pipeline merge. High rather than critical because nothing is blocked and no state is lost; it is friction that compounds. XS because the door exists and the body scopes the change to one call plus warning-level failure surfacing, ruling the other commitPlanArtifacts callers (pan task, the pan done test waiver, planning promotion) out of scope as feature-branch writers.
+New since the prior pass and the direct sibling of PAN-4109 — the same tmux-only liveness blindness, one layer down in the runtimes. Herdr is the default backend, so isRunning returns false for every live agent: pokeAgentWithEscalation bails before it can unstick anything, getAgentHealth reports a working agent as stuck (feeding kill_on_stuck), and handleAgentCrash counts crashes without consulting the liveness oracle. The fix pattern is already landed in #4088/#4103/#4107 — route through isAlive in liveness.ts and require confirmed-dead before any crash action — so this is a small, well-specified change guarding the pipeline against killing healthy agents. Ranked at 10, immediately after PAN-4109.
 
 ### PAN-3930 (rank 15)
 
@@ -1137,10 +1135,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T18:51:20.491Z",
+  "generatedAt": "2026-09-24T19:16:40.169Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 822,
+  "openCount": 820,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -2312,19 +2310,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Workspace init container's bun install doesn't populate container-node-modules named volume",
       "rationale": "Workspace init container bun install does not populate the container-node-modules named volume.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3954",
-      "rank": 123,
-      "size": "XS",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan merge cancel still DELETEs the dead /api/flywheel/auto-merge/:id route; 404s against a live dashboard; untested",
-      "rationale": "One-line route fix plus a unit test; a real operator verb is broken today.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7985,18 +7970,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-3955",
-      "rank": 602,
-      "size": "XS",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "configuration/auto-merge.mdx documents the dead pan flywheel config CLI and /api/flywheel/* endpoints; sweep to /api/merge-train/*",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-947",
       "rank": 603,
       "size": "M",
@@ -11299,15 +11272,15 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-4108",
-      "rank": 11,
-      "size": "XS",
-      "importance": "high",
-      "score": 70,
+      "issue": "PAN-4116",
+      "rank": 10,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Every pan orders write commits .pan/orders on main and never pushes, so local main drifts ahead of origin before the next pipeline merge",
-      "rationale": "Filed 2026-09-24, slotted into rank 11 — freed when PAN-4105 closed — so no existing rank moves. It is the last un-migrated caller of the push door PR #4084 built for pan backlog write-sequence under PAN-3923: pushPlanArtifacts in src/lib/overdeck/plan-artifact-commit.ts pushes only unpushed commits that touch .pan/ alone and replays them onto a moved origin without forcing. commitOrders in src/cli/commands/orders.ts commits on main for all five write verbs (create, add, remove, move, queue) and stops there, so every Flywheel order-book edit leaves an unpushed commit on main — the divergence hazard CLAUDE.md names explicitly, paid back as reconciliation work at the next release or pipeline merge. High rather than critical because nothing is blocked and no state is lost; it is friction that compounds. XS because the door exists and the body scopes the change to one call plus warning-level failure surfacing, ruling the other commitPlanArtifacts callers (pan task, the pan done test waiver, planning promotion) out of scope as feature-branch writers.",
+      "why": "Every runtime's isRunning asks tmux only, so on the default Herdr backend live agents read stuck, pokes never fire and crashes miscount",
+      "rationale": "New since the prior pass and the direct sibling of PAN-4109 — the same tmux-only liveness blindness, one layer down in the runtimes. Herdr is the default backend, so isRunning returns false for every live agent: pokeAgentWithEscalation bails before it can unstick anything, getAgentHealth reports a working agent as stuck (feeding kill_on_stuck), and handleAgentCrash counts crashes without consulting the liveness oracle. The fix pattern is already landed in #4088/#4103/#4107 — route through isAlive in liveness.ts and require confirmed-dead before any crash action — so this is a small, well-specified change guarding the pipeline against killing healthy agents. Ranked at 10, immediately after PAN-4109.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12441,8 +12414,8 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 0.5
     },
     {
-      "from": "PAN-3923",
-      "to": "PAN-4108",
+      "from": "PAN-4109",
+      "to": "PAN-4116",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
