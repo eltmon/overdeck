@@ -53,8 +53,9 @@ decision. `postReviewVerdict` therefore tries two identities, in order:
    <!-- overdeck-verdict: CHANGES_REQUESTED sha=<head> -->
    ```
 
-   (or `APPROVED`), followed by the verdict body. `sha=` names the PR head the
-   verdict judged (#3853); a marker posted without it, or before it existed,
+   (or `APPROVED`), followed by the verdict body. `sha=` names the commit the
+   review run reviewed (#3853), and is written only while that commit is still
+   the PR head; a marker posted without it, or before it existed,
    still reads as a verdict but proves nothing about which commit it approved. The result carries
    `via: 'comment'` so the CLI can say which path was used.
 
