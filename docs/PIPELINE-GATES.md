@@ -339,11 +339,27 @@ tmux alike (`cloister/verdict-caller.ts`): no id is an operator shell, a
 `conv-*` id is an operator conversation, and anything else is an agent
 session. An operator may record any review verdict. An agent session may
 record one only as the issue's own review session (`agent-<issue>-review` or
-its convoy), and never a `blocked`/`failed` verdict that reverses the approval
-standing on the current head: with no new commit there is nothing new to
-review. The approval is dated against the head commit (`approvedAtHead` in
-`pr-facts`); an approval the forge kept across a push does not count. A
-refused verdict posts nothing, journals nothing, and delivers no rework.
+its convoy).
+
+That review session's `blocked`/`failed` verdict is refused only when it is
+proven that the exact head commit carries an approval: with no new commit
+there is nothing new to review. Proof is a commit sha, never a date. It is
+either a GitHub review whose `commit.oid` is the PR's `headRefOid`, or a
+trusted `overdeck-verdict: APPROVED` marker whose `sha=` names the head. The
+reviews are read only on this path (`forgeApprovalAtHead` in `pr-facts`), for
+an agent's rejection of an approved PR, so the shared PR read stays small.
+Anything short of proof lets the verdict through: a GitLab MR (GitLab ties no
+approval to a sha, and `mergeable` is not an approval), an approval of an
+older commit, an empty review list, a marker without `sha=`, or a failed
+read. Turning a real blocker into a pass is the worse failure.
+
+A run the operator asked for may always block. The dashboard's Request review
+and Re-run review (`/api/review/:id/trigger`, including the Full/Quick/None
+choice), a forced re-review of an approved PR, and `pan review restart` mark
+the review parent's state `reviewOperatorRequested`. Every dispatch rewrites
+that flag, so an automatic re-review (the PAN-3836 redundant cycle) runs
+without it and is still refused. A refused verdict posts nothing, journals
+nothing, and delivers no rework.
 
 ## Agent Auto-Resume Gates
 

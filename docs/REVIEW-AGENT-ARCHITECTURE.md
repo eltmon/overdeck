@@ -50,10 +50,12 @@ decision. `postReviewVerdict` therefore tries two identities, in order:
    whose first line is a machine marker:
 
    ```
-   <!-- overdeck-verdict: CHANGES_REQUESTED -->
+   <!-- overdeck-verdict: CHANGES_REQUESTED sha=<head> -->
    ```
 
-   (or `APPROVED`), followed by the verdict body. The result carries
+   (or `APPROVED`), followed by the verdict body. `sha=` names the PR head the
+   verdict judged (#3853); a marker posted without it, or before it existed,
+   still reads as a verdict but proves nothing about which commit it approved. The result carries
    `via: 'comment'` so the CLI can say which path was used.
 
 `pr-facts` reads both. A real forge `reviewDecision` always wins; only when the
