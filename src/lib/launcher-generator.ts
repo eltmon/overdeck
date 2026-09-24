@@ -196,6 +196,8 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
 
   // Post-claude behavior
   keepAlive?: boolean;
+  /** Conversation Claude Code line runs as `exec`: Herdr detects the pane's foreground process (PAN-3921). */
+  execConversationHarness?: boolean;
   debugLog?: string;
   useScriptWrapper?: boolean;
   scriptLogFile?: string;
@@ -522,7 +524,7 @@ function buildCommand(config: LauncherConfig): string[] {
       return buildKimiCodeCommand(config, false);
     }
 
-    // Conversation panel doesn't use exec — it runs the command then loops
+    // On tmux the conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
       let cmd = config.baseCommand;
       cmd += buildChannelsArgs(config);
@@ -538,7 +540,8 @@ function buildCommand(config: LauncherConfig): string[] {
       if (config.extraArgs) {
         args.push(config.extraArgs);
       }
-      parts.push(wrapWithSupervisor(config, `${cmd} ${args.join(' ')}`.trim()));
+      const line = wrapWithSupervisor(config, `${cmd} ${args.join(' ')}`.trim());
+      parts.push(config.execConversationHarness ? `exec ${line}` : line);
     }
     return parts;
   }

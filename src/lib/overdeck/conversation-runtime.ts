@@ -792,6 +792,7 @@ export async function spawnConversationSession(
         }),
         extraArgs: !piFields && !acpFields && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
         keepAlive: backend.name === 'tmux', // a sleep loop in a Herdr pane reads as a live harness (#3992)
+        execConversationHarness: backend.name !== 'tmux',
         fileMode: 0o700,
         channelsBridgeMcpConfig,
         useSupervisor,

@@ -156,6 +156,7 @@ describe('spawnConversationSession through the launch door (PAN-3921)', () => {
 
     expect(launcherConfigs[0]!['useSupervisor']).toBe(false);
     expect(launcherConfigs[0]!['keepAlive']).toBe(false);
+    expect(launcherConfigs[0]!['execConversationHarness']).toBe(true);
     expect((launcherConfigs[0]!['overdeckEnv'] as { agentId?: string }).agentId).toBe('conv-x');
     expect(writePtyToken).not.toHaveBeenCalled();
     expect(setOption).not.toHaveBeenCalled();
@@ -168,6 +169,7 @@ describe('spawnConversationSession through the launch door (PAN-3921)', () => {
     expect(starts).toHaveLength(1);
     expect(launcherConfigs[0]!['useSupervisor']).toBe(true);
     expect(launcherConfigs[0]!['keepAlive']).toBe(true);
+    expect(launcherConfigs[0]!['execConversationHarness']).toBe(false);
     expect(writePtyToken).toHaveBeenCalledWith('conv-x');
     expect(setOption).toHaveBeenCalledWith('conv-x', 'destroy-unattached', 'off');
     expect(setOption).toHaveBeenCalledWith(expect.stringContaining('conv-x'), 'remain-on-exit', 'on');

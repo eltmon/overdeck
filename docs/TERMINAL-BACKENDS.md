@@ -216,7 +216,9 @@ handoff renders as X's Review row. The role is persisted in
 restart-all of that conversation. With `--issue` and no `--cwd`, the handoff starts in
 `workspaces/feature-<issue>` when it exists. The PTY supervisor wraps a conversation on tmux only,
 the launcher exports `OVERDECK_AGENT_ID` on Herdr (the hooks have no `$TMUX` to read the name
-from), and the keep-alive sleep loop is tmux-only, as for planners.
+from), and the keep-alive sleep loop is tmux-only, as for planners. On Herdr the launcher `exec`s
+Claude Code, so the pane's foreground process is `claude` and Herdr's detection sees it (see
+"supervisor vs direct exec" below); on tmux Claude Code still runs as the launcher's child.
 
 `BackendPane.agentId` (PAN-3920) carries the Overdeck agent id into the dashboard's pane
 inventory: on Herdr it is the pane's `agentId` token, else Herdr's live agent name — but only on
