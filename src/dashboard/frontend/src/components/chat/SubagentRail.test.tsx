@@ -72,7 +72,7 @@ describe('SubagentRail', () => {
     expect(mainIndicator?.querySelector('.bg-primary')).toBeInTheDocument();
     const done = screen.getByLabelText('done');
     expect(done.querySelector('.animate-ping')).not.toBeInTheDocument();
-    expect(done.querySelector('.bg-muted-foreground\\/40')).toBeInTheDocument();
+    expect(done.querySelector('.bg-muted-foreground\\/70')).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toHaveClass('min-w-0');
   });
 
