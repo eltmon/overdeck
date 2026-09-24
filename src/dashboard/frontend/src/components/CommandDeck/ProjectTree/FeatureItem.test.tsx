@@ -69,18 +69,26 @@ vi.mock('../../../lib/wsTransport', () => ({
 }));
 
 vi.mock('./SessionNode', () => ({
-  SessionNode: ({ session, isSelected, onClick }: {
+  SessionNode: ({ session, isSelected, onClick, subtitle, onToggleExpand }: {
     session: SessionNodeType;
     isSelected?: boolean;
     onClick?: () => void;
+    subtitle?: string;
+    onToggleExpand?: () => void;
   }) => (
-    <button
-      data-testid={`session-${session.sessionId}`}
-      data-selected={isSelected ? 'true' : 'false'}
-      onClick={onClick}
-    >
-      {session.sessionId}
-    </button>
+    <>
+      <button
+        data-testid={`session-${session.sessionId}`}
+        data-selected={isSelected ? 'true' : 'false'}
+        onClick={onClick}
+      >
+        {session.sessionId}
+      </button>
+      {subtitle && <span data-testid={`subtitle-${session.sessionId}`}>{subtitle}</span>}
+      {onToggleExpand && (
+        <button data-testid={`expand-${session.sessionId}`} onClick={onToggleExpand}>expand</button>
+      )}
+    </>
   ),
 }));
 
@@ -638,6 +646,39 @@ describe('FeatureItem', () => {
     fireEvent.click(caret);
     expect(screen.getByTestId('chevron-down')).toBeInTheDocument();
     expect(screen.getByTestId('session-agent-pan-821')).toBeInTheDocument();
+  });
+
+  // PAN-4123: the server sends convoy reviewer nodes only when the current run
+  // launched the convoy. The tree renders exactly what it is sent: four lanes
+  // under the review row for a Full run, none for a Quick run.
+  it.each([
+    ['Full run', ['correctness', 'security', 'performance', 'requirements'], '4 reviewers · clean'],
+    ['Quick run', [], undefined],
+  ] as const)('renders the convoy lanes the server sends for a %s', (_label, roles, subtitle) => {
+    const reviewId = 'agent-pan-821-review';
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({ sessionId: reviewId, type: 'review', status: 'stopped', presence: 'ended' }),
+            ...roles.map(role => makeSession({
+              sessionId: `${reviewId}-${role}`, type: 'reviewer', role, status: 'stopped', presence: 'ended',
+            })),
+          ],
+          stateLabel: 'Done',
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('chevron-right'));
+    fireEvent.click(screen.getByTestId(`expand-${reviewId}`));
+
+    expect(screen.getByTestId(`session-${reviewId}`)).toBeInTheDocument();
+    const lanes = screen.queryAllByTestId(new RegExp(`^session-${reviewId}-`));
+    expect(lanes.map(lane => lane.textContent)).toEqual(roles.map(role => `${reviewId}-${role}`));
+    if (subtitle) expect(screen.getByTestId(`subtitle-${reviewId}`)).toHaveTextContent(subtitle);
+    else expect(screen.queryByTestId(`subtitle-${reviewId}`)).not.toBeInTheDocument();
   });
 
   it('collapses when caret is clicked again', () => {
