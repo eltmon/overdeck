@@ -121,9 +121,10 @@ function runInline<T>(operation: MemoryFtsWorkerOperation, projectId?: string, p
 }
 
 function shouldRunInline(): boolean {
-  // Source-mode workers cannot reliably resolve this repo's .js TypeScript import specifiers.
-  // The supported dashboard runtime is the built Node bundle, which always takes the worker path.
-  return import.meta.url.endsWith('.ts');
+  // Vitest only: memory tests vi.mock modules and change OVERDECK_HOME per test, and
+  // neither crosses a worker-thread boundary. Other source runs (tsx) take the worker
+  // path like the built bundle does; spawnModuleWorker boots the .ts worker (PAN-3930).
+  return import.meta.url.endsWith('.ts') && Boolean(process.env['VITEST']);
 }
 
 function requireProjectId(projectId: string | undefined): string {
