@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T16:35:44.350Z · model: claude-opus-5 · open: 846_
+_Last sequenced: 2026-09-24T16:41:34.799Z · model: claude-opus-5 · open: 843_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -60,7 +60,6 @@ _Last sequenced: 2026-09-24T16:35:44.350Z · model: claude-opus-5 · open: 846_
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 70 | PAN-4047 | S | critical | ok |  |  | GitHub App API helper has no request timeout; a hung forge call stalled `pan admin specialists done` and any caller waits forever |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -72,7 +71,6 @@ _Last sequenced: 2026-09-24T16:35:44.350Z · model: claude-opus-5 · open: 846_
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
-| 82 | PAN-3677 | M | high | ok |  |  | Planning agents wedge after a background Explore task finishes; parent never consumes the result |
 | 83 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 84 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 85 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -209,7 +207,6 @@ _Last sequenced: 2026-09-24T16:35:44.350Z · model: claude-opus-5 · open: 846_
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 220 | PAN-4046 | S | high | ok |  |  | findProjectByPathSync ignores ~, symlinks and path boundaries, so a path under ~/Projects/overdeck-knowledge matches project overdeck |
 | 221 | PAN-4052 | M | high | ok |  |  | Metrics cost panels, specialist run and handoff logs and the boot stamp have live readers but no writer post-Cut; restore or delete each |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
@@ -1074,10 +1071,6 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-4047 (rank 70)
-
-New this pass, entering at rank 70 — the slot PAN-4016 vacated, in a band of same-shaped pipeline-hang defects (post-merge label writes with no retry at 71, watchdog restart-churn at 73). Critical because it is an unbounded wait in the one helper every forge call goes through: there is no timeout at all, so a slow or half-open GitHub connection parks the caller indefinitely rather than failing. It is the confirmed root cause of the `pan admin specialists done` stall CodeRabbit flagged on #4033, and #4045 bounded only that single PR-head lookup, leaving every other request in `src/lib/github-app.ts` unprotected. The fix is small and fully specified in the body — an overridable `AbortSignal.timeout` default, an abort mapped to a typed error, and a fake-timer test, which the repo's retry-test rule already requires.
-
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1121,10 +1114,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 ### PAN-3100 (rank 81)
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
-### PAN-3677 (rank 82)
-
-Planning agents wedge after a background Explore task finishes; parent never consumes the result. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
 ### PAN-3096 (rank 83)
 
@@ -1174,6 +1163,14 @@ npm test fails in clean checkout — pretest removes the dashboard bundle the te
 
 Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
 
+### PAN-2817 (rank 95)
+
+Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; verify the composer-freeze detection gap against it. Rank held.
+
+### PAN-2813 (rank 96)
+
+Scheduler yield never self-clears — yielded work agents stay paused hours after the blocking review merges.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1181,10 +1178,10 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T16:35:44.350Z",
+  "generatedAt": "2026-09-24T16:41:34.799Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 846,
+  "openCount": 843,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1917,19 +1914,6 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "planning": "auto"
     },
     {
-      "issue": "PAN-4047",
-      "rank": 70,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "GitHub App API helper has no request timeout; a hung forge call stalled `pan admin specialists done` and any caller waits forever",
-      "rationale": "New this pass, entering at rank 70 — the slot PAN-4016 vacated, in a band of same-shaped pipeline-hang defects (post-merge label writes with no retry at 71, watchdog restart-churn at 73). Critical because it is an unbounded wait in the one helper every forge call goes through: there is no timeout at all, so a slow or half-open GitHub connection parks the caller indefinitely rather than failing. It is the confirmed root cause of the `pan admin specialists done` stall CodeRabbit flagged on #4033, and #4045 bounded only that single PR-head lookup, leaving every other request in `src/lib/github-app.ts` unprotected. The fix is small and fully specified in the body — an overridable `AbortSignal.timeout` default, an abort mapped to a typed error, and a fake-timer test, which the repo's retry-test rule already requires.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3557",
       "rank": 71,
       "size": "S",
@@ -2071,19 +2055,6 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "rationale": "New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3677",
-      "rank": 82,
-      "size": "M",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Planning agents wedge after a background Explore task finishes; parent never consumes the result",
-      "rationale": "Planning agents wedge after a background Explore task finishes; parent never consumes the result. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-3096",
@@ -3819,19 +3790,6 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
       "condition": "ok",
       "dependsOn": [],
       "why": "CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4046",
-      "rank": 220,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "findProjectByPathSync ignores ~, symlinks and path boundaries, so a path under ~/Projects/overdeck-knowledge matches project overdeck",
-      "rationale": "New this pass at rank 220, the slot the closed PAN-3958 epic vacated, among peers of the same size and score. High rather than medium because the sibling-prefix collision it describes is live in this very checkout: the OKF bundle sits at ~/Projects/overdeck-knowledge next to the overdeck project, so a path under it resolves to the wrong project and every project-scoped decision downstream inherits that mistake. The fix carries almost no design risk — #4045 already landed the correct containment helper (~ expansion, realpath with a plain-path fallback, a path.relative boundary check) in src/lib/projects/project-key.ts, and this is that helper applied to the second call site. The only real work is placement: projects.ts is at its file-size cap and importing the helper there risks a cycle, so it likely moves to a leaf module first.",
       "gate": "auto",
       "planning": "auto"
     },
