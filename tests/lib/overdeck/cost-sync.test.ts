@@ -11,6 +11,7 @@ import {
   getCostForIssueAggregateSync,
   getAgentCostStatsSync,
 } from '../../../src/lib/overdeck/cost-sync.js';
+import { buildAgentStatsSnapshot } from '../../../src/dashboard/server/routes/resources/agents-stats.js';
 import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../../../src/lib/overdeck/infra.js';
 import type { CostEvent } from '../../../src/lib/costs/events.js';
 
@@ -148,6 +149,42 @@ function insertRawCostEventWithNullProvider(input: { issueId: string; cost: numb
 }
 
 describe('agent resource cost aggregates', () => {
+  it('sums the burn window, hypothetical rate and total per agent with grouped SQL', () => {
+    const nowMs = Date.parse('2026-06-25T12:00:00.000Z');
+    // Rows on both sides of the 30-minute burn window, a future row, subscription-covered
+    // rows (hypothetical rate only), a zero-cost agent and an unrelated agent.
+    const fixtures = [
+      { agentId: 'agent-a', ageMs: 30 * 60_000 + 1, cost: 1 },
+      { agentId: 'agent-a', ageMs: 30 * 60_000, cost: 0.5 },
+      { agentId: 'agent-a', ageMs: 60_000, cost: 0.256 },
+      { agentId: 'agent-a', ageMs: -60_000, cost: 0.2 },
+      { agentId: 'agent-a', ageMs: 30 * 60_000 + 1, cost: 5, source: 'subscription-covered' },
+      { agentId: 'agent-a', ageMs: 30 * 60_000, cost: 0.125, source: 'subscription-covered' },
+      { agentId: 'agent-b', ageMs: 60_000, cost: 0 },
+      { agentId: 'unrelated', ageMs: 60_000, cost: 90 },
+    ];
+    fixtures.forEach((fixture, index) => insertCostEventSync(costEvent({
+      ...fixture, ts: new Date(nowMs - fixture.ageMs).toISOString(), requestId: `agent-aggregate-${index}`,
+    })));
+    const agentIds = ['agent-a', 'agent-b', 'agent-empty'];
+    const aggregates = getAgentCostStatsSync({ agentIds, nowMs });
+
+    expect(new Map(aggregates).get('agent-a')).toEqual({
+      burnUsdPerHour: 1.91, hypotheticalUsdPerHour: 0.25, totalUsd: 1.96,
+    });
+    expect(aggregates).toHaveLength(2);
+
+    // The resources snapshot built from these aggregates omits a zero hypothetical rate.
+    const snapshot = buildAgentStatsSnapshot({
+      nowMs,
+      agents: agentIds.map(id => ({ id, issueId: 'PAN-1', role: 'work' as const, model: 'fixture',
+        status: 'running' as const, startedAt: new Date(nowMs - 3_600_000).toISOString() })),
+      sessionRoots: [{ agentId: 'agent-a', rootPid: 123 }],
+      processes: [{ pid: 123, ppid: 1, cpuPercent: 1.5, rssBytes: 1024 }],
+      costStatsByAgent: new Map(aggregates),
+    });
+    expect(snapshot.agents[1]).not.toHaveProperty('hypotheticalUsdPerHour');
+  });
 
   it('returns no aggregates for an empty fleet or missing ledger history', () => {
     expect(getAgentCostStatsSync({ agentIds: [], nowMs: 0 })).toEqual([]);

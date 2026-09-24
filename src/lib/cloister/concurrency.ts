@@ -234,22 +234,6 @@ export function workResumeSlotsAvailable(
   return Math.max(0, limits.maxWorkAgents - counts.work);
 }
 
-/**
- * Whether an advancing-role (review/test/ship) dispatch is allowed. Gated on the
- * overall ceiling so review/test/ship can always claim their reserved headroom —
- * and, per PAN-2500 specialist-budget, on the memory governor: don't reserve GB
- * for a specialist under memory pressure. Count-slot semantics are UNCHANGED
- * when the cached band is 'ok' (or no patrol has assessed memory yet).
- */
-export function canDispatchAdvancing(
-  counts: RunningCounts,
-  limits: ConcurrencyLimits = getConcurrencyLimits(),
-): boolean {
-  const verdict = getCachedMemoryVerdict();
-  if (verdict && verdict.band !== 'ok') return false;
-  return counts.total < limits.totalCeiling;
-}
-
 // ---------------------------------------------------------------------------
 // Swarm-dispatch reservation
 //

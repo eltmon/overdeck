@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   workResumeSlotsAvailable,
-  canDispatchAdvancing,
   tryReserveSwarmSlot,
   resetPatrolDispatchBudget,
   type ConcurrencyLimits,
@@ -22,12 +21,6 @@ describe('concurrency governor — pure math', () => {
     expect(workResumeSlotsAvailable({ work: 6, advancing: 0, swarm: 0, total: 6 }, LIMITS)).toBe(0);
     // Over the cap (e.g. forced starts) → still 0, never negative; deacon resumes nothing.
     expect(workResumeSlotsAvailable({ work: 9, advancing: 0, swarm: 0, total: 9 }, LIMITS)).toBe(0);
-  });
-
-  it('allows advancing dispatch until the total ceiling, using reserved headroom', () => {
-    // Work at its cap but total below ceiling → advancing roles can still claim slots.
-    expect(canDispatchAdvancing({ work: 6, advancing: 2, swarm: 0, total: 8 }, LIMITS)).toBe(true);
-    expect(canDispatchAdvancing({ work: 6, advancing: 3, swarm: 0, total: 9 }, LIMITS)).toBe(false);
   });
 });
 

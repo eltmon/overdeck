@@ -1,6 +1,6 @@
 /**
  * PAN-2500: the cached MemoryVerdict, split out from memory-governor.ts into
- * its own zero-dependency module. concurrency.ts (canDispatchAdvancing) needs
+ * its own zero-dependency module. concurrency.ts (memoryDrivenWorkSlots) needs
  * to read this synchronously without importing
  * memory-governor.ts directly — memory-governor.ts pulls in
  * dashboard/server/routes/resources/stacks.ts, which transitively reaches

@@ -1570,9 +1570,11 @@ Test files deleted:
 
 - `cloister/stall-sweeper.ts`: `runStallSweeperPatrol` lost its production caller in PAN-3917 W5. Only its tests and
   the `patrolBudgets.exempt` name list in `cloister/config.ts` mention it.
-- Writers with no production caller, whose live readers now read nothing: cost events (`recordCostSync` feeds
-  `getCostSummary`, which `/api/metrics/*` serves), specialist run logs (`createRunLogSync`), and specialist handoffs
-  (`logSpecialistHandoff`). They are kept as test seams because tests of the live readers use them.
+- Writers with no production caller, whose live readers now read nothing: Cloister's `cost-data.json`
+  (`cloister/cost-monitor.ts` `recordCostSync` feeds `getCostSummary`, which `/api/metrics/*` serves; the
+  `cost_events` table is a different store and has live writers), specialist run logs (`createRunLogSync`), and
+  specialist handoffs (`logSpecialistHandoff`). They are kept as test seams because tests of the live readers use
+  them; the coordinator is filing the gaps separately.
 - `GET /api/metrics/runtimes` and `/api/metrics/tasks` read a file nothing writes (see above).
 
 ### Left undone
@@ -1827,3 +1829,28 @@ one is Oh My Pi (#4003).
 | `xbrief/io.ts` | `findSpecByIssueSync` (9) |
 | `xbrief/lifecycle-io.ts` | `findXBriefByIssueSync` (7) |
 | `xbrief/lifecycle.ts` | `ensureXBriefDirsSync` (3) |
+
+### #4051 review follow-ups
+
+- `tests/unit/lib/overdeck/merge-queue.test.ts` is restored. It was the only real-DB coverage of the live
+  `markMergeProcessing(key, id, false)` (called on the deferred-verification path, `merge-ops.ts`), which moves a
+  `processing` row back to `queued` and clears `started_at`. It now observes the row with a direct `odb.raw()` read
+  instead of the deleted `getQueueForProject`. A second test pins the `WHERE status = ?` source-state guard: un-marking
+  a queued row and re-marking a processing row both match nothing.
+- `tests/lib/overdeck/cost-sync.test.ts` gets back the `getAgentCostStatsSync` assertion (`burnUsdPerHour: 1.91,
+  hypotheticalUsdPerHour: 0.25, totalUsd: 1.96`) with its fixtures on the 30-minute boundary and its
+  subscription-covered rows; that function feeds `dashboard-db-worker.ts`. Only the comparison against the deleted
+  `queryCostEventsSync` is dropped; the zero-hypothetical-rate check now runs on the snapshot built from the aggregates.
+- `canDispatchAdvancing` (`cloister/concurrency.ts`) lost its only caller, `tryReserveAdvancingSlot`, in this PR. The
+  scan missed it because `memory-verdict-cache.ts`'s header named it. It is deleted with its tests
+  (`tests/unit/lib/cloister/concurrency.test.ts` and one test in `tests/lib/cloister/concurrency.test.ts`), and the header
+  now names `memoryDrivenWorkSlots`, the real consumer.
+- **The scan counts comment mentions as uses.** A variant that ignores comments in code files finds 9 more exports
+  live only through a comment: `DEAD` `decideEscalation` (`agents/tier-escalation.ts`), `parseAgentOutput`
+  (`cloister/merge-agent.ts`), `buildPiCommand` (`launcher-generator.ts`), `createSymlinks`
+  (`workspace-manager/worktree-ops.ts`); `TESTONLY` `assignDispatchTier` (`agents/dispatch-tier.ts`),
+  `swarmJanitorPass` (`cloister/deacon-swarm.ts`), `parsePiSessionSync` (`cost-parsers/pi-parser.ts`),
+  `listEligibleCandidatesByProject` and `pickFromSequence` (`flywheel-merge-order.ts`). They are not deleted here:
+  several of their tests exercise live code through them (the merge-train route tests mock
+  `listEligibleCandidatesByProject`; the swarm-foreman liveness tests drive through `swarmJanitorPass`), so each needs
+  the same port-or-delete review as the rows above. CH-8b handles them.
