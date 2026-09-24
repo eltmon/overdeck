@@ -1,27 +1,52 @@
+import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { BackendConnectionBoundary } from './BackendConnectionBoundary';
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents';
 
 describe('BackendConnectionBoundary', () => {
-  it('replaces the UI while the backend is down', () => {
+  it('hides the UI, without unmounting it, while the backend is down', () => {
     render(
       <BackendConnectionBoundary backendDown restarting={false}>
         <div data-testid="app-content">app</div>
       </BackendConnectionBoundary>,
     );
-    expect(screen.queryByTestId('app-content')).toBeNull();
+    // Hidden, not unmounted: route state such as typed input survives (PAN-3867).
+    expect(screen.getByTestId('app-content')).not.toBeVisible();
     expect(screen.getByRole('status')).toHaveTextContent('Waiting for backend data');
   });
 
-  it('replaces the UI while the dashboard is restarting', () => {
+  it('hides the UI, without unmounting it, while the dashboard is restarting', () => {
     render(
       <BackendConnectionBoundary backendDown={false} restarting>
         <div data-testid="app-content">app</div>
       </BackendConnectionBoundary>,
     );
-    expect(screen.queryByTestId('app-content')).toBeNull();
+    // Hidden, not unmounted: route state such as typed input survives (PAN-3867).
+    expect(screen.getByTestId('app-content')).not.toBeVisible();
     expect(screen.getByRole('status')).toHaveTextContent('Dashboard is restarting');
+  });
+
+  it('keeps child state across an outage and recovery', () => {
+    function Counter() {
+      const [count, setCount] = useState(0);
+      return (
+        <button type="button" data-testid="app-content" onClick={() => setCount((c) => c + 1)}>
+          {count}
+        </button>
+      );
+    }
+    const { rerender } = render(
+      <BackendConnectionBoundary backendDown={false} restarting={false}><Counter /></BackendConnectionBoundary>,
+    );
+    fireEvent.click(screen.getByTestId('app-content'));
+    rerender(<BackendConnectionBoundary backendDown restarting={false}><Counter /></BackendConnectionBoundary>);
+    rerender(<BackendConnectionBoundary backendDown={false} restarting><Counter /></BackendConnectionBoundary>);
+    rerender(<BackendConnectionBoundary backendDown={false} restarting={false}><Counter /></BackendConnectionBoundary>);
+
+    expect(screen.getByTestId('app-content')).toBeVisible();
+    expect(screen.getByTestId('app-content')).toHaveTextContent('1');
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('keeps children mounted with a banner during a transient reconnect', () => {
