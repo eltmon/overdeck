@@ -279,12 +279,21 @@ export interface GhPrRow {
 const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
 /** One `gh pr list` per repo, cached briefly — the batch door's forge read. */
-const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[]>(PR_CACHE_TTL_MS);
+const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[] | null>(PR_CACHE_TTL_MS);
 
 /** The last listing each repo answered successfully, and when (PAN-3925). */
 const lastRepoPullRequests = new Map<string, { readonly rows: readonly GhPrRow[]; readonly settledAt: number }>();
 
+/** The repo's PR listing; empty when the read failed. */
 export async function listRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[]> {
+  return (await readRepoPullRequests(projectPath)) ?? [];
+}
+
+/**
+ * The repo's PR listing, or null when the read failed (rate limit, auth,
+ * network), so a caller that backs off can tell "failed" from "no PRs".
+ */
+export async function readRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[] | null> {
   return cachedRepoPullRequests(projectPath, async () => {
     try {
       const { stdout } = await execFileAsync('gh', [
@@ -294,7 +303,7 @@ export async function listRepoPullRequests(projectPath: string): Promise<readonl
       lastRepoPullRequests.set(projectPath, { rows, settledAt: Date.now() });
       return rows;
     } catch {
-      return [];
+      return null;
     }
   });
 }

@@ -27,13 +27,15 @@ vi.mock('../git-info.js', () => ({
 }));
 
 type Row = Record<string, unknown>;
-let prRows: Row[] = [];
+/** The project's `gh pr list` answer; null = the read failed (rate limit, auth, network). */
+let prRows: Row[] | null = [];
 const listRepoPullRequestsMock = vi.fn(async (_projectPath: string) => prRows);
 vi.mock('../../../../lib/overdeck/derived-issue-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/overdeck/derived-issue-state.js')>();
   return {
     ...actual,
-    listRepoPullRequests: (projectPath: string) => listRepoPullRequestsMock(projectPath),
+    readRepoPullRequests: (projectPath: string) => listRepoPullRequestsMock(projectPath),
+    listRepoPullRequests: async (projectPath: string) => (await listRepoPullRequestsMock(projectPath)) ?? [],
     forgeForProject: () => 'github' as const,
   };
 });
@@ -301,6 +303,41 @@ describe('runPullRequestSyncOnce — slow lane, fallback, backoff (WI-4)', () =>
     expect(listConversationPullRequests(name)[0]?.snapshot).toBeNull();
   });
 
+  it('a failed listing does not cascade into one gh pr view per linked PR', async () => {
+    const name = conversation('feature/limited');
+    linkExplicitly(name, 905);
+    prRows = null;
+    const read = vi.fn(async () => pr(905, 'feature/limited') as never);
+
+    await runPullRequestSyncOnce(T0, read);
+
+    expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(1);
+    expect(read).not.toHaveBeenCalled();
+    expect(listConversationPullRequests(name)[0]?.snapshot).toBeNull();
+  });
+
+  it('an empty listing is not a failure', async () => {
+    conversation('feature/no-prs-yet');
+    prRows = [];
+
+    for (let sweep = 0; sweep < 5; sweep += 1) await runPullRequestSyncOnce(T0 + sweep * MINUTE);
+
+    expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('never reads the listing of a project with no branch to detect and no link due', async () => {
+    const name = conversation('main');
+    linkExplicitly(name, 906);
+    setPullRequestLinkSnapshot({ host: 'github.com', repository: 'eltmon/overdeck', number: 906 }, {
+      ...snapshotFromGhRow(pr(906, 'x', { state: 'MERGED', mergedAt: '2026-09-20T00:00:00Z' }) as never, '2026-09-20T00:00:00Z'),
+    });
+    prRows = [pr(906, 'x', { state: 'MERGED', mergedAt: '2026-09-20T00:00:00Z' })];
+
+    await runPullRequestSyncOnce(T0);
+
+    expect(listRepoPullRequestsMock).not.toHaveBeenCalled();
+  });
+
   it('never reads a merged or dismissed link through the fallback', async () => {
     const name = conversation('feature/final');
     linkExplicitly(name, 903);
@@ -411,5 +448,21 @@ describe('startPullRequestSyncService — schedule', () => {
     stopPullRequestSyncService();
     await vi.advanceTimersByTimeAsync(PR_SYNC_INTERVAL_MS * 3);
     expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('backs a failing listing off for 15 minutes after 3 failures in a row, then retries', async () => {
+    conversation('feature/rate-limited');
+    prRows = null;
+
+    startPullRequestSyncService();
+    await vi.advanceTimersByTimeAsync(PR_SYNC_BOOT_DELAY_MS + 2 * PR_SYNC_INTERVAL_MS);
+    expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(3);
+
+    // The third failure started the backoff; sweeps inside the window skip the listing.
+    await vi.advanceTimersByTimeAsync(PR_SYNC_SLOW_INTERVAL_MS - PR_SYNC_INTERVAL_MS);
+    expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(3);
+
+    await vi.advanceTimersByTimeAsync(PR_SYNC_INTERVAL_MS);
+    expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(4);
   });
 });

@@ -5,8 +5,11 @@
  * snapshot fresh, with no dashboard client open:
  *
  *   1. Load every non-archived conversation and group it by registered project.
- *   2. Read each project's PR list ONCE per sweep (`listRepoPullRequests`,
- *      `gh pr list --state all`, cached 30 s).
+ *   2. Read each project's PR list ONCE per sweep (`readRepoPullRequests`,
+ *      `gh pr list --state all`, cached 30 s), and only when the project has a
+ *      conversation with a branch to detect or a link due for refresh. A failed
+ *      listing (a rate limit included) counts toward the same 3-strike backoff
+ *      as the fallback reads and leaves that project's links for a later sweep.
  *   3. Branch detection: a PR whose head branch equals the conversation's branch
  *      (`resolveConversationBranch`; never the default branch) becomes a
  *      `branch` link. A dismissed row blocks re-insertion. A link whose PR drops
@@ -51,7 +54,7 @@ import {
 } from '../../../lib/overdeck/conversation-pull-requests.js';
 import {
   forgeForProject,
-  listRepoPullRequests,
+  readRepoPullRequests,
   toChecksState,
   toReviewState,
   type GhPrRow,
@@ -64,7 +67,7 @@ export const PR_SYNC_BOOT_DELAY_MS = 30_000;
 export const PR_SYNC_INTERVAL_MS = 60_000;
 /** Closed PRs are re-read at most this often; also the per-repo backoff window. */
 export const PR_SYNC_SLOW_INTERVAL_MS = 15 * 60_000;
-/** Consecutive failed `gh pr view` reads before a repository is skipped. */
+/** Consecutive failed reads (a project listing, or `gh pr view` per repository) before it is skipped. */
 export const PR_SYNC_FAILURE_THRESHOLD = 3;
 const BRANCH_READ_CONCURRENCY = 8;
 const LOG_PREFIX = '[pr-sync]';
@@ -79,7 +82,7 @@ let stopped = false;
 // In-memory sweep bookkeeping (cleared on stop; a restart just re-reads once).
 /** PR key → when this process last read it from the forge (ms). */
 const lastReadAt = new Map<string, number>();
-/** `host/owner/repo` → consecutive failed reads and the backoff deadline. */
+/** `host/owner/repo` (`gh pr view`) or project path (listing) → consecutive failed reads and the backoff deadline. */
 const repoFailures = new Map<string, { count: number; skipUntil: number }>();
 
 export interface PullRequestSyncResult {
@@ -199,7 +202,30 @@ async function syncProject(
   conversations: readonly PullRequestSyncConversation[],
   ctx: SweepContext,
 ): Promise<PullRequestSyncResult> {
-  const rows = await listRepoPullRequests(project.path);
+  const defaultBranch = getRepoTargetBranch(undefined, project);
+  const branches = await withConcurrencyLimit(
+    conversations.map((conversation) => () => resolveConversationBranch(conversation, defaultBranch)),
+    BRANCH_READ_CONCURRENCY,
+  );
+  const links = listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name));
+  const linkList = [...links.values()].flat();
+  // Nothing to detect and nothing due: skip the forge read entirely.
+  if (!branches.some(Boolean) && !linkList.some((link) => isDue(link, ctx.now))) return { inserted: 0, updated: 0 };
+
+  // A failed or backed-off listing leaves this project's links for the next
+  // sweep instead of cascading into one `gh pr view` each (same forge, same
+  // rate limit).
+  const skipLinks = (): PullRequestSyncResult => {
+    for (const link of linkList) ctx.handled.add(keyString(link));
+    return { inserted: 0, updated: 0 };
+  };
+  if (repoInBackoff(project.path, ctx.now)) return skipLinks();
+  const rows = await readRepoPullRequests(project.path);
+  if (rows === null) {
+    recordRepoFailure(project.path, ctx.now);
+    return skipLinks();
+  }
+  repoFailures.delete(project.path);
   if (rows.length === 0) return { inserted: 0, updated: 0 };
 
   const byKey = new Map<string, { key: PullRequestKey & { url: string }; row: GhPrRow }>();
@@ -217,11 +243,6 @@ async function syncProject(
   }
 
   // Branch detection.
-  const defaultBranch = getRepoTargetBranch(undefined, project);
-  const branches = await withConcurrencyLimit(
-    conversations.map((conversation) => () => resolveConversationBranch(conversation, defaultBranch)),
-    BRANCH_READ_CONCURRENCY,
-  );
   let inserted = 0;
   conversations.forEach((conversation, index) => {
     const branch = branches[index];
@@ -237,9 +258,10 @@ async function syncProject(
 
   // Snapshot refresh from the listing — one write pass per distinct due PR.
   // PRs not in the listing are left for the `gh pr view` fallback pass.
-  const links = listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name));
+  // Re-read: branch detection may have just inserted links.
+  const refreshed = listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name));
   let updated = 0;
-  for (const conversationLinks of links.values()) {
+  for (const conversationLinks of refreshed.values()) {
     for (const link of conversationLinks) {
       const id = keyString(link);
       const entry = byKey.get(id);
