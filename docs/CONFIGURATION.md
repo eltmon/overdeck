@@ -7,13 +7,10 @@ Complete guide to configuring Overdeck's multi-model routing system.
 - [Quick Start](#quick-start)
 - [Configuration Files](#configuration-files)
 - [Permission Mode](#permission-mode)
-- [Presets](#presets)
-- [Per-Work-Type Overrides](#per-work-type-overrides)
+- [Removed: Presets, Work-Type Overrides, Thinking Levels](#removed-presets-work-type-overrides-thinking-levels)
 - [Provider Management](#provider-management)
 - [Model Deprecation & Migration](#model-deprecation--migration)
 - [Fallback Strategy](#fallback-strategy)
-- [Examples](#examples)
-- [Precedence Rules](#precedence-rules)
 - [Advanced Configuration](#advanced-configuration)
 - [Using Alternative LLM APIs with Claude Code](#using-alternative-llm-apis-with-claude-code)
 - [Getting Help](#getting-help)
@@ -22,10 +19,12 @@ Complete guide to configuring Overdeck's multi-model routing system.
 
 ## Quick Start
 
-1. **Choose a preset** (in `~/.overdeck/config.yaml`):
+1. **Pick your model slots** (optional, in `~/.overdeck/config.yaml`; the built-in defaults work without this):
    ```yaml
-   models:
-     preset: balanced  # premium | balanced | budget
+   workhorses:
+     expensive: claude-opus-4-8
+     mid: claude-sonnet-5
+     cheap: claude-haiku-4-5
    ```
 
 2. **Add API keys** (in `~/.overdeck.env`):
@@ -55,9 +54,6 @@ System-wide defaults applied to all projects.
 **Example**:
 ```yaml
 models:
-  # Preset selection
-  preset: balanced  # premium | balanced | budget
-
   # Provider enable/disable
   providers:
     anthropic: true   # Always enabled (required)
@@ -65,17 +61,20 @@ models:
     google: false     # Disabled (no API key or user preference)
     zai: false        # Disabled
 
-  # Per-work-type overrides (optional)
-  overrides:
-    issue-agent:implementation: gpt-5.2-codex
-    review:security: claude-opus-4-6
-    subagent:explore: glm-4.7-flashx
+# Model slots that roles reference as workhorse:<slot>
+workhorses:
+  expensive: claude-opus-4-8
+  mid: claude-sonnet-5
+  cheap: claude-haiku-4-5
 
-  # Gemini thinking levels (optional)
-  thinking:
-    issue-agent:exploration: minimal
-    issue-agent:planning: high
-    review:performance: high
+# Per-role models (optional; see MODEL-CALLS.md for every role's default)
+roles:
+  work:
+    model: gpt-5.2-codex
+  review:
+    sub:
+      security:
+        model: claude-opus-4-8
 
 # Permission mode for spawned Claude Code agents.
 # 'auto' (default) — Claude Code's classifier blocks destructive ops
@@ -96,17 +95,15 @@ Project-specific overrides in the project root directory.
 
 **Example**:
 ```yaml
-models:
-  # Override preset for this project
-  preset: premium  # Use premium models for critical work
-
-  # Project-specific overrides
-  overrides:
-    # Never compromise on security, even in budget mode
-    review:security: claude-opus-4-6
-
-    # Use Codex for implementation in this codebase
-    issue-agent:implementation: gpt-5.2-codex
+# Project values win over ~/.overdeck/config.yaml
+roles:
+  work:
+    model: gpt-5.2-codex   # Use Codex for implementation in this codebase
+  review:
+    mode: full
+    sub:
+      security:
+        model: claude-opus-4-8   # Never compromise on security here
 ```
 
 ### API Keys: `~/.overdeck.env`
@@ -238,132 +235,24 @@ Highest wins:
 
 ---
 
-## Presets
+## Removed: Presets, Work-Type Overrides, Thinking Levels
 
-Presets provide curated model configurations optimized for different priorities.
+These `models:` keys belonged to the old work-type router. Presets went first
+(`60033c12674`), and PAN-1048 (`cfd48b80881`) deleted the router itself in
+favour of roles and workhorse slots. Nothing picks a model from these keys. A config file that still carries them loads without error, and the
+keys do nothing.
 
-### Premium Preset
+| Key | What it did | Where the job went |
+|---|---|---|
+| `models.preset` (`premium` / `balanced` / `budget`) | Picked a curated model per work type | `workhorses.expensive` / `mid` / `cheap`, which the role defaults reference as `workhorse:<slot>` |
+| `models.overrides` (`issue-agent:*`, `review:*`, `specialist-*`, `subagent:*`, `cli:*` keys) | Pinned a model to one work type | `roles.<role>.model`, and `roles.review.sub.<lane>.model` for review lanes (see [Review Mode and Reviewer Models](#review-mode-and-reviewer-models)) |
+| `models.thinking` | Set a Gemini thinking level per work type | dropped; per-role reasoning effort is `roles.<role>.effort` |
 
-**Goal**: Best quality and accuracy
-**Cost**: Highest
-**Use case**: Critical production work, complex problems, quality-first projects
-
-**Model Selection**:
-- **Critical thinking**: claude-opus-4-6
-- **Code generation**: gpt-5.2-codex
-- **Security**: claude-opus-4-6
-- **Exploration**: gemini-3-flash-preview
-- **Documentation**: claude-sonnet-4-5
-
-**Example**:
-```yaml
-models:
-  preset: premium
-```
-
-### Balanced Preset (Recommended)
-
-**Goal**: Good quality at moderate cost
-**Cost**: Moderate
-**Use case**: Daily development, most production work
-
-**Model Selection**:
-- **Critical thinking**: claude-opus-4-6 or gemini-3-pro-preview
-- **Code generation**: gpt-5.2-codex or gemini-3-pro-preview
-- **Security**: claude-sonnet-4-5
-- **Exploration**: gemini-3-flash-preview
-- **Documentation**: claude-sonnet-4-5
-
-**Example**:
-```yaml
-models:
-  preset: balanced
-```
-
-### Budget Preset
-
-**Goal**: Lowest cost, Gemini-leaning
-**Cost**: Lowest
-**Use case**: High-volume work, experimentation, learning
-
-**Model Selection**:
-- **Most work**: gemini-3-pro-preview or gemini-3-flash-preview
-- **Security**: gemini-3-pro-preview (thinking: high)
-- **Exploration**: glm-4.7-flashx
-- **Documentation**: claude-haiku-4-5
-
-**Example**:
-```yaml
-models:
-  preset: budget
-```
-
----
-
-## Per-Work-Type Overrides
-
-Override specific work types while keeping preset defaults for others.
-
-### Available Work Types
-
-See [WORK-TYPES.md](./WORK-TYPES.md) for the complete list of 23 work types.
-
-**Categories**:
-- `issue-agent:*` - Main work agent phases (6 types)
-- `specialist-*` - Long-running specialists (3 types)
-- `subagent:*` - Task tool subagents (4 types)
-- `review:*` - Parallel review agents (5 types: security, performance, correctness, requirements, synthesis)
-- `*-agent` - Pre-work agents (4 types: prd, triage, planning, decomposition)
-- `cli:*` - User-facing CLI contexts (2 types)
-
-### Override Examples
-
-**Example 1: Always use Opus for security**
-```yaml
-models:
-  preset: budget  # Use cheap models everywhere...
-
-  overrides:
-    review:security: claude-opus-4-6  # ...except security!
-```
-
-**Example 2: Use Codex for implementation**
-```yaml
-models:
-  preset: balanced
-
-  overrides:
-    issue-agent:implementation: gpt-5.2-codex  # Prefer Codex for code generation
-    issue-agent:testing: gpt-5.2-codex         # Also for testing
-```
-
-**Example 3: Gemini-only configuration**
-```yaml
-models:
-  preset: budget
-
-  overrides:
-    issue-agent:planning: gemini-3-pro-preview
-    issue-agent:implementation: gemini-3-pro-preview
-    review:security: gemini-3-pro-preview
-
-  thinking:
-    issue-agent:planning: high
-    review:security: high
-```
-
-**Example 4: Performance-focused**
-```yaml
-models:
-  preset: balanced
-
-  overrides:
-    subagent:explore: glm-4.7-flashx  # Fast exploration
-    cli:quick-command: gpt-4o-mini    # Fast CLI responses
-
-  thinking:
-    issue-agent:exploration: minimal  # Minimal thinking for speed
-```
+No spawn path reads `models.overrides`. What still touches it changes no
+agent's model: the deprecated-model-ID migration below, a Settings deprecation
+warning, and the Command Deck status review, which looks up a `status-review`
+key in a Settings payload that never carries `overrides` and so always runs on
+its built-in model.
 
 ---
 
@@ -441,7 +330,7 @@ models:
 
 ## Model Deprecation & Migration
 
-When model IDs change (e.g., `claude-opus-4-5` → `claude-opus-4-6`), Overdeck automatically migrates your configuration to use the current model IDs.
+When model IDs change (e.g., `claude-opus-4-5` → `claude-opus-4-6`), Overdeck rewrites deprecated IDs it finds in the retired `models.overrides` map of `~/.overdeck/config.yaml`. That map routes nothing (see [Removed](#removed-presets-work-type-overrides-thinking-levels)), so this migration only tidies a leftover key. Model IDs under `roles` and `workhorses` are not rewritten on disk.
 
 ### How It Works
 
@@ -558,201 +447,13 @@ Warning: Model gpt-5.2-codex requires openai API key - falling back to claude-so
 
 ---
 
-## Examples
-
-### Example 1: Default Setup (Balanced)
-
-Use Overdeck with sensible defaults.
-
-**~/.overdeck/config.yaml**:
-```yaml
-models:
-  preset: balanced
-```
-
-**~/.overdeck.env**:
-```env
-ANTHROPIC_API_KEY=sk-ant-api03-...
-```
-
-**Result**: Works immediately with Claude models only. Falls back gracefully for all work types.
-
----
-
-### Example 2: Multi-Provider (Premium)
-
-Use all providers for maximum flexibility.
-
-**~/.overdeck/config.yaml**:
-```yaml
-models:
-  preset: premium
-
-  providers:
-    anthropic: true
-    openai: true
-    google: true
-    zai: false  # Don't need Z.AI
-```
-
-**~/.overdeck.env**:
-```env
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-GOOGLE_API_KEY=...
-```
-
-**Result**: Uses best model for each work type according to premium preset.
-
----
-
-### Example 3: Budget-Conscious (Gemini-Heavy)
-
-Minimize costs with Gemini models.
-
-**~/.overdeck/config.yaml**:
-```yaml
-models:
-  preset: budget
-
-  providers:
-    anthropic: true
-    google: true
-    openai: false  # Don't pay for OpenAI
-    zai: false
-
-  overrides:
-    # Only use Claude for security
-    review:security: claude-opus-4-6
-
-  thinking:
-    # Dial up thinking for complex tasks
-    issue-agent:planning: high
-    review:security: high
-    review:performance: high
-```
-
-**~/.overdeck.env**:
-```env
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=...
-```
-
-**Result**: Gemini for most work, Claude Opus only for security review.
-
----
-
-### Example 4: Per-Project Override (Critical Project)
-
-Override global defaults for a specific project.
-
-**~/.overdeck/config.yaml** (global):
-```yaml
-models:
-  preset: balanced  # Default for all projects
-```
-
-**.overdeck.yaml** (project root):
-```yaml
-models:
-  preset: premium  # This project is critical
-
-  overrides:
-    # Extra emphasis on quality
-    review:security: claude-opus-4-6
-    review:correctness: claude-opus-4-6
-    issue-agent:implementation: gpt-5.2-codex
-```
-
-**Result**: This project uses premium models, other projects use balanced.
-
----
-
-### Example 5: Custom Thinking Levels (Gemini)
-
-Fine-tune Gemini thinking for cost/quality tradeoffs.
-
-**~/.overdeck/config.yaml**:
-```yaml
-models:
-  preset: budget  # Use Gemini everywhere
-
-  thinking:
-    # Minimal thinking for fast exploration
-    issue-agent:exploration: minimal
-    subagent:explore: minimal
-
-    # High thinking for critical tasks
-    issue-agent:planning: high
-    review:security: high
-
-    # Medium thinking for balanced tasks
-    issue-agent:implementation: medium
-    specialist-review-agent: medium
-```
-
-**Result**: Optimized Gemini usage - fast where possible, careful where needed.
-
----
-
-## Precedence Rules
-
-When multiple configuration sources exist, Overdeck resolves model selection in this order:
-
-### Resolution Order
-
-1. **Per-project override** (`.overdeck.yaml` in project root)
-2. **Global override** (`~/.overdeck/config.yaml` overrides section)
-3. **Preset default** (`~/.overdeck/config.yaml` preset selection)
-4. **Fallback** (if provider disabled or API key missing)
-5. **Hardcoded default** (`claude-sonnet-4-5`)
-
-### Example Resolution
-
-**Global config**:
-```yaml
-models:
-  preset: balanced  # Default: gemini-3-flash-preview for exploration
-
-  overrides:
-    issue-agent:exploration: claude-haiku-4-5  # Override: use Haiku
-```
-
-**Project config** (`.overdeck.yaml`):
-```yaml
-models:
-  overrides:
-    issue-agent:exploration: glm-4.7-flashx  # Project override: use GLM
-```
-
-**Result**: `issue-agent:exploration` uses `glm-4.7-flashx` (project override wins)
-
----
-
 ## Advanced Configuration
 
 ### Debugging Model Resolution
 
-To see which model is selected for a specific work type:
-
-Use the Settings page and the documented YAML files as the source of truth for model routing. Overdeck does not currently expose a `pan admin config show|get|set|validate` CLI for router inspection.
-
-For the older TOML-backed runtime config, the currently supported admin CLI surface is shadow mode only:
-
-```bash
-# View effective configuration
-pan config show
-
-# Check model for specific work type
-pan config get issue-agent:implementation
-```
-
-### Validation
-
-Overdeck validates configuration on startup:
-- Invalid work type IDs → Warning logged, ignored
-- Missing API keys → Fallback applied
-- Syntax errors → Error message, defaults used
+`GET /api/models/resolve` on the dashboard returns the model each role and
+review lane resolves to under the current config (`resolveModel` in
+`src/lib/config-yaml/roles.ts`).
 
 ### Migration from settings.json
 

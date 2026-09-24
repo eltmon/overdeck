@@ -1,5 +1,12 @@
 # Overdeck Work Types
 
+> **Removed.** The work-type router this page describes was replaced by roles
+> and workhorse slots in PAN-1048 (`cfd48b80881`). Nothing picks a model from
+> `models.overrides` or a work-type ID any more. Configure models with
+> `roles.<role>.model`, `roles.review.sub.<lane>.model`, and `workhorses`; see
+> [CONFIGURATION.md](CONFIGURATION.md#removed-presets-work-type-overrides-thinking-levels)
+> and [MODEL-CALLS.md](MODEL-CALLS.md). This page is kept for history.
+
 Reference for the job settings Overdeck uses for model routing.
 
 This document is about **routed work types and model-selection slots**, not the high-level roster of Overdeck runtime agents. Use [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) if you want the newcomer-friendly map of what kinds of agents exist.
