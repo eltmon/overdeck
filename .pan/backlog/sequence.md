@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T16:57:44.615Z · model: claude-opus-5 · open: 839_
+_Last sequenced: 2026-09-24T17:00:19.712Z · model: claude-opus-5 · open: 838_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -142,7 +142,6 @@ _Last sequenced: 2026-09-24T16:57:44.615Z · model: claude-opus-5 · open: 839_
 | 155 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
 | 156 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
 | 157 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
-| 158 | PAN-3689 | S | high | ok |  |  | Orphaned swarm-slot GC targets the aggregate polyrepo root; nested worktrees survive and spam failures |
 | 159 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
 | 160 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
 | 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
@@ -1174,10 +1173,10 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T16:57:44.615Z",
+  "generatedAt": "2026-09-24T17:00:19.712Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 839,
+  "openCount": 838,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -2949,18 +2948,6 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "condition": "ok",
       "dependsOn": [],
       "why": "New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3689",
-      "rank": 158,
-      "size": "S",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Orphaned swarm-slot GC targets the aggregate polyrepo root; nested worktrees survive and spam failures",
       "gate": "auto",
       "planning": "auto"
     },
