@@ -54,6 +54,15 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
+- The snapshot's agent `status` is derived when it is served, not copied from the stored
+  record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
+  backend inventory (matched by terminal id, pane id or the `agentId` token, the way
+  `GET /api/agents` matches) is served `stopped`. Before the inventory has answered even
+  once (Herdr not up at dashboard boot), such rows are served `unknown`, never dead; after
+  that, a failed read keeps the last-good panes. Stored `stopped`/`error` and the `paused`
+  / `stoppedByUser` intent fields pass through unchanged. Only `agent-`, `planning-` and
+  `strike-` ids are derived, the set the inventory answers for
+  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`).
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 
