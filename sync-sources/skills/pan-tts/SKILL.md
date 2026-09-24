@@ -34,7 +34,7 @@ The TTS pipeline has three independent components:
 ## Architecture
 
 ```
-pan dashboard                  qwen-tts daemon            audio out
+Overdeck dashboard             qwen-tts daemon            audio out
 ────────────────────────       ─────────────────          ─────────
 activity.tts ──▶ resolve voice ──▶ POST /speak ──▶         PipeWire
                  mute/filter      synthesize (GPU)
@@ -100,7 +100,7 @@ The subscriber is a small Python project that connects to Overdeck's SSE feed an
 
 ```yaml
 endpoint: http://127.0.0.1:3000/events/stream
-token: ${OVERDECK_EVENTS_TOKEN}   # optional, only if pan has the token set
+token: ${OVERDECK_EVENTS_TOKEN}   # optional, only if Overdeck has the token set
 
 filters:
   types: [activity.tts]

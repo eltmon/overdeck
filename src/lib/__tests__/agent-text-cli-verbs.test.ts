@@ -27,6 +27,11 @@ const MARKDOWN_ROOTS = [
   'src/lib/cloister/prompts',
   'sync-sources/agents',
   'sync-sources/rules',
+  'sync-sources/skills',
+  'sync-sources/dev-skills',
+  'cli',
+  'features',
+  'reference',
 ];
 
 /**
@@ -142,7 +147,7 @@ function scan(): string[] {
   }
   for (const root of MARKDOWN_ROOTS) {
     for (const file of walk(join(ROOT, root))) {
-      if (!file.endsWith('.md')) continue;
+      if (!/\.mdx?$/.test(file)) continue;
       for (const { line, code } of markdownCode(readFileSync(file, 'utf-8'))) check(file, line, code);
     }
   }
