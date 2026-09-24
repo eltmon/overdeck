@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T21:09:24.694Z · model: claude-opus-5 · open: 819_
+_Last sequenced: 2026-09-24T21:26:13.188Z · model: claude-opus-5 · open: 818_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -46,7 +46,6 @@ _Last sequenced: 2026-09-24T21:09:24.694Z · model: claude-opus-5 · open: 819_
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 70 | PAN-4149 | XS | high | ok |  |  | Effect ratchet splits two-line diagnostics: 68 findings carry no file, so the per-file 'yours to fix' list blames the wrong file |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -991,10 +990,6 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-4149 (rank 70)
-
-New since the prior run. The gate itself trips on the total count only, so this raises no false red — but every regression it does catch points the fixer, and the verification feedback an agent consumes, at the wrong file: each unknownInEffectCatch warning spans two lines and the ratchet keeps only the indented marker line, dropping the file position. Sits beside PAN-3605, the other defect in the same script. The fix is fully specified (group tsc output into whole diagnostics, then regenerate the baseline at the same commit), so it is XS and ready to plan.
-
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1138,10 +1133,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T21:09:24.694Z",
+  "generatedAt": "2026-09-24T21:26:13.188Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 819,
+  "openCount": 818,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1634,19 +1629,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin.",
       "rationale": "New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4149",
-      "rank": 70,
-      "size": "XS",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Effect ratchet splits two-line diagnostics: 68 findings carry no file, so the per-file 'yours to fix' list blames the wrong file",
-      "rationale": "New since the prior run. The gate itself trips on the total count only, so this raises no false red — but every regression it does catch points the fixer, and the verification feedback an agent consumes, at the wrong file: each unknownInEffectCatch warning spans two lines and the ratchet keeps only the indented marker line, dropping the file position. Sits beside PAN-3605, the other defect in the same script. The fix is fully specified (group tsc output into whole diagnostics, then regenerate the baseline at the same commit), so it is XS and ready to plan.",
       "gate": "auto",
       "planning": "auto"
     },
