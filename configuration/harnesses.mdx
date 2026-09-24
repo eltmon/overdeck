@@ -649,8 +649,9 @@ Check `~/.overdeck/agents/<id>/ready.json` — the vendored extension writes thi
 on `session_start`. If it never appears:
 
 1. Confirm `packages/ohmypi-extension/dist/index.js` exists (`pan doctor` will warn).
-2. Tail the tmux session: `tmux -L overdeck attach -t agent-<id>`. omp prints
-   stdout to the pane; structural errors show up there.
+2. Watch the agent's pane: open it in the dashboard, or run the `Attach:`
+   command `pan start <id>` prints (Herdr or tmux, whichever backend launched
+   it). omp prints stdout to the pane; structural errors show up there.
 3. Verify the named pipe exists at `~/.overdeck/agents/<id>/rpc.in`. If a stale
    regular file is in its place, `createOhmypiFifo` replaces it on next spawn.
 
