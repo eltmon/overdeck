@@ -698,26 +698,26 @@ export async function killAllReviewerSessions(
 
   const { closeAgentPaneDetailed } = await import('../terminal-backends/launch.js');
   const { stopAgent } = await import('../agents.js');
-  await Promise.all(
-    candidates.map(async (sessionName) => {
-      const result = await closeAgentPaneDetailed(sessionName);
-      if (result.outcome === 'failed') {
-        console.warn(`[review-agent] Could not stop reviewer ${sessionName}: ${result.reason}`);
-        failed.push(sessionName);
-        return;
-      }
-      if (result.outcome === 'closed') {
-        console.log(`[review-agent] Killed reviewer session ${sessionName}`);
-        killed.push(sessionName);
-      }
-      const status = getAgentState(sessionName)?.status;
-      if (result.outcome === 'closed' || status === 'running' || status === 'starting') {
-        await Effect.runPromise(stopAgent(sessionName)).catch((err: unknown) => {
-          console.warn(`[review-agent] Could not write stopped state for ${sessionName}: ${err instanceof Error ? err.message : String(err)}`);
-        });
-      }
-    }),
-  );
+  // One reviewer at a time: each close is a handful of backend round trips,
+  // and a convoy is at most five reviewers.
+  for (const sessionName of candidates) {
+    const result = await closeAgentPaneDetailed(sessionName);
+    if (result.outcome === 'failed') {
+      console.warn(`[review-agent] Could not stop reviewer ${sessionName}: ${result.reason}`);
+      failed.push(sessionName);
+      continue;
+    }
+    if (result.outcome === 'closed') {
+      console.log(`[review-agent] Killed reviewer session ${sessionName}`);
+      killed.push(sessionName);
+    }
+    const status = getAgentState(sessionName)?.status;
+    if (result.outcome === 'closed' || status === 'running' || status === 'starting') {
+      await Effect.runPromise(stopAgent(sessionName)).catch((err: unknown) => {
+        console.warn(`[review-agent] Could not write stopped state for ${sessionName}: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
+  }
   return { killed, failed };
 }
 
