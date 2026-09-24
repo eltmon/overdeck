@@ -1,5 +1,5 @@
 import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
-import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, statSync, renameSync, rmSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, statSync, renameSync, rmSync, realpathSync } from 'fs';
 import { join, dirname, extname, relative, resolve } from 'path';
 import { homedir } from 'os';
 import { exec, execFile } from 'child_process';
@@ -432,6 +432,13 @@ export function preTrustDirectory(dirPath: string): void {
   }
 
   if (dirty) {
-    writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf8');
+    // PAN-3905: every Claude Code session on the machine reads this file, and
+    // spawns now call this too. Write a sibling temp file and rename it over
+    // the real one (resolved through a symlink, keeping its mode), so no
+    // reader ever sees a half-written file.
+    const target = realpathSync(claudeJsonPath);
+    const tmpPath = `${target}.tmp-${process.pid}`;
+    writeFileSync(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf8', mode: statSync(target).mode & 0o777 });
+    renameSync(tmpPath, target);
   }
 }

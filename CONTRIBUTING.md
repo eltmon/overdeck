@@ -360,9 +360,9 @@ export function startMyService() {
 
 Duplicate service instances cause duplicate event emissions, double API calls, and subtle race conditions that are extremely hard to debug.
 
-### Directories are pre-trusted when they are created or registered
+### Directories are pre-trusted when they are created and before every Claude Code launch
 
-Claude Code prompts "Do you trust this folder?" for an untrusted directory, and a session waiting on that prompt never starts. Overdeck pre-trusts a directory once, where it comes into being: workspace creation (`workspace-manager/create.ts`) and project registration (`project-registration.ts`, `projects/create-perform.ts`) call `preTrustDirectory(path)`. Spawns do not pre-trust: `preTrustDirectory` rewrites `~/.claude.json`, which every Claude Code session on the machine shares, without an atomic rename, so calling it on every spawn could race. A new code path that creates a directory for Claude Code to run in pre-trusts it at creation. References: PAN-502, PAN-4012.
+Claude Code prompts "Do you trust this folder?" for an untrusted directory, and a session waiting on that prompt never starts; its kickoff fails with `ready-signal-timeout`, which names the last pane lines. Overdeck calls `preTrustDirectory(path)` where a directory comes into being (workspace creation in `workspace-manager/create.ts`, project registration in `project-registration.ts` and `projects/create-perform.ts`) and again right before a launch: `launchAgentPane` (`terminal-backends/launch.ts`) pre-trusts the cwd of every Claude Code issue pane, and `pan spawn`, which starts its item worker through the backend directly, pre-trusts the item's cwd. A workspace made by another path (the planner, a slot or item worktree, a resume into an older workspace) is then still trusted. `preTrustDirectory` writes `~/.claude.json` only when the entry is missing, and writes it through a temp file and a rename, so a reader never sees a half-written file. It is still a read-modify-write of a file every Claude Code session shares, so a concurrent write can drop one entry; the next launch writes it again. Operator conversations (panes with no issue) are not pre-trusted here. A new launch path goes through `launchAgentPane`, or calls `preTrustDirectory` itself. References: PAN-502, PAN-3905.
 
 ### SQLite is the authoritative state store
 
@@ -594,7 +594,7 @@ These properties must be preserved across all changes. A change that would viola
 |-----------|---------------|
 | `mergeStatus: 'merging'` is cleared on server restart | Pending merges are in-memory only. Stale `merging` permanently disables the Merge button. |
 | `.overdeck/continue.json` is never committed | It is mutable workspace runtime state; committing it creates false authoritative state and merge conflicts. |
-| Workspace creation and project registration call `preTrustDirectory()`; spawns do not | An untrusted directory makes Claude Code hang asking "Do you trust this folder?". Pre-trusting on every spawn would race on the shared `~/.claude.json`. |
+| Workspace creation, project registration and every Claude Code launch (`launchAgentPane`, `pan spawn`) call `preTrustDirectory()` | An untrusted directory makes Claude Code hang asking "Do you trust this folder?". A workspace made by any other path must still be trusted before an agent starts in it. |
 | `maxForks: 4` in all Vitest configs | 24 cores × 3.5 GB = OOM. Non-negotiable. |
 | Node 22 is the production runtime | The production server path must explicitly use the Node 22 binary, not the system default. |
 | `execSync` is never used in server-reachable modules | Blocks the event loop, stalls all concurrent requests. |
