@@ -10,8 +10,9 @@ import {
   getAgentRuntimeStateSync,
   stopAgent,
 } from '../agents.js';
-import { isAlive } from '../agents/liveness.js';
-import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
+import { idleAgeMs, isAlive } from '../agents/liveness.js';
+import { FINISHED_REPROBE_DELAY_MS, isFinishedRoleRun, waitForPaneGone } from '../agents/warm-idle-reap.js';
+import { closeAgentPane } from '../terminal-backends/launch.js';
 import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
 import type { PassMode } from './types.js';
 import type { CollectOpenBacklogResult } from './backlog-input.js';
@@ -23,7 +24,7 @@ export type SequencerRunStatus = {
   running: boolean;
   done: boolean;
   startedAt: string | null;
-  doneReason: 'fresh-sequence' | 'idle' | 'pane-dead' | null;
+  doneReason: 'fresh-sequence' | 'idle' | 'pane-dead' | 'pane-finished' | null;
 };
 
 export type SpawnSequencerOptions = {
@@ -66,7 +67,16 @@ export async function getSequencerRunStatus(projectRoot: string): Promise<Sequen
 
   const runtimeState = alive ? getAgentRuntimeStateSync(SEQUENCER_AGENT_ID)?.state ?? null : null;
   const idle = runtimeState === 'idle' || runtimeState === 'stopped' || runtimeState === 'suspended';
-  const doneReason = paneDead ? 'pane-dead' : freshSequence ? 'fresh-sequence' : idle ? 'idle' : null;
+  // PAN-3923: the runtime mirror is in-process and empty after a dashboard
+  // restart, and a pass that failed before writing leaves no fresh sequence.
+  // The backend still knows: a Herdr harness idle at its prompt after its
+  // prompt was delivered, with stale work activity, has finished (the same
+  // rule spawnRun's reap uses; clearFinishedSequencerRun probes it twice).
+  const paneFinished = verdict.alive
+    && isFinishedRoleRun(verdict, getAgentState(SEQUENCER_AGENT_ID) ?? undefined, idleAgeMs(SEQUENCER_AGENT_ID));
+  const doneReason = paneDead
+    ? 'pane-dead'
+    : freshSequence ? 'fresh-sequence' : idle ? 'idle' : paneFinished ? 'pane-finished' : null;
   const done = alive && doneReason !== null;
 
   return {
@@ -78,8 +88,6 @@ export async function getSequencerRunStatus(projectRoot: string): Promise<Sequen
   };
 }
 
-const REAP_SETTLE_MS = 3_000;
-
 /**
  * Stop the finished sequencer the way `spawnRun` will notice: state bookkeeping
  * through `stopAgent`, then the pane itself (tmux dies with `stopAgent`; a
@@ -89,11 +97,7 @@ const REAP_SETTLE_MS = 3_000;
 async function stopSequencerRun(): Promise<void> {
   await Effect.runPromise(stopAgent(SEQUENCER_AGENT_ID)).catch(() => {});
   await closeAgentPane(SEQUENCER_AGENT_ID);
-  const deadline = Date.now() + REAP_SETTLE_MS;
-  while (Date.now() < deadline) {
-    if (!(await agentPaneExists(SEQUENCER_AGENT_ID).catch(() => false))) return;
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
+  await waitForPaneGone(SEQUENCER_AGENT_ID);
 }
 
 export async function clearFinishedSequencerRun(
@@ -101,9 +105,14 @@ export async function clearFinishedSequencerRun(
   stop: () => Promise<void> = stopSequencerRun,
 ): Promise<SequencerRunStatus> {
   const status = await getSequencerRunStatus(projectRoot);
-  if (status.done) {
-    await stop();
+  if (!status.done) return status;
+  if (status.doneReason === 'pane-finished') {
+    // A Herdr idle label must hold on a second probe before it kills the pane.
+    await new Promise((resolve) => setTimeout(resolve, FINISHED_REPROBE_DELAY_MS));
+    const again = await getSequencerRunStatus(projectRoot);
+    if (!again.done) return again;
   }
+  await stop();
   return status;
 }
 

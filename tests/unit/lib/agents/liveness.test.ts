@@ -7,11 +7,14 @@
  * tmux modules the activity signals read.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
   getAgentRuntimeStateSync: vi.fn(),
   getRuntimeForAgent: vi.fn(),
   listPaneValuesSync: vi.fn(),
+  tmuxSessionExists: vi.fn(),
+  tmuxExecAsync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
@@ -20,6 +23,9 @@ vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
   listPaneValuesSync: mocks.listPaneValuesSync,
+  sessionExists: mocks.tmuxSessionExists,
+  tmuxExecAsync: mocks.tmuxExecAsync,
+  exactSession: (id: string) => `=${id}`,
 }));
 
 import {
@@ -110,6 +116,93 @@ describe('isAlive: the single liveness oracle (PAN-3849)', () => {
   });
 });
 
+// ─── tmux has-session errors (PAN-3923 review, F5) ──────────────────────────
+
+/**
+ * tmux.ts `sessionExists` folds every has-session failure into false. On the
+ * tmux path the oracle re-asks through the three-part probe, so a tmux error
+ * is indeterminate (never a confirmed death that remediators act on).
+ */
+describe('isAlive on tmux: a has-session error is indeterminate, never no-session', () => {
+  function tmuxDeps(answer: 'exists' | 'missing' | 'error' | Error) {
+    const { sessionExists: _seam, ...rest } = aliveDeps();
+    const queryTmuxSession = vi.fn(async () => {
+      if (answer instanceof Error) throw answer;
+      return answer;
+    });
+    return { ...rest, backend: 'tmux' as const, queryTmuxSession };
+  }
+
+  beforeEach(() => {
+    mocks.tmuxSessionExists.mockReset();
+    mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(false));
+  });
+
+  it('reads a has-session error as runtime-indeterminate', async () => {
+    const deps = tmuxDeps('error');
+    const verdict = await isAlive('agent-x', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    expect(isConfirmedDead(verdict)).toBe(false);
+    expect(deps.queryTmuxSession).toHaveBeenCalledWith('agent-x');
+    expect(deps.listPaneRows).not.toHaveBeenCalled();
+  });
+
+  it('reads a probe that throws as runtime-indeterminate', async () => {
+    const verdict = await isAlive('agent-x', tmuxDeps(new Error('spawn failed')));
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+  });
+
+  it('keeps a clean "no such session" as no-session', async () => {
+    await expect(isAlive('agent-x', tmuxDeps('missing'))).resolves.toEqual({ alive: false, reason: 'no-session' });
+  });
+
+  it('walks the panes when the re-ask finds the session after all', async () => {
+    await expect(isAlive('agent-x', tmuxDeps('exists'))).resolves.toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
+  });
+
+  it('does not re-ask when sessionExists already found the session', async () => {
+    mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(true));
+    const deps = tmuxDeps('error');
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
+    expect(deps.queryTmuxSession).not.toHaveBeenCalled();
+  });
+});
+
+// ─── No tmux binary (PAN-3923 review 2) ─────────────────────────────────────
+
+/**
+ * A missing tmux binary (spawn ENOENT) through the real bounded has-session
+ * probe: indeterminate on a tmux host, which requires the binary; no session
+ * on a Herdr host, which does not.
+ */
+describe('isAlive with no tmux binary on PATH', () => {
+  beforeEach(() => {
+    mocks.tmuxSessionExists.mockReset();
+    mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(false));
+    mocks.tmuxExecAsync.mockReset();
+    mocks.tmuxExecAsync.mockRejectedValue(Object.assign(new Error('spawn tmux ENOENT'), { code: 'ENOENT', syscall: 'spawn tmux' }));
+  });
+
+  it('is indeterminate on a tmux host, never a confirmed death', async () => {
+    const { sessionExists: _seam, ...rest } = aliveDeps();
+    const verdict = await isAlive('agent-x', { ...rest, backend: 'tmux' as const });
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    expect(isConfirmedDead(verdict)).toBe(false);
+    expect(mocks.tmuxExecAsync).toHaveBeenCalled();
+  });
+
+  it('keeps the Herdr death on a Herdr host: no tmux means no legacy session', async () => {
+    const { sessionExists: _seam, ...rest } = aliveDeps();
+    const verdict = await isAlive('agent-x', {
+      ...rest,
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+    });
+    expect(verdict).toEqual({ alive: false, reason: 'no-session' });
+    expect(mocks.tmuxExecAsync).toHaveBeenCalled();
+  });
+});
+
 // ─── Herdr backend (PAN-3917 W12) ───────────────────────────────────────────
 
 /**
@@ -124,7 +217,9 @@ describe('isAlive on the Herdr backend', () => {
       backend: 'herdr' as const,
       probeHerdr: vi.fn(async () => ({ kind: 'alive' as const, paneId: 'wE:p2', state: 'working' as const })),
     });
-    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true });
+    // PAN-3923: Herdr's own pane state rides along, so a reaper can tell a
+    // working run from one idle at its prompt.
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true, backendState: 'working' });
     expect(deps.sessionExists).not.toHaveBeenCalled();
     expect(deps.listPaneRows).not.toHaveBeenCalled();
   });
@@ -137,7 +232,7 @@ describe('isAlive on the Herdr backend', () => {
       backend: 'herdr' as const,
       probeHerdr: vi.fn(async () => ({ kind: 'alive' as const, paneId: 'wE:p2', state: 'unknown' as const })),
     });
-    await expect(isAlive('agent-pan-3705-review', deps)).resolves.toEqual({ alive: true, paneAlive: true });
+    await expect(isAlive('agent-pan-3705-review', deps)).resolves.toEqual({ alive: true, paneAlive: true, backendState: 'unknown' });
   });
 
   it('reports an agent Herdr does not know as no-session (a confirmed death)', async () => {

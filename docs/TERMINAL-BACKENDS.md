@@ -183,9 +183,50 @@ Who uses them:
 - **`pan kill` / `pan stop` / `pan pause`** — use the async `stopAgent`, and decide "running" and "live
   sibling" with `agentPaneExists`, not `sessionExistsSync`.
 - **`spawnRun`'s warm-idle reap** (PAN-2579, `reapWarmIdleRoleRun` in `src/lib/agents/warm-idle-reap.ts`) — when
-  a role run's pane is still there at dispatch, it asks `isAlive` and reaps through `stopAgent` only on
-  `pane-dead`. It used to read tmux's `#{pane_dead}`, which a Herdr host always answered "not dead",
-  so every re-dispatch was refused as "already running" (PAN-3966).
+  a role run's pane is still there at dispatch, it asks `isAlive` and reaps through `stopAgent` when
+  `isFinishedRoleRun` says the previous run finished. It used to read tmux's `#{pane_dead}`, which a
+  Herdr host always answered "not dead", so every re-dispatch was refused as "already running"
+  (PAN-3966). A role run's harness is interactive and never exits on its own, so a finished run is
+  usually a live harness idle at its prompt, not a dead pane (PAN-3923). Role runs do not close their
+  own pane when they finish, on either backend: sessions stay warm (PAN-2579), and the next dispatch
+  reaps the leftover here. The rule:
+
+  | Liveness verdict | Previous run's `state.json` | Result |
+  | --- | --- | --- |
+  | any | missing, no status, or `starting` | refused |
+  | `pane-dead`, `runtime-missing`, `no-session` (no live harness in the pane) | status past `starting` | reaped |
+  | alive, Herdr `idle` or `done` on two probes 5 s apart, work activity older than 60 s | one-shot role (`sequencer`), `running` | reaped |
+  | alive, Herdr `idle` or `done` | any other role, fresh activity, or a second probe that no longer reads idle/done | refused |
+  | alive, Herdr `working`, `blocked`, `unknown` | any | refused |
+  | alive on tmux (no per-pane agent state) | any | refused |
+  | `runtime-indeterminate`, or the probe threw | any | refused |
+
+  A run that is `starting`, or has no state, may be booting: `launcher.sh` runs its prologue before the
+  harness execs, so the pane reads `runtime-missing`, and `resumeAgent` and `restartAgent` both hold
+  `starting` while they relaunch. `spawnRun` marks a run `running` only after its prompt is delivered.
+
+  Herdr's `idle`/`done` means "waiting for input", not "done for good": Claude Code also sits at its
+  prompt while it waits on a background task or a usage limit. So the idle branch applies only to roles
+  whose prompt is a single turn that ends the run (`ONE_SHOT_ROLES` in `warm-idle-reap.ts`: the
+  sequencer), and only when work activity is stale by the `liveness.ts` rule (`idleAgeMs`, never the
+  label alone) on two probes. The review synthesis parent waits idle in STANDBY for its reviewers, and
+  the tier supervisor stays resident between commit deliveries; a re-dispatch of either is refused.
+  Work, plan, test, knowledge, worker and review-lane runs are refused too.
+
+  After a reap, `spawnRun` waits (up to 3 s) for the backend to drop the pane before it relaunches under
+  the same name, because Herdr drops the record asynchronously. On Herdr, `isAlive` carries the pane's
+  `agent_status` as `backendState` on an alive verdict; tmux verdicts carry none.
+
+  **Gap: non-Claude harnesses on Herdr.** Herdr tracks `agent_status` only for Claude Code panes
+  (`detectionPolicyFor` in `src/lib/terminal-backends/launch.ts`). Codex, kimi-code, pi, opencode and
+  ACP panes are pane-bound and read `unknown`, so a finished role run on one of those harnesses is
+  still refused as "already running" until its process exits and it reads confirmed dead (#4169).
+- **tmux `has-session` errors** — on the tmux path, `isAlive` re-asks a false `sessionExists` through the
+  three-part `queryTmuxSession` (`src/lib/agents/tmux-session-query.ts`). Only a clean "no such
+  session" is `no-session`; a tmux error or timeout is `runtime-indeterminate`, never a confirmed death.
+  A missing tmux binary is `runtime-indeterminate` on a tmux host, which requires it, and `no-session` for
+  the legacy check on a Herdr host, which does not. The other `sessionExists` callers outside the
+  liveness door still read a failure as false.
 - **Dashboard Pause and Suspend** — probe with `agentPaneExists` and close with `closeAgentPane`.
 - **Post-merge lifecycle** (`postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`) —
   `closeAgentPane` for the work, planning and strike agents; `closeIssuePanes` with roles
