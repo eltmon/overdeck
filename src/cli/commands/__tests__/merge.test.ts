@@ -38,7 +38,7 @@ describe('merge CLI', () => {
 
     await mergeCancelCommand('pan-123', fetchImpl as never);
 
-    expect(fetchImpl).toHaveBeenCalledWith('http://dashboard.test/api/flywheel/auto-merge/PAN-123', {
+    expect(fetchImpl).toHaveBeenCalledWith('http://dashboard.test/api/merge-train/auto-merge/PAN-123', {
       method: 'DELETE',
       headers: { 'x-pan-test-token': 'secret-token' },
     });
@@ -112,7 +112,7 @@ describe('merge CLI', () => {
 
     await program.parseAsync(['node', 'pan', 'merge', 'cancel', 'pan-123']);
 
-    expect(fetchSpy).toHaveBeenCalledWith('http://dashboard.test/api/flywheel/auto-merge/PAN-123', {
+    expect(fetchSpy).toHaveBeenCalledWith('http://dashboard.test/api/merge-train/auto-merge/PAN-123', {
       method: 'DELETE',
       headers: { 'x-pan-test-token': 'secret-token' },
     });

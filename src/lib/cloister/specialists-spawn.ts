@@ -75,7 +75,6 @@ export async function buildSpecialistBaseCommand(
 /**
  * Build shell export lines for caveman compression for specialist agents.
  *
- * Excluded: inspect-agent (its INSPECTION PASSED/BLOCKED sentinels are parsed by Cloister).
  * Uses per-specialist-type intensity from config.
  *
  * @param specialistType  The specialist type (review-agent, test-agent, etc.)
@@ -88,8 +87,7 @@ export async function buildSpecialistCavemanExports(
   workspacePath: string | undefined,
   config: import('../config-yaml.js').NormalizedCavemanConfig
 ): Promise<string> {
-  // inspect-agent: never compress — output contains sentinel strings parsed by Cloister
-  if (specialistType === 'inspect-agent' || !config.enabled) return '';
+  if (!config.enabled) return '';
 
   // Read the workspace's A/B variant if we have a workspace path
   const variant = workspacePath ? await readCavemanVariant(workspacePath) : 'off';

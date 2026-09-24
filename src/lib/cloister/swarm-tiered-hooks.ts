@@ -11,9 +11,7 @@
  *   1. broadcastCommit — every live slot agent hears the rendered diff
  *      (ingestion-only; everyone-hears-everything per docs/TIERED-EXECUTION.md).
  *   2. shouldSupervise(item, subscribe) → deliverCommitForReview — the
- *      standing supervisor reviews per its subscribe policy. This is
- *      independent of supervisor.owns_inspection, which only routes
- *      `pan inspect`.
+ *      standing supervisor reviews per its subscribe policy.
  *
  * Both hooks are best-effort: the commit has already landed, so a delivery
  * failure logs loudly and never blocks the merge loop.

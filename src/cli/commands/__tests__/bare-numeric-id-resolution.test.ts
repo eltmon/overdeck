@@ -41,11 +41,6 @@ const lifecycleMocks = vi.hoisted(() => ({
   closeOut: vi.fn(),
 }));
 
-const inspectMocks = vi.hoisted(() => ({
-  spawnInspectAgent: vi.fn(),
-  getInspectDiffContext: vi.fn(),
-}));
-
 const trackerMocks = vi.hoisted(() => ({
   resolveTrackerType: vi.fn(),
   isGitHubIssue: vi.fn(),
@@ -130,14 +125,6 @@ vi.mock('../../../lib/agents/resume.js', () => ({
 
 vi.mock('../../../lib/lifecycle/index.js', () => ({
   closeOut: lifecycleMocks.closeOut,
-}));
-
-vi.mock('../../../lib/cloister/inspect-agent.js', () => ({
-  spawnInspectAgent: inspectMocks.spawnInspectAgent,
-}));
-
-vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({
-  getInspectDiffContext: inspectMocks.getInspectDiffContext,
 }));
 
 vi.mock('../../../lib/xbrief/io.js', () => ({
@@ -245,16 +232,6 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
     unpauseMocks.resumeAgent.mockResolvedValue({ success: true });
     lifecycleMocks.closeOut.mockReset();
     lifecycleMocks.closeOut.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
-    inspectMocks.spawnInspectAgent.mockReset();
-    inspectMocks.spawnInspectAgent.mockReturnValue(Effect.succeed({ success: true, tmuxSession: 'inspect-1', runId: 'run-1' }));
-    inspectMocks.getInspectDiffContext.mockReset();
-    inspectMocks.getInspectDiffContext.mockReturnValue(Effect.succeed({
-      currentHead: 'fedcba987654',
-      checkpoint: 'abcdef12',
-      diffStats: '1 file changed',
-      diffCommand: 'git diff abcdef123456...HEAD',
-      repos: [],
-    }));
     trackerMocks.resolveTrackerType.mockReset();
     trackerMocks.resolveTrackerType.mockReturnValue('rally');
     trackerMocks.isGitHubIssue.mockReset();

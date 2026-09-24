@@ -25,7 +25,7 @@ vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
   listAgentStatesSync: vi.fn(),
 }));
 
-// Fake terminal backend: the live inventory behind hasLiveTmuxSession (#4109).
+// Fake terminal backend: the live inventory behind hasLivePane / hasLiveTmuxSession (#4109).
 vi.mock('../../../../src/lib/terminal-backends/inventory.js', () => ({
   listLiveAgentIds: vi.fn(),
 }));
@@ -94,10 +94,12 @@ describe('reconstructCache', () => {
       agentState({ id: 'agent-pan-1920', issueId: 'PAN-1920' }),
       agentState({ id: 'agent-pan-1920-review', issueId: 'PAN-1920', role: 'review' }),
     ]) as any);
+    listLiveAgentIdsMock.mockResolvedValue(new Set(['agent-pan-1920']));
 
     const result = await reconstructCache(fakeDb());
     expect(result.agentsEnumerated).toBe(2);
     expect(result.agentsById['agent-pan-1920']?.issueId).toBe('PAN-1920');
+    expect(result.agentsById['agent-pan-1920']).toMatchObject({ hasLivePane: true, hasLiveTmuxSession: true });
     expect(result.agentRuntimeById['agent-pan-1920']?.activity).toBe('working');
   });
 
@@ -109,8 +111,8 @@ describe('reconstructCache', () => {
     listLiveAgentIdsMock.mockResolvedValue(new Set(['agent-herdr']));
 
     const result = await reconstructCache(fakeDb());
-    expect(result.agentsById['agent-herdr']?.hasLiveTmuxSession).toBe(true);
-    expect(result.agentsById['agent-gone']?.hasLiveTmuxSession).toBe(false);
+    expect(result.agentsById['agent-herdr']).toMatchObject({ hasLivePane: true, hasLiveTmuxSession: true });
+    expect(result.agentsById['agent-gone']).toMatchObject({ hasLivePane: false, hasLiveTmuxSession: false });
   });
 
   it('#4109: leaves pane liveness unknown when the backend inventory is unreadable', async () => {
@@ -118,6 +120,7 @@ describe('reconstructCache', () => {
     listLiveAgentIdsMock.mockResolvedValue(null);
 
     const result = await reconstructCache(fakeDb());
+    expect(result.agentsById['agent-herdr']?.hasLivePane).toBeUndefined();
     expect(result.agentsById['agent-herdr']?.hasLiveTmuxSession).toBeUndefined();
   });
 
@@ -135,6 +138,7 @@ describe('reconstructCache', () => {
 
     const result = await reconstructCache(fakeDb());
     expect(result.agentsById['agent-pan-1919']?.status).toBe('stopped');
+    expect(result.agentsById['agent-pan-1919']).toMatchObject({ hasLivePane: false, hasLiveTmuxSession: false });
     expect(result.agentRuntimeById['agent-pan-1919']?.activity).toBe('stopped');
   });
 

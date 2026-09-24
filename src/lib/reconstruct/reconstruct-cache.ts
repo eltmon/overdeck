@@ -83,7 +83,9 @@ function toAgentSnapshot(state: AgentState, hasLivePane: boolean | undefined): A
     phase: state.phase || undefined,
     workType: state.workType || undefined,
     roleRunHead: state.roleRunHead || undefined,
-    // Contract name; true for a live pane on either backend (#4105, #4109).
+    // Both from the backend inventory (#4109), never the tmux-only `tmuxActive`.
+    hasLivePane,
+    // Deprecated alias of `hasLivePane` (#4105).
     hasLiveTmuxSession: hasLivePane,
     stoppedByUser: state.stoppedByUser,
     paused: state.paused,

@@ -281,7 +281,7 @@ describe('doctor command', () => {
           id: 'agent-pan-1419',
           issueId: 'PAN-1419',
           status: 'running',
-          hasLiveTmuxSession: true,
+          hasLivePane: true,
         }],
       });
 

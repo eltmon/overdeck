@@ -234,6 +234,8 @@ function buildAgentControlEventPayload(state: AgentState, previousStatus: AgentS
     issueId: state.issueId,
     status: toAgentStatusPayload(state.status),
     previousStatus,
+    hasLivePane: hasLiveTmuxSession,
+    // Deprecated alias of `hasLivePane` (#4105).
     hasLiveTmuxSession,
     stoppedByUser: state.stoppedByUser === true,
     paused: state.paused === true,
@@ -335,6 +337,7 @@ function buildStoppedAgentLifecycle(
   return {
     agentId,
     hasAgentState,
+    hasLivePane: hasLiveTmuxSession,
     hasLiveTmuxSession,
     hasSavedSession,
     hasResumableTranscript,
