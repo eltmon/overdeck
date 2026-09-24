@@ -23,7 +23,7 @@
  * Invoked via `pan admin remote reap` (and suitable for a deacon patrol).
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
 import { exec } from 'child_process';
@@ -39,115 +39,18 @@ import {
   getRemoteAgentOutput,
   sendToRemoteAgent,
 } from './remote-agents.js';
-import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { PAN_DIRNAME, PAN_CONTINUE_FILENAME } from '../pan-dir/index.js';
 
 const execAsync = promisify(exec);
 const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
-const REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
-
-interface PerVmCredentialRefreshState {
-  fingerprint: string | null;
-  refreshedAtMs: number;
-}
-
-const perVmCredentialRefreshState = new Map<string, PerVmCredentialRefreshState>();
 
 export interface RemoteReapResult {
   agentId: string;
   issueId: string;
   status: 'handed-off' | 'still-running' | 'stale' | 'error';
   details: string[];
-}
-
-interface RemoteClaudeCredentialRefreshDeps {
-  listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
-  nowMs?: () => number;
-  credentialFingerprint?: () => string | null;
-  loadConfig?: typeof loadConfigSync;
-  createFlyProvider?: typeof createFlyProviderFromConfig;
-}
-
-function getHostClaudeCredentialFingerprint(): string | null {
-  const credFile = join(homedir(), '.claude', '.credentials.json');
-  if (!existsSync(credFile)) return null;
-  try {
-    const stat = statSync(credFile);
-    return `${stat.mtimeMs}:${stat.size}`;
-  } catch {
-    return null;
-  }
-}
-
-export function resetRemoteClaudeCredentialRefreshForTests(): void {
-  perVmCredentialRefreshState.clear();
-}
-
-/**
- * Proactively copy fresh host Claude credentials to active remote agents.
- *
- * Host OAuth refresh rotates refresh tokens, so a long-running Fly VM can be
- * left with an orphaned copy. The host credentials file mtime is the precise
- * trigger on Linux; platforms without that file fall back to a bounded 15 min
- * refresh cadence. The active-agent scan runs first so the common zero-remote
- * case never constructs a Fly provider or makes Fly API calls.
- *
- * Refresh state is tracked per VM (keyed by vmName), not globally. A failed
- * or newly started VM must be retried on the next patrol regardless of whether
- * another VM already succeeded this cycle.
- */
-export async function refreshClaudeCredentialsForActiveRemoteAgents(
-  deps: RemoteClaudeCredentialRefreshDeps = {},
-): Promise<string[]> {
-  const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
-  const activeVmNames = new Set(activeStates.map((state) => state.vmName));
-
-  // Drop state for VMs that are no longer active so a future machine reusing
-  // the same vmName starts with a clean watermark. Do this before the empty
-  // short-circuit so the Map is pruned even when no agents are currently active.
-  for (const vmName of perVmCredentialRefreshState.keys()) {
-    if (!activeVmNames.has(vmName)) {
-      perVmCredentialRefreshState.delete(vmName);
-    }
-  }
-
-  if (activeStates.length === 0) return [];
-
-  const nowMs = (deps.nowMs ?? Date.now)();
-  const currentFingerprint = (deps.credentialFingerprint ?? getHostClaudeCredentialFingerprint)();
-  const config = (deps.loadConfig ?? loadConfigSync)();
-  const fly = (deps.createFlyProvider ?? createFlyProviderFromConfig)(config.remote);
-  const actions: string[] = [];
-
-  for (const state of activeStates) {
-    const last = perVmCredentialRefreshState.get(state.vmName);
-    const credentialChanged = currentFingerprint !== null && currentFingerprint !== last?.fingerprint;
-    const refreshDue = !last ||
-      nowMs - last.refreshedAtMs >= REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS;
-    if (!credentialChanged && !refreshDue) continue;
-
-    try {
-      const synced = await fly.syncClaudeCredentials(state.vmName);
-      if (synced) {
-        // Only advance this VM's watermark on a successful sync. A failure
-        // leaves its last watermark intact so the next patrol retries it.
-        perVmCredentialRefreshState.set(state.vmName, {
-          fingerprint: currentFingerprint,
-          refreshedAtMs: nowMs,
-        });
-      }
-      actions.push(
-        synced
-          ? `Remote credentials refreshed for ${state.issueId.toUpperCase()} on ${state.vmName}`
-          : `Remote credentials refresh skipped for ${state.issueId.toUpperCase()} on ${state.vmName} (no host credentials)`,
-      );
-    } catch (err: any) {
-      actions.push(`Remote credentials refresh failed for ${state.issueId.toUpperCase()} on ${state.vmName}: ${err.message}`);
-    }
-  }
-
-  return actions;
 }
 
 /** List agent IDs that have a remote-state.json in running/starting state. */
@@ -321,7 +224,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       }
 
       const teamPrefix = extractTeamPrefix(issueId);
-      const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
       const resolved = resolveProjectFromIssueSync(issueId, []);
       const projectRoot = projectConfig?.path ?? resolved?.projectPath;
       if (!projectRoot) {
@@ -384,11 +287,11 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
       if (!existsSync(workspacePath)) {
         if (!projectConfig) throw new Error(`No project config for ${issueId}; cannot create workspace`);
-        const wsResult = await Effect.runPromise(createWorkspace({
+        const wsResult = await createWorkspace({
           projectConfig,
           featureName: issueId.toLowerCase(),
           startDocker: false,
-        }));
+        });
         if (!wsResult.success) {
           throw new Error(`Failed to create local worktree: ${wsResult.errors.join('; ')}`);
         }
@@ -417,8 +320,8 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       }
 
       // 4. Minimal local agent state so downstream flows resolve the workspace.
-      const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
-      const existing = getAgentStateSync(agentId);
+      const { getAgentState, saveAgentStateSync } = await import('../agents.js');
+      const existing = getAgentState(agentId);
       if (existing) {
         existing.workspace = existing.workspace || workspacePath;
         existing.status = 'stopped';
@@ -440,7 +343,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
 
       // 5. Review artifacts + completed marker — same entries pan done uses.
       const { createReviewArtifactsForIssue } = await import('../review-artifacts.js');
-      const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+      const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
       const primaryArtifact = artifactResult.mergeSet?.repos.find((repo) => !!repo.artifactUrl);
       if (primaryArtifact?.artifactUrl) {
         details.push(`Review artifact: ${primaryArtifact.artifactUrl}`);
@@ -478,8 +381,8 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       } catch (err: any) {
         details.push(`Warning: could not destroy machine: ${err.message}`);
       }
-      const { deleteWorkspaceMetadataSync } = await import('./workspace-metadata.js');
-      deleteWorkspaceMetadataSync(issueId);
+      const { deleteWorkspaceMetadata } = await import('./workspace-metadata.js');
+      deleteWorkspaceMetadata(issueId);
       details.push('Removed remote workspace metadata (pipeline is local from here)');
       saveRemoteAgentState({ ...remoteState, status: 'stopped', lastActivity: new Date().toISOString() });
 

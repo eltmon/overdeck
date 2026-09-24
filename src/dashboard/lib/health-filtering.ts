@@ -27,7 +27,7 @@ export const checkAgentHealth = (agentId: string) =>
       return { alive: false };
     }
 
-    const stdout = yield* capturePane(agentId, 5);
+    const stdout = yield* Effect.promise(() => capturePane(agentId, 5));
 
     return { alive: true, lastOutput: stdout.trim() };
   }).pipe(Effect.catch(() => Effect.succeed({ alive: false })));

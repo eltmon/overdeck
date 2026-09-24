@@ -296,7 +296,7 @@ describe('ReadModel checkpoint reconciliation', () => {
       const turnNumber = Number.parseInt(turnId.replace('turn-', ''), 10)
       return Effect.succeed(new Date(Date.parse('2026-05-08T05:00:00.000Z') + turnNumber * 1000).toISOString())
     })
-    const deleteLegacyCheckpointRefs = vi.fn(() => Effect.succeed(0))
+    const deleteLegacyCheckpointRefs = vi.fn(async () => 0)
 
     // PAN-1938: agents now come from AgentsResolver (overdeck.db), not reconstructCache.
     const agentReconcile = {
@@ -328,7 +328,7 @@ describe('ReadModel checkpoint reconciliation', () => {
             deleteLegacyCheckpointRefs,
           }))
           vi.doMock('../../../lib/agent-enrichment.js', () => ({
-            computeAgentEnrichment: vi.fn(() => Effect.succeed(undefined)),
+            computeAgentEnrichment: vi.fn(async () => undefined),
           }))
           vi.doMock('../../../lib/agents.js', () => ({
             listRunningAgents: vi.fn(() => Effect.succeed([

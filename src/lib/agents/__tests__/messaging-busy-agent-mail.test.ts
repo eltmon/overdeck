@@ -23,7 +23,7 @@ let tmpHome: string;
 let stateDir: string;
 
 const loggerMocks = vi.hoisted(() => ({
-  logAgentLifecycleSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
 }));
 
 const interventionMocks = vi.hoisted(() => ({
@@ -37,7 +37,7 @@ vi.mock('../../operator-interventions.js', () => ({
 
 vi.mock('../../persistent-logger.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  logAgentLifecycleSync: loggerMocks.logAgentLifecycleSync,
+  logAgentLifecycle: loggerMocks.logAgentLifecycle,
 }));
 
 vi.mock('../../tmux.js', () => ({
@@ -52,9 +52,9 @@ vi.mock('../../tmux.js', () => ({
   sessionExistsSync: vi.fn(() => true),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
   getAgentSessionsSync: vi.fn(() => []),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   capturePaneSync: vi.fn(() => ''),
-  listPaneValues: vi.fn(() => Effect.succeed([])),
+  listPaneValues: vi.fn(async () => []),
   listPaneValuesSync: vi.fn(() => []),
   setOption: vi.fn(() => Effect.void),
 }));
@@ -70,7 +70,6 @@ vi.mock('../../paths.js', async (importOriginal) => {
 });
 
 vi.mock('../monitor-transport.js', () => ({
-  isMonitorLive: vi.fn(() => false),
   formatMailFileContent: vi.fn(
     (body: string, source: string, date: Date) =>
       `# Message\n\nsource: ${source}\ndate: ${date.toISOString()}\n\n${body}\n`,
@@ -149,7 +148,7 @@ describe('messageAgent busy-agent mail wording (PAN-3736)', () => {
     stateDir = join(tmpHome, 'agents');
     mkdirSync(stateDir, { recursive: true });
     process.env.OVERDECK_HOME = tmpHome;
-    loggerMocks.logAgentLifecycleSync.mockReset();
+    loggerMocks.logAgentLifecycle.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockResolvedValue(undefined);
   });
@@ -184,7 +183,7 @@ describe('messageAgent busy-agent mail wording (PAN-3736)', () => {
     expect(readFileSync(mailPath!, 'utf8')).toContain('peer ping');
 
     // Same phrase on the lifecycle log and the console line.
-    expect(loggerMocks.logAgentLifecycleSync).toHaveBeenCalledWith(
+    expect(loggerMocks.logAgentLifecycle).toHaveBeenCalledWith(
       'agent-pan-3736',
       `messageAgent: ${result.reason}`,
     );
@@ -213,7 +212,7 @@ describe('mail filename matrix (PAN-3738)', () => {
     stateDir = join(tmpHome, 'agents');
     mkdirSync(stateDir, { recursive: true });
     process.env.OVERDECK_HOME = tmpHome;
-    loggerMocks.logAgentLifecycleSync.mockReset();
+    loggerMocks.logAgentLifecycle.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockResolvedValue(undefined);
     deliveryMocks.deliverAgentMessage.mockReset();

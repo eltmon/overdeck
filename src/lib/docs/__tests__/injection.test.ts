@@ -7,10 +7,10 @@ import { getDefaultDocsConfig, type NormalizedDocsConfig } from '../../config-ya
 import type { DocsPathOverrides } from '../../paths.js';
 import {
   buildDocsIndex,
-  deterministicDocsTestEmbedding,
 } from '../index-builder.js';
 import { buildDocsInjectionContext } from '../injection.js';
 import { readDocsBudgetState, recordDocsInjection } from '../state.js';
+import { deterministicDocsTestEmbedding } from '../../../../tests/helpers/docs-test-embedding.js';
 
 let rootDir: string;
 let paths: DocsPathOverrides;

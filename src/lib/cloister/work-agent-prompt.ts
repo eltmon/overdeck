@@ -1,9 +1,10 @@
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { renderPrompt } from './prompts.js';
-import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
-import { isTldrEnabledSync } from '../config-yaml.js';
+import { extractTeamPrefix, findProjectByPath, findProjectByTeam } from '../projects.js';
+import { resolveVerificationTestsMode } from './verification-tests-mode.js';
+import { isTldrEnabled } from '../config-yaml.js';
 import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext, readIssueDraft } from '../pan-dir/index.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
@@ -73,12 +74,37 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
       // TLDR is advertised to the agent only when the operator toggle is on AND
       // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
-      TLDR_AVAILABLE: isTldrEnabledSync() && existsSync(join(ctx.workspacePath, '.venv')),
+      TLDR_AVAILABLE: isTldrEnabled() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
+      // Review of #3993 (PAN-3965): the test wording follows the project —
+      // "the suite runs on CI" only where it does, `npx vitest` only for vitest.
+      TESTS_ON_CI: projectRunsTestsOnCi(ctx.projectRoot),
+      USES_VITEST: usesVitest(ctx.workspacePath) || (ctx.projectRoot ? usesVitest(ctx.projectRoot) : false),
     },
   }));
 }
 
+
+/** True when the project at `projectRoot` runs its test gate on CI (`verification.tests`). */
+function projectRunsTestsOnCi(projectRoot: string | undefined): boolean {
+  if (!projectRoot) return false;
+  try {
+    return resolveVerificationTestsMode(findProjectByPath(projectRoot)) === 'ci';
+  } catch {
+    return false;
+  }
+}
+
+/** True when the checkout at `dir` tests with vitest (a vitest config, or vitest in package.json). */
+function usesVitest(dir: string): boolean {
+  try {
+    if (readdirSync(dir).some((name) => /^vitest\.(?:config|workspace)\.[cm]?[jt]s$/.test(name))) return true;
+    const packageJson = join(dir, 'package.json');
+    return existsSync(packageJson) && /"vitest"\s*:/.test(readFileSync(packageJson, 'utf-8'));
+  } catch {
+    return false;
+  }
+}
 
 async function buildActiveSliceContext(workspacePath: string, issueId: string): Promise<string> {
   try {
@@ -449,7 +475,7 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
  * Check if planning content contains Stitch design information.
  * Returns the Stitch section if found, null otherwise.
  */
-export function extractStitchDesigns(stateContent: string | null): string | null {
+function extractStitchDesigns(stateContent: string | null): string | null {
   if (!stateContent) return null;
 
   // Look for Stitch-related sections in planning content
@@ -500,7 +526,7 @@ export function extractStitchDesigns(stateContent: string | null): string | null
  */
 export function buildPolyrepoContext(issueId: string, workspacePath: string): string {
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
   if (
     !projectConfig?.workspace?.type ||

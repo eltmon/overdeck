@@ -1,22 +1,38 @@
-import { Effect } from 'effect';
 /**
  * Tests for specialist-handoff-logger.ts - PAN-83
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  logSpecialistHandoff,
-  createSpecialistHandoff,
-  readSpecialistHandoffs,
-  readIssueSpecialistHandoffs,
-  getSpecialistHandoffStats,
-  getTodaySpecialistHandoffs,
-  updateSpecialistHandoffStatus,
-} from '../../../src/lib/cloister/specialist-handoff-logger.js';
+import { logSpecialistHandoff, createSpecialistHandoff, readSpecialistHandoffs, getSpecialistHandoffStats, updateSpecialistHandoffStatus } from '../../../src/lib/cloister/specialist-handoff-logger.js';
 import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { getOverdeckHome } from '../../../src/lib/paths.js';
+import type { SpecialistHandoff } from '../../../src/lib/cloister/specialist-handoff-logger.js';
+
+// Moved here from src/lib/cloister/specialist-handoff-logger.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Get handoffs from today
+ *
+ * @returns Array of specialist handoff events from today
+ */
+function getTodaySpecialistHandoffs(): SpecialistHandoff[] {
+  const events = readSpecialistHandoffs();
+  const today = new Date().toISOString().split('T')[0];
+  return events.filter(e => e.timestamp.startsWith(today));
+}
+
+// Moved here from src/lib/cloister/specialist-handoff-logger.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Read specialist handoff events for a specific issue
+ *
+ * @param issueId - Issue ID
+ * @returns Array of specialist handoff events for the issue
+ */
+function readIssueSpecialistHandoffs(issueId: string): SpecialistHandoff[] {
+  const allEvents = readSpecialistHandoffs();
+  return allEvents.filter(e => e.issueId === issueId);
+}
 
 function getTestLogFile(): string {
   return join(getOverdeckHome(), 'logs', 'specialist-handoffs.jsonl');
@@ -278,7 +294,7 @@ describe('specialist-handoff-logger', () => {
 
   describe('getSpecialistHandoffStats', () => {
     it('should return zero stats for empty log', async () => {
-      const stats = await Effect.runPromise(getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR }));
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.totalHandoffs).toBe(0);
       expect(stats.todayCount).toBe(0);
@@ -294,7 +310,7 @@ describe('specialist-handoff-logger', () => {
         logSpecialistHandoff(handoff);
       }
 
-      const stats = await Effect.runPromise(getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR }));
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
       expect(stats.totalHandoffs).toBe(5);
     });
 
@@ -308,7 +324,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = await Effect.runPromise(getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR }));
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // review-agent: sent 2, received 1
       expect(stats.bySpecialist['review-agent'].sent).toBe(2);
@@ -338,7 +354,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = await Effect.runPromise(getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR }));
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.byStatus['queued']).toBe(1);
       expect(stats.byStatus['processing']).toBe(1);
@@ -356,7 +372,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = await Effect.runPromise(getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR }));
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // 3 successes out of 4 completed
       expect(stats.successRate).toBe(0.75);
@@ -371,7 +387,7 @@ describe('specialist-handoff-logger', () => {
 
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = await Effect.runPromise(getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR }));
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       // Only 1 completed, 1 success = 100%
       expect(stats.successRate).toBe(1.0);
@@ -388,7 +404,7 @@ describe('specialist-handoff-logger', () => {
       ];
       handoffs.forEach(h => logSpecialistHandoff(h));
 
-      const stats = await Effect.runPromise(getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR }));
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
       expect(stats.queueDepth).toBe(0);
     });
 
@@ -409,7 +425,7 @@ describe('specialist-handoff-logger', () => {
       };
       logSpecialistHandoff(yesterdayHandoff);
 
-      const stats = await Effect.runPromise(getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR }));
+      const stats = await getSpecialistHandoffStats({ agentsDir: TEST_AGENTS_DIR });
 
       expect(stats.totalHandoffs).toBe(3);
       expect(stats.todayCount).toBe(2);
@@ -479,7 +495,7 @@ describe('specialist-handoff-logger', () => {
 
   describe('updateSpecialistHandoffStatus', () => {
     it('should return false when log file does not exist', async () => {
-      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
       expect(result).toBe(false);
     });
 
@@ -487,7 +503,7 @@ describe('specialist-handoff-logger', () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       logSpecialistHandoff(handoff);
 
-      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
       expect(result).toBe(true);
 
       const handoffs = readSpecialistHandoffs();
@@ -501,7 +517,7 @@ describe('specialist-handoff-logger', () => {
       logSpecialistHandoff(handoff);
 
       const before = Date.now();
-      await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
       const after = Date.now();
 
       const handoffs = readSpecialistHandoffs();
@@ -515,7 +531,7 @@ describe('specialist-handoff-logger', () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       logSpecialistHandoff(handoff);
 
-      await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'processing'));
+      await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'processing');
 
       const handoffs = readSpecialistHandoffs();
       expect(handoffs[0].status).toBe('processing');
@@ -531,7 +547,7 @@ describe('specialist-handoff-logger', () => {
       };
       logSpecialistHandoff(handoff);
 
-      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
       expect(result).toBe(false);
     });
 
@@ -539,7 +555,7 @@ describe('specialist-handoff-logger', () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       logSpecialistHandoff(handoff);
 
-      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-999', 'test-agent', 'completed', 'success'));
+      const result = await updateSpecialistHandoffStatus('PAN-999', 'test-agent', 'completed', 'success');
       expect(result).toBe(false);
 
       // Original record unchanged
@@ -554,7 +570,7 @@ describe('specialist-handoff-logger', () => {
       logSpecialistHandoff(first);
       logSpecialistHandoff(second);
 
-      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
       expect(result).toBe(true);
 
       // Only the most recent (second) should be updated
@@ -574,7 +590,7 @@ describe('specialist-handoff-logger', () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       writeFileSync(logFile, `{corrupted json}\n${JSON.stringify(handoff)}\n`, 'utf-8');
 
-      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
       expect(result).toBe(true);
 
       const content = readFileSync(logFile, 'utf-8');
@@ -591,7 +607,7 @@ describe('specialist-handoff-logger', () => {
       const logFile = getTestLogFile();
       writeFileSync(logFile, '', 'utf-8');
 
-      const result = await Effect.runPromise(updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success'));
+      const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
       expect(result).toBe(false);
     });
   });

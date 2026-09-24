@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync, getIsolatedPlaywrightMcpConfigSync } from '../../src/lib/claude-mcp.js';
+import { ensurePlaywrightIsolation, ensureExcalidrawMcp, getIsolatedPlaywrightMcpConfig } from '../../src/lib/claude-mcp.js';
 
 describe('ensurePlaywrightIsolation', () => {
   it('adds --isolated when Playwright args are missing', () => {
@@ -11,7 +11,7 @@ describe('ensurePlaywrightIsolation', () => {
       },
     };
 
-    const changed = ensurePlaywrightIsolationSync(config);
+    const changed = ensurePlaywrightIsolation(config);
 
     expect(changed).toBe(true);
     expect(config.mcpServers.playwright.args).toEqual(['--isolated']);
@@ -27,7 +27,7 @@ describe('ensurePlaywrightIsolation', () => {
       },
     };
 
-    const changed = ensurePlaywrightIsolationSync(config);
+    const changed = ensurePlaywrightIsolation(config);
 
     expect(changed).toBe(false);
     expect(config.mcpServers.playwright.args).toEqual(['--isolated']);
@@ -35,7 +35,7 @@ describe('ensurePlaywrightIsolation', () => {
 
   it('returns false when Playwright MCP is absent', () => {
     const config = { mcpServers: {} };
-    expect(ensurePlaywrightIsolationSync(config)).toBe(false);
+    expect(ensurePlaywrightIsolation(config)).toBe(false);
   });
 });
 
@@ -53,7 +53,7 @@ describe('getIsolatedPlaywrightMcpConfig', () => {
       },
     };
 
-    const result = getIsolatedPlaywrightMcpConfigSync(config);
+    const result = getIsolatedPlaywrightMcpConfig(config);
 
     expect(result).toEqual({
       mcpServers: {
@@ -68,7 +68,7 @@ describe('getIsolatedPlaywrightMcpConfig', () => {
   });
 
   it('returns null when Playwright MCP is absent', () => {
-    expect(getIsolatedPlaywrightMcpConfigSync({ mcpServers: {} })).toBeNull();
+    expect(getIsolatedPlaywrightMcpConfig({ mcpServers: {} })).toBeNull();
   });
 });
 
@@ -76,7 +76,7 @@ describe('ensureExcalidrawMcp', () => {
   it('injects the off-the-shelf excalidraw-mcp default when the entry is missing', () => {
     const config: { mcpServers: Record<string, any> } = { mcpServers: {} };
 
-    const changed = ensureExcalidrawMcpSync(config);
+    const changed = ensureExcalidrawMcp(config);
 
     expect(changed).toBe(true);
     expect(config.mcpServers.excalidraw).toEqual({
@@ -92,7 +92,7 @@ describe('ensureExcalidrawMcp', () => {
   it('creates mcpServers if absent entirely', () => {
     const config: Record<string, any> = {};
 
-    const changed = ensureExcalidrawMcpSync(config);
+    const changed = ensureExcalidrawMcp(config);
 
     expect(changed).toBe(true);
     expect(config.mcpServers.excalidraw.command).toBe('npx');
@@ -109,7 +109,7 @@ describe('ensureExcalidrawMcp', () => {
       },
     };
 
-    const changed = ensureExcalidrawMcpSync(config);
+    const changed = ensureExcalidrawMcp(config);
 
     expect(changed).toBe(false);
     expect(config.mcpServers.excalidraw.command).toBe('node');
@@ -121,7 +121,7 @@ describe('ensureExcalidrawMcp', () => {
       mcpServers: { excalidraw: { args: [] } },
     };
 
-    const changed = ensureExcalidrawMcpSync(config);
+    const changed = ensureExcalidrawMcp(config);
 
     expect(changed).toBe(true);
     expect(config.mcpServers.excalidraw.command).toBe('npx');

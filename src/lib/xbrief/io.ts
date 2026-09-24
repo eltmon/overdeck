@@ -16,7 +16,23 @@
  * `updateSubItemStatus` write ONLY to the continue file.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `findPlanSync` (async: `findPlan`): 7 sites in cli/commands/plan-finalize.ts, cli/commands/scope.ts,
+ *   cli/commands/start-status.ts, cli/commands/start.ts, lib/xbrief/io.ts.
+ * - `findWorkspaceDraftPlanSync` (async: `findWorkspaceDraftPlan`): src/lib/xbrief/io.ts:229.
+ * - `readPlanSync` (async: `readPlan`): 8 sites in cli/commands/plan-finalize.ts, cli/commands/scope.ts,
+ *   lib/xbrief/io.ts, lib/xbrief/lifecycle-io.ts.
+ * - `readWorkspacePlanSync` (async: `readWorkspacePlan`): 9 sites in cli/commands/task.ts,
+ *   lib/agents/registered-slot-spawn.ts, lib/agents/spawn-prep.ts, lib/cloister/handoff-context.ts,
+ *   lib/cloister/swarm-slot-lifecycle.ts, lib/work/done-preflight.ts, lib/xbrief/acceptance-criteria.ts.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
@@ -25,7 +41,7 @@ import { getProjectPanPaths } from '../pan-dir/specs.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
 import { parseXBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
-import { subItemsOf, type XBriefDifficulty, type XBriefDocument, type XBriefInfo, type XBriefItemStatus } from './types.js';
+import { subItemsOf, type XBriefDocument, type XBriefInfo, type XBriefItemStatus } from './types.js';
 import {
   readItemStatuses,
   readItemStatusesAsync,
@@ -45,7 +61,7 @@ export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry, TierRet
  * `Effect.runSync` — so we keep a local sync mirror rather than break CLI
  * synchronous semantics. Dashboard server code uses `findPlanAsync`.
  */
-export function findSpecByIssueSync(projectRoot: string, issueId: string): { path: string } | null {
+export function findSpecByIssue(projectRoot: string, issueId: string): { path: string } | null {
   const upperIssueId = issueId.toUpperCase();
   const { specsDir } = getProjectPanPaths(projectRoot);
   if (!existsSync(specsDir)) return null;
@@ -208,8 +224,8 @@ export function findPlanSync(workspacePath: string): string | null {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
   const entry =
-    findSpecByIssueSync(planCheckoutFromWorkspace(workspacePath), issueId)
-    ?? findSpecByIssueSync(mainCheckoutFromWorkspace(workspacePath), issueId);
+    findSpecByIssue(planCheckoutFromWorkspace(workspacePath), issueId)
+    ?? findSpecByIssue(mainCheckoutFromWorkspace(workspacePath), issueId);
   return entry ? entry.path : findWorkspaceDraftPlanSync(workspacePath);
 }
 
@@ -326,93 +342,6 @@ export function readTierOverrides(workspacePath: string): TierOverridesMap {
   }
 }
 
-export function recordTierPromotion(
-  workspacePath: string,
-  itemId: string,
-  from: XBriefDifficulty,
-  to: XBriefDifficulty,
-  reason: string,
-): void {
-  const path = workspaceContinuePath(workspacePath);
-  const readablePath = readableWorkspaceContinuePath(workspacePath);
-  let state: Record<string, unknown> = {};
-  try {
-    state = JSON.parse(readFileSync(readablePath, 'utf-8')) as Record<string, unknown>;
-  } catch {
-    state = {};
-  }
-
-  const current = (state.tierOverrides && typeof state.tierOverrides === 'object')
-    ? state.tierOverrides as TierOverridesMap
-    : {};
-  const existing = current[itemId];
-  const nextOverrides: TierOverridesMap = {
-    ...current,
-    [itemId]: {
-      effectiveDifficulty: to,
-      promotions: (existing?.promotions ?? 0) + 1,
-      history: [
-        ...(existing?.history ?? []),
-        { at: new Date().toISOString(), from, to, reason },
-      ],
-    },
-  };
-
-  // A promotion moves the item to a new tier, so its retry count at the old
-  // tier is discarded (PAN-3858).
-  const currentRetries = (state.tierRetries && typeof state.tierRetries === 'object')
-    ? { ...(state.tierRetries as TierRetriesMap) }
-    : {};
-  delete currentRetries[itemId];
-
-  mkdirSync(getWorkspacePanPaths(workspacePath).panDir, { recursive: true });
-  writeFileSync(path, JSON.stringify({ ...state, tierOverrides: nextOverrides, tierRetries: currentRetries }, null, 2), 'utf-8');
-}
-
-/** Recorded retry attempts per item (PAN-3858), keyed by xBRIEF item id. */
-export function readTierRetries(workspacePath: string): TierRetriesMap {
-  const path = readableWorkspaceContinuePath(workspacePath);
-  try {
-    const raw = readFileSync(path, 'utf-8');
-    const parsed = JSON.parse(raw) as { tierRetries?: TierRetriesMap };
-    return parsed.tierRetries ?? {};
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Persist a retry attempt at the item's current effective difficulty
- * (PAN-3858). `attempts` is the attempt number decideEscalation returned;
- * a later promotion clears the entry via recordTierPromotion.
- */
-export function recordTierRetry(
-  workspacePath: string,
-  itemId: string,
-  difficulty: XBriefDifficulty,
-  attempts: number,
-): void {
-  const path = workspaceContinuePath(workspacePath);
-  const readablePath = readableWorkspaceContinuePath(workspacePath);
-  let state: Record<string, unknown> = {};
-  try {
-    state = JSON.parse(readFileSync(readablePath, 'utf-8')) as Record<string, unknown>;
-  } catch {
-    state = {};
-  }
-
-  const current = (state.tierRetries && typeof state.tierRetries === 'object')
-    ? state.tierRetries as TierRetriesMap
-    : {};
-  const nextRetries: TierRetriesMap = {
-    ...current,
-    [itemId]: { difficulty, attempts },
-  };
-
-  mkdirSync(getWorkspacePanPaths(workspacePath).panDir, { recursive: true });
-  writeFileSync(path, JSON.stringify({ ...state, tierRetries: nextRetries }, null, 2), 'utf-8');
-}
-
 /**
  * PAN-2401: overlay the continue file's item statuses onto an already-loaded
  * plan document. The single overlay door for read paths that resolve the spec
@@ -445,48 +374,6 @@ export function readWorkspacePlanSync(workspacePath: string): XBriefDocument | n
  * written) and 'cancelled' (abandoned).
  */
 const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
-
-/**
- * Check whether planning has reached the "proposed" state for this workspace.
- *
- * Returns true ONLY when `plan.status === 'proposed'`. Used to gate the
- * dashboard Done button which should hide once the user has approved the plan
- * (status moves out of 'proposed').
- */
-export function isPlanningProposed(workspacePath: string, planningDir?: string): boolean {
-  return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
-}
-
-
-/**
- * Check whether planning has finished for this workspace — i.e., tasks have
- * been generated and the agent can (or already did) start work.
- *
- * Returns true when `plan.status` is any of: 'proposed', 'approved', 'pending',
- * 'running', 'completed', or 'blocked'.
- */
-export function isPlanningCompleteSync(workspacePath: string, planningDir?: string): boolean {
-  return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
-}
-
-
-function checkPlanStatus(
-  workspacePath: string,
-  _planningDir: string | undefined,
-  matchStatus: (status: string) => boolean,
-): boolean {
-  const planPath = findPlanSync(workspacePath);
-  if (!planPath) return false;
-  try {
-    const doc = readPlanSync(planPath);
-    const status = doc.plan?.status;
-    if (status && matchStatus(status)) return true;
-    if (status) return false;
-  } catch {
-    // Corrupt / unreadable plan
-  }
-  return false;
-}
 
 
 /**
@@ -536,12 +423,10 @@ export function updateSubItemStatus(
   setItemStatus(planHomeForWorkspace(workspacePath), issueId, fullSubId, status);
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 //
-// These wrap the existing async APIs in Effect with typed error channels so
-// callers can compose xBRIEF reads with other Effect-native code. They do NOT
-// replace the sync/Promise variants — CLI and legacy callers continue to use
-// those. Migrate callers individually as they move into Effect.
+// xBRIEF reads as Effect programs with typed error channels. The sync twins stay
+// for the callers this module's header names.
 
 /**
  * Effect variant of readPlanAsync — failures surface as typed errors in the

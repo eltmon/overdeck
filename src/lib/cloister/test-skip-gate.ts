@@ -61,7 +61,7 @@ const TEST_CALL_REMOVED = /^\s*(?:it|test)\s*\(/;
  * and — when the test sits in a `__tests__/` directory — its parent. Basename
  * and extension follow the codebase convention (`Foo.test.tsx` ⇒ `Foo.tsx`).
  */
-export function subjectCandidatesForTestFile(testFile: string): string[] {
+function subjectCandidatesForTestFile(testFile: string): string[] {
   const parsed = /^(.*?)([^/]+)\.(?:test|spec)\.(?:ts|tsx|js|jsx)$/.exec(testFile);
   if (!parsed) return [];
   const dir = parsed[1]!;

@@ -2,7 +2,7 @@
  * Pipeline Notifier — event bridge between library code and Socket.io
  *
  * Lightweight singleton that decouples pipeline events (review convoy progress,
- * specialist queue) from the dashboard's Socket.io server. Library code calls notifyPipeline() which is
+ * specialist queue) from the dashboard's Socket.io server. Library code calls notifyPipelineSync() which is
  * fire-and-forget — when an in-process handler is registered (the dashboard server),
  * the handler is invoked synchronously. Otherwise the call is forwarded to the
  * dashboard via a best-effort HTTP POST so CLI-process state changes (e.g.
@@ -13,8 +13,7 @@
  * dashboard read derives the current state from the tracker, git and the PR.
  */
 
-import { Effect } from 'effect';
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =
   | { type: 'review.approved'; issueId: string }
@@ -24,16 +23,25 @@ export type PipelineEvent =
   | { type: 'reviewer_completed'; issueId: string; role: string }
   | { type: 'reviewer_timed_out'; issueId: string; role: string; sessionName: string; attempt: number; maxRetries: number; willRetry: boolean }
   | { type: 'coordinator_started'; issueId: string; sessionName: string }
-  | { type: 'coordinator_died'; issueId: string; sessionName: string; reason: string };
+  | { type: 'coordinator_died'; issueId: string; sessionName: string; reason: string }
+  // The append-only per-issue pipeline journal (see cloister/pipeline-journal.ts).
+  // Plain JSON, so the HTTP forward below carries it verbatim from a CLI
+  // process. The entry is typed structurally rather than imported: the journal
+  // module imports THIS one, and an import back would close a cycle.
+  | {
+    type: 'pipeline.entry';
+    issueId: string;
+    entry: { at: string; type: string; issueId: string; source?: string; data?: Record<string, unknown> };
+  };
 
 type Handler = (event: PipelineEvent) => void;
 let handler: Handler | null = null;
 
-export function setPipelineHandlerSync(fn: Handler): void {
+export function setPipelineHandler(fn: Handler): void {
   handler = fn;
 }
 
-export function notifyPipelineSync(event: PipelineEvent): void {
+export function notifyPipeline(event: PipelineEvent): void {
   if (handler) {
     try {
       handler(event);
@@ -55,7 +63,7 @@ export function notifyPipelineSync(event: PipelineEvent): void {
 
   // Resolve shared secret (PAN-891). If the dashboard hasn't started in this
   // home (no token file, no env), skip the forward — DB write is durable.
-  const token = getInternalTokenSync();
+  const token = getInternalToken();
   if (!token) return;
 
   // PAN-915 — forward the full event; each type carries its own payload.
@@ -79,14 +87,3 @@ export function notifyPipelineSync(event: PipelineEvent): void {
     })
     .finally(() => clearTimeout(timer));
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of {@link setPipelineHandlerSync}. */
-export const setPipelineHandler = (fn: Handler): Effect.Effect<void, never> =>
-  Effect.sync(() => setPipelineHandlerSync(fn));
-
-/** Effect variant of {@link notifyPipelineSync}. Fire-and-forget; never fails. */
-export const notifyPipeline = (event: PipelineEvent): Effect.Effect<void, never> =>
-  Effect.sync(() => notifyPipelineSync(event));
-

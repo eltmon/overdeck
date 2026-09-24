@@ -34,7 +34,7 @@ vi.mock('../../agent-input-detection.js', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>;
   return {
     ...actual,
-    detectAwaitingInputForAgent: vi.fn(() => Effect.succeed({
+    detectAwaitingInputForAgent: vi.fn(async () => ({
       reason: 'other',
       prompt: 'Would you like to run the following command?\n\nls\n\n1. Yes\n2. No',
     })),

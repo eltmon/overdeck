@@ -13,10 +13,9 @@
  */
 
 import { randomUUID } from 'crypto';
-import { Effect } from 'effect';
 import type { DomainEvent } from '@overdeck/contracts';
 import type { Role } from './agents/role.js';
-import { getDashboardApiUrlSync } from './config.js';
+import { getDashboardApiUrl } from './config.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
 export type ActivityStatus = 'accepted' | 'running' | 'completed' | 'failed';
@@ -231,7 +230,7 @@ export async function emitActivityEntryOncePortable(
   if (getActivityEventStore()) return emitActivityEntryOnce(options);
   try {
     const { createDeaconEventClient } = await import('./cloister/deacon-event-client.js');
-    return await createDeaconEventClient({ dashboardUrl: getDashboardApiUrlSync() })
+    return await createDeaconEventClient({ dashboardUrl: getDashboardApiUrl() })
       .appendOnce(buildActivityEntryEvent(options), options.id);
   } catch {
     return 'failed';
@@ -242,7 +241,7 @@ export async function emitActivityEntryOncePortable(
  * Emit an activity.entry domain event without blocking the caller. Failures are
  * non-fatal because this path is also used during early dashboard boot.
  */
-export function emitActivityEntrySync(options: EmitActivityOptions): void {
+export function emitActivityEntry(options: EmitActivityOptions): void {
   void emitActivityEntryDurable(options).catch(() => undefined);
 }
 
@@ -250,7 +249,7 @@ export function emitActivityEntrySync(options: EmitActivityOptions): void {
  * Emit a detailed activity log entry — auto-generated from domain state changes.
  * Use for fine-grained visibility into agent lifecycle, plan changes, pipeline transitions.
  */
-export function emitActivityDetailedSync(options: EmitDetailedOptions): void {
+export function emitActivityDetailed(options: EmitDetailedOptions): void {
   appendActivityEventAsync({
     type: 'activity.detailed' as const,
     timestamp: new Date().toISOString(),
@@ -276,7 +275,7 @@ function normalizeForSpeech(utterance: string): string {
  * Emit a TTS activity log entry — upleveled utterance for text-to-speech.
  * Keep utterances short (<140 chars), human-friendly, and speakable.
  */
-export function emitActivityTtsSync(options: EmitTtsOptions): void {
+export function emitActivityTts(options: EmitTtsOptions): void {
   appendActivityEventAsync({
     type: 'activity.tts' as const,
     timestamp: new Date().toISOString(),
@@ -295,7 +294,7 @@ export function emitActivityTtsSync(options: EmitTtsOptions): void {
  * Emit a dashboard lifecycle event (started, completed, failed).
  * Used by pending-lifecycle.ts and the ship-role merge path.
  */
-export function emitDashboardLifecycleSync(
+export function emitDashboardLifecycle(
   status: 'started' | 'completed' | 'failed',
   options: {
     reason: string;
@@ -383,36 +382,3 @@ export function emitDashboardLifecycleSync(
     // Non-fatal
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native emit of an activity.entry domain event. Non-failing — the
- * underlying append is fire-and-forget and silently swallows any event-store
- * errors to match the Promise contract.
- */
-export const emitActivityEntry = (
-  options: EmitActivityOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityEntrySync(options));
-
-/** Effect-native variant of emitActivityDetailed. */
-export const emitActivityDetailed = (
-  options: EmitDetailedOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityDetailedSync(options));
-
-/** Effect-native variant of emitActivityTts. */
-export const emitActivityTts = (
-  options: EmitTtsOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityTtsSync(options));
-
-/** Effect-native variant of emitDashboardLifecycle. */
-export const emitDashboardLifecycle = (
-  status: 'started' | 'completed' | 'failed',
-  options: {
-    reason: string;
-    issueId?: string;
-    trigger?: string;
-    durationMs?: number;
-    error?: string;
-  },
-): Effect.Effect<void> => Effect.sync(() => emitDashboardLifecycleSync(status, options));

@@ -93,7 +93,10 @@ function getShadowStatePath(issueId: string): string {
   // Normalize issue ID for filename (uppercase, replace special chars)
   const normalizedId = issueId.toUpperCase().replace(/[^A-Z0-9-]/g, '');
   return join(shadowStateDir(), `${normalizedId}.json`);
-}async function getShadowStatePromise(issueId: string): Promise<ShadowState | null> {
+}
+
+/** Read an issue's shadow state, or null when the issue is not shadowed. */
+export async function getShadowState(issueId: string): Promise<ShadowState | null> {
   const filePath = getShadowStatePath(issueId);
 
   if (!existsSync(filePath)) {
@@ -107,9 +110,15 @@ function getShadowStatePath(issueId: string): string {
     console.error(`Error reading shadow state for ${issueId}:`, error);
     return null;
   }
-}async function isShadowedPromise(issueId: string): Promise<boolean> {
-  return (await Effect.runPromise(getShadowState(issueId))) !== null;
-}async function createShadowStatePromise(
+}
+
+/** Whether an issue has shadow state. */
+export async function isShadowed(issueId: string): Promise<boolean> {
+  return (await getShadowState(issueId)) !== null;
+}
+
+/** Create shadow state for an issue, starting from `initialTrackerStatus`. */
+export async function createShadowState(
   issueId: string,
   initialTrackerStatus: IssueState = 'open',
   _triggeredBy: string = 'unknown'
@@ -131,7 +140,10 @@ function getShadowStatePath(issueId: string): string {
   await writeFile(filePath, JSON.stringify(shadowState, null, 2), 'utf-8');
 
   return shadowState;
-}async function updateShadowStatePromise(
+}
+
+/** Record a shadow status change for an issue. */
+export async function updateShadowState(
   issueId: string,
   newStatus: IssueState,
   triggeredBy: string,
@@ -139,7 +151,7 @@ function getShadowStatePath(issueId: string): string {
 ): Promise<ShadowState> {
   ensureShadowStateDir();
 
-  let state = await Effect.runPromise(getShadowState(issueId));
+  let state = await getShadowState(issueId);
 
   // Create new shadow state if it doesn't exist
   if (!state) {
@@ -177,63 +189,10 @@ function getShadowStatePath(issueId: string): string {
   await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
 
   return state;
-}async function updateTrackerStatusCachePromise(
-  issueId: string,
-  trackerStatus: IssueState
-): Promise<ShadowState> {
-  const state = await Effect.runPromise(getShadowState(issueId));
+}
 
-  if (!state) {
-    throw new Error(`Cannot update tracker status: ${issueId} is not in shadow mode`);
-  }
-
-  state.trackerStatus = trackerStatus;
-  state.trackerStatusUpdatedAt = new Date().toISOString();
-
-  const filePath = getShadowStatePath(issueId);
-  await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
-
-  return state;
-}async function markAsSyncedPromise(
-  issueId: string,
-  syncedState: IssueState,
-  previousTrackerState?: IssueState
-): Promise<SyncResult> {
-  const state = await Effect.runPromise(getShadowState(issueId));
-
-  if (!state) {
-    return {
-      success: false,
-      error: `Issue ${issueId} is not in shadow mode`,
-    };
-  }
-
-  const now = new Date().toISOString();
-  let entriesSynced = 0;
-
-  // Mark all unsynced history entries as synced
-  for (const entry of state.history) {
-    if (!entry.syncedToTracker) {
-      entry.syncedToTracker = true;
-      entriesSynced++;
-    }
-  }
-
-  // Update sync timestamp and tracker status
-  state.syncedAt = now;
-  state.trackerStatus = syncedState;
-  state.trackerStatusUpdatedAt = now;
-
-  const filePath = getShadowStatePath(issueId);
-  await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
-
-  return {
-    success: true,
-    syncedState,
-    previousState: previousTrackerState,
-    entriesSynced,
-  };
-}async function listShadowedIssuesPromise(): Promise<ShadowState[]> {
+/** List every shadowed issue's state. */
+export async function listShadowedIssues(): Promise<ShadowState[]> {
   const dir = shadowStateDir();
   if (!existsSync(dir)) {
     return [];
@@ -292,58 +251,31 @@ export function removeShadowState(
       error: `Failed to remove shadow state: ${error.message}`,
     };
   }
-}async function getDisplayStatusPromise(
-  issueId: string,
-  trackerStatus: IssueState
-): Promise<{
-  status: IssueState;
-  isShadowed: boolean;
-  trackerStatus?: IssueState;
-  outOfSync?: boolean;
-}> {
-  const state = await Effect.runPromise(getShadowState(issueId));
+}
 
-  if (!state) {
-    return {
-      status: trackerStatus,
-      isShadowed: false,
-    };
-  }
-
-  return {
-    status: state.shadowStatus,
-    isShadowed: true,
-    trackerStatus: state.trackerStatus,
-    outOfSync: state.shadowStatus !== state.trackerStatus,
-  };
-}async function needsSyncPromise(issueId: string): Promise<boolean> {
-  const state = await Effect.runPromise(getShadowState(issueId));
+/** Whether a shadowed issue's shadow status differs from its tracker status. */
+export async function needsSync(issueId: string): Promise<boolean> {
+  const state = await getShadowState(issueId);
 
   if (!state) {
     return false;
   }
 
   return state.shadowStatus !== state.trackerStatus;
-}async function getUnsyncedHistoryPromise(issueId: string): Promise<ShadowHistoryEntry[]> {
-  const state = await Effect.runPromise(getShadowState(issueId));
+}
 
-  if (!state) {
-    return [];
-  }
-
-  return state.history.filter(entry => !entry.syncedToTracker);
-}async function getPendingSyncCountPromise(): Promise<number> {
-  const states = await Effect.runPromise(listShadowedIssues());
+/** Count shadowed issues whose shadow status differs from the tracker status. */
+export async function getPendingSyncCount(): Promise<number> {
+  const states = await listShadowedIssues();
   return states.filter(state =>
     state.shadowStatus !== state.trackerStatus
   ).length;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 //
-// Additive Effect-channel variants for the async shadow-state surface. The
-// one sync export (`removeShadowState`) is left unwrapped — it uses
-// `unlinkSync` for atomic deletion guarantees the caller relies on.
+// `removeShadowState` stays sync: it uses `unlinkSync` for the atomic deletion
+// its caller relies on.
 
 /** Tagged error for shadow-state Effect variants. */
 export class ShadowStateError extends Data.TaggedError('ShadowStateError')<{
@@ -352,163 +284,3 @@ export class ShadowStateError extends Data.TaggedError('ShadowStateError')<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
-
-/** Effect variant of `getShadowState`. */
-export const getShadowState = (
-  issueId: string,
-): Effect.Effect<ShadowState | null, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => getShadowStatePromise(issueId),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'getShadowState',
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `isShadowed`. */
-export const isShadowed = (issueId: string): Effect.Effect<boolean, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => isShadowedPromise(issueId),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'isShadowed',
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `createShadowState`. */
-export const createShadowState = (
-  issueId: string,
-  initialTrackerStatus: IssueState = 'open',
-  triggeredBy: string = 'unknown',
-): Effect.Effect<ShadowState, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => createShadowStatePromise(issueId, initialTrackerStatus, triggeredBy),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'createShadowState',
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `updateShadowState`. */
-export const updateShadowState = (
-  issueId: string,
-  newStatus: IssueState,
-  triggeredBy: string,
-  targetCanonicalState?: CanonicalState,
-): Effect.Effect<ShadowState, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => updateShadowStatePromise(issueId, newStatus, triggeredBy, targetCanonicalState),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'updateShadowState',
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `updateTrackerStatusCache`. */
-export const updateTrackerStatusCache = (
-  ...args: Parameters<typeof updateTrackerStatusCachePromise>
-): Effect.Effect<Awaited<ReturnType<typeof updateTrackerStatusCachePromise>>, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => updateTrackerStatusCachePromise(...args),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'updateTrackerStatusCache',
-        issueId: args[0],
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `markAsSynced`. */
-export const markAsSynced = (
-  ...args: Parameters<typeof markAsSyncedPromise>
-): Effect.Effect<Awaited<ReturnType<typeof markAsSyncedPromise>>, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => markAsSyncedPromise(...args),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'markAsSynced',
-        issueId: args[0],
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `listShadowedIssues`. */
-export const listShadowedIssues = (): Effect.Effect<ShadowState[], ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => listShadowedIssuesPromise(),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'listShadowedIssues',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getDisplayStatus`. */
-export const getDisplayStatus = (
-  ...args: Parameters<typeof getDisplayStatusPromise>
-): Effect.Effect<Awaited<ReturnType<typeof getDisplayStatusPromise>>, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => getDisplayStatusPromise(...args),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'getDisplayStatus',
-        issueId: args[0],
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `needsSync`. */
-export const needsSync = (issueId: string): Effect.Effect<boolean, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => needsSyncPromise(issueId),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'needsSync',
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getUnsyncedHistory`. */
-export const getUnsyncedHistory = (
-  issueId: string,
-): Effect.Effect<ShadowHistoryEntry[], ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => getUnsyncedHistoryPromise(issueId),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'getUnsyncedHistory',
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getPendingSyncCount`. */
-export const getPendingSyncCount = (): Effect.Effect<number, ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => getPendingSyncCountPromise(),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'getPendingSyncCount',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

@@ -24,7 +24,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatMessage } from '@overdeck/contracts';
-import { buildChildEnvSync } from '../child-env.js';
+import { buildChildEnv } from '../child-env.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { getOverdeckHome } from '../paths.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
@@ -233,7 +233,7 @@ async function invokeClaudeStructured(
   feature: BackgroundAiFeature = 'conversationTitles',
 ): Promise<Record<string, unknown>> {
   const providerEnv = await getProviderEnvForModel(model);
-  const childEnv = { ...buildChildEnvSync(), ...providerEnv };
+  const childEnv = { ...buildChildEnv(), ...providerEnv };
 
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn(

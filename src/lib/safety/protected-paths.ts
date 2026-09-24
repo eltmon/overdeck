@@ -20,7 +20,7 @@
  * If this list is incomplete, an automatic restart can destroy the agent's
  * planning artifacts, beads, and the workspace-local orchestration state.
  */
-export const RESTART_PRESERVE = [
+const RESTART_PRESERVE = [
   '.pan',
   '.beads',
 ] as const;
@@ -35,7 +35,7 @@ export const RESTART_PRESERVE = [
  * NOT a security boundary — code that intentionally rebuilds a workspace
  * (e.g. `pan workspace destroy`) is allowed to delete these.
  */
-export const WORKSPACE_ARTIFACTS = [
+const WORKSPACE_ARTIFACTS = [
   '.devcontainer',     // rendered docker compose + Dockerfile + dev script
   '.env',              // workspace env vars (ports, URLs, secrets)
   '.env.local',

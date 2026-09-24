@@ -20,7 +20,6 @@
  * (config or `--no-yolo`) when you want hook-moderated execution.
  */
 
-import { Effect } from 'effect';
 import type { ClaudePermissionMode } from './config.js';
 import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 
@@ -65,7 +64,7 @@ export function readYoloEnv(env: NodeJS.ProcessEnv = process.env): ClaudePermiss
  * in their cmdline until they are respawned. (This exact gap — code clean,
  * config `bypass` — is how DSP survived a code-only audit. See PAN settings-desync bug.)
  */
-export function resolvePermissionModeSync(explicit?: ClaudePermissionMode): ClaudePermissionMode {
+export function resolvePermissionMode(explicit?: ClaudePermissionMode): ClaudePermissionMode {
   const fromEnv = readYoloEnv();
   if (fromEnv) return fromEnv;
   if (explicit) return explicit;
@@ -77,8 +76,8 @@ export function resolvePermissionModeSync(explicit?: ClaudePermissionMode): Clau
 }
 
 /** Permission CLI flags as an argv-friendly array. */
-export function getClaudePermissionFlagsSync(mode?: ClaudePermissionMode): string[] {
-  const resolved = mode ?? resolvePermissionModeSync();
+export function getClaudePermissionFlags(mode?: ClaudePermissionMode): string[] {
+  const resolved = mode ?? resolvePermissionMode();
   if (resolved === 'auto') {
     // 'auto' is Overdeck's internal mode name, NOT a Claude Code --permission-mode
     // value. Claude Code's valid modes are acceptEdits/bypassPermissions/default/plan;
@@ -92,8 +91,8 @@ export function getClaudePermissionFlagsSync(mode?: ClaudePermissionMode): strin
 }
 
 /** Permission CLI flags as a single space-joined string for shell-style command construction. */
-export function getClaudePermissionFlagsStringSync(mode?: ClaudePermissionMode): string {
-  return getClaudePermissionFlagsSync(mode).join(' ');
+export function getClaudePermissionFlagsString(mode?: ClaudePermissionMode): string {
+  return getClaudePermissionFlags(mode).join(' ');
 }
 
 /**
@@ -107,12 +106,12 @@ export function getClaudePermissionFlagsStringSync(mode?: ClaudePermissionMode):
  * `--permission-mode` and abort the launch. Route every such append through this
  * helper so the mode→flag mapping stays in one place.
  */
-export function ensureClaudePermissionFlagSync(
+export function ensureClaudePermissionFlag(
   command: string,
   mode?: ClaudePermissionMode,
 ): string {
   if (command.includes('--permission-mode')) return command;
-  return `${command} ${getClaudePermissionFlagsStringSync(mode)}`;
+  return `${command} ${getClaudePermissionFlagsString(mode)}`;
 }
 
 /**
@@ -121,7 +120,7 @@ export function ensureClaudePermissionFlagSync(
  * roles/<role>.md frontmatter permissionMode. Always returns `''`; kept as a
  * stable call site so the launch builders that consume it need no change.
  */
-export function bypassPrefixForAgentFlagSync(_mode?: ClaudePermissionMode): string {
+export function bypassPrefixForAgentFlag(_mode?: ClaudePermissionMode): string {
   return '';
 }
 
@@ -155,8 +154,8 @@ export interface ClaudeUserSettings {
  * mode at provision time is captured deterministically. With no argument,
  * resolves from env/config like the CLI flag helpers.
  */
-export function buildClaudeUserSettingsSync(mode?: ClaudePermissionMode): ClaudeUserSettings {
-  const resolved = mode ?? resolvePermissionModeSync();
+export function buildClaudeUserSettings(mode?: ClaudePermissionMode): ClaudeUserSettings {
+  const resolved = mode ?? resolvePermissionMode();
   return {
     theme: 'dark',
     permissions: {
@@ -164,33 +163,3 @@ export function buildClaudeUserSettingsSync(mode?: ClaudePermissionMode): Claude
     },
   };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// All helpers are pure-sync — additive Effect.sync wrappers keep Effect-graph
-// callers from needing inline Effect.sync().
-
-/** Resolve the effective permission mode. Pure. */
-export const resolvePermissionMode = (
-  explicit?: ClaudePermissionMode,
-): Effect.Effect<ClaudePermissionMode> =>
-  Effect.sync(() => resolvePermissionModeSync(explicit));
-
-/** Permission CLI flags as an argv-friendly array. Pure. */
-export const getClaudePermissionFlags = (
-  mode?: ClaudePermissionMode,
-): Effect.Effect<string[]> => Effect.sync(() => getClaudePermissionFlagsSync(mode));
-
-/** Permission CLI flags as a single shell-friendly string. Pure. */
-export const getClaudePermissionFlagsString = (
-  mode?: ClaudePermissionMode,
-): Effect.Effect<string> => Effect.sync(() => getClaudePermissionFlagsStringSync(mode));
-
-/** Bypass prefix for the `--agent` flag form. Pure. */
-export const bypassPrefixForAgentFlag = (
-  mode?: ClaudePermissionMode,
-): Effect.Effect<string> => Effect.sync(() => bypassPrefixForAgentFlagSync(mode));
-
-/** Build the `~/.claude/settings.json` payload. Pure. */
-export const buildClaudeUserSettings = (
-  mode?: ClaudePermissionMode,
-): Effect.Effect<ClaudeUserSettings> => Effect.sync(() => buildClaudeUserSettingsSync(mode));

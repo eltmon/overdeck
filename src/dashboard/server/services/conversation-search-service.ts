@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 
-import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
+import { getConversationSearchConfig, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { rankConversationSearch, type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
@@ -63,7 +63,7 @@ export async function searchConversationChunks(input: {
   limit: number;
   config?: NormalizedConversationSearchConfig;
 }): Promise<ConversationSearchHit[]> {
-  const config = input.config ?? getConversationSearchConfigSync();
+  const config = input.config ?? getConversationSearchConfig();
   const handle = getHandle(config);
   if (!handle) return [];
 

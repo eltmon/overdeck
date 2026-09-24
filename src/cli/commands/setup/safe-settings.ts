@@ -21,11 +21,11 @@ import { dirname, basename, join } from 'path';
 
 // Pure write primitives moved to src/lib/claude-settings-file.ts (PAN-2595)
 // so the desktop boot provisioner shares them; re-exported for existing callers.
-import { findNewestBackupSync } from '../../../lib/claude-settings-file.js';
+import { findNewestBackup } from '../../../lib/claude-settings-file.js';
 export {
-  atomicWriteJsonSync,
-  backupSettingsSync,
-  pruneBackupsSync,
+  atomicWriteJson,
+  backupSettings,
+  pruneBackups,
   SETTINGS_BACKUP_KEEP,
   SETTINGS_BACKUP_PREFIX,
 } from '../../../lib/claude-settings-file.js';
@@ -57,7 +57,7 @@ export async function readSettingsOrAbort(path: string): Promise<Record<string, 
     return JSON.parse(raw);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const newestBackup = findNewestBackupSync(path);
+    const newestBackup = findNewestBackup(path);
     console.error(chalk.red(`\n✗ ${path} is not valid JSON: ${message}`));
     console.error(chalk.yellow('Refusing to overwrite — your file likely contains user customizations.'));
     if (newestBackup) {

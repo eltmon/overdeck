@@ -97,12 +97,12 @@ describe('WorkspaceService Effect service', () => {
     it('calls createWorkspace and returns workspace path when workspace does not exist', async () => {
       // Workspace does not yet exist — should call createWorkspace
       mockExistsSync.mockReturnValue(false);
-      mockCreateWorkspace.mockReturnValue(Effect.succeed({
+      mockCreateWorkspace.mockResolvedValue({
         success: true,
         workspacePath: '/projects/myapp/workspaces/feature-pan-1',
         errors: [],
         steps: ['created'],
-      }));
+      });
 
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
@@ -136,12 +136,12 @@ describe('WorkspaceService Effect service', () => {
 
     it('fails with WorkspaceCreateError when creation fails', async () => {
       mockExistsSync.mockReturnValue(false);
-      mockCreateWorkspace.mockReturnValue(Effect.succeed({
+      mockCreateWorkspace.mockResolvedValue({
         success: false,
         workspacePath: '',
         errors: ['git worktree failed'],
         steps: [],
-      }));
+      });
 
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
@@ -173,11 +173,11 @@ describe('WorkspaceService Effect service', () => {
 
   describe('remove', () => {
     it('calls removeWorkspace for existing workspace', async () => {
-      mockRemoveWorkspace.mockReturnValue(Effect.succeed({
+      mockRemoveWorkspace.mockResolvedValue({
         success: true,
         errors: [],
         steps: ['removed'],
-      }));
+      });
 
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
@@ -207,7 +207,7 @@ describe('WorkspaceService Effect service', () => {
 
   describe('stopDocker', () => {
     it('calls stopWorkspaceDocker and is non-fatal on error', async () => {
-      mockStopWorkspaceDocker.mockReturnValue(Effect.fail(new Error('Docker not running')));
+      mockStopWorkspaceDocker.mockRejectedValue(new Error('Docker not running'));
 
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 

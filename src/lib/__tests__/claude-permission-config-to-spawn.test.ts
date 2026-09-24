@@ -43,12 +43,12 @@ describe('claude.permissionMode reaches the spawned command', () => {
 
   it('bypass in config yields --permission-mode bypassPermissions on an agent/conversation spawn', async () => {
     permissionMode = 'bypass';
-    const { resolvePermissionModeSync, getClaudePermissionFlagsStringSync } =
+    const { resolvePermissionMode, getClaudePermissionFlagsString } =
       await import('../claude-permissions.js');
     const { getAgentRuntimeBaseCommand } = await import('../agents.js');
 
-    expect(resolvePermissionModeSync()).toBe('bypass');
-    expect(getClaudePermissionFlagsStringSync()).toBe('--permission-mode bypassPermissions');
+    expect(resolvePermissionMode()).toBe('bypass');
+    expect(getClaudePermissionFlagsString()).toBe('--permission-mode bypassPermissions');
 
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6');
     expect(cmd).toMatch(/--permission-mode bypassPermissions/);
@@ -56,12 +56,12 @@ describe('claude.permissionMode reaches the spawned command', () => {
 
   it('auto in config yields --permission-mode default (auto is not a Claude Code flag value)', async () => {
     permissionMode = 'auto';
-    const { resolvePermissionModeSync, getClaudePermissionFlagsStringSync } =
+    const { resolvePermissionMode, getClaudePermissionFlagsString } =
       await import('../claude-permissions.js');
     const { getAgentRuntimeBaseCommand } = await import('../agents.js');
 
-    expect(resolvePermissionModeSync()).toBe('auto');
-    expect(getClaudePermissionFlagsStringSync()).toBe('--permission-mode default');
+    expect(resolvePermissionMode()).toBe('auto');
+    expect(getClaudePermissionFlagsString()).toBe('--permission-mode default');
 
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6');
     expect(cmd).toMatch(/--permission-mode default/);

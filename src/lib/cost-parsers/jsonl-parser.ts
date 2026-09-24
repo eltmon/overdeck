@@ -7,11 +7,8 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, basename } from 'path';
-import { homedir } from 'os';
-import { Effect } from 'effect';
-import { encodeClaudeProjectDir } from '../paths.js';
-import { TokenUsage, calculateCostSync, getPricingSync, AIProvider, logCostSync, CostEntry } from '../cost.js';
-import { FsError } from '../errors.js';
+import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
+import { TokenUsage, calculateCost, getPricing, AIProvider } from '../cost.js';
 
 // Claude Code JSONL message format
 export interface ClaudeMessage {
@@ -74,13 +71,13 @@ export interface SessionUsage {
 
 // Claude projects directory
 function getClaudeProjectsDir(): string {
-  return process.env.CLAUDE_PROJECTS_DIR || join(homedir(), '.claude', 'projects');
+  return process.env.CLAUDE_PROJECTS_DIR || claudeProjectsRoot();
 }
 
 /**
  * Get all Claude Code project directories
  */
-export function getProjectDirsSync(): string[] {
+export function getProjectDirs(): string[] {
   const claudeProjectsDir = getClaudeProjectsDir();
   if (!existsSync(claudeProjectsDir)) {
     return [];
@@ -100,7 +97,7 @@ export function getProjectDirsSync(): string[] {
 /**
  * Get session JSONL files for a project directory
  */
-export function getSessionFilesSync(projectDir: string): string[] {
+export function getSessionFiles(projectDir: string): string[] {
   if (!existsSync(projectDir)) {
     return [];
   }
@@ -120,11 +117,11 @@ export function getSessionFilesSync(projectDir: string): string[] {
 /**
  * Get all session files across all projects
  */
-export function getAllSessionFilesSync(): string[] {
+export function getAllSessionFiles(): string[] {
   const files: string[] = [];
 
-  for (const projectDir of getProjectDirsSync()) {
-    files.push(...getSessionFilesSync(projectDir));
+  for (const projectDir of getProjectDirs()) {
+    files.push(...getSessionFiles(projectDir));
   }
 
   return files.sort((a, b) => {
@@ -155,7 +152,9 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     }
 
     // Opus models
-    if (model.includes('opus-5') || model.includes('opus.5')) {
+    if (model.includes('opus-5-5') || model.includes('opus-5.5') || model.includes('opus.5.5')) {
+      normalizedModel = 'claude-opus-5-5';
+    } else if (model.includes('opus-5') || model.includes('opus.5')) {
       normalizedModel = 'claude-opus-5';
     } else if (model.includes('opus-4-8') || model.includes('opus-4.8')) {
       normalizedModel = 'claude-opus-4-8';
@@ -237,7 +236,7 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
  * @param sessionFile - Path to the .jsonl session file
  * @returns Session usage summary with accurate multi-model costing, or null if no usage found
  */
-export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null {
+export function parseClaudeSession(sessionFile: string): SessionUsage | null {
   if (!existsSync(sessionFile)) {
     return null;
   }
@@ -311,7 +310,7 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
         if (modelId) {
           // Normalize model name for pricing lookup
           const { provider, model: normalizedModel } = normalizeModelName(modelId);
-          const pricing = getPricingSync(provider, normalizedModel);
+          const pricing = getPricing(provider, normalizedModel);
 
           if (pricing) {
             // Create message-specific usage object
@@ -327,7 +326,7 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
             };
 
             // Calculate cost for this message
-            const msgCost = calculateCostSync(msgUsage, pricing);
+            const msgCost = calculateCost(msgUsage, pricing);
             totalCostV2 += msgCost;
 
             // Track breakdown by exact model ID
@@ -388,8 +387,8 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
 
   // DEPRECATED: Calculate cost using first model (for backward compatibility)
   const { provider, model } = normalizeModelName(primaryModel);
-  const pricing = getPricingSync(provider, model);
-  const cost = pricing ? calculateCostSync(totalUsage, pricing) : 0;
+  const pricing = getPricing(provider, model);
+  const cost = pricing ? calculateCost(totalUsage, pricing) : 0;
 
   return {
     sessionId,
@@ -406,47 +405,13 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
 }
 
 /**
- * Parse all sessions and return usage summaries
- */
-export function parseAllSessionsSync(maxAge?: number): SessionUsage[] {
-  const sessions: SessionUsage[] = [];
-  const cutoffTime = maxAge ? Date.now() - maxAge : 0;
-
-  for (const file of getAllSessionFilesSync()) {
-    try {
-      const stat = statSync(file);
-      if (cutoffTime && stat.mtime.getTime() < cutoffTime) {
-        continue;
-      }
-
-      const usage = parseClaudeSessionSync(file);
-      if (usage) {
-        sessions.push(usage);
-      }
-    } catch {
-      // Skip files that can't be read
-    }
-  }
-
-  return sessions;
-}
-
-/**
- * Get recent sessions (last N days)
- */
-export function getRecentSessionsSync(days: number = 7): SessionUsage[] {
-  const maxAge = days * 24 * 60 * 60 * 1000;
-  return parseAllSessionsSync(maxAge);
-}
-
-/**
  * Get the active session model for a workspace
  * Returns the full model ID (e.g., "claude-sonnet-4-5-20250929") from the most recent session file
  *
  * NOTE: Claude Max can auto-upgrade models mid-session (e.g., Sonnet → Opus).
  * We read from the END of the file to get the CURRENT model, not the initial one.
  */
-export function getActiveSessionModelSync(workspacePath: string): string | null {
+export function getActiveSessionModel(workspacePath: string): string | null {
   try {
     // Convert workspace path to Claude project dir name
     // e.g., /home/user/projects/myn/workspaces/feature-min-664
@@ -456,7 +421,7 @@ export function getActiveSessionModelSync(workspacePath: string): string | null 
     const projectDir = join(getClaudeProjectsDir(), projectDirName);
 
     // Find most recently modified session file
-    const sessions = getSessionFilesSync(projectDir);
+    const sessions = getSessionFiles(projectDir);
     if (sessions.length === 0) {
       return null;
     }
@@ -501,102 +466,3 @@ export function getActiveSessionModelSync(workspacePath: string): string | null 
     return null;
   }
 }
-
-/**
- * Import session usage to cost log
- */
-export function importSessionToCostLog(
-  session: SessionUsage,
-  options: {
-    issueId?: string;
-    agentId?: string;
-    operation?: string;
-  } = {}
-): CostEntry | null {
-  const { provider, model } = normalizeModelName(session.model);
-  const pricing = getPricingSync(provider, model);
-
-  if (!pricing) {
-    console.warn(`No pricing found for ${session.model}`);
-    return null;
-  }
-
-  return logCostSync({
-    provider,
-    model,
-    usage: session.usage,
-    cost: session.cost,
-    currency: 'USD',
-    operation: options.operation || 'claude_session',
-    issueId: options.issueId,
-    agentId: options.agentId,
-    metadata: {
-      sessionId: session.sessionId,
-      sessionFile: session.sessionFile,
-      startTime: session.startTime,
-      endTime: session.endTime,
-      messageCount: session.messageCount,
-    },
-  });
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of getProjectDirs. */
-export const getProjectDirs = (): Effect.Effect<string[], FsError> =>
-  Effect.try({
-    try: () => getProjectDirsSync(),
-    catch: (cause) => new FsError({ path: '~/.claude/projects', operation: 'getProjectDirs', cause }),
-  });
-
-/** Effect variant of getSessionFiles. */
-export const getSessionFiles = (
-  projectDir: string,
-): Effect.Effect<string[], FsError> =>
-  Effect.try({
-    try: () => getSessionFilesSync(projectDir),
-    catch: (cause) => new FsError({ path: projectDir, operation: 'getSessionFiles', cause }),
-  });
-
-/** Effect variant of getAllSessionFiles. */
-export const getAllSessionFiles = (): Effect.Effect<string[], FsError> =>
-  Effect.try({
-    try: () => getAllSessionFilesSync(),
-    catch: (cause) => new FsError({ path: '~/.claude/projects', operation: 'getAllSessionFiles', cause }),
-  });
-
-/** Effect variant of parseClaudeSession. */
-export const parseClaudeSession = (
-  sessionFile: string,
-): Effect.Effect<SessionUsage | null, FsError> =>
-  Effect.try({
-    try: () => parseClaudeSessionSync(sessionFile),
-    catch: (cause) => new FsError({ path: sessionFile, operation: 'parseClaudeSession', cause }),
-  });
-
-/** Effect variant of parseAllSessions. */
-export const parseAllSessions = (
-  maxAge?: number,
-): Effect.Effect<SessionUsage[], FsError> =>
-  Effect.try({
-    try: () => parseAllSessionsSync(maxAge),
-    catch: (cause) => new FsError({ path: '~/.claude/projects', operation: 'parseAllSessions', cause }),
-  });
-
-/** Effect variant of getRecentSessions. */
-export const getRecentSessions = (
-  days: number = 7,
-): Effect.Effect<SessionUsage[], FsError> =>
-  Effect.try({
-    try: () => getRecentSessionsSync(days),
-    catch: (cause) => new FsError({ path: '~/.claude/projects', operation: 'getRecentSessions', cause }),
-  });
-
-/** Effect variant of getActiveSessionModel. */
-export const getActiveSessionModel = (
-  workspacePath: string,
-): Effect.Effect<string | null, FsError> =>
-  Effect.try({
-    try: () => getActiveSessionModelSync(workspacePath),
-    catch: (cause) => new FsError({ path: workspacePath, operation: 'getActiveSessionModel', cause }),
-  });

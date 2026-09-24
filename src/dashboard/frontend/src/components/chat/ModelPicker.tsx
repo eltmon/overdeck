@@ -52,12 +52,13 @@ type ProviderHarnesses = Partial<Record<string, Harness>>;
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** @deprecated Use string — exported for backward compatibility only. */
-export type ClaudeModelId = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
+export type ClaudeModelId = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
   'claude-fable-5-1': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-fable-5': ['low', 'medium', 'high', 'xhigh', 'max'],
+  'claude-opus-5-5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-8': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -94,6 +95,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     models: [
       { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-fable-5', label: 'Claude Fable 5 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (1M context)', provider: 'anthropic', costDisplay: '$12/1M', costPer1MTokens: 12, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-opus-5', label: 'Claude Opus 5 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-opus-4-7', label: 'Claude Opus 4.7 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },

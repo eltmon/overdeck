@@ -1,13 +1,22 @@
-import { Effect } from 'effect';
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `loadConfigSync` (async: `loadConfig`): 14 sites in cli/commands/issues.ts, cli/commands/start.ts,
+ *   cli/commands/triage.ts, dashboard/server/routes/misc/trackers.ts, dashboard/server/routes/workspaces.ts,
+ *   lib/cloister/work-agent-prompt.ts, lib/config.ts, lib/smee.ts, lib/traefik.ts.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { promises as fs } from 'fs';
-import { join, dirname, parse as parsePath } from 'path';
+import { join } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from '@iarna/toml';
 import { CONFIG_FILE } from './paths.js';
 import { loadConfigSync as loadYamlConfigSync } from './config-yaml.js';
 import type { TrackerType } from './tracker/interface.js';
-import { FsError } from './errors.js';
 
 // Individual tracker configuration
 export interface LinearConfig {
@@ -348,12 +357,13 @@ export function loadConfigSync(): OverdeckConfig {
   return config;
 }
 
-export function saveConfigSync(config: OverdeckConfig): void {
+export function saveConfig(config: OverdeckConfig): void {
   const content = stringify(config as any);
   writeFileSync(CONFIG_FILE, content, 'utf8');
 }
 
-async function loadConfigFromFile(): Promise<OverdeckConfig> {
+/** Load config.toml (async; dashboard-safe). */
+export async function loadConfig(): Promise<OverdeckConfig> {
   let config: OverdeckConfig;
 
   try {
@@ -387,12 +397,7 @@ async function loadConfigFromFile(): Promise<OverdeckConfig> {
   return config;
 }
 
-async function saveConfigToFile(config: OverdeckConfig): Promise<void> {
-  const content = stringify(config as any);
-  await fs.writeFile(CONFIG_FILE, content, 'utf8');
-}
-
-export function getDefaultConfigSync(): OverdeckConfig {
+export function getDefaultConfig(): OverdeckConfig {
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
 
@@ -408,7 +413,7 @@ export function getDefaultConfigSync(): OverdeckConfig {
  * runtime already standardized on OVERDECK_DASHBOARD_URL (agent-runtime.ts,
  * cli/commands/merge.ts, flywheel.ts); this resolver now matches them.
  */
-export function getDashboardApiUrlSync(): string {
+export function getDashboardApiUrl(): string {
   const internal = process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL;
   if (internal) return internal;
   const config = loadConfigSync();
@@ -424,7 +429,7 @@ export function getDashboardApiUrlSync(): string {
  * rejects the local TLS cert and every CLI call back to the server fails
  * with a bare "fetch failed" (PAN-3331).
  */
-export function getDashboardLoopbackApiUrlSync(): string {
+export function getDashboardLoopbackApiUrl(): string {
   const envPort = Number(process.env.API_PORT || process.env.PORT);
   const config = loadConfigSync();
   const port = (Number.isFinite(envPort) && envPort > 0 ? envPort : 0)
@@ -437,7 +442,7 @@ export function getDashboardLoopbackApiUrlSync(): string {
  * Returns null if devroot is disabled (set to null or empty string).
  * Resolves ~ to home directory and validates the directory exists.
  */
-export function getDevrootPathSync(): string | null {
+export function getDevrootPath(): string | null {
   const config = loadConfigSync();
   const devroot = config.sync?.devroot;
 
@@ -471,103 +476,3 @@ export function checkDevrootDeprecation(): string | null {
   ].join('\n');
 }
 
-/**
- * Find the devroot for a given project path.
- * Tries config first, then walks up from projectPath looking for .claude/ directory.
- * Returns the project path itself as last resort.
- */
-export function findDevrootForProjectSync(projectPath: string): string {
-  // 1. Explicit config takes priority
-  const configured = getDevrootPathSync();
-  if (configured) return configured;
-
-  // 2. Walk up from project path to find nearest .claude/ directory
-  let dir = projectPath;
-  const root = parsePath(dir).root;
-  while (dir !== root && dir !== homedir()) {
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    if (existsSync(join(parent, '.claude'))) {
-      return parent;
-    }
-    dir = parent;
-  }
-
-  // 3. Fallback to project path itself
-  return projectPath;
-}
-
-/**
- * Get the conversations config block, with defaults merged in.
- * Resolves watchDirs ~ to home directory.
- */
-function resolveConversationsConfig(config: OverdeckConfig): ConversationsConfig {
-  const conv = config.conversations ?? (DEFAULT_CONFIG.conversations as ConversationsConfig);
-  return {
-    ...conv,
-    watchDirs: conv.watchDirs.map((d) =>
-      d.startsWith('~/') ? join(homedir(), d.slice(2)) : d,
-    ),
-  };
-}
-
-export function getConversationsConfigSync(): ConversationsConfig {
-  return resolveConversationsConfig(loadConfigSync());
-}
-
-async function readConversationsConfig(): Promise<ConversationsConfig> {
-  return resolveConversationsConfig(await loadConfigFromFile());
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Both sync and async config IO surfaces get Effect variants. The async paths
-// (preferred in dashboard-reachable code) wrap the existing Promise functions
-// via Effect.tryPromise; the sync paths route through Effect.try.
-
-/** Load config.toml (async; dashboard-safe). */
-export const loadConfig = (): Effect.Effect<OverdeckConfig, FsError> =>
-  Effect.tryPromise({
-    try: () => loadConfigFromFile(),
-    catch: (cause) =>
-      new FsError({ path: CONFIG_FILE, operation: 'load-config-async', cause }),
-  });
-
-/** Persist config.toml (async; dashboard-safe). */
-export const saveConfig = (
-  config: OverdeckConfig,
-): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: () => saveConfigToFile(config),
-    catch: (cause) =>
-      new FsError({ path: CONFIG_FILE, operation: 'save-config-async', cause }),
-  });
-
-/** Default config template. Pure. */
-export const getDefaultConfig = (): Effect.Effect<OverdeckConfig> =>
-  Effect.sync(() => getDefaultConfigSync());
-
-/** Compute the dashboard's external API URL. Pure (reads env). */
-export const getDashboardApiUrl = (): Effect.Effect<string> =>
-  Effect.sync(() => getDashboardApiUrlSync());
-
-/** Resolve the configured devroot path. Pure (reads config). */
-export const getDevrootPath = (): Effect.Effect<string | null> =>
-  Effect.sync(() => getDevrootPathSync());
-
-/** Compute the devroot for a project path. Pure. */
-export const findDevrootForProject = (
-  projectPath: string,
-): Effect.Effect<string> => Effect.sync(() => findDevrootForProjectSync(projectPath));
-
-/** Resolve conversations sub-config (async). */
-export const getConversationsConfig =
-  (): Effect.Effect<ConversationsConfig, FsError> =>
-    Effect.tryPromise({
-      try: () => readConversationsConfig(),
-      catch: (cause) =>
-        new FsError({
-          path: CONFIG_FILE,
-          operation: 'get-conversations-config-async',
-          cause,
-        }),
-    });

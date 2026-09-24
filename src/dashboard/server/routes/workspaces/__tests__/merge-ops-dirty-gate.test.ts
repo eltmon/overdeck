@@ -10,7 +10,7 @@ vi.mock('../../../../../lib/agents/spawn.js', () => ({
   spawnRun: vi.fn(),
   postAgentsRoute: vi.fn(),
 }));
-vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(),
   messageAgent: vi.fn(),

@@ -7,8 +7,9 @@ import { Effect } from 'effect';
 import { isBranchMerged } from '../close-out.js';
 import { AGENTS_DIR } from '../paths.js';
 import { killSession, listSessionNames } from '../tmux.js';
-import { teardownWorkspaceDockerByNamePromise } from '../workspace-manager/docker.js';
-import { removeAgentStateDir } from '../agents/state-dir-removal.js';
+import { teardownWorkspaceDockerByName } from '../workspace-manager/docker.js';
+import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
+import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
 
 const execAsync = promisify(exec);
 
@@ -42,13 +43,24 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
     // tmux server may not be running.
   }
 
+  // PAN-3947: on a Herdr host the issue's agents live in panes stamped with its
+  // `issue` token, not in named tmux sessions. No-op on a tmux host.
+  try {
+    const { closeIssuePanes } = await import('../terminal-backends/launch.js');
+    for (const agentName of await closeIssuePanes(issueId)) {
+      actions.push(`closed Herdr pane ${agentName}`);
+    }
+  } catch {
+    // Backend unavailable — nothing more to close.
+  }
+
   // Remove Docker stack by name, independent of whether the workspace dir still
   // exists — and independent of the merged check below. Containers and networks
   // are disposable runtime state (rebuildWorkspaceStack no-ops for terminal
   // issues), so tearing them down for a closed issue destroys no work, while
   // leaked `_devnet` networks eventually exhaust Docker's address pools.
   try {
-    const teardownResult = await teardownWorkspaceDockerByNamePromise(issueLower);
+    const teardownResult = await teardownWorkspaceDockerByName(issueLower);
     if (teardownResult.networkRemoved) {
       actions.push(`removed Docker stack for feature-${issueLower}`);
     } else {
@@ -64,6 +76,14 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
   if (merged.status === 'unmerged') {
     actions.push(`skipped disk reap for ${issueId} — branch unmerged`);
     return actions;
+  }
+
+  // PAN-3920: registered workers' `.swarm/worker-<n>` worktrees and their
+  // `<feature>-worker-<n>` branches go with the issue.
+  try {
+    actions.push(...await reapWorkerWorktrees(projectPath, issueId, { removeWorktrees: true }));
+  } catch {
+    // Git unavailable — the workspace removal below still runs.
   }
 
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -99,9 +119,8 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
     const agentDir = join(AGENTS_DIR, agentDirName);
     if (!existsSync(agentDir)) continue;
     try {
-      const result = await removeAgentStateDir(agentDir);
-      const transcriptLabel = `transcript file${result.preservedTranscripts === 1 ? '' : 's'} preserved`;
-      actions.push(`cleaned agent state ${agentDirName} (${result.preservedTranscripts} ${transcriptLabel})`);
+      const result = await pruneAgentStateDir(agentDir);
+      actions.push(`pruned agent state ${agentDirName} (${result.removed.length} regenerable entr${result.removed.length === 1 ? 'y' : 'ies'} removed)`);
     } catch {
       // Already gone or inaccessible.
     }

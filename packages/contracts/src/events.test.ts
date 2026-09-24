@@ -442,7 +442,7 @@ describe("Agent lifecycle events", () => {
   })
 
   describe("agent.stopped", () => {
-    it("removes the agent from the read model", () => {
+    it("retains the stopped agent in the read model", () => {
       const agent = baseAgentSnapshot({ status: "running" })
       const started = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({
         type: "agent.started" as const,
@@ -457,7 +457,10 @@ describe("Agent lifecycle events", () => {
         payload: { agentId: "agent-pan-1908", issueId: "PAN-1908" },
       }))
 
-      expect(stopped.agentsById["agent-pan-1908"]).toBeUndefined()
+      expect(stopped.agentsById["agent-pan-1908"]).toMatchObject({
+        status: "stopped",
+        hasLiveTmuxSession: false,
+      })
     })
   })
 

@@ -18,6 +18,8 @@ const {
   mockSurfaceIssueFeedbackNeedsYou,
   mockPostReviewVerdict,
   mockGetPrFacts,
+  mockRelayUatFailureFeedback,
+  mockAppendPipelineEntry,
 } = vi.hoisted(() => ({
   mockDiscoverArtifact: vi.fn(),
   mockCommentOnArtifact: vi.fn(),
@@ -26,6 +28,12 @@ const {
   mockSurfaceIssueFeedbackNeedsYou: vi.fn(),
   mockPostReviewVerdict: vi.fn(),
   mockGetPrFacts: vi.fn(),
+  mockRelayUatFailureFeedback: vi.fn(),
+  mockAppendPipelineEntry: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/uat-failure-feedback.js', () => ({
+  relayUatFailureFeedback: mockRelayUatFailureFeedback,
 }));
 
 vi.mock('../../../../src/lib/forge.js', () => ({
@@ -39,6 +47,15 @@ vi.mock('../../../../src/lib/cloister/pr-review-verdict.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
   getPrFacts: mockGetPrFacts,
+  resetPrFactsCache: vi.fn(),
+}));
+
+vi.mock('../../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
+  bumpIssuePrTabCacheGeneration: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/pipeline-journal.js', () => ({
+  appendPipelineEntry: mockAppendPipelineEntry,
 }));
 
 vi.mock('../../../../src/lib/overdeck/issue-projects.js', () => ({
@@ -80,13 +97,16 @@ describe('specialists done command', () => {
     });
     mockGetPrFacts.mockResolvedValue({
       issueId: 'PAN-1059', forge: 'github', url: ARTIFACT_URL, open: true,
-      approved: false, changesRequested: true,
+      approved: false, changesRequested: true, headSha: 'head-sha-1',
     });
-    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
+    mockRelayUatFailureFeedback.mockResolvedValue({
+      agentMessageSent: true, needsYouSurfaced: false, deduplicated: false,
+    });
+    mockDeliverReviewVerdictFeedback.mockResolvedValue({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       prCommentPosted: true,
       agentMessageSent: true,
-    }));
+    });
   });
 
   afterEach(() => {
@@ -273,12 +293,133 @@ describe('specialists done command', () => {
     expect(body).toContain('typecheck, lint, and tests passed');
     expect(body).toContain('browser UAT: failed');
     expect(body).toContain('workspace has no tracker-backed issue data');
+    // #4036: the marker merge readiness reads, anchored where PAN-4030 anchors.
+    expect(body).toContain('<!-- overdeck-uat: failed sha=head-sha-1 -->');
     expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+  });
+
+  it('PAN-4030: a failed UAT relays the UAT notes to the work agent, anchored on the PR head', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', {
+      status: 'passed',
+      notes: 'gates green',
+      uatStatus: 'failed',
+      uatNotes: 'criterion 3: save does not persist',
+    });
+
+    expect(mockCommentOnArtifact).toHaveBeenCalledTimes(1);
+    expect(mockRelayUatFailureFeedback).toHaveBeenCalledTimes(1);
+    expect(mockRelayUatFailureFeedback).toHaveBeenCalledWith({
+      issueId: 'PAN-1059',
+      uatNotes: 'criterion 3: save does not persist',
+      workspacePath: '/project/workspaces/feature-pan-1059',
+      anchor: 'head-sha-1',
+    });
+    expect(mockAppendPipelineEntry).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059', expect.objectContaining({
+      type: 'uat.verdict',
+      issueId: 'PAN-1059',
+      data: expect.objectContaining({ status: 'failed' }),
+    }));
+  });
+
+  it('PAN-4030: anchors on --tested-sha, not the PR head that moved during the run', async () => {
+    // PR head is head-sha-1 (a push landed mid-run); UAT exercised ABC1234.
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', {
+      status: 'passed', uatStatus: 'failed', uatNotes: 'x', testedSha: 'ABC1234',
+    });
+
+    expect(mockRelayUatFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({ anchor: 'abc1234' }));
+    // #4036: the verdict marker carries the same tested commit.
+    expect(mockCommentOnArtifact.mock.calls[0][1].body).toContain('<!-- overdeck-uat: failed sha=abc1234 -->');
+    expect(mockGetPrFacts).not.toHaveBeenCalled();
+  });
+
+  it('PAN-4030: rejects a malformed --tested-sha, or one on a review verdict, before posting', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', { status: 'passed', testedSha: 'not-a-sha' });
+    await doneCommand('review', 'pan-1059', { status: 'passed', testedSha: 'abc1234' });
+
+    expect(exit).toHaveBeenCalledTimes(2);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(mockDiscoverArtifact).not.toHaveBeenCalled();
+  });
+
+  it('PAN-4030: the uat role\'s own failed status is a UAT failure too', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('uat', 'pan-1059', { status: 'failed', notes: 'login redirects to 404' });
+
+    expect(mockRelayUatFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-1059',
+      uatNotes: 'login redirects to 404',
+      anchor: 'head-sha-1',
+    }));
+  });
+
+  it('#4035: a passing UAT is journaled (a new verdict episode) and relays nothing', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', { status: 'passed', uatStatus: 'passed', uatNotes: 'all criteria observed' });
+
+    expect(mockAppendPipelineEntry).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059', {
+      type: 'uat.verdict',
+      issueId: 'PAN-1059',
+      source: 'pan-specialists-done',
+      data: { status: 'passed', subRole: 'test' },
+    });
+    expect(mockRelayUatFailureFeedback).not.toHaveBeenCalled();
+  });
+
+  it('PAN-4030: a test verdict without UAT neither relays nor journals a UAT verdict', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', { status: 'failed', notes: 'unit tests red' });
+
+    expect(mockRelayUatFailureFeedback).not.toHaveBeenCalled();
+    expect(mockAppendPipelineEntry).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: 'uat.verdict' }));
+  });
+
+  it('PAN-4030: an unreadable PR head still relays the failure, unanchored', async () => {
+    mockGetPrFacts.mockRejectedValue(new Error('gh: rate limited'));
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', { status: 'passed', uatStatus: 'failed', uatNotes: 'x' });
+
+    expect(mockRelayUatFailureFeedback).toHaveBeenCalledWith({
+      issueId: 'PAN-1059',
+      uatNotes: 'x',
+      workspacePath: '/project/workspaces/feature-pan-1059',
+    });
+  });
+
+  it('PAN-4030: surfaces a uat-agent needs-you when UAT relay exceeds the advisory deadline', async () => {
+    vi.useFakeTimers();
+    mockRelayUatFailureFeedback.mockReturnValue(new Promise(() => {}));
+    const {
+      doneCommand,
+      FEEDBACK_DELIVERY_TIMEOUT_MS,
+    } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    const completion = doneCommand('test', 'pan-1059', { status: 'passed', uatStatus: 'failed', uatNotes: 'x' });
+
+    await vi.advanceTimersByTimeAsync(FEEDBACK_DELIVERY_TIMEOUT_MS);
+    await expect(completion).resolves.toBeUndefined();
+
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
+      'PAN-1059',
+      expect.stringContaining('UAT failure feedback delivery exceeded'),
+      { specialist: 'uat-agent', retryable: true, source: 'specialists-done-timeout' },
+    );
   });
 
   it('PAN-2524/PAN-3642: surfaces needs-you when feedback delivery exceeds the advisory deadline', async () => {
     vi.useFakeTimers();
-    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);
+    mockDeliverReviewVerdictFeedback.mockReturnValue(new Promise(() => {}));
     const {
       doneCommand,
       FEEDBACK_DELIVERY_TIMEOUT_MS,

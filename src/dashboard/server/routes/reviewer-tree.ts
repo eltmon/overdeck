@@ -18,10 +18,9 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentState } from '../../../lib/agents.js';
 import { isExtendedReviewEnabled } from '../../../lib/cloister/review-agent.js';
 
-import { Effect } from 'effect';
 import type { AgentStatus, SessionNodePresence, AgentSnapshot } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import {
@@ -65,7 +64,7 @@ function awaitingInputFromProjection(
 
 async function detectApiError(sessionId: string): Promise<boolean> {
   try {
-    const pane = await Effect.runPromise(capturePane(sessionId, 15));
+    const pane = await capturePane(sessionId, 15);
     return API_ERROR_PATTERNS.some(p => p.test(pane));
   } catch {
     return false;
@@ -89,7 +88,7 @@ async function readReviewerStoppedAt(
   _agentsRoot?: string,
 ): Promise<string | undefined> {
   try {
-    const state = getAgentStateSync(sessionId);
+    const state = getAgentState(sessionId);
     return state?.stoppedAt;
   } catch {
     return undefined;
@@ -359,7 +358,7 @@ export async function buildReviewerNodes(
       const roundMetadata = await readReviewerRounds(sessionId, agentsRoot);
       // A state row is evidence the reviewer was at least spawned (it is written
       // at spawn start, before tmux readiness). Read it from agentsRoot directly —
-      // getAgentStateSync would escape the agentsDirOverride test seam.
+      // getAgentState would escape the agentsDirOverride test seam.
       const hasStateRow = existsSync(join(agentsRoot, sessionId, 'state.json'));
       // Reviewers run inside the workspace (pan review run sets cwd to workspace),
       // so JSONL files land in the workspace-encoded Claude projects dir.

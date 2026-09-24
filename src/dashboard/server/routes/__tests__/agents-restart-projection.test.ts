@@ -92,7 +92,7 @@ describe('POST /api/agents/:id/restart graceful projection', () => {
     vi.useFakeTimers()
     vi.clearAllMocks()
     mocks.detectPendingOperatorDecision.mockResolvedValue(null)
-    mocks.getAgentState.mockReturnValue(Effect.succeed(agentState as any))
+    mocks.getAgentState.mockReturnValue(agentState as any)
   })
 
   afterEach(() => {

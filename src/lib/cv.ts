@@ -4,11 +4,9 @@
  * Tracks agent performance over time to enable capability-based routing.
  */
 
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
-import { FsError } from './errors.js';
 
 export interface WorkEntry {
   issueId: string;
@@ -47,7 +45,7 @@ function getCVFile(agentId: string): string {
 /**
  * Read an agent's CV without creating one.
  */
-export function readAgentCVSync(agentId: string): AgentCV | null {
+export function readAgentCV(agentId: string): AgentCV | null {
   const cvFile = getCVFile(agentId);
 
   if (!existsSync(cvFile)) return null;
@@ -62,8 +60,8 @@ export function readAgentCVSync(agentId: string): AgentCV | null {
 /**
  * Get or create an agent's CV
  */
-export function getAgentCVSync(agentId: string): AgentCV {
-  const existing = readAgentCVSync(agentId);
+export function getAgentCV(agentId: string): AgentCV {
+  const existing = readAgentCV(agentId);
   if (existing) return existing;
 
   // Create new CV
@@ -92,7 +90,7 @@ export function getAgentCVSync(agentId: string): AgentCV {
 /**
  * Save an agent's CV
  */
-export function saveAgentCVSync(cv: AgentCV): void {
+function saveAgentCVSync(cv: AgentCV): void {
   const dir = join(AGENTS_DIR, cv.agentId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(getCVFile(cv.agentId), JSON.stringify(cv, null, 2));
@@ -101,8 +99,8 @@ export function saveAgentCVSync(cv: AgentCV): void {
 /**
  * Start tracking work for an agent
  */
-export function startWorkSync(agentId: string, issueId: string, skills?: string[]): void {
-  const cv = getAgentCVSync(agentId);
+export function startWork(agentId: string, issueId: string, skills?: string[]): void {
+  const cv = getAgentCV(agentId);
 
   const entry: WorkEntry = {
     issueId,
@@ -135,13 +133,13 @@ export function startWorkSync(agentId: string, issueId: string, skills?: string[
 /**
  * Complete work for an agent
  */
-export function completeWorkSync(
+export function completeWork(
   agentId: string,
   issueId: string,
   outcome: 'success' | 'failed' | 'abandoned',
   details?: { commits?: number; linesChanged?: number; failureReason?: string }
 ): void {
-  const cv = getAgentCVSync(agentId);
+  const cv = getAgentCV(agentId);
 
   // Find the work entry
   const entry = cv.recentWork.find(
@@ -188,7 +186,7 @@ export function completeWorkSync(
 /**
  * Get agent rankings by success rate
  */
-export function getAgentRankingsSync(): Array<{
+export function getAgentRankings(): Array<{
   agentId: string;
   successRate: number;
   totalIssues: number;
@@ -208,7 +206,7 @@ export function getAgentRankingsSync(): Array<{
   );
 
   for (const dir of dirs) {
-    const cv = getAgentCVSync(dir.name);
+    const cv = getAgentCV(dir.name);
     if (cv.stats.totalIssues > 0) {
       rankings.push({
         agentId: dir.name,
@@ -233,7 +231,7 @@ export function getAgentRankingsSync(): Array<{
 /**
  * Format CV for display
  */
-export function formatCVSync(cv: AgentCV): string {
+export function formatCV(cv: AgentCV): string {
   const lines: string[] = [
     `# Agent CV: ${cv.agentId}`,
     '',
@@ -283,50 +281,3 @@ export function formatCVSync(cv: AgentCV): string {
 
   return lines.join('\n');
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// CV file IO is sync by design. Read paths return Effect.sync; write paths
-// surface FsError.
-
-/** Load (or create) the CV for an agent. Pure-ish. */
-export const getAgentCV = (agentId: string): Effect.Effect<AgentCV> =>
-  Effect.sync(() => getAgentCVSync(agentId));
-
-/** Persist a CV to disk. */
-export const saveAgentCV = (cv: AgentCV): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveAgentCVSync(cv),
-    catch: (cause) =>
-      new FsError({ path: cv.agentId, operation: 'save-agent-cv', cause }),
-  });
-
-/** Mark the start of a work item on an agent's CV. */
-export const startWork = (
-  agentId: string,
-  issueId: string,
-  skills?: string[],
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => startWorkSync(agentId, issueId, skills),
-    catch: (cause) =>
-      new FsError({ path: agentId, operation: 'cv-start-work', cause }),
-  });
-
-/** Mark completion (success / failure / abandoned). */
-export const completeWork = (
-  ...args: Parameters<typeof completeWorkSync>
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => completeWorkSync(...args),
-    catch: (cause) =>
-      new FsError({ path: args[0], operation: 'cv-complete-work', cause }),
-  });
-
-/** Aggregate rankings across all agents. Pure-ish. */
-export const getAgentRankings = (): Effect.Effect<
-  ReturnType<typeof getAgentRankingsSync>
-> => Effect.sync(() => getAgentRankingsSync());
-
-/** Render a CV as text. Pure. */
-export const formatCV = (cv: AgentCV): Effect.Effect<string> =>
-  Effect.sync(() => formatCVSync(cv));

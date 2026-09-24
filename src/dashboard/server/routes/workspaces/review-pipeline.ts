@@ -8,6 +8,10 @@
  * Release read endpoint:
  *   GET  /api/workspaces/:issueId/release
  *
+ * `startRequestReviewPipeline` is the door behind the request route, registered
+ * on `cloister/request-review-pipeline.ts` so the GitHub webhook can start the
+ * same pipeline for a PR opened or readied by hand (PAN-3917 W12).
+ *
  * The cancel routes (purge, abort, pending) live in review-control.ts. Shared
  * singletons (pending-ops cluster, project path, readJsonBody, workspace info,
  * flyExecCmd) stay owned by ../workspaces.js.
@@ -29,16 +33,22 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import type { DerivedIssueState } from '@overdeck/contracts';
 
-import { parseIssueIdSync, extractPrefixSync, resolveIssueIdSync } from '../../../../lib/issue-id.js';
+import { parseIssueId, extractPrefix, resolveIssueId } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { getDerivedIssueState } from '../../services/derived-issue-state.js';
-import { getReleaseSetSync } from '../../../../lib/release-set.js';
+import { getReleaseSet } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { transitionIssueToInReview } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
 import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-push.js';
-import { requestReviewPipeline } from '../../../../lib/cloister/request-review-pipeline.js';
+import {
+  registerRequestReviewStarter,
+  requestReviewPipeline,
+  type RequestReviewSource,
+  type StartRequestReviewOutcome,
+} from '../../../../lib/cloister/request-review-pipeline.js';
+import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { httpHandler } from '../http-handler.js';
@@ -194,6 +204,139 @@ export async function reReviewGuardError(
   return null;
 }
 
+/**
+ * The one door that starts "verify → push → review" for an issue (PAN-3917
+ * W12). `POST /api/review/:issueId/request` is one caller; the GitHub webhook
+ * that sees a PR opened or readied by hand is the other, so a pull request
+ * gets reviewed whoever opened it. `requestReviewPipeline` coalesces, so two
+ * callers for the same issue cost one run.
+ *
+ * It resolves the workspace, refuses a dirty tree, and hands the verification
+ * continuation to the host-side pipeline; the circuit breaker and the
+ * already-approved branches stay with the HTTP route, which owns agent
+ * re-request semantics.
+ */
+export async function startRequestReviewPipeline(
+  issueId: string,
+  options: { note?: string; source?: RequestReviewSource; onReviewSpawned?: () => void } = {},
+): Promise<StartRequestReviewOutcome> {
+  const canonicalIssueId = issueId.toUpperCase();
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = canonicalIssueId.toLowerCase();
+  const branchName = `feature/${issueLower}`;
+
+  const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+  const workspacePath = workspaceInfo.isRemote
+    ? workspaceInfo.remotePath!
+    : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+  if (!workspaceInfo.exists) return { started: false, reason: 'no-workspace' };
+
+  const dirtyWorkspaceError = await getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo);
+  if (dirtyWorkspaceError) return { started: false, reason: 'dirty-workspace', error: dirtyWorkspaceError };
+
+  if (requestReviewPipeline.isInFlight(canonicalIssueId)) {
+    return { started: false, reason: 'already-running' };
+  }
+
+  if (!resolveProjectFromIssueSync(issueId)) return { started: false, reason: 'no-project' };
+
+  transitionIssueToInReview(issueId, workspacePath).catch((err: unknown) => {
+    console.warn(
+      `[request-review] Could not transition ${issueId} to in_review: ${errorMessage(err)}`
+    );
+  });
+
+  if (options.note) console.log(`[request-review] ${canonicalIssueId}: ${options.note}`);
+
+  // The one door every review request passes through — the HTTP route, the
+  // `pan review request` / `pan done` CLI behind it, and the PR webhook. This
+  // is the moment Overdeck accepts the request, so this is where it is
+  // journalled; nothing downstream re-states it.
+  appendPipelineEntry(workspacePath, {
+    type: 'review.requested',
+    issueId: canonicalIssueId,
+    source: options.source ?? 'api',
+    ...(options.note ? { data: { note: options.note } } : {}),
+  });
+
+  const started = requestReviewPipeline.start(canonicalIssueId, {
+    verify: () => Effect.runPromise(runVerificationForIssue(
+      issueId,
+      workspacePath,
+      workspaceInfo,
+      'request-review'
+    )),
+    onVerificationFailed: (outcome) => {
+      // FR-8: the detail is in `verification-latest.json` and the check run.
+      console.log(`[request-review] Verification failed for ${issueId} at ${outcome.failedCheck}`);
+      completePendingOperation(issueId, `Verification failed at ${outcome.failedCheck} — fix and resubmit`);
+    },
+    onVerificationError: (outcome) => {
+      console.error(`[request-review] Verification infrastructure error for ${issueId}: ${outcome.message}`);
+      completePendingOperation(issueId, `Verification infrastructure error: ${outcome.message}`);
+    },
+    onVerificationDeferred: (outcome) => {
+      console.log(`[request-review] Verification deferred for ${issueId}: ${outcome.reason}`);
+      completePendingOperation(issueId, outcome.reason);
+    },
+    pushBranch: async () => {
+      await pushReviewBranch(issueId, workspacePath, workspaceInfo, branchName);
+      console.log(`[request-review] Pushed verified branch ${branchName} for ${issueId}`);
+    },
+    dispatchReview: async () => {
+      const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
+      const result = await Effect.runPromise(spawnReviewRoleForIssue({
+        issueId,
+        workspace: workspacePath,
+        branch: branchName,
+        force: true,
+      }));
+
+      if (result.success) {
+        console.log(`[request-review] Review role spawned for ${issueId}`);
+        options.onReviewSpawned?.();
+        try {
+          const { initEventStore } = await import('../../event-store.js');
+          const store = await initEventStore();
+          await store.appendAsync({
+            type: 'pipeline.review-started',
+            timestamp: new Date().toISOString(),
+            payload: { issueId },
+          });
+        } catch { /* non-fatal */ }
+        return;
+      }
+
+      if (result.gated) {
+        console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
+        completePendingOperation(issueId, result.message);
+        return;
+      }
+
+      const dispatchError = result.error || result.message || 'Failed to dispatch review';
+      console.warn(`[request-review] Dispatch failed for ${issueId}: ${dispatchError}`);
+      completePendingOperation(issueId, `Dispatch failed: ${dispatchError}`);
+    },
+    onError: (error) => {
+      const detail = errorMessage(error) || String(error);
+      console.error(`[request-review] Background pipeline failed for ${issueId}: ${detail}`);
+      completePendingOperation(issueId, `Review pipeline error: ${detail}`);
+    },
+  });
+
+  if (!started) return { started: false, reason: 'already-running' };
+  const outcome: StartRequestReviewOutcome = { started: true };
+  return workspaceInfo.isRemote && workspaceInfo.vmName
+    ? { ...outcome, remoteVmName: workspaceInfo.vmName }
+    : outcome;
+}
+
+// The webhook path reaches this door through the registry, never by importing
+// a dashboard route from `src/lib/`.
+registerRequestReviewStarter(startRequestReviewPipeline);
+
 // ─── Route: POST /api/review/:issueId/trigger ─────────────────────────────
 const postWorkspaceReviewRoute = HttpRouter.add(
   'POST',
@@ -205,7 +348,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -220,7 +363,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
       (body as { force?: unknown })?.force === true;
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
@@ -333,7 +476,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	            let artifactUrl: string | undefined;
 	            try {
 	              const { createReviewArtifactsForIssue } = await import('../../../../lib/review-artifacts.js');
-	              const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+	              const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
 	              const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
 	              reviewTargetBranch = artifactResult.mergeSet?.repos.find(repo => repo.repoMerge !== 'skipped')?.targetBranch;
 	              if (primaryArtifact?.artifactUrl) {
@@ -456,7 +599,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const parsedIssueId = parseIssueIdSync(issueId);
+    const parsedIssueId = parseIssueId(issueId);
     if (!parsedIssueId) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
@@ -464,6 +607,11 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
+    const rawSource = (body as { source?: unknown }).source;
+    const requestSource: RequestReviewSource =
+      rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'webhook'
+        ? rawSource
+        : 'api';
     const eventStore = yield* EventStoreService;
 
     const urlOpt = HttpServerRequest.toURL(request);
@@ -516,7 +664,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (forceReview && shouldTreatAsRerun(derived)) {
         const issueLowerRerun = canonicalIssueId.toLowerCase();
-        const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
+        const issuePrefixRerun = extractPrefix(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
         const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
         const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
         // Review runs against the local worktree only (PAN-1676) — see the
@@ -673,128 +821,34 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-    const projectPath = getProjectPath(undefined, issuePrefix);
-    const issueLower = issueId.toLowerCase();
-    const branchName = `feature/${issueLower}`;
-
-    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const workspacePath = workspaceInfo.isRemote
-      ? workspaceInfo.remotePath!
-      : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-    if (!workspaceInfo.exists) {
-      return jsonResponse(
-        { success: false, error: 'Workspace does not exist' },
-        { status: 400 }
-      );
-    }
-
-    const dirtyWorkspaceError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo));
-    if (dirtyWorkspaceError) {
-      return jsonResponse(
-        { success: false, error: dirtyWorkspaceError },
-        { status: 400 }
-      );
-    }
-
-    if (requestReviewPipeline.isInFlight(canonicalIssueId)) {
-      return jsonResponse({
-        success: true,
-        queued: true,
-        alreadyRunning: true,
-        message: `Verification already running for ${canonicalIssueId}; review will start automatically when it passes`,
-      }, { status: 202 });
-    }
-
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) {
-      return jsonResponse(
-        {
-          success: false,
-          error: `No project configured for ${issueId}. Add it to projects.yaml.`,
-          autoRequeueCount: currentCount,
-        },
-        { status: 500 }
-      );
-    }
-
-    transitionIssueToInReview(issueId, workspacePath).catch((err: unknown) => {
-      console.warn(
-        `[request-review] Could not transition ${issueId} to in_review: ${errorMessage(err)}`
-      );
-    });
-
     const newCount = currentCount + 1;
     const requestNote = message
       ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}`
       : `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE})`;
-    console.log(`[request-review] ${canonicalIssueId}: ${requestNote}`);
 
-    const started = requestReviewPipeline.start(canonicalIssueId, {
-      verify: () => Effect.runPromise(runVerificationForIssue(
-        issueId,
-        workspacePath,
-        workspaceInfo,
-        'request-review'
-      )),
-      onVerificationFailed: (outcome) => {
-        // FR-8: the detail is in `verification-latest.json` and the check run.
-        console.log(`[request-review] Verification failed for ${issueId} at ${outcome.failedCheck}`);
-        completePendingOperation(issueId, `Verification failed at ${outcome.failedCheck} — fix and resubmit`);
-      },
-      onVerificationError: (outcome) => {
-        console.error(`[request-review] Verification infrastructure error for ${issueId}: ${outcome.message}`);
-        completePendingOperation(issueId, `Verification infrastructure error: ${outcome.message}`);
-      },
-      onVerificationDeferred: (outcome) => {
-        console.log(`[request-review] Verification deferred for ${issueId}: ${outcome.reason}`);
-        completePendingOperation(issueId, outcome.reason);
-      },
-      pushBranch: async () => {
-        await pushReviewBranch(issueId, workspacePath, workspaceInfo, branchName);
-        console.log(`[request-review] Pushed verified branch ${branchName} for ${issueId}`);
-      },
-      dispatchReview: async () => {
-        const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
-        const result = await Effect.runPromise(spawnReviewRoleForIssue({
-          issueId,
-          workspace: workspacePath,
-          branch: branchName,
-          force: true,
-        }));
+    const outcome = yield* Effect.promise(() => startRequestReviewPipeline(issueId, {
+      note: requestNote,
+      source: requestSource,
+      onReviewSpawned: () => autoRequeueCounts.set(canonicalIssueId, newCount),
+    }));
 
-        if (result.success) {
-          console.log(`[request-review] Review role spawned for ${issueId}`);
-          autoRequeueCounts.set(canonicalIssueId, newCount);
-          try {
-            await Effect.runPromise(eventStore.append({
-              type: 'pipeline.review-started',
-              timestamp: new Date().toISOString(),
-              payload: { issueId },
-            }));
-          } catch { /* non-fatal */ }
-          return;
-        }
-
-        if (result.gated) {
-          console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
-          completePendingOperation(issueId, result.message);
-          return;
-        }
-
-        const dispatchError = result.error || result.message || 'Failed to dispatch review';
-        console.warn(`[request-review] Dispatch failed for ${issueId}: ${dispatchError}`);
-        completePendingOperation(issueId, `Dispatch failed: ${dispatchError}`);
-      },
-      onError: (error) => {
-        const detail = errorMessage(error) || String(error);
-        console.error(`[request-review] Background pipeline failed for ${issueId}: ${detail}`);
-        completePendingOperation(issueId, `Review pipeline error: ${detail}`);
-      },
-    });
-
-    if (!started) {
+    if (!outcome.started) {
+      if (outcome.reason === 'no-workspace') {
+        return jsonResponse({ success: false, error: 'Workspace does not exist' }, { status: 400 });
+      }
+      if (outcome.reason === 'dirty-workspace') {
+        return jsonResponse({ success: false, error: outcome.error }, { status: 400 });
+      }
+      if (outcome.reason === 'no-project') {
+        return jsonResponse(
+          {
+            success: false,
+            error: `No project configured for ${issueId}. Add it to projects.yaml.`,
+            autoRequeueCount: currentCount,
+          },
+          { status: 500 }
+        );
+      }
       return jsonResponse({
         success: true,
         queued: true,
@@ -804,7 +858,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     }
 
     console.log(
-      `[request-review] Verification started for ${issueId}; review will dispatch after the verified branch is pushed${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`
+      `[request-review] Verification started for ${issueId}; review will dispatch after the verified branch is pushed${outcome.remoteVmName ? ` (remote: ${outcome.remoteVmName})` : ''}`
     );
     return jsonResponse({
       success: true,
@@ -824,12 +878,12 @@ const getReleaseSetRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const rawIssueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(rawIssueId)) {
+    if (!parseIssueId(rawIssueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issueId = resolveIssueIdSync(rawIssueId);
+    const issueId = resolveIssueId(rawIssueId);
 
-    const releaseSet = getReleaseSetSync(issueId);
+    const releaseSet = getReleaseSet(issueId);
     if (!releaseSet) {
       return jsonResponse({ error: 'Release set not found' }, { status: 404 });
     }

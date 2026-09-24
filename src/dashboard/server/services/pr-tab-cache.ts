@@ -3,7 +3,16 @@ type CacheKind = 'pr' | 'discussions';
 type CacheEntry<T> = {
   generation: number;
   value: T;
+  at: number;
 };
+
+/**
+ * #4036: an entry also expires after a minute. The generation is bumped by the
+ * PR webhooks, but a verdict comment posted where no webhook reaches this
+ * process (a CLI process, an install without webhooks) must still reach the
+ * merge gate, which reads PR comments through this cache.
+ */
+export const PR_TAB_CACHE_TTL_MS = 60_000;
 
 const generations = new Map<string, number>();
 const caches = new Map<string, CacheEntry<unknown>>();
@@ -32,6 +41,7 @@ export function getCachedIssuePrTabResponse<T>(
 ): T | null {
   const entry = caches.get(cacheKey(kind, issueId));
   if (!entry || entry.generation !== generation) return null;
+  if (Date.now() - entry.at >= PR_TAB_CACHE_TTL_MS) return null;
   return entry.value as T;
 }
 
@@ -41,7 +51,7 @@ export function setCachedIssuePrTabResponse<T>(
   generation: number,
   value: T,
 ): void {
-  caches.set(cacheKey(kind, issueId), { generation, value });
+  caches.set(cacheKey(kind, issueId), { generation, value, at: Date.now() });
 }
 
 export function clearIssuePrTabCacheForTests(): void {

@@ -126,14 +126,6 @@ export async function* chunkConversationJsonl(
   }
 }
 
-export async function chunkConversationJsonlFile(
-  options: ChunkConversationJsonlOptions,
-): Promise<ConversationChunkRecord[]> {
-  const records: ConversationChunkRecord[] = [];
-  for await (const record of chunkConversationJsonl(options)) records.push(record);
-  return records;
-}
-
 export async function getLastCompleteJsonlOffset(
   filePath: string,
   fromOffset = 0,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MODEL_DEPRECATIONS, resolveModelIdSync } from '../../src/lib/model-capabilities.js';
+import { MODEL_DEPRECATIONS, resolveModelId } from '../../src/lib/model-capabilities.js';
 import { validateSettingsApi } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
@@ -29,32 +29,32 @@ describe('Model Deprecation System', () => {
 
   describe('resolveModelId()', () => {
     it('should resolve deprecated model IDs to current ones', () => {
-      expect(resolveModelIdSync('claude-opus-4-5')).toBe('claude-opus-4-7');
-      expect(resolveModelIdSync('claude-sonnet-4-5')).toBe('claude-sonnet-4-6');
+      expect(resolveModelId('claude-opus-4-5')).toBe('claude-opus-4-7');
+      expect(resolveModelId('claude-sonnet-4-5')).toBe('claude-sonnet-4-6');
     });
 
     it('should return current model IDs unchanged', () => {
-      expect(resolveModelIdSync('claude-opus-4-6')).toBe('claude-opus-4-6');
-      expect(resolveModelIdSync('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
-      expect(resolveModelIdSync('claude-haiku-4-5')).toBe('claude-haiku-4-5');
-      expect(resolveModelIdSync('k3')).toBe('k3');
+      expect(resolveModelId('claude-opus-4-6')).toBe('claude-opus-4-6');
+      expect(resolveModelId('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
+      expect(resolveModelId('claude-haiku-4-5')).toBe('claude-haiku-4-5');
+      expect(resolveModelId('k3')).toBe('k3');
     });
 
     it('remaps the retired K2.5/K2.6 Kimi generation to the live coding model', () => {
       for (const retired of ['kimi-k2', 'kimi-k2.5', 'kimi-k2.6', 'K2.6-code-preview']) {
-        expect(resolveModelIdSync(retired)).toBe('kimi-k2.7-code');
+        expect(resolveModelId(retired)).toBe('kimi-k2.7-code');
       }
     });
 
     it('should handle unknown model IDs gracefully', () => {
       const unknownId = 'nonexistent-model';
-      expect(resolveModelIdSync(unknownId)).toBe(unknownId);
+      expect(resolveModelId(unknownId)).toBe(unknownId);
     });
 
     it('should be idempotent', () => {
       const deprecated = 'claude-sonnet-4-5';
-      const resolved = resolveModelIdSync(deprecated);
-      expect(resolveModelIdSync(resolved)).toBe(resolved);
+      const resolved = resolveModelId(deprecated);
+      expect(resolveModelId(resolved)).toBe(resolved);
     });
   });
 

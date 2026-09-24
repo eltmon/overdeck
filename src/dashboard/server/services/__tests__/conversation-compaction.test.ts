@@ -20,10 +20,9 @@ vi.mock('../../../../lib/config-yaml.js', () => ({
 }));
 
 vi.mock('../../../../lib/conversations/smart-compaction.js', async () => {
-  const { Effect } = await import('effect');
   return {
-    generateSmartSummary: mockGenerateSmartSummary.mockImplementation((opts: { model?: string }) =>
-      Effect.succeed({
+    generateSmartSummary: mockGenerateSmartSummary.mockImplementation(async (opts: { model?: string }) =>
+      ({
         summary: `summary from ${opts.model ?? 'default'}`,
         tokensBefore: 42,
         firstKeptEntryIndex: 0,

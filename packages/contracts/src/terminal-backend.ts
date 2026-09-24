@@ -28,6 +28,8 @@ export interface PaneTokens {
   readonly role: AgentRole
   readonly harness: string
   readonly model: string
+  /** Agent or conversation that spawned this pane (PAN-3920 workers); it may prompt the pane. */
+  readonly parent?: string
 }
 
 /** One agent pane as the backend reports it. */
@@ -35,6 +37,8 @@ export interface BackendAgentSnapshot {
   readonly backend: TerminalBackendName
   /** Backend-native pane handle (Herdr `w1:p1`, tmux session name). */
   readonly paneId: string
+  /** Overdeck agent id, when the pane carries one (PAN-3920). */
+  readonly agentId?: string
   /** Handle the terminal WebSocket attaches to. */
   readonly terminalId: string
   /** Issue workspace the pane belongs to. */

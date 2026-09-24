@@ -1,6 +1,5 @@
-import { Effect } from 'effect';
-import { deleteReleaseSet as dbDelete, getAllReleaseSetsFromDb, getReleaseSetFromDb, upsertReleaseSet as dbUpsert } from './overdeck/release-sync.js';
-import { resolveIssueIdSync } from './issue-id.js';
+import { getReleaseSetFromDb, upsertReleaseSet as dbUpsert } from './overdeck/release-sync.js';
+import { resolveIssueId } from './issue-id.js';
 import type {
   ReleaseCheckStatus,
   ReleaseComponentState,
@@ -19,23 +18,15 @@ export type {
   RollbackStatus,
 } from './release-set-types.js';
 
-export function upsertReleaseSetSync(releaseSet: ReleaseSet): void {
-  dbUpsert({ ...releaseSet, issueId: resolveIssueIdSync(releaseSet.issueId) });
+export function upsertReleaseSet(releaseSet: ReleaseSet): void {
+  dbUpsert({ ...releaseSet, issueId: resolveIssueId(releaseSet.issueId) });
 }
 
-export function getReleaseSetSync(issueId: string): ReleaseSet | null {
-  return getReleaseSetFromDb(resolveIssueIdSync(issueId));
+export function getReleaseSet(issueId: string): ReleaseSet | null {
+  return getReleaseSetFromDb(resolveIssueId(issueId));
 }
 
-export function getAllReleaseSetsSync(projectKey?: string): ReleaseSet[] {
-  return getAllReleaseSetsFromDb(projectKey);
-}
-
-export function deleteReleaseSetSync(issueId: string): void {
-  dbDelete(resolveIssueIdSync(issueId));
-}
-
-export function withComponentStateSync(
+export function withComponentState(
   releaseSet: ReleaseSet,
   componentKey: string,
   patch: Partial<ReleaseComponentState>,
@@ -51,34 +42,3 @@ export function withComponentStateSync(
     )),
   };
 }
-
-export const upsertReleaseSet = (releaseSet: ReleaseSet): Effect.Effect<void, Error> =>
-  Effect.try({
-    try: () => upsertReleaseSetSync(releaseSet),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-export const getReleaseSet = (issueId: string): Effect.Effect<ReleaseSet | null, Error> =>
-  Effect.try({
-    try: () => getReleaseSetSync(issueId),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-export const getAllReleaseSets = (projectKey?: string): Effect.Effect<ReleaseSet[], Error> =>
-  Effect.try({
-    try: () => getAllReleaseSetsSync(projectKey),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-export const deleteReleaseSet = (issueId: string): Effect.Effect<void, Error> =>
-  Effect.try({
-    try: () => deleteReleaseSetSync(issueId),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-export const withComponentState = (
-  releaseSet: ReleaseSet,
-  componentKey: string,
-  patch: Partial<ReleaseComponentState>,
-): Effect.Effect<ReleaseSet> =>
-  Effect.sync(() => withComponentStateSync(releaseSet, componentKey, patch));

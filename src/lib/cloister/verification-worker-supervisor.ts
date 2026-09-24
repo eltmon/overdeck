@@ -2,7 +2,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, w
 import { join } from 'node:path';
 
 import { getOverdeckHome, packageRoot } from '../paths.js';
-import { snapshotWorkspaceHeadsPromise, type HeadAnchor } from '../git-utils.js';
+import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 import { buildVerificationWorkerLaunch, launchVerificationWorker } from './verification-worker-launcher.js';
 
@@ -108,7 +108,7 @@ function writeJsonAtomic(path: string, value: unknown): void {
   renameSync(temp, path);
 }
 
-export function verificationWorkerDeadline(state: WorkerState): number | null {
+function verificationWorkerDeadline(state: WorkerState): number | null {
   if (state.phase !== 'running' || !state.admittedAt) return null;
   const admittedAt = Date.parse(state.admittedAt);
   return Number.isFinite(admittedAt) ? admittedAt + MAX_RUN_MS : null;
@@ -165,7 +165,7 @@ async function runSupervisedVerificationInternal(
   logPrefix: string,
   options: Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'> = {},
 ): Promise<VerificationRunnerOutcome> {
-  const headAnchor = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
+  const headAnchor = await snapshotWorkspaceHeads(issueId, workspacePath);
   const existing = readVerificationWorkerState(issueId);
   // Never join a worker past its deadline: its result (if it ever lands) is
   // for a stale gate run, and waitForResult would re-fail on the same deadline

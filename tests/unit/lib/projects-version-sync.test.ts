@@ -24,7 +24,7 @@ vi.mock('../../../src/lib/paths.js', async () => {
 import {
   PROJECTS_CONFIG_FILE,
   loadProjectsConfigSync,
-  saveProjectsConfigSync,
+  saveProjectsConfig,
   validateVersionSyncConfig,
   type VersionSyncConfig,
 } from '../../../src/lib/projects.js';
@@ -85,7 +85,7 @@ afterEach(() => {
 
 describe('project version_sync config', () => {
   it('preserves a full version_sync block from projects.yaml', () => {
-    saveProjectsConfigSync({
+    saveProjectsConfig({
       projects: {
         myn: {
           name: 'Mind Your Now',
@@ -99,7 +99,7 @@ describe('project version_sync config', () => {
   });
 
   it('leaves version_sync undefined when the key is absent', () => {
-    saveProjectsConfigSync({
+    saveProjectsConfig({
       projects: {
         app: {
           name: 'App',
@@ -280,7 +280,7 @@ describe('setProjectVersionSync', () => {
     const lock = await acquireProjectsConfigLock(PROJECTS_CONFIG_FILE);
 
     try {
-      expect(() => saveProjectsConfigSync({
+      expect(() => saveProjectsConfig({
         projects: { beta: { name: 'Beta', path: '/repo/beta' } },
       })).toThrow('projects.yaml is already being modified');
       expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);

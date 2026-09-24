@@ -7,14 +7,14 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   killSession: vi.fn(),
   saveAgentState: vi.fn(),
   spawnReviewSubRoleForIssue: vi.fn(),
 }));
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: mocks.getAgentStateSync,
+  getAgentState: mocks.getAgentState,
   saveAgentRuntimeState: vi.fn(),
 }));
 
@@ -26,12 +26,14 @@ vi.mock('../../../../lib/tmux.js', () => ({
   // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   killSession: (agentId: string) => Effect.promise(() => mocks.killSession(agentId)),
 }));
 
 vi.mock('../../../../lib/cloister/review-agent.js', () => ({
-  spawnReviewSubRoleForIssue: (opts: unknown) => Effect.promise(() => mocks.spawnReviewSubRoleForIssue(opts)),
+  spawnReviewSubRoleForIssue: (opts: unknown) => mocks.spawnReviewSubRoleForIssue(opts),
 }));
 
 async function requestRoute(path: string, init: RequestInit): Promise<{ status: number; body: unknown }> {
@@ -58,7 +60,7 @@ afterEach(() => {
 describe('per-reviewer restart route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getAgentStateSync.mockImplementation((agentId: string) => {
+    mocks.getAgentState.mockImplementation((agentId: string) => {
       if (agentId === 'agent-pan-3368-review') {
         return {
           id: agentId,
@@ -132,7 +134,7 @@ describe('per-reviewer restart route', () => {
       status: 'starting',
       startedAt: '2000-01-01T00:00:00.000Z',
     };
-    mocks.getAgentStateSync.mockImplementation((agentId: string) =>
+    mocks.getAgentState.mockImplementation((agentId: string) =>
       agentId === parent.id ? parent : null,
     );
 
@@ -172,7 +174,7 @@ describe('per-reviewer restart route', () => {
     for (const runId of runIds) {
       mkdirSync(join(workspace, '.pan', 'review', runId), { recursive: true });
     }
-    mocks.getAgentStateSync.mockImplementation((agentId: string) =>
+    mocks.getAgentState.mockImplementation((agentId: string) =>
       agentId === 'agent-pan-3368-review'
         ? {
             id: agentId,

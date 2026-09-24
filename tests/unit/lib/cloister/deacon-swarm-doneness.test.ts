@@ -27,7 +27,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
   resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
   listProjectsSync: mocks.listProjectsSync,
-  findProjectByPathSync: () => null,
+  findProjectByPath: () => null,
   getProjectSwarmHotspots: () => [],
   getProjectSync: () => null,
   // PAN-3917: these coordination tests fixture the continue file and slot
@@ -167,7 +167,7 @@ function makeCoordinateDeps(
     releaseSwarmSlot: vi.fn(),
     spawnRun: vi.fn(async () => null),
     getIssueHold: vi.fn(() => null),
-    readItemStatuses: vi.fn(() => ({})),
+    readItemStatuses: vi.fn(async () => ({})),
     getFinalizedAt: vi.fn(() => undefined),
     setFinalizedAt: vi.fn(),
     shouldDispatch: vi.fn(() => true),
@@ -423,7 +423,7 @@ describe('PAN-3695: an uncleared merged slot holds finalization and dependent di
         branches: [],
         agents: [],
       })),
-      readItemStatuses: vi.fn(() => ({ 'wi-1': 'completed' })),
+      readItemStatuses: vi.fn(async () => ({ 'wi-1': 'completed' })),
       runGitCommand,
       slotWorktreeExists: vi.fn((path: string) => path === slotWorkspace),
       registeredSlotCapacityAvailable: vi.fn(() => true),

@@ -226,8 +226,8 @@ const getVsMainDiffRoute = HttpRouter.add(
 
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const files = await Effect.runPromise(diffAgainstMainFiles(workspace))
-        const diff = filePath ? await Effect.runPromise(diffAgainstMain(workspace, filePath)) : undefined
+        const files = await diffAgainstMainFiles(workspace)
+        const diff = filePath ? await diffAgainstMain(workspace, filePath) : undefined
 
         return jsonResponse({ agentId, ...(diff !== undefined && { diff }), files })
       } catch (error: unknown) {

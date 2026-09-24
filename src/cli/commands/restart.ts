@@ -1,5 +1,4 @@
 import { exitCli } from '../exit.js';
-import { Effect } from 'effect';
 /**
  * `pan restart` — scoped restart with explicit dependency isolation.
  *
@@ -40,13 +39,13 @@ import {
 } from '../../lib/restart-gate-client.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
-import { readActiveDashboardBundleSync, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
+import { readActiveDashboardBundle, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 
 import {
   DASHBOARD_LOG_FILE,
   openDashboardLogStdio,
-  readPlatformConfigSync,
+  readPlatformConfig,
   restartDashboard,
   restartCliproxy,
   restartTraefik,
@@ -180,7 +179,7 @@ let warnedActiveBundleFailure: string | null = null;
  * node_modules, so a restart recovers on its own.
  */
 function usableActiveDashboardBundle(): ActiveDashboardBundle | null {
-  const activeBundle = readActiveDashboardBundleSync();
+  const activeBundle = readActiveDashboardBundle();
   if (!activeBundle) return null;
 
   const failure = dashboardServerBootFailure(activeBundle.serverPath);
@@ -392,7 +391,7 @@ async function recordRestartStatus(
   error?: string,
   phase: RestartPhase = success ? 'healthy' : 'failed',
 ): Promise<void> {
-  await Effect.runPromise(writeRestartStatus({
+  await writeRestartStatus({
     ts: new Date().toISOString(),
     trigger: 'pan restart',
     success,
@@ -403,11 +402,11 @@ async function recordRestartStatus(
     pid: process.pid,
     initiator: process.env.OVERDECK_RESTART_INITIATOR ?? process.env.OVERDECK_AGENT_ID,
     issueId: process.env.OVERDECK_ISSUE_ID,
-  }));
+  });
 }
 
 async function reportHeldRestartLock(startedAt: number): Promise<void> {
-  const holder = await Effect.runPromise(readRestartLockHolder());
+  const holder = await readRestartLockHolder();
   const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
   const error = `restart in progress (${heldBy})`;
   console.error(chalk.yellow(error));
@@ -460,7 +459,7 @@ async function runRestartNowBypass(
   options: { reloadHandoffOnly?: boolean } = {},
 ): Promise<'restart' | 'handed-off' | 'no-handoff'> {
   const requesterId = restartGateRequesterId('restart');
-  const lockHolder = await Effect.runPromise(readRestartLockHolder());
+  const lockHolder = await readRestartLockHolder();
   if (options.reloadHandoffOnly && lockHolder?.caller !== 'pan reload') return 'no-handoff';
 
   await registerRestartGateRequest({
@@ -524,7 +523,9 @@ export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = pr
   if (env.OVERDECK_SKIP_SUPERVISOR_CYCLE === '1') return false;
 
   try {
-    const { systemdUserAvailable, isSupervisorUnitActive } = await import('../../lib/systemd.js');
+    const { supervisorUnitAllowed, systemdUserAvailable, isSupervisorUnitActive } = await import('../../lib/systemd.js');
+    // A non-canonical home's supervisor is its own process, never the shared unit.
+    if (!supervisorUnitAllowed(env)) return true;
     return !(await systemdUserAvailable() && await isSupervisorUnitActive());
   } catch {
     return true;
@@ -537,7 +538,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   if ((scope === 'dashboard' || scope === 'full') && refuseNonPrimaryDashboardCwd(process.cwd(), 'restart')) {
     return;
   }
-  const config = readPlatformConfigSync();
+  const config = readPlatformConfig();
   let healthTimeoutMs: number | undefined;
   try {
     healthTimeoutMs = options.healthTimeout
@@ -601,7 +602,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
   let restartLock: RestartLockHandle | null = null;
   if (needsRestartLock) {
-    restartLock = await Effect.runPromise(acquireRestartLock('pan restart'));
+    restartLock = await acquireRestartLock('pan restart');
     if (!restartLock) {
       await reportHeldRestartLock(startedAt);
       return;
@@ -619,16 +620,16 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       case 'dashboard': {
         if (await shouldRunManualSupervisorCycle()) {
           try {
-            const { stopSupervisorProcessSync, startSupervisorProcessSync } = await import('../../lib/supervisor.js');
-            stopSupervisorProcessSync();
-            startSupervisorProcessSync();
+            const { stopSupervisorProcess, startSupervisorProcess } = await import('../../lib/supervisor.js');
+            stopSupervisorProcess();
+            startSupervisorProcess();
           } catch { /* non-fatal */ }
         }
 
-        const result = await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
+        const result = await restartDashboard(config, () => spawnDashboardDetached(config, options), {
           healthTimeoutMs,
           expectedIdentity: resolvePrimaryDashboardIdentity(),
-        }));
+        });
         await recordRestartStatus(startedAt, true);
         console.log(chalk.green(result.ownershipVerified
           ? '✓ Dashboard restarted and healthy'
@@ -638,12 +639,12 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       }
       case 'cliproxy': {
         const cliproxy = await import('../../lib/cliproxy.js');
-        await Effect.runPromise(restartCliproxy({
-          stopCliproxy: cliproxy.stopCliproxySync,
-          startCliproxy: cliproxy.startCliproxySync,
-          isCliproxyRunning: cliproxy.isCliproxyRunningSync,
-          installCliproxy: cliproxy.installCliproxySync,
-        }, { force: options.force === true }));
+        await restartCliproxy({
+          stopCliproxy: cliproxy.stopCliproxy,
+          startCliproxy: cliproxy.startCliproxy,
+          isCliproxyRunning: cliproxy.isCliproxyRunning,
+          installCliproxy: cliproxy.installCliproxy,
+        }, { force: options.force === true });
         if (options.force) {
           console.log(chalk.green('✓ CLIProxy reinstalled at pinned version and restarted'));
         } else {
@@ -653,7 +654,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         break;
       }
       case 'traefik': {
-        await Effect.runPromise(restartTraefik(config));
+        await restartTraefik(config);
         console.log(chalk.green('✓ Traefik restarted'));
         console.log(chalk.dim('  Dashboard and CLIProxy were left running.'));
         break;
@@ -705,26 +706,26 @@ async function runFullRestart(
 
   // ── Stop phase ──
   // Dashboard first so it doesn't spam errors while sidecars die.
-  await Effect.runPromise(stopDashboard(config));
+  await stopDashboard(config);
 
   try {
-    const { stopSupervisorProcessSync } = await import('../../lib/supervisor.js');
-    stopSupervisorProcessSync();
+    const { stopSupervisorProcess } = await import('../../lib/supervisor.js');
+    stopSupervisorProcess();
   } catch {
     // non-fatal
   }
 
   if (tldrAvailable) {
     try {
-      const { getTldrDaemonServiceSync } = await import('../../lib/tldr-daemon.js');
-      await getTldrDaemonServiceSync(projectRoot, venvPath).stop();
+      const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+      await getTldrDaemonService(projectRoot, venvPath).stop();
     } catch {
       // non-fatal — daemon may already be down
     }
   }
 
   if (config.traefikEnabled) {
-    await Effect.runPromise(stopTraefik(config));
+    await stopTraefik(config);
   }
 
   // ── Start phase ──
@@ -732,42 +733,42 @@ async function runFullRestart(
   // dashboard so GPT-backed agents have their router from t=0; TLDR last
   // because it's non-critical and shouldn't block the dashboard coming up.
   if (config.traefikEnabled) {
-    await Effect.runPromise(startTraefik(config));
+    await startTraefik(config);
   }
 
   // restartCliproxy handles stop-sleep-start-verify in one shot.
   const cliproxy = await import('../../lib/cliproxy.js');
-  await Effect.runPromise(restartCliproxy({
-    stopCliproxy: cliproxy.stopCliproxySync,
-    startCliproxy: cliproxy.startCliproxySync,
-    isCliproxyRunning: cliproxy.isCliproxyRunningSync,
-    installCliproxy: cliproxy.installCliproxySync,
-  }));
+  await restartCliproxy({
+    stopCliproxy: cliproxy.stopCliproxy,
+    startCliproxy: cliproxy.startCliproxy,
+    isCliproxyRunning: cliproxy.isCliproxyRunning,
+    installCliproxy: cliproxy.installCliproxy,
+  });
 
   const spawnedDashboard = spawnDashboardDetached(config, opts.bootGateOptions);
   const spawnedPid = await spawnedDashboard.pid?.() ?? null;
   try {
-    await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
+    await waitForDashboardHealth(config.dashboardApiPort, {
       timeoutMs: opts.healthTimeoutMs,
       expectedIdentity: resolvePrimaryDashboardIdentity(),
       expectedPid: spawnedPid ?? undefined,
-    }));
+    });
   } catch (error) {
     await spawnedDashboard.stop();
     throw error;
   }
 
   try {
-    const { startSupervisorProcessSync } = await import('../../lib/supervisor.js');
-    startSupervisorProcessSync();
+    const { startSupervisorProcess } = await import('../../lib/supervisor.js');
+    startSupervisorProcess();
   } catch {
     // non-fatal
   }
 
   if (tldrAvailable) {
     try {
-      const { getTldrDaemonServiceSync } = await import('../../lib/tldr-daemon.js');
-      await getTldrDaemonServiceSync(projectRoot, venvPath).start(true);
+      const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+      await getTldrDaemonService(projectRoot, venvPath).start(true);
     } catch {
       // non-fatal — dashboard is already healthy; TLDR just won't be available
     }

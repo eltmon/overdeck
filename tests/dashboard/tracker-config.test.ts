@@ -28,7 +28,6 @@ beforeEach(() => {
   }));
   // Make loadYamlConfig throw so getLinearApiKey falls through to the env-file cache
   vi.doMock('../../src/lib/config-yaml.js', () => ({
-    loadConfig: () => { throw new Error('no yaml config in test'); },
     loadConfigSync: () => { throw new Error('no yaml config in test'); },
   }));
 });

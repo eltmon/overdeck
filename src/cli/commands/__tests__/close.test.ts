@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => {
     existsSync: vi.fn(() => true),
     readFileSync: vi.fn(() => 'GITHUB_REPOS=eltmon/overdeck:PAN\n'),
     appendOnce: vi.fn().mockResolvedValue('appended'),
-    getDashboardApiUrlSync: vi.fn(() => 'http://dashboard.test'),
+    getDashboardApiUrl: vi.fn(() => 'http://dashboard.test'),
   };
 });
 
@@ -42,7 +42,6 @@ vi.mock('../../../lib/lifecycle/index.js', () => ({
 vi.mock('../../../lib/projects.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/projects.js')>()),
   findProjectByTeam: mocks.findProjectByTeam,
-  findProjectByTeamSync: mocks.findProjectByTeam,
   resolveProjectFromIssue: mocks.resolveProjectFromIssue,
   resolveProjectFromIssueSync: mocks.resolveProjectFromIssue,
 }));
@@ -53,7 +52,7 @@ vi.mock('../../../lib/cloister/deacon-event-client.js', () => ({
 
 vi.mock('../../../lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/config.js')>()),
-  getDashboardApiUrlSync: mocks.getDashboardApiUrlSync,
+  getDashboardApiUrl: mocks.getDashboardApiUrl,
 }));
 
 import { closeOutCommand } from '../close.js';
@@ -115,7 +114,7 @@ describe('closeOutCommand', () => {
   it('publishes a settled cross-process status event after successful close-out', async () => {
     await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
 
-    expect(mocks.getDashboardApiUrlSync).toHaveBeenCalledOnce();
+    expect(mocks.getDashboardApiUrl).toHaveBeenCalledOnce();
     expect(mocks.appendOnce).toHaveBeenCalledWith({
       type: 'issue.statusChanged',
       timestamp: expect.any(String),

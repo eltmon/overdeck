@@ -13,6 +13,7 @@ import type { ConversationMutations } from './useConversationMutations';
 import type { RegisteredProject } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { fallbackBadgeTone } from './fallbackBadge';
+import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import styles from './styles/command-deck.module.css';
 
 /** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
@@ -40,6 +41,14 @@ function shortHarness(harness: NonNullable<Conversation['harness']>): string {
   if (harness === 'kimi-code') return 'Kimi Code';
   // Unknown future harness — show the raw id rather than a wrong label.
   return harness;
+}
+
+function formatStalledTime(timestamp: string): string {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }
 
 // ─── WorkingSpinner ───────────────────────────────────────────────────────────
@@ -112,12 +121,17 @@ export function ConversationRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuBtnRef = useRef<HTMLSpanElement>(null);
+  const rowRef = useRef<HTMLButtonElement>(null);
+  // Which control opened the overflow menu: the kebab (click/keyboard) or the
+  // row itself (right-click). Focus returns to the actual opener.
+  const menuOpenerRef = useRef<'row' | 'kebab'>('kebab');
   const [moveSubmenuOpen, setMoveSubmenuOpen] = useState(false);
   const confirm = useConfirm();
   const now = useNow(60_000);
 
   const openMenu = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
+    menuOpenerRef.current = 'kebab';
     const rect = menuBtnRef.current?.getBoundingClientRect();
     if (rect) {
       // Right-align the menu under the trigger; clamp to the viewport.
@@ -131,7 +145,7 @@ export function ConversationRow({
   useEffect(() => {
     if (!menuOpen) { setMoveSubmenuOpen(false); return; }
     const dismiss = () => setMenuOpen(false);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) setMenuOpen(false); };
     window.addEventListener('keydown', onKey);
     window.addEventListener('scroll', dismiss, true);
     window.addEventListener('resize', dismiss);
@@ -150,6 +164,9 @@ export function ConversationRow({
   const iconSize = isNested ? 10 : 11;
   const dotSize = isNested ? 6 : 7;
   const spinnerSize = isNested ? 10 : 12;
+  const stalledLabel = conv.stalledSince
+    ? `waiting on agent — no activity since ${formatStalledTime(conv.stalledSince)}`
+    : null;
 
   const beginRename = useCallback(() => {
     committingRef.current = false;
@@ -218,6 +235,15 @@ export function ConversationRow({
   // Fork / spawn status badges — shared by both row variants.
   const forkBadges = (
     <>
+      {stalledLabel && (
+        <span
+          className={styles.conversationStalledStatus}
+          aria-label={`Agent stalled in ${conv.name}`}
+          title={new Date(conv.stalledSince!).toLocaleString()}
+        >
+          {stalledLabel}
+        </span>
+      )}
       {conv.forkStatus && conv.forkStatus !== 'failed' && (
         <span className={styles.conversationForkStatus} title={`Fork: ${conv.forkStatus}`}>
           <Loader2 size={10} className={styles.conversationWorkingSpinner} />
@@ -272,6 +298,7 @@ export function ConversationRow({
   return (
     <>
     <button
+      ref={rowRef}
       className={itemClass}
       draggable
       style={{ cursor: 'grab' }}
@@ -283,9 +310,11 @@ export function ConversationRow({
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        e.currentTarget.focus();
+        menuOpenerRef.current = 'row';
         setMenuPos({
-          top: Math.min(e.clientY, window.innerHeight - 320),
-          left: Math.min(e.clientX, window.innerWidth - 230),
+          top: Math.max(8, Math.min(e.clientY, window.innerHeight - 320)),
+          left: Math.max(8, Math.min(e.clientX, window.innerWidth - 230)),
         });
         setMenuOpen(true);
       }}
@@ -340,6 +369,12 @@ export function ConversationRow({
           kinds={conv.pendingInputKinds}
           size={spinnerSize}
           onClick={() => requestAskUserQuestionReopen(conv.name)}
+        />
+      ) : conv.stalledSince ? (
+        <AlertCircle
+          size={spinnerSize}
+          className={styles.conversationStalledIcon}
+          aria-hidden="true"
         />
       ) : conv.isWorking ? (
         <WorkingSpinner
@@ -486,23 +521,21 @@ export function ConversationRow({
         button and doesn't clip against the scrolling conversation list. */}
     {menuOpen && menuPos && createPortal(
       <>
-        <div className={styles.headerMenuOverlay} onClick={() => setMenuOpen(false)} />
-        <div
-          role="menu"
-          className={styles.headerMenu}
+        <MenuOverlay onClick={() => setMenuOpen(false)} />
+        <MenuSurface
+          aria-label={`Actions for ${conv.title ?? conv.name}`}
+          onClose={() => setMenuOpen(false)}
+          returnFocusRef={menuOpenerRef.current === 'row' ? rowRef : menuBtnRef}
+          className="fixed z-[1000] min-w-[220px]"
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, right: 'auto' }}
         >
-          <button
-            role="menuitem"
-            className={styles.headerMenuItem}
+          <MenuItemButton
             onClick={() => { beginRename(); setMenuOpen(false); }}
           >
             <Pencil size={14} />
             Rename
-          </button>
-          <button
-            role="menuitem"
-            className={styles.headerMenuItem}
+          </MenuItemButton>
+          <MenuItemButton
             onClick={() => { mutations.retitle(conv.name); setMenuOpen(false); }}
             disabled={mutations.isRetitlePending(conv.name)}
           >
@@ -510,31 +543,31 @@ export function ConversationRow({
               ? <Loader2 size={14} className={styles.conversationWorkingSpinner} />
               : <Sparkles size={14} />}
             Regenerate title
-          </button>
+          </MenuItemButton>
           {registeredProjects.length > 0 && (
             <span style={{ position: 'relative', display: 'block' }}>
-              <button
-                role="menuitem"
-                className={styles.headerMenuItem}
+              <MenuItemButton
                 aria-haspopup="menu"
                 aria-expanded={moveSubmenuOpen}
                 onClick={() => setMoveSubmenuOpen((open) => !open)}
               >
                 <FolderInput size={14} />
                 Move
-              </button>
+              </MenuItemButton>
               {moveSubmenuOpen && (
                 <>
-                  <div className={styles.headerMenuOverlay} onClick={() => setMoveSubmenuOpen(false)} />
-                  <div role="menu" className={styles.headerSubmenu}>
+                  <MenuOverlay onClick={() => setMoveSubmenuOpen(false)} />
+                  <MenuSurface
+                    aria-label="Move conversation"
+                    onClose={() => setMoveSubmenuOpen(false)}
+                    className="absolute left-full top-0 z-[1001] ml-1 min-w-[180px]"
+                  >
                     {registeredProjects.map((project) => {
                       const isCurrent = resolveEffectiveProjectKey(conv, registeredProjects) === project.key;
                       const projectName = project.name ?? project.key;
                       return (
-                        <button
+                        <MenuItemButton
                           key={project.key}
-                          role="menuitem"
-                          className={styles.headerMenuItem}
                           disabled={isCurrent}
                           onClick={() => {
                             if (isCurrent) return;
@@ -544,74 +577,63 @@ export function ConversationRow({
                           }}
                         >
                           {projectName}
-                          {isCurrent && <Check size={14} className={styles.headerMenuItemCheck} />}
-                        </button>
+                          {isCurrent && <Check size={14} className="ml-auto text-primary" />}
+                        </MenuItemButton>
                       );
                     })}
-                  </div>
+                  </MenuSurface>
                 </>
               )}
             </span>
           )}
           {conv.claudeSessionId && !conv.forkStatus && (
-            <button
-              role="menuitem"
-              className={styles.headerMenuItem}
+            <MenuItemButton
               onClick={() => { mutations.openForkModal(conv, { mode: 'handoff' }); setMenuOpen(false); }}
             >
               <Share2 size={14} />
               Hand off to new conversation
-            </button>
+            </MenuItemButton>
           )}
           {conv.claudeSessionId && !conv.forkStatus && (
-            <button
-              role="menuitem"
-              className={styles.headerMenuItem}
+            <MenuItemButton
               onClick={() => { mutations.openForkModal(conv); setMenuOpen(false); }}
             >
               <GitBranchPlus size={14} />
               Create summary fork
-            </button>
+            </MenuItemButton>
           )}
           {conv.handoffDocPath && (
-            <button
-              role="menuitem"
-              className={styles.headerMenuItem}
+            <MenuItemButton
               onClick={(e) => { openHandoffDoc(e); setMenuOpen(false); }}
             >
               <FileText size={14} />
               Open handoff doc
-            </button>
+            </MenuItemButton>
           )}
           {conv.handoffTargetConvId && (
-            <button
-              role="menuitem"
-              className={styles.headerMenuItem}
+            <MenuItemButton
               onClick={(e) => { openHandoffTarget(e); setMenuOpen(false); }}
             >
               <ExternalLink size={14} />
               Open handoff target
-            </button>
+            </MenuItemButton>
           )}
-          <div className={styles.headerMenuDivider} />
-          <button
-            role="menuitem"
-            className={styles.headerMenuItem}
+          <MenuSeparator />
+          <MenuItemButton
             onClick={(e) => { handleCopyLink(e); setMenuOpen(false); }}
           >
             {copiedId ? <Check size={14} /> : <Copy size={14} />}
             Copy link
-          </button>
-          <div className={styles.headerMenuDivider} />
-          <button
-            role="menuitem"
-            className={`${styles.headerMenuItem} ${styles.headerMenuItemDestructive}`}
+          </MenuItemButton>
+          <MenuSeparator />
+          <MenuItemButton
+            destructive
             onClick={() => { setMenuOpen(false); void handleArchiveClick(); }}
           >
             <Archive size={14} />
             Archive
-          </button>
-        </div>
+          </MenuItemButton>
+        </MenuSurface>
       </>,
       document.body,
     )}

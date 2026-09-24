@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { MemoryIdentity } from '@overdeck/contracts';
-import { getPricingSync, type AIProvider } from '../../cost.js';
-import { insertCostEventSync } from '../../overdeck/cost-sync.js';
+import { getPricing, type AIProvider } from '../../cost.js';
+import { insertCostEvent } from '../../overdeck/cost-sync.js';
 import type { CostEvent } from '../../costs/events.js';
 
 export interface ExtractionUsage {
@@ -81,7 +81,7 @@ export function buildJsonExtractionPrompt(prompt: string, jsonSchema: unknown): 
 
 export function calculateExtractionCost(provider: string, model: string, usage: ExtractionUsage): ExtractionCost {
   const pricingProvider = extractionProviderToAiProvider(provider);
-  const pricing = getPricingSync(pricingProvider, model);
+  const pricing = getPricing(pricingProvider, model);
   if (!pricing) {
     warnUnpricedExtractionModel(provider, model);
     return { usd: 0 };
@@ -124,7 +124,7 @@ export function recordExtractionCost(input: {
     sessionId: input.identity.sessionId,
   };
 
-  insertCostEventSync(event);
+  insertCostEvent(event);
 }
 
 function extractionProviderToAiProvider(provider: string): AIProvider {

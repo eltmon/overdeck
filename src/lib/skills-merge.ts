@@ -1,24 +1,20 @@
-import { Effect } from 'effect';
 import {
   existsSync,
   readdirSync,
   mkdirSync,
-  readFileSync,
-  writeFileSync,
   copyFileSync,
 } from 'fs';
 import { join, relative, dirname } from 'path';
 import { SKILLS_DIR, CACHE_AGENTS_DIR } from './paths.js';
 import {
-  readManifestSync,
-  writeManifestSync,
-  collectSourceFilesSync,
-  hashFileSync,
+  readManifest,
+  writeManifest,
+  collectSourceFiles,
+  hashFile,
   setManifestEntry,
   compareFileToManifest,
-  pruneStaleManifestEntriesSync,
+  pruneStaleManifestEntries,
 } from './manifest.js';
-import { FsError } from './errors.js';
 import { isHarnessNativeTarget } from './context-layers/native-instructions.js';
 
 export interface MergeResult {
@@ -67,12 +63,12 @@ function copyTree(sourceDir: string, targetDir: string): string[] {
  * 2. Write manifest tracking what was placed
  *
  * Project template overlay is handled separately by workspace-manager.ts
- * (processTemplates + createSymlinks → now also copy-based).
+ * (processTemplatesSync + createSymlinks → now also copy-based).
  */
-export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult {
+export function mergeSkillsIntoWorkspace(workspacePath: string): MergeResult {
   const claudeDir = join(workspacePath, '.claude');
   const manifestPath = join(claudeDir, '.overdeck-manifest.json');
-  const manifest = readManifestSync(manifestPath);
+  const manifest = readManifest(manifestPath);
 
   const result: MergeResult = {
     added: [],
@@ -93,20 +89,20 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
     { sourceDir: CACHE_AGENTS_DIR, targetSubdir: 'agents' },
   ];
   const sourceSet = new Set(sources.flatMap(({ sourceDir, targetSubdir }) =>
-    collectSourceFilesSync(sourceDir, '').map((file) => `${targetSubdir}/${file.relativePath}`),
+    collectSourceFiles(sourceDir, '').map((file) => `${targetSubdir}/${file.relativePath}`),
   ));
 
   for (const { sourceDir, targetSubdir } of sources) {
     if (!existsSync(sourceDir)) continue;
 
     const prefix = targetSubdir ? `${targetSubdir}/` : '';
-    const files = collectSourceFilesSync(sourceDir, '');
+    const files = collectSourceFiles(sourceDir, '');
 
     for (const file of files) {
       const relativePath = `${prefix}${file.relativePath}`;
       if (isHarnessNativeTarget(join('.claude', relativePath))) continue;
       const targetPath = join(claudeDir, relativePath);
-      const sourceHash = hashFileSync(file.absolutePath);
+      const sourceHash = hashFile(file.absolutePath);
 
       // Check status against manifest
       const status = compareFileToManifest(targetPath, relativePath, manifest);
@@ -144,14 +140,14 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
   for (const path of Object.keys(manifest.installed)) {
     if (isHarnessNativeTarget(join('.claude', path))) sourceSet.add(path);
   }
-  const pruneResult = pruneStaleManifestEntriesSync(claudeDir, manifest, sourceSet, {
+  const pruneResult = pruneStaleManifestEntries(claudeDir, manifest, sourceSet, {
     prefixes: ['skills/', 'agents/'],
   });
   result.pruned.push(...pruneResult.pruned);
   result.keptModified.push(...pruneResult.keptModified);
 
   // Write updated manifest
-  writeManifestSync(manifestPath, manifest);
+  writeManifest(manifestPath, manifest);
 
   return result;
 }
@@ -167,14 +163,14 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
  * @param templateDir - Absolute path to the project's agent template directory
  * @param templates - Optional list of specific template files to process (source → target mappings)
  */
-export function applyProjectTemplateOverlaySync(
+export function applyProjectTemplateOverlay(
   workspacePath: string,
   templateDir: string,
   templates?: Array<{ source: string; target: string }>,
 ): string[] {
   const claudeDir = join(workspacePath, '.claude');
   const manifestPath = join(claudeDir, '.overdeck-manifest.json');
-  const manifest = readManifestSync(manifestPath);
+  const manifest = readManifest(manifestPath);
   const overlayed: string[] = [];
 
   if (!existsSync(templateDir)) return overlayed;
@@ -191,7 +187,7 @@ export function applyProjectTemplateOverlaySync(
 
       // Read template content and check if it's a template file
       if (source.endsWith('.template')) {
-        // Template files are handled by workspace-manager's processTemplates
+        // Template files are handled by workspace-manager's processTemplatesSync
         // We just track them in the manifest after they're processed
         continue;
       }
@@ -201,7 +197,7 @@ export function applyProjectTemplateOverlaySync(
       // Track in manifest if it's under .claude/
       if (target.startsWith('.claude/')) {
         const relativePath = target.slice('.claude/'.length);
-        const hash = hashFileSync(targetPath);
+        const hash = hashFile(targetPath);
         setManifestEntry(manifest, relativePath, hash, 'project-template');
         overlayed.push(relativePath);
       }
@@ -213,7 +209,7 @@ export function applyProjectTemplateOverlaySync(
       const copied = copyTree(claudeInTemplate, claudeDir);
       for (const rel of copied) {
         const targetPath = join(claudeDir, rel);
-        const hash = hashFileSync(targetPath);
+        const hash = hashFile(targetPath);
         setManifestEntry(manifest, rel, hash, 'project-template');
         overlayed.push(rel);
       }
@@ -221,7 +217,7 @@ export function applyProjectTemplateOverlaySync(
   }
 
   // Write updated manifest
-  writeManifestSync(manifestPath, manifest);
+  writeManifest(manifestPath, manifest);
 
   return overlayed;
 }
@@ -229,88 +225,17 @@ export function applyProjectTemplateOverlaySync(
 // ─── Legacy exports (kept for migration, to be removed in future) ───
 
 /**
- * @deprecated No longer needed — skills are copies, not symlinks. Kept for migration.
- */
-export function cleanupGitignoreSync(gitignorePath: string): {
-  cleaned: boolean;
-  duplicatesRemoved: number;
-  entriesAfter: number;
-} {
-  if (!existsSync(gitignorePath)) {
-    return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
-  }
-
-  const OVERDECK_HEADER = '# Overdeck-managed symlinks (not committed)';
-  let content: string;
-  try {
-    content = readFileSync(gitignorePath, 'utf-8');
-  } catch {
-    return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
-  }
-
-  // If no Overdeck section, nothing to clean
-  if (!content.includes(OVERDECK_HEADER)) {
-    return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
-  }
-
-  // Remove the entire Overdeck section (skills are copies now, not symlinks)
-  const lines = content.split('\n');
-  const newLines: string[] = [];
-  let inOverdeckSection = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed === OVERDECK_HEADER) {
-      inOverdeckSection = true;
-      continue;
-    }
-    if (inOverdeckSection) {
-      if (trimmed.startsWith('#') && trimmed !== '') {
-        inOverdeckSection = false;
-        newLines.push(line);
-      } else if (trimmed === '') {
-        // Skip blank lines in Overdeck section
-        continue;
-      }
-      // Skip entries in Overdeck section
-      continue;
-    }
-    newLines.push(line);
-  }
-
-  // Write cleaned file
-  try {
-    writeFileSync(gitignorePath, newLines.join('\n'), 'utf-8');
-    return { cleaned: true, duplicatesRemoved: 0, entriesAfter: 0 };
-  } catch {
-    return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
-  }
-}
-
-/**
- * @deprecated No longer needed — skills are copies, not symlinks. Kept for migration.
- */
-export function cleanupWorkspaceGitignoreSync(workspacePath: string): {
-  cleaned: boolean;
-  duplicatesRemoved: number;
-  entriesAfter: number;
-} {
-  const gitignorePath = join(workspacePath, '.claude', 'skills', '.gitignore');
-  return cleanupGitignoreSync(gitignorePath);
-}
-
-/**
  * Merge project-local skills from .pan/skills/ into a workspace's .claude/skills/.
  *
  * Precedence (highest wins):
  * 1. .claude/skills/<name>/ already in workspace (user-owned or project template) → skip
  * 2. .pan/skills/<name>/ in project repo → copy into workspace .claude/skills/
- * 3. Global cache (handled by mergeSkillsIntoWorkspace) → baseline
+ * 3. Global cache (handled by mergeSkillsIntoWorkspaceSync) → baseline
  *
- * This should be called AFTER mergeSkillsIntoWorkspace so that project-local skills
+ * This should be called AFTER mergeSkillsIntoWorkspaceSync so that project-local skills
  * can override global cache skills (but never overwrite user-owned content).
  */
-export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePath: string): MergeResult {
+export function mergePanSkillsIntoWorkspace(projectPath: string, workspacePath: string): MergeResult {
   const result: MergeResult = {
     added: [], updated: [], skipped: [], overlayed: [], pruned: [], keptModified: [],
   };
@@ -319,7 +244,7 @@ export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePa
 
   const claudeSkillsDir = join(workspacePath, '.claude', 'skills');
   const manifestPath = join(workspacePath, '.claude', '.overdeck-manifest.json');
-  const manifest = readManifestSync(manifestPath);
+  const manifest = readManifest(manifestPath);
 
   const skillDirs = readdirSync(panSkillsDir, { withFileTypes: true })
     .filter(e => e.isDirectory())
@@ -336,7 +261,7 @@ export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePa
     }
 
     // Rule #2: copy from .pan/skills/<name>/ to workspace .claude/skills/<name>/
-    const files = collectSourceFilesSync(sourceSkillDir, '');
+    const files = collectSourceFiles(sourceSkillDir, '');
     mkdirSync(targetSkillDir, { recursive: true });
     let anyAdded = false;
     for (const file of files) {
@@ -344,7 +269,7 @@ export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePa
       const targetPath = join(targetSkillDir, file.relativePath);
       mkdirSync(dirname(targetPath), { recursive: true });
       copyFileSync(file.absolutePath, targetPath);
-      const hash = hashFileSync(targetPath);
+      const hash = hashFile(targetPath);
       setManifestEntry(manifest, `skills/${skillName}/${file.relativePath}`, hash, 'pan-skills');
       result.added.push(`skills/${skillName}/${file.relativePath}`);
       anyAdded = true;
@@ -354,69 +279,6 @@ export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePa
     }
   }
 
-  writeManifestSync(manifestPath, manifest);
+  writeManifest(manifestPath, manifest);
   return result;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Sync FS by design — CLI install/sync paths. Each mutating helper surfaces
-// FsError; the read-only gitignore inspector stays Effect.sync.
-
-/** Merge ~/.claude/skills into a workspace's .claude/skills tree. */
-export const mergeSkillsIntoWorkspace = (
-  workspacePath: string,
-): Effect.Effect<MergeResult, FsError> =>
-  Effect.try({
-    try: () => mergeSkillsIntoWorkspaceSync(workspacePath),
-    catch: (cause) =>
-      new FsError({ path: workspacePath, operation: 'merge-skills', cause }),
-  });
-
-/** Overlay project-specific template files on top of merged skills. */
-export const applyProjectTemplateOverlay = (
-  ...args: Parameters<typeof applyProjectTemplateOverlaySync>
-): Effect.Effect<ReturnType<typeof applyProjectTemplateOverlaySync>, FsError> =>
-  Effect.try({
-    try: () => applyProjectTemplateOverlaySync(...args),
-    catch: (cause) =>
-      new FsError({ path: args[0], operation: 'apply-template-overlay', cause }),
-  });
-
-/** Inspect (and rewrite) a workspace's .gitignore against drift. */
-export const cleanupGitignore = (
-  gitignorePath: string,
-): Effect.Effect<ReturnType<typeof cleanupGitignoreSync>, FsError> =>
-  Effect.try({
-    try: () => cleanupGitignoreSync(gitignorePath),
-    catch: (cause) =>
-      new FsError({ path: gitignorePath, operation: 'cleanup-gitignore', cause }),
-  });
-
-/** Convenience: locate then clean the workspace .gitignore. */
-export const cleanupWorkspaceGitignore = (
-  workspacePath: string,
-): Effect.Effect<ReturnType<typeof cleanupWorkspaceGitignoreSync>, FsError> =>
-  Effect.try({
-    try: () => cleanupWorkspaceGitignoreSync(workspacePath),
-    catch: (cause) =>
-      new FsError({
-        path: workspacePath,
-        operation: 'cleanup-workspace-gitignore',
-        cause,
-      }),
-  });
-
-/** Merge a project's pan-skills overlay (skills + rules) into a workspace. */
-export const mergePanSkillsIntoWorkspace = (
-  projectPath: string,
-  workspacePath: string,
-): Effect.Effect<MergeResult, FsError> =>
-  Effect.try({
-    try: () => mergePanSkillsIntoWorkspaceSync(projectPath, workspacePath),
-    catch: (cause) =>
-      new FsError({
-        path: workspacePath,
-        operation: 'merge-pan-skills',
-        cause,
-      }),
-  });

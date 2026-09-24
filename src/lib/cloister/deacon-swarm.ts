@@ -4,7 +4,6 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join, resolve } from 'path';
 import { getAgentRuntimeSnapshot } from '../agent-runtime.js';
-import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
 import { verifyAndMergeSlot } from '../agents/slot-merge.js';
 import {
@@ -21,12 +20,12 @@ import {
   getDispatchableItems,
   type PersistedTaskOperation,
 } from '../xbrief/dag.js';
-import { readItemStatuses, setItemStatus } from '../xbrief/continue-state.js';
+import { readItemStatusesAsync, setItemStatus } from '../xbrief/continue-state.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
 import { applyItemStatuses } from '../xbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../xbrief/swarm-readiness.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
-import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
+import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { resolveAutomaticSwarmPolicy, resolveSwarmMaxSlots } from '../swarm-policy.js';
 import type { SwarmInferCompletionMode } from './config.js';
 import {
@@ -72,8 +71,6 @@ import { updateSwarmSlotState } from './swarm-slot-store.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 import { archiveBlockedSwarmSlot, defaultIsSlotBranchPushed, prepareReleasedSwarmSlot, releaseBlockedSlots } from './swarm-blocked-slot.js';
-import { ensureSwarmForeman } from './swarm-foreman.js';
-import { maintainSwarmForeman, resetForemanRespawnFailuresForTests, type SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -111,14 +108,14 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   listSessionNames: () => Effect.runPromise(listTmuxSessionNames()),
   isPaneDead: (sessionName) => Effect.runPromise(isPaneDead(sessionName)),
   getPaneExitStatus: async (sessionName) => {
-    const values = await Effect.runPromise(listPaneValues(sessionName, '#{pane_dead_status}'));
+    const values = await listPaneValues(sessionName, '#{pane_dead_status}');
     const raw = values[0]?.trim();
     if (!raw) return null;
     const status = Number(raw);
     return Number.isFinite(status) ? status : null;
   },
   getAgentRuntimeState: (agentId) => Effect.runPromise(getAgentRuntimeSnapshot(agentId)),
-  getPaneOutputDigest: async (sessionName) => Effect.runPromise(capturePane(sessionName, 200)),
+  getPaneOutputDigest: async (sessionName) => capturePane(sessionName, 200),
   getBranchTipCommitTime: async (workspacePath, branch) => {
     try {
       const { stdout } = await execAsync(`git log -1 --format=%ct ${JSON.stringify(branch)}`, { cwd: workspacePath });
@@ -167,8 +164,6 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   readSlotCompletion: defaultReadSlotCompletion,
   clearSlotCompletion: clearSwarmSlotCompletion,
   recordForemanTakeover: writeSwarmForemanTakeover,
-  ensureSwarmForeman,
-  sendStallEvent: (agentId, message) => messageAgent(agentId, message, 'deacon:swarm-stall'),
   resolveAutomaticSwarmPolicy,
 };
 
@@ -210,9 +205,9 @@ function planHomeForWorkspace(workspacePath: string): string {
 }
 
 /** Item id → status, from the issue's continue file. */
-function defaultReadItemStatuses(workspacePath: string, issueId: string): Record<string, string> {
+async function defaultReadItemStatuses(workspacePath: string, issueId: string): Promise<Record<string, string>> {
   try {
-    return readItemStatuses(planHomeForWorkspace(workspacePath), issueId);
+    return await readItemStatusesAsync(planHomeForWorkspace(workspacePath), issueId);
   } catch {
     return {};
   }
@@ -236,7 +231,7 @@ function defaultReadSlotCompletion(
 }
 
 function defaultShouldDispatch(issueId: string): boolean {
-  return !isDeaconGloballyPausedSync();
+  return !isDeaconGloballyPaused();
 }
 
 export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled' | 'awaiting-completion-signal' | 'failed-merge-blocked';
@@ -307,7 +302,7 @@ export async function coordinateSwarmSlots(
       if (!spec) continue;
       const planStatus = spec.document.plan.status;
       if (planStatus === 'completed' || planStatus === 'cancelled') continue;
-      const itemStatuses = (deps.readItemStatuses ?? defaultReadItemStatuses)(workspace.workspacePath, issueId);
+      const itemStatuses = await (deps.readItemStatuses ?? defaultReadItemStatuses)(workspace.workspacePath, issueId);
       const doc = Object.keys(itemStatuses).length > 0
         ? applyItemStatuses(spec.document, itemStatuses)
         : spec.document;
@@ -350,28 +345,6 @@ export async function coordinateSwarmSlots(
   return actions;
 }
 
-export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultDeps): Promise<string[]> {
-  const actions: string[] = [];
-  const sessions = await deps.listSessionNames();
-  for (const workspace of deps.listFeatureWorkspaces()) {
-    const issueId = workspace.issueId.toUpperCase();
-    const spec = await Effect.runPromise((deps.findSpecByIssue ?? findSpecByIssue)(workspace.projectPath, issueId));
-    if (!spec) continue;
-    const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, spec.document);
-    actions.push(`[swarm-janitor] enumerated ${issueId}`);
-    actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
-    actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
-    const automatic = (deps.resolveAutomaticSwarmPolicy ?? resolveAutomaticSwarmPolicy)(issueId, analyzeSwarmReadiness(spec.document).swarmEligible);
-    actions.push(...await maintainSwarmForeman(issueId, workspace.workspacePath, reconciled, sessions, deps, automatic.policy.mode !== 'off', automatic.spawnForeman));
-    const classified = await classifyInFlightSlots(reconciled.inFlight, { ...deps, listSessionNames: async () => sessions }, { issueId, workspacePath: workspace.workspacePath });
-    for (const slot of classified.filter(candidate => candidate.signal === 'stall-event')) {
-      await deps.sendStallEvent?.(`agent-${issueId.toLowerCase()}`, `[swarm-event] slot ${slot.slotIndex} stalled (no progress ${Math.floor((slot.stalledForMs ?? 0) / 60_000)}m)`);
-      actions.push(`[swarm-janitor] notified ${issueId} foreman that slot ${slot.slotIndex} stalled`);
-    }
-  }
-  return actions;
-}
-export { resetForemanRespawnFailuresForTests };
 export async function classifyInFlightSlots(
   slots: ReconciledSlotItem[],
   deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus'>
@@ -623,7 +596,7 @@ export function recordSwarmAdvanceFailure(issueId: string, now = Date.now()): vo
   });
 }
 
-export function recordSwarmAdvanceSuccess(issueId: string): void {
+function recordSwarmAdvanceSuccess(issueId: string): void {
   issueAdvanceFailures.delete(issueId.toUpperCase());
 }
 

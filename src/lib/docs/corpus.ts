@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'fs/promises';
+import { readdir, stat } from 'fs/promises';
 import { join, relative, sep } from 'path';
 
 import type { NormalizedDocsConfig } from '../config-yaml.js';
@@ -95,19 +95,6 @@ export async function discoverDocsCorpusSources(options: DocsCorpusOptions = {})
   }
 
   return dedupeSources(sources).sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-}
-
-export async function loadDocsCorpus(options: DocsCorpusOptions = {}): Promise<DocsChunk[]> {
-  const sources = await discoverDocsCorpusSources(options);
-  const maxChunkTokens = corpusConfig(options.config).maxChunkTokens;
-  const chunks: DocsChunk[] = [];
-
-  for (const source of sources) {
-    const markdown = await readFile(source.absolutePath, 'utf8');
-    chunks.push(...chunkMarkdown(source, markdown, { maxChunkTokens }));
-  }
-
-  return chunks;
 }
 
 export function chunkMarkdown(

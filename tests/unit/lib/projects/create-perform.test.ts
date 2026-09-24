@@ -48,7 +48,6 @@ vi.mock('../../../../src/lib/paths.js', async () => {
 });
 
 vi.mock('../../../../src/lib/workspace-manager.js', () => ({
-  preTrustDirectorySync: vi.fn(),
   preTrustDirectory: vi.fn(),
 }));
 

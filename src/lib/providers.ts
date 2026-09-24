@@ -6,12 +6,9 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
 import type { ModelId, GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
@@ -90,7 +87,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Anthropic',
     compatibility: 'direct',
     defaultHarness: 'claude-code',
-    models: ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
@@ -417,7 +414,7 @@ function nearestKnownModelId(modelId: string): string | undefined {
 /**
  * Get provider for a given model ID
  */
-export function getProviderForModelSync(modelId: ModelId | string): ProviderConfig {
+export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   if (PROVIDERS.meta.models.includes(modelId)) return PROVIDERS.meta;
   // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free'),
   // except for explicitly supported slash-delimited providers such as Nous Portal.
@@ -440,7 +437,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Anthropic models
-  if (['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
+  if (['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
   }
 
@@ -505,13 +502,6 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
 }
 
 /**
- * Get all direct-compatible providers
- */
-export function getDirectProviders(): ProviderConfig[] {
-  return Object.values(PROVIDERS);
-}
-
-/**
  * Get environment variables for spawning agent with specific provider.
  *
  * `harness` is optional and defaults to preserving the pre-PAN-1837 behavior
@@ -521,7 +511,7 @@ export function getDirectProviders(): ProviderConfig[] {
  * `kimi login` / ~/.kimi-code/config.toml, and leaking these vars into the
  * native binary's env would risk silently redirecting or breaking its auth.
  */
-export function getProviderEnvSync(
+export function getProviderEnv(
   provider: ProviderConfig,
   apiKey: string,
   harness?: RuntimeName,
@@ -639,7 +629,7 @@ export function getProviderEnvSync(
  * This writes to .claude/settings.local.json in the workspace directory.
  * Must be called before spawning the agent.
  */
-export function setupCredentialFileAuthSync(provider: ProviderConfig, workspacePath: string): void {
+export function setupCredentialFileAuth(provider: ProviderConfig, workspacePath: string): void {
   if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
 
   const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
@@ -672,7 +662,7 @@ export function setupCredentialFileAuthSync(provider: ProviderConfig, workspaceP
  * .claude/settings.local.json. Otherwise Claude Code will keep using the stale
  * token helper and fail with "Invalid API key".
  */
-export function clearCredentialFileAuthSync(workspacePath: string): void {
+export function clearCredentialFileAuth(workspacePath: string): void {
   const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
   if (!existsSync(settingsPath)) return;
 
@@ -685,62 +675,7 @@ export function clearCredentialFileAuthSync(workspacePath: string): void {
   } catch { /* non-fatal */ }
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of {@link getProviderForModelSync}. Pure lookup; cannot fail. */
-export const getProviderForModel = (modelId: ModelId | string): Effect.Effect<ProviderConfig, never> =>
-  Effect.sync(() => getProviderForModelSync(modelId));
-
-/** Effect variant of {@link getProviderEnvSync}. Pure transform; cannot fail. */
-export const getProviderEnv = (
-  provider: ProviderConfig,
-  apiKey: string,
-): Effect.Effect<Record<string, string>, never> =>
-  Effect.sync(() => getProviderEnvSync(provider, apiKey));
-
-/** Effect variant of {@link setupCredentialFileAuthSync}. */
-export const setupCredentialFileAuth = (
-  provider: ProviderConfig,
-  workspacePath: string,
-): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: async () => {
-      if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
-
-      const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
-      const claudeDir = join(workspacePath, '.claude');
-      const settingsPath = join(claudeDir, 'settings.local.json');
-
-      if (!existsSync(claudeDir)) {
-        await mkdir(claudeDir, { recursive: true });
-      }
-
-      let settings: Record<string, unknown> = {};
-      if (existsSync(settingsPath)) {
-        try {
-          settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
-        } catch { /* start fresh */ }
-      }
-
-      settings.apiKeyHelper = helperPath;
-      await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    },
-    catch: (cause) =>
-      new FsError({ path: workspacePath, operation: 'setupCredentialFileAuth', cause }),
-  });
-
-/** Effect variant of {@link clearCredentialFileAuthSync}. Swallows all errors (non-fatal). */
-export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<void, never> =>
-  Effect.promise(async () => {
-    const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
-    if (!existsSync(settingsPath)) return;
-    try {
-      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
-      if (!settings.apiKeyHelper) return;
-      delete settings.apiKeyHelper;
-      await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    } catch { /* non-fatal */ }
-  });
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 /**
  * Map a Overdeck provider to the Pi harness's provider name for that
@@ -752,7 +687,7 @@ export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<vo
  * constrain WHICH Pi provider is used — we never inject keys.
  */
 export function piProviderForModel(modelId: string): string | undefined {
-  const provider = getProviderForModelSync(modelId).name;
+  const provider = getProviderForModel(modelId).name;
   switch (provider) {
     case 'openai':
       return 'openai-codex';

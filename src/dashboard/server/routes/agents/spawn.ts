@@ -12,16 +12,17 @@ import {
 import { resolveIssueWorkModel } from '../../../../lib/agents/staffing.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
-import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
-import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
-import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
-import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
+import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
+import { canUseHarness } from '../../../../lib/harness-policy.js';
+import { emitActivityEntry } from '../../../../lib/activity-logger.js';
+import { FsError } from '../../../../lib/errors.js';
 import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
-import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
-import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
+import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
-import { validateProviderHealth } from '../../../../lib/provider-health.js';
+import { ProviderHealthError, validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
@@ -65,7 +66,7 @@ import { claimAgentStart, handleContainerOrchestration, handleRemoteAgentSpawn, 
  */
 export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: string): void {
   try {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'warn',
       message: `Workspace dirty — agent start refused for ${issueId}`,
@@ -114,7 +115,10 @@ export function resolveStartAgentGateForRoute(input: {
   let gate: AgentStartGateDecision | null = null;
 
   return Effect.gen(function* () {
-    const state = yield* getAgentState(input.agentSessionName);
+    const state = yield* Effect.try({
+      try: () => getAgentState(input.agentSessionName),
+      catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${input.agentSessionName}`, cause }),
+    });
     gate = evaluateAgentStartGate(input.agentSessionName, state);
     if (!gate) return null;
 
@@ -149,7 +153,10 @@ export function resolveStartAgentGateForRoute(input: {
 
     if (!cleared) return gate;
 
-    gate = evaluateAgentStartGate(input.agentSessionName, yield* getAgentState(input.agentSessionName));
+    gate = evaluateAgentStartGate(input.agentSessionName, yield* Effect.try({
+      try: () => getAgentState(input.agentSessionName),
+      catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${input.agentSessionName}`, cause }),
+    }));
     return gate;
   }).pipe(
     Effect.catch((err) => {
@@ -236,7 +243,7 @@ export const postAgentsRoute = HttpRouter.add(
       );
     }
 
-    const parsedIssueId = parseIssueIdSync(String(issueId));
+    const parsedIssueId = parseIssueId(String(issueId));
     if (!parsedIssueId) {
       return jsonResponse(
         {
@@ -278,7 +285,7 @@ export const postAgentsRoute = HttpRouter.add(
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
     const clearGates = (body as any).clearGates === true;
-    const initialAgentState = yield* getAgentState(agentSessionName);
+    const initialAgentState = getAgentState(agentSessionName);
     const startGateBlock = evaluateAgentStartGate(agentSessionName, initialAgentState);
     if (startGateBlock) {
       if (!clearGates) {
@@ -295,7 +302,7 @@ export const postAgentsRoute = HttpRouter.add(
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const resolvedProject = resolveProjectFromIssueSync(String(issueId));
     const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
     const projectPath = projectConfig?.path ?? getProjectPath(projectId, issuePrefix);
@@ -309,7 +316,7 @@ export const postAgentsRoute = HttpRouter.add(
         const nodeDir = dirname(process.execPath);
         yield* Effect.promise(() => execAsync(
           `pan workspace create ${issueId} --local`,
-          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmuxSync(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
+          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmux(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
         ));
       } catch (wsErr) {
         return jsonResponse({
@@ -432,7 +439,13 @@ export const postAgentsRoute = HttpRouter.add(
     const explicitModel: string | null = (body as any).model ? spawnModel : null;
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
-      const codexAuth = yield* checkCodexAuthStatus();
+      const codexAuth = yield* Effect.tryPromise({
+        try: () => checkCodexAuthStatus(),
+        catch: (cause) => new CodexAuthCheckError({
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+      });
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({
           success: false,
@@ -446,10 +459,12 @@ export const postAgentsRoute = HttpRouter.add(
 
     // Pre-flight provider health check — detect quota/auth/network errors
     // before spawning the agent into Claude Code's opaque retry loop.
-    // validateProviderHealth returns an Effect (typed ProviderHealthError
-    // channel) — wrapping it in Effect.promise handed a non-thenable to the
-    // runtime and crashed the whole request (PAN-1768).
-    const providerHealthCheck = yield* validateProviderHealth(spawnModel).pipe(
+    // validateProviderHealth rejects only with ProviderHealthError (any other
+    // throw is re-wrapped), so every failure lands in the blocked branch below.
+    const providerHealthCheck = yield* Effect.tryPromise({
+      try: () => validateProviderHealth(spawnModel),
+      catch: (cause) => cause as ProviderHealthError,
+    }).pipe(
       Effect.match({
         onFailure: (err) => ({ _tag: 'failure' as const, err }),
         onSuccess: () => ({ _tag: 'success' as const, err: null }),
@@ -496,7 +511,7 @@ export const postAgentsRoute = HttpRouter.add(
             workspacePath,
             lastObserved: stackHealth.lastObserved,
           });
-          emitActivityEntrySync({
+          emitActivityEntry({
             source: 'dashboard',
             level: 'error',
             issueId: issueId.toUpperCase(),
@@ -552,30 +567,28 @@ export const postAgentsRoute = HttpRouter.add(
     const markWorkStartAccepted = async (): Promise<void> => {
       if (workStartAccepted) return;
       workStartAccepted = true;
-      await Effect.runPromise(transitionXBriefOnMain(
+      await transitionXBriefOnMain(
         projectPath,
         issueId,
         'active',
         'running',
         `chore(state): start ${issueId.toUpperCase()} xBRIEF (status=running)`,
-      ).pipe(
-        Effect.match({
-          onSuccess: (result) => {
-            if (result.moved) {
-              console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
-            }
-            if (result.statusUpdated) {
-              console.log(`[start-agent] Set plan.status=running for ${issueId}`);
-            }
-            if (result.committed) {
-              console.log(`[start-agent] Committed running transition for ${issueId}`);
-            }
-          },
-          onFailure: (err) => {
-            console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err?.message ?? err}`);
-          },
-        }),
-      ));
+      ).then(
+        (result) => {
+          if (result.moved) {
+            console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
+          }
+          if (result.statusUpdated) {
+            console.log(`[start-agent] Set plan.status=running for ${issueId}`);
+          }
+          if (result.committed) {
+            console.log(`[start-agent] Committed running transition for ${issueId}`);
+          }
+        },
+        (err: unknown) => {
+          console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+        },
+      );
 
       if (planPath.startsWith(workspacePath + sep)) {
         try {
@@ -624,7 +637,7 @@ export const postAgentsRoute = HttpRouter.add(
       role,
     }));
 
-    const agentLifecycle = yield* getWorkAgentLifecycleState(agentSessionName);
+    const agentLifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(agentSessionName));
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_lifecycle_evaluated', {
       issueId,
       lifecycle: agentLifecycle,
@@ -704,7 +717,7 @@ export const postAgentsRoute = HttpRouter.add(
     let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
-        canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
+        canUseHarness(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
       );
       // PAN-1837 review fix (NFR-2): an explicitly requested harness that
       // policy denies must fail loudly, not silently substitute claude-code —
@@ -845,7 +858,7 @@ export const postAgentsRoute = HttpRouter.add(
           workspacePath,
           activityId: error?.activityId,
         });
-        emitActivityEntrySync({
+        emitActivityEntry({
           source: 'dashboard',
           level: 'error',
           issueId: issueId.toUpperCase(),

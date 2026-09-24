@@ -26,7 +26,7 @@ import { Effect } from 'effect';
 import { recordDockerContainerLifecycleSnapshot } from '../docker-stats.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
-import { ensureDevcontainerSync } from './ensure-devcontainer.js';
+import { ensureDevcontainer } from './ensure-devcontainer.js';
 import {
   collectDockerContainerLifecycleSnapshot,
   composeProjectNameForWorkspace,
@@ -102,7 +102,7 @@ export interface RebuildWorkspaceStackOptions {
  * poison token-based health matching and can hold port bindings. Never touches
  * a running container: a live foreign stack is left for a human.
  */
-export const removeStaleIssueContainers = (
+const removeStaleIssueContainers = (
   issueId: string,
   composeProjectName: string,
 ): Effect.Effect<number> =>
@@ -216,7 +216,7 @@ export const rebuildWorkspaceStack = (
     if (existsSync(devcontainerDir)) {
       rmSync(devcontainerDir, { recursive: true, force: true });
     }
-    const ensured = ensureDevcontainerSync({ workspacePath, issueId: normalizedIssueId });
+    const ensured = ensureDevcontainer({ workspacePath, issueId: normalizedIssueId });
     if (!ensured.step.success) {
       return {
         success: false,

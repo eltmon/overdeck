@@ -6,8 +6,8 @@ const mockGetIssue = vi.fn();
 const mockCreateTracker = vi.fn(() => ({ getIssue: mockGetIssue }));
 
 vi.mock('../../../../lib/tracker-utils.js', () => ({
-  resolveTrackerTypeSync: (id: string) => mockResolveTrackerTypeSync(id),
-  resolveGitHubIssueSync: (id: string) => mockResolveGitHubIssueSync(id),
+  resolveTrackerType: (id: string) => mockResolveTrackerTypeSync(id),
+  resolveGitHubIssue: (id: string) => mockResolveGitHubIssueSync(id),
 }));
 vi.mock('../../../../lib/tracker/factory.js', () => ({
   createTracker: (config: unknown) => mockCreateTracker(config),

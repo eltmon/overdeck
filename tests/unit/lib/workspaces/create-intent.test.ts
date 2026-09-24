@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
-import { registerProjectSync, unregisterProjectSync } from '../../../../src/lib/projects.js';
+import { registerProject, unregisterProject } from '../../../../src/lib/projects.js';
 import { getProjectByKey, listWorkspaces } from '../../../../src/lib/workspaces/resolver.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 import {
@@ -64,12 +64,12 @@ beforeEach(() => {
   odb = setupOverdeckTestDb();
   projectRoot = mkdtempSync(join(tmpdir(), 'pan-3330-create-intent-'));
   initRepo(projectRoot);
-  registerProjectSync(PROJECT_KEY, { name: 'Create intent test project', path: projectRoot });
+  registerProject(PROJECT_KEY, { name: 'Create intent test project', path: projectRoot });
   targetDir = mkdtempSync(join(tmpdir(), 'pan-3330-target-dir-'));
 });
 
 afterEach(() => {
-  unregisterProjectSync(PROJECT_KEY);
+  unregisterProject(PROJECT_KEY);
   teardownOverdeckTestDb(odb);
   rmSync(projectRoot, { recursive: true, force: true });
   rmSync(targetDir, { recursive: true, force: true });
@@ -237,13 +237,13 @@ describe('resolveWorkspaceCreateIntent — no ambient working directory (AC-4)',
 
   beforeEach(async () => {
     secondRoot = mkdtempSync(join(tmpdir(), 'pan-3330-second-project-'));
-    registerProjectSync(SECOND_PROJECT_KEY, { name: 'Second project', path: secondRoot });
+    registerProject(SECOND_PROJECT_KEY, { name: 'Second project', path: secondRoot });
     upsertProjectFromConfig(PROJECT_KEY, { name: 'Create intent test project', path: projectRoot });
     await createWorkspace({ projectId: PROJECT_KEY, kind: 'main', name: 'main', path: projectRoot });
   });
 
   afterEach(() => {
-    unregisterProjectSync(SECOND_PROJECT_KEY);
+    unregisterProject(SECOND_PROJECT_KEY);
     rmSync(secondRoot, { recursive: true, force: true });
   });
 

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { projectRootRef } = vi.hoisted(() => ({ projectRootRef: { current: '' } }));
 vi.mock('../../../src/lib/projects.js', () => ({
-  findProjectByPathSync: () => ({ name: 'Project', path: projectRootRef.current }),
+  findProjectByPath: () => ({ name: 'Project', path: projectRootRef.current }),
 }));
 
 import {

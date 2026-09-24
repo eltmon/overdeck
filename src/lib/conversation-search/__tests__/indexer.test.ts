@@ -7,7 +7,7 @@ import { estimateFullReindexConversationSearchCost, fullReindexConversationSearc
 import type { ChunkInsert, EmbeddingsDbHandle } from '../../database/conversation-embeddings-db.js';
 import type { ConversationEmbeddingProvider } from '../embedding-provider.js';
 import type { NormalizedConversationSearchConfig } from '../../config-yaml.js';
-import { encodeClaudeProjectDir } from '../../paths.js';
+import { encodeClaudeProjectDir } from '../../runtimes/storage/claude-code.js';
 
 let tmpDir: string | undefined;
 

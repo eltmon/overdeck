@@ -10,11 +10,9 @@
  * not here.
  */
 
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
-import { FsError } from './errors.js';
 
 export interface SummaryEntry {
   title: string;
@@ -34,7 +32,7 @@ function getSummaryFile(agentId: string): string {
 /**
  * Append a work summary to SUMMARY.md
  */
-export function appendSummarySync(agentId: string, summary: SummaryEntry): void {
+export function appendSummary(agentId: string, summary: SummaryEntry): void {
   const dir = join(AGENTS_DIR, agentId);
   mkdirSync(dir, { recursive: true });
 
@@ -98,7 +96,7 @@ function getHistoryDir(agentId: string): string {
 /**
  * Log an action to queryable history
  */
-export function logHistorySync(
+export function logHistory(
   agentId: string,
   action: string,
   details?: Record<string, any>
@@ -120,7 +118,7 @@ export function logHistorySync(
 /**
  * Search history files for a pattern
  */
-export function searchHistorySync(agentId: string, pattern: string): string[] {
+export function searchHistory(agentId: string, pattern: string): string[] {
   const historyDir = getHistoryDir(agentId);
   if (!existsSync(historyDir)) return [];
 
@@ -147,7 +145,7 @@ export function searchHistorySync(agentId: string, pattern: string): string[] {
 /**
  * Get recent history entries
  */
-export function getRecentHistorySync(agentId: string, limit: number = 20): string[] {
+export function getRecentHistory(agentId: string, limit: number = 20): string[] {
   const historyDir = getHistoryDir(agentId);
   if (!existsSync(historyDir)) return [];
 
@@ -182,38 +180,8 @@ export interface ContextBudget {
 /**
  * Estimate token count (rough approximation: ~4 chars per token)
  */
-export function estimateTokensSync(text: string): number {
+export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
-}
-
-/**
- * Check if context budget allows adding more content
- */
-export function checkContextBudgetSync(
-  budget: ContextBudget,
-  newContent: string
-): { allowed: boolean; warning: boolean; remaining: number } {
-  const newTokens = estimateTokensSync(newContent);
-  const totalUsed = budget.usedTokens + newTokens;
-  const remaining = budget.maxTokens - totalUsed;
-  const usageRatio = totalUsed / budget.maxTokens;
-
-  return {
-    allowed: totalUsed <= budget.maxTokens,
-    warning: usageRatio >= budget.warningThreshold,
-    remaining,
-  };
-}
-
-/**
- * Create a context budget for a session
- */
-export function createContextBudgetSync(maxTokens: number = 100000): ContextBudget {
-  return {
-    maxTokens,
-    usedTokens: 0,
-    warningThreshold: 0.8,
-  };
 }
 
 // ============== Context Materialization ==============
@@ -225,7 +193,7 @@ function getMaterializedDir(agentId: string): string {
 /**
  * Materialize tool output for later retrieval
  */
-export function materializeOutputSync(
+export function materializeOutput(
   agentId: string,
   toolName: string,
   output: string,
@@ -261,7 +229,7 @@ export function materializeOutputSync(
   writeFileSync(filepath, lines.join('\n'));
 
   // Log to history
-  logHistorySync(agentId, `materialized:${toolName}`, { file: filename });
+  logHistory(agentId, `materialized:${toolName}`, { file: filename });
 
   return filepath;
 }
@@ -269,7 +237,7 @@ export function materializeOutputSync(
 /**
  * List materialized outputs for an agent
  */
-export function listMaterializedSync(agentId: string): Array<{
+export function listMaterialized(agentId: string): Array<{
   tool: string;
   timestamp: number;
   file: string;
@@ -294,80 +262,7 @@ export function listMaterializedSync(agentId: string): Array<{
 /**
  * Read materialized output
  */
-export function readMaterializedSync(filepath: string): string | null {
+export function readMaterialized(filepath: string): string | null {
   if (!existsSync(filepath)) return null;
   return readFileSync(filepath, 'utf-8');
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Context-engineering helpers — sync FS by design (CLI / agent-local), wrapped
-// for callers in Effect graphs. FsError surfaces only on write paths.
-
-/** Append a work-summary entry for an agent. */
-export const appendSummary = (
-  agentId: string,
-  summary: SummaryEntry,
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => appendSummarySync(agentId, summary),
-    catch: (cause) =>
-      new FsError({ path: agentId, operation: 'append-summary', cause }),
-  });
-
-/** Append a history entry for an agent. */
-export const logHistory = (
-  ...args: Parameters<typeof logHistorySync>
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => logHistorySync(...args),
-    catch: (cause) =>
-      new FsError({ path: args[0], operation: 'log-history', cause }),
-  });
-
-/** Search agent history for a regex pattern. Pure-ish (logs on error). */
-export const searchHistory = (
-  agentId: string,
-  pattern: string,
-): Effect.Effect<string[]> => Effect.sync(() => searchHistorySync(agentId, pattern));
-
-/** Return the most recent history entries for an agent. Pure-ish. */
-export const getRecentHistory = (
-  agentId: string,
-  limit: number = 20,
-): Effect.Effect<string[]> => Effect.sync(() => getRecentHistorySync(agentId, limit));
-
-/** Estimate token count from text. Pure. */
-export const estimateTokens = (text: string): Effect.Effect<number> =>
-  Effect.sync(() => estimateTokensSync(text));
-
-/** Check a context budget against a token estimate. Pure. */
-export const checkContextBudget = (
-  ...args: Parameters<typeof checkContextBudgetSync>
-): Effect.Effect<ReturnType<typeof checkContextBudgetSync>> =>
-  Effect.sync(() => checkContextBudgetSync(...args));
-
-/** Construct a new context budget. Pure. */
-export const createContextBudget = (
-  maxTokens: number = 100000,
-): Effect.Effect<ContextBudget> => Effect.sync(() => createContextBudgetSync(maxTokens));
-
-/** Materialize agent output to a file (returns filepath). */
-export const materializeOutput = (
-  ...args: Parameters<typeof materializeOutputSync>
-): Effect.Effect<ReturnType<typeof materializeOutputSync>, FsError> =>
-  Effect.try({
-    try: () => materializeOutputSync(...args),
-    catch: (cause) =>
-      new FsError({ path: args[0], operation: 'materialize-output', cause }),
-  });
-
-/** Enumerate materialized files for an agent. Pure-ish. */
-export const listMaterialized = (
-  agentId: string,
-): Effect.Effect<ReturnType<typeof listMaterializedSync>> =>
-  Effect.sync(() => listMaterializedSync(agentId));
-
-/** Read a materialized file's contents (null when missing). Pure-ish. */
-export const readMaterialized = (
-  filepath: string,
-): Effect.Effect<string | null> => Effect.sync(() => readMaterializedSync(filepath));

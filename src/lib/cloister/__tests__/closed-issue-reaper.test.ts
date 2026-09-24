@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
   exec: vi.fn(),
   getPrFacts: vi.fn(),
   isIssueClosed: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('../../agents.js', () => ({
 }));
 
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: mocks.emitActivityEntrySync,
+  emitActivityEntry: mocks.emitActivityEntry,
 }));
 
 vi.mock('../../paths.js', async (importOriginal) => ({
@@ -113,7 +113,7 @@ describe('reconcileClosedIssueAgents', () => {
 
     expect(mocks.stopAgent).toHaveBeenCalledTimes(1);
     expect(mocks.stopAgent).toHaveBeenCalledWith('agent-pan-1613-ship');
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       source: 'cloister',
       level: 'info',
       issueId: 'PAN-1613',
@@ -132,7 +132,7 @@ describe('reconcileClosedIssueAgents', () => {
     await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
 
     expect(mocks.stopAgent).not.toHaveBeenCalled();
-    expect(mocks.emitActivityEntrySync).not.toHaveBeenCalled();
+    expect(mocks.emitActivityEntry).not.toHaveBeenCalled();
   });
 
   it('evaluates isIssueClosed once per distinct issue per pass and is idempotent after agents are stopped', async () => {

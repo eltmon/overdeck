@@ -10,11 +10,11 @@
 import chalk from 'chalk';
 
 import { exitCli } from '../../exit.js';
-import { getDashboardApiUrlSync } from '../../../lib/config.js';
+import { getDashboardApiUrl } from '../../../lib/config.js';
 import { getConversationByName, listConversations, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
 import { getProjectSync, listProjectsSync } from '../../../lib/projects.js';
 
-const DASHBOARD_URL = getDashboardApiUrlSync();
+const DASHBOARD_URL = getDashboardApiUrl();
 
 interface ResolveResult {
   conversation: LegacyConversation | null;

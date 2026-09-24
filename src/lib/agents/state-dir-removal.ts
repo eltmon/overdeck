@@ -1,4 +1,10 @@
-import { lstat, readdir, realpath, rmdir, unlink, writeFile } from 'node:fs/promises';
+/**
+ * Agent-state cleanup doors.
+ *
+ * Close-out pruning keeps durable state and transcripts, removing only direct
+ * regenerable children. Full removal remains a separate retention-owned door.
+ */
+import { lstat, readdir, realpath, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { AGENTS_DIR } from '../paths.js';
@@ -9,6 +15,8 @@ export interface RemoveAgentStateDirResult {
   /** true when the dir was fully removed (no transcripts existed) */
   removedDir: boolean;
 }
+
+export interface PruneAgentStateDirResult { kept: string[]; removed: string[]; bytesFreed: number }
 
 export const RETAINED_TRANSCRIPTS_MARKER = '.retained-transcripts';
 
@@ -28,6 +36,94 @@ function assertContained(root: string, candidate: string): void {
   if (!isContained(root, candidate)) {
     throw new Error(`removeAgentStateDir: path escapes AGENTS_DIR: ${candidate}`);
   }
+}
+
+async function listKeptFiles(dirPath: string, root: string): Promise<string[]> {
+  const entries = await readdir(dirPath, { withFileTypes: true });
+  const kept: string[] = [];
+  for (const entry of entries) {
+    const entryPath = join(dirPath, entry.name);
+    if (entry.isDirectory() && !entry.isSymbolicLink()) {
+      kept.push(...await listKeptFiles(entryPath, root));
+    } else {
+      kept.push(relative(root, entryPath));
+    }
+  }
+  return kept;
+}
+
+async function validateDirectDeletion(parent: string, path: string): Promise<number> {
+  if (relative(parent, path).includes(sep)) {
+    throw new Error(`pruneAgentStateDir: expected direct child: ${path}`);
+  }
+  const pathStat = await lstat(path);
+  if (pathStat.isSymbolicLink()) {
+    throw new Error(`pruneAgentStateDir: refusing symbolic-link child: ${path}`);
+  }
+  const canonicalPath = await realpath(path);
+  assertContained(parent, canonicalPath);
+  if (relative(parent, canonicalPath).includes(sep)) {
+    throw new Error(`pruneAgentStateDir: canonical path is not a direct child: ${canonicalPath}`);
+  }
+  return pathStat.size;
+}
+
+export async function pruneAgentStateDir(
+  dirPath: string,
+  agentsRootPath: string = AGENTS_DIR,
+): Promise<PruneAgentStateDirResult> {
+  const agentsRoot = resolve(agentsRootPath);
+  const candidate = resolve(dirPath);
+  assertContained(agentsRoot, candidate);
+  if (relative(agentsRoot, candidate).includes(sep)) {
+    throw new Error(`pruneAgentStateDir: expected direct child of AGENTS_DIR: ${candidate}`);
+  }
+
+  let candidateStat;
+  try {
+    candidateStat = await lstat(candidate);
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return { kept: [], removed: [], bytesFreed: 0 };
+    throw error;
+  }
+  if (candidateStat.isSymbolicLink()) {
+    throw new Error(`pruneAgentStateDir: refusing symbolic-link root: ${candidate}`);
+  }
+  if (!candidateStat.isDirectory()) {
+    throw new Error(`pruneAgentStateDir: expected directory: ${candidate}`);
+  }
+
+  const [canonicalRoot, canonicalCandidate] = await Promise.all([realpath(agentsRoot), realpath(candidate)]);
+  assertContained(canonicalRoot, canonicalCandidate);
+  if (relative(canonicalRoot, canonicalCandidate).includes(sep)) {
+    throw new Error(`pruneAgentStateDir: canonical path is not a direct child of AGENTS_DIR: ${canonicalCandidate}`);
+  }
+
+  const removed: string[] = [];
+  let bytesFreed = 0;
+  const entries = await readdir(candidate, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = join(canonicalCandidate, entry.name);
+    if (entry.name === 'pending.lock' || entry.name.endsWith('.sock')) {
+      bytesFreed += await validateDirectDeletion(canonicalCandidate, entryPath);
+      await rm(entryPath, { recursive: true, force: true });
+      removed.push(entry.name);
+      continue;
+    }
+    if (!entry.isDirectory() || !entry.name.startsWith('codex-home')) continue;
+
+    await validateDirectDeletion(canonicalCandidate, entryPath);
+    const canonicalCodexHome = await realpath(entryPath);
+    for (const child of await readdir(entryPath, { withFileTypes: true })) {
+      if (child.name === 'sessions') continue;
+      const childPath = join(entryPath, child.name);
+      bytesFreed += await validateDirectDeletion(canonicalCodexHome, childPath);
+      await rm(childPath, { recursive: true, force: true });
+      removed.push(relative(canonicalCandidate, childPath));
+    }
+  }
+
+  return { kept: (await listKeptFiles(candidate, candidate)).sort(), removed: removed.sort(), bytesFreed };
 }
 
 async function cleanDirectory(

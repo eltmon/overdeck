@@ -1,28 +1,28 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
-import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
+import { writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { isTldrEnabledSync, loadConfigSync } from '../config-yaml.js';
+import { isTldrEnabled, loadConfigSync } from '../config-yaml.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn, setConversationClaudeSessionId } from '../overdeck/conversations.js';
-import { startWorkSync } from '../cv.js';
-import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { startWork } from '../cv.js';
+import { generateFixedPointPrompt, checkHook, initHook } from '../hooks.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { writeBridgeTokenSync } from '../bridge-token.js';
+import { writeBridgeToken } from '../bridge-token.js';
 import { exactPaneTarget, sessionExists, setOption } from '../tmux.js';
 import { agentPaneExists, closeBackendPane, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import { toPaneRole } from '../terminal-backends/tmux.js';
@@ -75,7 +75,7 @@ import {
 } from './spawn-prep.js';
 import { getConcurrencyLimits } from '../cloister/concurrency.js';
 import { listAgentStates } from './queries.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPath } from '../projects.js';
 import {
   decideChannelsForWorkAgent,
   dismissDevChannelsDialog,
@@ -84,7 +84,11 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-import { clearSessionResetMarker, createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
+import {
+  appendSessionIdToHistory,
+  createFreshSessionIdentity,
+  logLauncherSessionPinned,
+} from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 import {
   withAutoSpawnConsentClaim,
@@ -191,7 +195,7 @@ async function spawnRunWithoutConsentClaim(
     await Effect.runPromise(killSession(agentId)).catch(() => {});
   }
   await prepareWorkspaceForAgentSpawn(issueId, role, options.allowHost, workspace);
-  initHookSync(agentId);
+  initHook(agentId);
 
   const resolvedHarness: RuntimeName = await resolveHarness({
     explicit: options.harness,
@@ -205,11 +209,11 @@ async function spawnRunWithoutConsentClaim(
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   if (
-    getProviderForModelSync(selectedModel).name === 'openai'
+    getProviderForModel(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
     const { isCliproxyRunning } = await import('../cliproxy.js');
-    if (!(await Effect.runPromise(isCliproxyRunning()))) {
+    if (!(await isCliproxyRunning())) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription role runs route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '
@@ -239,6 +243,7 @@ async function spawnRunWithoutConsentClaim(
     reviewSynthesisAgentId: options.reviewSynthesisAgentId,
     reviewOutputPath: options.reviewOutputPath,
     reviewDeadlineAt: options.reviewDeadlineAt,
+    parentId: options.parentId,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -251,7 +256,9 @@ async function spawnRunWithoutConsentClaim(
   // ship), not on stdin to a headless `claude --print`.
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
-  const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
+  // PAN-3920: codex reads no prompt file, so a worker's brief is delivered after launch, as its parent.
+  const shouldDeliverPromptViaCodexTui = (shouldRegisterConversation || role === 'worker') && resolvedHarness === 'codex';
+  const kickoffOpts = options.parentId ? { sender: { id: options.parentId } } : {};
   const shouldDeliverPromptViaKimiCode = resolvedHarness === 'muse' || resolvedHarness === 'kimi-code';
   const shouldDeliverPromptViaAcp = resolvedHarness === 'acp' || resolvedHarness === 'opencode';
   const prompt = options.prompt
@@ -277,11 +284,11 @@ async function spawnRunWithoutConsentClaim(
   }
 
   if (!isAcp) {
-    const provider = getProviderForModelSync(selectedModel as ModelId);
+    const provider = getProviderForModel(selectedModel as ModelId);
     if (provider.authType === 'credential-file') {
-      setupCredentialFileAuthSync(provider, workspace);
+      setupCredentialFileAuth(provider, workspace);
     } else {
-      clearCredentialFileAuthSync(workspace);
+      clearCredentialFileAuth(workspace);
     }
   }
 
@@ -289,7 +296,7 @@ async function spawnRunWithoutConsentClaim(
   const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel, resolvedHarness);
   // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
   // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
-  // redirect) through generateLauncherScript so the role launcher emits the
+  // redirect) through generateLauncherScriptSync so the role launcher emits the
   // correct `omp --mode rpc` command instead of a malformed Claude command.
   // Without this, a config'd `roles.review.harness: ohmypi` produced a launcher
   // that silently fell back to Claude shape.
@@ -342,15 +349,10 @@ async function spawnRunWithoutConsentClaim(
       : (options.resumeSessionId ?? randomUUID());
 
     if (!isAcp && resolvedHarness !== 'kimi-code' && rawSessionId) {
-      // Persist the session ID to <agentDir>/session.id so resolveClaudeSessionId can locate the
-      // JSONL after the specialist exits. Works for both fresh (--session-id) and resumed (--resume).
-      try {
-        const agentDir = getAgentDir(agentId);
-        await mkdir(agentDir, { recursive: true });
-        await writeFile(join(agentDir, 'session.id'), rawSessionId, 'utf-8');
-      } catch (err) {
-        console.warn(`[spawnRun] Failed to persist session.id for ${agentId}:`, err instanceof Error ? err.message : String(err));
-      }
+      appendSessionIdToHistory(agentId, rawSessionId, 'launcher', {
+        harness: resolvedHarness,
+        model: selectedModel,
+      });
     }
 
     try {
@@ -387,7 +389,7 @@ async function spawnRunWithoutConsentClaim(
     extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
   }
 
-  const launcherContent = generateLauncherScriptSync({
+  const launcherContent = generateLauncherScript({
     role,
     workingDir: workspace,
     changeDir: false,
@@ -397,6 +399,7 @@ async function spawnRunWithoutConsentClaim(
     promptFileMode: undefined,
     overdeckEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     extraEnvExports,
+    gitGuardMode: options.gitGuardMode,
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
@@ -414,11 +417,6 @@ async function spawnRunWithoutConsentClaim(
   await writeLauncherScriptAtomic(launcherScript, launcherContent);
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=role-run | role=${role} | model=${state.model} | source=agents.ts:spawnRun | session=${agentId} | command="${claudeCmd}"`);
-
-  try {
-    const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-    preTrustDirectory(workspace);
-  } catch { /* non-fatal */ }
 
   // PAN-1594: clear any stale ready.json before launch so waitForReadySignal()
   // only observes the session-start signal from THIS launch.
@@ -451,6 +449,7 @@ async function spawnRunWithoutConsentClaim(
       role: toPaneRole(role),
       harness: resolvedHarness,
       model: selectedModel,
+      ...(options.parentId ? { parent: options.parentId } : {}),
     },
   }).then((pane) => { launchedPane = pane; });
   if (resolvedHarness === 'kimi-code') {
@@ -490,7 +489,7 @@ async function spawnRunWithoutConsentClaim(
     if (shouldDeliverPromptViaAcp) {
       try {
         await waitForPromptReady(agentId, resolvedHarness, 30);
-        const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+        const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt', undefined, kickoffOpts);
         if (!delivery.ok) {
           throw new Error(delivery.failure ?? `ACP delivery returned ok=false via ${delivery.path}`);
         }
@@ -552,7 +551,7 @@ async function spawnRunWithoutConsentClaim(
         if (ready) {
           await new Promise<void>((resolve) => setTimeout(resolve, 500));
           try {
-            const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+            const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt', undefined, kickoffOpts);
             if (resolvedHarness === 'kimi-code' && !delivery.ok) {
               throw new Error(delivery.failure ?? `delivery returned ok=false via ${delivery.path}`);
             }
@@ -578,8 +577,8 @@ async function spawnRunWithoutConsentClaim(
   // A non-fatal probe failure leaves the marker absent and preserves the
   // status-only fallback.
   try {
-    const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-    const headAnchor = await snapshotWorkspaceHeadsPromise(issueId, workspace);
+    const { snapshotWorkspaceHeads } = await import('../git-utils.js');
+    const headAnchor = await snapshotWorkspaceHeads(issueId, workspace);
     if (headAnchor) state.roleRunHead = headAnchor;
   } catch { /* non-fatal — marker stays absent */ }
 
@@ -590,7 +589,7 @@ async function spawnRunWithoutConsentClaim(
   // "role started" for review so the orchestrator + 4 convoy sub-reviewers
   // don't each spam the session feed and bury conversations.
   if (role !== 'review') {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: role,
       level: 'info',
       message: `${role} role started for ${issueId}`,
@@ -635,7 +634,7 @@ async function spawnAgentWithoutConsentClaim(
   await prepareWorkspaceForAgentSpawn(options.issueId, role, options.allowHost, options.workspace);
 
   // Initialize hook for this agent (FPP support)
-  initHookSync(agentId);
+  initHook(agentId);
 
   if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined && !readWorkspacePlanSync(options.workspace)) {
     throw new Error(`The required xBRIEF checklist for ${options.issueId} is missing or unreadable. Run planning before spawning a work agent.`);
@@ -657,11 +656,11 @@ async function spawnAgentWithoutConsentClaim(
   // route handlers where blocking on curl/tar would freeze the event loop
   // (see PAN-70 / PAN-446 — no blocking I/O in server code).
   if (
-    getProviderForModelSync(selectedModel).name === 'openai'
+    getProviderForModel(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
     const { isCliproxyRunning } = await import('../cliproxy.js');
-    if (!(await Effect.runPromise(isCliproxyRunning()))) {
+    if (!(await isCliproxyRunning())) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription agents route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '
@@ -694,7 +693,7 @@ async function spawnAgentWithoutConsentClaim(
     startedAt: new Date().toISOString(),
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
-    sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
+    sessionId: createFreshSessionIdentity(agentId, resolvedHarness, selectedModel),
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
     startedBy,
   };
@@ -708,7 +707,6 @@ async function spawnAgentWithoutConsentClaim(
   );
 
   saveAgentStateSync(state);
-  clearSessionResetMarker(agentId);
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
   // while workspace setup continues. Best-effort, don't block agent spawn.
   // Only for work agents, not planning/specialist agents.
@@ -733,9 +731,9 @@ async function spawnAgentWithoutConsentClaim(
   let prompt = options.prompt || '';
 
   // FPP: Check for pending work on hook
-  const { hasWork } = checkHookSync(agentId);
+  const { hasWork } = checkHook(agentId);
   if (hasWork) {
-    const fixedPointPrompt = generateFixedPointPromptSync(agentId);
+    const fixedPointPrompt = generateFixedPointPrompt(agentId);
     if (fixedPointPrompt) {
       prompt = fixedPointPrompt + '\n\n---\n\n' + prompt;
     }
@@ -769,9 +767,9 @@ async function spawnAgentWithoutConsentClaim(
   // file reads.
   try {
     const venvPath = join(options.workspace, '.venv');
-    if (isTldrEnabledSync() && existsSync(venvPath)) {
-      const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
-      const tldrService = getTldrDaemonServiceSync(options.workspace, venvPath);
+    if (isTldrEnabled() && existsSync(venvPath)) {
+      const { getTldrDaemonService } = await import('../tldr-daemon.js');
+      const tldrService = getTldrDaemonService(options.workspace, venvPath);
       const status = await tldrService.getStatus();
       if (!status.running) {
         await tldrService.start(true);
@@ -795,7 +793,7 @@ async function spawnAgentWithoutConsentClaim(
   let channelsBridgeMcpConfig: string | undefined;
   if (channelsDecision.eligible) {
     channelsBridgeMcpConfig = join(options.workspace, '.pan', 'agent-mcp.json');
-    writeBridgeTokenSync(agentId);
+    writeBridgeToken(agentId);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, agentId);
     state.channelsEnabled = true;
     saveAgentStateSync(state);
@@ -823,19 +821,13 @@ async function spawnAgentWithoutConsentClaim(
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
-  // Pre-trust workspace directory in Claude Code to avoid the trust prompt
-  try {
-    const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-    preTrustDirectory(options.workspace);
-  } catch { /* non-fatal */ }
-
   // Configure workspace for GitHub App bot identity (PAN-536)
   // Agents push as panopticon-agent[bot] with short-lived installation tokens
   try {
     const { isGitHubAppConfigured, generateInstallationToken, configureWorkspaceForBot } = await import('../github-app.js');
     if (isGitHubAppConfigured()) {
-      const { findProjectByPathSync } = await import('../projects.js');
-      const project = findProjectByPathSync(resolve(options.workspace, '..', '..'));
+      const { findProjectByPath } = await import('../projects.js');
+      const project = findProjectByPath(resolve(options.workspace, '..', '..'));
       const ghRepo = project?.github_repo;
       if (ghRepo) {
         const [owner, repo] = ghRepo.split('/');
@@ -929,11 +921,14 @@ async function spawnAgentWithoutConsentClaim(
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[${agentId}] ACP prompt delivery failed:`, message);
       if (tracksKickoffDelivery) {
+        // Already writes the reason markSpawnFailed below would clobber (PAN-2771).
         await recordKickoffDeliveryFailure(state, options.issueId, role);
       }
       await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
-      await markSpawnFailed(agentId, `kickoff delivery failed: ${message}`);
+      if (!tracksKickoffDelivery) {
+        await markSpawnFailed(agentId, `kickoff delivery failed: ${message}`);
+      }
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
     }
   } else if (prompt && resolvedHarness === 'ohmypi') {
@@ -946,10 +941,10 @@ async function spawnAgentWithoutConsentClaim(
     } catch (err) {
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       if (tracksKickoffDelivery) {
+        // No markSpawnFailed here — it would clobber the reason just recorded (PAN-2771).
         await recordKickoffDeliveryFailure(state, options.issueId, role);
         await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
-        await markSpawnFailed(agentId, `kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
         throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
@@ -968,11 +963,14 @@ async function spawnAgentWithoutConsentClaim(
           if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
             await recordStartupSessionExit(state, options.issueId, role);
           }
+          // Already writes a reason markSpawnFailed below would clobber (PAN-2771).
           await recordKickoffDeliveryFailure(state, options.issueId, role);
         }
         await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId)).catch(() => {});
-        await markSpawnFailed(agentId, `kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
+        if (!tracksKickoffDelivery) {
+          await markSpawnFailed(agentId, `kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
+        }
       },
     });
     if (delivery.ok) {
@@ -984,10 +982,10 @@ async function spawnAgentWithoutConsentClaim(
       if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
         await recordStartupSessionExit(state, options.issueId, role);
       }
+      // No markSpawnFailed here — it would clobber the reason just recorded (PAN-2771).
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
-      await markSpawnFailed(agentId, `kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
     }
   }
@@ -1005,12 +1003,12 @@ async function spawnAgentWithoutConsentClaim(
     const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
     void (async () => {
       try {
-        const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
-          await import('../runtimes/codex.js');
+        const { waitForCodexRollout, recordCodexRolloutSession } = await import('../runtimes/codex.js');
+        const { extractThreadIdFromRollout } = await import('../runtimes/storage/codex.js');
         const rollout = await waitForCodexRollout(codexHomeForAgent, 120_000);
         if (rollout) {
           const threadId = extractThreadIdFromRollout(rollout);
-          if (threadId) writeThreadId(agentId, threadId);
+          if (threadId) recordCodexRolloutSession(agentId, threadId, rollout);
         }
       } catch { /* non-fatal — the latest-rollout fallback still resolves the transcript */ }
     })();
@@ -1021,16 +1019,16 @@ async function spawnAgentWithoutConsentClaim(
   saveAgentStateSync(state);
 
   // Track work in CV
-  startWorkSync(agentId, options.issueId);
+  startWork(agentId, options.issueId);
 
   // Emit activity + TTS so the user knows an agent has started
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: role,
     level: 'info',
     message: `Work agent started for ${options.issueId}`,
     issueId: options.issueId,
   });
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: `Work agent started for ${options.issueId}`,
     priority: 2,
     issueId: options.issueId,

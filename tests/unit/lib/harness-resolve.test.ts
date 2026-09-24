@@ -3,7 +3,7 @@ import type { RuntimeName } from '../../../src/lib/runtimes/types.js';
 
 const mocks = vi.hoisted(() => ({
   loadConfigSync: vi.fn(),
-  canUseHarnessSync: vi.fn(),
+  canUseHarness: vi.fn(),
   getProviderAuthMode: vi.fn(),
   configuredHarnessBinaryPath: vi.fn(),
   resolveHarnessBinary: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('../../../src/lib/harness-policy.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/harness-policy.js')>();
   return {
     ...actual,
-    canUseHarnessSync: mocks.canUseHarnessSync,
+    canUseHarness: mocks.canUseHarness,
   };
 });
 
@@ -59,7 +59,7 @@ describe('resolveHarness', () => {
     setBinaryAvailable(true);
     mocks.configuredHarnessBinaryPath.mockReturnValue(undefined);
     mocks.getProviderAuthMode.mockResolvedValue(undefined);
-    mocks.canUseHarnessSync.mockReturnValue({ allowed: true });
+    mocks.canUseHarness.mockReturnValue({ allowed: true });
     infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -100,24 +100,24 @@ describe('resolveHarness', () => {
     const { resolveHarness } = await loadSubject();
 
     await expect(resolveHarness({ model: 'glm5.2' })).rejects.toThrow('Unknown model "glm5.2". Did you mean "glm-5.2"?');
-    expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
+    expect(mocks.canUseHarness).not.toHaveBeenCalled();
     expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
   it('passes an explicit harness winner through the harness policy gate', async () => {
     mocks.getProviderAuthMode.mockResolvedValue('subscription');
-    mocks.canUseHarnessSync.mockReturnValue({ allowed: false, reason: 'blocked' });
+    mocks.canUseHarness.mockReturnValue({ allowed: false, reason: 'blocked' });
     const { resolveHarness } = await loadSubject();
 
     await expect(resolveHarness({ explicit: 'ohmypi', model: 'claude-sonnet-4-6' })).rejects.toThrow('blocked');
 
-    expect(mocks.canUseHarnessSync).toHaveBeenCalledWith('ohmypi', 'claude-sonnet-4-6', 'subscription');
+    expect(mocks.canUseHarness).toHaveBeenCalledWith('ohmypi', 'claude-sonnet-4-6', 'subscription');
     expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
   it('falls back to claude-code when a native model’s provider-default harness is policy-denied (only after checking the fallback)', async () => {
     mocks.getProviderAuthMode.mockResolvedValue('subscription');
-    mocks.canUseHarnessSync
+    mocks.canUseHarness
       .mockReturnValueOnce({ allowed: false, reason: 'pi denied' })
       .mockReturnValueOnce({ allowed: true });
     // anthropic's per-provider default is set to pi; pi is denied → since claude-code is
@@ -127,8 +127,8 @@ describe('resolveHarness', () => {
 
     await expect(resolveHarness({ model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
 
-    expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(1, 'ohmypi', 'claude-sonnet-4-6', 'subscription');
-    expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(2, 'claude-code', 'claude-sonnet-4-6', 'subscription');
+    expect(mocks.canUseHarness).toHaveBeenNthCalledWith(1, 'ohmypi', 'claude-sonnet-4-6', 'subscription');
+    expect(mocks.canUseHarness).toHaveBeenNthCalledWith(2, 'claude-code', 'claude-sonnet-4-6', 'subscription');
     expect(warnSpy).toHaveBeenCalledWith('harness ohmypi denied for anthropic: pi denied — falling back to native claude-code');
   });
 
@@ -138,7 +138,7 @@ describe('resolveHarness', () => {
 
     await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('needs a ChatGPT/Codex subscription sign-in');
 
-    expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
+    expect(mocks.canUseHarness).not.toHaveBeenCalled();
     expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 

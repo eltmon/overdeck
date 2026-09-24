@@ -7,7 +7,7 @@
  */
 import { formatAnchorShort } from '../git-utils.js';
 import { runTestSkipGate, type TestSkipViolation } from './test-skip-gate.js';
-import { resolveActiveTestSkipWaiverSync } from './test-skip-waiver.js';
+import { resolveActiveTestSkipWaiver } from './test-skip-waiver.js';
 
 /** The subset of a resolved workspace repo root the gate needs. */
 export interface TestSkipRepoRoot {
@@ -37,7 +37,7 @@ export async function evaluateTestSkipGate(
   roots: readonly TestSkipRepoRoot[],
   head: string | undefined,
 ): Promise<TestSkipGateEvaluation> {
-  const waiver = resolveActiveTestSkipWaiverSync(issueId, head);
+  const waiver = resolveActiveTestSkipWaiver(issueId, head);
   const violations: TestSkipViolation[] = [];
   const errors: string[] = [];
   for (const root of roots) {

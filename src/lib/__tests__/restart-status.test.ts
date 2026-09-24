@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,11 +23,11 @@ describe('restart status', () => {
   });
 
   it('returns null when the status file is missing', async () => {
-    expect(await Effect.runPromise(readRestartStatus())).toBeNull();
+    expect(await readRestartStatus()).toBeNull();
   });
 
   it('writes and reads the latest restart status', async () => {
-    await Effect.runPromise(writeRestartStatus({
+    await writeRestartStatus({
       ts: '2026-05-17T15:00:00.000Z',
       trigger: 'watchdog',
       success: false,
@@ -37,9 +36,9 @@ describe('restart status', () => {
       durationMs: 1234,
       attempts: 3,
       gaveUp: true,
-    }));
+    });
 
-    expect(await Effect.runPromise(readRestartStatus())).toEqual({
+    expect(await readRestartStatus()).toEqual({
       ts: '2026-05-17T15:00:00.000Z',
       trigger: 'watchdog',
       success: false,
@@ -72,11 +71,11 @@ describe('restart status', () => {
       initiator: 'conv-b',
     };
 
-    await Effect.runPromise(writeRestartStatus(entryA));
-    await Effect.runPromise(writeRestartStatus(entryB));
+    await writeRestartStatus(entryA);
+    await writeRestartStatus(entryB);
 
-    expect(await Effect.runPromise(readRestartStatus())).toEqual(entryB);
-    expect(await Effect.runPromise(readRestartEvents())).toEqual([entryA, entryB]);
+    expect(await readRestartStatus()).toEqual(entryB);
+    expect(await readRestartEvents()).toEqual([entryA, entryB]);
   });
 
   it('detects concurrent restart writers within the window', () => {
@@ -99,19 +98,17 @@ describe('restart status', () => {
   it('caps the journal to the most recent 200 entries', async () => {
     const baseTime = new Date('2026-05-17T15:00:00.000Z').getTime();
     for (let i = 0; i < 205; i++) {
-      await Effect.runPromise(
-        writeRestartStatus({
+      await writeRestartStatus({
           ts: new Date(baseTime + i * 1000).toISOString(),
           trigger: 'watchdog',
           success: true,
           durationMs: i,
           attempts: 1,
           pid: i,
-        }),
-      );
+        });
     }
 
-    const events = await Effect.runPromise(readRestartEvents());
+    const events = await readRestartEvents();
     expect(events).toHaveLength(200);
     expect(events[0].pid).toBe(5);
     expect(events[199].pid).toBe(204);
@@ -120,16 +117,14 @@ describe('restart status', () => {
   it('compacts the persisted journal file, not just the read view', async () => {
     const baseTime = new Date('2026-05-17T15:00:00.000Z').getTime();
     for (let i = 0; i < 205; i++) {
-      await Effect.runPromise(
-        writeRestartStatus({
+      await writeRestartStatus({
           ts: new Date(baseTime + i * 1000).toISOString(),
           trigger: 'watchdog',
           success: true,
           durationMs: i,
           attempts: 1,
           pid: i,
-        }),
-      );
+        });
     }
 
     const journalPath = join(testHome, 'restart-events.jsonl');
@@ -152,7 +147,7 @@ describe('restart status', () => {
       pid: 1,
     };
 
-    await expect(Effect.runPromise(writeRestartStatus(entry))).resolves.toBeUndefined();
-    expect(await Effect.runPromise(readRestartStatus())).toEqual(entry);
+    await expect(writeRestartStatus(entry)).resolves.toBeUndefined();
+    expect(await readRestartStatus()).toEqual(entry);
   });
 });

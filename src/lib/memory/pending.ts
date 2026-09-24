@@ -34,6 +34,7 @@ let configuredStatusRollupEnqueuer: EnqueueStatusRollup | undefined;
 let configuredStatusRollupProcessor: StatusRollupProcessor | undefined;
 const inFlightRollups = new Set<string>();
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function setStatusRollupEnqueuer(enqueue: EnqueueStatusRollup | undefined): () => void {
   const previous = configuredStatusRollupEnqueuer;
   configuredStatusRollupEnqueuer = enqueue;
@@ -42,6 +43,7 @@ export function setStatusRollupEnqueuer(enqueue: EnqueueStatusRollup | undefined
   };
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function setStatusRollupProcessor(processor: StatusRollupProcessor | undefined): () => void {
   const previous = configuredStatusRollupProcessor;
   configuredStatusRollupProcessor = processor;

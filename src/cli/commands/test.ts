@@ -1,12 +1,11 @@
 import { exitCli } from '../exit.js';
-import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { runTests } from '../../lib/test-runner.js';
-import { findProjectByTeamSync, extractTeamPrefix, listProjectsSync } from '../../lib/projects.js';
+import { findProjectByTeam, extractTeamPrefix, listProjectsSync } from '../../lib/projects.js';
 
 export function registerTestCommands(program: Command): void {
   const test = program.command('test').description('Test running and management');
@@ -51,7 +50,7 @@ async function runCommand(target: string | undefined, options: RunOptions): Prom
       // Try to extract team prefix from target (e.g., "min-123")
       const prefix = extractTeamPrefix(target);
       if (prefix) {
-        const found = findProjectByTeamSync(prefix);
+        const found = findProjectByTeam(prefix);
         if (found) {
           projectConfig = found;
         }
@@ -101,12 +100,12 @@ async function runCommand(target: string | undefined, options: RunOptions): Prom
     spinner.stop();
 
     // Run tests
-    const result = await Effect.runPromise(runTests({
+    const result = await runTests({
       projectConfig,
       featureName,
       testNames,
       notify: options.notify !== false,
-    }));
+    });
 
     // Exit with appropriate code
     return exitCli(result.overallStatus === 'passed' ? 0 : 1);

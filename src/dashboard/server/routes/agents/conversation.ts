@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,7 +7,6 @@ import type { ConversationResponse } from '@overdeck/contracts';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 import {
   getActivity,
   getAgentState,
@@ -18,18 +17,21 @@ import { parsePiConversationMessages } from '../../services/pi-conversation-pars
 import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
+import { sharedTranscriptParser } from '../../services/shared-transcript-parser.js';
 import {
-  readLauncherPinnedSessionId,
-  resolvePiSessionPath,
-  resolveCodexRolloutPath,
-  resolveAcpTranscriptPath,
-  resolveAgentHarness,
-} from '../jsonl-resolver.js';
+  listAgentTranscriptCandidates,
+} from '../../../../lib/agents/transcript-resolver.js';
+import { isExternalAgentId, readExternalRegistration } from '../../../../lib/agents/external-registry.js';
+import { checkTranscriptPath } from '../../../../lib/agents/external-paths.js';
+import {
+  isSafeSubagentId,
+  listAgentSubagents,
+  resolveAgentSubagentTranscript,
+} from '../../services/agent-subagents.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
   execAsync,
-  getAgentJsonlPath,
   getAgentWorkspace,
 } from './shared.js';
 
@@ -67,7 +69,7 @@ export const getAgentOutputRoute = HttpRouter.add(
             const { getRemoteAgentOutput } = await import('../../../../lib/remote/remote-agents.js');
             stdout = await getRemoteAgentOutput(id, vmName, parseInt(String(lines), 10) || 100);
           } else {
-            stdout = await Effect.runPromise(capturePane(id, parseInt(String(lines), 10) || 100));
+            stdout = await capturePane(id, parseInt(String(lines), 10) || 100);
           }
 
           if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
@@ -101,47 +103,77 @@ export const getAgentOutputRoute = HttpRouter.add(
 
 // ─── Route: GET /api/agents/:id/conversation ─────────────────────────────────
 
+/**
+ * The workspace transcript resolution keys on. An external agent (PAN-3920
+ * W21) has no state.json and no Overdeck pane: its registration's cwd is the
+ * workspace, and no tmux lookup is made for it.
+ */
+async function agentWorkspaceFor(id: string): Promise<string | null> {
+  if (isExternalAgentId(id)) return (await readExternalRegistration(id))?.cwd ?? null;
+  return getAgentWorkspace(id);
+}
+
 const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
+
+type AgentConversationResult =
+  | { status: 200; body: ConversationResponse }
+  | { status: 400; body: { error: string } }
+  | { status: 404; body: { error: string; checked: string[] } }
+  | { status: 500; body: { error: string } };
+
+async function pathExists(path: string): Promise<boolean> {
+  return access(path).then(() => true, () => false);
+}
+
+function missingTranscript(id: string, checked: string[]): AgentConversationResult {
+  return { status: 404, body: { error: `No transcript found for ${id}.`, checked } };
+}
 
 /**
  * Resolve and parse an agent's conversation JSONL file.
  * Exported for unit testing — the Effect route layer is not directly unit-testable.
  *
  * Dispatches on harness so Pi and Codex agents get their native parsers (PAN-2012).
- * For claude-code agents, tries the launcher-pinned --session-id first (the exact
- * session the Terminal tab attaches to) before falling back to mtime-based pick
- * (PAN-2011). This makes the Conversation tab match the Terminal tab by construction.
+ * Claude resolution follows the append-only session index, newest first.
  */
-export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
+export async function buildAgentConversationResult(
+  id: string,
+  opts: { subagentId?: string } = {},
+): Promise<AgentConversationResult> {
+  if (opts.subagentId !== undefined && !isSafeSubagentId(opts.subagentId)) {
+    return { status: 400, body: { error: 'subagentId must match ^[A-Za-z0-9_-]+$' } };
+  }
   try {
-    const harness = await resolveAgentHarness(id);
-
-    if (harness === 'ohmypi') {
-      const sessionFile = await resolvePiSessionPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parseOhmypiConversationMessages(sessionFile);
-      return { ...result, streaming: false };
+    const workspace = await agentWorkspaceFor(id);
+    if (opts.subagentId !== undefined) {
+      // External agents have no subagents Overdeck reads (their files are another tool's).
+      if (isExternalAgentId(id)) return { status: 404, body: { error: `No subagent ${opts.subagentId} found for ${id}.`, checked: [] } };
+      return await buildAgentSubagentResult(id, workspace ?? '', opts.subagentId);
+    }
+    const candidates = await listAgentTranscriptCandidates(id, workspace ?? '');
+    const checked = candidates.map(({ path }) => path);
+    let selected: (typeof candidates)[number] | null = null;
+    for (const candidate of candidates) {
+      if (await pathExists(candidate.path)) { selected = candidate; break; }
+    }
+    if (!selected) return missingTranscript(id, checked);
+    if (isExternalAgentId(id)) {
+      // Another tool wrote this path: re-check it before reading (a regular
+      // file under the transcript roots; never a FIFO, never a symlink escape).
+      const safe = await checkTranscriptPath(selected.path);
+      if (!safe.ok) return missingTranscript(id, checked);
+      selected = { ...selected, path: safe.path };
     }
 
-    if (harness === 'pi') {
-      const sessionFile = await resolvePiSessionPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parsePiConversationMessages(sessionFile);
-      return { ...result, streaming: false };
-    }
+    const result = selected.kind === 'claude' ? await parseEntireConversation(selected.path)
+      : selected.kind === 'pi' ? await parsePiConversationMessages(selected.path)
+      : selected.kind === 'ohmypi' ? await parseOhmypiConversationMessages(selected.path)
+      : selected.kind === 'codex' ? await parseCodexConversationMessages(selected.path)
+      : selected.kind === 'acp' ? await parseAcpConversationMessages(selected.path)
+      : await sharedTranscriptParser(selected.kind)(selected.path);
 
-    if (harness === 'codex') {
-      const sessionFile = await resolveCodexRolloutPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parseCodexConversationMessages(sessionFile);
-      return { ...result, streaming: false };
-    }
-
-    if (harness === 'acp' || harness === 'opencode') {
-      const sessionFile = await resolveAcpTranscriptPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parseAcpConversationMessages(sessionFile);
-      return {
+    if (selected.kind === 'acp') {
+      return { status: 200, body: {
         ...result,
         messages: result.messages.map((message) => message.role === 'assistant'
           ? {
@@ -151,39 +183,35 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
             }
           : message),
         streaming: false,
-      };
+      } };
     }
-
-    // claude-code (default): try launcher-pinned session ID first (ground truth),
-    // then fall back to mtime-based pick.
-    let jsonlPath: string | null = null;
-    const pinnedSessionId = await readLauncherPinnedSessionId(id);
-    if (pinnedSessionId) {
-      const workspace = await Effect.runPromise(getAgentWorkspace(id));
-      if (workspace) {
-        const candidate = join(
-          homedir(), '.claude', 'projects',
-          encodeClaudeProjectDir(workspace),
-          `${pinnedSessionId}.jsonl`,
-        );
-        if (existsSync(candidate)) jsonlPath = candidate;
-      }
-    }
-    if (!jsonlPath) {
-      jsonlPath = await Effect.runPromise(getAgentJsonlPath(id));
-    }
-
-    if (!jsonlPath || !existsSync(jsonlPath)) return EMPTY_CONVERSATION;
-    // parseEntireConversation, not parseConversationMessages: a single parse caps
-    // at MAX_READ_BYTES (10 MB) and would drop the most recent turns of a larger
-    // transcript (PAN-1989). This one-shot endpoint must return the whole file.
-    const result = await parseEntireConversation(jsonlPath);
-    // Force streaming: false — tmux session is dead, any "streaming" state is stale
-    return { ...result, streaming: false };
+    return { status: 200, body: { ...result, streaming: false } };
   } catch (err) {
     console.error('[conversation] failed for', id, err);
-    return EMPTY_CONVERSATION;
+    return { status: 500, body: { error: `Failed to load transcript for ${id}.` } };
   }
+}
+
+/** One subagent transcript of an agent (PAN-3920 W2, `?subagentId=`). */
+async function buildAgentSubagentResult(
+  id: string,
+  workspace: string,
+  subagentId: string,
+): Promise<AgentConversationResult> {
+  const resolved = await resolveAgentSubagentTranscript(id, workspace, subagentId);
+  if (!resolved) {
+    return { status: 404, body: { error: `No subagent ${subagentId} found for ${id}.`, checked: [] } };
+  }
+  const result = resolved.kind === 'claude'
+    ? await parseEntireConversation(resolved.path)
+    : await parseCodexConversationMessages(resolved.path);
+  return { status: 200, body: { ...result, streaming: false } };
+}
+
+/** Compatibility helper retained for callers that only consume a transcript body. */
+export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
+  const result = await buildAgentConversationResult(id);
+  return result.status === 200 ? result.body : EMPTY_CONVERSATION;
 }
 
 export const getAgentConversationRoute = HttpRouter.add(
@@ -192,7 +220,40 @@ export const getAgentConversationRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    return yield* Effect.promise(async () => jsonResponse(await buildConversationResponse(id)));
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const urlOpt = HttpServerRequest.toURL(request);
+    const subagentId = Option.isSome(urlOpt) ? urlOpt.value.searchParams.get('subagentId') : null;
+    return yield* Effect.promise(async () => {
+      const result = await buildAgentConversationResult(id, subagentId === null ? {} : { subagentId });
+      return jsonResponse(result.body, { status: result.status });
+    });
+  })),
+);
+
+// ─── Route: GET /api/agents/:id/subagents ────────────────────────────────────
+
+/** The agent's in-harness subagents (PAN-3920 W2). Transcript paths stay server-side. */
+export async function buildAgentSubagentsResult(id: string): Promise<{ subagents: Array<Record<string, unknown>> }> {
+  const workspace = await agentWorkspaceFor(id);
+  if (isExternalAgentId(id)) return { subagents: [] };
+  const subagents = await listAgentSubagents(id, workspace ?? '');
+  return { subagents: subagents.map(({ transcriptPath: _path, ...summary }) => summary) };
+}
+
+export const getAgentSubagentsRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/subagents',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        return jsonResponse(await buildAgentSubagentsResult(id));
+      } catch (err) {
+        console.error('[agent-subagents] failed for', id, err);
+        return jsonResponse({ error: `Failed to list subagents for ${id}.` }, { status: 500 });
+      }
+    });
   })),
 );
 
@@ -223,7 +284,7 @@ export const getAgentFilesRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentState(id);
     if (!agentState?.workspace) {
       return jsonResponse({ files: [] });
     }
@@ -264,7 +325,7 @@ export const getAgentTimelineRoute = HttpRouter.add(
     const limit = parseInt(limitStr) || 50;
 
     const activity = getActivity(id, limit);
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentState(id);
     const events = activity.map((a: any) => ({
       timestamp: a.timestamp || new Date().toISOString(),
       type: a.type || 'activity',

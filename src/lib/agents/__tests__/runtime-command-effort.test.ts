@@ -7,18 +7,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../model-validation.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  requireModelOverrideSync: vi.fn((model: string) => model),
-  shellQuoteModelIdSync: vi.fn((model: string) => model),
+  requireModelOverride: vi.fn((model: string) => model),
+  shellQuoteModelId: vi.fn((model: string) => model),
 }));
 
 vi.mock('../../providers.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
+  getProviderForModel: vi.fn(() => ({ name: 'anthropic' })),
 }));
 
 vi.mock('../../claude-permissions.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  getClaudePermissionFlagsStringSync: vi.fn(() => '--permission-mode default'),
+  getClaudePermissionFlagsString: vi.fn(() => '--permission-mode default'),
 }));
 
 import { getRoleRuntimeBaseCommand } from '../runtime-command.js';

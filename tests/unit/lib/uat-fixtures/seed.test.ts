@@ -32,8 +32,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  const { closeOverdeckDatabaseSync } = await import('../../../../src/lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
+  closeOverdeckDatabase();
   vi.unstubAllEnvs();
   rmSync(tempHome, { recursive: true, force: true });
 });

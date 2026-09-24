@@ -27,7 +27,7 @@ import {
   HOOK_SCRIPT_NAMES,
   type ClaudeSettings,
 } from './claude-hooks-registration.js';
-import { atomicWriteJsonSync, backupSettingsSync, pruneBackupsSync } from './claude-settings-file.js';
+import { atomicWriteJson, backupSettings, pruneBackups } from './claude-settings-file.js';
 import { BIN_DIR, SYNC_SOURCES } from './paths.js';
 
 const execFileAsync = promisify(execFile);
@@ -129,9 +129,9 @@ export async function provisionClaudeHooks(
       return { ok: true, changed: false, binariesSynced, registered: [], pruned: [] };
     }
 
-    backupSettingsSync(settingsPath);
-    atomicWriteJsonSync(settingsPath, settings);
-    pruneBackupsSync(settingsPath);
+    backupSettings(settingsPath);
+    atomicWriteJson(settingsPath, settings);
+    pruneBackups(settingsPath);
     return { ok: true, changed: true, binariesSynced, registered: added, pruned: removed };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

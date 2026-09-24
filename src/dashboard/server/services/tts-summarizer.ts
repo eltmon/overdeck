@@ -11,7 +11,7 @@
 
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { initEventStore, type StoredEvent } from '../event-store.js';
-import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { emitActivityTts } from '../../../lib/activity-logger.js';
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { recordBackgroundAiCost } from '../../../lib/background-ai/cost.js';
 
@@ -168,7 +168,7 @@ async function flush(): Promise<void> {
   const priority = hasError ? 0 : hasWarn ? 1 : 2;
 
   try {
-    emitActivityTtsSync({
+    emitActivityTts({
       utterance: result.text,
       priority,
       source: 'tts-summarizer',

@@ -144,19 +144,6 @@ export async function isToolInstalled(tool: PrereqTool): Promise<boolean> {
   return checkCommand(tool);
 }
 
-export async function getMissingToolsForFeature(
-  feature: PrereqFeature
-): Promise<PrereqTool[]> {
-  const tools = PREREQ_REGISTRY[feature];
-  const missing: PrereqTool[] = [];
-  for (const tool of tools) {
-    if (!(await isToolInstalled(tool))) {
-      missing.push(tool);
-    }
-  }
-  return missing;
-}
-
 export interface InstallResult {
   tool: PrereqTool;
   success: boolean;

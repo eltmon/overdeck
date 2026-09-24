@@ -1,35 +1,34 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
-import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { loadConfigSync } from '../config.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
-import { getFlywheelActiveRunIdSync } from '../overdeck/control-settings.js';
+import { getFlywheelActiveRunId } from '../overdeck/control-settings.js';
 import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
-import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByPath, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 import { getPrFacts } from '../cloister/pr-facts.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
-import { requireModelOverrideSync } from '../model-validation.js';
+import { requireModelOverride } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
 import type { XBriefDocument, XBriefDifficulty, XBriefItem, XBriefItemStatus } from '../xbrief/types.js';
 import { type Role } from './agent-state.js';
-import type { TierAssignment } from './dispatch-tier.js';
 import { normalizeFlywheelRunId } from './provenance.js';
 import { resolveStaffing } from './staffing.js';
 import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { checkStaffingFitness } from './tier-fitness.js';
-import { buildTierFitnessContextSync } from './tier-fitness-context.js';
+import { buildTierFitnessContext } from './tier-fitness-context.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
 import {
   buildCavemanExports,
@@ -46,7 +45,7 @@ import {
   getOhmypiLauncherFields,
   inferMemoryProjectId,
   roleAgentDefinitionPath,
-  roleSystemPromptInjectionSync,
+  roleSystemPromptInjection,
 } from './runtime-command.js';
 
 export type FlywheelSpawnEnv = {
@@ -55,7 +54,7 @@ export type FlywheelSpawnEnv = {
 };
 
 export function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
-  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunIdSync());
+  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunId());
   return runId
     ? { OVERDECK_FLYWHEEL_RUN_ID: runId, OVERDECK_FLYWHEEL_AGENT_ROLE: role }
     : {};
@@ -87,7 +86,8 @@ export interface SpawnOptions {
   prompt?: string;
   /**
    * Spawn role. Defaults to 'work'. The 'strike' role is the bypass path that
-   * skips plan/review/test/ship and lands directly on main — see roles/strike.md.
+   * skips plan/review/test/ship and ends with a PR the operator merges — see
+   * roles/strike.md.
    * Strike sessions are named `strike-<issue-id>` instead of `agent-<issue-id>`.
    */
   role?: 'work' | 'strike' | 'knowledge';
@@ -161,6 +161,10 @@ export interface SpawnRunOptions {
   slotBranch?: string;
   /** Optional per-spawn cap for registered work-agent slots. Defaults to the work-agent governor cap. */
   maxRegisteredSlots?: number;
+  /** PAN-3920: agent or conversation that spawned this run (workers); stamped as the `parent` pane token. */
+  parentId?: string;
+  /** PAN-3920: `read-only` blocks git writes inside the run's workspace. */
+  gitGuardMode?: 'default' | 'read-only';
 }
 
 export interface RegisteredSlotSpawn {
@@ -169,24 +173,6 @@ export interface RegisteredSlotSpawn {
   workspace: string;
   slotIndex: number;
   slotItemId: string;
-}
-
-/**
- * Thread a tiered-execution tier assignment into spawn options (PAN-1791).
- * When the assignment resolved a tier, its model+harness replace the parent
- * defaults so the dispatched bead runs on the tier its difficulty selected.
- * With no assignment (tiering disabled), the options pass through unchanged.
- */
-export function applyTierAssignment<T extends Pick<SpawnRunOptions, 'model' | 'harness'>>(
-  options: T,
-  assignment?: TierAssignment,
-): T {
-  if (!assignment?.model) return options;
-  return {
-    ...options,
-    model: assignment.model,
-    harness: assignment.harness ?? options.harness,
-  };
 }
 
 export function resolveRegisteredSlotSpawn(
@@ -241,8 +227,8 @@ export interface SlotTierSpawnParams {
 /**
  * Tiered-execution model resolution for a registered slot spawn (PAN-1791,
  * fixing PAN-1196's "difficulty captured and ignored"). When tiered execution
- * is enabled for the plan, resolve the slot item's tier through
- * assignDispatchTier and return its (model, harness) as spawn params so the
+ * is enabled for the plan, resolve the slot item's tier through the
+ * resolution chain and return its (model, harness) as spawn params so the
  * dispatched bead runs on the tier its difficulty selected.
  *
  * Returns {} — leaving the existing model resolution untouched — when:
@@ -371,7 +357,7 @@ function effectiveItemDifficulty(
  * resolvable difficulty sort below every ranked item. Recorded tier
  * promotions (PAN-3858) raise an item's effective difficulty before ranking.
  */
-export function selectStaffingItem(
+function selectStaffingItem(
   doc: XBriefDocument,
   tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
   tierOverrides?: TierOverridesMap,
@@ -381,20 +367,6 @@ export function selectStaffingItem(
     tiered,
     tierOverrides,
   );
-}
-
-/**
- * The plan's hardest item regardless of status (PAN-3858). Verification-failed
- * escalation attributes to this item: verification runs against the whole
- * submitted diff after items are already marked completed, so the
- * status-filtered staffing pick would find nothing to promote.
- */
-export function selectHardestPlanItem(
-  doc: XBriefDocument,
-  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
-  tierOverrides?: TierOverridesMap,
-): XBriefItem | undefined {
-  return selectHardestItem(doc.plan.items, tiered, tierOverrides);
 }
 
 function selectHardestItem(
@@ -502,7 +474,7 @@ export function logTierFitnessAtSpawn(
 ): void {
   if (!staffing.model || difficulties.length === 0) return;
   try {
-    const ctx = buildTierFitnessContextSync(loadYamlConfig().config);
+    const ctx = buildTierFitnessContext(loadYamlConfig().config);
     const warnings = checkStaffingFitness(
       { tierName: staffing.tierName, model: staffing.model, harness: staffing.harness, path: `tier '${staffing.tierName}'` },
       difficulties,
@@ -616,7 +588,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
 
   // Resolve the project from workspacePath — its configured tracker is authoritative.
   // Every issue MUST belong to a registered project with a tracker configured.
-  const projectConfig = workspacePath ? findProjectByPathSync(workspacePath) : null;
+  const projectConfig = workspacePath ? findProjectByPath(workspacePath) : null;
   if (!projectConfig) {
     throw new Error(`Cannot transition ${issueId}: no project config found for workspace ${workspacePath || '(none)'}. Register the project in projects.yaml.`);
   }
@@ -716,7 +688,7 @@ export async function buildAgentLaunchConfig(opts: {
   /** Inline prompt to embed in launch commands that still support prompt arguments. */
   promptInline?: string;
 }): Promise<AgentLaunchConfig> {
-  const model = requireModelOverrideSync(opts.model);
+  const model = requireModelOverride(opts.model);
 
   // Substrate guard: inject permission deny rules for Overdeck infrastructure
   // paths (.claude/agents/, .claude/hooks/, ~/.overdeck/, JSONL session dirs)
@@ -735,11 +707,11 @@ export async function buildAgentLaunchConfig(opts: {
   const providerEnv = isAcp ? {} : await getProviderEnvForModel(model, opts.harness);
 
   if (!isAcp) {
-    const provider = getProviderForModelSync(model as ModelId);
+    const provider = getProviderForModel(model as ModelId);
     if (provider.authType === 'credential-file') {
-      setupCredentialFileAuthSync(provider, opts.workspace);
+      setupCredentialFileAuth(provider, opts.workspace);
     } else {
-      clearCredentialFileAuthSync(opts.workspace);
+      clearCredentialFileAuth(opts.workspace);
     }
   }
 
@@ -752,7 +724,7 @@ export async function buildAgentLaunchConfig(opts: {
 
   // PAN-1055: ohmypi harness needs --session-dir + fifo redirect threaded into
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
-  // and they're spread into generateLauncherScript() below.
+  // and they're spread into generateLauncherScriptSync() below.
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
   const piLauncherFields = behavior.usesRpcFifo
     ? await getOhmypiLauncherFields(opts.agentId, model, opts.effort)
@@ -805,7 +777,7 @@ export async function buildAgentLaunchConfig(opts: {
     // --dangerously-skip-permissions on resume too.
     // Use the shared helper so the only string literal for DSP lives in
     // claude-permissions.ts (see scripts/lint-permissions.sh allowlist).
-    const launcherContent = generateLauncherScriptSync({
+    const launcherContent = generateLauncherScript({
       role: launchRole,
       spawnMode: 'resume',
       workingDir: opts.workspace,
@@ -819,7 +791,7 @@ export async function buildAgentLaunchConfig(opts: {
       // which short-circuits to the omp/codex form.
       baseCommand: behavior.launchCommandKind !== 'claude-code'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
-        : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
+        : `claude ${getClaudePermissionFlagsString()}${roleSystemPromptInjection(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
       // PAN-3189: the git guard is emitted for launchers that carry an agent
       // id. Work/strike/review agents — the ones the stash/rebase rules exist
@@ -857,7 +829,7 @@ export async function buildAgentLaunchConfig(opts: {
   // definitions). The launcher generator's Pi branch then layers --session-dir
   // and the fifo redirect on top.
   const agentDefinition = roleAgentDefinitionPath(launchRole);
-  const launcherContent = generateLauncherScriptSync({
+  const launcherContent = generateLauncherScript({
     role: launchRole,
     workingDir: opts.workspace,
     changeDir: false,
@@ -984,7 +956,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
   allowHost = false,
   workspacePath?: string,
 ): Promise<void> {
-  if (role === 'plan' || role === 'knowledge') return;
+  if (role === 'plan' || role === 'knowledge' || role === 'worker') return;
 
   // PAN-1872: guard against an undefined issueId so workspace health checks do
   // not crash with `Cannot read properties of undefined (reading 'toUpperCase')`
@@ -1055,7 +1027,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     if (!record.hostFallbackNoticed) {
       record.hostFallbackNoticed = true;
       spawnStackRebuildState.set(normalizedIssue, record);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: role,
         level: 'warn',
         issueId: normalizedIssue,
@@ -1078,7 +1050,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     if (!record.escalated) {
       record.escalated = true;
       spawnStackRebuildState.set(normalizedIssue, record);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: role,
         level: 'error',
         issueId: normalizedIssue,

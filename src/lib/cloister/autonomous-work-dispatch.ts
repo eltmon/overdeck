@@ -61,6 +61,7 @@ const RELEASE_CONTEXT_CACHE_MS = 5_000;
 let autoPickupCache: { expiresAt: number; value: boolean } | null = null;
 const activeBookCache = new Map<string, { expiresAt: number; value: ReadonlySet<string> }>();
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function clearAutonomousWorkDispatchCaches(): void {
   autoPickupCache = null;
   activeBookCache.clear();

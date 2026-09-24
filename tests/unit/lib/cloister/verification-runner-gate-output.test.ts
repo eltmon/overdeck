@@ -43,11 +43,11 @@ vi.mock('../../../../src/lib/cloister/verification-check-run.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: mockEmitActivity,
+  emitActivityEntry: mockEmitActivity,
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   clearAgentPaused: vi.fn(() => Effect.succeed(null)),
   setAgentPaused: vi.fn(() => Effect.succeed(null)),
   messageAgent: vi.fn(),
@@ -66,25 +66,25 @@ vi.mock('../../../../src/lib/cloister/verification-artifact.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
-  writeFeedbackFile: vi.fn(() => Effect.succeed({ success: false, error: 'not written' })),
+  writeFeedbackFile: vi.fn(async () => ({ success: false, error: 'not written' })),
 }));
 
 vi.mock('../../../../src/lib/xbrief/acceptance-criteria.js', () => ({
-  getXBriefACStatusSync: vi.fn(() => null),
+  getXBriefACStatus: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/work/done-preflight.js', () => ({
-  checkIncompletePlanItemsPromise: vi.fn(async () => []),
+  checkIncompletePlanItems: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
-  findProjectByPathSync: vi.fn(() => ({ name: 'Overdeck', github_repo: 'eltmon/overdeck' })),
+  findProjectByPath: vi.fn(() => ({ name: 'Overdeck', github_repo: 'eltmon/overdeck' })),
   resolveProjectFromIssueSync: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveWorkspaceRepoRootsSync: mockResolveWorkspaceRepoRootsSync,
-  resolveProjectReposForIssueSync: vi.fn(() => []),
+  resolveWorkspaceRepoRoots: mockResolveWorkspaceRepoRootsSync,
+  resolveProjectReposForIssue: vi.fn(() => []),
 }));
 
 vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
@@ -92,12 +92,12 @@ vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/test-skip-waiver.js', () => ({
-  resolveActiveTestSkipWaiverSync: vi.fn(() => null),
+  resolveActiveTestSkipWaiver: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/git-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/git-utils.js')>();
-  return { ...actual, snapshotWorkspaceHeadsPromise: mockSnapshotHeads };
+  return { ...actual, snapshotWorkspaceHeads: mockSnapshotHeads };
 });
 
 vi.mock('../../../../src/lib/telemetry/pipeline.js', () => ({
@@ -128,13 +128,13 @@ const issueId = 'PAN-3847';
 const workspacePath = '/tmp/feature-pan-3847';
 
 function run() {
-  return Effect.runPromise(runVerificationForIssueInProcess(
+  return runVerificationForIssueInProcess(
     issueId,
     workspacePath,
     { isRemote: false },
     'test',
     { syncTargetBranch: false, skipPlanChecklist: true },
-  ));
+  );
 }
 
 describe('verification runner gate output (PAN-3847, re-pointed PAN-3917)', () => {
@@ -148,9 +148,9 @@ describe('verification runner gate output (PAN-3847, re-pointed PAN-3917)', () =
       { repoKey: 'main', dir: '/tmp/feature-pan-3847', isPolyrepo: false, targetBranch: 'main' },
     ]);
     mockRunTestSkipGate.mockResolvedValue({ passed: true, violations: [] });
-    mockRunQualityGates.mockReturnValue(Effect.succeed([
+    mockRunQualityGates.mockResolvedValue([
       { name: 'test', passed: true, required: true, durationMs: 1 },
-    ]));
+    ]);
     mockSnapshotHeads.mockResolvedValue('a'.repeat(40));
     mockWriteArtifact.mockReturnValue({ path: '/tmp/verification-latest.json' });
   });
@@ -166,9 +166,9 @@ describe('verification runner gate output (PAN-3847, re-pointed PAN-3917)', () =
   });
 
   it('failure feedback references the immutable per-run artifact path (PAN-3847 W13)', async () => {
-    mockRunQualityGates.mockReturnValue(Effect.succeed([
+    mockRunQualityGates.mockResolvedValue([
       { name: 'test', passed: false, required: true, durationMs: 5, output: 'boom' },
-    ]));
+    ]);
     const perRunPath = `${workspacePath}/.overdeck/verification/2026-09-17T01-02-03-000Z-abcd1234.json`;
     mockWriteArtifact.mockReturnValue({ path: perRunPath });
 

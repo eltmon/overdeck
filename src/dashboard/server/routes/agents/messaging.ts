@@ -48,7 +48,7 @@ export async function handleAgentMessage(
     if (isComposerCommandMessage(message)) {
       let agentState;
       try {
-        agentState = await Effect.runPromise(getAgentState(id));
+        agentState = getAgentState(id);
       } catch {
         return jsonResponse({
           error: `Failed to resolve agent target: ${id}`,

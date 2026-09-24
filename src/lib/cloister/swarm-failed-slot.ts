@@ -3,15 +3,11 @@ import type { ReconciledSlotItem, SlotReconcileResult } from './swarm-slot-recon
 import {
   clearSwarmSlotCompletion,
   writeSwarmSupersededAttempt,
-  type SwarmSlotState,
   type SwarmSupersededAttempt,
 } from './deacon-swarm-record.js';
 import type { PersistedTaskOperation } from '../xbrief/dag.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 
-
-/** Patrol GC never removes forensic attempts; configured issue close-out owns teardown. */
-export const SWARM_SUPERSEDED_RETENTION = 'issue-close-out' as const;
 
 export interface FailedSlotArchiveDeps {
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
@@ -26,16 +22,6 @@ interface FailedSlotRequeueDeps extends FailedSlotArchiveDeps {
   ) => Promise<unknown>;
 }
 interface ClassifiedSlot extends ReconciledSlotItem { lifecycle: string; reason?: string }
-
-export function nextSwarmSlotIndex(swarm: SwarmSlotState | null | undefined, reconciled: SlotReconcileResult): number {
-  return Math.max(0,
-    ...reconciled.branches.map(value => value.slotIndex),
-    ...reconciled.agents.map(value => value.slotIndex),
-    ...reconciled.inFlight.map(value => value.slotIndex),
-    ...(swarm?.slotAssignments ?? []).map(value => value.slotIndex),
-    ...(swarm?.supersededAttempts ?? []).map(value => value.slotIndex),
-  ) + 1;
-}
 
 export async function archiveFailedSwarmSlot(
   issueId: string,

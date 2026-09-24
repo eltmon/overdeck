@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The projection logs via persistent-logger — fire-and-forget in tests.
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
-  logAgentLifecycleSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
 }));
 
 import {
@@ -22,7 +22,7 @@ import {
   teardownOverdeckTestDb,
   type OverdeckTestDb,
 } from '../../../helpers/overdeck-test-db.js';
-import { getAgentStateSync } from '../../../../src/lib/agents/agent-state.js';
+import { getAgentState } from '../../../../src/lib/agents/agent-state.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../src/lib/work-agent-lifecycle.js';
 
 const AGENT = 'agent-pan-3849';
@@ -70,13 +70,13 @@ describe('claimAgentStart (PAN-3849 W34)', () => {
 });
 
 describe('no-placeholder invariant (AC2)', () => {
-  it('a failed spawn with no state written leaves getAgentStateSync null and pan start proceeds fresh', () => {
+  it('a failed spawn with no state written leaves getAgentState null and pan start proceeds fresh', () => {
     // Simulate the whole W34 flow: claim, spawn fails before the child writes
     // anything, release. Nothing was ever persisted for this agent.
     expect(claimAgentStart(AGENT)).toBe(true);
     releaseAgentStart(AGENT);
 
-    expect(getAgentStateSync(AGENT)).toBeNull();
+    expect(getAgentState(AGENT)).toBeNull();
 
     // No 'resumable session' refusal: the lifecycle classifier offers a fresh start.
     const lifecycle = getWorkAgentLifecycleStateSync(AGENT);

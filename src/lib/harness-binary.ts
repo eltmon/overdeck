@@ -60,7 +60,7 @@ export function isWindowsInteropPath(path: string, roots: readonly string[] = wi
   return roots.some((root) => path === root || path.startsWith(root.endsWith('/') ? root : `${root}/`));
 }
 
-export const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
+const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   'claude-code': 'claude',
   ohmypi: 'omp',
   codex: 'codex',

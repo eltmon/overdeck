@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -47,11 +46,11 @@ describe('deliverReviewVerdictFeedback', () => {
     vi.clearAllMocks();
     mocks.resolveProjectFromIssueSync.mockReturnValue(null);
     mocks.getReviewStatusSync.mockReturnValue(undefined);
-    mocks.writeFeedbackFile.mockReturnValue(Effect.succeed({
+    mocks.writeFeedbackFile.mockResolvedValue({
       success: true,
       relativePath: '.pan/feedback/001-review-agent-blocked.md',
       filePath: '/tmp/overdeck/workspaces/feature-pan-1917/.pan/feedback/001-review-agent-blocked.md',
-    }));
+    });
     mocks.resolveIssueFeedbackTarget.mockReturnValue({
       needsYou: true,
       reason: 'No live feedback target for PAN-1917',
@@ -63,12 +62,12 @@ describe('deliverReviewVerdictFeedback', () => {
   });
 
   it('swallows a readonly DB failure when marking review feedback as needing human attention', async () => {
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-1917',
       verdict: 'blocked',
       notes: 'Blocked by missing dependency',
       workspacePath: '/tmp/overdeck/workspaces/feature-pan-1917',
-    }));
+    });
 
     expect(result).toEqual(expect.objectContaining({
       feedbackPath: '/tmp/overdeck/workspaces/feature-pan-1917/.pan/feedback/001-review-agent-blocked.md',

@@ -6,8 +6,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../overdeck/control-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
-vi.mock('../../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn() }));
-vi.mock('../../persistent-logger.js', () => ({ logDeaconEventSync: vi.fn() }));
+vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
+vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn() }));
 
 import {
   selectOrphanServerPids,

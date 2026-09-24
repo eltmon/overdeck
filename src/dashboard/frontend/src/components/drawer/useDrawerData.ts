@@ -7,6 +7,7 @@ import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { useDashboardStore, selectIssues, selectAgents, selectBackendPanes, selectDerivedIssueState } from '../../lib/store';
 import { useTasksQuery } from '../Stage/cockpit/TasksRail';
 import type { Agent, BackendPane, DerivedIssueState, Issue } from '../../types';
+import { sortIssueAgents } from '../../lib/agentConversation';
 
 export type DrawerActivityPhase = 'work' | 'review' | 'ship' | 'done' | 'info';
 
@@ -352,7 +353,9 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
     }
 
     const issue = issues.find((candidate) => issueMatches(candidate, drawerIssueId)) ?? null;
-    const issueAgents = agents.filter((agent) => agent.issueId?.toLowerCase() === drawerIssueId.toLowerCase());
+    const issueAgents = sortIssueAgents(
+      agents.filter((agent) => agent.issueId?.toLowerCase() === drawerIssueId.toLowerCase()),
+    );
     const agentIssueLookup = buildAgentIssueLookup(agents);
     const byId = new Map<string, ActivityEntry>();
     for (const entry of [...recentActivity, ...detailedActivity]) {

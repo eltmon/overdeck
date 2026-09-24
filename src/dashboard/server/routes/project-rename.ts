@@ -3,6 +3,7 @@ import * as Result from 'effect/Result';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { ProjectRenameError, renameProject } from '../../../lib/projects.js';
+import type { ConfigParseError, FsError } from '../../../lib/errors.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -27,7 +28,12 @@ export const postProjectRenameRoute = HttpRouter.add(
       return jsonResponse({ error: 'Project name must be a string' }, { status: 400 });
     }
 
-    const result = yield* Effect.result(renameProject(projectIdentifier, body.name));
+    const newName = body.name;
+    // renameProject rejects only with ProjectRenameError, ConfigParseError or FsError.
+    const result = yield* Effect.result(Effect.tryPromise({
+      try: () => renameProject(projectIdentifier, newName),
+      catch: (cause) => cause as ProjectRenameError | ConfigParseError | FsError,
+    }));
     if (Result.isFailure(result)) {
       if (!(result.failure instanceof ProjectRenameError)) {
         return yield* Effect.fail(result.failure);

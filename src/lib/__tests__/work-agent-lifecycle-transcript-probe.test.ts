@@ -8,12 +8,10 @@ const mockSessionExists = vi.fn();
 const mockExistsSync = vi.fn<(path: string) => boolean>();
 
 vi.mock('../agents.js', () => ({
-  getAgentStateSync: () => mockGetAgentState(),
-  getAgentState: () => Effect.succeed(mockGetAgentState()),
+  getAgentState: () => mockGetAgentState(),
   getAgentRuntimeStateSync: () => mockGetAgentRuntimeState(),
   getAgentRuntimeState: () => Effect.succeed(mockGetAgentRuntimeState()),
-  getLatestSessionIdSync: () => mockGetLatestSessionId(),
-  getLatestSessionId: () => Effect.succeed(mockGetLatestSessionId()),
+  getLatestSessionId: () => mockGetLatestSessionId(),
   normalizeAgentId: (id: string) => id,
 }));
 
@@ -36,14 +34,23 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...actual,
-    access: (path: string) => mockExistsSync(path)
-      ? Promise.resolve()
-      : Promise.reject(new Error('ENOENT')),
+    // Routed through mockExistsSync only for the workspace path (PAN-3917
+    // W12): mockExistsSync's `true` fallback also answered the host-backend
+    // probe's herdr-binary/herdr-socket `access()` checks (hostTerminalBackendName,
+    // called from the async isAlive door but never the sync one), making
+    // every host look like it has Herdr and desyncing the async lifecycle
+    // snapshot from the sync one. Anything else falls through to the real
+    // filesystem, where the synthetic test OVERDECK_HOME's herdr socket
+    // genuinely does not exist.
+    access: (path: string, ...rest: unknown[]) =>
+      path === '/tmp/pan-3194-workspace'
+        ? (mockExistsSync(path) ? Promise.resolve() : Promise.reject(new Error('ENOENT')))
+        : (actual.access as (...args: unknown[]) => Promise<void>)(path, ...rest),
   };
 });
 
 import {
-  assertCanStartFreshSync,
+  assertCanStartFresh,
   getWorkAgentLifecycleState,
   getWorkAgentLifecycleStateSync,
 } from '../work-agent-lifecycle.js';
@@ -118,8 +125,8 @@ describe('Claude transcript resumability probe (PAN-3194)', () => {
   it('allows pan start to proceed without --fresh when the transcript is missing', () => {
     configureLifecycle({ transcriptExists: false });
 
-    expect(() => assertCanStartFreshSync('agent-pan-3194')).not.toThrow();
-    expect(assertCanStartFreshSync('agent-pan-3194').recommendedAction).toBe('start');
+    expect(() => assertCanStartFresh('agent-pan-3194')).not.toThrow();
+    expect(assertCanStartFresh('agent-pan-3194').recommendedAction).toBe('start');
   });
 
   it('does not require a Claude JSONL for a non-Claude harness', () => {
@@ -137,7 +144,7 @@ describe('Claude transcript resumability probe (PAN-3194)', () => {
       configureLifecycle({ transcriptExists });
 
       const syncLifecycle = getWorkAgentLifecycleStateSync('agent-pan-3194');
-      const asyncLifecycle = await Effect.runPromise(getWorkAgentLifecycleState('agent-pan-3194'));
+      const asyncLifecycle = await getWorkAgentLifecycleState('agent-pan-3194');
 
       expect(asyncLifecycle).toMatchObject({
         hasSavedSession: syncLifecycle.hasSavedSession,

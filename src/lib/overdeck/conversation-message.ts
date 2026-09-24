@@ -8,7 +8,7 @@ import { Option } from 'effect';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { compactConversationNative, shouldInterceptManualCompact } from '../../dashboard/server/services/conversation-compaction.js';
 import { watchForEatenConversationMessage } from '../../dashboard/server/services/conversation-eaten-message-watcher.js';
-import { modelSupportsImagesSync } from '../model-capabilities.js';
+import { modelSupportsImages } from '../model-capabilities.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { waitForManagedKimiSessionId } from '../runtimes/kimi-context-envelope.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -497,7 +497,7 @@ export async function handleConversationMessage(
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
   const behavior = getHarnessBehavior(harness);
-  const supportsImages = modelSupportsImagesSync(conv.model ?? '');
+  const supportsImages = modelSupportsImages(conv.model ?? '');
   const partition = partitionAttachmentsForModel(message, managedAttachmentPaths, supportsImages);
   const outboundMessage = partition.outboundMessage;
   const effectiveAttachmentPaths = partition.effectiveAttachmentPaths;

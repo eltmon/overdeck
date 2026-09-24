@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { reconcilePiTranscripts } from '../../../../src/lib/costs/reconciler.js';
-import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../../../../src/lib/overdeck/infra.js';
+import { closeOverdeckDatabase, getOverdeckDatabase } from '../../../../src/lib/overdeck/infra.js';
 
 let testHome: string;
 let agentDir: string;
@@ -18,12 +18,12 @@ beforeEach(() => {
   process.env.OVERDECK_HOME = join(testHome, '.overdeck');
   agentDir = join(testHome, '.overdeck', 'agents', 'agent-pan-3743');
   mkdirSync(agentDir, { recursive: true });
-  getOverdeckDatabaseSync();
-  closeOverdeckDatabaseSync();
+  getOverdeckDatabase();
+  closeOverdeckDatabase();
 });
 
 afterEach(() => {
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   if (previousHome === undefined) delete process.env.HOME;
   else process.env.HOME = previousHome;
   delete process.env.OVERDECK_HOME;

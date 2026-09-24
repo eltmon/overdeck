@@ -11,7 +11,7 @@ import {
   composeProjectNameForWorkspace,
   requireComposeProjectNameForWorkspace,
 } from '../../../../src/lib/workspace/stack-health.js';
-import { renderDevcontainerSync } from '../../../../src/lib/workspace/devcontainer-renderer.js';
+import { renderDevcontainer } from '../../../../src/lib/workspace/devcontainer-renderer.js';
 import type { ProjectConfig } from '../../../../src/lib/workspace-config.js';
 
 let tmpRoot: string | null = null;
@@ -133,7 +133,7 @@ describe('the real Overdeck devcontainer template declares a compose `name:` (PA
       path: join(__dirname, '../../../..'),
       workspace: { docker: { compose_template: 'infra/.devcontainer-template' } },
     };
-    renderDevcontainerSync({ workspacePath, projectConfig, featureName });
+    renderDevcontainer({ workspacePath, projectConfig, featureName });
   }
 
   it('ac1: resolves overdeck-feature-<issue> from the rendered compose file alone (no dev script)', () => {

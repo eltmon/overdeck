@@ -1,3 +1,14 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `listRunningAgentsSync` (async: `listRunningAgents`): 8 sites in lib/agents/recovery.ts,
+ *   lib/cloister/concurrency.ts, lib/cloister/service.ts, lib/work-agent-conflicts.ts.
+ * It blocks on a child process: never call it from src/dashboard/** or src/lib/cloister/** (FR-8).
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -183,7 +194,7 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
       } catch {
         return;
       }
-      const state = await Effect.runPromise(getAgentState(entry));
+      const state = getAgentState(entry);
       if (state?.issueId && /^\d+$/.test(state.issueId)) {
         legacy.push(`${entry} (issueId: "${state.issueId}")`);
       }

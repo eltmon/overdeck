@@ -7,14 +7,14 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentHealth } from '../../../../lib/cloister/health.js';
-import { performHandoff } from '../../../../lib/cloister/handoff.js';
+import { HandoffError, performHandoff } from '../../../../lib/cloister/handoff.js';
 import { loadCloisterConfigSync } from '../../../../lib/cloister/config.js';
 import { getCloisterService } from '../../../../lib/cloister/service.js';
 import { checkAllTriggers } from '../../../../lib/cloister/triggers.js';
-import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../../lib/cost.js';
+import { calculateCost, getPricing, type TokenUsage } from '../../../../lib/cost.js';
 import { normalizeModelName } from '../../../../lib/cost-parsers/jsonl-parser.js';
-import { requireModelOverrideSync } from '../../../../lib/model-validation.js';
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
+import { requireModelOverride } from '../../../../lib/model-validation.js';
+import { claudeProjectsRoot, encodeClaudeProjectDir } from '../../../../lib/runtimes/storage/claude-code.js';
 import { getRuntimeForAgent } from '../../../../lib/runtimes/index.js';
 import {
   getAgentState,
@@ -52,7 +52,7 @@ export const getAgentHandoffSuggestionRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -63,14 +63,14 @@ export const getAgentHandoffSuggestionRoute = HttpRouter.add(
     }
 
     const health = getAgentHealth(id, runtime);
-    const triggers = yield* checkAllTriggers(
+    const triggers = yield* Effect.promise(() => checkAllTriggers(
       id,
       agentState.workspace,
       agentState.issueId,
       agentState.model,
       health,
       loadCloisterConfigSync()
-    );
+    ));
 
     if (triggers.length > 0) {
       const trigger = triggers[0];
@@ -106,14 +106,23 @@ export const postAgentHandoffRoute = HttpRouter.add(
     const { toModel, reason } = body as any;
     let targetModel: string;
     try {
-      targetModel = requireModelOverrideSync(toModel);
+      targetModel = requireModelOverride(toModel);
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const result = yield* performHandoff(id, {
-      targetModel,
-      reason: reason || 'Manual handoff from dashboard',
+    const result = yield* Effect.tryPromise({
+      try: () => performHandoff(id, {
+        targetModel,
+        reason: reason || 'Manual handoff from dashboard',
+      }),
+      catch: (cause) =>
+        new HandoffError({
+          agentId: id,
+          stage: 'performHandoff',
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
     });
 
     if (result.success) {
@@ -138,7 +147,7 @@ export const getAgentCostRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -155,7 +164,7 @@ export const getAgentCostRoute = HttpRouter.add(
     const countedUsageIds = new Set<string>();
 
     const homeDir = process.env.HOME || homedir();
-    const claudeProjectsDir = join(homeDir, '.claude', 'projects');
+    const claudeProjectsDir = claudeProjectsRoot(homeDir);
     const workspacePath = agentState.workspace;
 
     if (workspacePath) {
@@ -209,7 +218,7 @@ export const getAgentCostRoute = HttpRouter.add(
 
     if (inputTokens > 0 || outputTokens > 0) {
       const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
-      const pricing = getPricingSync(modelInfo.provider, modelInfo.model);
+      const pricing = getPricing(modelInfo.provider, modelInfo.model);
       if (pricing) {
         const usage: TokenUsage = {
           inputTokens,
@@ -217,7 +226,7 @@ export const getAgentCostRoute = HttpRouter.add(
           cacheReadTokens,
           cacheWriteTokens,
         };
-        cost = calculateCostSync(usage, pricing);
+        cost = calculateCost(usage, pricing);
       }
     }
 
@@ -265,7 +274,7 @@ export const postAgentDeliveryMethodRoute = HttpRouter.add(
       return jsonResponse({ error: 'deliveryMethod must be auto, channels, or tmux' }, { status: 400 });
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }

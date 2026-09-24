@@ -75,7 +75,9 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
   // PAN-3917 FR-12: the backend inventory's tmux fallback probes panes directly.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
 }));
 
 vi.mock('../../../../../src/lib/workspaces/resolver.js', () => ({
@@ -154,7 +156,7 @@ beforeEach(() => {
   mocks.openPullRequests = [];
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
-  mocks.findDraftPrd.mockReturnValue(Effect.succeed(null));
+  mocks.findDraftPrd.mockResolvedValue(null);
   mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
   mocks.getPipelineMembershipForProjects.mockResolvedValue([]);
   mocks.membershipSnapshotResults = [];
@@ -477,11 +479,11 @@ describe('resource-discovery membership-aware state labels', () => {
     mocks.issueService.getIssues.mockReturnValue([
       { identifier: 'PAN-3341', title: 'Merged work without cached tracker state' },
     ]);
-    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+    mocks.findDraftPrd.mockResolvedValue({
       path: '/state/drafts/PAN-3341.md',
       format: 'pan-draft',
       status: 'draft',
-    }));
+    });
     mocks.getPipelineMembershipForProjects.mockResolvedValue([{
       issueId: 'PAN-3341',
       inPipeline: true,
@@ -580,11 +582,11 @@ describe('resource-discovery membership-aware state labels', () => {
       { identifier: 'PAN-3346', title: 'Planning work without membership' },
     ]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3346']));
-    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+    mocks.findDraftPrd.mockResolvedValue({
       path: '/state/drafts/PAN-3346.md',
       format: 'pan-draft',
       status: 'draft',
-    }));
+    });
 
     await refreshResourceAllocatedProjects([project], { refreshMembership: false });
 
@@ -907,11 +909,11 @@ describe('resource-discovery PRD signal', () => {
   });
 
   it('adds the canonical PRD source and detail flag when a draft exists', async () => {
-    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+    mocks.findDraftPrd.mockResolvedValue({
       path: '/state/drafts/PAN-9004.md',
       format: 'pan-draft',
       status: 'draft',
-    }));
+    });
 
     const discovered = await discoverResourceAllocatedIssues();
     const issue = discovered.find((entry) => entry.issueId === 'PAN-9004');

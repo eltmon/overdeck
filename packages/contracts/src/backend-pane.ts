@@ -11,6 +11,8 @@ import { Schema } from "effect"
 export const BackendPane = Schema.Struct({
   /** Stable pane identity: the backend-native pane handle. */
   id: Schema.String,
+  /** Overdeck agent id: Herdr `agentId` token or live agent name; tmux session name (PAN-3920). */
+  agentId: Schema.optional(Schema.String),
   /** Issue the pane belongs to; absent for operator conversations. */
   issue: Schema.optional(Schema.String),
   role: Schema.Literals(["work", "worker", "review", "test", "uat", "strike", "plan"]),

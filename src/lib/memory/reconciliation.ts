@@ -82,7 +82,7 @@ export async function reconcileAgentMemory(
   return result;
 }
 
-export async function reconcileTranscriptCheckpoint(
+async function reconcileTranscriptCheckpoint(
   checkpoint: TranscriptCheckpoint,
   options: ReconcileTranscriptCheckpointOptions = {},
 ): Promise<'empty' | 'fired' | 'failed' | 'missing'> {
@@ -138,8 +138,8 @@ async function getTranscriptStat(path: string): Promise<{ size: number; mtimeMs:
   return { size: fileStat.size, mtimeMs: fileStat.mtimeMs };
 }
 
-function getAgentStateFromStore(agentId: string): Promise<AgentState | null> {
-  return Effect.runPromise(getAgentState(agentId));
+async function getAgentStateFromStore(agentId: string): Promise<AgentState | null> {
+  return getAgentState(agentId);
 }
 
 function getAgentRuntimeStateFromStore(agentId: string): Promise<AgentRuntimeState | null> {

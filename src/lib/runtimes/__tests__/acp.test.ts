@@ -7,15 +7,15 @@ import { mkdtempSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const tmuxMocks = vi.hoisted(() => ({
-  createSession: vi.fn(),
-  killSession: vi.fn(),
-  sessionExists: vi.fn(),
+  tmuxCreateSession: vi.fn(),
+  tmuxKillSession: vi.fn(),
+  tmuxSessionExists: vi.fn(),
 }))
 
 vi.mock('../tmux-cli.js', () => ({
-  tmuxCreateSession: tmuxMocks.createSession,
-  tmuxKillSession: tmuxMocks.killSession,
-  tmuxSessionExists: tmuxMocks.sessionExists,
+  tmuxCreateSession: tmuxMocks.tmuxCreateSession,
+  tmuxKillSession: tmuxMocks.tmuxKillSession,
+  tmuxSessionExists: tmuxMocks.tmuxSessionExists,
 }))
 
 import type { AgentState } from '../../agents/agent-state.js'
@@ -67,9 +67,9 @@ async function listenOnSocket(
 }
 
 beforeEach(() => {
-  tmuxMocks.createSession.mockReset()
-  tmuxMocks.killSession.mockReset()
-  tmuxMocks.sessionExists.mockReset()
+  tmuxMocks.tmuxCreateSession.mockReset()
+  tmuxMocks.tmuxKillSession.mockReset()
+  tmuxMocks.tmuxSessionExists.mockReset()
 })
 
 afterEach(async () => {
@@ -102,12 +102,12 @@ describe('AcpRuntimeSync', () => {
   it('spawns the package host with the preflight-resolved binary and fresh readiness', async () => {
     const home = makeHome()
     const staleSessionPath = writeAgentFile(home, 'agent-spawn', 'acp-session-id', 'stale-session\n')
-    tmuxMocks.createSession.mockImplementation(async (agentId: string) => {
+    tmuxMocks.tmuxCreateSession.mockImplementation(async (agentId: string) => {
       expect(existsSync(staleSessionPath)).toBe(false)
       writeAgentFile(home, agentId, 'acp-session-id', 'session-2858\n')
       writeAgentFile(home, agentId, 'acp-token', 'secret\n')
     })
-    tmuxMocks.sessionExists.mockResolvedValue(true)
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true)
     const runtime = new AcpRuntimeSync({
       overdeckHome: home,
       prepareLaunch: async () => ({
@@ -125,7 +125,7 @@ describe('AcpRuntimeSync', () => {
       env: { EXTRA: 'value' },
     })
 
-    expect(tmuxMocks.createSession).toHaveBeenCalledWith(
+    expect(tmuxMocks.tmuxCreateSession).toHaveBeenCalledWith(
       'agent-spawn',
       '/tmp/work space',
       expect.stringContaining(`node '${join(packageRoot, 'dist', 'acp-host.js')}' --agent 'agent-spawn' --provider 'kimi'`),
@@ -134,7 +134,7 @@ describe('AcpRuntimeSync', () => {
         OVERDECK_AGENT_ID: 'agent-spawn',
       },
     )
-    const command = tmuxMocks.createSession.mock.calls[0]?.[2]
+    const command = tmuxMocks.tmuxCreateSession.mock.calls[0]?.[2]
     expect(command).toContain("--workspace '/tmp/work space'")
     expect(command).toContain("--binary-path '/opt/kimi code/bin/kimi'")
     expect(command).toContain(`--context-file '${join(home, 'agents', 'agent-spawn', 'acp-context.md')}'`)
@@ -151,7 +151,7 @@ describe('AcpRuntimeSync', () => {
 
   it('surfaces the host launch diagnostic without waiting for readiness timeout', async () => {
     const home = makeHome()
-    tmuxMocks.createSession.mockImplementation(async (agentId: string) => {
+    tmuxMocks.tmuxCreateSession.mockImplementation(async (agentId: string) => {
       writeAgentFile(
         home,
         agentId,
@@ -159,7 +159,7 @@ describe('AcpRuntimeSync', () => {
         'Kimi authentication is required. Run `kimi`, then /login, and retry.\n',
       )
     })
-    tmuxMocks.sessionExists.mockResolvedValue(true)
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true)
     const runtime = new AcpRuntimeSync({
       overdeckHome: home,
       prepareLaunch: async () => ({
@@ -175,15 +175,15 @@ describe('AcpRuntimeSync', () => {
     })).rejects.toThrow(
       'ACP host agent-auth-failed failed to start: Kimi authentication is required. Run `kimi`, then /login, and retry.',
     )
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-auth-failed')
+    expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith('agent-auth-failed')
   })
 
   it('kills a host that never produces fresh readiness', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
     const home = makeHome()
     writeAgentFile(home, 'agent-timeout', 'acp-session-id', 'stale-session\n')
-    tmuxMocks.createSession.mockResolvedValue(undefined)
-    tmuxMocks.sessionExists.mockResolvedValue(true)
+    tmuxMocks.tmuxCreateSession.mockResolvedValue(undefined)
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true)
     const runtime = new AcpRuntimeSync({
       overdeckHome: home,
       prepareLaunch: async () => ({
@@ -203,7 +203,7 @@ describe('AcpRuntimeSync', () => {
     await vi.advanceTimersByTimeAsync(30_000)
 
     await rejection
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-timeout')
+    expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith('agent-timeout')
   })
 
   it('posts authenticated messages and surfaces missing protocol artifacts', async () => {
@@ -323,7 +323,7 @@ describe('AcpRuntimeSync', () => {
       operations.push(body)
       interruptReceived()
     })
-    tmuxMocks.sessionExists.mockResolvedValue(true)
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true)
     const execCommand = vi.fn(async (command: string) => ({
       stdout: command.includes('list-panes') ? '4242\n' : '',
     }))
@@ -339,7 +339,7 @@ describe('AcpRuntimeSync', () => {
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('list-panes'))
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('kill -TERM'))
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('kill -KILL'))
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith(agentId)
+    expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith(agentId)
     expect(existsSync(transcript)).toBe(true)
   })
 })

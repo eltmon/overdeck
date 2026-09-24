@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { migrateOverdeckToPanSync, ensurePanGitignoreSync } from '../../src/lib/workspace-manager.js';
-import { mergePanSkillsIntoWorkspaceSync } from '../../src/lib/skills-merge.js';
+import { migrateOverdeckToPan, ensurePanGitignore } from '../../src/lib/workspace-manager.js';
+import { mergePanSkillsIntoWorkspace } from '../../src/lib/skills-merge.js';
 
 function makeTmp(): string {
   return mkdtempSync(join(tmpdir(), 'pan-artifacts-test-'));
@@ -17,7 +17,7 @@ describe('ensurePanGitignore', () => {
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
   it('creates .gitignore with required entries when file does not exist', () => {
-    ensurePanGitignoreSync(dir);
+    ensurePanGitignore(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     expect(content).toContain('.pan/events/');
     expect(content).toContain('.pan/review/');
@@ -28,7 +28,7 @@ describe('ensurePanGitignore', () => {
 
   it('appends missing entries to an existing .gitignore', () => {
     writeFileSync(join(dir, '.gitignore'), 'node_modules/\n', 'utf-8');
-    ensurePanGitignoreSync(dir);
+    ensurePanGitignore(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     expect(content).toContain('node_modules/');
     expect(content).toContain('.pan/events/');
@@ -40,7 +40,7 @@ describe('ensurePanGitignore', () => {
 
   it('does not duplicate entries if already present', () => {
     writeFileSync(join(dir, '.gitignore'), '.pan/events/\n.pan/review/\n.pan/prompts/\n.pan/test/\n.claude/skills/\n', 'utf-8');
-    ensurePanGitignoreSync(dir);
+    ensurePanGitignore(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     const panMatches = (content.match(/\.pan\/events\//g) || []).length;
     const testMatches = (content.match(/\.pan\/test\//g) || []).length;
@@ -51,7 +51,7 @@ describe('ensurePanGitignore', () => {
   });
 
   it('does not add .pan/ itself (only runtime subdirs)', () => {
-    ensurePanGitignoreSync(dir);
+    ensurePanGitignore(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     // Must not gitignore .pan/ at root level (would block .pan/skills/)
     const lines = content.split('\n').map(l => l.trim());
@@ -59,14 +59,14 @@ describe('ensurePanGitignore', () => {
   });
 
   it('does not add .planning/ to .gitignore', () => {
-    ensurePanGitignoreSync(dir);
+    ensurePanGitignore(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     expect(content).not.toContain('.planning/');
   });
 
   it('is idempotent across multiple calls', () => {
-    ensurePanGitignoreSync(dir);
-    ensurePanGitignoreSync(dir);
+    ensurePanGitignore(dir);
+    ensurePanGitignore(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     const panMatches = (content.match(/\.pan\/events\//g) || []).length;
     const testMatches = (content.match(/\.pan\/test\//g) || []).length;
@@ -85,7 +85,7 @@ describe('migrateOverdeckToPan', () => {
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
   it('returns empty result when no .overdeck/ subdirs exist', () => {
-    const result = migrateOverdeckToPanSync(dir);
+    const result = migrateOverdeckToPan(dir);
     expect(result.migrated).toHaveLength(0);
     expect(result.skipped).toHaveLength(0);
     expect(result.errors).toHaveLength(0);
@@ -96,7 +96,7 @@ describe('migrateOverdeckToPan', () => {
     mkdirSync(oldDir, { recursive: true });
     writeFileSync(join(oldDir, 'PAN-1.jsonl'), '{}', 'utf-8');
 
-    const result = migrateOverdeckToPanSync(dir);
+    const result = migrateOverdeckToPan(dir);
     expect(result.migrated.some(m => m.includes('.overdeck/events'))).toBe(true);
     expect(existsSync(join(dir, '.pan', 'events', 'PAN-1.jsonl'))).toBe(true);
     expect(existsSync(join(dir, '.overdeck', 'events'))).toBe(false);
@@ -106,7 +106,7 @@ describe('migrateOverdeckToPan', () => {
     mkdirSync(join(dir, '.overdeck', 'triage'), { recursive: true });
     writeFileSync(join(dir, '.overdeck', 'triage', 'out.md'), 'triage', 'utf-8');
 
-    migrateOverdeckToPanSync(dir);
+    migrateOverdeckToPan(dir);
     expect(existsSync(join(dir, '.pan', 'review'))).toBe(true);
   });
 
@@ -114,7 +114,7 @@ describe('migrateOverdeckToPan', () => {
     mkdirSync(join(dir, '.overdeck', 'health'), { recursive: true });
     writeFileSync(join(dir, '.overdeck', 'health', 'out.md'), 'health', 'utf-8');
 
-    migrateOverdeckToPanSync(dir);
+    migrateOverdeckToPan(dir);
     expect(existsSync(join(dir, '.pan', 'review'))).toBe(true);
   });
 
@@ -122,7 +122,7 @@ describe('migrateOverdeckToPan', () => {
     mkdirSync(join(dir, '.overdeck', 'prompts'), { recursive: true });
     writeFileSync(join(dir, '.overdeck', 'prompts', 'agent.md'), 'prompt', 'utf-8');
 
-    migrateOverdeckToPanSync(dir);
+    migrateOverdeckToPan(dir);
     expect(existsSync(join(dir, '.pan', 'prompts', 'agent.md'))).toBe(true);
   });
 
@@ -130,7 +130,7 @@ describe('migrateOverdeckToPan', () => {
     mkdirSync(join(dir, '.overdeck', 'events'), { recursive: true });
     mkdirSync(join(dir, '.pan', 'events'), { recursive: true });
 
-    const result = migrateOverdeckToPanSync(dir);
+    const result = migrateOverdeckToPan(dir);
     expect(result.skipped).toContain('.overdeck/events');
     // Old dir not removed
     expect(existsSync(join(dir, '.overdeck', 'events'))).toBe(true);
@@ -138,7 +138,7 @@ describe('migrateOverdeckToPan', () => {
 
   it('never touches paths outside the project directory', () => {
     // Verify ~/.overdeck is untouched by confirming migration only checks project path
-    const result = migrateOverdeckToPanSync(dir);
+    const result = migrateOverdeckToPan(dir);
     // No errors from attempting to access global ~/.overdeck/
     expect(result.errors).toHaveLength(0);
   });
@@ -146,7 +146,7 @@ describe('migrateOverdeckToPan', () => {
   it('removes empty .overdeck/ directory after migration', () => {
     mkdirSync(join(dir, '.overdeck', 'events'), { recursive: true });
 
-    migrateOverdeckToPanSync(dir);
+    migrateOverdeckToPan(dir);
     expect(existsSync(join(dir, '.overdeck'))).toBe(false);
   });
 });
@@ -169,7 +169,7 @@ describe('mergePanSkillsIntoWorkspace', () => {
   });
 
   it('returns empty result when .pan/skills/ does not exist', () => {
-    const result = mergePanSkillsIntoWorkspaceSync(projectDir, workspaceDir);
+    const result = mergePanSkillsIntoWorkspace(projectDir, workspaceDir);
     expect(result.added).toHaveLength(0);
   });
 
@@ -178,7 +178,7 @@ describe('mergePanSkillsIntoWorkspace', () => {
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), '# My Skill\nContent', 'utf-8');
 
-    const result = mergePanSkillsIntoWorkspaceSync(projectDir, workspaceDir);
+    const result = mergePanSkillsIntoWorkspace(projectDir, workspaceDir);
     expect(result.added.length).toBeGreaterThan(0);
     expect(existsSync(join(workspaceDir, '.claude', 'skills', 'my-skill', 'SKILL.md'))).toBe(true);
   });
@@ -193,7 +193,7 @@ describe('mergePanSkillsIntoWorkspace', () => {
     mkdirSync(existingDir, { recursive: true });
     writeFileSync(join(existingDir, 'SKILL.md'), '# User Owned', 'utf-8');
 
-    const result = mergePanSkillsIntoWorkspaceSync(projectDir, workspaceDir);
+    const result = mergePanSkillsIntoWorkspace(projectDir, workspaceDir);
     expect(result.skipped.some(s => s.includes('my-skill'))).toBe(true);
     // Content must be unchanged
     const content = readFileSync(join(existingDir, 'SKILL.md'), 'utf-8');
@@ -207,7 +207,7 @@ describe('mergePanSkillsIntoWorkspace', () => {
       writeFileSync(join(d, 'SKILL.md'), `# ${name}`, 'utf-8');
     }
 
-    const result = mergePanSkillsIntoWorkspaceSync(projectDir, workspaceDir);
+    const result = mergePanSkillsIntoWorkspace(projectDir, workspaceDir);
     expect(result.overlayed).toHaveLength(3);
     expect(existsSync(join(workspaceDir, '.claude', 'skills', 'skill-a'))).toBe(true);
     expect(existsSync(join(workspaceDir, '.claude', 'skills', 'skill-b'))).toBe(true);

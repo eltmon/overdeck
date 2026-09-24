@@ -6,7 +6,7 @@
  * operator re-surface TTL. Runtime-plane residue — deleting the directory only
  * resets reporting cadence and never loses pipeline state.
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from '../paths.js';
 
@@ -42,11 +42,6 @@ export function readSweeperRowState(issueId: string, orbit: string): StallSweepe
 export function writeSweeperRowState(issueId: string, orbit: string, state: StallSweeperRowState): void {
   mkdirSync(sweeperDir(), { recursive: true });
   writeFileSync(statePath(issueId, orbit), JSON.stringify(state, null, 2));
-}
-
-/** Episode over (row resolved or orbit changed) — forget so a future park starts fresh. */
-export function clearSweeperRowState(issueId: string, orbit: string): void {
-  rmSync(statePath(issueId, orbit), { force: true });
 }
 
 /** Population-signature persistence for change-only sweep.scan emission. */

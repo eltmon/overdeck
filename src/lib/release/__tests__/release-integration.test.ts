@@ -8,20 +8,20 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../merge-set.js', () => ({
-  getMergeSetSync: vi.fn(() => mocks.mergeSet),
+  getMergeSet: vi.fn(() => mocks.mergeSet),
 }));
 
 vi.mock('../../projects.js', () => ({
   getProjectSync: vi.fn(() => mocks.project),
-  findProjectByPathSync: vi.fn(() => mocks.project),
+  findProjectByPath: vi.fn(() => mocks.project),
 }));
 
 
 vi.mock('../../release-set.js', () => ({
-  upsertReleaseSetSync: vi.fn((releaseSet: any) => {
+  upsertReleaseSet: vi.fn((releaseSet: any) => {
     mocks.persistedSets.push(structuredClone(releaseSet));
   }),
-  withComponentStateSync: vi.fn((releaseSet: any, componentKey: string, patch: any) => ({
+  withComponentState: vi.fn((releaseSet: any, componentKey: string, patch: any) => ({
     ...releaseSet,
     updatedAt: new Date().toISOString(),
     components: releaseSet.components.map((component: any) =>

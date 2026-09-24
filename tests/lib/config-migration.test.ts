@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { needsMigrationSync, hasLegacySettingsSync, convertToYamlConfigSync, previewMigration, cleanupLegacyRuntimeSymlinksSync, migrateSyncTargetsSync } from '../../src/lib/config-migration.js';
+import { needsMigration, hasLegacySettings, convertToYamlConfig, previewMigration, cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../src/lib/config-migration.js';
 import type { SettingsConfig } from '../../src/lib/settings.js';
 import { existsSync, mkdirSync, rmSync, writeFileSync, symlinkSync } from 'fs';
 import { join } from 'path';
@@ -48,20 +48,20 @@ describe('config-migration', () => {
   describe('needsMigration', () => {
     it.skip('should return true when legacy settings exist and no YAML config', () => {
       // Skipped: Requires complex module-level mocking to isolate from real config files
-      vi.mocked(hasLegacySettingsSync).mockReturnValue(true);
-      expect(needsMigrationSync()).toBe(true);
+      vi.mocked(hasLegacySettings).mockReturnValue(true);
+      expect(needsMigration()).toBe(true);
     });
 
     it.skip('should return false when YAML config already exists', () => {
       // Skipped: Requires complex module-level mocking to isolate from real config files
       // This would need proper mocking of hasGlobalConfig
-      expect(typeof needsMigrationSync()).toBe('boolean');
+      expect(typeof needsMigration()).toBe('boolean');
     });
   });
 
   describe('hasLegacySettings', () => {
     it('should detect presence of settings.json', () => {
-      const result = hasLegacySettingsSync();
+      const result = hasLegacySettings();
       expect(typeof result).toBe('boolean');
     });
   });
@@ -88,7 +88,7 @@ describe('config-migration', () => {
         },
       };
 
-      const yamlConfig = convertToYamlConfigSync(legacySettings);
+      const yamlConfig = convertToYamlConfig(legacySettings);
 
       // New format uses providers instead of presets
       expect(yamlConfig.models?.providers).toBeDefined();
@@ -117,7 +117,7 @@ describe('config-migration', () => {
         },
       };
 
-      const yamlConfig = convertToYamlConfigSync(legacySettings);
+      const yamlConfig = convertToYamlConfig(legacySettings);
 
       // Providers should be enabled based on API keys
       expect(yamlConfig.models?.providers?.anthropic).toBe(true);
@@ -144,7 +144,7 @@ describe('config-migration', () => {
         api_keys: {},
       };
 
-      const yamlConfig = convertToYamlConfigSync(legacySettings);
+      const yamlConfig = convertToYamlConfig(legacySettings);
 
       // Only anthropic should be enabled by default (no API keys needed)
       expect(yamlConfig.models?.providers?.anthropic).toBe(true);
@@ -171,7 +171,7 @@ describe('config-migration', () => {
         api_keys: {},
       };
 
-      const yamlConfig = convertToYamlConfigSync(legacySettings);
+      const yamlConfig = convertToYamlConfig(legacySettings);
 
       // Legacy conversion doesn't create overrides (smart selection handles this)
       expect(yamlConfig.models?.overrides).toBeDefined();
@@ -201,7 +201,7 @@ describe('config-migration', () => {
         },
       };
 
-      const yamlConfig = convertToYamlConfigSync(legacySettings);
+      const yamlConfig = convertToYamlConfig(legacySettings);
 
       expect(yamlConfig.api_keys).toEqual({
         openai: 'sk-test-123',
@@ -225,7 +225,7 @@ describe('config-migration', () => {
   describe('cleanupLegacyRuntimeSymlinks', () => {
     it('should return empty result when no legacy directories exist', () => {
       // In CI / clean environments there are no ~/.codex etc. dirs — safe to call directly
-      const result = cleanupLegacyRuntimeSymlinksSync();
+      const result = cleanupLegacyRuntimeSymlinks();
 
       expect(result).toHaveProperty('cleaned');
       expect(result).toHaveProperty('total');
@@ -256,7 +256,7 @@ describe('config-migration', () => {
       // We can't easily redirect homedir() in the function, so call with real dirs.
       // Instead, verify the function correctly identifies and removes only Overdeck symlinks
       // when given a realistic setup. We test the logic by checking it ran without throwing.
-      const result = cleanupLegacyRuntimeSymlinksSync();
+      const result = cleanupLegacyRuntimeSymlinks();
 
       expect(result.total).toBe(result.cleaned.length);
       expect(result.errors).toBeDefined();
@@ -266,7 +266,7 @@ describe('config-migration', () => {
 
     it('should not throw when legacy directories are unreadable', () => {
       // The function should handle errors gracefully (missing dirs, permission errors)
-      expect(() => cleanupLegacyRuntimeSymlinksSync()).not.toThrow();
+      expect(() => cleanupLegacyRuntimeSymlinks()).not.toThrow();
     });
   });
 
@@ -276,7 +276,7 @@ describe('config-migration', () => {
       // The function reads from ~/.overdeck/config.toml; if it doesn't exist, no migration
       // We can't redirect homedir easily so we test observable behavior:
       // if the real user has no config.toml with targets, it should return false
-      const result = migrateSyncTargetsSync();
+      const result = migrateSyncTargets();
 
       // Result must always be a valid object
       expect(result).toHaveProperty('migrated');

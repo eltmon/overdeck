@@ -452,35 +452,6 @@ export function mergeToolCallState(
   };
 }
 
-export function parsePermissionRequest(
-  params: EffectAcpSchema.RequestPermissionRequest,
-): AcpPermissionRequest {
-  const toolCall = makeToolCallState(
-    {
-      toolCallId: params.toolCall.toolCallId,
-      title: params.toolCall.title,
-      kind: params.toolCall.kind,
-      status: params.toolCall.status,
-      rawInput: params.toolCall.rawInput,
-      rawOutput: params.toolCall.rawOutput,
-      content: params.toolCall.content,
-      locations: params.toolCall.locations,
-    },
-    { fallbackStatus: "pending" },
-  );
-  const kind = normalizeToolKind(params.toolCall.kind) ?? "unknown";
-  const detail =
-    toolCall?.command ??
-    toolCall?.title ??
-    toolCall?.detail ??
-    (typeof params.sessionId === "string" ? `Session ${params.sessionId}` : undefined);
-  return {
-    kind,
-    ...(detail ? { detail } : {}),
-    ...(toolCall ? { toolCall } : {}),
-  };
-}
-
 export function sessionUpdateIsReplay(params: EffectAcpSchema.SessionNotification): boolean {
   const meta = params._meta;
   return isRecord(meta) && meta.isReplay === true;

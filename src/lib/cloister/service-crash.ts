@@ -1,11 +1,12 @@
 /** Cloister crash recovery and poke escalation seam. */
+import { Effect } from 'effect';
 import { createHash } from 'crypto';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { DomainEvent } from '@overdeck/contracts';
 import { CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
-import { getAgentRuntimeStateSync, getAgentStateSync, saveAgentStateSync } from '../agents.js';
-import { setCloisterSpawnsPausedSync } from '../overdeck/control-settings.js';
+import { getAgentRuntimeStateSync, getAgentState, saveAgentStateSync } from '../agents.js';
+import { setCloisterSpawnsPaused } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { exactPaneTarget, getManagedTmuxSocketName } from '../tmux.js';
 import { advancingPhaseFromPrFacts, isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
@@ -85,8 +86,8 @@ export function nonRestartableReason(role: string, sessionId: string | undefined
 /**
  * Poke an agent (send "are you stuck?" message).
  *
- * NOTE: runtime.sendMessage() is async — both ClaudeCodeRuntime and PiRuntime
- * are declared `async sendMessage(): Promise<void>`. A `throw` inside an
+ * NOTE: runtime.sendMessage() is async — ClaudeCodeRuntimeSync.sendMessage()
+ * is declared `async sendMessage(): Promise<void>`. A `throw` inside an
  * async function before any await still returns a rejected Promise, so the
  * surrounding try/catch CANNOT catch it. Without explicit `.catch()`, the
  * rejection becomes an UnhandledPromiseRejection and crashes the dashboard
@@ -103,13 +104,13 @@ export function pokeAgent(host: CrashHost, agentId: string): void {
 /** PAN-2452: fingerprint of observable progress — workspace HEAD + pane tail.
  * Unchanged fingerprint across pokes = the poke did nothing. */
 export async function progressFingerprint(_host: CrashHost, agentId: string): Promise<string> {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   let head = '';
   if (state?.workspace) {
     try {
       if (state.issueId) {
-        const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-        head = await snapshotWorkspaceHeadsPromise(state.issueId, state.workspace) ?? '';
+        const { snapshotWorkspaceHeads } = await import('../git-utils.js');
+        head = await snapshotWorkspaceHeads(state.issueId, state.workspace) ?? '';
       } else {
         const { stdout } = await execAsync('git rev-parse HEAD', { cwd: state.workspace, encoding: 'utf-8' });
         head = stdout.trim();
@@ -151,9 +152,9 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
 
   // Tier 3 (5th no-progress poke): stop poking — surface to the operator.
   if (ineffective >= 4) {
-    const { setAgentPausedSync } = await import('../agents/agent-state.js');
+    const { setAgentPaused } = await import('../agents/agent-state.js');
     try {
-      setAgentPausedSync(agentId, `needs-you: idle-alive — no observable progress across ${ineffective + 1} pokes (idle-alive escalation)`);
+      await Effect.runPromise(setAgentPaused(agentId, `needs-you: idle-alive — no observable progress across ${ineffective + 1} pokes (idle-alive escalation)`));
       host.emit({ type: 'agent_stuck', agentId, health: undefined as never });
       console.log(`🛑 ${agentId} paused: idle-alive across ${ineffective + 1} pokes`);
     } catch (pauseErr) {
@@ -230,7 +231,7 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
   // Both state.json and runtime.json must be checked — stopAgent writes both,
   // but a race between the CLI kill and this health check poll could see one
   // but not the other if only one file is consulted.
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!agentState || agentState.status === 'stopped') {
     console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
     return;
@@ -367,7 +368,7 @@ export async function restartAgent(_host: CrashHost, agentId: string): Promise<v
   }
 
   // Get agent state to find session ID and workspace
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!agentState?.sessionId) {
     throw new Error(`No session ID found for agent ${agentId}`);
   }
@@ -430,7 +431,7 @@ export function checkForMassDeaths(host: CrashHost): void {
  */
 export function pauseSpawns(host: CrashHost, reason: string): void {
   host.spawnsPaused = true;
-  setCloisterSpawnsPausedSync(true);
+  setCloisterSpawnsPaused(true);
   host.emit({ type: 'spawn_paused', reason });
   console.log(`🔔 Agent spawns paused: ${reason}`);
 }

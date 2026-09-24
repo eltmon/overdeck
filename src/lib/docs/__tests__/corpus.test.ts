@@ -7,7 +7,6 @@ import {
   chunkMarkdown,
   discoverDocsCorpusSources,
   headingAnchor,
-  loadDocsCorpus,
   type DocsCorpusSource,
 } from '../corpus.js';
 import { getDefaultDocsConfig, type NormalizedDocsConfig } from '../../config-yaml.js';
@@ -80,25 +79,6 @@ describe('docs corpus discovery', () => {
     expect(withPrds.map((item) => item.relativePath)).not.toContain('docs/prds/completed/PAN-2.md');
   });
 
-  it('loads skill documents into chunks with skill doc kind', async () => {
-    await writeSyncFixture('skills/pan-sync/SKILL.md', '# pan-sync\n\nUse `pan sync`.\n');
-
-    const chunks = await loadDocsCorpus({
-      rootDir,
-      syncSourcesRoot,
-      config: docsConfig({ docs: false, rules: false, claudeMd: false, skills: true }),
-    });
-
-    expect(chunks).toHaveLength(1);
-    expect(chunks[0]).toMatchObject({
-      docPath: 'sync-sources/skills/pan-sync/SKILL.md',
-      docKind: 'skill',
-      sectionHeading: 'pan-sync',
-      sectionAnchor: 'pan-sync',
-      headingPath: ['pan-sync'],
-    });
-    expect(chunks[0].content).toContain('Use `pan sync`.');
-  });
 });
 
 describe('markdown chunking', () => {

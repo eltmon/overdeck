@@ -16,16 +16,16 @@ import {
   type OverdeckTestDb,
 } from '../../../helpers/overdeck-test-db.js';
 import {
-  closeOverdeckDatabaseSync,
-  getOverdeckDatabaseSync,
+  closeOverdeckDatabase,
+  getOverdeckDatabase,
 } from '../../../../src/lib/overdeck/infra.js';
 
 import {
-  insertUatGenerationSync,
-  getUatGenerationSync,
-  listUatGenerationsSync,
-  updateUatGenerationSync,
-  markUatGenerationRepoPromotedSync,
+  insertUatGeneration,
+  getUatGeneration,
+  listUatGenerations,
+  updateUatGeneration,
+  markUatGenerationRepoPromoted,
   type UatGeneration,
 } from '../../../../src/lib/overdeck/merge-sync.js';
 
@@ -128,9 +128,9 @@ describe('per-repo generation round-trip', () => {
     seedIssue(db, 'MIN-902');
 
     const gen = makePolyrepoGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    const loaded = getUatGenerationSync(gen.name)!;
+    const loaded = getUatGeneration(gen.name)!;
 
     expect(loaded.repos).toHaveLength(2);
     expect(loaded.repos!.map((r) => r.repoKey)).toEqual(['fe', 'api']);
@@ -165,18 +165,18 @@ describe('per-repo generation round-trip', () => {
 
     const gen = makePolyrepoGeneration();
     // Hand the writer the repos back-to-front; read order must still follow mergeOrder.
-    insertUatGenerationSync({ ...gen, repos: [...gen.repos!].reverse() });
+    insertUatGeneration({ ...gen, repos: [...gen.repos!].reverse() });
 
-    expect(getUatGenerationSync(gen.name)!.repos!.map((r) => r.repoKey)).toEqual(['fe', 'api']);
+    expect(getUatGeneration(gen.name)!.repos!.map((r) => r.repoKey)).toEqual(['fe', 'api']);
   });
 
-  it('carries repos through listUatGenerationsSync', () => {
+  it('carries repos through listUatGenerations', () => {
     const db = odb.raw();
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
-    insertUatGenerationSync(makePolyrepoGeneration());
+    insertUatGeneration(makePolyrepoGeneration());
 
-    const listed = listUatGenerationsSync({ projectRoot: '/tmp/myn' });
+    const listed = listUatGenerations({ projectRoot: '/tmp/myn' });
     expect(listed).toHaveLength(1);
     expect(listed[0].repos!.map((r) => r.repoKey)).toEqual(['fe', 'api']);
   });
@@ -186,7 +186,7 @@ describe('per-repo generation round-trip', () => {
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
 
-    insertUatGenerationSync(makePolyrepoGeneration());
+    insertUatGeneration(makePolyrepoGeneration());
 
     // Rebuild of the same deterministic daily name, now only one repo contributes.
     const rebuilt = makePolyrepoGeneration({
@@ -209,9 +209,9 @@ describe('per-repo generation round-trip', () => {
         repos: [{ repoKey: 'api', branch: 'feature/min-902', headSha: 'api902', mergeOrderInRepo: 1 }],
       }],
     });
-    insertUatGenerationSync(rebuilt);
+    insertUatGeneration(rebuilt);
 
-    const loaded = getUatGenerationSync('uat/min-otter-0727')!;
+    const loaded = getUatGeneration('uat/min-otter-0727')!;
     expect(loaded.repos!.map((r) => r.repoKey)).toEqual(['api']);
     expect(loaded.members.map((m) => m.issueId)).toEqual(['MIN-902']);
   });
@@ -223,9 +223,9 @@ describe('legacy and monorepo rows synthesize a single repo', () => {
     seedIssue(db, 'PAN-1');
 
     const gen = makeLegacyGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    const loaded = getUatGenerationSync(gen.name)!;
+    const loaded = getUatGeneration(gen.name)!;
     expect(loaded.repos).toEqual([{
       repoKey: 'project',
       repoPath: '/tmp/project',
@@ -242,21 +242,21 @@ describe('legacy and monorepo rows synthesize a single repo', () => {
   it('leaves members without per-repo contributions undefined', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');
-    insertUatGenerationSync(makeLegacyGeneration());
+    insertUatGeneration(makeLegacyGeneration());
 
-    expect(getUatGenerationSync('uat/pan-otter-0610')!.members[0].repos).toBeUndefined();
+    expect(getUatGeneration('uat/pan-otter-0610')!.members[0].repos).toBeUndefined();
   });
 });
 
-describe('updateUatGenerationSync with per-repo state', () => {
+describe('updateUatGeneration with per-repo state', () => {
   it('replaces repo rows when repos are patched', () => {
     const db = odb.raw();
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
     const gen = makePolyrepoGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    updateUatGenerationSync(gen.name, {
+    updateUatGeneration(gen.name, {
       repos: [{
         repoKey: 'api',
         repoPath: '/tmp/myn/api',
@@ -268,7 +268,7 @@ describe('updateUatGenerationSync with per-repo state', () => {
       }],
     });
 
-    const loaded = getUatGenerationSync(gen.name)!;
+    const loaded = getUatGeneration(gen.name)!;
     expect(loaded.repos!.map((r) => r.repoKey)).toEqual(['api']);
     expect(loaded.repos![0].baseSha).toBe('fff6666');
   });
@@ -279,15 +279,15 @@ describe('updateUatGenerationSync with per-repo state', () => {
     seedIssue(db, 'MIN-902');
     seedIssue(db, 'MIN-903');
     const gen = makePolyrepoGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
     // heldOut-only patches reconstruct members from rows that carry no repo
     // data — the contributions must survive that rebuild.
-    updateUatGenerationSync(gen.name, {
+    updateUatGeneration(gen.name, {
       heldOut: [{ issueId: 'MIN-903', reason: 'conflict in api could not be resolved' }],
     });
 
-    const loaded = getUatGenerationSync(gen.name)!;
+    const loaded = getUatGeneration(gen.name)!;
     expect(loaded.heldOut).toEqual([
       { issueId: 'MIN-903', reason: 'conflict in api could not be resolved' },
     ]);
@@ -302,12 +302,12 @@ describe('per-repo target branch and merge sha', () => {
     seedIssue(db, 'MIN-902');
     const gen = makePolyrepoGeneration();
     // api merges into develop, not main — promote must publish there.
-    insertUatGenerationSync({
+    insertUatGeneration({
       ...gen,
       repos: gen.repos!.map((r) => (r.repoKey === 'api' ? { ...r, targetBranch: 'develop' } : r)),
     });
 
-    const loaded = getUatGenerationSync(gen.name)!;
+    const loaded = getUatGeneration(gen.name)!;
     expect(loaded.repos!.find((r) => r.repoKey === 'api')!.targetBranch).toBe('develop');
     expect(loaded.repos!.find((r) => r.repoKey === 'fe')!.targetBranch).toBe('main');
   });
@@ -317,11 +317,11 @@ describe('per-repo target branch and merge sha', () => {
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
     const gen = makePolyrepoGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    markUatGenerationRepoPromotedSync(gen.name, 'fe', '2026-07-27T10:00:00.000Z', 'fe1234567890');
+    markUatGenerationRepoPromoted(gen.name, 'fe', '2026-07-27T10:00:00.000Z', 'fe1234567890');
 
-    const fe = getUatGenerationSync(gen.name)!.repos!.find((r) => r.repoKey === 'fe')!;
+    const fe = getUatGeneration(gen.name)!.repos!.find((r) => r.repoKey === 'fe')!;
     expect(fe.promotedAt).toBe('2026-07-27T10:00:00.000Z');
     expect(fe.mergeSha).toBe('fe1234567890');
   });
@@ -331,27 +331,27 @@ describe('per-repo target branch and merge sha', () => {
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
     const gen = makePolyrepoGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    markUatGenerationRepoPromotedSync(gen.name, 'fe', '2026-07-27T10:00:00.000Z', 'fe1234567890');
-    markUatGenerationRepoPromotedSync(gen.name, 'fe', '2026-07-27T11:00:00.000Z');
+    markUatGenerationRepoPromoted(gen.name, 'fe', '2026-07-27T10:00:00.000Z', 'fe1234567890');
+    markUatGenerationRepoPromoted(gen.name, 'fe', '2026-07-27T11:00:00.000Z');
 
-    expect(getUatGenerationSync(gen.name)!.repos!.find((r) => r.repoKey === 'fe')!.mergeSha)
+    expect(getUatGeneration(gen.name)!.repos!.find((r) => r.repoKey === 'fe')!.mergeSha)
       .toBe('fe1234567890');
   });
 });
 
-describe('markUatGenerationRepoPromotedSync', () => {
+describe('markUatGenerationRepoPromoted', () => {
   it('stamps promoted_at on one repo and leaves the others pending', () => {
     const db = odb.raw();
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
     const gen = makePolyrepoGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    markUatGenerationRepoPromotedSync(gen.name, 'fe', '2026-07-27T10:00:00.000Z');
+    markUatGenerationRepoPromoted(gen.name, 'fe', '2026-07-27T10:00:00.000Z');
 
-    const loaded = getUatGenerationSync(gen.name)!;
+    const loaded = getUatGeneration(gen.name)!;
     expect(loaded.repos!.find((r) => r.repoKey === 'fe')!.promotedAt).toBe('2026-07-27T10:00:00.000Z');
     expect(loaded.repos!.find((r) => r.repoKey === 'api')!.promotedAt).toBeNull();
   });
@@ -361,9 +361,9 @@ describe('markUatGenerationRepoPromotedSync', () => {
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
     const gen = makePolyrepoGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    expect(() => markUatGenerationRepoPromotedSync(gen.name, 'infra', '2026-07-27T10:00:00.000Z'))
+    expect(() => markUatGenerationRepoPromoted(gen.name, 'infra', '2026-07-27T10:00:00.000Z'))
       .toThrow(/uat generation repo not found/);
   });
 });
@@ -373,12 +373,12 @@ describe('schema top-up idempotency', () => {
     const db = odb.raw();
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
-    insertUatGenerationSync(makePolyrepoGeneration());
+    insertUatGeneration(makePolyrepoGeneration());
 
     // Re-opening runs ensureRuntimeIndexesSync — and so the per-repo table
     // top-up — a second time against a db that already has the tables.
-    closeOverdeckDatabaseSync();
-    const reopened = getOverdeckDatabaseSync(odb.dbPath);
+    closeOverdeckDatabase();
+    const reopened = getOverdeckDatabase(odb.dbPath);
 
     const repoCount = reopened
       .prepare('SELECT COUNT(*) AS n FROM uat_generation_repos')
@@ -389,6 +389,6 @@ describe('schema top-up idempotency', () => {
 
     expect(repoCount.n).toBe(2);
     expect(memberRepoCount.n).toBe(3);
-    expect(getUatGenerationSync('uat/min-otter-0727')!.repos).toHaveLength(2);
+    expect(getUatGeneration('uat/min-otter-0727')!.repos).toHaveLength(2);
   });
 });

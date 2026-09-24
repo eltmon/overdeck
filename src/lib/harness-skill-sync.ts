@@ -2,34 +2,23 @@ import { copyFileSync, mkdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { AGENT_SKILLS_DIR, SKILLS_DIR } from './paths.js';
 import {
-  collectSourceFilesSync,
+  collectSourceFiles,
   compareFileToManifest,
-  hashFileSync,
-  pruneStaleManifestEntriesSync,
-  readManifestSync,
+  hashFile,
+  pruneStaleManifestEntries,
+  readManifest,
   setManifestEntry,
-  writeManifestSync,
+  writeManifest,
 } from './manifest.js';
 import type { SyncItem, SyncOptions, SyncResult } from './sync.js';
 
-/**
- * Every harness whose native skill discovery is supplied by `pan sync`.
- *
- * kimi-code (PAN-1837): confirmed on the shared ~/.agents/skills discovery
- * path — the wi-fixture capture's system prompt listed the same skill
- * catalog Overdeck syncs there, so no second ~/.kimi-code/skills target is
- * needed. Muse Code 1.0.2 also discovers ~/.agents/skills and ~/.claude/skills
- * natively (verified with muse skills list --source user --json).
- */
-export const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'acp', 'pi', 'ohmypi', 'kimi-code', 'opencode', 'muse'] as const;
-
 /** Plan the shared Agent Skills half of the harness fan-out. */
-export function planAgentSkillsSync(
+export function planAgentSkills(
   targetSkillsDir: string = AGENT_SKILLS_DIR,
   sourceSkillsDir: string = SKILLS_DIR,
 ): SyncItem[] {
-  const manifest = readManifestSync(join(dirname(targetSkillsDir), '.overdeck-manifest.json'));
-  return collectSourceFilesSync(sourceSkillsDir, '').map((file) => {
+  const manifest = readManifest(join(dirname(targetSkillsDir), '.overdeck-manifest.json'));
+  return collectSourceFiles(sourceSkillsDir, '').map((file) => {
     const targetPath = join(targetSkillsDir, file.relativePath);
     const status = compareFileToManifest(targetPath, `skills/${file.relativePath}`, manifest);
     const syncStatus: SyncItem['status'] = status.action === 'new'
@@ -44,7 +33,7 @@ export function planAgentSkillsSync(
 }
 
 /** Copy complete skill bundles into the standard directory shared by Codex, Pi, and Oh My Pi. */
-export function executeAgentSkillsSync(
+export function executeAgentSkills(
   options: SyncOptions = {},
   targetSkillsDir: string = AGENT_SKILLS_DIR,
   sourceSkillsDir: string = SKILLS_DIR,
@@ -53,8 +42,8 @@ export function executeAgentSkillsSync(
     created: [], updated: [], adopted: [], skipped: [], conflicts: [], pruned: [], keptModified: [], diffs: [],
   };
   const manifestPath = join(dirname(targetSkillsDir), '.overdeck-manifest.json');
-  const manifest = readManifestSync(manifestPath);
-  const sourceFiles = collectSourceFilesSync(sourceSkillsDir, '');
+  const manifest = readManifest(manifestPath);
+  const sourceFiles = collectSourceFiles(sourceSkillsDir, '');
 
   for (const file of sourceFiles) {
     const targetFile = join(targetSkillsDir, file.relativePath);
@@ -64,7 +53,7 @@ export function executeAgentSkillsSync(
     if (status.action === 'new' || status.action === 'update') {
       mkdirSync(dirname(targetFile), { recursive: true });
       copyFileSync(file.absolutePath, targetFile);
-      setManifestEntry(manifest, manifestKey, hashFileSync(targetFile), 'overdeck');
+      setManifestEntry(manifest, manifestKey, hashFile(targetFile), 'overdeck');
       result[status.action === 'new' ? 'created' : 'updated'].push(file.relativePath);
     } else if (status.action === 'modified') {
       if (options.diff) {
@@ -76,7 +65,7 @@ export function executeAgentSkillsSync(
       }
       if (options.force) {
         copyFileSync(file.absolutePath, targetFile);
-        setManifestEntry(manifest, manifestKey, hashFileSync(targetFile), 'overdeck');
+        setManifestEntry(manifest, manifestKey, hashFile(targetFile), 'overdeck');
         result.updated.push(file.relativePath);
       } else {
         result.conflicts.push(file.relativePath);
@@ -87,13 +76,13 @@ export function executeAgentSkillsSync(
   }
 
   const sourceSet = new Set(sourceFiles.map((file) => `skills/${file.relativePath}`));
-  const pruneResult = pruneStaleManifestEntriesSync(dirname(targetSkillsDir), manifest, sourceSet, {
+  const pruneResult = pruneStaleManifestEntries(dirname(targetSkillsDir), manifest, sourceSet, {
     prefixes: ['skills/'],
   });
   result.pruned.push(...pruneResult.pruned);
   result.keptModified.push(...pruneResult.keptModified);
 
   mkdirSync(dirname(manifestPath), { recursive: true });
-  writeManifestSync(manifestPath, manifest);
+  writeManifest(manifestPath, manifest);
   return result;
 }

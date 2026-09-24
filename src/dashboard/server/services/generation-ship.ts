@@ -9,9 +9,9 @@
 
 import { relative, resolve } from 'node:path';
 
-import { getUatGenerationSync, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
-import { resolveConfiguredReposSync } from '../../../lib/project-repos.js';
-import { findProjectByPathSync, listProjectsSync, type ProjectConfig } from '../../../lib/projects.js';
+import { getUatGeneration, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
+import { resolveConfiguredRepos } from '../../../lib/project-repos.js';
+import { findProjectByPath, listProjectsSync, type ProjectConfig } from '../../../lib/projects.js';
 import { runVersionShip, VersionShipOperationError, type ShipReport } from '../../../lib/cloister/version-ship.js';
 import { buildVersionShipDeps } from '../../../lib/cloister/version-ship-deps.js';
 import { withVersionShipWorkspace, type VersionShipSourceRepo } from '../../../lib/cloister/version-ship-worktree.js';
@@ -47,7 +47,7 @@ function registeredSourceRepos(generation: UatGeneration, project: ProjectConfig
   if (!entry) {
     throw new VersionShipOperationError('workspace-failed', 'project is not present in the registered project catalog');
   }
-  const configured = resolveConfiguredReposSync(entry.key, project.path, project, `${entry.key}-ship`)
+  const configured = resolveConfiguredRepos(entry.key, project.path, project, `${entry.key}-ship`)
     .filter((repo) => repo.required);
 
   return (generation.repos ?? []).map((repo) => {
@@ -107,14 +107,14 @@ export async function executeVersionShipForGeneration(
 }
 
 export interface ShipPromotedBatchDeps {
-  getGeneration: typeof getUatGenerationSync;
-  findProject: typeof findProjectByPathSync;
+  getGeneration: typeof getUatGeneration;
+  findProject: typeof findProjectByPath;
   execute?: typeof executeVersionShipForGeneration;
 }
 
 const defaultPromotedBatchDeps: ShipPromotedBatchDeps = {
-  getGeneration: getUatGenerationSync,
-  findProject: findProjectByPathSync,
+  getGeneration: getUatGeneration,
+  findProject: findProjectByPath,
 };
 
 export async function shipPromotedBatch(

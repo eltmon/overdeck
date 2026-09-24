@@ -6,9 +6,8 @@
  * JSONL file was spawned by Overdeck.
  */
 
-import { Effect } from 'effect';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
-import { sessionFilePath } from '../paths.js';
+import { getOverdeckDatabase } from '../overdeck/infra.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 
 export interface CorrelationResult {
   overdeckManaged: boolean;
@@ -24,11 +23,11 @@ export interface CorrelationResult {
  *
  * @param jsonlPaths  All JSONL paths discovered in this scan run
  */
-export function buildCorrelationMapSync(
+export function buildCorrelationMap(
   jsonlPaths: string[],
   sessionIdsByPath: ReadonlyMap<string, string | null | undefined> = new Map(),
 ): Map<string, CorrelationResult> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const map = new Map<string, CorrelationResult>();
 
   if (jsonlPaths.length === 0) return map;
@@ -122,8 +121,8 @@ export function buildCorrelationMapSync(
   return map;
 }
 
-export function buildLocatorCorrelationMapSync(): Map<string, CorrelationResult> {
-  const db = getOverdeckDatabaseSync();
+export function buildLocatorCorrelationMap(): Map<string, CorrelationResult> {
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(
       `SELECT c.name, cf.locator, c.issue_id
@@ -164,16 +163,4 @@ export function mergeCorrelation(
     actualCost: base?.actualCost ?? override.actualCost,
     costEventCount: base?.costEventCount ?? override.costEventCount,
   };
-}
-
-// ─── Effect variant (PAN-1249, additive) ─────────────────────────────────────
-//
-// Additive Effect wrapper — the existing function is purely synchronous DB
-// access, so this is just a sync lift for callers that compose with Effect.
-
-/** Effect variant of buildCorrelationMap — pure sync lift. */
-export function buildCorrelationMap(
-  jsonlPaths: string[],
-): Effect.Effect<Map<string, CorrelationResult>> {
-  return Effect.sync(() => buildCorrelationMapSync(jsonlPaths));
 }

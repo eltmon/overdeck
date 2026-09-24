@@ -1,8 +1,7 @@
 import { exitCli } from '../exit.js';
-import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { loadConfigSync, saveConfigSync, OverdeckConfig } from '../../lib/config.js';
+import { loadConfigSync, saveConfig, OverdeckConfig } from '../../lib/config.js';
 import { getShadowModeFromEnv } from '../../lib/env-loader.js';
 import { listShadowedIssues, getPendingSyncCount } from '../../lib/shadow-state.js';
 
@@ -50,11 +49,11 @@ async function configShadowCommand(options: ShadowOptions): Promise<void> {
 
     if (options.enable) {
       config.shadow.trackers[trackerType] = true;
-      saveConfigSync(config);
+      saveConfig(config);
       console.log(chalk.green(`✓ Shadow mode enabled for ${trackerType}`));
     } else if (options.disable) {
       config.shadow.trackers[trackerType] = false;
-      saveConfigSync(config);
+      saveConfig(config);
       console.log(chalk.green(`✓ Shadow mode disabled for ${trackerType}`));
     } else {
       // Show tracker status
@@ -67,7 +66,7 @@ async function configShadowCommand(options: ShadowOptions): Promise<void> {
   // Handle global enable/disable
   if (options.enable) {
     config.shadow.enabled = true;
-    saveConfigSync(config);
+    saveConfig(config);
     console.log(chalk.green('✓ Global shadow mode enabled'));
     console.log(chalk.dim('All issues will be tracked in shadow mode by default'));
     console.log(chalk.dim('Use --no-shadow flag to override for specific commands'));
@@ -76,7 +75,7 @@ async function configShadowCommand(options: ShadowOptions): Promise<void> {
 
   if (options.disable) {
     config.shadow.enabled = false;
-    saveConfigSync(config);
+    saveConfig(config);
     console.log(chalk.green('✓ Global shadow mode disabled'));
     console.log(chalk.dim('Use --shadow flag to enable for specific commands'));
     return;
@@ -107,8 +106,8 @@ async function configShadowCommand(options: ShadowOptions): Promise<void> {
     }
 
     // Current shadowed issues
-    const shadowedIssues = await Effect.runPromise(listShadowedIssues());
-    const pendingSync = await Effect.runPromise(getPendingSyncCount());
+    const shadowedIssues = await listShadowedIssues();
+    const pendingSync = await getPendingSyncCount();
 
     if (shadowedIssues.length > 0) {
       console.log(chalk.bold(`\nShadowed issues: ${shadowedIssues.length}`));

@@ -14,7 +14,7 @@ import { Command } from 'commander';
 
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { computeWorkspaceRepoRootsSync, resolveProjectReposForIssueSync } from '../../lib/project-repos.js';
+import { computeWorkspaceRepoRoots, resolveProjectReposForIssue } from '../../lib/project-repos.js';
 import { getDispatchableItems } from '../../lib/xbrief/dag.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import {
@@ -120,8 +120,8 @@ export async function runTaskClaim(issue: string, itemId: string, options: TaskO
  * may be none of them, so the corroborating commit is looked for in all of them.
  */
 export function issueRepoRoots(issueId: string, workspacePath: string, planHome: string): string[] {
-  const repos = resolveProjectReposForIssueSync(issueId);
-  const roots = computeWorkspaceRepoRootsSync(repos, issueId, workspacePath).map((root) => root.dir);
+  const repos = resolveProjectReposForIssue(issueId);
+  const roots = computeWorkspaceRepoRoots(repos, issueId, workspacePath).map((root) => root.dir);
   return [...new Set([...roots, planHome])];
 }
 

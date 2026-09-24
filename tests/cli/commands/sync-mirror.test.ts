@@ -6,7 +6,6 @@
  * the layered context into harness CLAUDE.md files via syncContextLayers().
  */
 
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Module-level mocks (hoisted before imports) ────────────────────────────
@@ -34,7 +33,7 @@ const mockResolveAlsoSyncTools = vi.fn().mockReturnValue([]);
 const mockEnsurePlaywrightIsolation = vi.fn().mockReturnValue(false);
 const mockEnsureExcalidrawMcp = vi.fn().mockReturnValue(false);
 const mockCreateBackup = vi.fn().mockReturnValue({ targets: [], timestamp: 'now' });
-const mockCleanupAgentDirectories = vi.fn().mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
+const mockCleanupAgentDirectories = vi.fn().mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
 const mockStartupSyncNeeded = vi.fn().mockReturnValue({ needed: true, reason: 'test' });
 const mockProvisionClaudeHooks = vi.fn().mockResolvedValue({
   ok: true,
@@ -49,33 +48,22 @@ const mockSpinnerWarn = vi.fn();
 
 vi.mock('../../../src/lib/sync.js', () => ({
   planSync: mockPlanSync,
-  planSyncSync: mockPlanSync,
   executeSync: mockExecuteSync,
-  executeSyncSync: mockExecuteSync,
   syncContextLayers: mockSyncContextLayers,
-  syncContextLayersSync: mockSyncContextLayers,
   refreshCache: mockRefreshCache,
-  refreshCacheSync: mockRefreshCache,
   migrateStalePersonalContent: mockMigrateStalePersonalContent,
-  migrateStalePersonalContentSync: mockMigrateStalePersonalContent,
   removeLegacySkills070: mockRemoveLegacySkills070,
-  removeLegacySkills070Sync: mockRemoveLegacySkills070,
   planHooksSync: mockPlanHooksSync,
-  planHooksSyncSync: mockPlanHooksSync,
   syncHooks: mockSyncHooks,
-  syncHooksSync: mockSyncHooks,
   syncStatusline: mockSyncStatusline,
-  syncStatuslineSync: mockSyncStatusline,
   mirrorProjectSkills: mockMirrorProjectSkills,
-  mirrorProjectSkillsSync: mockMirrorProjectSkills,
   syncPiSettings: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
-  syncPiSettingsSync: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
-  isStartupSyncNeededSync: mockStartupSyncNeeded,
-  writeSyncManifestSync: vi.fn(),
+  isStartupSyncNeeded: mockStartupSyncNeeded,
+  writeSyncManifest: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/harness-skill-sync.js', () => ({
-  executeAgentSkillsSync: mockExecuteAgentSkillsSync,
+  executeAgentSkills: mockExecuteAgentSkillsSync,
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
@@ -83,43 +71,33 @@ vi.mock('../../../src/lib/config.js', () => ({
   loadConfigSync: mockLoadConfig,
   checkDevrootDeprecation: mockCheckDevrootDeprecation,
   getDashboardApiUrl: vi.fn().mockReturnValue('http://localhost:3000'),
-  getDashboardApiUrlSync: vi.fn().mockReturnValue('http://localhost:3000'),
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
-  listProjects: mockListProjects,
   listProjectsSync: mockListProjects,
 }));
 
 vi.mock('../../../src/lib/config-migration.js', () => ({
   cleanupLegacyRuntimeSymlinks: mockCleanupLegacyRuntimeSymlinks,
-  cleanupLegacyRuntimeSymlinksSync: mockCleanupLegacyRuntimeSymlinks,
   migrateSyncTargets: mockMigrateSyncTargets,
-  migrateSyncTargetsSync: mockMigrateSyncTargets,
 }));
 
 vi.mock('../../../src/lib/workspace-manager.js', () => ({
   migrateOverdeckToPan: mockMigrateOverdeckToPan,
-  migrateOverdeckToPanSync: mockMigrateOverdeckToPan,
 }));
 
 vi.mock('../../../src/lib/multi-tool-sync.js', () => ({
   runMultiToolSync: mockRunMultiToolSync,
-  runMultiToolSyncSync: mockRunMultiToolSync,
   resolveAlsoSyncTools: mockResolveAlsoSyncTools,
-  resolveAlsoSyncToolsSync: mockResolveAlsoSyncTools,
 }));
 
 vi.mock('../../../src/lib/claude-mcp.js', () => ({
   ensurePlaywrightIsolation: mockEnsurePlaywrightIsolation,
-  ensurePlaywrightIsolationSync: mockEnsurePlaywrightIsolation,
   ensureExcalidrawMcp: mockEnsureExcalidrawMcp,
-  ensureExcalidrawMcpSync: mockEnsureExcalidrawMcp,
 }));
 
 vi.mock('../../../src/lib/backup.js', () => ({
   createBackup: mockCreateBackup,
-  createBackupSync: mockCreateBackup,
 }));
 
 vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({
@@ -178,7 +156,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
       keptModified: [],
     });
     mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
-    mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
+    mockCleanupAgentDirectories.mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
     mockStartupSyncNeeded.mockReturnValue({ needed: true, reason: 'test' });
     mockProvisionClaudeHooks.mockResolvedValue({
       ok: true,

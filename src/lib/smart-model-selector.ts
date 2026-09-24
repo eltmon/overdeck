@@ -9,13 +9,12 @@
  * Users control cost by which providers they enable, not a sensitivity slider.
  */
 
-import { Effect } from 'effect';
 import { ModelId } from './settings.js';
 import {
   MODEL_CAPABILITIES,
   SkillDimension,
   ModelCapability,
-  getModelCapabilitySync,
+  getModelCapability,
 } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
@@ -42,7 +41,7 @@ export interface SkillRequirement {
  * Work type to skill mapping
  * Defines what skills each work type needs
  */
-export const WORK_TYPE_REQUIREMENTS: Record<string, SkillRequirement[]> = {
+const WORK_TYPE_REQUIREMENTS: Record<string, SkillRequirement[]> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ISSUE AGENT PHASES
   // ═══════════════════════════════════════════════════════════════════════════
@@ -271,7 +270,7 @@ function calculateSkillScore(
   model: ModelId,
   requirements: SkillRequirement[]
 ): number {
-  const cap = getModelCapabilitySync(model);
+  const cap = getModelCapability(model);
   let totalScore = 0;
   let totalWeight = 0;
 
@@ -321,7 +320,7 @@ function isAccessibleAtTier(
 /**
  * Select the best model for a work type from available models
  */
-export function selectModelSync(
+export function selectModel(
   workType: string,
   availableModels: ModelId[],
   options: SelectionOptions = {}
@@ -363,7 +362,7 @@ export function selectModelSync(
   const eligible = candidates.filter((c) => {
     if (!c.available || c.skillScore < minCapability) return false;
     if (userTier === undefined) return true; // caller responsible for tier filtering
-    const cap = getModelCapabilitySync(c.model);
+    const cap = getModelCapability(c.model);
     return isAccessibleAtTier(cap.minTier, userTier);
   });
 
@@ -403,7 +402,7 @@ export function selectModelSync(
   }
 
   const selected = eligible[0];
-  const cap = getModelCapabilitySync(selected.model);
+  const cap = getModelCapability(selected.model);
 
   // Generate reason
   const topSkills = requirements
@@ -428,7 +427,7 @@ export function selectModelSync(
 /**
  * Select models for all work types at once
  */
-export function selectAllModelsSync(
+export function selectAllModels(
   availableModels: ModelId[],
   options: SelectionOptions = {}
 ): Record<string, ModelSelectionResult> {
@@ -436,27 +435,10 @@ export function selectAllModelsSync(
   const results: Record<string, ModelSelectionResult> = {};
 
   for (const workType of workTypes) {
-    results[workType] = selectModelSync(workType, availableModels, options);
+    results[workType] = selectModel(workType, availableModels, options);
   }
 
   return results;
-}
-
-/**
- * Get simple model mapping (for backward compatibility with presets)
- */
-export function getSimpleModelMappingSync(
-  availableModels: ModelId[],
-  options: SelectionOptions = {}
-): Record<string, ModelId> {
-  const results = selectAllModelsSync(availableModels, options);
-  const mapping: Record<string, ModelId> = {} as Record<string, ModelId>;
-
-  for (const [workType, result] of Object.entries(results)) {
-    mapping[workType] = result.model;
-  }
-
-  return mapping;
 }
 
 /**
@@ -475,29 +457,3 @@ export function formatSelectionResults(
 
   return lines.join('\n');
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// These mirror the pure synchronous selectors so callers in Effect graphs can
-// stay end-to-end Effect without `Effect.sync`-wrapping every call site.
-
-/** Select the best model for a single work type. Pure. */
-export const selectModel = (
-  workType: string,
-  availableModels: readonly ModelId[],
-  options: SelectionOptions = {},
-): Effect.Effect<ModelSelectionResult> =>
-  Effect.sync(() => selectModelSync(workType, [...availableModels], options));
-
-/** Select the best model for every known work type. Pure. */
-export const selectAllModels = (
-  availableModels: readonly ModelId[],
-  options: SelectionOptions = {},
-): Effect.Effect<Record<string, ModelSelectionResult>> =>
-  Effect.sync(() => selectAllModelsSync([...availableModels], options));
-
-/** Compact map { workType → selected model } for preset compatibility. Pure. */
-export const getSimpleModelMapping = (
-  availableModels: readonly ModelId[],
-  options: SelectionOptions = {},
-): Effect.Effect<Record<string, ModelId>> =>
-  Effect.sync(() => getSimpleModelMappingSync([...availableModels], options));

@@ -14,7 +14,7 @@ import {
 } from './github-app.js';
 
 /** A forge (GitHub or GitLab) review-artifact operation failed. */
-export class ForgeError extends Data.TaggedError('ForgeError')<{
+class ForgeError extends Data.TaggedError('ForgeError')<{
   readonly forge: 'github' | 'gitlab';
   readonly operation: string;
   readonly message: string;
@@ -146,7 +146,7 @@ async function getExistingGitHubArtifact(
 ): Promise<CreateReviewArtifactResult | null> {
   const parsedRepo = parseRepository(repository);
   if (isGitHubAppConfigured() && parsedRepo) {
-    const prs = await Effect.runPromise(listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, branchName, 'all'));
+    const prs = await listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, branchName, 'all');
     const pr = prs[0];
     if (!pr) return null;
     return {
@@ -218,7 +218,7 @@ async function findMergedGitHubArtifact(
 
   if (isGitHubAppConfigured() && parsedRepo) {
     if (Number.isFinite(exactNumber)) {
-      const state = await Effect.runPromise(getPullRequestState(parsedRepo.owner, parsedRepo.repo, exactNumber!));
+      const state = await getPullRequestState(parsedRepo.owner, parsedRepo.repo, exactNumber!);
       if (!state.merged || !matchesCurrentArtifact(input, {
         sourceBranch: input.sourceBranch,
         targetBranch: state.baseBranch,
@@ -232,7 +232,7 @@ async function findMergedGitHubArtifact(
       };
     }
 
-    const prs = await Effect.runPromise(listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, input.sourceBranch, 'all'));
+    const prs = await listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, input.sourceBranch, 'all');
     for (const pr of prs.filter((candidate) => candidate.merged === true || candidate.mergedAt != null)) {
       if (input.targetBranch === undefined && input.headSha === undefined) {
         return {
@@ -241,7 +241,7 @@ async function findMergedGitHubArtifact(
           id: String(pr.number),
         };
       }
-      const state = await Effect.runPromise(getPullRequestState(parsedRepo.owner, parsedRepo.repo, pr.number));
+      const state = await getPullRequestState(parsedRepo.owner, parsedRepo.repo, pr.number);
       if (state.merged && matchesCurrentArtifact(input, {
         sourceBranch: input.sourceBranch,
         targetBranch: state.baseBranch,
@@ -383,7 +383,7 @@ const githubForgeAdapter: ForgeAdapter = {
     console.log(`[forge] mergeReviewArtifact: GitHub App path for ${ref.owner}/${ref.repo}#${ref.number}, timeout=${GITHUB_MERGE_TIMEOUT_MS}ms`);
 
     while (Date.now() < deadline) {
-      const state = await Effect.runPromise(getPullRequestState(ref.owner, ref.repo, ref.number));
+      const state = await getPullRequestState(ref.owner, ref.repo, ref.number);
       console.log(`[forge] mergeReviewArtifact: PR #${ref.number} state=${state.state} merged=${state.merged} draft=${state.draft} checksFailed=${state.checksFailed}`);
 
       if (state.merged) return;
@@ -403,13 +403,13 @@ const githubForgeAdapter: ForgeAdapter = {
       }
 
       try {
-        const mergeResult = await Effect.runPromise(mergePullRequestWithApp(
+        const mergeResult = await mergePullRequestWithApp(
           ref.owner,
           ref.repo,
           ref.number,
           method,
           state.headSha || undefined,
-        ));
+        );
         console.log(`[forge] mergePullRequestWithApp: result merged=${mergeResult.merged} for ${ref.owner}/${ref.repo}#${ref.number}`);
         if (mergeResult.merged) return;
       } catch (err: any) {
@@ -540,7 +540,7 @@ export function getForgeAdapter(forge: ForgeType): ForgeAdapter {
   return forge === 'gitlab' ? gitlabForgeAdapter : githubForgeAdapter;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 const wrapForgeOp = <T>(
   forge: ForgeType,

@@ -26,14 +26,10 @@ vi.mock('../../../../src/lib/cloister/config.js', async (importOriginal) => ({
 }));
 
 import {
-  DEFAULT_PATROL_ACTIONS_PER_DAY,
-  getPatrolBudget,
-  isPatrolSuspended,
   listPatrolBudgetRows,
   patrolBudgetFilePath,
   readPatrolBudgetState,
   recordPatrolActions,
-  runBudgetedPatrol,
   suspendPatrol,
   utcDayKey,
 } from '../../../../src/lib/cloister/patrol-budget.js';
@@ -89,89 +85,12 @@ describe('patrol firing budgets (PAN-3850 W39)', () => {
     expect(recordPatrolActions('checkDeadEndAgents', 0, DAY_ONE)).toBe(5);
   });
 
-  it('getPatrolBudget resolves override, then default', () => {
-    expect(getPatrolBudget('chattyPatrol', BUDGETS)).toBe(2);
-    expect(getPatrolBudget('checkDeadEndAgents', BUDGETS)).toBe(50);
-    expect(DEFAULT_PATROL_ACTIONS_PER_DAY).toBe(50);
-  });
 
-  it('a patrol over budget is suspended: the 52nd call does not run and exactly one needs-you is recorded', async () => {
-    const fn = vi.fn(async () => ['acted']);
-    for (let i = 0; i < 51; i++) {
-      const actions = await runBudgetedPatrol('checkDeadEndAgents', fn, { config: BUDGETS });
-      expect(actions).toEqual(['acted']);
-    }
-    expect(fn).toHaveBeenCalledTimes(51);
-    expect(isPatrolSuspended('checkDeadEndAgents', DAY_ONE, BUDGETS)).toBe(true);
-    expect(mockEmitActivityEntryOnce).toHaveBeenCalledTimes(1);
-    expect(mockEmitActivityEntryOnce.mock.calls[0]?.[0]).toMatchObject({
-      id: 'patrol-budget-exceeded:checkDeadEndAgents:2026-09-17',
-      level: 'error',
-    });
 
-    // The 52nd call is skipped entirely — the patrol body never runs.
-    const skipped = await runBudgetedPatrol('checkDeadEndAgents', fn, { config: BUDGETS });
-    expect(skipped).toEqual([]);
-    expect(fn).toHaveBeenCalledTimes(51);
 
-    // A repeated suspension in the same day does not re-emit the needs-you.
-    await suspendPatrol('checkDeadEndAgents', 'fired 52 actions in one UTC day (budget 50)', DAY_ONE);
-    expect(mockEmitActivityEntryOnce).toHaveBeenCalledTimes(1);
-  });
 
-  it('a suspended patrol runs again on the next UTC day', async () => {
-    const fn = vi.fn(async () => ['acted']);
-    for (let i = 0; i < 51; i++) await runBudgetedPatrol('checkDeadEndAgents', fn, { config: BUDGETS });
-    expect(isPatrolSuspended('checkDeadEndAgents', DAY_ONE, BUDGETS)).toBe(true);
 
-    vi.setSystemTime(DAY_TWO);
-    expect(isPatrolSuspended('checkDeadEndAgents', DAY_TWO, BUDGETS)).toBe(false);
-    const actions = await runBudgetedPatrol('checkDeadEndAgents', fn, { config: BUDGETS });
-    expect(actions).toEqual(['acted']);
-    expect(fn).toHaveBeenCalledTimes(52);
-  });
 
-  it('an exempt alarm patrol exceeds the budget without suspending and without a needs-you', async () => {
-    const fn = vi.fn(async () => ['alarm']);
-    for (let i = 0; i < 60; i++) {
-      const actions = await runBudgetedPatrol('runStallSweeperPatrol', fn, { config: BUDGETS });
-      expect(actions).toEqual(['alarm']);
-    }
-    expect(fn).toHaveBeenCalledTimes(60);
-    expect(isPatrolSuspended('runStallSweeperPatrol', DAY_ONE, BUDGETS)).toBe(false);
-    expect(mockEmitActivityEntryOnce).not.toHaveBeenCalled();
-    // The tally still accrues for the doctor table.
-    expect(readPatrolBudgetState().days['2026-09-17']?.runStallSweeperPatrol?.actions).toBe(60);
-  });
-
-  it('a per-patrol override suspends a chatty patrol after its smaller budget', async () => {
-    const fn = vi.fn(async () => ['x', 'y']);
-    await runBudgetedPatrol('chattyPatrol', fn, { config: BUDGETS }); // tally 2 — at budget, still allowed
-    expect(isPatrolSuspended('chattyPatrol', DAY_ONE, BUDGETS)).toBe(false);
-    await runBudgetedPatrol('chattyPatrol', fn, { config: BUDGETS }); // tally 4 — over budget 2
-    expect(isPatrolSuspended('chattyPatrol', DAY_ONE, BUDGETS)).toBe(true);
-    expect(mockEmitActivityEntryOnce).toHaveBeenCalledTimes(1);
-  });
-
-  it('suspension persists in the state file (survives a fresh read)', async () => {
-    await suspendPatrol('checkDeadEndAgents', 'test suspension', DAY_ONE);
-    const state = readPatrolBudgetState();
-    expect(state.days['2026-09-17']?.checkDeadEndAgents?.suspendedReason).toBe('test suspension');
-    expect(state.days['2026-09-17']?.checkDeadEndAgents?.needsYouEmittedAt).toBeDefined();
-    expect(isPatrolSuspended('checkDeadEndAgents', DAY_ONE, BUDGETS)).toBe(true);
-  });
-
-  it('a failed needs-you emit still suspends; the flag is retried on the next suspension attempt', async () => {
-    mockEmitActivityEntryOnce.mockResolvedValue('failed');
-    await suspendPatrol('checkDeadEndAgents', 'fired 51 actions', DAY_ONE);
-    expect(isPatrolSuspended('checkDeadEndAgents', DAY_ONE, BUDGETS)).toBe(true);
-    expect(readPatrolBudgetState().days['2026-09-17']?.checkDeadEndAgents?.needsYouEmittedAt).toBeUndefined();
-
-    mockEmitActivityEntryOnce.mockResolvedValue('appended');
-    await suspendPatrol('checkDeadEndAgents', 'fired 52 actions', DAY_ONE);
-    expect(readPatrolBudgetState().days['2026-09-17']?.checkDeadEndAgents?.needsYouEmittedAt).toBeDefined();
-    expect(mockEmitActivityEntryOnce).toHaveBeenCalledTimes(2);
-  });
 
   it('listPatrolBudgetRows reports tally, budget and suspension for the doctor table', async () => {
     recordPatrolActions('runStallSweeperPatrol', 60, DAY_ONE);

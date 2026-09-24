@@ -26,8 +26,3 @@ export function resolveTerminalBackend(name: TerminalBackendName): TerminalBacke
   }
   return backend;
 }
-
-/** Names with a registered adapter, in registration order. */
-export function registeredTerminalBackends(): readonly TerminalBackendName[] {
-  return [...backends.keys()];
-}

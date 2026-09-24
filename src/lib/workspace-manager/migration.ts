@@ -13,7 +13,7 @@ import type { PanMigrationResult } from './types.js';
  * - Only migrates the specific runtime subdirs (events, prompts, legacy output).
  *   .pan/skills/ is not migrated here since it may not have existed before.
  */
-export function migrateOverdeckToPanSync(projectPath: string): PanMigrationResult {
+export function migrateOverdeckToPan(projectPath: string): PanMigrationResult {
   const result: PanMigrationResult = { migrated: [], skipped: [], errors: [] };
 
   // Map legacy .overdeck/<subdir> paths to new .pan/<subdir> paths.
@@ -80,7 +80,7 @@ export function migrateOverdeckToPanSync(projectPath: string): PanMigrationResul
  *
  * Safe to call multiple times — merges rather than overwrites.
  */
-export function copyOverdeckSettingsToWorkspaceSync(workspacePath: string): { copied: string[]; errors: string[] } {
+export function copyOverdeckSettingsToWorkspace(workspacePath: string): { copied: string[]; errors: string[] } {
   const result = { copied: [] as string[], errors: [] as string[] };
   const overdeckDir = join(workspacePath, '.overdeck');
   const claudeDir = join(workspacePath, '.claude');
@@ -201,7 +201,7 @@ export function copyOverdeckSettingsToWorkspaceSync(workspacePath: string): { co
  * in the given project root's .gitignore. .pan/skills/ is intentionally NOT excluded
  * since project-specific skills should be committed.
  */
-export function ensurePanGitignoreSync(projectPath: string): void {
+export function ensurePanGitignore(projectPath: string): void {
   const gitignorePath = join(projectPath, '.gitignore');
   const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.pan/test/', '.claude/skills/'];
 

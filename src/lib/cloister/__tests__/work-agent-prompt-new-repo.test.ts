@@ -3,11 +3,11 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const findProjectByTeamSync = vi.hoisted(() => vi.fn());
+const findProjectByTeam = vi.hoisted(() => vi.fn());
 
 vi.mock('../../projects.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../projects.js')>(),
-  findProjectByTeamSync,
+  findProjectByTeam,
 }));
 
 import { buildPolyrepoContext } from '../work-agent-prompt.js';
@@ -24,7 +24,7 @@ describe('polyrepo new-repository guidance', () => {
   it('warns non-progressive work agents to register a new deliverable repo first', () => {
     workspace = mkdtempSync(join(tmpdir(), 'overdeck-polyrepo-prompt-'));
     mkdirSync(join(workspace, 'api'));
-    findProjectByTeamSync.mockReturnValue({
+    findProjectByTeam.mockReturnValue({
       name: 'Mind Your Now',
       path: '/project',
       issue_prefix: 'MIN',

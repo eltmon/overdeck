@@ -11,8 +11,6 @@ import {
   type ExecException,
 } from 'child_process';
 import { promisify } from 'util';
-import { Effect } from 'effect';
-import { GitError, FsError } from './errors.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -26,7 +24,7 @@ const DEFAULT_PROCESS_PROBE_TIMEOUT_MS = 30_000;
  * every such value with `git check-ref-format --branch` before it reaches a
  * git command.
  */
-export async function isValidBranchNamePromise(name: string): Promise<boolean> {
+export async function isValidBranchName(name: string): Promise<boolean> {
   if (!name || name.length > 255) return false;
   try {
     await execFileAsync('git', ['check-ref-format', '--branch', name], { encoding: 'utf-8', timeout: 5_000 });
@@ -37,8 +35,8 @@ export async function isValidBranchNamePromise(name: string): Promise<boolean> {
 }
 
 /** Throw when a branch value fails isValidBranchNamePromise — the rejection every fetch gate uses. */
-export async function assertValidBranchNamePromise(name: string, context: string): Promise<void> {
-  if (!(await isValidBranchNamePromise(name))) {
+export async function assertValidBranchName(name: string, context: string): Promise<void> {
+  if (!(await isValidBranchName(name))) {
     throw new Error(`Invalid branch name for ${context}: ${JSON.stringify(name)} — refusing to run git with it`);
   }
 }
@@ -221,9 +219,14 @@ function findGitLockFiles(repoPath: string): string[] {
   return lockFiles;
 }
 
-async function cleanupStaleLocksPromise(
+/**
+ * Remove stale `*.lock` files in `.git/` when no git process holds the repo.
+ * Per-file failures are reported in `errors`; it rejects only when lock removal
+ * throws unexpectedly (e.g. permission denied at unlink).
+ */
+export async function cleanupStaleLocks(
   repoPath: string,
-  options: StaleLockCleanupOptions,
+  options: StaleLockCleanupOptions = {},
 ): Promise<{
   found: string[];
   removed: string[];
@@ -274,17 +277,6 @@ async function cleanupStaleLocksPromise(
   return result;
 }
 
-/**
- * Result of getWorkspaceGitInfo.
- * Note: `branch` is the branch name (not a hash) despite the parent function name.
- */
-export interface WorkspaceCommitInfo {
-  /** Full SHA of the HEAD commit */
-  HEAD: string;
-  /** Current branch name (e.g. "feature/pan-342") */
-  branch: string;
-}
-
 export interface WorkspaceHeadAnchorEntry {
   repoKey: string;
   sha: string;
@@ -326,7 +318,7 @@ export function parseWorkspaceHeadAnchor(anchor: string): WorkspaceHeadAnchorEnt
  * Composite entries are resolved to their nested worktree and labeled using
  * the same repo-section convention as review and inspect diff summaries.
  */
-export async function renderWorkspaceGitShowPromise(
+export async function renderWorkspaceGitShow(
   issueId: string | undefined,
   workspacePath: string,
   anchor: string,
@@ -339,9 +331,9 @@ export async function renderWorkspaceGitShowPromise(
     throw new Error(`Cannot resolve composite workspace head anchor '${anchor}' without an issue id`);
   }
 
-  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+  const { resolveWorkspaceRepoRoots } = await import('./project-repos.js');
   const rootsByKey = new Map(
-    resolveWorkspaceRepoRootsSync(issueId, workspacePath).map(root => [root.repoKey, root]),
+    resolveWorkspaceRepoRoots(issueId, workspacePath).map(root => [root.repoKey, root]),
   );
 
   const sections = await Promise.all(entries.map(async ({ repoKey, sha }) => {
@@ -356,31 +348,10 @@ export async function renderWorkspaceGitShowPromise(
   return sections.join('\n');
 }
 
-async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<WorkspaceCommitInfo> {
-  try {
-    const [headResult, branchResult] = await Promise.all([
-      execAsync('git rev-parse HEAD', { cwd: workspacePath }),
-      execAsync('git rev-parse --abbrev-ref HEAD', { cwd: workspacePath }),
-    ]);
-    return {
-      HEAD: headResult.stdout.trim(),
-      branch: branchResult.stdout.trim(),
-    };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`getWorkspaceGitInfo failed for ${workspacePath}: ${msg}`);
-  }
-}
-
 declare const headAnchorBrand: unique symbol;
 
 /** A producer-issued snapshot of every code HEAD in a workspace. */
 export type HeadAnchor = string & { readonly [headAnchorBrand]: true };
-
-/** Rehydrate a persisted anchor after it crosses an unbranded storage boundary. */
-export function rehydrateHeadAnchor(anchor: string): HeadAnchor {
-  return anchor as HeadAnchor;
-}
 
 export function parseCompositeSnapshot(snapshot: string | undefined): Map<string, string> {
   const heads = new Map<string, string>();
@@ -414,14 +385,14 @@ export function formatAnchorShort(anchor: string): string {
  * the ref lookup and fall back to their conservative full-rerun path.
  *
  * Its branded return value is the only legitimate source for reviewedAtCommit,
- * lastVerifiedCommit, and roleRunHead. Persisted values regain that brand only
- * through rehydrateHeadAnchor at an explicitly documented storage boundary.
+ * lastVerifiedCommit, and roleRunHead. Persisted values never regain that brand
+ * (the rehydrate helper had no caller and was removed in PAN-3958 CH-8).
  */
-export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
+export async function snapshotWorkspaceHeads(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
   // Dynamic import: project-repos → projects sits above this low-level module
   // in the layering; a static edge here would risk a require cycle.
-  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
-  const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  const { resolveWorkspaceRepoRoots } = await import('./project-repos.js');
+  const roots = resolveWorkspaceRepoRoots(issueId, workspacePath);
   // PAN-3254: a degraded polyrepo resolution would snapshot the wrapper repo,
   // whose HEAD never moves — every drift comparison against a real composite
   // anchor then false-drifts forever (426 review cycles on MIN-901). No
@@ -438,66 +409,3 @@ export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePa
   }
   return heads.length > 0 ? heads.join(' ') as HeadAnchor : undefined;
 }
-
-async function hasStaleLocksPromise(repoPath: string): Promise<boolean> {
-  const lockFiles = findGitLockFiles(repoPath);
-  if (lockFiles.length === 0) {
-    return false;
-  }
-
-  const processProbe = await hasRunningGitProcesses(repoPath, {});
-  return processProbe.status === 'idle';
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native cleanupStaleLocks. Removes stale `*.lock` files in `.git/`
- * when no git processes hold the repo. Fails with FsError if lock removal
- * throws unexpectedly (e.g. permission denied at unlink); per-file errors
- * are reported in the `errors` payload like the original.
- */
-export const cleanupStaleLocks = (
-  repoPath: string,
-  options: StaleLockCleanupOptions = {},
-): Effect.Effect<
-  {
-    found: string[];
-    removed: string[];
-    errors: Array<{ file: string; error: string }>;
-  },
-  FsError
-> =>
-  Effect.tryPromise({
-    try: () => cleanupStaleLocksPromise(repoPath, options),
-    catch: (cause) =>
-      new FsError({ path: repoPath, operation: 'cleanupStaleLocks', cause }),
-  });
-
-/**
- * Effect-native getWorkspaceGitInfo. Returns the HEAD SHA and current branch
- * name. Fails with GitError if rev-parse exits non-zero (e.g. path is not a
- * git repository).
- */
-export const getWorkspaceGitInfo = (
-  workspacePath: string,
-): Effect.Effect<WorkspaceCommitInfo, GitError> =>
-  Effect.tryPromise({
-    try: () => getWorkspaceGitInfoPromise(workspacePath),
-    catch: (cause) =>
-      new GitError({
-        command: ['rev-parse', 'HEAD'],
-        stderr: cause instanceof Error ? cause.message : String(cause),
-        exitCode: -1,
-        cause,
-      }),
-  });
-
-/**
- * Effect-native hasStaleLocks — predicate variant. Never fails; defers to
- * the Promise implementation which already swallows errors conservatively.
- */
-export const hasStaleLocks = (
-  repoPath: string,
-): Effect.Effect<boolean, never> =>
-  Effect.promise(() => hasStaleLocksPromise(repoPath));

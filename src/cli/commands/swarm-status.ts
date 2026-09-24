@@ -4,7 +4,7 @@ import { Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
-import { readItemStatuses } from '../../lib/xbrief/continue-state.js';
+import { readItemStatusesAsync } from '../../lib/xbrief/continue-state.js';
 import { applyItemStatuses } from '../../lib/xbrief/io.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import {
@@ -35,7 +35,7 @@ export interface SwarmStatusCommandDeps {
   getFailedMergeBlocks: typeof getFailedMergeBlocks;
   readSwarmHold: typeof readSwarmHold;
   readSwarmInterventions: typeof readSwarmInterventions;
-  readItemStatuses: (workspacePath: string, issueId: string) => Record<string, string>;
+  readItemStatuses: (workspacePath: string, issueId: string) => Promise<Record<string, string>>;
   listSessionNamesSync: () => string[];
   getConcurrencyLimits: typeof getConcurrencyLimits;
   countRunningSwarmSlotsForIssue: (issueId: string) => number;
@@ -83,7 +83,7 @@ const defaultStatusDeps: SwarmStatusCommandDeps = {
   getFailedMergeBlocks,
   readSwarmHold,
   readSwarmInterventions,
-  readItemStatuses: (workspacePath, issueId) => readItemStatuses(resolvePlanHome(workspacePath), issueId),
+  readItemStatuses: (workspacePath, issueId) => readItemStatusesAsync(resolvePlanHome(workspacePath), issueId),
   listSessionNamesSync,
   getConcurrencyLimits,
   countRunningSwarmSlotsForIssue,
@@ -106,7 +106,7 @@ export async function deriveSwarmStatus(
   const loaded = await loadSwarmPlan(issue, deps);
   if (!loaded) return null;
   const workspacePath = join(loaded.project.projectPath, 'workspaces', `feature-${issueLower}`);
-  const itemStatuses = deps.readItemStatuses(workspacePath, issue);
+  const itemStatuses = await deps.readItemStatuses(workspacePath, issue);
   const effectiveDoc = Object.keys(itemStatuses).length > 0
     ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;

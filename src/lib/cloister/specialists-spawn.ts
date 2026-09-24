@@ -2,7 +2,6 @@
  * Cloister specialist spawn command and environment helpers.
  */
 
-import { Effect } from 'effect';
 import { readCavemanVariant } from '../caveman/workspace.js';
 import { resolveHarness } from '../harness-resolve.js';
 
@@ -95,7 +94,7 @@ export async function buildSpecialistCavemanExports(
   if (specialistType === 'inspect-agent' || !config.enabled) return '';
 
   // Read the workspace's A/B variant if we have a workspace path
-  const variant = workspacePath ? await Effect.runPromise(readCavemanVariant(workspacePath)) : 'off';
+  const variant = workspacePath ? await readCavemanVariant(workspacePath) : 'off';
   if (variant === 'off') return '';
   if (variant === 'disabled') {
     return `export OVERDECK_CAVEMAN_VARIANT="${variant}"\n`;

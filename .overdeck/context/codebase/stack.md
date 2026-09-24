@@ -28,12 +28,12 @@
   remains typechecked by no root gate.
 - **Agent substrate:** tmux on a dedicated `overdeck` socket
   (`tmux -L overdeck`); per-agent state under `~/.overdeck/agents/`;
-  harnesses: claude-code, pi, and codex with persistent transports.
+  harnesses: claude-code, ohmypi, codex, acp, kimi-code, opencode (via ACP),
+  and muse, with persistent transports.
 - **Issue tracking:** GitHub Issues (`PAN-<n>` = `#<n>` on eltmon/overdeck);
-  xBRIEF v0.8 specs live under `.pan/specs/` and item state under `.pan/continues/` in the
-  project repo (feature branch), exposed through `pan task`; `overdeck-state` is archived.
+  xBRIEF v0.8 specs and task state live under `.pan/` in the project repo and are exposed through `pan task`.
 - **Config:** YAML at `~/.overdeck/` (settings, projects.yaml), normalized by
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 
-<!-- last-verified: 2026-09-19 -->
+<!-- last-verified: 2026-09-20 -->

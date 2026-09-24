@@ -6,7 +6,7 @@ const { capturePaneTextMock, deliverAgentMessageMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
-  capturePaneText: capturePaneTextMock,
+  capturePane: capturePaneTextMock,
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({

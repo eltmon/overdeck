@@ -59,22 +59,20 @@ describe('canonical agent removal with retained transcripts', () => {
   }
 
   function seedAgedTranscript(agentDir: string, name = 'review.jsonl'): string {
-    const transcriptPath = join(agentDir, 'sessions', name);
-    mkdirSync(join(agentDir, 'sessions'), { recursive: true });
+    const transcriptPath = join(agentDir, 'codex-home', 'sessions', '2026', '07', '01', name);
+    mkdirSync(join(transcriptPath, '..'), { recursive: true });
     writeFileSync(transcriptPath, '{}\n');
     const oldTime = new Date(NOW.getTime() - 30 * DAY_MS);
     utimesSync(transcriptPath, oldTime, oldTime);
     return transcriptPath;
   }
 
-  function sweep(agentsDir: string, listAgents = listAgentStatesSync): Promise<string[]> {
+  function sweep(agentsDir: string): Promise<string[]> {
     return sweepTranscriptRetention({
       transcriptDays: 2,
       agentsDir,
       deps: {
-        listSessionNames: vi.fn(async () => []),
-        listAgents,
-        isTerminalAgent: vi.fn(async () => true),
+        listLiveAgentIds: vi.fn(async () => new Set()),
         listConversations: vi.fn(() => []),
         listArchivedConversations: vi.fn(() => []),
         now: () => Date.now(),
@@ -83,7 +81,7 @@ describe('canonical agent removal with retained transcripts', () => {
     });
   }
 
-  it('retains the transcript and its linkage, and the sweep keeps what it cannot vouch for', async () => {
+  it('retains the transcript during explicit removal until configured retention expires it', async () => {
     const agentId = 'agent-pan-3357-review-correctness';
     const agentsDir = join(testHome, 'agents');
     const agentDir = seedAgent(agentId, 'PAN-3357');
@@ -99,11 +97,8 @@ describe('canonical agent removal with retained transcripts', () => {
 
     await sweep(agentsDir);
 
-    // NFR-4: removeAgent took state.json, so no listing can say this agent
-    // stopped with its work landed. The retention gate fails closed — the
-    // marker is linkage, never a licence to delete.
-    expect(existsSync(agentDir)).toBe(true);
-    expect(existsSync(transcriptPath)).toBe(true);
+    expect(existsSync(agentDir)).toBe(false);
+    expect(existsSync(transcriptPath)).toBe(false);
     expect(listAgentStatesSync()).toEqual([]);
   });
 
@@ -115,12 +110,10 @@ describe('canonical agent removal with retained transcripts', () => {
 
     await sweep(agentsDir);
 
-    // The listing says stopped and the forge says the work landed, so the
-    // expired transcript and its sessions/ directory go. state.json is the
-    // listing's own evidence and is removeAgent's job, not the sweep's.
+    // Retention enumerates durable agent directories directly and owns final
+    // deletion once their newest retained artifact has expired.
     expect(existsSync(transcriptPath)).toBe(false);
-    expect(existsSync(join(agentDir, 'sessions'))).toBe(false);
-    expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
+    expect(existsSync(agentDir)).toBe(false);
   });
 
   it('retires the runtime residue but never the session transcript (PAN-3479)', async () => {

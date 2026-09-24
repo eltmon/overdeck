@@ -26,19 +26,19 @@ import type { CanonicalState } from '../shadow-state.js';
 /** Reserved project key. Never register a real project under this key. */
 export const FIXTURE_PROJECT_KEY = 'uat-fixtures';
 /** Reserved issue-identifier prefix — never used by a real project. */
-export const FIXTURE_ISSUE_PREFIX = 'FIX';
+const FIXTURE_ISSUE_PREFIX = 'FIX';
 /** The single fixture issue's identifier. */
 export const FIXTURE_ISSUE_ID = 'FIX-1';
-export const FIXTURE_ISSUE_NUMBER = 1;
+const FIXTURE_ISSUE_NUMBER = 1;
 /** Fake "owner/repo" the fixture issue claims to live in — does not exist. */
-export const FIXTURE_SOURCE_REPO = 'uat-fixtures/repo';
+const FIXTURE_SOURCE_REPO = 'uat-fixtures/repo';
 /**
  * Container-local, container-writable path for the fixture project — derived
  * from the current OVERDECK_HOME (not hardcoded) so it always matches where
  * seed.ts actually writes the plan/continue files, even under an overridden
  * container-local home (review finding, PAN-3362 cycle 3).
  */
-export function fixtureProjectPath(): string {
+function fixtureProjectPath(): string {
   return join(getOverdeckHome(), FIXTURE_PROJECT_KEY, 'repo');
 }
 /**
@@ -52,7 +52,7 @@ export function fixtureWorkspacePath(): string {
   return join(fixtureProjectPath(), 'workspaces', 'feature-fix-1');
 }
 /** Cached-issue id, matching the `github-${owner}-${repo}-${number}` shape. */
-export const FIXTURE_ISSUE_CACHE_ID = 'github-uat-fixtures-repo-1';
+const FIXTURE_ISSUE_CACHE_ID = 'github-uat-fixtures-repo-1';
 /** Cached-project id, matching the `github-${owner}-${repo}` shape. */
 export const FIXTURE_PROJECT_CACHE_ID = 'github-uat-fixtures-repo';
 /** Title prefix that marks every fixture-issue title as obviously fake. */
@@ -60,16 +60,16 @@ export const FIXTURE_TITLE_PREFIX = '[FIXTURE]';
 /** Label applied to the fixture issue. */
 export const FIXTURE_LABEL = 'uat-fixture';
 /** Banner text explaining the fixture is not real pipeline state. */
-export const FIXTURE_DESCRIPTION_BANNER =
+const FIXTURE_DESCRIPTION_BANNER =
   'This is a seeded UAT fixture issue, not real pipeline state. It was created ' +
   'by `pan admin seed-uat-fixtures` so browser verification has a live-looking ' +
   'issue to render inside an isolated workspace container.';
-export const FIXTURE_CANONICAL_STATUS: CanonicalState = 'in_progress';
+const FIXTURE_CANONICAL_STATUS: CanonicalState = 'in_progress';
 /** Fake branch name for the fixture work agent. */
-export const FIXTURE_BRANCH = 'feature/fix-1';
+const FIXTURE_BRANCH = 'feature/fix-1';
 /** Fake model identifier used on every fixture agent row. */
-export const FIXTURE_AGENT_MODEL = 'fixture/uat-seed';
-export const FIXTURE_WORK_AGENT_ID = 'agent-fix-1-work';
+const FIXTURE_AGENT_MODEL = 'fixture/uat-seed';
+const FIXTURE_WORK_AGENT_ID = 'agent-fix-1-work';
 export const REVIEW_SPECIALIST_ROLES = ['security', 'correctness', 'performance', 'requirements'] as const;
 export type ReviewSpecialistRole = (typeof REVIEW_SPECIALIST_ROLES)[number];
 
@@ -78,8 +78,8 @@ export function fixtureReviewAgentId(role: ReviewSpecialistRole): string {
 }
 
 /** xBRIEF plan id for the fixture workspace's seeded plan. */
-export const FIXTURE_XBRIEF_PLAN_ID = 'fix-1';
-export const FIXTURE_XBRIEF_PLAN_UID = '00000000-0000-4000-8000-0000000fix01';
+const FIXTURE_XBRIEF_PLAN_ID = 'fix-1';
+const FIXTURE_XBRIEF_PLAN_UID = '00000000-0000-4000-8000-0000000fix01';
 
 /** The cached-GitHub-shape normalized issue served from IssueDataService's L2 cache. */
 export interface FixtureNormalizedIssue {
@@ -175,7 +175,7 @@ export function fixtureAgentStates(now: string = new Date().toISOString()): Agen
  * emitActivityEntryOnce() as the idempotency key so a re-seed replaces these
  * four rows in place instead of appending duplicate visible lifecycle events.
  */
-export const FIXTURE_ACTIVITY_IDS = {
+const FIXTURE_ACTIVITY_IDS = {
   workCompleted: 'fix-1-activity-work-completed',
   reviewApproved: 'fix-1-activity-review-approved',
   testsPassed: 'fix-1-activity-tests-passed',

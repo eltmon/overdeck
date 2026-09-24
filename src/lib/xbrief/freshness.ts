@@ -22,10 +22,17 @@ export interface PlanFreshnessResult {
 /** Globs (`*`, `?`, `{`) name a pattern, not a concrete path — skip them. */
 const GLOB_CHARS = /[*?{]/;
 
+/**
+ * A plan's `files_scope` names both files an item edits and files it will
+ * create. A path that is absent AND was never part of the repository is a
+ * file the plan intends to create, not evidence of drift, so callers pass
+ * `isNewFile` (typically "no git history for this path") to exclude it.
+ */
 export function checkPlanFreshness(
   plan: XBriefDocument,
   workspaceRoot: string,
   existsFn: (path: string) => boolean,
+  isNewFile: (scope: string) => boolean = () => false,
 ): PlanFreshnessResult {
   const seen = new Set<string>();
   const missing: string[] = [];
@@ -36,7 +43,7 @@ export function checkPlanFreshness(
       if (GLOB_CHARS.test(scope) || seen.has(scope)) continue;
       seen.add(scope);
       checked += 1;
-      if (!existsFn(join(workspaceRoot, scope))) {
+      if (!existsFn(join(workspaceRoot, scope)) && !isNewFile(scope)) {
         missing.push(scope);
       }
     }

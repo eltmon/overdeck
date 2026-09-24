@@ -6,38 +6,41 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const tmuxMocks = vi.hoisted(() => ({
-  createSession: vi.fn(),
-  killSession: vi.fn(),
-  sessionExists: vi.fn(),
+  tmuxCreateSession: vi.fn(),
+  tmuxKillSession: vi.fn(),
+  tmuxSessionExists: vi.fn(),
 }));
 
 vi.mock('../tmux-cli.js', () => ({
-  tmuxCreateSession: tmuxMocks.createSession,
-  tmuxKillSession: tmuxMocks.killSession,
-  tmuxSessionExists: tmuxMocks.sessionExists,
+  tmuxCreateSession: tmuxMocks.tmuxCreateSession,
+  tmuxKillSession: tmuxMocks.tmuxKillSession,
+  tmuxSessionExists: tmuxMocks.tmuxSessionExists,
 }));
 
-const agentStateMocks = vi.hoisted(() => ({ getAgentStateSync: vi.fn(), saveAgentStateSync: vi.fn() }));
+const agentStateMocks = vi.hoisted(() => ({ getAgentState: vi.fn(), saveAgentStateSync: vi.fn() }));
 vi.mock('../../agents/agent-state.js', () => ({
-  getAgentStateSync: agentStateMocks.getAgentStateSync,
+  getAgentState: agentStateMocks.getAgentState,
   saveAgentStateSync: agentStateMocks.saveAgentStateSync,
 }));
 
 import {
-  createKimiCodeRuntimeSync,
-  findKimiWirePath,
-  findKimiWirePathAsync,
-  findLatestKimiSession,
-  findLatestKimiSessionAsync,
+  createKimiCodeRuntime,
   kimiCaptureLockPath,
-  kimiSessionsRoot,
-  kimiWorkDirKey,
   launchAndCaptureManagedKimiSession,
   KimiCodeRuntimeSync,
   waitForNewKimiSessionAsync,
   withKimiSessionCaptureLock,
   writeKimiSessionId,
 } from '../kimi-code.js';
+import {
+  findKimiWirePath,
+  findKimiWirePathAsync,
+  findLatestKimiSession,
+  findLatestKimiSessionAsync,
+  kimiSessionsRoot,
+  kimiWorkDirKey,
+} from '../storage/kimi-code.js';
+import { readSessionIndex } from '../../session-history.js';
 
 const tempHomes: string[] = [];
 
@@ -55,17 +58,22 @@ function writeWireFixture(kimiHome: string, workDir: string, sessionId: string, 
   return path;
 }
 
+let originalOverdeckHome: string | undefined;
+
 beforeEach(() => {
-  tmuxMocks.createSession.mockReset();
-  tmuxMocks.killSession.mockReset();
-  tmuxMocks.sessionExists.mockReset();
-  agentStateMocks.getAgentStateSync.mockReset();
+  tmuxMocks.tmuxCreateSession.mockReset();
+  tmuxMocks.tmuxKillSession.mockReset();
+  tmuxMocks.tmuxSessionExists.mockReset();
+  agentStateMocks.getAgentState.mockReset();
   agentStateMocks.saveAgentStateSync.mockReset();
+  originalOverdeckHome = process.env.OVERDECK_HOME;
 });
 
 afterEach(() => {
   vi.useRealTimers();
   tempHomes.splice(0).forEach((home) => rmSync(home, { recursive: true, force: true }));
+  if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalOverdeckHome;
 });
 
 describe('kimiWorkDirKey (D2 — verified against installed kimi 0.29.2)', () => {
@@ -115,6 +123,7 @@ describe('launchAndCaptureManagedKimiSession', () => {
   it('captures and persists a fresh native identity before launch delivery can continue', async () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
     const workspace = '/tmp/kimi-managed-fresh';
     const agentId = 'agent-kimi-managed-fresh';
     mkdirSync(join(overdeckHome, 'agents', agentId), { recursive: true });
@@ -131,11 +140,20 @@ describe('launchAndCaptureManagedKimiSession', () => {
     expect(sessionId).toBe('session-managed-fresh');
     expect(readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8'))
       .toBe('session-managed-fresh');
+    expect(readSessionIndex(agentId)).toEqual([
+      expect.objectContaining({
+        sessionId: 'session-managed-fresh',
+        source: 'capture',
+        harness: 'kimi-code',
+        path: join(kimiSessionsRoot(kimiHome, workspace), 'session-managed-fresh', 'agents', 'main', 'wire.jsonl'),
+      }),
+    ]);
   });
 
   it('persists the exact -S resume identity without waiting for a new session directory', async () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
     const workspace = '/tmp/kimi-managed-resume';
     const agentId = 'agent-kimi-managed-resume';
     mkdirSync(join(overdeckHome, 'agents', agentId), { recursive: true });
@@ -155,6 +173,14 @@ describe('launchAndCaptureManagedKimiSession', () => {
     expect(readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8'))
       .toBe('session-existing-resume');
     expect(existsSync(kimiSessionsRoot(kimiHome, workspace))).toBe(false);
+    expect(readSessionIndex(agentId)).toEqual([
+      expect.objectContaining({
+        sessionId: 'session-existing-resume',
+        source: 'capture',
+        harness: 'kimi-code',
+        path: join(kimiSessionsRoot(kimiHome, workspace), 'session-existing-resume', 'agents', 'main', 'wire.jsonl'),
+      }),
+    ]);
   });
 });
 
@@ -190,7 +216,7 @@ describe('KimiCodeRuntimeSync', () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
     const workDir = '/tmp/activity-workspace';
-    agentStateMocks.getAgentStateSync.mockReturnValue({ workspace: workDir });
+    agentStateMocks.getAgentState.mockReturnValue({ workspace: workDir });
     mkdirSync(join(overdeckHome, 'agents', 'agent-activity'), { recursive: true });
     writeFileSync(join(overdeckHome, 'agents', 'agent-activity', 'kimi-session-id'), 'session_activity\n');
     const wirePath = writeWireFixture(kimiHome, workDir, 'session_activity');
@@ -208,11 +234,11 @@ describe('KimiCodeRuntimeSync', () => {
     expect(runtime.getSessionCost('agent-activity')).toBeNull();
   });
 
-  it('getTokenUsage/getSessionCost return real, non-zero values via wi8b parseKimiSessionSync (AC3)', () => {
+  it('getTokenUsage/getSessionCost return real, non-zero values via wi8b parseKimiSession (AC3)', () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
     const workDir = '/tmp/cost-workspace';
-    agentStateMocks.getAgentStateSync.mockReturnValue({ workspace: workDir });
+    agentStateMocks.getAgentState.mockReturnValue({ workspace: workDir });
     mkdirSync(join(overdeckHome, 'agents', 'agent-cost'), { recursive: true });
     writeFileSync(join(overdeckHome, 'agents', 'agent-cost', 'kimi-session-id'), 'session_cost\n');
     const wireDir = join(kimiSessionsRoot(kimiHome, workDir), 'session_cost', 'agents', 'main');
@@ -236,7 +262,7 @@ describe('KimiCodeRuntimeSync', () => {
 
   it('returns null session info for an agent with no known workspace', () => {
     const overdeckHome = makeHome();
-    agentStateMocks.getAgentStateSync.mockReturnValue(null);
+    agentStateMocks.getAgentState.mockReturnValue(null);
     const runtime = new KimiCodeRuntimeSync({ overdeckHome, kimiHome: makeHome() });
 
     expect(runtime.getSessionPath('agent-unknown')).toBeNull();
@@ -247,14 +273,15 @@ describe('KimiCodeRuntimeSync', () => {
   it('spawns via the wi6 launcher command, captures the newly-appeared session id, and persists it (AC1/AC2)', async () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
     const workspace = '/tmp/kimi-spawn-workspace';
     // A pre-existing session in the bucket must NOT be mistaken for the new one.
     writeWireFixture(kimiHome, workspace, 'session_preexisting');
 
-    tmuxMocks.createSession.mockImplementation(async () => {
+    tmuxMocks.tmuxCreateSession.mockImplementation(async () => {
       writeWireFixture(kimiHome, workspace, 'session_fresh');
     });
-    tmuxMocks.sessionExists.mockResolvedValue(true);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
 
     const writePtyTokenFor = vi.fn(async (agentId: string) => {
       const dir = join(overdeckHome, 'agents', agentId);
@@ -263,7 +290,7 @@ describe('KimiCodeRuntimeSync', () => {
       writeFileSync(join(dir, 'pty-token'), `${token}\n`);
       return token;
     });
-    agentStateMocks.getAgentStateSync.mockReturnValue({ id: 'agent-kimi-spawn', workspace });
+    agentStateMocks.getAgentState.mockReturnValue({ id: 'agent-kimi-spawn', workspace });
 
     const deliverMessage = vi.fn(async () => ({ ok: true }));
     const runtime = new KimiCodeRuntimeSync({
@@ -294,7 +321,7 @@ describe('KimiCodeRuntimeSync', () => {
       model: 'k3',
       workspace,
     });
-    expect(tmuxMocks.createSession).toHaveBeenCalledWith(
+    expect(tmuxMocks.tmuxCreateSession).toHaveBeenCalledWith(
       'agent-kimi-spawn',
       workspace,
       expect.stringContaining('launcher.sh'),
@@ -313,6 +340,14 @@ describe('KimiCodeRuntimeSync', () => {
 
     const persistedId = readFileSync(join(overdeckHome, 'agents', 'agent-kimi-spawn', 'kimi-session-id'), 'utf-8');
     expect(persistedId).toBe('session_fresh');
+    expect(readSessionIndex('agent-kimi-spawn')).toEqual([
+      expect.objectContaining({
+        sessionId: 'session_fresh',
+        source: 'capture',
+        harness: 'kimi-code',
+        path: join(kimiSessionsRoot(kimiHome, workspace), 'session_fresh', 'agents', 'main', 'wire.jsonl'),
+      }),
+    ]);
     expect(deliverMessage).toHaveBeenCalledTimes(1);
     expect(deliverMessage).toHaveBeenCalledWith(
       'agent-kimi-spawn',
@@ -325,7 +360,7 @@ describe('KimiCodeRuntimeSync', () => {
     // it BEFORE the tmux session (and thus the supervisor process) exists.
     expect(writePtyTokenFor).toHaveBeenCalledWith('agent-kimi-spawn');
     expect(writePtyTokenFor.mock.invocationCallOrder[0]).toBeLessThan(
-      tmuxMocks.createSession.mock.invocationCallOrder[0],
+      tmuxMocks.tmuxCreateSession.mock.invocationCallOrder[0],
     );
     const tokenPath = join(overdeckHome, 'agents', 'agent-kimi-spawn', 'pty-token');
     expect(existsSync(tokenPath)).toBe(true);
@@ -342,8 +377,8 @@ describe('KimiCodeRuntimeSync', () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
     const workspace = '/tmp/kimi-timeout-workspace';
-    tmuxMocks.createSession.mockResolvedValue(undefined);
-    tmuxMocks.sessionExists.mockResolvedValue(true);
+    tmuxMocks.tmuxCreateSession.mockResolvedValue(undefined);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
 
     const runtime = new KimiCodeRuntimeSync({
       overdeckHome,
@@ -365,7 +400,7 @@ describe('KimiCodeRuntimeSync', () => {
     await drainFakeTimersUntilSettled(spawn, 250);
 
     await rejection;
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-kimi-timeout');
+    expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith('agent-kimi-timeout');
   }, 30_000);
 
   it('sendMessage delegates to deliverAgentMessage and throws on failure (AC3)', async () => {
@@ -395,7 +430,7 @@ describe('KimiCodeRuntimeSync', () => {
   it('killAgent Ctrl-C\'s the pane then escalates to SIGTERM once the first poll window lapses (AC4)', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     let terminated = false;
-    tmuxMocks.sessionExists.mockImplementation(async () => !terminated);
+    tmuxMocks.tmuxSessionExists.mockImplementation(async () => !terminated);
     const execCommand = vi.fn(async (command: string) => {
       if (command.includes('list-panes')) return { stdout: '4242\n' };
       if (command.includes('kill -TERM')) terminated = true;
@@ -411,12 +446,12 @@ describe('KimiCodeRuntimeSync', () => {
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('send-keys -t \'agent-kill\' C-c'));
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('list-panes'));
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('kill -TERM'));
-    expect(tmuxMocks.killSession).not.toHaveBeenCalled();
+    expect(tmuxMocks.tmuxKillSession).not.toHaveBeenCalled();
   });
 
   it('falls back to tmuxKillSession when the escalation ladder cannot confirm exit', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
-    tmuxMocks.sessionExists.mockResolvedValue(true);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
     const execCommand = vi.fn(async (command: string) => {
       if (command.includes('list-panes')) return { stdout: '' };
       return { stdout: '' };
@@ -428,14 +463,14 @@ describe('KimiCodeRuntimeSync', () => {
     await vi.advanceTimersByTimeAsync(5_000); // second poll window (session never dies — no pane pid to signal)
     await killPromise;
 
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-kill-fallback');
+    expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith('agent-kill-fallback');
   });
 
   it('isRunning mirrors tmuxSessionExists (AC4)', async () => {
-    tmuxMocks.sessionExists.mockResolvedValue(true);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
     const runtime = new KimiCodeRuntimeSync({ overdeckHome: makeHome(), kimiHome: makeHome() });
     await expect(runtime.isRunning('agent-x')).resolves.toBe(true);
-    expect(tmuxMocks.sessionExists).toHaveBeenCalledWith('agent-x');
+    expect(tmuxMocks.tmuxSessionExists).toHaveBeenCalledWith('agent-x');
   });
 
   it('listSessions returns only kimi-code agents with a captured session id (AC4)', () => {
@@ -461,8 +496,8 @@ describe('KimiCodeRuntimeSync', () => {
     expect(sessions[0]).toMatchObject({ id: 'session_listed', agentId: 'agent-listed', workspace });
   });
 
-  it('createKimiCodeRuntimeSync builds a usable instance named kimi-code', () => {
-    const runtime = createKimiCodeRuntimeSync();
+  it('createKimiCodeRuntime builds a usable instance named kimi-code', () => {
+    const runtime = createKimiCodeRuntime();
     expect(runtime.name).toBe('kimi-code');
     expect(runtime.getHarnessBehavior().transcriptKind).toBe('kimi-wire-jsonl');
   });

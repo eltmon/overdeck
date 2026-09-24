@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Effect } from 'effect';
 import type { MergeSet } from '../../../src/lib/merge-set.js';
 
 const execMock = vi.hoisted(() => vi.fn());
@@ -71,7 +70,7 @@ function optionsFor(command: string): Record<string, any> {
 
 describe('rebaseAndPushRepos', () => {
   it('does not push when an up-to-date branch is already published', async () => {
-    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+    const result = await rebaseAndPushRepos('/workspace', mergeSet);
 
     expect(result).toEqual({
       success: true,
@@ -94,7 +93,7 @@ describe('rebaseAndPushRepos', () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+    const result = await rebaseAndPushRepos('/workspace', mergeSet);
 
     expect(result.success).toBe(true);
     expect(execMock).toHaveBeenCalledWith(
@@ -120,7 +119,7 @@ describe('rebaseAndPushRepos', () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+    const result = await rebaseAndPushRepos('/workspace', mergeSet);
 
     expect(result.success).toBe(true);
     expect(execMock).toHaveBeenCalledWith(
@@ -142,7 +141,7 @@ describe('rebaseAndPushRepos', () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+    const result = await rebaseAndPushRepos('/workspace', mergeSet);
 
     expect(result).toEqual({
       success: false,
@@ -170,7 +169,7 @@ describe('rebaseAndPushRepos', () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+    const result = await rebaseAndPushRepos('/workspace', mergeSet);
 
     expect(result.success).toBe(true);
     expect(optionsFor('git rebase origin/main').env).toEqual(expect.objectContaining({
@@ -192,7 +191,7 @@ describe('rebaseAndPushRepos', () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+    const result = await rebaseAndPushRepos('/workspace', mergeSet);
 
     expect(result.success).toBe(true);
     expect(optionsFor('git rebase --continue').env).toEqual(expect.objectContaining({
@@ -213,7 +212,7 @@ describe('rebaseAndPushRepos', () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+    const result = await rebaseAndPushRepos('/workspace', mergeSet);
 
     expect(result.success).toBe(true);
     expect(optionsFor('git rebase --abort').env).toEqual(expect.objectContaining({
