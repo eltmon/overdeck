@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T17:17:25.650Z · model: claude-opus-5 · open: 835_
+_Last sequenced: 2026-09-24T17:26:30.637Z · model: claude-opus-5 · open: 831_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
-| 5 | PAN-3922 | S | high | ok |  |  | Deacon-lite status is read from the wrong process: dashboard always shows running:false; relay patrol-done from the child |
 | 6 | PAN-3926 | S | high | ok |  |  | isAliveSync is tmux-only; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled — make backend-aware before swarm re-enable |
 | 7 | PAN-3925 | S | medium | ok |  |  | /api/parked and /api/merge-train/auto-merge take 10s+ deriving state per request; batch through the issue-data cache |
 | 10 | PAN-4090 | S | high | ok |  |  | On a Herdr host pipeline-status, pan-agent-activity and pan-recap report every agent dead; pipeline-status 404s on a hardcoded project key |
@@ -64,7 +63,6 @@ _Last sequenced: 2026-09-24T17:17:25.650Z · model: claude-opus-5 · open: 835_
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
-| 82 | PAN-4074 | XS | high | ok |  |  | Reconnect banner sticks forever after a restart; heartbeats cancel the retry. Fix is already up in PR #4075 — needs merge, not a worker. |
 | 83 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 84 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 85 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -200,7 +198,6 @@ _Last sequenced: 2026-09-24T17:17:25.650Z · model: claude-opus-5 · open: 835_
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 221 | PAN-4052 | M | high | ok |  |  | Metrics cost panels, specialist run and handoff logs and the boot stamp have live readers but no writer post-Cut; restore or delete each |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 223 | PAN-4077 | S | medium | ok |  |  | Four post-cut follow-ups with file paths: async project-path containment, Herdr-wrong tmux tooltip, stale planning prompt, Codex noise. |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
@@ -266,7 +263,6 @@ _Last sequenced: 2026-09-24T17:17:25.650Z · model: claude-opus-5 · open: 835_
 | 289 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 292 | PAN-3420 | M | high | needs-refinement |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
 | 293 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 294 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
@@ -851,10 +847,6 @@ In pipeline (workspace exists) — rank pinned at the top tier. The last big spa
 
 In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.
 
-### PAN-3922 (rank 5)
-
-In pipeline — rank pinned. The watchdog stale verdict was neutralised because of this; restoring it needs the child to report each run.
-
 ### PAN-3926 (rank 6)
 
 In pipeline — rank pinned. Herdr gaps in the sync liveness path and swarm accounting; substrate hardening ahead of re-enabling swarm.
@@ -1079,10 +1071,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
-### PAN-4074 (rank 82)
-
-New since the prior run and fully root-caused in the body: EventRouter sets reconnecting=true, only a successful snapshot bootstrap clears it, and handleEvent() cancelled the pending retry on every domain event — heartbeats included — so a recovered stream permanently suppressed the recovery it was proving unnecessary. The operator's live tab then shows 'Connection lost — reconnecting…' until a manual page load. Ranked high because it silently blinds the primary operator surface after every pan reload, but placed at 82 rather than the top tier because the fix already exists on fix/terminal-reconnect-after-restart with PR #4075 open and CI running: the remaining work is merge, not implementation, and a worker spawned here would duplicate landed code.
-
 ### PAN-3096 (rank 83)
 
 New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
@@ -1163,6 +1151,10 @@ Triage: verify the no-kickoff zombie gap against the current liveness definition
 
 Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation heuristic gap against that routine. Rank held.
 
+### PAN-2734 (rank 103)
+
+Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boots.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1170,10 +1162,10 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T17:17:25.650Z",
+  "generatedAt": "2026-09-24T17:26:30.637Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 835,
+  "openCount": 831,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1198,19 +1190,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "dependsOn": [],
       "why": "Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed",
       "rationale": "In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3922",
-      "rank": 5,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Deacon-lite status is read from the wrong process: dashboard always shows running:false; relay patrol-done from the child",
-      "rationale": "In pipeline — rank pinned. The watchdog stale verdict was neutralised because of this; restoring it needs the child to report each run.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1941,19 +1920,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "rationale": "New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-4074",
-      "rank": 82,
-      "size": "XS",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Reconnect banner sticks forever after a restart; heartbeats cancel the retry. Fix is already up in PR #4075 — needs merge, not a worker.",
-      "rationale": "New since the prior run and fully root-caused in the body: EventRouter sets reconnecting=true, only a successful snapshot bootstrap clears it, and handleEvent() cancelled the pending retry on every domain event — heartbeats included — so a recovered stream permanently suppressed the recovery it was proving unnecessary. The operator's live tab then shows 'Connection lost — reconnecting…' until a manual page load. Ranked high because it silently blinds the primary operator surface after every pan reload, but placed at 82 rather than the top tier because the fix already exists on fix/terminal-reconnect-after-restart with PR #4075 open and CI running: the remaining work is merge, not implementation, and a worker spawned here would duplicate landed code.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-3096",
@@ -3668,19 +3634,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "planning": "auto"
     },
     {
-      "issue": "PAN-4052",
-      "rank": 221,
-      "size": "M",
-      "importance": "high",
-      "score": 73,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Metrics cost panels, specialist run and handoff logs and the boot stamp have live readers but no writer post-Cut; restore or delete each",
-      "rationale": "New this pass at rank 221, beside PAN-4046 in the band the closed façade-cut chapters vacated. Post-Cut substrate hygiene with a user-visible edge: nothing on main calls recordCostSync, so the Metrics page's daily total and its top-agents/top-issues panels render stale or empty data while the Costs page — reading cost_events, which does have writers — is correct, which is worse than an outright outage because the two pages disagree. Three smaller gaps sit behind it: finalizeRunLogSync runs in production against run logs createRunLogSync never created, logSpecialistHandoff has readers and no caller, and the missing stampBootReconciliation drops the watchdog back to the OVERDECK_BOOT_ID env var. Condition ok, not needs-refinement: each item carries a stated restore-or-delete rule and the acceptance is mechanically checkable, with the disposition recorded in docs/THE-CUT.md.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2874",
       "rank": 222,
       "size": "M",
@@ -4478,19 +4431,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "condition": "ok",
       "dependsOn": [],
       "why": "'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3420",
-      "rank": 292,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
-      "rationale": "Triage: review-specialist history on the issue page needs a new source (PR review history / pipeline journal) since stored fields are gone; verify rendering. Has a PRD and planned label; rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12685,20 +12625,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.75
-    },
-    {
-      "from": "PAN-3778",
-      "to": "PAN-4074",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4074",
-      "to": "PAN-3616",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.55
     },
     {
       "from": "PAN-3928",
