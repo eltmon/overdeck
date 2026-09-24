@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listRunningAgentsMock = vi.fn();
 const listLiveAgentIdsMock = vi.fn();
+const isAliveMock = vi.fn(async (_agentId: string): Promise<{ alive: boolean; reason?: string }> => ({ alive: false, reason: 'no-session' }));
 const getRuntimeForAgentMock = vi.fn((_agentId: string): unknown => null);
 
 vi.mock('../../../../src/lib/agents.js', () => ({
@@ -18,6 +19,13 @@ vi.mock('../../../../src/lib/runtimes/index.js', () => ({
 vi.mock('../../../../src/lib/terminal-backends/inventory.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../../src/lib/terminal-backends/inventory.js')>(),
   listLiveAgentIds: () => listLiveAgentIdsMock(),
+}));
+
+// Fake liveness oracle: confirms (or cannot confirm) a death before crash handling.
+vi.mock('../../../../src/lib/agents/liveness.js', () => ({
+  isAlive: (agentId: string) => isAliveMock(agentId),
+  isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
+    !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
 
 vi.mock('../../../../src/lib/cloister/pi-cost-reconciler.js', () => ({
@@ -53,6 +61,8 @@ describe('performHealthCheck liveness (#4109)', () => {
   beforeEach(() => {
     listRunningAgentsMock.mockReset();
     listLiveAgentIdsMock.mockReset();
+    isAliveMock.mockReset();
+    isAliveMock.mockResolvedValue({ alive: false, reason: 'no-session' });
     // A Herdr agent: the tmux-only flag is false while its pane is live.
     listRunningAgentsMock.mockReturnValue([
       { id: 'agent-pan-1', issueId: 'PAN-1', role: 'work', status: 'running', tmuxActive: false },
@@ -76,6 +86,19 @@ describe('performHealthCheck liveness (#4109)', () => {
     await performHealthCheck(host);
 
     expect(host.handleAgentCrash).toHaveBeenCalledWith('agent-pan-1');
+  });
+
+  it('never reports a crash for an agent missing from a readable inventory whose probe is indeterminate', async () => {
+    listLiveAgentIdsMock.mockResolvedValue(new Set());
+    isAliveMock.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+    const host = makeHost(['agent-pan-1']);
+
+    await performHealthCheck(host);
+
+    expect(isAliveMock).toHaveBeenCalledWith('agent-pan-1');
+    expect(host.handleAgentCrash).not.toHaveBeenCalled();
+    // Carried over, so the next round re-checks it.
+    expect([...host.previousRunningAgents]).toEqual(['agent-pan-1']);
   });
 
   it('never reports a crash when the backend inventory is unreadable, and keeps the previous set', async () => {
