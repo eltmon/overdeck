@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:31:01.590Z · model: claude-opus-5 · open: 822_
+_Last sequenced: 2026-09-24T20:40:55.533Z · model: claude-opus-5 · open: 819_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
-| 9 | PAN-4109 | M | critical | ok |  |  | Nine readers still filter on tmuxActive: on Herdr the health loop, emergencyStop and the memory governor's shed all see zero agents |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
@@ -32,7 +31,6 @@ _Last sequenced: 2026-09-24T20:31:01.590Z · model: claude-opus-5 · open: 822_
 | 46 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
 | 47 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
 | 48 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
-| 50 | PAN-3953 | XS | high | ok |  |  | planned label is applied at planning spawn, before any spec exists; five issues labeled planned with no spec on disk |
 | 52 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
 | 53 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
 | 54 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
@@ -439,7 +437,6 @@ _Last sequenced: 2026-09-24T20:31:01.590Z · model: claude-opus-5 · open: 822_
 | 476 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
 | 477 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
 | 478 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 479 | PAN-3893 | S | medium | ok |  |  | ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema |
 | 480 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
 | 481 | PAN-3867 | S | medium | ok |  |  | /projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test |
 | 482 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
@@ -838,10 +835,6 @@ In pipeline (workspace exists) — rank pinned at the top tier. The last big spa
 
 In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.
 
-### PAN-4109 (rank 9)
-
-Filed 2026-09-24, placed at rank 9 — freed when PAN-4097 closed — so it inherits its predecessor's slot in the same Herdr-blindness wave and no existing rank moves. PRs #4088, #4103 and #4107 moved the lifecycle guards, the output route and crash detection onto the backend-aware door (isAlive in src/lib/agents/liveness.ts plus the backend inventory), but nine readers still take liveness from the tmuxActive flag on listRunningAgents(), which reports tmux session presence on the overdeck socket alone and is therefore false for every agent on Herdr, the default backend. This is critical rather than high because two of those sites are protections, not reports: memory-governor.ts shed() never pauses a Herdr agent under HARD pressure and cannot protect a live agent's stack from the merged-stack shed, and service.ts emergencyStop() kills nothing — so the OOM defences the host relies on are inert on the default backend, while service-health.ts silently skips crash detection, pokes and stuck handling for the whole fleet. The body enumerates every site with the grep that finds them, states the safety rule (an unreachable backend must never read as dead where that drives a kill, restart, pause or stack stop), keeps tmuxActive where it is part of an API shape, and asks for scripts/lint-liveness.sh to be extended so the sites cannot regress. M rather than S because it is nine modules across CLI, Cloister and the dashboard server plus a lint ratchet.
-
 ### PAN-3930 (rank 15)
 
 In pipeline — rank pinned.
@@ -937,10 +930,6 @@ New this pass. Under concurrent review convoys the PTY supervisor returns 502 'i
 ### PAN-3520 (rank 48)
 
 New this pass. The test gate records a real 'test failed' verdict for uniform 5000ms timeout signatures under host load, proven on multiple branches where the same files pass in isolation in about 19 seconds. Every false verdict costs a full rework cycle and another saturated re-test, so this is both a correctness and a cost fix. Retrying timeout-only failures in isolation before writing a verdict is the minimal change.
-
-### PAN-3953 (rank 50)
-
-Violates the cut's rule that planned is derived from spec existence; a dead planner leaves an issue looking planned forever and the pickup gate mis-reads it. Delete the spawn-time label write. PAN-3961 reported the same bug and was closed as its duplicate on 2026-09-20; this issue is the single owner.
 
 ### PAN-3500 (rank 52)
 
@@ -1134,6 +1123,10 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
 
 Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.
 
+### PAN-1618 (rank 111)
+
+Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1141,10 +1134,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:31:01.590Z",
+  "generatedAt": "2026-09-24T20:40:55.533Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 822,
+  "openCount": 819,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1169,19 +1162,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed",
       "rationale": "In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4109",
-      "rank": 9,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Nine readers still filter on tmuxActive: on Herdr the health loop, emergencyStop and the memory governor's shed all see zero agents",
-      "rationale": "Filed 2026-09-24, placed at rank 9 — freed when PAN-4097 closed — so it inherits its predecessor's slot in the same Herdr-blindness wave and no existing rank moves. PRs #4088, #4103 and #4107 moved the lifecycle guards, the output route and crash detection onto the backend-aware door (isAlive in src/lib/agents/liveness.ts plus the backend inventory), but nine readers still take liveness from the tmuxActive flag on listRunningAgents(), which reports tmux session presence on the overdeck socket alone and is therefore false for every agent on Herdr, the default backend. This is critical rather than high because two of those sites are protections, not reports: memory-governor.ts shed() never pauses a Herdr agent under HARD pressure and cannot protect a live agent's stack from the merged-stack shed, and service.ts emergencyStop() kills nothing — so the OOM defences the host relies on are inert on the default backend, while service-health.ts silently skips crash detection, pokes and stuck handling for the whole fleet. The body enumerates every site with the grep that finds them, states the safety rule (an unreachable backend must never read as dead where that drives a kill, restart, pause or stack stop), keeps tmuxActive where it is part of an API shape, and asks for scripts/lint-liveness.sh to be extended so the sites cannot regress. M rather than S because it is nine modules across CLI, Cloister and the dashboard server plus a lint ratchet.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1494,19 +1474,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict.",
       "rationale": "New this pass. The test gate records a real 'test failed' verdict for uniform 5000ms timeout signatures under host load, proven on multiple branches where the same files pass in isolation in about 19 seconds. Every false verdict costs a full rework cycle and another saturated re-test, so this is both a correctness and a cost fix. Retrying timeout-only failures in isolation before writing a verdict is the minimal change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3953",
-      "rank": 50,
-      "size": "XS",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "planned label is applied at planning spawn, before any spec exists; five issues labeled planned with no spec on disk",
-      "rationale": "Violates the cut's rule that planned is derived from spec existence; a dead planner leaves an issue looking planned forever and the pickup gate mis-reads it. Delete the spawn-time label write. PAN-3961 reported the same bug and was closed as its duplicate on 2026-09-20; this issue is the single owner.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6555,19 +6522,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains",
       "rationale": "Triage: the agents SQLite table is gone but read-model.ts agentsById may still be a second door beside AgentsResolver; verify before treating as resolved. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3893",
-      "rank": 479,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema",
-      "rationale": "New this run: medium/50 — ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11916,13 +11870,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 0.9
     },
     {
-      "from": "PAN-3833",
-      "to": "PAN-3893",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
       "from": "PAN-3827",
       "to": "PAN-3831",
       "type": "informs",
@@ -12175,20 +12122,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 1
     },
     {
-      "from": "PAN-3953",
-      "to": "PAN-3923",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3953",
-      "to": "PAN-3948",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3952",
       "to": "PAN-3944",
       "type": "informs",
@@ -12404,13 +12337,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-3921",
-      "to": "PAN-4109",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-4131",
