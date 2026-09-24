@@ -24,6 +24,7 @@ import {
   buildConvoyPrompt,
   buildReviewRolePrompt,
   recoverMissingConvoyReviewers,
+  redispatchReviewSynthesis,
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
@@ -56,6 +57,7 @@ const {
   mockWipeAgentStateDirs,
   mockMarkAgentStoppedState,
   mockConvergeRowFromVerdictOfRecord,
+  mockCloseAgentPaneDetailed,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockListSessionNames: vi.fn().mockReturnValue([]),
@@ -79,10 +81,12 @@ const {
   mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
   mockMarkAgentStoppedState: vi.fn((state: { id?: string; status?: string }) => ({ ...state, status: 'stopped' })),
   mockConvergeRowFromVerdictOfRecord: vi.fn(),
+  mockCloseAgentPaneDetailed: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
   agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
+  closeAgentPaneDetailed: (agentId: string) => mockCloseAgentPaneDetailed(agentId),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -186,6 +190,7 @@ beforeEach(() => {
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockClearFeedbackFiles.mockResolvedValue(undefined);
   mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
+  mockCloseAgentPaneDetailed.mockResolvedValue({ outcome: 'absent' });
 });
 
 const REVIEW_MODE_WORKSPACE = '/tmp/pan-review-mode';
@@ -1173,8 +1178,109 @@ describe('convoy orchestration', () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('already launched');
+    expect(result.allReported).toBe(false);
     expect(mockSpawnRun).not.toHaveBeenCalled();
     expect(mockMarkAgentStoppedState).not.toHaveBeenCalled();
+  });
+
+  // #4134: the no-op answer says whether every lane's report is on disk, so
+  // deacon-lite can tell "all reported, synthesis missing" from "lanes live".
+  it('reports allReported and the run when every lane already wrote its report', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    prepareWorkspace(workspace);
+    const manifestPath = writeReviewManifest(workspace);
+    const reviewDir = dirname(manifestPath);
+    for (const role of ['security', 'correctness', 'performance', 'requirements']) {
+      writeFileSync(`${reviewDir}/${role}.md`, `${role} complete`, 'utf-8');
+    }
+    mockGetAgentState.mockImplementation((agentId: string) => agentId === 'agent-pan-1059-review'
+      ? { id: agentId, workspace, reviewRunId: REVIEW_AGENT_RUN_ID, reviewContextManifestPath: manifestPath }
+      : null);
+
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+    expect(result).toMatchObject({ success: true, runId: REVIEW_AGENT_RUN_ID, allReported: true });
+    expect(result.launched).toBeUndefined();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+});
+
+// #4134: re-running the synthesis step of a convoy whose lanes all reported.
+describe('redispatchReviewSynthesis', () => {
+  const PARENT_ID = 'agent-pan-1059-review';
+
+  function savedParent(workspace: string) {
+    return {
+      id: PARENT_ID,
+      issueId: 'PAN-1059',
+      workspace,
+      role: 'review',
+      model: 'review-model',
+      harness: 'claude-code',
+      status: 'running',
+      reviewRunId: REVIEW_AGENT_RUN_ID,
+      startedAt: '2000-01-01T00:00:00.000Z',
+    };
+  }
+
+  it('resumes the saved parent with a prompt that starts synthesis now, and launches no reviewer', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    prepareWorkspace(workspace);
+    const reviewDir = dirname(writeReviewManifest(workspace));
+    mockGetAgentState.mockImplementation((agentId: string) => (agentId === PARENT_ID ? savedParent(workspace) : null));
+    mockGetLatestSessionIdSync.mockReturnValue('saved-session' as never);
+    mockResumeAgent.mockResolvedValue({ success: true });
+
+    const result = await redispatchReviewSynthesis('PAN-1059', { workspace, runId: REVIEW_AGENT_RUN_ID, source: 'test' });
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain(`resumed ${PARENT_ID} for run ${REVIEW_AGENT_RUN_ID}`);
+    expect(mockResumeAgent).toHaveBeenCalledTimes(1);
+    const [resumedId, prompt] = mockResumeAgent.mock.calls[0] as [string, string];
+    expect(resumedId).toBe(PARENT_ID);
+    expect(prompt).toContain('RECOVERY');
+    expect(prompt).toContain('No REVIEWER_* signals will arrive');
+    expect(prompt).toContain(`${reviewDir}/correctness.md`);
+    expect(prompt).toContain(`--run-id "${REVIEW_AGENT_RUN_ID}"`);
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      id: PARENT_ID,
+      reviewRunId: REVIEW_AGENT_RUN_ID,
+      reviewDeadlineAt: expect.any(String),
+    }));
+  });
+
+  it('closes the dead pane and spawns a fresh parent when there is no session to resume', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    prepareWorkspace(workspace);
+    writeReviewManifest(workspace);
+    mockGetAgentState.mockImplementation((agentId: string) => (agentId === PARENT_ID ? savedParent(workspace) : null));
+    mockCloseAgentPaneDetailed.mockResolvedValue({ outcome: 'closed' });
+    mockSpawnRun.mockResolvedValue({ id: PARENT_ID });
+
+    const result = await redispatchReviewSynthesis('PAN-1059', { workspace, runId: REVIEW_AGENT_RUN_ID });
+
+    expect(result.success).toBe(true);
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(mockCloseAgentPaneDetailed).toHaveBeenCalledWith(PARENT_ID);
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    const [issueId, role, options] = mockSpawnRun.mock.calls[0] as [string, string, { prompt: string; subRole?: string }];
+    expect([issueId, role]).toEqual(['PAN-1059', 'review']);
+    expect(options.subRole).toBeUndefined();
+    expect(options.prompt).toContain('RECOVERY');
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({ id: PARENT_ID, reviewRunId: REVIEW_AGENT_RUN_ID }));
+  });
+
+  it('spawns nothing when the dead parent pane cannot be closed', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    prepareWorkspace(workspace);
+    mockCloseAgentPaneDetailed.mockResolvedValue({ outcome: 'failed', reason: 'herdr could not close pane p1' });
+
+    const result = await redispatchReviewSynthesis('PAN-1059', { workspace, runId: REVIEW_AGENT_RUN_ID });
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('herdr could not close pane p1');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
   });
 });
 
