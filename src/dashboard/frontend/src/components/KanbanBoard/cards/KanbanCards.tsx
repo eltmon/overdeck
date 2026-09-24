@@ -305,7 +305,7 @@ export function ListIssueRow({
     (workAgent) =>
       workAgent.status === 'stopped' &&
       (workAgent.role ?? 'work') === 'work' &&
-      !!workAgent.lifecycle?.hasLiveTmuxSession,
+      !!workAgent.lifecycle?.hasLivePane,
   );
   const isRunning = workAgents.some(isAgentSessionAttachable) || !!standbyAgent;
   const hasMultipleWorkAgents = workAgents.length > 1;

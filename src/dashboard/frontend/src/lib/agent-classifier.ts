@@ -5,7 +5,7 @@ export type DashboardAgentClassification = 'active' | 'stopped' | 'orphan_test';
 export const ORPHAN_PREFIX_PATTERN = /^PAN-(AC|PI(-PROMPT)?|TEST|REVIEW|SHIP|SUB(REVIEW|SIGNAL)?)-?\d*$/;
 export const ORPHAN_AGE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 
-type ClassifiableAgent = Pick<AgentSnapshot, 'issueId' | 'status' | 'hasLiveTmuxSession' | 'lastActivity' | 'startedAt'>;
+type ClassifiableAgent = Pick<AgentSnapshot, 'issueId' | 'status' | 'hasLivePane' | 'lastActivity' | 'startedAt'>;
 
 function getAgentTimestampMs(agent: ClassifiableAgent): number | null {
   const timestamp = agent.lastActivity ?? agent.startedAt;
@@ -19,10 +19,10 @@ export function classifyDashboardAgent(
   agent: ClassifiableAgent,
   nowMs = Date.now(),
 ): DashboardAgentClassification {
-  if (agent.hasLiveTmuxSession === true) return 'active';
+  if (agent.hasLivePane === true) return 'active';
 
   if (
-    agent.hasLiveTmuxSession === undefined &&
+    agent.hasLivePane === undefined &&
     (agent.status === 'running' || agent.status === 'starting')
   ) {
     return 'active';

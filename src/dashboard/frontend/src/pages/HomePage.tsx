@@ -478,7 +478,7 @@ function buildSummaryCardViews(summary: HomeSummaryCards): SummaryCardView[] {
 }
 
 function isRunningAgent(agent: AgentSnapshot): boolean {
-  return agent.hasLiveTmuxSession === true || agent.status === 'running' || agent.status === 'starting';
+  return agent.hasLivePane === true || agent.status === 'running' || agent.status === 'starting';
 }
 
 function selectActionObservations(observationsByIssueId: Record<string, MemoryObservation[]>): Array<MemoryObservation & { actionStatus: string }> {
@@ -527,7 +527,7 @@ function buildHomeWorkspaceCards({
 }
 
 function isActiveWorkspaceAgent(agent: AgentSnapshot): boolean {
-  return agent.hasLiveTmuxSession === true || ['healthy', 'running', 'starting', 'stuck', 'warning'].includes(agent.status);
+  return agent.hasLivePane === true || ['healthy', 'running', 'starting', 'stuck', 'warning'].includes(agent.status);
 }
 
 function buildWorkspaceStats(
