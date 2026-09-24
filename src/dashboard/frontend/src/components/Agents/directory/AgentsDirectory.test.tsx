@@ -147,6 +147,40 @@ describe('AgentsDirectory', () => {
     expect(node).toHaveTextContent('PAN-2 · Agents page as a directory');
   });
 
+  it('collapsing an ancestor of the selected node moves the selection to that ancestor', () => {
+    render(<AgentsDirectory />);
+    fireEvent.click(screen.getByText('PAN-1', { selector: 'span' }));
+    expect(screen.getByTestId('detail')).toHaveTextContent('agent-pan-1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse overdeck' }));
+
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('node')).toBe('proj:local:overdeck');
+    expect(params.get('entry')).toBe('agent-pan-1');
+    expect(screen.queryByText('PAN-1', { selector: 'span' })).not.toBeInTheDocument();
+    const tree = screen.getByRole('tree');
+    expect(within(tree).getByRole('treeitem', { selected: true })).toHaveAttribute('data-node-id', 'proj:local:overdeck');
+    expect(rowIds()).toEqual(['agent-pan-2', 'conv:notes', 'agent-pan-1']);
+    expect(screen.getByTestId('detail')).toHaveTextContent('agent-pan-1');
+  });
+
+  it('collapsing a node that does not contain the selection leaves the selection alone', () => {
+    useAgentDirectory.mockReturnValue({
+      data: {
+        generatedAt: '',
+        windowHours: 24,
+        entries: [...ENTRIES, entry({ id: 'agent-min-1', projectKey: 'myn', issueId: 'MIN-1', label: 'work · MIN-1' })],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(<AgentsDirectory />);
+    fireEvent.click(screen.getByText('PAN-1', { selector: 'span' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse myn' }));
+    expect(new URLSearchParams(window.location.search).get('node')).toBe('issue:local:PAN-1');
+    expect(rowIds()).toEqual(['agent-pan-1']);
+  });
+
   it('/ focuses the filter, not the app-wide search, and the filter narrows the list', () => {
     const documentSlash = vi.fn();
     document.addEventListener('keydown', documentSlash);

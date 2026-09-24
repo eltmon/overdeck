@@ -134,6 +134,28 @@ describe('DirectoryDetail', () => {
     expect(screen.getByText('· $2.50')).toBeInTheDocument();
   });
 
+  it('shows an agent subagent cost once its transcript query resolves', async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({ messages: [], workLog: [], streaming: false, totalCost: 0.42, byteOffset: 0 }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      renderDetail(entry({
+        id: 'agent-pan-1:sub-1', label: 'Explore · scan the repo', role: null, parentId: 'agent-pan-1', state: 'done',
+        transcript: { route: 'agent-subagent', agentId: 'agent-pan-1', subagentId: 'sub-1' },
+      }));
+      expect(screen.queryByText(/\$0\.420/)).not.toBeInTheDocument();
+      expect(await screen.findByText('· $0.420')).toBeInTheDocument();
+      const subagentFetches = fetchMock.mock.calls
+        .map((call) => String((call as unknown[])[0]))
+        .filter((url) => url.startsWith('/api/agents/agent-pan-1/conversation'));
+      expect(subagentFetches).toEqual(['/api/agents/agent-pan-1/conversation?subagentId=sub-1']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('shows an external agent read-only, with its Claude-session parent and no composer', () => {
     renderDetail(entry({
       id: 'ext-codex-plugin-task-1', kind: 'external', source: 'codex-plugin', role: null, label: 'Fix the flaky test',

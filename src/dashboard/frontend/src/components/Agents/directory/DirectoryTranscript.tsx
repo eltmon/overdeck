@@ -65,6 +65,11 @@ function useConversationByName(name: string | null): { conversation: Conversatio
   return { conversation: data?.find((row) => row.name === name) ?? null, loading: isLoading };
 }
 
+/** Cache key of an agent subagent's transcript; DirectoryDetail reads its `totalCost` from it. */
+export function agentSubagentTranscriptQueryKey(agentId: string, subagentId: string) {
+  return ['agent-subagent-transcript', agentId, subagentId] as const;
+}
+
 async function fetchAgentSubagentTranscript(agentId: string, subagentId: string): Promise<ConversationResponse> {
   const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/conversation?subagentId=${encodeURIComponent(subagentId)}`);
   if (!res.ok) throw new Error(`Failed to load subagent transcript (${res.status})`);
@@ -73,7 +78,7 @@ async function fetchAgentSubagentTranscript(agentId: string, subagentId: string)
 
 function AgentSubagentTranscript({ entry, agentId, subagentId }: { entry: DirectoryEntry; agentId: string; subagentId: string }) {
   const transcript = useQuery({
-    queryKey: ['agent-subagent-transcript', agentId, subagentId],
+    queryKey: agentSubagentTranscriptQueryKey(agentId, subagentId),
     queryFn: () => fetchAgentSubagentTranscript(agentId, subagentId),
     refetchInterval: isLiveState(entry.state) ? 5_000 : false,
   });

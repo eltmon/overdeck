@@ -14,11 +14,15 @@ import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'reac
 import { DirectoryDetail } from './DirectoryDetail';
 import { DirectoryList } from './DirectoryList';
 import { DirectoryTree } from './DirectoryTree';
-import { buildDirectoryTree, entriesForNode, filterRows, visibleNodes } from './directory-tree';
+import { buildDirectoryTree, entriesForNode, filterRows, visibleNodes, type DirectoryNode } from './directory-tree';
 import { useAgentDirectory } from './useAgentDirectory';
 import { useDirectoryUrlState } from './useDirectoryUrlState';
 
 type Pane = 'tree' | 'list' | 'detail';
+
+function containsNode(node: DirectoryNode, nodeId: string): boolean {
+  return node.children.some((child) => child.id === nodeId || containsNode(child, nodeId));
+}
 const PANES: Pane[] = ['tree', 'list', 'detail'];
 
 export function AgentsDirectory() {
@@ -122,12 +126,26 @@ export function AgentsDirectory() {
     }
   };
 
-  const toggleNode = (nodeId: string) => setCollapsed((previous) => {
-    const next = new Set(previous);
-    if (next.has(nodeId)) next.delete(nodeId);
-    else next.add(nodeId);
-    return next;
-  });
+  // WAI-ARIA tree pattern: collapsing a node that contains the selection moves
+  // the selection to that node, so the selection never hides and silently
+  // falls back to the first visible row. The selected entry is listed under
+  // the ancestor too, so it stays selected.
+  const toggleNode = (nodeId: string) => {
+    const collapsing = !collapsed.has(nodeId);
+    if (collapsing && selectedNodeId && selectedNodeId !== nodeId) {
+      const target = nodes.find(({ node }) => node.id === nodeId)?.node;
+      if (target && containsNode(target, selectedNodeId)) {
+        url.setNode(nodeId);
+        if (selectedEntryId) url.setEntry(selectedEntryId);
+      }
+    }
+    setCollapsed((previous) => {
+      const next = new Set(previous);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  };
 
   return (
     <div

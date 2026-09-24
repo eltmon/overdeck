@@ -323,8 +323,12 @@ export async function buildAgentDirectory(
     const remoteState = remotes[index];
     const remote = remoteState?.location === 'remote';
     // A remote agent's terminal is on the Fly VM: unknown while it runs, stopped once
-    // remote-state.json says it stopped or failed, so it windows out (D3/D4).
-    const remoteStopped = remote && (remoteState?.status === 'stopped' || remoteState?.status === 'error');
+    // remote-state.json or state.json says it stopped or failed, so it windows out
+    // (D3/D4). `pan kill` with the remote unreachable writes only state.json.
+    const remoteStopped = remote && (
+      remoteState?.status === 'stopped' || remoteState?.status === 'error'
+      || state.status === 'stopped' || state.status === 'error'
+    );
     const worker = workerFacts[index];
     const localState = worker ? workerState(pane, worker.reportAt) : paneState(pane);
     const entry: DirectoryEntry = {
