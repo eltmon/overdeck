@@ -543,6 +543,45 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(mockSpawnRun).toHaveBeenCalledTimes(1);
   });
 
+  // #3853: the verdict guard lets an operator-requested run block an approved
+  // head. The request rides the parent's state and every dispatch rewrites it,
+  // so an automatic cycle never inherits it.
+  it('records an operator request on a fresh parent and clears it on the next plain dispatch', async () => {
+    await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, operatorRequested: true }));
+    const saved = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .filter((state) => state.id === 'agent-pan-1982-review');
+    expect(saved.at(-1)).toMatchObject({ reviewOperatorRequested: true });
+
+    mockSaveAgentStateAsync.mockClear();
+    await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+    const next = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .filter((state) => state.id === 'agent-pan-1982-review');
+    expect(next.length).toBeGreaterThan(0);
+    expect(next.at(-1)?.reviewOperatorRequested).toBeUndefined();
+  });
+
+  it('rewrites the operator request on a resumed parent', async () => {
+    const saved = { id: 'agent-pan-1982-review', status: 'running', reviewOperatorRequested: true } as Record<string, unknown>;
+    mockGetAgentState.mockImplementation((id: string) => (id === 'agent-pan-1982-review' ? saved : null));
+    mockGetLatestSessionIdSync.mockReturnValue('session-1');
+    mockResumeAgent.mockResolvedValue({ success: true });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(result.message).toContain('Review resumed');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    const resumedSave = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .find((state) => state.id === 'agent-pan-1982-review');
+    expect(resumedSave).toBeDefined();
+    expect(resumedSave!.reviewOperatorRequested).toBeUndefined();
+
+    mockSaveAgentStateAsync.mockClear();
+    await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, operatorRequested: true }));
+    const operatorSave = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .find((state) => state.id === 'agent-pan-1982-review');
+    expect(operatorSave).toMatchObject({ reviewOperatorRequested: true });
+  });
+
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');

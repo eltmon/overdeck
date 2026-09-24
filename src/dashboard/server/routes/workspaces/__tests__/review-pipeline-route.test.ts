@@ -250,6 +250,31 @@ describe('POST /api/review/:issueId/trigger — derived guards', () => {
     });
   });
 
+  // #3853: a forced Full review on an approved head is the operator's request,
+  // so its reviewer must be able to block that head.
+  it('marks a forced review of an approved PR as operator-requested', async () => {
+    routeMocks.getDerivedIssueState.mockResolvedValue(derived({
+      state: 'ready',
+      pr: { url: 'https://gh/pr/7', number: 7, reviewState: 'approved', checks: 'green', mergeable: true },
+    }));
+    routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
+    routeMocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
+    routeMocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'spawned' }));
+
+    const result = await trigger({
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ force: true, reviewMode: 'full' }),
+    });
+
+    expect(result.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ issueId: 'PAN-3340', force: true, reviewMode: 'full', operatorRequested: true }),
+      );
+    });
+  });
+
   it('leaves review mode to config when no mode is requested', async () => {
     routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
     routeMocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
