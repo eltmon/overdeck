@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T21:36:46.824Z · model: claude-opus-5 · open: 817_
+_Last sequenced: 2026-09-24T21:40:22.399Z · model: claude-opus-5 · open: 816_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -785,7 +785,6 @@ _Last sequenced: 2026-09-24T21:36:46.824Z · model: claude-opus-5 · open: 817_
 | 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 836 | PAN-3868 | XS | low | stale |  |  | Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists |
 | 837 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
 | 838 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
 | 839 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
@@ -1132,10 +1131,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T21:36:46.824Z",
+  "generatedAt": "2026-09-24T21:40:22.399Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 817,
+  "openCount": 816,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -10721,19 +10720,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "skip"
     },
     {
-      "issue": "PAN-3868",
-      "rank": 836,
-      "size": "XS",
-      "importance": "low",
-      "score": 15,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists",
-      "rationale": "New this run but stale on arrival: filed 2026-09-16..18 against a module the PAN-3917 cut deleted; work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-299",
       "rank": 837,
       "size": "M",
@@ -11847,13 +11833,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
     {
       "from": "PAN-3853",
       "to": "PAN-3854",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3852",
-      "to": "PAN-3868",
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
