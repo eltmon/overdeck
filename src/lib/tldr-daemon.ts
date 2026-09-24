@@ -476,15 +476,6 @@ export function getTldrDaemonServiceSync(workspacePath: string, venvPath: string
 }
 
 /**
- * Remove a daemon service from the registry
- *
- * @param workspacePath - Path to the workspace
- */
-export function removeTldrDaemonServiceSync(workspacePath: string): void {
-  daemonRegistry.delete(workspacePath);
-}
-
-/**
  * List all registered daemon services
  */
 export function listTldrDaemonServicesSync(): TldrDaemonService[] {

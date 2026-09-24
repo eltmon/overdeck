@@ -78,12 +78,6 @@ export function classifyAdvancingSessionLifecycle(
   return isRoleTerminal(role, phase) ? 'warm' : 'active';
 }
 
-export function isAdvancingLifecycleReclaimable(
-  lifecycle: AdvancingSessionLifecycle,
-): boolean {
-  return lifecycle === 'orphaned';
-}
-
 /**
  * Of the alive sessions, the ones belonging to `issueId`'s advancing `role`.
  * Matches the canonical role session (`agent-<id>-<role>`), the review convoy

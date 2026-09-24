@@ -961,19 +961,6 @@ export function hasProjectsSync(): boolean {
 }
 
 /**
- * Create a default projects.yaml with example structure
- */
-export function createDefaultProjectsConfig(): ProjectsConfig {
-  const defaultConfig: ProjectsConfig = {
-    projects: {
-      // Example project - commented out in actual file
-    },
-  };
-
-  return defaultConfig;
-}
-
-/**
  * Initialize projects.yaml with example configuration
  */
 export function initializeProjectsConfigSync(): void {
@@ -1093,21 +1080,6 @@ export function findProjectsByRallyProject(): Array<{ key: string; config: Proje
   return Object.entries(config.projects)
     .filter(([, projectConfig]) => !!projectConfig.rally_project)
     .map(([key, projectConfig]) => ({ key, config: projectConfig }));
-}
-
-/**
- * Get custom prompt override for a specialist (if configured)
- *
- * @param projectKey - Project key
- * @param specialistType - Specialist type
- * @returns Custom prompt or null if not configured
- */
-export function getSpecialistPromptOverride(
-  projectKey: string,
-  specialistType: string
-): string | null {
-  const config = getSpecialistConfig(projectKey);
-  return (config.prompts as Record<string, string | undefined>)[specialistType] || null;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

@@ -94,11 +94,6 @@ function within(iso: string | null | undefined, from: number, to: number): boole
 
 const issueCache = new Map<string, { at: number; since: number; rows: readonly SubstrateIssue[] }>();
 
-/** Test seam: drop the 60 s issue cache. */
-export function clearSubstrateIssueCache(): void {
-  issueCache.clear();
-}
-
 interface GhIssueRow {
   number?: number;
   title?: string;

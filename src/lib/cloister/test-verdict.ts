@@ -20,7 +20,6 @@
  */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { XBriefDocument } from '../xbrief/types.js';
 
 export interface TestVerdictArtifact {
   status: 'passed' | 'failed';
@@ -146,53 +145,4 @@ export function decideUnsignaledTestAction(input: {
   // the honest move is to tell a human, not to keep quiet.
   if (alreadyNudged) return { action: 'escalate' };
   return { action: 'nudge-write' };
-}
-
-/**
- * PAN-3092: surface an `escalate` decision to the operator, once per test
- * dispatch generation. Returns the needs-you line to log, or undefined when this
- * generation already escalated. Never touches the verdict itself (D6) — a
- * pane-only verdict is a human's call to read and apply.
- */
-const escalatedTestGenerations = new Set<string>();
-
-/** Test hook: forget which dispatch generations have already escalated. */
-export function resetUnsignaledTestEscalationsForTests(): void {
-  escalatedTestGenerations.clear();
-}
-
-export async function recordUnsignaledTestEscalation(
-  _workspacePath: string,
-  issueId: string,
-  testSession: string,
-  generation: string,
-): Promise<string | undefined> {
-  // PAN-3917: once per dispatch generation, held in process memory. The trip
-  // ledger this used to write was a stored counter for a message.
-  const key = `${issueId.toUpperCase()}:${generation}`;
-  if (escalatedTestGenerations.has(key)) return undefined;
-  escalatedTestGenerations.add(key);
-  return (
-    `needs-you ${issueId}: the test agent (${testSession}) is alive but has not responded to a verdict ` +
-    `nudge, and it wrote no .pan/test/result.json — its verdict may exist only in the agent's pane, where ` +
-    `nothing can recover it automatically. Read the pane ` +
-    `(tmux -L overdeck capture-pane -t ${testSession} -p -S -200), then either apply the verdict yourself ` +
-    `(pan admin specialists done test ${issueId} --status passed|failed) or run pan kill ${issueId} and ` +
-    `re-dispatch the test.`
-  );
-}
-
-export function resolveSlotFeedbackAgentId(
-  issueId: string,
-  slotItemId: string | undefined,
-  _doc: XBriefDocument | null | undefined,
-  slotOwnership: Array<{ slotIndex: number; slotItemId?: string; itemId?: string }> = [],
-): string | null {
-  const normalizedItemId = slotItemId?.trim();
-  if (!normalizedItemId) return null;
-
-  const persistedOwner = slotOwnership.find(slot => (slot.slotItemId ?? slot.itemId) === normalizedItemId);
-  if (persistedOwner) return `agent-${issueId.toLowerCase()}-slot-${persistedOwner.slotIndex}`;
-
-  return null;
 }

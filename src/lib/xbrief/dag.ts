@@ -255,29 +255,6 @@ export function blockingParentCount(doc: XBriefDocument, itemId: string): number
   }).length;
 }
 
-export function blockingParentTotal(doc: XBriefDocument, itemId: string): number {
-  const itemIds = new Set(doc.plan.items.map(i => i.id));
-  return doc.plan.edges.filter(e => e.type === 'blocks' && e.to === itemId && itemIds.has(e.from)).length;
-}
-
-export function deriveSynthesisMetadata(doc: XBriefDocument): XBriefDocument {
-  const next = cloneDoc(doc);
-  const itemIds = new Set(next.plan.items.map(item => item.id));
-  const incomingBlockCounts = new Map<string, number>();
-
-  for (const edge of next.plan.edges) {
-    if (edge.type !== 'blocks' || !itemIds.has(edge.from) || !itemIds.has(edge.to)) continue;
-    incomingBlockCounts.set(edge.to, (incomingBlockCounts.get(edge.to) ?? 0) + 1);
-  }
-
-  for (const item of next.plan.items) {
-    if ((incomingBlockCounts.get(item.id) ?? 0) > 1) {
-      item.metadata = { ...(item.metadata ?? {}), requiresSynthesis: true };
-    }
-  }
-  return next;
-}
-
 /**
  * Converts a glob pattern to a RegExp for simple path matching.
  * Supports `**` (any path segment), `*` (any chars within a segment), and `?`.
@@ -541,88 +518,6 @@ export interface TaskOperationResult {
   item: XBriefItem;
 }
 
-const TASK_OPERATION_TYPES = new Set<string>(['claim', 'done', 'block', 'unblock', 'cancel', 'reopen']);
-const TASK_COMMANDS = new Set<string>(['next', 'show', ...TASK_OPERATION_TYPES]);
-
-export function isTaskOperationType(value: string): value is TaskOperationType {
-  return TASK_OPERATION_TYPES.has(value);
-}
-
-export function isTaskCommand(value: string): value is TaskCommand {
-  return TASK_COMMANDS.has(value);
-}
-
-function statusForOperation(type: TaskOperationType): XBriefItemStatus {
-  switch (type) {
-    case 'claim': return 'running';
-    case 'done': return 'completed';
-    case 'block': return 'blocked';
-    case 'unblock': return 'pending';
-    // PAN-3691: reopen is the canonical recovery for a task falsely marked
-    // completed (e.g. a swarm slot merged with no current-item changes).
-    case 'reopen': return 'pending';
-    case 'cancel': return 'cancelled';
-    default: {
-      const exhaustive: never = type;
-      throw new Error(`Unsupported xBRIEF task operation: ${String(exhaustive)}`);
-    }
-  }
-}
-
-function cloneDoc(doc: XBriefDocument): XBriefDocument {
-  return JSON.parse(JSON.stringify(doc)) as XBriefDocument;
-}
-
-/**
- * Apply a Overdeck-native task operation to the xBRIEF itself. This is the
- * single mutation authority for swarm task status: legacy stores can mirror state during
- * migration, but the plan document wins and receives the sequence bump.
- */
-export function applyTaskOperation(doc: XBriefDocument, operation: TaskOperation): TaskOperationResult {
-  if (!isTaskOperationType(String(operation.type))) {
-    throw new Error(`Unsupported xBRIEF task operation: ${String(operation.type)}`);
-  }
-  const currentSequence = doc.plan.sequence ?? 0;
-  if (operation.expectedSequence !== undefined && operation.expectedSequence !== currentSequence) {
-    throw new Error(`xBRIEF sequence conflict: expected ${operation.expectedSequence}, found ${currentSequence}`);
-  }
-  const next = cloneDoc(doc);
-  const item = next.plan.items.find(i => i.id === operation.itemId);
-  if (!item) throw new Error(`Plan item not found: ${operation.itemId}`);
-
-  const now = new Date().toISOString();
-  item.status = statusForOperation(operation.type);
-  if (operation.type === 'done') item.completed = now;
-  if (operation.type === 'reopen') delete item.completed;
-  if (operation.reason) {
-    item.metadata = { ...(item.metadata ?? {}), statusReason: operation.reason, statusUpdatedAt: now };
-  }
-  if (operation.subItemIds?.length) {
-    const ids = new Set(operation.subItemIds);
-    for (const sub of subItemsOf(item)) {
-      if (ids.has(sub.id)) {
-        sub.status = item.status;
-        if (operation.type === 'done') sub.completed = now;
-        if (operation.type === 'reopen') delete sub.completed;
-      }
-    }
-  } else if (operation.type === 'done') {
-    for (const sub of subItemsOf(item)) {
-      sub.status = 'completed';
-      sub.completed = now;
-    }
-  } else if (operation.type === 'reopen') {
-    for (const sub of subItemsOf(item)) {
-      sub.status = 'pending';
-      delete sub.completed;
-    }
-  }
-  next.plan.sequence = currentSequence + 1;
-  next.plan.updated = now;
-  next.xBRIEFInfo.updated = now;
-  return { doc: next, item };
-}
-
 export interface TaskGraphView {
   source: 'vbrief';
   next: XBriefItem[];
@@ -660,17 +555,11 @@ export function getTaskGraphView(doc: XBriefDocument, mergedItemIds: Set<string>
   };
 }
 
-export function activeSlicePromptSize(slice: ActiveSlice): number {
-  return Buffer.byteLength(slice.prompt, 'utf8');
-}
-
 
 export interface PersistedTaskOperation extends TaskOperation {
   /** Stable ID of the single writer that owns this worktree mutation. */
   writerId: string;
 }
-
-export const activePlanWriters = new Map<string, string>();
 
 export type TaskCommand = 'next' | 'show' | TaskOperationType;
 
@@ -688,14 +577,4 @@ export interface PromptSizeVerification {
   fullPlanBytes: number;
   activeSliceBytes: number;
   reductionRatio: number;
-}
-
-export function verifyActiveSlicePromptReduction(doc: XBriefDocument, slice: ActiveSlice): PromptSizeVerification {
-  const fullPlanBytes = Buffer.byteLength(JSON.stringify(doc, null, 2), 'utf8');
-  const activeSliceBytes = activeSlicePromptSize(slice);
-  return {
-    fullPlanBytes,
-    activeSliceBytes,
-    reductionRatio: fullPlanBytes === 0 ? 0 : activeSliceBytes / fullPlanBytes,
-  };
 }

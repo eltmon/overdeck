@@ -1212,9 +1212,6 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
   }));
 }
 
-export function listArchivedConversationNames(): string[] {
-  return listArchivedConversations().map((conv) => conv.name);
-}
 const nullIfEmpty = (value: string | undefined): string | null => value?.trim() || null;
 export function createConversation(opts: {
   name: string;
@@ -1332,12 +1329,6 @@ export function updateLastAttached(name: string): void {
   overdeckDb()
     .prepare(`UPDATE conversations SET last_attached_at = ? WHERE name = ?`)
     .run(Date.now(), name);
-}
-
-export function markAllEndedOnStartup(): void {
-  overdeckDb()
-    .prepare(`UPDATE conversations SET status = 'ended', ended_at = COALESCE(ended_at, ?) WHERE status = 'active'`)
-    .run(Date.now());
 }
 
 export function updateConversationTitle(name: string, title: string, titleSource?: LegacyTitleSource): void {
@@ -1472,10 +1463,6 @@ export function updateSpawnError(name: string, error: string | null): void {
   overdeckDb().prepare(`UPDATE conversations SET spawn_error = ? WHERE name = ?`).run(error, name);
 }
 
-export function clearStuckForks(): number {
-  return 0;
-}
-
 export function canReplaceTitle(conv: LegacyConversation): boolean {
   if (conv.titleSource === 'manual') return false;
   return conv.titleSource === 'default' || conv.titleSource === 'auto';
@@ -1580,13 +1567,4 @@ export function importLegacyConversation(mapped: ImportLegacyConversationMapped)
     }
   })();
   return { uuid };
-}
-
-export function setImportedConversationLinks(
-  uuid: string,
-  links: { handoffTargetUuid: string | null; clearedToUuid: string | null },
-): void {
-  overdeckDb()
-    .prepare(`UPDATE conversations SET handoff_target_conv_id = ?, cleared_to_conv_id = ? WHERE id = ?`)
-    .run(links.handoffTargetUuid, links.clearedToUuid, uuid);
 }

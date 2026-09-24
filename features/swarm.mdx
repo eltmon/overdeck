@@ -94,7 +94,7 @@ Two fields on `XBriefItem.metadata` control swarm behavior.
 | Field | Purpose |
 |---|---|
 | `files_scope: string[]` | Globs (`**`, `*`, `?`) of files this item touches. Used by `hasFileOverlap()` to serialize file-conflicting items. Items without a scope are treated as non-overlapping. |
-| `requiresSynthesis: boolean` | Auto-derived during planning by `deriveSynthesisMetadata()`. Set on any item with >1 blocking parent. Do not hand-edit. |
+| `requiresSynthesis: boolean` | Marks a synthesis item. The swarm treats any item with more than one blocking parent as a synthesis item whether or not this is set, so you rarely need it. |
 
 Plans that omit `files_scope` will still run — but every parallel pair is treated as non-overlapping, so two slots could race the same file. Author `files_scope` whenever items can plausibly touch the same code.
 

@@ -180,21 +180,6 @@ export function migrateConfigSync(options: MigrationOptions = {}): MigrationResu
 }
 
 /**
- * Get migration status
- */
-export function getMigrationStatusSync(): {
-  needsMigration: boolean;
-  hasLegacySettings: boolean;
-  hasNewConfig: boolean;
-} {
-  return {
-    needsMigration: needsMigrationSync(),
-    hasLegacySettings: existsSync(LEGACY_SETTINGS_PATH),
-    hasNewConfig: existsSync(NEW_CONFIG_PATH),
-  };
-}
-
-/**
  * Clean up legacy runtime symlinks from removed runtimes.
  *
  * PAN-142: Overdeck consolidated to Claude Code as the sole runtime.

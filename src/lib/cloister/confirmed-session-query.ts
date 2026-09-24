@@ -32,8 +32,3 @@ export async function queryConfirmedSession(agentId: string): Promise<[SessionQu
 export function clearConfirmedSessionMiss(agentId: string): void {
   consecutiveMisses.delete(agentId);
 }
-
-export function consumeConfirmedSessionDetail(agentId: string, query: SessionQueryResult): string {
-  clearConfirmedSessionMiss(agentId);
-  return query.status === 'missing' ? query.detail : 'pane confirmed dead';
-}

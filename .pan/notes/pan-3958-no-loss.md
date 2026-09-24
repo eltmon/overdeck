@@ -1283,3 +1283,156 @@ from its `paths.js` mock, which no longer exports it.
   `tests/unit/lib/agents/codex-agent-home-golden.test.ts` pins all six call paths; it was committed and passing
   before the helpers replaced the joins, and passes unchanged after.
 - `docs/MUSE-HARNESS.md` names `src/lib/runtimes/storage/muse.ts`.
+
+## CH-8a: dead exports, dead files, alias shims (#4014, part 1)
+
+PRD W10 steps 1, 2, 5 and 6, and W11 part 5. `python3 .pan/notes/pan-3958-dead-exports.py v` on main at 08a1c998083
+listed 161 `DEAD` exports (exported from `src/lib`, named in no other tracked file and never used in their own). All
+161 are deleted (none is Oh My Pi code; the one Oh My Pi row the scan prints is `TESTONLY`). Deleting them left
+private helpers unused, which are deleted too. The scan then finds 29 more `DEAD` exports that only the deleted code
+used; they go the same way, repeated until the scan reports 0 `DEAD` rows. In total: 190 exports and 37 private
+helpers in 89 modules. `tsc` on the root and dashboard projects is clean after every round.
+
+`DEAD` rows have no test reference by construction (the scan's name index includes test files), so no test imports
+or mocks a deleted name and no test changes for them.
+
+Q1 is answered "internal": `src/index.ts` gains the header "Internal entry; not a supported library API". These
+deleted names were reachable through its `export *` and are listed for the v0.61.0 release notes:
+`findDevrootForProjectSync` (`config.ts`); `HANDOFFS_DIR`, `CACHE_SKILLS_DIR`, `DOCS_INDEX_FILE`,
+`DOCS_BUDGET_STATE_FILE`, `DOCS_DISABLE_STATE_FILE`, `DOCS_TELEMETRY_FILE`, `resolvePiExtensionPath` (`paths.ts`);
+`getDirectProviders` (`providers.ts`); `isOverdeckSymlinkSync` (`sync.ts`).
+
+Ratchets: Effect diagnostics 250 → 231. Façades unchanged (A 1, B 4, C 35): none of the deleted `*Sync` functions still
+had a twin. File-size caps lowered for `tmux.ts`, `model-capabilities.ts`, `overdeck/conversations.ts`,
+`cloister/merge-agent.ts`, `projects.ts`, `sync.ts`, `agents/runtime-command.ts`, `agents/spawn-prep.ts`,
+`cloister/review-agent.ts` and `overdeck/merge.ts`. Circular dependencies unchanged (64 baselined).
+
+### Dead files (W10 step 6)
+
+Every export of these files was `DEAD` after the rounds above and nothing imports them:
+
+| File | Last caller removed by | THE-CUT.md |
+| --- | --- | --- |
+| `cloister/planning-wedge.ts` (PAN-3677 background-task wedge detector) | PAN-3917 W4, `deacon.ts` cut to deacon-lite | the "One of ~40 individual patrol routines inside `runPatrol`" rows: dropped, deacon-lite runs four fixed routines. Its two redacted fixtures, `tests/fixtures/pan-3677/`, had no test left and go with it |
+| `flywheel-state-retention.ts` (compacting the stored Flywheel state log) | PAN-3917 W9, flywheel is a conversation | `flywheel-state` row: dropped (FR-13), no stored Flywheel run record |
+| `state-migration-manifest.ts` | PAN-3917 W3, record plane deleted | state-layer rows: dropped |
+| `cloister/uat-assemble-deps.ts` | PAN-1737 (long before the Cut) | not a Cut surface |
+| `cost-parsers/session-map.ts` (`~/.overdeck/session-map.json` issue ↔ session map) | CH-1a deleted its last Shape B callers; the `*Sync` survivors had no caller | not a Cut surface |
+
+None is named by THE-CUT.md as a feature's new home.
+
+### Alias shims (W10 step 5)
+
+- `routes/misc/shared.ts`, `routes/issues.ts`, `routes/workspaces.ts`, `routes/workspaces/merge-ops.ts`: import
+  `resolveGitHubIssueSync` under its own name instead of `as resolveGitHubIssueShared`.
+- `routes/misc/trackers.ts`: `getLinearApiKey`, `getGitHubConfig`, `getRallyConfig` under their own names (no local
+  name collided). `routes/misc/meta.ts` imported `getGitHubConfig as getGitHubConfigShared` and never used it; the import
+  is dropped.
+- `cloister/feedback-writer.ts` `archiveFeedbackFiles` (a `@deprecated` alias of `clearFeedbackFiles`) is deleted;
+  `review-agent.ts` calls `clearFeedbackFiles`. Its three test files mock and assert `clearFeedbackFiles` instead; one
+  duplicate `not.toHaveBeenCalled()` line for the alias goes, no `it()` changes.
+- Left alone: `dashboard/frontend/src/lib/store.ts` imports `syncSnapshot`/`applyEvent`/`applyEvents` as `…Shared`
+  because it defines store actions with those names.
+
+### Docs
+
+`features/swarm.mdx` said `requiresSynthesis` is "auto-derived during planning by `deriveSynthesisMetadata()`", a
+function with no caller. The row now says what the code does: `deacon-swarm.ts` treats an item with more than one
+blocking parent as a synthesis item whether or not the field is set. Mentions of deleted names in `docs/prds/**` and
+`docs/overdeck-remodel/**` are historical plans and are left as written.
+
+### Deleted, by module
+
+All paths are relative to `src/lib/`.
+
+| Module | Dead exports deleted | Private helpers left unused, deleted with them |
+| --- | --- | --- |
+| `agent-runtime.ts` | `emitWaitingStart`, `emitWaitingClear`, `emitModelSet`, `emitMessageReceived`, `emitChannelReply`, `emitResolution`, `emitContextSaturationChanged` | — |
+| `agents/agent-state-source.ts` | `readActiveReviewArtifactContext` | — |
+| `agents/pinned-launch.ts` | `readPinnedAgentLaunchSync` | — |
+| `agents/runtime-command.ts` | `getPiLauncherFields` | — |
+| `agents/spawn-prep.ts` | `selectHardestPlanItem` | — |
+| `agents/tier-escalation.ts` | `decideVerificationFailureEscalation` | — |
+| `agents/tier-supervisor.ts` | `shouldHaltDispatch` | `dependencyClosure` |
+| `artifacts/thumbnails.ts` | `readPlaceholderThumbnail`, `readThumbnailFile` | — |
+| `boot-no-resume.ts` | `isExplicitNoResumeRequest` | — |
+| `checkpoint/checkpoint-manager.ts` | `hasCheckpoint`, `diffCheckpointToHead`, `deleteAllCheckpoints`, `runCheckpointGit` | `checkpointSpawnerLayer`, `deleteAllCheckpointsPromise`, `diffCheckpointToHeadPromise`, `hasCheckpointPromise` |
+| `claude-settings-overlay.ts` | `injectProviderEnvOverlay`, `removeProviderEnvOverlay` | `backupIfNeeded`, `findNewestBackup`, `BACKUP_PREFIX` |
+| `cloister/config.ts` | `getCloisterConfigPath` | — |
+| `cloister/confirmed-session-query.ts` | `consumeConfirmedSessionDetail` | — |
+| `cloister/database.ts` | `writeHealthEventSync`, `getHealthHistorySync`, `getRecentHealthHistorySync`, `getAllHealthHistorySync`, `getLatestHealthEventSync`, `getAgentsWithHistorySync`, `deleteAgentHistorySync` | — |
+| `cloister/deacon-swarm-record.ts` | `readSwarmSupersededAttempts` | — |
+| `cloister/handoff-logger.ts` | `getHandoffStats` | — |
+| `cloister/handoff.ts` | `shouldHandoff` | — |
+| `cloister/idle-stack-reaper.ts` | `resetIdleStackGraceClock` | — |
+| `cloister/label-reconciler.ts` | `reconcilePipelineLabelsPatrol`, `collectLabelReconcileCandidates` | `execAsync` |
+| `cloister/memory-verdict-cache.ts` | `setCachedMemoryVerdictForTests` | — |
+| `cloister/merge-agent.ts` | `logMergeHistory`, `captureTmuxOutput`, `isMergeAgentRunning`, `sendMessageToAgent` | `MERGE_HISTORY_FILE`, `MERGE_HISTORY_DIR`, `SPECIALISTS_DIR` |
+| `cloister/planning-wedge.ts (file deleted)` | `readAgentBackgroundTaskWedgeEvidence`, `readBackgroundTaskWedgeEvidence`, `parseBackgroundTaskWedge` | `TERMINAL_TASK_STATUSES`, `isPromptBoundary`, `parseTaskNotification` |
+| `cloister/reap-terminal-sessions.ts` | `isAdvancingLifecycleReclaimable` | — |
+| `cloister/review-agent.ts` | `isReviewStaleSync` | — |
+| `cloister/review-verdict-report.ts` | `findVerdictReportAsync` | — |
+| `cloister/specialist-completion.ts` | `waitForSpecialistCompletion`, `cancelAllPendingCompletions` | — |
+| `cloister/stall-sweeper-state.ts` | `clearSweeperRowState` | — |
+| `cloister/stall-sweeper.ts` | `forgetResolvedSweeperRows` | — |
+| `cloister/test-verdict.ts` | `resetUnsignaledTestEscalationsForTests`, `recordUnsignaledTestEscalation`, `resolveSlotFeedbackAgentId` | `escalatedTestGenerations` |
+| `cloister/uat-assemble-deps.ts (file deleted)` | `buildUatAssembleSession` | `execAsync` |
+| `cloister/verification-types.ts` | `INTERRUPTED_VERIFICATION_NOTE` | — |
+| `config-migration.ts` | `getMigrationStatusSync` | — |
+| `config.ts` | `findDevrootForProjectSync` | — |
+| `context.ts` | `checkContextBudgetSync`, `createContextBudgetSync` | — |
+| `conversations/hash-resolver.ts` | `resolveJsonl` | — |
+| `cost-parsers/jsonl-parser.ts` | `getRecentSessionsSync`, `importSessionToCostLog`, `parseAllSessionsSync` | — |
+| `cost-parsers/session-map.ts (file deleted)` | `linkSessionToIssueSync`, `completeSessionSync`, `getIssueSessionsSync`, `getIssueCostSummarySync`, `getAllIssuesWithCostsSync`, `findSessionByIdSync`, `updateSessionFromJSONLSync`, `loadSessionMapSync`, `saveSessionMapSync` | `recalculateIssueTotals`, `DEFAULT_DATA`, `SESSION_MAP_FILE` |
+| `cost.ts` | `logUsageSync`, `updateBudgetSpentSync`, `logCostSync` | — |
+| `db-provisioners/flyway-postgres.ts` | `getFlywayPostgresSnapshotHelp` | `getSnapshotHelp` |
+| `dns.ts` | `restartDnsmasq` | — |
+| `docker-stats.ts` | `getDockerNetworks`, `getDockerVolumes` | — |
+| `env-loader.ts` | `hasEnvFile`, `getEnvFilePath` | — |
+| `flywheel-state-retention.ts (file deleted)` | `compactFlywheelStateFile`, `compactFlywheelState`, `FLYWHEEL_STATE_VERBATIM_RUNS`, `shouldCompactFlywheelState`, `FLYWHEEL_STATE_MAX_BYTES`, `FLYWHEEL_STATE_MAX_LINES` | `buildCompactedLog`, `parseBlocks`, `readExistingSummaries`, `summarizeRun`, `normalizeOneLine`, `tickNumber`, `truncate` |
+| `flywheel/substrate-stats.ts` | `clearSubstrateIssueCache` | — |
+| `harness-policy.ts` | `ACP_KIMI_ONLY_BLOCK_REASON`, `KIMI_CODE_KIMI_ONLY_BLOCK_REASON`, `KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK_REASON` | — |
+| `health.ts` | `sendHealthNudge`, `getAgentOutput` | — |
+| `hooks.ts` | `collectMailSync` | — |
+| `lifecycle/auto-close-out-canonical-state.ts` | `sweepAutoCloseOutCache` | — |
+| `linear-mcp-auth.ts` | `appendLinearMcpAuthRequiredEvent` | — |
+| `memory/poller.ts` | `getTranscriptPoller`, `unregisterTranscriptForPolling` | — |
+| `memory/query-expansion.ts` | `getCachedMemoryQueryExpansion` | — |
+| `memory/worker-pool.ts` | `getMemoryExtractionWorkerPool`, `getMemoryPipelineWorkerPool`, `enqueueMemoryExtractionJob`, `enqueueReconciledMemoryExtractionJobs` | `defaultMemoryExtractionWorkerPool` |
+| `merge-set.ts` | `getAllMergeSetsSync` | — |
+| `model-capabilities.ts` | `getModelsBySkillSync`, `getModelsForProviderSync`, `getCheapestModelsSync`, `getValueScoreSync`, `getAllSkillDimensionsSync` | — |
+| `overdeck/claude-session-file-search.ts` | `findSubagentTranscriptById` | — |
+| `overdeck/control-settings.ts` | `SettingsApi`, `setBootReconciliationDecision`, `setBootReconciliationGrace`, `setFlywheelActiveRunId`, `ConfigApi`, `FLYWHEEL_ACTIVE_RUN_ID_KEY` | — |
+| `overdeck/conversations.ts` | `listArchivedConversationNames`, `markAllEndedOnStartup`, `clearStuckForks`, `setImportedConversationLinks` | — |
+| `overdeck/cost-sync.ts` | `getCostBreakdownByStageAndModelSync` | — |
+| `overdeck/issues.ts` | `IssueWriterLive`, `IssuesApi` | — |
+| `overdeck/merge.ts` | `QueueEntryStatus` | — |
+| `overdeck/observability.ts` | `ObservabilityRpcLive` | — |
+| `overdeck/process-services.ts` | `EmptyProcessServicesLive`, `ProcessServicesLive`, `emptyConversationRuntimeLive`, `DeliveryServiceLive`, `makeConversationRuntimeLive`, `CloisterRuntimeLive` | `defaultPokeMessage` |
+| `overdeck/release-sync.ts` | `getAllReleaseSetsFromDb` | — |
+| `pan-dir/context.ts` | `workspaceContextTmpPath` | — |
+| `paths.ts` | `HANDOFFS_DIR`, `CACHE_SKILLS_DIR`, `DOCS_INDEX_FILE`, `DOCS_BUDGET_STATE_FILE`, `DOCS_DISABLE_STATE_FILE`, `DOCS_TELEMETRY_FILE`, `resolvePiExtensionPath` | — |
+| `platform-lifecycle.ts` | `describeStageFailure` | — |
+| `prereqs/registry.ts` | `getMissingToolsForFeature` | — |
+| `projects.ts` | `createDefaultProjectsConfig`, `getSpecialistPromptOverride` | — |
+| `providers.ts` | `getDirectProviders` | — |
+| `release-set.ts` | `getAllReleaseSetsSync` | — |
+| `remote/index.ts` | `getRemoteProvider` | — |
+| `runtime-census.ts` | `resetRuntimeCensusForTests` | — |
+| `runtime/index.ts` | `createRuntimeRegistry`, `isRuntimeInstalled`, `registryGetAvailable`, `registrySyncToAll`, `getRuntimeAdapter` | — |
+| `runtime/interface.ts` | `DEFAULT_FEATURES` | — |
+| `runtime/metrics.ts` | `recordTaskSync`, `getRuntimeMetricsSync`, `getAllRuntimeMetricsSync`, `getAggregatedMetricsSync`, `getIssueTasksSync`, `getRecentTasksSync`, `clearMetricsSync`, `loadMetricsSync`, `saveMetricsSync` | `rebuildRuntimeMetrics`, `DEFAULT_METRICS`, `METRICS_FILE` |
+| `runtimes/storage/claude-code.ts` | `sessionIdFromFile` | — |
+| `shadow-utils.ts` | `formatState` | — |
+| `smart-model-selector.ts` | `getSimpleModelMappingSync` | — |
+| `state-migration-manifest.ts (file deleted)` | `verifyStateMigrationManifest`, `manifestEntry` | — |
+| `sync.ts` | `isOverdeckSymlinkSync` | — |
+| `systemd.ts` | `uninstallSupervisorUnit` | — |
+| `terminal-backends/herdr-api.ts` | `setHerdrApiClient` | — |
+| `tldr-daemon.ts` | `removeTldrDaemonServiceSync` | — |
+| `tmux.ts` | `confirmDelivery`, `getReviewSessions` | — |
+| `workspace-config.ts` | `getServiceFromTemplateSync`, `SERVICE_TEMPLATES` | — |
+| `xbrief/dag.ts` | `blockingParentTotal`, `deriveSynthesisMetadata`, `isTaskCommand`, `applyTaskOperation`, `activePlanWriters`, `verifyActiveSlicePromptReduction`, `isTaskOperationType`, `activeSlicePromptSize` | `TASK_COMMANDS`, `cloneDoc`, `statusForOperation`, `TASK_OPERATION_TYPES` |
+| `xbrief/io.ts` | `readTierRetries`, `recordTierRetry` | — |
+| `xbrief/lifecycle-io.ts` | `writeContinueStateForIssue` | — |
+| `xbrief/lifecycle.ts` | `resolveXBriefRoot` | — |

@@ -160,27 +160,6 @@ export function getReleaseSetFromDb(issueId: string): ReleaseSet | null {
   return rowToReleaseSet(row, loadComponentsForReleaseSet(db, issueId));
 }
 
-/** List release sets, optionally filtered by project key. */
-export function getAllReleaseSetsFromDb(projectKey?: string): ReleaseSet[] {
-  const db = getOverdeckDatabaseSync();
-  const rows = (
-    projectKey
-      ? db.prepare(`
-          SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at
-          FROM release_sets
-          WHERE project_key = ?
-          ORDER BY updated_at DESC
-        `).all(projectKey)
-      : db.prepare(`
-          SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at
-          FROM release_sets
-          ORDER BY updated_at DESC
-        `).all()
-  ) as OverdeckReleaseSetRow[];
-
-  return rows.map(row => rowToReleaseSet(row, loadComponentsForReleaseSet(db, row.issue_id)));
-}
-
 /** Delete a release set and its component rows. */
 export function deleteReleaseSet(issueId: string): void {
   const db = getOverdeckDatabaseSync();

@@ -108,69 +108,6 @@ export function getCostForIssueSync(issueId: string): { totalCost: number } | nu
   return { totalCost: row.total_cost };
 }
 
-/**
- * Returns per-stage/per-model token breakdown for an issue.
- * Mirrors getCostBreakdownByStageAndModel from cost-events-db.
- * overdeck stores ts as integer milliseconds, but the GROUP BY query is the same.
- */
-export function getCostBreakdownByStageAndModelSync(issueId: string): {
-  byStage: Record<
-    string,
-    Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }>
-  >;
-  totals: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }>;
-} {
-  const db = getOverdeckDatabaseSync();
-  const rows = db
-    .prepare(
-      `SELECT
-         CASE WHEN session_type IS NULL OR session_type = 'unknown' THEN 'other' ELSE session_type END AS stage,
-         COALESCE(provider || '/' || model, 'unknown') AS provider_model,
-         SUM(input) AS input,
-         SUM(output) AS output,
-         SUM(cache_read) AS cache_read,
-         SUM(cache_write) AS cache_write
-       FROM cost_events
-       WHERE UPPER(issue_id) = UPPER(?)
-       GROUP BY stage, provider_model`,
-    )
-    .all(issueId) as Array<{
-    stage: string;
-    provider_model: string;
-    input: number;
-    output: number;
-    cache_read: number;
-    cache_write: number;
-  }>;
-
-  const byStage: Record<
-    string,
-    Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }>
-  > = {};
-  const totals: Record<
-    string,
-    { input: number; output: number; cacheRead: number; cacheWrite: number }
-  > = {};
-
-  for (const row of rows) {
-    if (!byStage[row.stage]) byStage[row.stage] = {};
-    byStage[row.stage][row.provider_model] = {
-      input: row.input,
-      output: row.output,
-      cacheRead: row.cache_read,
-      cacheWrite: row.cache_write,
-    };
-    const t = totals[row.provider_model] ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-    t.input += row.input;
-    t.output += row.output;
-    t.cacheRead += row.cache_read;
-    t.cacheWrite += row.cache_write;
-    totals[row.provider_model] = t;
-  }
-
-  return { byStage, totals };
-}
-
 // ── IssueAggregate helpers (for routes/costs.ts and cli/commands/cost.ts) ─────
 
 export interface ModelBreakdown {

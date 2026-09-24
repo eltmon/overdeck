@@ -263,13 +263,6 @@ export async function appendLinearMcpAuthEvent(input: LinearMcpAuthEventInput): 
   return store.appendAsync(linearMcpAuthEvent(input));
 }
 
-export function appendLinearMcpAuthRequiredEvent(
-  payload: RequiredPayload,
-  timestamp?: string,
-): Promise<number> {
-  return appendLinearMcpAuthEvent({ type: 'linear_mcp_auth.required', payload, timestamp });
-}
-
 export function appendLinearMcpAuthHealthyEvent(
   payload: HealthyPayload,
   timestamp?: string,

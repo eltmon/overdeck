@@ -388,20 +388,6 @@ export function selectStaffingItem(
   );
 }
 
-/**
- * The plan's hardest item regardless of status (PAN-3858). Verification-failed
- * escalation attributes to this item: verification runs against the whole
- * submitted diff after items are already marked completed, so the
- * status-filtered staffing pick would find nothing to promote.
- */
-export function selectHardestPlanItem(
-  doc: XBriefDocument,
-  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
-  tierOverrides?: TierOverridesMap,
-): XBriefItem | undefined {
-  return selectHardestItem(doc.plan.items, tiered, tierOverrides);
-}
-
 function selectHardestItem(
   items: readonly XBriefItem[],
   tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,

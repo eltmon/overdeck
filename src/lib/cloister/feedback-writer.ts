@@ -91,12 +91,6 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
 }
 
 /**
- * @deprecated Alias kept for backward compatibility with in-flight code paths.
- * Prefer `clearFeedbackFiles` directly.
- */
-export const archiveFeedbackFiles = clearFeedbackFiles;
-
-/**
  * Write one specialist feedback entry to the scope continue file and mirror it
  * into the workspace `.pan/feedback/NNN-<specialist>-<outcome>.md`.
  */

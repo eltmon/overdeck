@@ -132,15 +132,3 @@ export const ObservabilityRpcGroup = RpcGroup.make(
   ReplayEventsRpc,
 );
 export type ObservabilityRpcGroup = typeof ObservabilityRpcGroup;
-
-export const ObservabilityRpcLive = ObservabilityRpcGroup.toLayer(
-  Effect.gen(function* () {
-    const observability = yield* Observability;
-
-    return ObservabilityRpcGroup.of({
-      'pan.getSnapshot': () => observability.getSnapshot,
-      'pan.subscribeDomainEvents': () => observability.subscribeDomainEvents,
-      'pan.replayEvents': (input) => observability.replayEvents(input.fromSequence),
-    });
-  }),
-);

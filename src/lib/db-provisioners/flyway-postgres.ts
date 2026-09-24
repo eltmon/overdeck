@@ -75,22 +75,6 @@ function getSnapshotCommand(dbConfig: DatabaseConfig): string | null {
   return null;
 }
 
-function getSnapshotHelp(projectKey: string): string {
-  return `
-  ${projectKey}:
-    workspace:
-      database:
-        name: myapp
-        snapshot_command: "kubectl exec -n prod pod/postgres -- pg_dump -U app mydb"
-        # or
-        external_db:
-          host: prod-db.example.com
-          database: myapp
-          user: readonly
-          password_env: PROD_DB_PASSWORD
-`;
-}
-
 function kubectlNoisePatterns(): RegExp[] {
   return [
     /^Defaulted container/,
@@ -584,7 +568,3 @@ export const flywayPostgresProvisioner: DatabaseProvisioner = {
     }
   },
 };
-
-export function getFlywayPostgresSnapshotHelp(projectKey: string): string {
-  return getSnapshotHelp(projectKey);
-}

@@ -28,7 +28,7 @@ import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { isOverdeckOwnedOnlyStatus } from '../../../../lib/state-plane.js';
 import { findPlan } from '../../../../lib/xbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequestState } from '../../../../lib/github-app.js';
-import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
+import { resolveGitHubIssueSync } from '../../../../lib/tracker-utils.js';
 import { sessionExists } from '../../../../lib/tmux.js';
 import { resolveIssueWorkspaceSyncTarget } from '../../../../lib/workspaces/resolver.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
@@ -1714,7 +1714,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
 
         // Post-merge lifecycle
         const { approve: lifecycleApprove } = await import('../../../../lib/lifecycle/index.js');
-        const ghResolved = resolveGitHubIssueShared(issueId);
+        const ghResolved = resolveGitHubIssueSync(issueId);
         const isGitHubIssueFlag = ghResolved.isGitHub;
         const lifecycleCtx = {
           issueId,

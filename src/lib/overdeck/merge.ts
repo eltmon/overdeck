@@ -128,9 +128,6 @@ export const RepoMergeStatus = Schema.Literals([
   'pending', 'ready', 'merging', 'merged', 'failed', 'blocked', 'skipped',
 ]);
 export const WorkspaceType = Schema.Literals(['monorepo', 'polyrepo']);
-export const QueueEntryStatus = Schema.Literals([
-  'queued', 'processing', 'completed', 'failed',
-]);
 export const AutoMergeStatus = Schema.Literals([
   'pending', 'merging', 'blocked', 'failed', 'merged', 'cancelled',
 ]);

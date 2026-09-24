@@ -211,21 +211,6 @@ export interface RuntimeAdapter {
 }
 
 /**
- * Default feature set for runtimes
- */
-export const DEFAULT_FEATURES: RuntimeFeatures = {
-  skills: true,
-  commands: false,
-  mcpServers: false,
-  hooks: false,
-  multiModel: false,
-  backgroundAgents: false,
-  planMode: false,
-  webSearch: false,
-  codeExecution: true,
-};
-
-/**
  * Claude Code feature set
  */
 export const CLAUDE_FEATURES: RuntimeFeatures = {

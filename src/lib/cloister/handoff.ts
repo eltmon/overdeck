@@ -205,20 +205,6 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Check if handoff is recommended for an agent
- *
- * This is a placeholder for future trigger logic.
- * Triggers will be implemented in Phase C.
- *
- * @param agentId - Agent ID
- * @returns True if handoff is recommended
- */
-export function shouldHandoff(agentId: string): boolean {
-  // TODO: Implement trigger logic in Phase C
-  return false;
-}
-
-/**
  * Tagged error for a rejected {@link performHandoff}, raised where an Effect
  * caller bridges it (the dashboard handoff route). `message` is the underlying
  * error's message.

@@ -48,7 +48,7 @@ const {
   mockGetCachedConflictGateMergeability,
   mockSetReviewStatus,
   mockGetReviewStatus,
-  mockArchiveFeedbackFiles,
+  mockClearFeedbackFiles,
   mockLoadConfigSync,
   mockGetLatestSessionIdSync,
   mockResumeAgent,
@@ -71,7 +71,7 @@ const {
   mockGetCachedConflictGateMergeability: vi.fn(() => undefined),
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(() => null),
-  mockArchiveFeedbackFiles: vi.fn(async () => undefined),
+  mockClearFeedbackFiles: vi.fn(async () => undefined),
   mockLoadConfigSync: vi.fn(() => ({ config: {} })),
   mockGetLatestSessionIdSync: vi.fn(() => null),
   mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
@@ -153,7 +153,7 @@ vi.mock('../../../src/lib/cloister/conflict-gate.js', () => ({
 }));
 
 vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
-  archiveFeedbackFiles: mockArchiveFeedbackFiles,
+  clearFeedbackFiles: mockClearFeedbackFiles,
 }));
 
 vi.mock('../../../src/lib/cloister/verdict-restore.js', () => ({
@@ -185,7 +185,7 @@ beforeEach(() => {
   mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
   mockResolveConflictGate.mockResolvedValue({ gated: false });
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
-  mockArchiveFeedbackFiles.mockResolvedValue(undefined);
+  mockClearFeedbackFiles.mockResolvedValue(undefined);
   mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
 });
 
@@ -621,7 +621,7 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     );
 
     const guardMatch = agentSrc.match(
-      /async function spawnReviewRoleForIssuePromise[\s\S]*?archiveFeedbackFiles/,
+      /async function spawnReviewRoleForIssuePromise[\s\S]*?clearFeedbackFiles/,
     );
     expect(guardMatch).not.toBeNull();
     const guardBlock = guardMatch![0];

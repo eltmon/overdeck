@@ -9,7 +9,6 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getGitHubConfig as getGitHubConfigShared } from '../../services/tracker-config.js';
 import type { IssueDataService } from '../../services/issue-data-service.js';
 import { extractPrefixSync } from '../../../../lib/issue-id.js';
 import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';

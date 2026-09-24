@@ -1,7 +1,6 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, Records } from './infra.js';
 
@@ -304,51 +303,4 @@ export function makeIssueWriterLive(): Layer.Layer<IssueWriter, never, Db | Even
     }),
   );
 }
-
-export const IssueWriterLive = makeIssueWriterLive();
-
-export const IssuesApi = HttpApiGroup.make('issues')
-  .add(HttpApiEndpoint.get('list', '/issues', {
-    query: IssueFilter,
-    success: Schema.Array(Issue),
-  }))
-  .add(HttpApiEndpoint.get('get', '/issues/:id', {
-    params: { id: IssueId },
-    success: Issue,
-    error: IssueNotFound,
-  }))
-  .add(HttpApiEndpoint.get('getPlan', '/issues/:id/plan', {
-    params: { id: IssueId },
-    success: Schema.Unknown,
-    error: IssueNotFound,
-  }))
-  .add(HttpApiEndpoint.post('advance', '/issues/:id/advance', {
-    params: { id: IssueId },
-    payload: Schema.Struct({
-      to: Stage,
-      reason: Schema.String,
-      hint: Schema.optional(Schema.Literals(['skipped'])),
-    }),
-    success: Issue,
-    error: [IssueNotFound, IllegalTransition],
-  }))
-  .add(HttpApiEndpoint.post('setBlockers', '/issues/:id/blockers', {
-    params: { id: IssueId },
-    payload: Schema.Struct({
-      blockers: Schema.Array(Blocker),
-      reason: Schema.String,
-    }),
-    success: Issue,
-    error: IssueNotFound,
-  }))
-  .add(HttpApiEndpoint.post('setPr', '/issues/:id/pr', {
-    params: { id: IssueId },
-    payload: Schema.Struct({
-      url: Schema.String,
-      number: Schema.Number,
-      headSha: Sha,
-    }),
-    success: Issue,
-    error: IssueNotFound,
-  }));
 

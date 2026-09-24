@@ -14,8 +14,7 @@ import { randomUUID } from 'crypto'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { mkdtemp, rm } from 'fs/promises'
-import { Effect, Layer, Stream } from 'effect'
-import { ChildProcess } from 'effect/unstable/process'
+import { Effect } from 'effect'
 import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import * as NodePath from '@effect/platform-node/NodePath'
@@ -23,10 +22,6 @@ import { CheckpointError, GitError, InvalidAgentIdError, VcsError } from '../err
 import { PAN_RUNTIME_SUBDIRS } from '../state-plane.js'
 
 const execFileAsync = promisify(execFile)
-
-const checkpointSpawnerLayer = NodeChildProcessSpawner.layer.pipe(
-  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
-)
 
 const CHECKPOINT_REF_PREFIX = 'refs/pan/turn'
 
@@ -195,12 +190,6 @@ async function captureCheckpointPromise(cwd: string, agentId: string, turnId: st
   }
 }
 
-async function hasCheckpointPromise(cwd: string, agentId: string, turnId: string): Promise<boolean> {
-  assertSafeAgentId(agentId)
-  const commit = await resolveCheckpointCommit(cwd, agentId, turnId)
-  return commit !== null
-}
-
 async function deleteCheckpointPromise(cwd: string, agentId: string, turnId: string): Promise<void> {
   assertSafeAgentId(agentId)
   try {
@@ -226,20 +215,6 @@ async function diffCheckpointsPromise(cwd: string, agentId: string, fromTurnId: 
   if (filePath) args.push('--', filePath)
 
   const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
-
-  return stdout
-}
-
-async function diffCheckpointToHeadPromise(cwd: string, agentId: string, turnId: string): Promise<string> {
-  assertSafeAgentId(agentId)
-  const checkpointCommit = await resolveCheckpointCommit(cwd, agentId, turnId)
-  if (!checkpointCommit) {
-    throw new Error(`Checkpoint ref unavailable: ${turnId}`)
-  }
-
-  const { stdout } = await execFileAsync('git', [
-    'diff', '--patch', '--minimal', '--no-color', checkpointCommit, 'HEAD',
-  ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
 
   return stdout
 }
@@ -317,14 +292,6 @@ async function listCheckpointsPromise(cwd: string, agentId: string): Promise<str
     'for-each-ref', '--format=%(refname:strip=4)', `${CHECKPOINT_REF_PREFIX}/${agentId}/`,
   ], { cwd, encoding: 'utf-8' })
   return stdout.split('\n').filter(Boolean).sort()
-}
-
-async function deleteAllCheckpointsPromise(cwd: string, agentId: string): Promise<void> {
-  assertSafeAgentId(agentId)
-  const turns = await Effect.runPromise(listCheckpoints(cwd, agentId))
-  for (const turnId of turns) {
-    await Effect.runPromise(deleteCheckpoint(cwd, agentId, turnId))
-  }
 }
 
 /** Delete all checkpoint refs for a set of agent IDs. */
@@ -534,18 +501,6 @@ export function captureCheckpoint(
   })
 }
 
-/** Check whether a checkpoint exists for the given turn. */
-export function hasCheckpoint(
-  cwd: string,
-  agentId: string,
-  turnId: string,
-): Effect.Effect<boolean, InvalidAgentIdError> {
-  return Effect.gen(function* () {
-    yield* assertSafeAgentIdProgram(agentId)
-    return yield* Effect.promise(() => hasCheckpointPromise(cwd, agentId, turnId))
-  })
-}
-
 /** Delete a checkpoint ref. No-op if it doesn't exist. */
 export function deleteCheckpoint(
   cwd: string,
@@ -572,22 +527,6 @@ export function diffCheckpoints(
       try: () => diffCheckpointsPromise(cwd, agentId, fromTurnId, toTurnId, filePath),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'diff', message: String(cause), cause }),
-    })
-  })
-}
-
-/** Compute diff between a checkpoint and the current HEAD. */
-export function diffCheckpointToHead(
-  cwd: string,
-  agentId: string,
-  turnId: string,
-): Effect.Effect<string, CheckpointError | InvalidAgentIdError> {
-  return Effect.gen(function* () {
-    yield* assertSafeAgentIdProgram(agentId)
-    return yield* Effect.tryPromise({
-      try: () => diffCheckpointToHeadPromise(cwd, agentId, turnId),
-      catch: (cause) =>
-        new CheckpointError({ agentId, operation: 'diff-to-head', message: String(cause), cause }),
     })
   })
 }
@@ -632,17 +571,6 @@ export function listCheckpoints(
   })
 }
 
-/** Delete all checkpoint refs for a workspace. */
-export function deleteAllCheckpoints(
-  cwd: string,
-  agentId: string,
-): Effect.Effect<void, InvalidAgentIdError> {
-  return Effect.gen(function* () {
-    yield* assertSafeAgentIdProgram(agentId)
-    yield* Effect.promise(() => deleteAllCheckpointsPromise(cwd, agentId))
-  })
-}
-
 // ─── Effect-native git runner (for callers that want typed GitError) ──────────
 //
 // Exposed for downstream perf-driver work. Internal use only for now —
@@ -652,56 +580,4 @@ interface CheckpointGitResult {
   readonly stdout: string
   readonly stderr: string
   readonly exitCode: number
-}
-
-/** Run a git subcommand under ChildProcessSpawner. */
-export function runCheckpointGit(
-  args: readonly string[],
-  cwd: string,
-  env?: NodeJS.ProcessEnv,
-): Effect.Effect<CheckpointGitResult, GitError> {
-  return Effect.gen(function* () {
-    const handle = yield* ChildProcess.make('git', [...args], {
-      cwd,
-      ...(env ? { env } : {}),
-    })
-    const stdoutBuf = yield* Stream.runFold(
-      handle.stdout,
-      () => Buffer.alloc(0),
-      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]),
-    )
-    const stderrBuf = yield* Stream.runFold(
-      handle.stderr,
-      () => Buffer.alloc(0),
-      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]),
-    )
-    const exitCode = yield* handle.exitCode
-    if (exitCode !== 0) {
-      return yield* Effect.fail(
-        new GitError({
-          command: ['git', ...args],
-          stderr: stderrBuf.toString('utf-8'),
-          exitCode,
-        }),
-      )
-    }
-    return {
-      stdout: stdoutBuf.toString('utf-8'),
-      stderr: stderrBuf.toString('utf-8'),
-      exitCode,
-    }
-  }).pipe(
-    Effect.scoped,
-    Effect.provide(checkpointSpawnerLayer),
-    Effect.catchCause((cause) =>
-      Effect.fail(
-        new GitError({
-          command: ['git', ...args],
-          stderr: String(cause),
-          exitCode: -1,
-          cause,
-        }),
-      ),
-    ),
-  )
 }

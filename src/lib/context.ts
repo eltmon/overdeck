@@ -184,36 +184,6 @@ export function estimateTokensSync(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-/**
- * Check if context budget allows adding more content
- */
-export function checkContextBudgetSync(
-  budget: ContextBudget,
-  newContent: string
-): { allowed: boolean; warning: boolean; remaining: number } {
-  const newTokens = estimateTokensSync(newContent);
-  const totalUsed = budget.usedTokens + newTokens;
-  const remaining = budget.maxTokens - totalUsed;
-  const usageRatio = totalUsed / budget.maxTokens;
-
-  return {
-    allowed: totalUsed <= budget.maxTokens,
-    warning: usageRatio >= budget.warningThreshold,
-    remaining,
-  };
-}
-
-/**
- * Create a context budget for a session
- */
-export function createContextBudgetSync(maxTokens: number = 100000): ContextBudget {
-  return {
-    maxTokens,
-    usedTokens: 0,
-    warningThreshold: 0.8,
-  };
-}
-
 // ============== Context Materialization ==============
 
 function getMaterializedDir(agentId: string): string {

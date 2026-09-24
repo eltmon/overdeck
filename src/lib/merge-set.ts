@@ -1,6 +1,5 @@
 import {
   deleteMergeSet as dbDelete,
-  getAllMergeSetsFromDb,
   getMergeSetFromDb,
   patchMergeSetRepo as dbPatchRepo,
   patchMergeSetRepos as dbPatchRepos,
@@ -52,10 +51,6 @@ export function upsertMergeSetSync(mergeSet: MergeSet): void {
 /** Fetch a merge-set by issue id; throws on a merge-set DB failure. */
 export function getMergeSetSync(issueId: string): MergeSet | null {
   return getMergeSetFromDb(resolveIssueIdSync(issueId));
-}
-
-export function getAllMergeSetsSync(projectKey?: string): MergeSet[] {
-  return getAllMergeSetsFromDb(projectKey);
 }
 
 export function deleteMergeSetSync(issueId: string): void {

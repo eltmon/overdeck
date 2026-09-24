@@ -53,24 +53,6 @@ function removeTarget(targetPath: string): void {
   }
 }
 
-/**
- * Check if a path is a Overdeck-managed symlink
- */
-export function isOverdeckSymlinkSync(targetPath: string): boolean {
-  if (!existsSync(targetPath)) return false;
-
-  try {
-    const stats = lstatSync(targetPath);
-    if (!stats.isSymbolicLink()) return false;
-
-    const linkTarget = readlinkSync(targetPath);
-    // It's ours if it points to our skills/commands dir
-    return linkTarget.includes('.overdeck');
-  } catch {
-    return false;
-  }
-}
-
 export interface MigrationResult {
   removedSymlinks: string[];
   preservedUserContent: string[];

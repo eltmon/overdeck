@@ -1,4 +1,4 @@
-import { deleteReleaseSet as dbDelete, getAllReleaseSetsFromDb, getReleaseSetFromDb, upsertReleaseSet as dbUpsert } from './overdeck/release-sync.js';
+import { deleteReleaseSet as dbDelete, getReleaseSetFromDb, upsertReleaseSet as dbUpsert } from './overdeck/release-sync.js';
 import { resolveIssueIdSync } from './issue-id.js';
 import type {
   ReleaseCheckStatus,
@@ -24,10 +24,6 @@ export function upsertReleaseSetSync(releaseSet: ReleaseSet): void {
 
 export function getReleaseSetSync(issueId: string): ReleaseSet | null {
   return getReleaseSetFromDb(resolveIssueIdSync(issueId));
-}
-
-export function getAllReleaseSetsSync(projectKey?: string): ReleaseSet[] {
-  return getAllReleaseSetsFromDb(projectKey);
 }
 
 export function deleteReleaseSetSync(issueId: string): void {

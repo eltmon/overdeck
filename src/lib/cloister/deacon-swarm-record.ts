@@ -26,10 +26,6 @@ export type {
   SwarmSupersededAttempt,
 };
 
-export function readSwarmSupersededAttempts(workspacePath: string, issueId: string): SwarmSupersededAttempt[] {
-  return readSwarmSlotState(workspacePath, issueId)?.supersededAttempts ?? [];
-}
-
 export async function writeSwarmSupersededAttempt(
   workspacePath: string,
   issueId: string,

@@ -122,14 +122,6 @@ export function resolveXBriefDir(projectRoot: string, lifecycleDir: XBriefLifecy
 }
 
 /**
- * Resolve the absolute path to a project's xBRIEF root directory (without a
- * lifecycle subdirectory). Pure path math.
- */
-export function resolveXBriefRoot(projectRoot: string, legacyRootDirname?: string): string {
-  return join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME);
-}
-
-/**
  * Ensure the xBRIEF lifecycle directories exist under the given project root.
  * Returns the absolute path to the xBRIEF root. Idempotent.
  *

@@ -47,7 +47,6 @@ import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
 import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
-import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
 import { loadConfigSync as loadYamlConfig, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
@@ -436,8 +435,8 @@ async function spawnReviewRoleForIssuePromise(
   // Clear feedback from any previous review cycle so the work agent only
   // sees current-cycle feedback when it reads .pan/feedback/.
   try {
-    const { archiveFeedbackFiles } = await import('./feedback-writer.js');
-    await archiveFeedbackFiles(opts.workspace);
+    const { clearFeedbackFiles } = await import('./feedback-writer.js');
+    await clearFeedbackFiles(opts.workspace);
   } catch {
     // Non-fatal: archiving is best-effort
   }
@@ -767,24 +766,6 @@ export {
   spawnReviewSubRoleForIssue,
   recoverMissingConvoyReviewers,
 } from './review-convoy.js';
-
-/**
- * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a
- * prior cycle? PAN-2697: full-convoy review runs today, so "any sub-reviewer exists"
- * (the old quick-mode assumption) false-flagged every legitimate convoy — and the
- * always-on review supervisor matched the prefix too. A sub-reviewer is stale only
- * when its reviewRunId differs from the parent's active run.
- */
-export function isReviewStaleSync(issueId: string): boolean {
-  const issueLower = issueId.toLowerCase();
-  const prefix = `agent-${issueLower}-review-`;
-  const parentRunId = getAgentStateFileSync(`agent-${issueLower}-review`)?.reviewRunId;
-  return listAgentIdsByPrefixSync(prefix).some((id) => {
-    const subRole = id.slice(prefix.length);
-    if (!(REVIEW_SUB_ROLES as readonly string[]).includes(subRole)) return false;
-    return !parentRunId || getAgentStateFileSync(id)?.reviewRunId !== parentRunId;
-  });
-}
 
 /**
  * PAN-3917: the per-issue record override is gone with the record. Review mode

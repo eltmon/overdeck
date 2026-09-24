@@ -2,14 +2,14 @@
  * Merge Agent - Automatic merge conflict resolution using Claude Code
  */
 
-import { existsSync, mkdirSync, appendFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
+import { killSession, listSessionNames } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
@@ -151,9 +151,6 @@ export async function autoCommitWorkspaceChangesBeforeSync(
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-import {
-  OVERDECK_HOME,
-} from '../paths.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
 import { runQualityGates } from './validation.js';
@@ -163,10 +160,6 @@ import { gitPush, MainDivergedError } from '../git/operations.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
-
-const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
-const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
-const MERGE_HISTORY_FILE = join(MERGE_HISTORY_DIR, 'history.jsonl');
 
 /**
  * Context for a merge conflict resolution request
@@ -904,31 +897,6 @@ async function resolveMainPreferredSyncConflicts(
 }
 
 /**
- * Log merge to history
- */
-export function logMergeHistory(context: MergeConflictContext, result: MergeResult, sessionId?: string): void {
-  // Ensure history directory exists
-  if (!existsSync(MERGE_HISTORY_DIR)) {
-    mkdirSync(MERGE_HISTORY_DIR, { recursive: true });
-  }
-
-  const entry: MergeHistoryEntry = {
-    timestamp: new Date().toISOString(),
-    issueId: context.issueId,
-    sourceBranch: context.sourceBranch,
-    targetBranch: context.targetBranch,
-    conflictFiles: context.conflictFiles,
-    result: {
-      ...result,
-      output: undefined, // Don't store full output in history
-    },
-    sessionId,
-  };
-
-  appendFileSync(MERGE_HISTORY_FILE, JSON.stringify(entry) + '\n', 'utf-8');
-}
-
-/**
  * Log activity to the dashboard activity log (event-sourced via emitActivityEntry)
  */
 function logActivity(action: string, details: string, issueId?: string): void {
@@ -978,17 +946,6 @@ function announceMerge(
     source: 'merge-agent',
     eventType: `mergeOutcome.${status === 'completed' ? 'merged' : status === 'started' ? 'merging' : 'failed'}`,
   });
-}
-
-/**
- * Capture tmux output and look for result markers (async)
- */
-export async function captureTmuxOutput(sessionName: string): Promise<string> {
-  try {
-    return await capturePane(sessionName);
-  } catch {
-    return '';
-  }
 }
 
 /** Patterns to match in tmux capture-pane output (git push/fetch lines) */
@@ -1042,39 +999,6 @@ export function scanGitPatterns(
         break; // only match one pattern per line
       }
     }
-  }
-}
-
-/**
- * Check if specialist-merge-agent tmux session is running (async)
- */
-export async function isMergeAgentRunning(): Promise<boolean> {
-  return Effect.runPromise(sessionExists('specialist-merge-agent'));
-}
-
-/**
- * Send a message to an agent's tmux session (async)
- */
-export async function sendMessageToAgent(issueId: string, message: string): Promise<boolean> {
-  // Agent sessions are typically named agent-{issueId} (lowercase)
-  const sessionName = `agent-${issueId.toLowerCase()}`;
-
-  try {
-    // Check if session exists
-    if (!await Effect.runPromise(sessionExists(sessionName))) {
-      console.log(`[merge-agent] Could not send message to ${sessionName} (session does not exist)`);
-      return false;
-    }
-
-    // Send the message using centralized sendKeys
-    await Effect.runPromise(sendKeys(sessionName, message));
-
-    console.log(`[merge-agent] Sent message to ${sessionName}`);
-    logActivity('agent_message', `Sent to ${sessionName}: ${message.slice(0, 100)}...`);
-    return true;
-  } catch {
-    console.log(`[merge-agent] Could not send message to ${sessionName} (session may not exist)`);
-    return false;
   }
 }
 

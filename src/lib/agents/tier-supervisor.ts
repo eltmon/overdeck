@@ -32,7 +32,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { renderWorkspaceGitShowPromise } from '../git-utils.js';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
-import type { XBriefDocument, XBriefEdge, XBriefItem, XBriefSubItem } from '../xbrief/types.js';
+import type { XBriefItem, XBriefSubItem } from '../xbrief/types.js';
 import type { AgentState } from './agent-state.js';
 import { deliverAgentMessage } from './delivery.js';
 import type { DeliveryResult } from './delivery.js';
@@ -228,60 +228,6 @@ function resolveApiUrl(): string {
     || process.env.DASHBOARD_URL
     || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`
   );
-}
-
-/**
- * Does the next bead depend on a bead with an unresolved supervisor block?
- *
- * Verdicts are interpreted chronologically: the latest verdict for each bead is
- * authoritative. A failed/blocked verdict halts dependents until a later
- * passed/ack verdict for that same bead records the fix commit's approval.
- */
-export function shouldHaltDispatch(
-  verdicts: readonly SupervisorVerdict[],
-  nextBead: Pick<XBriefItem, 'id'>,
-  dag: Pick<XBriefDocument, 'plan'>,
-): boolean {
-  const latestByBead = new Map<string, SupervisorVerdict>();
-  for (const verdict of verdicts) {
-    latestByBead.set(verdict.itemId, verdict);
-  }
-
-  const unresolvedBlockedBeads = new Set<string>();
-  for (const [itemId, verdict] of latestByBead) {
-    if (verdict.status === 'failed' || verdict.status === 'blocked') {
-      unresolvedBlockedBeads.add(itemId);
-    }
-  }
-
-  if (unresolvedBlockedBeads.size === 0) return false;
-
-  for (const dependencyId of dependencyClosure(nextBead.id, dag.plan.edges ?? [])) {
-    if (unresolvedBlockedBeads.has(dependencyId)) return true;
-  }
-
-  return false;
-}
-
-function dependencyClosure(itemId: string, edges: readonly XBriefEdge[]): Set<string> {
-  const incoming = new Map<string, string[]>();
-  for (const edge of edges) {
-    if (edge.type !== 'blocks') continue;
-    const parents = incoming.get(edge.to) ?? [];
-    parents.push(edge.from);
-    incoming.set(edge.to, parents);
-  }
-
-  const dependencies = new Set<string>();
-  const stack = [...(incoming.get(itemId) ?? [])];
-  while (stack.length > 0) {
-    const dependencyId = stack.pop()!;
-    if (dependencies.has(dependencyId)) continue;
-    dependencies.add(dependencyId);
-    stack.push(...(incoming.get(dependencyId) ?? []));
-  }
-
-  return dependencies;
 }
 
 function childItems(item: XBriefItem): XBriefSubItem[] {

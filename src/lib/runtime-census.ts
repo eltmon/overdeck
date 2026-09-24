@@ -182,10 +182,6 @@ export function getRuntimeCensusSnapshot(): RuntimeCensus | null {
   return runtimeCensusService.peek();
 }
 
-export function resetRuntimeCensusForTests(): void {
-  runtimeCensusService.reset();
-}
-
 export function panePidsForSession(census: RuntimeCensus, sessionName: string): number[] {
   return (census.panesBySession.get(sessionName) ?? []).map((pane) => pane.panePid);
 }

@@ -502,13 +502,6 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
 }
 
 /**
- * Get all direct-compatible providers
- */
-export function getDirectProviders(): ProviderConfig[] {
-  return Object.values(PROVIDERS);
-}
-
-/**
  * Get environment variables for spawning agent with specific provider.
  *
  * `harness` is optional and defaults to preserving the pre-PAN-1837 behavior

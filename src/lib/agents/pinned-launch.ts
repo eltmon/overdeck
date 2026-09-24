@@ -1,9 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import type { RuntimeName } from '../runtimes/types.js';
-import { readLatestIndexedSessionIdSync } from '../session-history.js';
-import { getAgentDir } from './agent-state.js';
 
 export interface PinnedAgentLaunch {
   sessionId: string;
@@ -38,20 +34,4 @@ export function parsePinnedAgentLaunch(
   if (!harness || !model || model.startsWith('pending-')) return null;
 
   return { sessionId: pinnedSessionId, model, harness };
-}
-
-export function readPinnedAgentLaunchSync(agentId: string): PinnedAgentLaunch | null {
-  const agentDir = getAgentDir(agentId);
-  const launcherPath = join(agentDir, 'launcher.sh');
-  const sessionId = readLatestIndexedSessionIdSync(agentId);
-  if (!existsSync(launcherPath) || !sessionId) return null;
-
-  try {
-    return parsePinnedAgentLaunch(
-      readFileSync(launcherPath, 'utf8'),
-      sessionId,
-    );
-  } catch {
-    return null;
-  }
 }

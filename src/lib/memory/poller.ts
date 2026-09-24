@@ -226,10 +226,6 @@ function isSuccessfulExtractionResult(result: unknown): boolean {
 
 const defaultTranscriptPoller = new TranscriptPoller();
 
-export function getTranscriptPoller(): TranscriptPoller {
-  return defaultTranscriptPoller;
-}
-
 export function startTranscriptPoller(): void {
   defaultTranscriptPoller.start();
 }
@@ -244,10 +240,6 @@ export async function syncTranscriptPollerRegistry(): Promise<void> {
 
 export function registerTranscriptForPolling(entry: TranscriptEntry): void {
   defaultTranscriptPoller.register(entry);
-}
-
-export function unregisterTranscriptForPolling(sessionId: string): void {
-  defaultTranscriptPoller.unregister(sessionId);
 }
 
 async function readTranscriptSlice(path: string, fromOffset: number, toOffset: number): Promise<string> {

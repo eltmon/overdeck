@@ -650,13 +650,6 @@ export function saveCloisterConfigSync(config: CloisterConfig): void {
 }
 
 /**
- * Get the path to the Cloister config file
- */
-export function getCloisterConfigPath(): string {
-  return CLOISTER_CONFIG_FILE;
-}
-
-/**
  * Check if Cloister should auto-start
  */
 export function shouldAutoStart(): boolean {

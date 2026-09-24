@@ -1,4 +1,11 @@
-// Overdeck CLI - Main exports for library usage
+/**
+ * Internal entry; not a supported library API (PAN-3958 Q1).
+ *
+ * `package.json` points `main` here so the build has an entry, but nothing in
+ * this repository imports `@overdeck/core` as a library and no documentation
+ * describes library use. Names re-exported below may be removed in any release;
+ * removals are listed in the release notes.
+ */
 export * from './lib/paths.js';
 export * from './lib/config.js';
 export * from './lib/shell.js';
