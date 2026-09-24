@@ -44,7 +44,8 @@ import {
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
 import { closeAgentPane, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
-import { isAgentRole, type AgentRole } from '@overdeck/contracts';
+import type { AgentRole } from '@overdeck/contracts';
+import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -540,24 +541,6 @@ export async function piConversationSystemPromptFiles(cwd: string): Promise<stri
 }
 function isNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
-}
-function conversationStateDir(tmuxSession: string): string {
-  return join(getOverdeckHome(), 'conversations', tmuxSession);
-}
-/**
- * A conversation's pane role lives in `<stateDir>/pane-role` (PAN-3921 D2):
- * no DB column, and it survives every respawn, resume, restart-all and
- * fork-pipeline spawn. Without a file the role is `conversation`.
- */
-export async function writeConversationPaneRole(tmuxSession: string, role: AgentRole): Promise<void> {
-  const stateDir = conversationStateDir(tmuxSession);
-  await mkdir(stateDir, { recursive: true });
-  await writeFile(join(stateDir, 'pane-role'), `${role}\n`, { mode: 0o600 });
-}
-async function readConversationPaneRole(tmuxSession: string): Promise<AgentRole> {
-  const raw = await readFile(join(conversationStateDir(tmuxSession), 'pane-role'), 'utf-8').catch(() => '');
-  const role = raw.trim();
-  return isAgentRole(role) ? role : 'conversation';
 }
 export async function spawnConversationSession(
   tmuxSession: string,
