@@ -29,8 +29,11 @@ const {
 } = await import('../conversation-pull-requests.js');
 const {
   getConversationPullRequests,
+  getPullRequestConversations,
   linkPullRequestToConversation,
+  listPullRequestLinks,
   resolveConversationPullRequestRepos,
+  syncConversationPullRequests,
   unlinkPullRequestFromConversation,
 } = await import('../conversation-pull-request-commands.js');
 
@@ -218,5 +221,109 @@ describe('linkCreatedPullRequestToIssueConversations (pipeline-opened PRs)', () 
     conversation('agent-pan-3', REPO_PATH, 'PAN-3');
     expect(linkCreatedPullRequestToIssueConversations('PAN-3', undefined)).toEqual([]);
     expect(linkCreatedPullRequestToIssueConversations('PAN-3', 'not a url')).toEqual([]);
+  });
+});
+
+const SNAPSHOT_BASE = {
+  isDraft: false, title: 'A PR', headBranch: 'feature/x', baseBranch: 'main', reviewState: 'none', checks: 'none',
+  mergeable: null, additions: null, deletions: null, changedFiles: null, author: null, updatedAt: null,
+  mergedAt: null, closedAt: null, syncedAt: '2026-09-24T00:00:00Z',
+};
+
+describe('syncConversationPullRequests (forced refresh)', () => {
+  it('refreshes every live, unmerged link, emits for changed conversations, and returns the view', async () => {
+    const name = conversation('sync-conv');
+    await linkPullRequestToConversation(name, PR_URL, 'manual', deps);
+    await linkPullRequestToConversation(name, '#43', 'manual', deps);
+    await linkPullRequestToConversation(name, '#44', 'manual', deps);
+    await unlinkPullRequestFromConversation(name, '#44', deps);
+    const { setPullRequestLinkSnapshot } = await import('../conversation-pull-requests.js');
+    setPullRequestLinkSnapshot({ host: 'github.com', repository: 'eltmon/overdeck', number: 43 }, { ...SNAPSHOT_BASE, state: 'merged' } as never);
+    emitOnlyMock.mockClear();
+
+    const refresh = vi.fn(async (link: { number: number }) => (link.number === 42 ? [name] : []));
+    const result = await syncConversationPullRequests(name, refresh as never);
+
+    expect(refresh.mock.calls.map(([link]) => link.number)).toEqual([42]);
+    expect(emitOnlyMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ ok: true, status: 200, body: { links: expect.any(Array) } });
+  });
+
+  it('keeps going when one refresh throws, and 404s an unknown conversation', async () => {
+    const name = conversation('sync-throws');
+    await linkPullRequestToConversation(name, PR_URL, 'manual', deps);
+    await linkPullRequestToConversation(name, '#43', 'manual', deps);
+    const refresh = vi.fn(async (link: { number: number }) => {
+      if (link.number === 42) throw new Error('gh down');
+      return [];
+    });
+    expect(await syncConversationPullRequests(name, refresh as never)).toMatchObject({ ok: true });
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(await syncConversationPullRequests('nope', refresh as never)).toMatchObject({ status: 404 });
+  });
+});
+
+describe('getPullRequestConversations (reverse index)', () => {
+  it('lists the conversations with a live link to the PR, never dismissed ones', async () => {
+    const a = conversation('rev-a');
+    const b = conversation('rev-b');
+    const c = conversation('rev-c');
+    await linkPullRequestToConversation(a, PR_URL, 'manual', deps);
+    await linkPullRequestToConversation(b, PR_URL, 'agent', deps);
+    await linkPullRequestToConversation(c, PR_URL, 'manual', deps);
+    await unlinkPullRequestFromConversation(c, PR_URL, deps);
+
+    const result = getPullRequestConversations(`${PR_URL}/files`);
+    expect(result).toMatchObject({ ok: true, body: { pullRequest: { number: 42 } } });
+    const body = (result as { body: { conversations: Array<{ name: string; source: string; id: number }> } }).body;
+    expect(body.conversations.map(({ name, source }) => ({ name, source }))).toEqual([
+      { name: a, source: 'manual' },
+      { name: b, source: 'agent' },
+    ]);
+    expect(body.conversations[0]?.id).toEqual(expect.any(Number));
+  });
+
+  it('refuses a non-PR URL', () => {
+    expect(getPullRequestConversations('#42')).toMatchObject({ status: 400, body: { code: 'invalid_ref' } });
+  });
+});
+
+describe('listPullRequestLinks (all links)', () => {
+  it('lists live links with their conversation and effective project, filtered by state and project', async () => {
+    const inProject = conversation('all-in');
+    const outside = conversation('all-out', OTHER_CWD);
+    await linkPullRequestToConversation(inProject, PR_URL, 'manual', deps);
+    await linkPullRequestToConversation(inProject, '#43', 'manual', deps);
+    await linkPullRequestToConversation(outside, 'https://github.com/someone/scratch/pull/5', 'manual', {
+      readOriginRemote: async () => 'https://github.com/someone/scratch.git',
+    });
+    const { setPullRequestLinkSnapshot } = await import('../conversation-pull-requests.js');
+    setPullRequestLinkSnapshot({ host: 'github.com', repository: 'eltmon/overdeck', number: 43 }, { ...SNAPSHOT_BASE, state: 'merged' } as never);
+
+    const all = listPullRequestLinks();
+    const links = (all as { body: { links: Array<{ number: number; projectKey: string | null; conversationName: string }> } }).body.links;
+    expect(links.map((link) => [link.conversationName, link.number, link.projectKey]).sort()).toEqual([
+      ['all-in', 42, 'overdeck'],
+      ['all-in', 43, 'overdeck'],
+      ['all-out', 5, null],
+    ]);
+    const open = (listPullRequestLinks({ state: 'open', project: 'overdeck' }) as typeof all & { body: { links: Array<{ number: number }> } }).body.links;
+    expect(open.map((link) => link.number)).toEqual([42]);
+    expect(listPullRequestLinks({ state: 'bogus' })).toMatchObject({ status: 400, body: { code: 'invalid_filter' } });
+  });
+});
+
+describe('getConversationRead (GET /api/conversations/:id)', () => {
+  it('carries the effective pullRequest and every pullRequests link', async () => {
+    const name = conversation('read-conv');
+    await linkPullRequestToConversation(name, PR_URL, 'manual', deps);
+    await linkPullRequestToConversation(name, '#43', 'manual', deps);
+    await unlinkPullRequestFromConversation(name, '#43', deps);
+    const { getConversationRead } = await import('../conversation-reads.js');
+
+    const response = await getConversationRead(name, { resolveSessionFile: async () => null, tmuxSessionExists: async () => false });
+    const body = response.body as { pullRequest: { number: number } | null; pullRequests: Array<{ number: number }> };
+    expect(body.pullRequest?.number).toBe(42);
+    expect(body.pullRequests.map((link) => link.number)).toEqual([42, 43]);
   });
 });

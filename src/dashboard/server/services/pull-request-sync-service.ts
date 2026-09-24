@@ -178,17 +178,18 @@ async function readGithubPullRequest(key: PullRequestKey): Promise<GhPrRow | nul
  * Forced refresh right after an explicit link, outside the sweep schedule, so
  * the badge fills in within seconds, including PRs outside the 200-row listing.
  * GitHub PRs only; one `gh pr view`. Writes
- * the snapshot (no event: the caller emits one for the link it just made).
+ * the snapshot and returns the conversations whose link changed (no event:
+ * the caller emits).
  */
 export async function refreshPullRequestLinkNow(
   link: PullRequestLink,
   readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
   now: number = Date.now(),
-): Promise<void> {
-  if (!/\/pull\/\d+$/.test(link.url)) return;
+): Promise<string[]> {
+  if (!/\/pull\/\d+$/.test(link.url)) return [];
   const row = await readPullRequest(link);
-  if (!row) return;
-  setPullRequestLinkSnapshot(link, snapshotFromGhRow(row, new Date(now).toISOString()));
+  if (!row) return [];
+  return setPullRequestLinkSnapshot(link, snapshotFromGhRow(row, new Date(now).toISOString()));
 }
 
 /** One full sweep. Exported for tests and for a future forced refresh. */

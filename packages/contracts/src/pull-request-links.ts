@@ -62,6 +62,28 @@ export const ConversationPullRequests = Schema.Struct({
 })
 export type ConversationPullRequests = typeof ConversationPullRequests.Type
 
+/** One conversation linked to a PR — the reverse index (PR → conversations). */
+export const PullRequestLinkedConversation = Schema.Struct({
+  /** The /conv/<id> number. */
+  id: Schema.Number,
+  name: Schema.String,
+  title: Schema.NullOr(Schema.String),
+  source: PullRequestLinkSource,
+  linkedAt: Schema.String,
+})
+export type PullRequestLinkedConversation = typeof PullRequestLinkedConversation.Type
+
+/** One live link across all conversations, for the Pull requests list. */
+export const PullRequestLinkListing = Schema.Struct({
+  ...PullRequestLink.fields,
+  conversationId: Schema.Number,
+  conversationName: Schema.String,
+  conversationTitle: Schema.NullOr(Schema.String),
+  /** The conversation's effective project, or null when none resolves. */
+  projectKey: Schema.NullOr(Schema.String),
+})
+export type PullRequestLinkListing = typeof PullRequestLinkListing.Type
+
 function stateRank(link: PullRequestLink): number {
   if (link.snapshot === null) return 1
   if (link.snapshot.state === "open") return 0

@@ -10,10 +10,16 @@ const linkMock = vi.fn();
 const unlinkMock = vi.fn();
 const getMock = vi.fn();
 const invalidateMock = vi.fn();
+const syncMock = vi.fn();
+const listAllMock = vi.fn();
+const reverseMock = vi.fn();
 vi.mock('../../../../lib/overdeck/conversation-pull-request-commands.js', () => ({
   linkPullRequestToConversation: (...args: unknown[]) => linkMock(...args),
   unlinkPullRequestFromConversation: (...args: unknown[]) => unlinkMock(...args),
   getConversationPullRequests: (...args: unknown[]) => getMock(...args),
+  syncConversationPullRequests: (...args: unknown[]) => syncMock(...args),
+  listPullRequestLinks: (...args: unknown[]) => listAllMock(...args),
+  getPullRequestConversations: (...args: unknown[]) => reverseMock(...args),
 }));
 vi.mock('../../../../lib/overdeck/conversation-list.js', () => ({
   invalidateConversationListEnrichmentCache: () => invalidateMock(),
@@ -83,5 +89,28 @@ describe('conversation pull-request routes', () => {
     const res = await call('POST', '/api/conversations/conv-a/pull-requests', { body: { ref: '#1' }, origin: 'https://evil.example' });
     expect(res.status).toBe(403);
     expect(linkMock).not.toHaveBeenCalled();
+  });
+
+  it('POST /sync forces a refresh through the sync service and invalidates the list cache', async () => {
+    syncMock.mockResolvedValue({ ok: true, status: 200, body: { links: [], effective: null } });
+    const res = await call('POST', '/api/conversations/conv-a/pull-requests/sync');
+    expect(res).toEqual({ status: 200, json: { links: [], effective: null } });
+    expect(syncMock).toHaveBeenCalledWith('conv-a', expect.any(Function));
+    expect(invalidateMock).toHaveBeenCalled();
+  });
+
+  it('GET /api/pull-requests passes the state and project filters', async () => {
+    listAllMock.mockReturnValue({ ok: true, status: 200, body: { links: [] } });
+    const res = await call('GET', '/api/pull-requests?state=open&project=overdeck');
+    expect(res.status).toBe(200);
+    expect(listAllMock).toHaveBeenCalledWith({ state: 'open', project: 'overdeck' });
+  });
+
+  it('GET /api/pull-requests/conversations reads the PR URL from the query string', async () => {
+    reverseMock.mockReturnValue({ ok: true, status: 200, body: { conversations: [] } });
+    const url = 'https://github.com/eltmon/overdeck/pull/42';
+    const res = await call('GET', `/api/pull-requests/conversations?url=${encodeURIComponent(url)}`);
+    expect(res.status).toBe(200);
+    expect(reverseMock).toHaveBeenCalledWith(url);
   });
 });

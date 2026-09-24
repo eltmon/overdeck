@@ -14,8 +14,10 @@ import {
   resolveEffectivePullRequest,
   type PullRequestKey,
   type PullRequestLink,
+  type PullRequestLinkedConversation,
   type PullRequestLinkSource,
   type PullRequestSnapshot,
+  type PullRequestState,
 } from '@overdeck/contracts';
 
 import { getEventStore } from '../../dashboard/server/event-store.js';
@@ -214,6 +216,67 @@ export function linkCreatedPullRequestToIssueConversations(issueId: string, url:
     console.warn(`[pr-link] linking the PR for ${issueId} failed:`, error);
     return [];
   }
+}
+
+/** Reverse index: the conversations with a live (non-dismissed) link to this PR. */
+export function listConversationsLinkedToPullRequest(key: PullRequestKey): PullRequestLinkedConversation[] {
+  return getOverdeckDatabase()
+    .prepare(`
+      SELECT c.rowid AS id, c.name, c.title, l.source, l.linked_at
+      FROM conversation_pull_requests l
+      JOIN conversations c ON c.id = l.conversation_id
+      WHERE l.host = ? AND l.repository = ? AND l.number = ? AND l.dismissed_at IS NULL
+      ORDER BY l.linked_at
+    `)
+    .all<{ id: number; name: string; title: string | null; source: string; linked_at: number }>(key.host, key.repository, key.number)
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      title: row.title,
+      source: row.source as PullRequestLinkSource,
+      linkedAt: new Date(row.linked_at).toISOString(),
+    }));
+}
+
+export interface PullRequestLinkRow extends PullRequestLink {
+  readonly conversationId: number;
+  readonly conversationName: string;
+  readonly conversationTitle: string | null;
+  readonly conversationCwd: string;
+  readonly conversationProjectKey: string | null;
+}
+
+/**
+ * Every live link across conversations, newest first, optionally narrowed to
+ * one snapshot state (`open` also matches links not synced yet).
+ */
+export function listAllPullRequestLinks(filter: { state?: PullRequestState } = {}): PullRequestLinkRow[] {
+  const rows = getOverdeckDatabase()
+    .prepare(`
+      SELECT c.name AS conversation_name, c.rowid AS conversation_rowid, c.title AS conversation_title,
+             c.cwd AS conversation_cwd, c.project_key AS conversation_project_key,
+             l.host, l.repository, l.number, l.url, l.source, l.linked_at, l.dismissed_at, l.snapshot_json
+      FROM conversation_pull_requests l
+      JOIN conversations c ON c.id = l.conversation_id
+      WHERE l.dismissed_at IS NULL
+      ORDER BY l.linked_at DESC
+    `)
+    .all<LinkRow & {
+      conversation_rowid: number;
+      conversation_title: string | null;
+      conversation_cwd: string;
+      conversation_project_key: string | null;
+    }>();
+  return rows
+    .map((row) => ({
+      ...rowToLink(row),
+      conversationId: row.conversation_rowid,
+      conversationName: row.conversation_name,
+      conversationTitle: row.conversation_title,
+      conversationCwd: row.conversation_cwd,
+      conversationProjectKey: row.conversation_project_key,
+    }))
+    .filter((link) => !filter.state || (link.snapshot?.state ?? 'open') === filter.state);
 }
 
 function findLink(conversationName: string, key: PullRequestKey): PullRequestLink | null {

@@ -259,7 +259,12 @@ door that does not exist; a real record read door would be a separate change.
   `manual`/`agent` relink clears it; a `created` link does not. `created` links
   come from `linkCreatedPullRequestToIssueConversations`, called after
   `createReviewArtifact` in `review-artifacts.ts` and `pan done`: every
-  non-archived agent conversation with that `issue_id` gets the PR. A new table
+  non-archived agent conversation with that `issue_id` gets the PR. Other reads,
+  all in `routes/conversation-pull-requests.ts`: `POST …/pull-requests/sync`
+  (forced `gh pr view` refresh of every live, unmerged link), `GET
+  /api/pull-requests?state=&project=` (every live link, with its conversation and
+  effective project), `GET /api/pull-requests/conversations?url=` (reverse index),
+  and `pullRequest` + `pullRequests` on `GET /api/conversations/:id`. A new table
   goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
   and bumps `OVERDECK_TABLE_COUNT`.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered

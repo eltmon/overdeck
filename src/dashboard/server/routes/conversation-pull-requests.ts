@@ -4,9 +4,13 @@
  *   GET    /api/conversations/:name/pull-requests          → { links, effective }
  *   POST   /api/conversations/:name/pull-requests          { ref, source? } → 201 link
  *   DELETE /api/conversations/:name/pull-requests?ref=<ref> → { unlinked, link }
+ *   POST   /api/conversations/:name/pull-requests/sync     → { links, effective } after a forced refresh
+ *   GET    /api/pull-requests?state=&project=              → { links } across conversations
+ *   GET    /api/pull-requests/conversations?url=<pr url>   → { pullRequest, conversations } (reverse index)
  *
  * `ref` is a PR/MR URL, `#42`, or `owner/repo#42`. Errors carry a `code`:
- * `invalid_ref`, `foreign_repository` (400), `not_found`, `not_linked` (404).
+ * `invalid_ref`, `foreign_repository`, `invalid_filter` (400), `not_found`,
+ * `not_linked` (404).
  */
 
 import { Effect, Layer } from 'effect';
@@ -15,7 +19,10 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { invalidateConversationListEnrichmentCache } from '../../../lib/overdeck/conversation-list.js';
 import {
   getConversationPullRequests,
+  getPullRequestConversations,
   linkPullRequestToConversation,
+  listPullRequestLinks,
+  syncConversationPullRequests,
   unlinkPullRequestFromConversation,
   type PullRequestCommandResult,
 } from '../../../lib/overdeck/conversation-pull-request-commands.js';
@@ -84,4 +91,40 @@ const deleteRoute = HttpRouter.add('DELETE', ROUTE, Effect.gen(function* () {
   });
 }));
 
-export const conversationPullRequestRoutes = Layer.mergeAll(getRoute, postRoute, deleteRoute);
+const syncRoute = HttpRouter.add('POST', `${ROUTE}/sync`, Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+  const params = yield* HttpRouter.params;
+  const name = conversationName(params);
+  return yield* Effect.promise(async () => {
+    const result = await syncConversationPullRequests(name, (link) => refreshPullRequestLinkNow(link));
+    if (result.ok) invalidateConversationListEnrichmentCache();
+    return respond(result);
+  });
+}));
+
+const listAllRoute = HttpRouter.add('GET', '/api/pull-requests', Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+  const query = new URL(request.url, 'http://localhost').searchParams;
+  return respond(listPullRequestLinks({ state: query.get('state'), project: query.get('project') }));
+}));
+
+const reverseIndexRoute = HttpRouter.add('GET', '/api/pull-requests/conversations', Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+  const url = new URL(request.url, 'http://localhost').searchParams.get('url') ?? '';
+  return respond(getPullRequestConversations(url));
+}));
+
+export const conversationPullRequestRoutes = Layer.mergeAll(
+  getRoute,
+  postRoute,
+  deleteRoute,
+  syncRoute,
+  listAllRoute,
+  reverseIndexRoute,
+);

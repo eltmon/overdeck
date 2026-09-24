@@ -16,13 +16,18 @@ import {
   resolveEffectivePullRequest,
   type ConversationPullRequests,
   type PullRequestLink,
+  type PullRequestLinkedConversation,
+  type PullRequestLinkListing,
+  type PullRequestState,
 } from '@overdeck/contracts';
 
-import { findProjectByPath, getProjectSync, type ProjectConfig } from '../projects.js';
+import { findProjectByPath, getProjectSync, listProjectsSync, type ProjectConfig } from '../projects.js';
 import {
   emitConversationPullRequestsChanged,
   linkConversationPullRequest,
+  listAllPullRequestLinks,
   listConversationPullRequests,
+  listConversationsLinkedToPullRequest,
   unlinkConversationPullRequest,
   type ExplicitPullRequestLinkSource,
 } from './conversation-pull-requests.js';
@@ -37,7 +42,7 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-export type PullRequestCommandErrorCode = 'not_found' | 'invalid_ref' | 'foreign_repository' | 'not_linked';
+export type PullRequestCommandErrorCode = 'not_found' | 'invalid_ref' | 'foreign_repository' | 'not_linked' | 'invalid_filter';
 
 export type PullRequestCommandResult<T> =
   | { readonly ok: true; readonly status: number; readonly body: T }
@@ -183,4 +188,68 @@ export async function unlinkPullRequestFromConversation(
   }
   emitConversationPullRequestsChanged(name);
   return { ok: true, status: 200, body: { unlinked: true, link: existing } };
+}
+
+/**
+ * Force a snapshot refresh of every live, not-yet-merged link on a
+ * conversation (merged snapshots are final), then return the fresh view.
+ * Emits one event per conversation whose links changed.
+ */
+export async function syncConversationPullRequests(
+  name: string,
+  refresh: (link: PullRequestLink) => Promise<readonly string[]>,
+): Promise<PullRequestCommandResult<ConversationPullRequests>> {
+  if (!getConversationByName(name)) return fail(404, 'not_found', 'Conversation not found');
+  const due = listConversationPullRequests(name).filter((link) => link.dismissedAt === null && link.snapshot?.state !== 'merged');
+  const changed = new Set<string>();
+  for (const link of due) {
+    try {
+      for (const changedName of await refresh(link)) changed.add(changedName);
+    } catch (error) {
+      console.warn(`[pr-link] refresh of ${link.repository}#${link.number} failed:`, error);
+    }
+  }
+  for (const changedName of changed) emitConversationPullRequestsChanged(changedName);
+  return getConversationPullRequests(name);
+}
+
+/** Reverse index by PR URL: the conversations with a live link to it. */
+export function getPullRequestConversations(url: string): PullRequestCommandResult<{
+  pullRequest: ParsedPullRequestRef;
+  conversations: PullRequestLinkedConversation[];
+}> {
+  const ref = parsePullRequestRef(url);
+  if (!ref) return fail(400, 'invalid_ref', `Not a pull request URL: "${url}"`);
+  return { ok: true, status: 200, body: { pullRequest: ref, conversations: listConversationsLinkedToPullRequest(ref) } };
+}
+
+const PULL_REQUEST_STATES: readonly string[] = ['open', 'merged', 'closed'];
+
+function effectiveProjectKey(
+  conv: { cwd: string; projectKey: string | null },
+  projects: ReadonlyArray<{ key: string; config: ProjectConfig }>,
+): string | null {
+  if (conv.projectKey) return conv.projectKey;
+  return projects.find(({ config }) => config.path && (conv.cwd === config.path || conv.cwd.startsWith(`${config.path}/`)))?.key ?? null;
+}
+
+/**
+ * Every live link across conversations for the Pull requests list, optionally
+ * filtered by snapshot state and by the conversation's effective project.
+ */
+export function listPullRequestLinks(filter: { state?: string | null; project?: string | null } = {}): PullRequestCommandResult<{
+  links: PullRequestLinkListing[];
+}> {
+  const state = filter.state || undefined;
+  if (state && !PULL_REQUEST_STATES.includes(state)) {
+    return fail(400, 'invalid_filter', `Unknown state "${state}" (expected open, merged, or closed)`);
+  }
+  const projects = listProjectsSync();
+  const links = listAllPullRequestLinks({ state: state as PullRequestState | undefined })
+    .map(({ conversationCwd, conversationProjectKey, ...link }) => ({
+      ...link,
+      projectKey: effectiveProjectKey({ cwd: conversationCwd, projectKey: conversationProjectKey }, projects),
+    }))
+    .filter((link) => !filter.project || link.projectKey === filter.project);
+  return { ok: true, status: 200, body: { links } };
 }
