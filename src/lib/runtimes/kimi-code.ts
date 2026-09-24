@@ -597,6 +597,8 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
         launcherScript,
         env: config.env,
         backend,
+        state: getAgentState(config.agentId),
+        saveState: saveAgentStateSync,
       });
       const sessionId = await this.waitForNewSessionId(config.workspace, existingBefore);
       if (!sessionId) throw new KimiCodeSpawnTimeout(config.agentId);

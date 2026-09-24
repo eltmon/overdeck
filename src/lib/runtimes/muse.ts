@@ -4,6 +4,7 @@ import { statSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { listAgentStates } from '../agents/queries.js';
+import { getAgentState, saveAgentStateSync } from '../agents/agent-state.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { waitForPromptReady } from '../agents/runtime-command.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -102,6 +103,7 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
       pane = await launchRuntimePane({
         agentId: config.agentId, workspace: config.workspace, harness: 'muse', model: config.model,
         launcherScript: launcher, env: config.env, backend,
+        state: getAgentState(config.agentId), saveState: saveAgentStateSync,
       });
       if (!await waitForMuseStarted(config.agentId, backend)) throw new Error('Muse startup timed out');
       const path = await resolveMuseSessionPath(config.agentId);

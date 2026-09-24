@@ -272,11 +272,18 @@ The planner's stop and status paths follow the same backend: finalize (`planning
 abort (`planning-sessions.ts`), and the dashboard's planning status, message and Stop routes use
 `closeAgentPane`, `agentPaneExists` and `deliverAgentMessage` rather than tmux calls.
 
+The runtime-class `spawnAgent` of the muse and kimi-code runtimes, reached only from Cloister's
+session rotation and crash respawn (`session-rotation.ts`, `service-crash.ts`), launches through
+`launchRuntimePane` (`src/lib/runtimes/runtime-pane-launch.ts`, #3936): `launchAgentPane` on the
+host's backend with the same four tokens, the pane recorded on the agent state, and the PTY
+supervisor on tmux only. A failed start closes the Herdr pane with `closeBackendPane`. kimi-code's
+readiness is the new session directory under the kimi home, which does not depend on pane text.
+muse's is its prompt scan; on Herdr, where a TUI on the alternate screen reads back empty, a pane
+that is still present and has written its session log counts as started once the 60 s scan ends.
+
 **Not yet routed** (tracked elsewhere): operator conversations and `pan handoff` (#3921); the
-runtime-class `spawnAgent` of the muse and kimi-code runtimes (#3936) and of the codex, acp, ohmypi
-and pi runtimes, reached only from Cloister's session rotation and crash respawn
-(`session-rotation.ts`, `service-crash.ts`) — the claude-code runtime delegates to `spawnAgent` and
-is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
+runtime-class `spawnAgent` of the codex, acp, ohmypi and pi runtimes — the claude-code runtime
+delegates to `spawnAgent` and is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
 commands, plain dashboard terminals and the codex auth login are not agents.
 
 `GET /api/agents/:id/output` reads the pane through `readAgentPaneText` (Herdr `pane.read`, tmux
@@ -561,10 +568,10 @@ the same way `countRunningAgents` does. An unreadable inventory (`null`) fails o
 `running` row counts. The brake stops agents through the async `stopAgent`, so on Herdr it closes
 the pane.
 
-`runtimes/muse.ts`, `runtimes/kimi-code.ts` and `overdeck/conversation-runtime.ts` still hardcode
-`useSupervisor: true`, but that is no longer a launch failure: those harnesses are launched
-pane-bound, so nothing waits for a detection the supervisor's second pty would have hidden, and
-their delivery already goes through the supervisor socket. Only `claude-code` needs the supervisor
+`overdeck/conversation-runtime.ts` still hardcodes `useSupervisor: true` (the muse and kimi-code
+runtime adapters wrap only on tmux since #3936), but that is no longer a launch failure: those
+harnesses are launched pane-bound, so nothing waits for a detection the supervisor's second pty
+would have hidden, and their delivery already goes through the supervisor socket. Only `claude-code` needs the supervisor
 refused on Herdr, and `decideSupervisorForWorkAgent` does that.
 
 A detection failure now carries the pane's foreground process and its last 20 lines of output, so
