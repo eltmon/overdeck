@@ -22,6 +22,14 @@ import {
 
 const execAsync = promisify(exec);
 const DASHBOARD_RUNTIME_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'] as const;
+/**
+ * PAN-3902: gates run from the dashboard (or its verification worker), whose
+ * env carries host boot state such as OVERDECK_NO_RESUME or
+ * OVERDECK_TERMINAL_BACKEND. A gate command inheriting it makes the result
+ * depend on how the dashboard booted, not on the diff. Every OVERDECK_* key is
+ * dropped except these, which locate the host rather than describe its state.
+ */
+const GATE_INHERITED_OVERDECK_ENV_KEYS: ReadonlySet<string> = new Set(['OVERDECK_HOME']);
 
 function clipGateStream(stream: string, limit: number): string {
   const signal = stream
@@ -49,6 +57,12 @@ function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJ
   const env = { ...process.env };
   for (const key of DASHBOARD_RUNTIME_ENV_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(gateEnv ?? {}, key)) {
+      delete env[key];
+    }
+  }
+  // A gate that needs one of these sets it in gate.env, which is spread last.
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('OVERDECK_') && !GATE_INHERITED_OVERDECK_ENV_KEYS.has(key)) {
       delete env[key];
     }
   }

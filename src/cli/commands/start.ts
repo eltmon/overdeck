@@ -694,7 +694,7 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
   }
 }
 
-import { resolveStartSpawnModel } from './start-spawn-model.js';
+import { resolvePanStartSpawnModel } from './start-spawn-model.js';
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
@@ -715,7 +715,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentState(agentId);
-  const spawnModel = resolveStartSpawnModel(options.model, options.fresh, existingAgentState?.model);
+  const spawnModel = resolvePanStartSpawnModel(agentId, options.model, options.fresh, existingAgentState?.model);
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.

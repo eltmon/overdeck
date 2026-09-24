@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -68,6 +68,30 @@ function runGuard(root: string, args: string[] = [], tscExit = 0): GuardResult {
   }
 }
 
+// Reads findings from the fixture file instead of the four tsc lanes, so counts stay exact.
+function runGuardOnFixture(root: string, args: string[] = []): GuardResult {
+  try {
+    const output = execFileSync('bash', [join(root, 'scripts', 'lint-effect-diagnostics.sh'), ...args], {
+      cwd: root,
+      encoding: 'utf-8',
+      env: { ...process.env, EFFECT_DIAG_FIXTURE_OUTPUT: join(root, 'tsc-output.txt') },
+    });
+    return { ok: true, output };
+  } catch (error: unknown) {
+    const e = error as { stdout?: string; stderr?: string };
+    return { ok: false, output: [e.stdout ?? '', e.stderr ?? ''].join('\n') };
+  }
+}
+
+// tsc prints an unknownInEffectCatch finding over two lines: the header carries
+// file(line,col) and the indented continuation line carries the marker.
+const multiLineFinding = (file: string, n: number) => [
+  `${file}(${n},3): warning TS31: The 'catch' callback in Effect.tryPromise returns 'unknown'. The catch callback should be used to provide typed errors.`,
+  "    Consider wrapping unknown errors into Effect's Data.TaggedError for example, or narrow down the type to the specific error raised.    effect(unknownInEffectCatch)",
+];
+const singleLineFinding = (file: string, n: number) =>
+  `${file}(${n},1): error TS3: Effect must be yielded.    effect(floatingEffect)`;
+
 describe('lint-effect-diagnostics.sh', () => {
   it('names the file whose finding count rose (PAN-3847 per-file attribution)', () => {
     const root = makeTempGuard([]);
@@ -111,6 +135,54 @@ describe('lint-effect-diagnostics.sh', () => {
     expect(result.ok).toBe(false);
     expect(result.output).toContain('NEW: src/lib/projects.ts (8, baseline 6)');
     expect(result.output).not.toContain('settings.ts (');
+  });
+
+  it('attributes a new multi-line finding to its own file, not to another file (PAN-4149)', () => {
+    const baselineOutput = [
+      ...Array.from({ length: 6 }, (_, i) => singleLineFinding('src/routes/context.ts', i + 1)),
+      ...multiLineFinding('src/lib/load.ts', 1),
+    ];
+    const root = makeTempGuard([]);
+    // Initialize the baseline from the same output the check runs against.
+    rmSync(join(root, 'scripts', 'effect-diagnostics-baseline.txt'));
+    writeTscOutput(root, baselineOutput.join('\n'));
+    expect(runGuardOnFixture(root, ['--update']).ok).toBe(true);
+    expect(runGuardOnFixture(root).output).toContain('passed (7 known findings; none new)');
+
+    writeTscOutput(root, [...baselineOutput, ...multiLineFinding('src/routes/misc/health.ts', 9)].join('\n'));
+    const result = runGuardOnFixture(root);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain('regressed: 8 findings (baseline 7)');
+    expect(result.output).toContain('NEW: src/routes/misc/health.ts (1, baseline 0)');
+    expect(result.output).not.toContain('context.ts (');
+    expect(result.output).not.toContain('carry no file position');
+  });
+
+  it('counts a multi-line finding once and baselines it as one row with its file (PAN-4149)', () => {
+    const root = makeTempGuard([]);
+    const baselinePath = join(root, 'scripts', 'effect-diagnostics-baseline.txt');
+    rmSync(baselinePath);
+    writeTscOutput(root, [...multiLineFinding('src/lib/load.ts', 1), singleLineFinding('src/x.ts', 1)].join('\n'));
+
+    const result = runGuardOnFixture(root, ['--update']);
+    const rows = readFileSync(baselinePath, 'utf-8').split('\n').filter((l) => l && !l.startsWith('#'));
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('baseline updated: 0 → 2');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatch(/^src\/lib\/load\.ts\(1,3\): warning TS31: .*    Consider wrapping .*    effect\(unknownInEffectCatch\)$/);
+  });
+
+  it('keeps an old line-based baseline working: the total counts the same (PAN-4149)', () => {
+    // Pre-PAN-4149 baselines stored only the marker-bearing continuation line.
+    const root = makeTempGuard([multiLineFinding('src/lib/load.ts', 1)[1]!, singleLineFinding('src/x.ts', 1)]);
+    writeTscOutput(root, [...multiLineFinding('src/lib/load.ts', 1), singleLineFinding('src/x.ts', 1)].join('\n'));
+
+    const result = runGuardOnFixture(root);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('✓ Effect diagnostics guard passed (2 known findings; none new)');
   });
 
   it('ignores a plain TypeScript error with no Effect marker', () => {

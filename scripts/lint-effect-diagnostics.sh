@@ -7,6 +7,10 @@
 # Plugin findings render as:
 # file(line,col): <category> TS<ruleCode>: <message>    effect(<ruleName>)
 # The four spaces before the trailing marker are part of the pinned format.
+# A message can span several lines: the header line carries file(line,col) and
+# indented continuation lines follow, the last one ending in the marker. The
+# ratchet joins each diagnostic into one row before matching (PAN-4149), so
+# every finding keeps its file.
 #
 # The baseline is scripts/effect-diagnostics-baseline.txt: '#' header lines plus
 # one sorted finding per row. Run with --update after fixing findings to lower a
@@ -87,7 +91,24 @@ else
   done
 fi
 
-current=$(printf '%s\n' "$all_output" | grep -E "$MARKER_REGEX" | sort || true)
+# Join each diagnostic's indented continuation lines onto its header line, so a
+# multi-line finding is one row that starts with its file(line,col) (PAN-4149).
+# A row closes at the marker, so every marker line lands in exactly one row and
+# the total count is unchanged. Continuation lines keep their indentation.
+group_diagnostics() {
+  HEADER_RE="$TYPE_DIAGNOSTIC_REGEX" MARKER_RE="$MARKER_REGEX" awk '
+    function flush() { if (row != "") print row; row = "" }
+    $0 ~ ENVIRON["HEADER_RE"] { flush(); row = $0 }
+    $0 !~ ENVIRON["HEADER_RE"] {
+      if (row != "" && $0 ~ /^[ \t]/) row = row $0
+      else { flush(); print }
+    }
+    row != "" && row ~ ENVIRON["MARKER_RE"] { flush() }
+    END { flush() }
+  '
+}
+
+current=$(printf '%s\n' "$all_output" | group_diagnostics | grep -E "$MARKER_REGEX" | sort || true)
 count=$(printf '%s\n' "$current" | grep -cE "$MARKER_REGEX" || true)
 
 # Per-file finding counts: "<count> <file>" for rows that carry a file(line,col)
@@ -115,7 +136,9 @@ if (( count > baseline_count )); then
   join -a1 -e0 -o '0,1.2,2.2' <(printf '%s\n' "$current" | per_file) <(grep -E "$MARKER_REGEX" "$BASELINE_FILE" | per_file || true) \
     | awk '$2 > $3 { printf "  NEW: %s (%d, baseline %d)\n", $1, $2, $3 }' >&2
   tailless=$(printf '%s\n' "$current" | grep -E "$MARKER_REGEX" | grep -cvE '^[^(:]+\([0-9]+,[0-9]+\)' || true)
-  echo "  Note: $tailless finding rows carry no file position and are counted but not attributed." >&2
+  if (( tailless > 0 )); then
+    echo "  Note: $tailless finding rows carry no file position and are counted but not attributed." >&2
+  fi
   echo "  Reproduce each lane with: node_modules/.bin/tsc --noEmit -p <tsconfig.effect-diag.json>" >&2
   exit 1
 fi

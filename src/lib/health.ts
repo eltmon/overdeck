@@ -12,8 +12,8 @@ import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgent, getAgentState, getAgentRuntimeStateSync } from './agents.js';
-import { listSessionNames, sessionExists } from './tmux.js';
-import { getAgentEffectiveLastActivityMs } from './agents/liveness.js';
+import { listSessionNames } from './tmux.js';
+import { getAgentEffectiveLastActivityMs, isAlive, isConfirmedDead, type LivenessVerdict } from './agents/liveness.js';
 
 /** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
 class HealthError extends Data.TaggedError('HealthError')<{
@@ -88,9 +88,18 @@ function saveAgentHealth(health: AgentHealth): void {
   writeFileSync(getHealthFile(health.agentId), JSON.stringify(health, null, 2));
 }
 
-/** Tmux session liveness probe for an agent; never rejects. */
-async function isAgentAlive(agentId: string): Promise<boolean> {
-  return Effect.runPromise(sessionExists(agentId));
+/**
+ * Backend-aware liveness (#4109): `true` alive, `false` confirmed dead, `null`
+ * unknown (the probe could not answer). A bare tmux `has-session` read every
+ * Herdr agent as dead, and three dead pings force-kill and respawn an agent.
+ * Never rejects.
+ */
+async function isAgentAlive(agentId: string): Promise<boolean | null> {
+  const verdict = await isAlive(agentId).catch(
+    (): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }),
+  );
+  if (verdict.alive) return true;
+  return isConfirmedDead(verdict) ? false : null;
 }
 
 async function pingAgentBody(
@@ -129,10 +138,14 @@ async function pingAgentBody(
     health.status = 'stopped';
     health.consecutiveFailures = 0;
     health.reason = 'Agent was intentionally stopped';
+  } else if (alive === null) {
+    // Unknown is not dead: never count it toward the force-kill threshold.
+    health.status = 'warning';
+    health.reason = 'Liveness unknown (terminal backend did not answer)';
   } else if (!alive) {
     health.status = 'dead';
     health.consecutiveFailures++;
-    health.reason = 'tmux session is not running';
+    health.reason = 'agent terminal session is not running';
   } else if (runtime?.state === 'waiting-on-human') {
     health.status = 'warning';
     health.consecutiveFailures = 0;
