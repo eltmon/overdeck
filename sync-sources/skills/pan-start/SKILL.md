@@ -1,6 +1,6 @@
 ---
 name: pan-start
-description: "pan start <id> — spawn a work agent for an issue in its own tmux session and workspace"
+description: "pan start <id> — spawn a work agent for an issue in its own terminal-backend pane and workspace"
 triggers:
   - pan start
   - start working on
@@ -46,7 +46,7 @@ state it is in to running work.
 - **Plan exists** — `pan start` creates the workspace if needed and spawns the work agent
   from the existing xBRIEF and xBRIEF tasks.
 - **Already running** — `pan start` exits 0 with a no-op message naming `pan tell <id>` for
-  messaging and the tmux attach command.
+  messaging and the attach command for the agent's backend (Herdr or tmux).
 - **Swarm active** — the bare parent agent is the foreman. `pan start` attaches to or restores that foreman instead of refusing because slot agents exist; it never creates a competing serial parent.
 
 Planning depth is controlled by `--plan`:

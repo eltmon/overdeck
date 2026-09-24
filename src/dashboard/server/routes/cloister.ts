@@ -123,7 +123,7 @@ const postCloisterBrakeRoute = HttpRouter.add(
   'POST',
   '/api/cloister/brake',
   httpHandler(Effect.gen(function* () {
-    const result = yield* Effect.try({
+    const result = yield* Effect.tryPromise({
       try: () => emergencyBrake(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });

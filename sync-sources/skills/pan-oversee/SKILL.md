@@ -80,9 +80,12 @@ echo "Workspace: ${WS_PATH:-NONE}"
 AGENT_STATE=$(cat ~/.overdeck/agents/agent-$ISSUE_LOWER/state.json 2>/dev/null)
 echo "Agent state: ${AGENT_STATE:-NONE}"
 
-# 4. Tmux session?
-TMUX_SESSION=$(tmux -L overdeck list-sessions 2>/dev/null | grep -i "$ISSUE_LOWER" | head -1)
-echo "Tmux: ${TMUX_SESSION:-NONE}"
+# 4. Live pane? /api/agents reads the host's terminal backend (Herdr by
+# default, tmux only under terminal.backend: tmux); never `tmux -L overdeck`,
+# which sees no Herdr agent.
+LIVE_PANE=$(curl -s http://localhost:3011/api/agents 2>/dev/null \
+  | jq -r --arg id "agent-$ISSUE_LOWER" '.[] | select(.id == $id) | "\(.id) pane=\(.paneState) live=\(.hasLiveTmuxSession)"')
+echo "Live pane: ${LIVE_PANE:-NONE}"
 
 # 5. Completion marker?
 COMPLETED=$(ls ~/.overdeck/agents/agent-$ISSUE_LOWER/completed 2>/dev/null)
@@ -117,8 +120,8 @@ with the forge, log a bug and prefer the forge.
 | Condition | Current Phase | Jump To |
 |-----------|--------------|---------|
 | No workspace, no agent state | Not started | Phase 0 → Phase 1 |
-| Workspace exists, agent active + tmux running | Agent working | Phase 2 |
-| Workspace exists, agent active, no tmux | Agent crashed/stuck | Phase 2 (recovery) |
+| Workspace exists, agent active + live pane | Agent working | Phase 2 |
+| Workspace exists, agent active, no live pane | Agent crashed/stuck | Phase 2 (recovery) |
 | Workspace exists, agent stopped, no completion | Agent gave up or crashed | Phase 1 (resume) |
 | PR open, `reviewDecision` is `REVIEW_REQUIRED` or null | Awaiting review | Phase 4 |
 | PR `reviewDecision` is `CHANGES_REQUESTED` | Feedback loop | Phase 5 |
@@ -181,20 +184,20 @@ Or use the dashboard UI via Playwright:
 Poll the agent's activity every 30-60 seconds. Watch for:
 
 **Signs of progress:**
-- tmux pane shows tool calls, file edits, test runs
+- The agent's output shows tool calls, file edits, test runs
 - `lastActivity` timestamp in state.json is updating
 - Heartbeat file is fresh: `~/.overdeck/heartbeats/agent-pan-{ID}.json`
 
 **Signs of trouble:**
 - No output change for > 5 minutes → agent may be stuck
-- Error messages in tmux output
+- Error messages in the agent's output
 - Agent asking questions with no one to answer
 - Auth errors (wrong API key, provider issues)
 
 **Monitoring commands:**
 ```bash
-# Watch live output (non-blocking)
-tmux -L overdeck capture-pane -t agent-pan-{ID} -p -S -30
+# Watch live output (non-blocking; reads the pane on Herdr or tmux)
+curl -s "http://localhost:3011/api/agents/agent-pan-{ID}/output?lines=30" | jq -r .output
 
 # Check heartbeat freshness
 cat ~/.overdeck/heartbeats/agent-pan-{ID}.json 2>/dev/null | jq '{timestamp, tool_name, current_task}'
@@ -246,7 +249,7 @@ Once review is triggered, the review-agent specialist should wake up:
 curl -s http://localhost:3011/api/specialists | jq '.[] | select(.name == "review-agent")'
 
 # Watch review agent output
-tmux -L overdeck capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
+curl -s "http://localhost:3011/api/agents/agent-pan-{ID}-review/output?lines=50" | jq -r .output
 
 # Check review progression on the PR itself
 (cd "$WS_PATH" && gh pr view --json reviewDecision,reviews) | jq '{reviewDecision, latest: (.reviews | last)}'
@@ -277,7 +280,7 @@ If review returned feedback, the work agent should receive it and fix issues:
 
 ```bash
 # Check if work agent received feedback
-tmux -L overdeck capture-pane -t agent-pan-{ID} -p -S -50 2>/dev/null | tail -20
+curl -s "http://localhost:3011/api/agents/agent-pan-{ID}/output?lines=50" | jq -r .output | tail -20
 
 # How many review rounds this branch has been through (convergence signal)
 ls "$WS_PATH/.pan/review" 2>/dev/null | wc -l
@@ -303,7 +306,7 @@ cat "$WS_PATH/.pan/test/result.json" 2>/dev/null | jq .
 (cd "$WS_PATH" && gh pr view --json statusCheckRollup) | jq '.statusCheckRollup'
 
 # Watch test agent
-tmux -L overdeck capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
+curl -s "http://localhost:3011/api/agents/agent-pan-{ID}-test/output?lines=50" | jq -r .output
 ```
 
 **Expected:** `{"status":"passed"}` in the artifact and green checks on the PR
@@ -360,7 +363,7 @@ Be thorough. All of these are findings worth logging:
 |----------|--------|---------|
 | `/api/health` | GET | Dashboard health |
 | `/api/agents` | GET | List all agents |
-| `/api/agents/:id/output` | GET | Agent terminal output |
+| `/api/agents/:id/output` | GET | Agent terminal output (`?lines=N`; the Herdr or tmux pane, then `output.log`) |
 | `/api/agents/:id/activity` | GET | Agent activity log |
 | `/api/issues/:id/approve` | POST | Approve & merge |
 | `/api/specialists` | GET | List specialists |

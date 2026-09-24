@@ -6,6 +6,7 @@ import { getOverdeckHome } from '../paths.js';
 import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../overdeck/conversations-search.js';
 import { chunkConversationJsonl, getLastCompleteJsonlOffset, type ConversationChunkRecord } from './chunker.js';
+import { parentSessionIdFromPath, projectIdFromPath, sessionIdFromPath } from './transcript-paths.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
 
 export interface ConversationIndexProgress {
@@ -218,6 +219,7 @@ export async function indexConversationFile(
       filePath: options.filePath,
       sessionId: options.sessionId ?? sessionIdFromPath(options.filePath),
       projectId: options.projectId ?? projectIdFromPath(options.filePath),
+      parentSessionId: parentSessionIdFromPath(options.filePath),
       fromOffset,
       toOffset: stat.size,
       signal: options.signal,
@@ -369,13 +371,4 @@ function defaultConversationRoots(): string[] {
   return [claudeProjectsRoot()];
 }
 
-export function sessionIdFromPath(filePath: string): string {
-  return basename(filePath).replace(/\.jsonl$/, '');
-}
-
-function projectIdFromPath(filePath: string): string {
-  const parts = filePath.split(/[\\/]+/);
-  const projectsIndex = parts.lastIndexOf('projects');
-  if (projectsIndex >= 0 && parts[projectsIndex + 1]) return parts[projectsIndex + 1]!;
-  return 'unknown';
-}
+export { sessionIdFromPath } from './transcript-paths.js';

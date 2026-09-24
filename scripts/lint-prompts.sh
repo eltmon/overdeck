@@ -34,6 +34,8 @@ check_forbidden_strings() {
     && fail "forbidden-string: work.md contains 'pan inspect' (verb deleted by PAN-3917)"
   contains "roles/work.md" "pan inspect" \
     && fail "forbidden-string: roles/work.md contains 'pan inspect' (verb deleted by PAN-3917)"
+  contains "src/lib/cloister/prompts/planning.md" "work.inspect gate" \
+    && fail "forbidden-string: planning.md contains 'work.inspect gate' (gate deleted by PAN-3917)"
   contains "src/lib/cloister/verification-runner.ts" "plan.xbrief.json subItem" \
     && fail "forbidden-string: verification-runner.ts contains 'plan.xbrief.json subItem'"
   return 0
@@ -267,6 +269,8 @@ self_test() {
     "printf '%s\n' 'pan inspect ISSUE --item item' >> \"\$tmp/roles/work.md\""
   expect_self_test_failure "forbidden-string-pan-inspect-work-prompt" \
     "printf '%s\n' 'pan inspect ISSUE --item item' >> \"\$tmp/src/lib/cloister/prompts/work.md\""
+  expect_self_test_failure "forbidden-string-inspect-gate-planning-prompt" \
+    "printf '%s\n' 'needs the work.inspect gate' >> \"\$tmp/src/lib/cloister/prompts/planning.md\""
   expect_self_test_failure "item-loop-order" \
     "python3 - <<'PY' \"\$tmp/roles/work.md\"
 from pathlib import Path

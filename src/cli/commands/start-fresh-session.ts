@@ -47,7 +47,7 @@ export interface FreshSessionOptions {
 
 export interface FreshSessionDeps {
   detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
-  assertCanStartFresh?: (agentOrIssueId: string, options?: { allowPausedForce?: boolean; allowLiveSessionReplacement?: boolean; explicitFresh?: boolean }) => unknown;
+  assertCanStartFresh?: (agentOrIssueId: string, options?: { allowPausedForce?: boolean; allowLiveSessionReplacement?: boolean; explicitFresh?: boolean }) => Promise<unknown>;
   /** Whether the agent has a live pane or session on the host's backend (Herdr pane, tmux session, or legacy tmux). */
   sessionLive?: (agentId: string) => Promise<boolean>;
   /** Stop the agent through its terminal backend. */
@@ -100,7 +100,7 @@ export async function prepareFreshWorkAgentSession(
   // state dir. A durable session pointer can survive local cleanup, so a
   // refused command must leave both the process and state files untouched.
   try {
-    assertCanStartFresh(issueId, {
+    await assertCanStartFresh(issueId, {
       allowPausedForce: false,
       allowLiveSessionReplacement: true,
       explicitFresh: true,

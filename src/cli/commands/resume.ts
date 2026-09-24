@@ -2,7 +2,7 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { createInterface } from 'node:readline/promises';
 import { resumeAgent } from '../../lib/agents.js';
-import { assertCanResumeSession, getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
+import { assertCanResumeSession, getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 
 interface ResumeOptions {
   host?: boolean;
@@ -34,7 +34,7 @@ async function confirmHostOverride(options: ResumeOptions): Promise<boolean> {
 export async function resumeCommand(id: string, options: ResumeOptions = {}): Promise<void> {
   let lifecycle;
   try {
-    lifecycle = assertCanResumeSession(id);
+    lifecycle = await assertCanResumeSession(id);
   } catch (error) {
     const msg = (error as Error).message;
     // PAN-1675: `--compact` exists to recover a context-wedged agent, which is
@@ -44,7 +44,7 @@ export async function resumeCommand(id: string, options: ResumeOptions = {}): Pr
     // session before relaunch. Other lifecycle blocks (paused/troubled/no saved
     // session) still hard-fail.
     if (options.compact && /already running/i.test(msg)) {
-      lifecycle = getWorkAgentLifecycleStateSync(id);
+      lifecycle = await getWorkAgentLifecycleState(id);
     } else {
       console.error(chalk.red(msg));
       return exitCli(1);

@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
-import type { AgentSnapshot, DomainEvent } from '@overdeck/contracts';
+import type { AgentSnapshot, BackendPane, DomainEvent } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../../lib/store';
 import {
@@ -45,6 +45,16 @@ function queryClient(): QueryClient {
 const PARKED_EMPTY = { rows: [], summary: { total: 0, byOrbit: {}, primaryByIssue: {} } };
 let parkedPayload = PARKED_EMPTY;
 
+function pane(agentId: string, state: BackendPane['state'] = 'working'): BackendPane {
+  return { id: `w1:${agentId}`, agentId, role: 'work', harness: 'claude-code', model: 'unknown', state };
+}
+
+// The river only admits agents the terminal backend hosts (PAN-3540). The
+// fixtures below predate that gate, so by default every agent row gets a live
+// pane; the liveness tests switch this off and supply their own panes.
+let hostEveryAgent = true;
+let stopHostingAgents: () => void = () => {};
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
@@ -62,13 +72,22 @@ beforeEach(() => {
     sequence: 0,
     agentsById: {},
     agentRuntimeById: {},
+    backendPanesById: {},
     issuesRaw: [],
     derivedIssueStateByIssueId: {},
     recentActivity: [],
   });
+  hostEveryAgent = true;
+  stopHostingAgents = useDashboardStore.subscribe((state, previous) => {
+    if (!hostEveryAgent || state.agentsById === previous.agentsById) return;
+    useDashboardStore.setState({
+      backendPanesById: Object.fromEntries(Object.keys(state.agentsById).map((id) => [`w1:${id}`, pane(id)])),
+    });
+  });
 });
 
 afterEach(() => {
+  stopHostingAgents();
   vi.clearAllTimers();
   vi.useRealTimers();
 });
@@ -530,5 +549,84 @@ describe('event-driven liveness (operator directive: event-based, not polling)',
 
     const orb = result.current.find((candidate) => candidate.id === 'PAN-6');
     expect(orb?.state).toBe('stale');
+  });
+});
+
+describe('backend-observed liveness (PAN-3540)', () => {
+  beforeEach(() => {
+    hostEveryAgent = false;
+  });
+
+  function phantomFleet() {
+    useDashboardStore.setState({
+      agentsById: {
+        // Stored `running`, but the terminal backend hosts no pane for it.
+        'planning-pan-7': agent({ id: 'planning-pan-7', issueId: 'PAN-7', role: 'plan' }),
+        'agent-pan-7-review': agent({ id: 'agent-pan-7-review', issueId: 'PAN-7', role: 'review' }),
+        // Stored `running` and hosted.
+        'agent-pan-8': agent({ id: 'agent-pan-8', issueId: 'PAN-8', role: 'work' }),
+        // Its pane is still listed, but exited.
+        'agent-pan-9': agent({ id: 'agent-pan-9', issueId: 'PAN-9', role: 'test' }),
+      },
+      backendPanesById: {
+        'w1:p1': pane('agent-pan-8'),
+        'w1:p2': pane('agent-pan-9', 'exited'),
+      },
+      issuesRaw: [
+        { id: 'PAN-7', identifier: 'PAN-7', title: 'Phantom', labels: [], state: 'open' },
+        { id: 'PAN-8', identifier: 'PAN-8', title: 'Hosted', labels: [], state: 'open' },
+        { id: 'PAN-9', identifier: 'PAN-9', title: 'Exited', labels: [], state: 'open' },
+      ],
+    });
+  }
+
+  it('draws no orb for a stored running row the terminal backend does not host', async () => {
+    phantomFleet();
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    expect(result.current.map((orb) => orb.id)).toEqual(['PAN-8']);
+  });
+
+  it('counts only backend-hosted agents in the census', () => {
+    phantomFleet();
+    const client = queryClient();
+    client.setQueryData(['agents-fleet-cost-summary'], {});
+    client.setQueryData(['conversations'], []);
+    const { result } = renderHook(() => useConfluenceData(), { wrapper: wrapper(client) });
+
+    expect(result.current.meta.total).toBe(1);
+    expect(result.current.meta.active).toBe(1);
+    expect(result.current.meta.roleCounts).toEqual({ work: 1 });
+  });
+
+  it('brings the orb back when the backend reports the pane', async () => {
+    phantomFleet();
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(result.current.find((orb) => orb.id === 'PAN-7')).toBeUndefined();
+
+    act(() => {
+      useDashboardStore.setState((state) => ({
+        backendPanesById: { ...state.backendPanesById, 'w1:p3': pane('planning-pan-7') },
+      }));
+    });
+    expect(result.current.find((orb) => orb.id === 'PAN-7')).toMatchObject({ stage: 'PLAN', state: 'active' });
+  });
+
+  it('keeps an operator-paused issue on the shelf with no live pane', async () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-10': agent({ id: 'agent-pan-10', issueId: 'PAN-10', paused: true, pausedReason: 'operator pause' }),
+      },
+      issuesRaw: [{ id: 'PAN-10', identifier: 'PAN-10', title: 'Parked by hand', labels: [], state: 'open' }],
+    });
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-10')?.state).toBe('shelf');
   });
 });

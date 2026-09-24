@@ -3,9 +3,7 @@
 A 1 src/lib/runtimes/ohmypi-fifo.ts
 B 2 src/lib/cost-parsers/ohmypi-parser.ts
 B 2 src/lib/runtimes/ohmypi-fifo.ts
-C 1 src/lib/agents/liveness.ts
 C 1 src/lib/agents/queries.ts
-C 1 src/lib/agents/runtime-pid-probe.ts
 C 1 src/lib/agents/runtime-state.ts
 C 1 src/lib/agents/termination.ts
 C 1 src/lib/config.ts
@@ -15,7 +13,6 @@ C 1 src/lib/projects-config-write.ts
 C 1 src/lib/runtimes/ohmypi.ts
 C 1 src/lib/runtimes/storage/muse.ts
 C 1 src/lib/ui-theme.ts
-C 1 src/lib/work-agent-lifecycle.ts
 C 2 src/lib/agents/agent-state.ts
 C 2 src/lib/cloister/config.ts
 C 3 src/lib/projects.ts

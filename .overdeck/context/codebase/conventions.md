@@ -39,11 +39,11 @@
 - Project continue state: `<planHome>/.pan/continues/<issue>.xbrief.json` (written by `pan task`).
 - Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
 - Legacy `${OVERDECK_HOME}/state/<project>/…` and the `overdeck-state` branch are retired (branch archived, never delete it).
-- Agent transcripts: `sessions.json` under `~/.overdeck/agents/<id>/` is the append-only session index; `session.id` is gone (PAN-3950). One async resolver, `src/lib/agents/transcript-resolver.ts`, interprets agent directories; per-harness path formulas live only in `src/lib/runtimes/*`.
+- Agent transcripts: `sessions.json` under `~/.overdeck/agents/<id>/` is the append-only session index; `session.id` is gone (PAN-3950). One async resolver, `src/lib/agents/transcript-resolver.ts`, interprets agent directories; per-harness path formulas live only in `src/lib/runtimes/*`. Conversation search: `chunks.session_id` is always the JSONL basename; subagent chunks carry `parent_session_id`; palette hits on unregistered UUIDs are read-only via the exact-UUID fallback in `conversation-reads.ts` (PAN-3982).
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
 - Frontend tests co-located under `components/**/__tests__/`.
 
-<!-- last-verified: 2026-09-20 -->
+<!-- last-verified: 2026-09-24 -->

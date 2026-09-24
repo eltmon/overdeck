@@ -26,7 +26,7 @@
  */
 
 import { listAgentStates, listRunningAgentsSync } from '../agents/queries.js';
-import { isAliveSync, isConfirmedDead } from '../agents/liveness.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import type { AgentState } from '../agents.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -254,8 +254,13 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
   // with a live session is resumable residue, not a running agent, and must
   // not mint zombie-session/idle-running rows. A failed probe
   // (runtime-indeterminate) counts as live — never park an issue out from
-  // under an agent the probe could not observe.
-  const liveAgents = listRunningAgentsSync().filter((a) => (a.status === 'running' || a.status === 'starting') && !isConfirmedDead(isAliveSync(a.id)));
+  // under an agent the probe could not observe. The oracle asks the selected
+  // terminal backend (PAN-3926): on Herdr there is no tmux session, so a
+  // tmux-only probe read every live agent as dead. Probes run concurrently so
+  // a Herdr socket outage costs one probe timeout, not one per agent.
+  const runningRows = listRunningAgentsSync().filter((a) => a.status === 'running' || a.status === 'starting');
+  const verdicts = await Promise.all(runningRows.map((a) => isAlive(a.id)));
+  const liveAgents = runningRows.filter((_, index) => !isConfirmedDead(verdicts[index]!));
 
   const agentsByIssue = new Map<string, AgentState[]>();
   for (const agent of allAgents) {

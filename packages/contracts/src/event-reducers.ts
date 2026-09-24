@@ -20,6 +20,7 @@ import type {
   ProjectCiSnapshot,
   ResourceStats,
   RestartGateSnapshot,
+  ProjectDeploySnapshot,
   ScanProgressSnapshot,
   TurnDiffSummary,
 } from './types'
@@ -123,6 +124,8 @@ export interface ReadModelState {
   ciByProjectKey: Record<string, ProjectCiSnapshot>
   /** PAN-3729 — voluntary-restart approval gate; null until the gate first reports. */
   restartGate: RestartGateSnapshot | null
+  /** PAN-3751 — in-flight deploys keyed by project key; derived, never stored. */
+  deployByProjectKey: Record<string, ProjectDeploySnapshot>
   /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
   agentIdBySessionId: Record<string, string>
 }
@@ -170,6 +173,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   embedProgressBySessionId: {},
   ciByProjectKey: {},
   restartGate: null,
+  deployByProjectKey: {},
   agentIdBySessionId: {},
   dashboardLifecycle: {
     active: false,
@@ -345,6 +349,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     embedProgressBySessionId: snapshot.embedProgressBySessionId ?? {},
     ciByProjectKey: snapshot.ciByProjectKey ?? state.ciByProjectKey,
     restartGate: snapshot.restartGate ?? state.restartGate,
+    deployByProjectKey: snapshot.deployByProjectKey ?? state.deployByProjectKey,
     agentIdBySessionId,
   }
 }
@@ -741,6 +746,14 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           // notice. Dropping it here would silently starve the banner.
           ...(event.payload.lastOutcome === undefined ? {} : { lastOutcome: event.payload.lastOutcome }),
         },
+      }
+
+    // PAN-3751: complete projection, plain replace — like the restart gate.
+    case 'project.deploy_changed':
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        deployByProjectKey: event.payload.deploys,
       }
 
     case 'resources.updated':

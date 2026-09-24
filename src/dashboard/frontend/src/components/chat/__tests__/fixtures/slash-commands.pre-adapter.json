@@ -520,14 +520,6 @@
     "insert": "pan admin specialists done"
   },
   {
-    "label": "pan admin specialists logs",
-    "insert": "pan admin specialists logs"
-  },
-  {
-    "label": "pan admin specialists cleanup-logs",
-    "insert": "pan admin specialists cleanup-logs"
-  },
-  {
     "label": "pan admin remote status",
     "insert": "pan admin remote status"
   },

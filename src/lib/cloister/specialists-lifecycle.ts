@@ -240,19 +240,6 @@ export async function signalSpecialistCompletion(
   // Update status
   updateRunStatus(projectKey, registryKey, result.status);
 
-  // Finalize log if there's a current run
-  if (metadata.currentRun) {
-    try {
-      const { finalizeRunLog } = await import('./specialist-logs.js');
-      finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
-        status: result.status,
-        notes: result.notes,
-      });
-    } catch (error) {
-      console.error(`[specialist] Failed to finalize log:`, error);
-    }
-  }
-
   // Completion means the run itself is over, even if the tmux session stays alive
   // during the grace period for inspection or manual termination.
   setCurrentRun(projectKey, registryKey, null);
@@ -278,7 +265,7 @@ export async function signalSpecialistCompletion(
 /**
  * Terminate a specialist session
  *
- * Kills the tmux session, finalizes logs, and schedules digest generation.
+ * Kills the tmux session and clears the run's registry state.
  *
  * @param projectKey - Project identifier
  * @param specialistType - Specialist type
@@ -304,20 +291,8 @@ export async function terminateSpecialist(
     console.error(`[specialist] Failed to kill tmux session ${tmuxSession}:`, error);
   }
 
-  // Finalize log if there's a current run
+  // Clear current run
   if (metadata.currentRun) {
-    const { finalizeRunLog } = await import('./specialist-logs.js');
-
-    try {
-      finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
-        status: metadata.lastRunStatus || 'incomplete',
-        notes: 'Specialist terminated',
-      });
-    } catch (error) {
-      console.error(`[specialist] Failed to finalize log:`, error);
-    }
-
-    // Clear current run
     setCurrentRun(projectKey, registryKey, null);
   }
 
@@ -332,37 +307,5 @@ export async function terminateSpecialist(
   saveAgentRuntimeState(tmuxSession, {
     state: 'suspended',
     lastActivity: new Date().toISOString(),
-  });
-
-  // Schedule digest generation (async, fire-and-forget)
-  const { scheduleDigestGeneration } = await import('./specialist-context.js');
-  scheduleDigestGeneration(projectKey, specialistType);
-
-  // Run log cleanup for this project/specialist (async, fire-and-forget)
-  scheduleLogCleanup(projectKey, specialistType);
-}
-
-/**
- * Schedule log cleanup for a project's specialist (async, fire-and-forget)
- *
- * @param projectKey - Project identifier
- * @param specialistType - Specialist type
- */
-function scheduleLogCleanup(projectKey: string, specialistType: SpecialistAgentName): void {
-  // Run async without awaiting
-  Promise.resolve().then(async () => {
-    try {
-      const { cleanupOldLogs } = await import('./specialist-logs.js');
-      const { getSpecialistRetention } = await import('../projects.js');
-
-      const retention = getSpecialistRetention(projectKey);
-      const deleted = cleanupOldLogs(projectKey, specialistType, { maxDays: retention.max_days, maxRuns: retention.max_runs });
-
-      if (deleted > 0) {
-        console.log(`[specialist] Cleaned up ${deleted} old logs for ${projectKey}/${specialistType}`);
-      }
-    } catch (error) {
-      console.error(`[specialist] Log cleanup failed for ${projectKey}/${specialistType}:`, error);
-    }
   });
 }

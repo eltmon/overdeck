@@ -79,6 +79,8 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
 
 The operator reviews and merges the pull request (the human-merge step in [docs/MERGE-WORKFLOW.md](../docs/MERGE-WORKFLOW.md)). No Deacon routine, server merge door, or readiness command lands a pushed strike branch; a strike that stops after `git push` without opening a PR is never merged.
 
+Cleanup is part of completion, and Overdeck does it, not you. When the pull request merges, Overdeck stops the strike agent, removes the strike worktree, and deletes `strike/<id>` once its content is on the base branch. Do not remove the worktree or delete the branch yourself.
+
 If you are asked to update the pull request (conflicts, red CI, review feedback), run `pan sync-main <id>`, resolve the problem, rerun the configured gates, and push only `strike/<id>`. The open pull request picks up the new HEAD.
 
 The strike agent must never switch to the base branch, merge into it, merge its own pull request, or push it to `origin`. The pre-push guard (`scripts/guard-agent-main-push.sh`) mechanically rejects agent pushes of code changes to `main`.

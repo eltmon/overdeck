@@ -66,10 +66,11 @@ pan kill ISSUE-123
 ### 3. Verify Stopped
 
 ```bash
-pan status
+# alive comes from the host backend (Herdr or tmux); tmuxActive is tmux-only and deprecated
+pan status --json | jq -r '.[] | select(.issueId == "ISSUE-123") | "\(.id) alive=\(.alive)"'
 ```
 
-The agent must no longer be listed as running. If it still is, see Troubleshooting.
+Every agent of the issue must read `alive=false`. If one does not, see Troubleshooting.
 
 ## Pause Instead of Kill
 
@@ -97,19 +98,26 @@ git add -A && git commit -m "WIP: state before kill"
 
 ## Troubleshooting
 
-**Agent still listed as running after `pan kill`:** the terminal did not close. Find it on the
-host's backend:
+**Agent still alive after `pan kill`:** the terminal did not close. List the live panes the
+dashboard sees on the host's backend:
+
+```bash
+curl -s http://localhost:3011/api/agents \
+  | jq -r '.[] | select(.issueId == "ISSUE-123" and .hasLiveTmuxSession == true) | "\(.id) pane=\(.paneState)"'
+```
+
+`/api/agents` caches for about 5 seconds, so wait that long after a kill before trusting it.
+Then run `pan kill <agent-id>` again. If it still survives, find the pane on the backend itself:
 
 ```bash
 # Herdr host: panes carry the agent id in their agentId token
 herdr pane list
 
-# tmux host: agents live on the overdeck socket, never the default one
-tmux -L overdeck list-sessions | grep ISSUE-123
+# tmux host, or a pre-Herdr agent still on tmux: the overdeck socket, never the default one
+tmux -L overdeck list-sessions | grep -i issue-123
 ```
 
-Then run `pan kill <agent-id>` again. Close a pane by hand only if the backend is unreachable from
-`pan`, and report it as a bug.
+Close a pane by hand only if the backend is unreachable from `pan`, and report it as a bug.
 
 ## Related Skills
 

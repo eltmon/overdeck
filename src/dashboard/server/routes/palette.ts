@@ -193,6 +193,10 @@ export interface PaletteConversationHit {
   /** Dashboard project key (name ?? key) this conversation's cwd lives under, so
    *  the palette can route to the right deck. Null when under no registered project. */
   projectKey: string | null;
+  /** Parent session UUID when this hit is a Claude subagent transcript (PAN-3982). */
+  parentSessionId: string | null;
+  /** Bare subagent id (`agent-<id>.jsonl` → `<id>`), the rail's `?subagent=` value. */
+  subagentId: string | null;
   role: string;
   ts: string | null;
   byteOffset: number;
@@ -271,7 +275,9 @@ function toPaletteConversationHit(
   routeableConversations: Map<string, RouteableConversation>,
   projectDirs: ProjectDirMatch[],
 ): PaletteConversationHit {
-  const conversation = routeableConversation(hit.sessionId, routeableConversations);
+  // A subagent transcript opens through its parent conversation (PAN-3982).
+  const parentSessionId = hit.parentSessionId ?? null;
+  const conversation = routeableConversation(parentSessionId ?? hit.sessionId, routeableConversations);
   const explicitProject = conversation.projectKey
     ? projectDirs.find((dir) => dir.yamlKey === conversation.projectKey || dir.key === conversation.projectKey)
     : undefined;
@@ -280,6 +286,8 @@ function toPaletteConversationHit(
     conversationId: conversation.name,
     projectId: hit.projectId,
     projectKey: explicitProject?.key ?? resolveConversationProjectKey(hit.projectId, projectDirs),
+    parentSessionId,
+    subagentId: parentSessionId ? hit.sessionId.replace(/^agent-/, '') : null,
     role: hit.role,
     ts: hit.ts,
     byteOffset: hit.byteOffset,

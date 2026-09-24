@@ -78,7 +78,7 @@ pan status
 - Status (running, idle, crashed, completed)
 - Uptime (how long agent has been running)
 - Workspace path
-- tmux session name
+- Liveness from the terminal backend (Herdr by default, or tmux)
 - Recent activity
 
 **Example output:**
@@ -188,12 +188,26 @@ Status: All systems operational
 # Show detailed status for one agent
 pan status PAN-3
 
-# Attach to agent's tmux session (Ctrl+b d to detach)
-tmux attach -t agent-PAN-3
+# Is it alive? Asks the agent's terminal backend (Herdr or tmux).
+# `alive: false` carries a `livenessReason`; `runtime-indeterminate` means the
+# backend did not answer, which is unknown, not dead.
+pan status --json | jq '.[] | select(.issueId == "PAN-3") | {id, alive, livenessReason}'
 
-# View agent's recent output
-tmux capture-pane -t agent-PAN-3 -p | tail -20
+# The dashboard's view: hasLivePane is true for a live pane on either backend
+curl -s http://localhost:3011/api/agents | jq '.[] | select(.issueId == "PAN-3") | {id, status, hasLivePane}'
+
+# View agent's recent output (reads the Herdr or tmux pane)
+curl -s "http://localhost:3011/api/agents/agent-pan-3/output?lines=20" | jq -r .output
 ```
+
+To open the agent's terminal, run the `Attach:` command that `pan start` and
+`pan recover` print. It names the right backend:
+
+- Herdr: `herdr --session overdeck terminal attach <terminalId>` (`terminalId`
+  is in `~/.overdeck/agents/<agent-id>/state.json`; a non-default
+  `OVERDECK_HOME` uses a hashed session name, so prefer the printed line).
+- tmux (`terminal.backend: tmux`, or an agent from before Herdr):
+  `tmux -L overdeck attach -t <agent-id>` (Ctrl+b d to detach).
 
 ### Check Service Status
 
@@ -273,7 +287,7 @@ pan status && pan doctor
 watch -n 2 pan status
 
 # Monitor specific agent output
-watch -n 2 "tmux capture-pane -t agent-PAN-3 -p | tail -10"
+watch -n 2 "curl -s 'http://localhost:3011/api/agents/agent-pan-3/output?lines=10' | jq -r .output"
 
 # Monitor Docker containers
 watch -n 2 docker ps
@@ -295,11 +309,11 @@ Visit http://localhost:3001 for real-time visual monitoring:
 
 **Solutions:**
 ```bash
-# Check tmux sessions directly
-tmux list-sessions
+# Ask the terminal backend directly, per agent
+pan status --json | jq '.[] | {id, status, alive, livenessReason}'
 
-# Look for agent sessions
-tmux list-sessions | grep agent
+# Agents with a live pane, as the dashboard sees them
+curl -s http://localhost:3011/api/agents | jq '.[] | select(.hasLivePane) | .id'
 
 # If sessions exist but not showing, check:
 cat ~/.overdeck/agents/*.json
@@ -312,6 +326,10 @@ pan down && pan up
 
 **Problem:** `pan status` shows agent in crashed state
 
+`pan recover` lists an agent as crashed only when its state says `running` and
+the terminal backend confirms the pane or harness is gone. A backend that does
+not answer (Herdr socket down) never makes an agent crashed.
+
 **Solutions:**
 ```bash
 # Check agent logs
@@ -320,8 +338,8 @@ cat ~/.overdeck/logs/agent-<id>.log
 # Try to recover
 pan recover <id>
 
-# Attach to session to see error
-tmux attach -t agent-<id>
+# Read the pane to see the error (or run the Attach: command pan recover prints)
+curl -s "http://localhost:3011/api/agents/agent-<id>/output?lines=50" | jq -r .output
 
 # If unrecoverable, kill and restart
 pan kill <id>

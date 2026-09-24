@@ -12,6 +12,7 @@ import {
   getAgentState,
 } from '../../../../lib/agents.js';
 import { capturePane } from '../../../../lib/tmux.js';
+import { readAgentPaneText } from '../../../../lib/terminal-backends/agent-pane-io.js';
 import { parseEntireConversation } from '../../services/conversation-service.js';
 import { parsePiConversationMessages } from '../../services/pi-conversation-parser.js';
 import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversation-parser.js';
@@ -37,6 +38,78 @@ import {
 
 // ─── Route: GET /api/agents/:id/output ───────────────────────────────────────
 
+/** Seams for {@link readAgentOutput}. Production callers pass nothing. */
+export interface AgentOutputDeps {
+  /** The pane on the host's terminal backend; throws when it cannot be read. */
+  readPane?: (agentId: string, lines: number) => Promise<string>;
+  /** A pre-Herdr agent still running in its tmux session on a Herdr host. */
+  readLegacyTmuxPane?: (agentId: string, lines: number) => Promise<string>;
+  readRemoteState?: (agentId: string) => Promise<{ location?: string; vmName?: string } | null>;
+  readRemoteOutput?: (agentId: string, vmName: string, lines: number) => Promise<string>;
+  readSavedLog?: (agentId: string) => Promise<string | null>;
+}
+
+function agentStateDir(agentId: string): string {
+  return join(homedir(), '.overdeck', 'agents', agentId);
+}
+
+async function readRemoteStateDefault(agentId: string): Promise<{ location?: string; vmName?: string } | null> {
+  const remoteStateFile = join(agentStateDir(agentId), 'remote-state.json');
+  if (!existsSync(remoteStateFile)) return null;
+  try {
+    return JSON.parse(await readFile(remoteStateFile, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+async function readRemoteOutputDefault(agentId: string, vmName: string, lines: number): Promise<string> {
+  const { getRemoteAgentOutput } = await import('../../../../lib/remote/remote-agents.js');
+  return getRemoteAgentOutput(agentId, vmName, lines);
+}
+
+function isBlankOutput(text: string): boolean {
+  return text.trim() === '' || text.trim() === 'Session not found';
+}
+
+/**
+ * The recent terminal text of an agent, read through the host's terminal
+ * backend: Herdr `pane.read`, or tmux `capture-pane`. It used to read tmux
+ * alone, so a Herdr agent (the default backend) always came back empty. On a
+ * Herdr host an agent launched before the move still runs in its tmux session,
+ * so a Herdr miss tries tmux once. The saved `output.log` is the last fallback.
+ */
+export async function readAgentOutput(
+  agentId: string,
+  lines: number,
+  deps: AgentOutputDeps = {},
+): Promise<string> {
+  const readPane = deps.readPane ?? ((id: string, n: number) => readAgentPaneText(id, n));
+  const readLegacyTmuxPane = deps.readLegacyTmuxPane ?? capturePane;
+  const readRemoteState = deps.readRemoteState ?? readRemoteStateDefault;
+  const readRemoteOutput = deps.readRemoteOutput ?? readRemoteOutputDefault;
+  const readSavedLog = deps.readSavedLog
+    ?? ((id: string) => readFile(join(agentStateDir(id), 'output.log'), 'utf-8').catch(() => null));
+
+  let output = '';
+  const remote = await readRemoteState(agentId).catch(() => null);
+  if (remote?.location === 'remote' && remote.vmName) {
+    output = await readRemoteOutput(agentId, remote.vmName, lines).catch(() => '');
+  } else {
+    try {
+      output = await readPane(agentId, lines);
+    } catch {
+      output = await readLegacyTmuxPane(agentId, lines).catch(() => '');
+    }
+  }
+
+  if (isBlankOutput(output)) {
+    const logContent = await readSavedLog(agentId).catch(() => null);
+    output = logContent ? logContent.split('\n').slice(-lines).join('\n') : '';
+  }
+  return isBlankOutput(output) ? '' : output;
+}
+
 export const getAgentOutputRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/output',
@@ -48,56 +121,9 @@ export const getAgentOutputRoute = HttpRouter.add(
     const lines = Option.isSome(urlOpt) ? (urlOpt.value.searchParams.get('lines') ?? '100') : '100';
 
     return yield* Effect.promise(async () => {
-        try {
-          const agentStateDir = join(homedir(), '.overdeck', 'agents', id);
-          const remoteStateFile = join(agentStateDir, 'remote-state.json');
-          let isRemote = false;
-          let vmName = '';
-
-          if (existsSync(remoteStateFile)) {
-            try {
-              const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
-              if (state.location === 'remote' && state.vmName) {
-                isRemote = true;
-                vmName = state.vmName;
-              }
-            } catch {}
-          }
-
-          let stdout: string;
-          if (isRemote && vmName) {
-            const { getRemoteAgentOutput } = await import('../../../../lib/remote/remote-agents.js');
-            stdout = await getRemoteAgentOutput(id, vmName, parseInt(String(lines), 10) || 100);
-          } else {
-            stdout = await capturePane(id, parseInt(String(lines), 10) || 100);
-          }
-
-          if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
-            const savedLog = join(agentStateDir, 'output.log');
-            const logContent = await readFile(savedLog, 'utf-8').catch(() => null);
-            if (logContent) {
-              const logLines = logContent.split('\n');
-              const numLines = parseInt(String(lines), 10) || 100;
-              stdout = logLines.slice(-numLines).join('\n');
-            }
-          }
-
-          if (stdout?.trim() === 'Session not found') {
-            stdout = '';
-          }
-
-          return jsonResponse({ output: stdout });
-        } catch (error: unknown) {
-          // Try saved log on error
-          try {
-            const agentStateDir = join(homedir(), '.overdeck', 'agents', id);
-            const savedLog = join(agentStateDir, 'output.log');
-            const logContent = await readFile(savedLog, 'utf-8').catch(() => null);
-            if (logContent) return jsonResponse({ output: logContent });
-          } catch {}
-          return jsonResponse({ output: '' });
-        }
-      })
+      const output = await readAgentOutput(id, parseInt(String(lines), 10) || 100).catch(() => '');
+      return jsonResponse({ output });
+    });
   })),
 );
 

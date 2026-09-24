@@ -168,6 +168,36 @@ describe('pipeline membership service', () => {
     }
   });
 
+  it('PAN-3924: a failed refresh after a success keeps serving the last-good snapshot', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const project = { name: 'pan-3924-last-good', path: '/pan-3924-last-good', github_repo: 'owner/last-good' };
+      const getMembership = Object.assign(
+        vi.fn().mockResolvedValue([{ issueId: 'PAN-9' }]),
+        { invalidate: vi.fn() },
+      );
+
+      await refreshMembershipSnapshotsForProjects([project], getMembership);
+      getMembership.mockRejectedValueOnce(new PipelineMembershipUnavailableError(
+        'forge_unavailable',
+        'gh api graphql failed (exit 1, attempt 2): error connecting',
+      ));
+      await refreshMembershipSnapshotsForProjects([project], getMembership);
+
+      expect(getMembership).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('refresh failed for pan-3924-last-good; keeping last-good snapshot:'),
+        expect.stringContaining('gh api graphql failed (exit 1, attempt 2): error connecting'),
+      );
+      const read = readPipelineMembershipSnapshotsForProjects([project])[0];
+      expect(read?.memberships).toEqual([{ issueId: 'PAN-9' }]);
+      expect(read?.error).toBeUndefined();
+      expect(read?.unavailableReason).toBeUndefined();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('classifies untyped snapshot failures as gather_failed', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {

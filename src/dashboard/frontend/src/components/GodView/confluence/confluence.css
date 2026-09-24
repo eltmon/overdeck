@@ -28,6 +28,10 @@
 .confluence-meter i { height: 3px; overflow: hidden; border-radius: 2px; background: rgba(255, 255, 255, .08); }
 .confluence-meter i b { display: block; height: 100%; background: var(--gv-blue); box-shadow: 0 0 5px var(--gv-blue); }
 .confluence-meter em { color: var(--gv-text-secondary); font: 7px var(--gv-font-mono); font-style: normal; white-space: nowrap; }
+.confluence-meter[data-level="warning"] i b { background: var(--gv-amber); box-shadow: 0 0 5px var(--gv-amber); }
+.confluence-meter[data-level="warning"] em { color: var(--gv-amber); }
+.confluence-meter[data-level="critical"] i b { background: var(--gv-pink); box-shadow: 0 0 5px var(--gv-pink); }
+.confluence-meter[data-level="critical"] em { color: var(--gv-pink); }
 .confluence-active { flex: 0 0 auto; padding: 4px 8px; border: 1px solid var(--gv-border); border-radius: 999px; color: var(--gv-text-secondary); font: 700 9px var(--gv-font-mono); }
 .confluence-active.on { border-color: rgba(57, 255, 20, .3); color: var(--gv-green); background: rgba(57, 255, 20, .08); }
 .confluence-topbar-button { flex: 0 0 auto; height: 27px; padding: 0 8px; border: 1px solid var(--gv-border); border-radius: 7px; color: var(--gv-text-secondary); background: rgba(255, 255, 255, .02); font: 8px var(--gv-font-mono); cursor: pointer; }
