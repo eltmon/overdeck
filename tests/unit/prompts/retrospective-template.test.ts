@@ -128,16 +128,18 @@ describe('retrospective template invariants', () => {
     // show` (no such verb), then a `node -e` import of a .js path that does not
     // exist, then a state-root concatenation that is wrong for the legacy
     // layout (getIssueRecordPath -> getIssueRecordBasePath is issue-workspace
-    // scoped). The fix is structural: the server now gathers the evidence
-    // through the canonical read door and embeds it, so the prompt should
-    // instruct no read at all. Note we deliberately do NOT ban resolver API
-    // names here — prohibiting a legitimate API by name was itself a defect.
+    // scoped). The fix is structural: the server gathers the evidence and
+    // embeds it, so the prompt should instruct no read at all. Since PAN-3917
+    // the server reads the tracker and forge (Overdeck stores no per-issue
+    // record), so the prompt must say there is nothing on disk to enumerate.
+    // Note we deliberately do NOT ban resolver API names here — prohibiting a
+    // legitimate API by name was itself a defect.
     const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
     expect(inputs, RAIL_MESSAGE).not.toBeNull();
     const inputsSection = inputs![1];
-    expect(inputsSection, RAIL_MESSAGE).toContain('read door');
-    expect(inputsSection, RAIL_MESSAGE).toMatch(/do \*\*not\*\* read record JSON off disk/i);
-    expect(inputsSection, RAIL_MESSAGE).toMatch(/do \*\*not\*\* try to enumerate records yourself/i);
+    expect(inputsSection, RAIL_MESSAGE).toMatch(/\*\*already gathered for you\*\*/);
+    expect(inputsSection, RAIL_MESSAGE).toMatch(/stores no per-issue pipeline record/i);
+    expect(inputsSection, RAIL_MESSAGE).toMatch(/nothing on disk to enumerate/i);
     // No fabricated invocation may reappear in any form.
     expect(inputsSection, RAIL_MESSAGE).not.toMatch(/pan records show/i);
     expect(inputsSection, RAIL_MESSAGE).not.toMatch(/node\s+(-e|--input-type)/);
@@ -170,13 +172,15 @@ describe('retrospective template invariants', () => {
   });
 
   it('names the evidence field groups the report depends on', () => {
-    // The headline numbers ("more than two review cycles", "needed manual
-    // intervention") are derived from these. If the prompt stops naming them
-    // the agent will not know they are available in the snapshot.
+    // formatEvidence (src/lib/overdeck/conversation-retrospective.ts) renders
+    // tracker facts per issue plus a `pull request` line of forge facts. If
+    // the prompt stops naming them the agent will not know they are available
+    // in the snapshot, or will read `pull request: none` as proof of no PR.
     const inputs = template.match(/## Inputs([\s\S]*?)(\n## |\s*$)/);
     expect(inputs, RAIL_MESSAGE).not.toBeNull();
     const inputsSection = inputs![1];
-    for (const field of ['pipeline', 'feedback', 'scopeDrift', 'sessionHistory', 'recoveryTrips']) {
+    expect(inputsSection, RAIL_MESSAGE).toMatch(/`none` there is not proof that no PR exists/);
+    for (const field of ['title', 'labels', 'last update', '`pull request`', 'review decision', 'checks', 'merge time']) {
       expect(inputsSection, `Expected Inputs to name ${field}. ${RAIL_MESSAGE}`).toContain(field);
     }
   });

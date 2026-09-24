@@ -28,7 +28,7 @@ Overdeck has built-in dashboard TTS playback for `activity.tts` events when `tts
 The TTS pipeline has three independent components:
 
 1. **Dashboard playback service** — subscribes to internal `activity.tts` events, resolves `tts.voice` / `tts.statusVoice` / `tts.voiceMap`, and forwards utterances to the daemon when dashboard TTS is enabled.
-2. **Qwen3-TTS HTTP daemon** (`skills/pan-tts/scripts/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
+2. **Qwen3-TTS HTTP daemon** (`sync-sources/skills/pan-tts/scripts/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
 3. **Optional SSE subscriber** (`~/Projects/pan-tts/`) — connects to Overdeck's `/events/stream`, formats condensed utterances, and forwards them to the daemon for external playback.
 
 ## Architecture
@@ -54,7 +54,7 @@ Optional external path:
 
 ## Qwen3-TTS HTTP Daemon
 
-**Source:** `skills/pan-tts/scripts/tts_daemon.py`
+**Source:** `sync-sources/skills/pan-tts/scripts/tts_daemon.py`
 
 The daemon loads `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` on `cuda:0` at startup and exposes three endpoints:
 
@@ -191,4 +191,4 @@ If nothing speaks:
 
 - `docs/EXTERNAL-EVENT-STREAM.md` — the public contract this skill depends on
 - `packages/contracts/src/events.ts` — canonical event schemas
-- `skills/pan-tts/scripts/tts_daemon.py` — Qwen3-TTS HTTP daemon source
+- `sync-sources/skills/pan-tts/scripts/tts_daemon.py` — Qwen3-TTS HTTP daemon source
