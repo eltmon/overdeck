@@ -18,6 +18,7 @@ export default defineConfig({
     'acp-host': 'src/lib/acp/host.ts',
     'verification-worker': 'src/lib/cloister/verification-worker.ts',
     'lib/memory/fts-worker': 'src/lib/memory/fts-worker.ts',
+    'lib/memory/checkpoint-worker': 'src/lib/memory/checkpoint-worker.ts',
   },
   format: 'esm',
   dts: true,

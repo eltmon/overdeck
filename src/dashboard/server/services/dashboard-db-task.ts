@@ -1,8 +1,7 @@
 import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { randomUUID } from 'node:crypto';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
-import { Worker } from 'node:worker_threads';
+import type { Worker } from 'node:worker_threads';
+import { spawnModuleWorker } from '../../../lib/module-worker.js';
 import {
   aggregateDiscoveredSessionCost,
   aggregateDiscoveredSessionCostBy,
@@ -160,27 +159,6 @@ function workerScriptUrl(moduleUrl = import.meta.url): URL {
   return new URL('./dashboard-db-worker.js', moduleUrl);
 }
 
-// Source mode only (Vitest, tsx). Node strips the worker's types but does not rewrite
-// its `.js` import specifiers to `.ts`, so a raw `.ts` worker dies on its first
-// relative import. Loader flags in `execArgv` (`--import tsx`) do not reach worker
-// threads either, so the worker registers tsx itself before importing the entry.
-// Bun runs `.ts` workers natively. The dist worker never takes this path.
-function sourceWorkerBootstrap(workerUrl: URL, moduleUrl = import.meta.url): string {
-  const tsxApiUrl = pathToFileURL(createRequire(moduleUrl).resolve('tsx/esm/api')).href;
-  return `import(${JSON.stringify(tsxApiUrl)})`
-    + `.then((tsx) => { tsx.register(); return import(${JSON.stringify(workerUrl.href)}); })`
-    + `.catch((err) => { setImmediate(() => { throw err; }); });`;
-}
-
-function spawnDashboardDbWorker(): Worker {
-  const workerUrl = workerScriptUrl();
-  const execArgv = process.execArgv.filter((arg) => !arg.startsWith('--inspect'));
-  if (workerUrl.pathname.endsWith('.ts') && !process.versions['bun']) {
-    return new Worker(sourceWorkerBootstrap(workerUrl), { eval: true, execArgv });
-  }
-  return new Worker(workerUrl, { execArgv } as ConstructorParameters<typeof Worker>[1]);
-}
-
 // Workers are never unref()'d, so a test that boots a real one must terminate it.
 async function terminateWorkers(): Promise<void> {
   for (const lane of Object.keys(workers) as WorkerLane[]) {
@@ -246,7 +224,7 @@ function getWorker(lane: WorkerLane): Worker {
   const existing = workers[lane];
   if (existing) return existing;
 
-  const worker = spawnDashboardDbWorker();
+  const worker = spawnModuleWorker(workerScriptUrl());
   workers[lane] = worker;
 
   worker.on('message', (message: WorkerResponse) => {
