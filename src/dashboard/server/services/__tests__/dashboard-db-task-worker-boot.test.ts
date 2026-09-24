@@ -1,7 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { __testInternals, runDashboardDbJob } from '../dashboard-db-task.js';
 
 describe('dashboard DB worker entry', () => {
@@ -10,7 +7,7 @@ describe('dashboard DB worker entry', () => {
   it('resolves the built worker from the dist root for any dashboard chunk', () => {
     expect(workerScriptUrl('file:///opt/overdeck/dist/dashboard/server.js').href)
       .toBe('file:///opt/overdeck/dist/dashboard/dashboard-db-worker.js');
-    expect(workerScriptUrl('file:///opt/overdeck/dist/dashboard/shared-B_onMFsl.js').href)
+    expect(workerScriptUrl('file:///opt/overdeck/dist/dashboard/specialists-DFhmTtop.js').href)
       .toBe('file:///opt/overdeck/dist/dashboard/dashboard-db-worker.js');
   });
 
@@ -22,30 +19,20 @@ describe('dashboard DB worker entry', () => {
   });
 });
 
-// PAN-3930: from source, the worker is a `.ts` file whose imports use `.js`
-// specifiers. Spawned as a raw Node worker it died on its first relative import,
-// so any test that reached a polling snapshot through the real worker exploded.
-describe('dashboard DB worker from source', () => {
-  let tempDir: string;
-  let originalHome: string | undefined;
-
-  beforeAll(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'pan-dashboard-db-worker-'));
-    originalHome = process.env['OVERDECK_HOME'];
-    process.env['OVERDECK_HOME'] = tempDir;
+// PAN-3930: polling snapshots always go to the real worker (never the Vitest
+// inline path). From source the worker is a `.ts` file whose imports use `.js`
+// specifiers; spawned as a raw Node worker it died with ERR_MODULE_NOT_FOUND on
+// its first relative import. OVERDECK_HOME is a per-fork temp dir (tests/setup).
+describe('dashboard DB worker under a source run', () => {
+  afterEach(async () => {
+    await __testInternals.terminateWorkers();
   });
 
-  afterAll(async () => {
-    if (originalHome === undefined) delete process.env['OVERDECK_HOME'];
-    else process.env['OVERDECK_HOME'] = originalHome;
-    await rm(tempDir, { recursive: true, force: true });
-  });
-
-  it('boots the real worker and answers a polling read', async () => {
-    const stats = await runDashboardDbJob<{ available: boolean }>('getConversationSearchStats', {
-      dbPath: join(tempDir, 'search.db'),
-      model: 'small',
+  it('serves a polling snapshot from the real worker thread', async () => {
+    const result = await runDashboardDbJob<Array<[string, unknown]>>('getAgentCostStats', {
+      agentIds: ['agent-a'],
+      nowMs: Date.now(),
     });
-    expect(stats).toHaveProperty('available');
-  }, 60_000);
+    expect(Array.isArray(result)).toBe(true);
+  }, 30_000);
 });

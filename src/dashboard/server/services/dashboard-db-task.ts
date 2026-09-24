@@ -181,7 +181,16 @@ function spawnDashboardDbWorker(): Worker {
   return new Worker(workerUrl, { execArgv } as ConstructorParameters<typeof Worker>[1]);
 }
 
-export const __testInternals = { workerScriptUrl };
+// Workers are never unref()'d, so a test that boots a real one must terminate it.
+async function terminateWorkers(): Promise<void> {
+  for (const lane of Object.keys(workers) as WorkerLane[]) {
+    const worker = workers[lane];
+    workers[lane] = null;
+    if (worker) await worker.terminate();
+  }
+}
+
+export const __testInternals = { workerScriptUrl, terminateWorkers };
 
 function failPendingForLane(lane: WorkerLane, err: Error): void {
   for (const [id, job] of pending.entries()) {

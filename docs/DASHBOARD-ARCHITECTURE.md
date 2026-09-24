@@ -136,6 +136,17 @@ door that does not exist; a real record read door would be a separate change.
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.
+- The dashboard runs the built bundle, where `dashboard-db-worker.js` is its own entry in
+  `dist/dashboard/` (`src/dashboard/server/tsdown.config.ts`). `dashboard-db-task.ts`
+  resolves it from the `dist/` root, like the memory FTS worker, so it is found whichever
+  chunk the bundler puts the task module in.
+- Under a source run (Vitest, `tsx`) `dashboard-db-task.ts` loads as `.ts`. Node's type
+  stripping does not rewrite the worker's `.js` import specifiers, and a `--import tsx`
+  flag in `execArgv` does not reach a worker thread, so a raw `.ts` worker dies on its
+  first relative import. The `.ts` branch instead boots the thread through an `eval`
+  bootstrap that registers `tsx`'s resolver and then imports `dashboard-db-worker.ts`
+  (PAN-3930). Bun runs the `.ts` worker directly. Tests that boot the real worker call
+  `__testInternals.terminateWorkers()` in `afterEach`.
 - Jobs that wait or run for more than one second emit
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.
