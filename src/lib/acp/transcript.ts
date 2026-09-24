@@ -1,7 +1,8 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-export type AcpTranscriptRole = "user" | "assistant" | "tool" | "system";
+/** `thought` carries ACP `agent_thought_chunk` reasoning, kept apart from assistant text. */
+export type AcpTranscriptRole = "user" | "assistant" | "thought" | "tool" | "system";
 export type AcpTranscriptStopReason =
   | "end_turn"
   | "max_tokens"
