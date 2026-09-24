@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:13:34.051Z · model: claude-opus-5 · open: 820_
+_Last sequenced: 2026-09-24T20:19:28.465Z · model: claude-opus-5 · open: 821_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -45,6 +45,7 @@ _Last sequenced: 2026-09-24T20:13:34.051Z · model: claude-opus-5 · open: 820_
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 70 | PAN-4149 | XS | high | ok |  |  | Effect ratchet splits two-line diagnostics: 68 findings carry no file, so the per-file 'yours to fix' list blames the wrong file |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -405,6 +406,7 @@ _Last sequenced: 2026-09-24T20:13:34.051Z · model: claude-opus-5 · open: 820_
 | 444 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 445 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 447 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 449 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
 | 450 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
@@ -521,7 +523,6 @@ _Last sequenced: 2026-09-24T20:13:34.051Z · model: claude-opus-5 · open: 820_
 | 563 | PAN-3837 | S | medium | needs-refinement |  |  | Stale starting placeholder can no longer occur; remaining half = per-issue fs-lock contention kills auto-handoff spawn with no retry |
 | 564 | PAN-3499 | XS | medium | needs-refinement |  |  | Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate. |
 | 565 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 566 | PAN-3912 | XS | medium | ok |  |  | pan restart accepts a stray positional (pan restart status) and files a real restart request; reject excess args |
 | 567 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 568 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 569 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -988,6 +989,10 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
+### PAN-4149 (rank 70)
+
+New since the prior run. The gate itself trips on the total count only, so this raises no false red — but every regression it does catch points the fixer, and the verification feedback an agent consumes, at the wrong file: each unknownInEffectCatch warning spans two lines and the ratchet keeps only the indented marker line, dropping the file position. Sits beside PAN-3605, the other defect in the same script. The fix is fully specified (group tsc output into whole diagnostics, then regenerate the baseline at the same commit), so it is XS and ready to plan.
+
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1124,10 +1129,6 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
 
 Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.
 
-### PAN-1618 (rank 111)
-
-Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1135,10 +1136,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:13:34.051Z",
+  "generatedAt": "2026-09-24T20:19:28.465Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 820,
+  "openCount": 821,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -7494,19 +7495,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-3912",
-      "rank": 566,
-      "size": "XS",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan restart accepts a stray positional (pan restart status) and files a real restart request; reject excess args",
-      "rationale": "New this run: medium/40 — pan restart accepts a stray positional (pan restart status) and files a real restart request; reject excess args.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1754",
       "rank": 567,
       "size": "M",
@@ -11284,6 +11272,33 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "gate": "auto",
       "planning": "auto",
       "isEpic": false
+    },
+    {
+      "issue": "PAN-4149",
+      "rank": 70,
+      "size": "XS",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Effect ratchet splits two-line diagnostics: 68 findings carry no file, so the per-file 'yours to fix' list blames the wrong file",
+      "rationale": "New since the prior run. The gate itself trips on the total count only, so this raises no false red — but every regression it does catch points the fixer, and the verification feedback an agent consumes, at the wrong file: each unknownInEffectCatch warning spans two lines and the ratchet keeps only the indented marker line, dropping the file position. Sits beside PAN-3605, the other defect in the same script. The fix is fully specified (group tsc output into whole diagnostics, then regenerate the baseline at the same commit), so it is XS and ready to plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4151",
+      "rank": 447,
+      "size": "L",
+      "importance": "medium",
+      "score": 46,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-3822"
+      ],
+      "why": "Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12427,6 +12442,20 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.55
+    },
+    {
+      "from": "PAN-3822",
+      "to": "PAN-4151",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
+    },
+    {
+      "from": "PAN-3921",
+      "to": "PAN-4151",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
     }
   ]
 }
