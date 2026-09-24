@@ -271,10 +271,14 @@ function buildSelfReviewPrompt(opts: {
   return prompt;
 }
 async function spawnReviewRoleForIssueBody(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const dispatchStartedAtMs = Date.now();
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
+  // A mode chosen for this request (the dashboard's Full/Quick/None menu) wins
+  // over config for this run only. Nothing stores it: the next dispatch
+  // resolves `roles.review.mode` again.
+  const reviewMode = opts.reviewMode ?? resolveReviewMode(opts.issueId);
 
   // PAN-2420: GitHub-authoritative guard. Do not waste time on conflict-gate
   // checks or context builds for a PR that GitHub already reports merged.
@@ -293,8 +297,10 @@ async function spawnReviewRoleForIssueBody(
   // caller reaches here — 'none' skips only the AI review, never the quality floor.
   // PAN-3917: nothing is stamped. Skipping the AI review leaves the PR
   // unreviewed, which is exactly what the forge then reports.
-  if (resolveReviewMode(opts.issueId) === 'none') {
-    const message = `Review skipped for ${opts.issueId} (mode=none) — AI review disabled by configuration; the verification gate still applies`;
+  if (reviewMode === 'none') {
+    const message = opts.reviewMode === 'none'
+      ? `Review skipped for ${opts.issueId} (mode=none) — AI review skipped for this run by request; the verification gate still applies`
+      : `Review skipped for ${opts.issueId} (mode=none) — AI review disabled by configuration; the verification gate still applies`;
     console.log(`[review-agent] ${message}`);
     emitActivityEntry({ source: 'review', level: 'info', message, issueId: opts.issueId });
     return { success: true, message };
@@ -486,7 +492,7 @@ async function spawnReviewRoleForIssueBody(
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
-    const fullReview = isExtendedReviewEnabled(opts.issueId);
+    const fullReview = reviewMode === 'full';
 
     const prompt = fullReview
       ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary })
@@ -743,7 +749,7 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
 const reviewDispatchCoalescer = createPromiseCoalescer<{ success: boolean; message: string; error?: string; gated?: boolean }>();
 
 export const spawnReviewRoleForIssue = (
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode },
 ): Effect.Effect<{ success: boolean; message: string; error?: string; gated?: boolean }> =>
   Effect.promise(() => {
     const key = opts.issueId.toUpperCase();
@@ -769,7 +775,8 @@ export {
 
 /**
  * PAN-3917: the per-issue record override is gone with the record. Review mode
- * is project/global configuration; a one-off run passes its own flags.
+ * is project/global configuration; a one-off run passes its own `reviewMode`
+ * to `spawnReviewRoleForIssue`, which applies to that run only.
  */
 export function resolveReviewMode(_issueId?: string): ReviewMode {
   const configMode = loadYamlConfig().config.roles?.review?.mode;

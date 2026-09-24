@@ -228,6 +228,40 @@ describe('POST /api/review/:issueId/trigger — derived guards', () => {
     expect(result.status).toBe(200);
     expect(routeMocks.pushLocalReviewBranches).toHaveBeenCalledOnce();
   });
+
+  // #4118: the Full/Quick/None menu choice reaches the review run as a
+  // per-run override instead of being validated and dropped.
+  it.each(['full', 'quick', 'none'] as const)('passes a requested %s mode to this review run', async (reviewMode) => {
+    routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
+    routeMocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
+    routeMocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'spawned' }));
+
+    const result = await trigger({
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ reviewMode }),
+    });
+
+    expect(result.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ issueId: 'PAN-3340', reviewMode }),
+      );
+    });
+  });
+
+  it('leaves review mode to config when no mode is requested', async () => {
+    routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
+    routeMocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
+    routeMocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'spawned' }));
+
+    await trigger({ method: 'POST', headers: authHeaders, body: '{}' });
+
+    await vi.waitFor(() => {
+      expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledOnce();
+    });
+    expect(routeMocks.spawnReviewRoleForIssue.mock.calls[0][0]).not.toHaveProperty('reviewMode');
+  });
 });
 
 describe('POST /api/review/:issueId/trigger — verification (FR-8)', () => {
