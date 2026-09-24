@@ -148,6 +148,8 @@ describe('ProjectMembershipBoundary', () => {
       'Pipeline membership is temporarily unavailable (Pipeline membership snapshot is loading). Retrying automatically',
     );
     expect(screen.getByTestId('issue-tree')).toBeInTheDocument();
+    // A wedged warm-up still has the manual forced re-gather.
+    expect(screen.getByRole('button', { name: 'Retry membership' })).toBeInTheDocument();
 
     // Honors Retry-After (5s) rather than the 1s first backoff step.
     await act(() => vi.advanceTimersByTimeAsync(4_999));

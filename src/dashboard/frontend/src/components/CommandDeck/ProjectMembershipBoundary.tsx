@@ -82,7 +82,17 @@ export function ProjectMembershipBoundary({
     <>
       {transientFailure ? (
         <div className={styles.membershipStatus} role="status">
-          Pipeline membership is temporarily unavailable ({transientFailure.message}). Retrying automatically…
+          Pipeline membership is temporarily unavailable ({transientFailure.message}). Retrying automatically…{' '}
+          {/* Transient retries never settle, so keep the forced re-gather
+              reachable in case the server's snapshot warm-up is wedged. */}
+          <button
+            type="button"
+            className={styles.membershipErrorRetry}
+            onClick={() => retryMembership.mutate()}
+            disabled={retryMembership.isPending}
+          >
+            {retryMembership.isPending ? 'Retrying…' : 'Retry membership'}
+          </button>
         </div>
       ) : membership.isLoading && (
         <div className={styles.membershipStatus} role="status">
