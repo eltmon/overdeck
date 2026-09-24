@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { getPrFacts, parseVerdictMarker, resetPrFactsCache } from '../pr-facts.js';
+import { getPrFacts, parseVerdictMarker, parseVerdictMarkerWithSha, resetPrFactsCache } from '../pr-facts.js';
 import type { IssuePullRequestData } from '../../overdeck/pull-requests.js';
 
 const HEAD = 'a7b64f7c0000000000000000000000000000abcd';
@@ -54,6 +54,18 @@ describe('parseVerdictMarker', () => {
     expect(parseVerdictMarker('prose\n<!-- overdeck-verdict: APPROVED -->')).toBeNull();
     expect(parseVerdictMarker('just a comment')).toBeNull();
     expect(parseVerdictMarker(undefined)).toBeNull();
+  });
+
+  it('#3853: reads a marker that names its commit, and the merge-ready read is unchanged', async () => {
+    expect(parseVerdictMarker(`<!-- overdeck-verdict: APPROVED sha=${HEAD} -->\n\nok`)).toBe('APPROVED');
+    expect(parseVerdictMarkerWithSha(`<!-- overdeck-verdict: APPROVED sha=${HEAD} -->`))
+      .toEqual({ verdict: 'APPROVED', sha: HEAD });
+    expect(parseVerdictMarkerWithSha('<!-- overdeck-verdict: APPROVED -->'))
+      .toEqual({ verdict: 'APPROVED', sha: null });
+    const facts = await factsFor(prFixture({
+      comments: [{ authorAssociation: 'OWNER', body: `<!-- overdeck-verdict: APPROVED sha=${HEAD} -->`, createdAt: '2026-09-19T10:05:00Z' }],
+    }));
+    expect(facts.approved).toBe(true);
   });
 });
 
