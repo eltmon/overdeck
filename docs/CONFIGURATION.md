@@ -324,8 +324,8 @@ Disabling a provider does not reroute role agents. `determineModel`
 (`src/lib/config-yaml/roles.ts`) and never checks `models.providers`. If
 `roles.work.model` names a model whose provider is disabled, the agent still
 launches on that model. Nothing substitutes an Anthropic model. `pan doctor` flags a tiered-execution
-crew model whose provider is not enabled (`provider-not-enabled` in
-`src/lib/agents/tier-fitness.ts`).
+crew model, or `roles.work.model` when tiering is off, whose provider is not
+enabled (`provider-not-enabled` in `src/lib/agents/tier-fitness.ts`).
 
 To move a role off a provider, change its model: `roles.<role>.model`,
 `roles.review.sub.<lane>.model`, or the `workhorses` slot it references.
