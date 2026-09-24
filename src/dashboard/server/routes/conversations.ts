@@ -126,9 +126,9 @@ import {
   createSession,
   setOption,
   exactPaneTarget,
-  listSessionNames,
   findManagedServerPid,
 } from '../../../lib/tmux.js';
+import { listLiveConversationSessions } from '../../../lib/overdeck/conversation-liveness.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
 import {
@@ -182,7 +182,7 @@ function getHeader(
 export const conversationReadDependencies = {
   resolveSessionFile,
   tmuxSessionExists,
-  listSessionNames: () => Effect.runPromise(listSessionNames()),
+  listSessionNames: async () => [...((await listLiveConversationSessions()) ?? [])],
   shouldReportUnresolvedLiveSession,
 };
 const conversationMessageDependencies = {

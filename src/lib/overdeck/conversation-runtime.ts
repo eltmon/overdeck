@@ -8,7 +8,6 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { getClaudePermissionFlagsString, ensureClaudePermissionFlag } from '../claude-permissions.js';
@@ -31,19 +30,13 @@ import {
   hasOtherActiveConversationOnTmuxSession,
   type LegacyConversation as Conversation,
 } from './conversations.js';
-import {
-  capturePane,
-  sessionExists,
-  isHarnessProcessAlive,
-  killSession,
-  listSessionNames,
-  findManagedServerPid,
-} from '../tmux.js';
+import { capturePane, findManagedServerPid } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
 import { closeAgentPane, keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
 import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
+import { conversationHarnessAlive, conversationSessionAlive, listLiveConversationSessions, waitForConversationSession } from './conversation-liveness.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -292,16 +285,12 @@ function generateConversationName(): string {
 function sanitizeName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 64);
 }
+/** Is the conversation's pane alive on the host's backend (PAN-3921: the conversation liveness door)? */
 export async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  return Effect.runPromise(sessionExists(sessionName));
+  return conversationSessionAlive(sessionName);
 }
 export async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (await Effect.runPromise(sessionExists(sessionName))) return;
-    await new Promise(r => setTimeout(r, 250));
-  }
-  throw new Error(`Timed out waiting for tmux session ${sessionName}`);
+  return waitForConversationSession(sessionName, timeoutMs);
 }
 export function shouldUseSupervisorForConversation(
   harness: RuntimeName,
@@ -316,7 +305,7 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
     return;
   }
   if (harness === 'acp' || harness === 'opencode') {
-    await waitForAcpHostReady(tmuxSession, 30, { sessionExists: tmuxSessionExists }); // conversations are tmux on every host until PAN-3921
+    await waitForAcpHostReady(tmuxSession, 30, { sessionExists: tmuxSessionExists }); // the conversation liveness door, not the agent oracle
     return;
   }
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;
@@ -793,7 +782,7 @@ export async function spawnConversationSession(
           sessionId: resume ? undefined : claudeSessionId,
         }),
         extraArgs: !piFields && !acpFields && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
-        keepAlive: true,
+        keepAlive: backend.name === 'tmux', // a sleep loop in a Herdr pane reads as a live harness (#3992)
         fileMode: 0o700,
         channelsBridgeMcpConfig,
         useSupervisor,
@@ -1048,7 +1037,7 @@ export async function handleConversationResume(
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     const model = typeof body['model'] === 'string' && body['model'].trim() ? body['model'].trim() : (conv.model ?? undefined);
     const effort = typeof body['effort'] === 'string' && body['effort'].trim() ? body['effort'].trim() : (conv.effort ?? undefined);
-    const claudeAlive = await isHarnessProcessAlive(conv.tmuxSession);
+    const claudeAlive = await conversationHarnessAlive(conv.tmuxSession);
     if (claudeAlive) {
       updateLastAttached(name);
       markConversationActive(name);
@@ -1129,14 +1118,15 @@ export async function handleConversationRestartAll(
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
     const allConvs = listConversations();
-    const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
+    const liveSessionNames = await listLiveConversationSessions();
+    if (!liveSessionNames) return jsonResponse({ error: 'Terminal backend did not answer; no conversation restarted' }, { status: 503 });
     const convs = allConvs.filter((c) => liveSessionNames.has(c.tmuxSession));
     const results: { name: string; model: string | null; status: string }[] = [];
     for (const conv of convs) {
       const respawn = markRespawnPending(conv.tmuxSession);
       let attemptedHarness: RuntimeName = conv.harness ?? 'claude-code';
       try {
-        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        await closeAgentPane(conv.tmuxSession);
         const oldSessionId = conv.claudeSessionId;
         const sessionFileForResume = await deps.resolveSessionFile(conv);
         const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);

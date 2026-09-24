@@ -4,7 +4,6 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
@@ -65,7 +64,8 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
 import { activeComposerRegion } from '../pane-composer.js';
-import { capturePane, capturePaneViewport, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
+import { capturePane, capturePaneViewport, deliveryVerifyLine, sendKeysAsync } from '../tmux.js';
+import { conversationHarnessAlive, conversationSessionAlive } from './conversation-liveness.js';
 import {
   readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
@@ -269,13 +269,13 @@ export function __resetForkPipelineRuntimeOverridesForTest(): void {
 async function forkSessionExists(sessionName: string): Promise<boolean> {
   return forkPipelineRuntimeOverrides.sessionExists
     ? forkPipelineRuntimeOverrides.sessionExists(sessionName)
-    : Effect.runPromise(sessionExists(sessionName));
+    : conversationSessionAlive(sessionName);
 }
 
 async function forkHarnessProcessAlive(sessionName: string): Promise<boolean> {
   return forkPipelineRuntimeOverrides.isHarnessProcessAlive
     ? forkPipelineRuntimeOverrides.isHarnessProcessAlive(sessionName)
-    : isHarnessProcessAlive(sessionName);
+    : conversationHarnessAlive(sessionName);
 }
 
 function forkRuntimeState(sessionName: string): ReturnType<typeof getAgentRuntimeStateSync> {

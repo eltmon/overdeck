@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock tmux.sessionExists — pending-respawn polls it. Each test resets
 // the mock's implementation so cases are independent.
@@ -22,7 +22,15 @@ import {
   waitForSessionRespawn,
 } from '../pending-respawn.js';
 
+import { hostTerminalBackendName } from '../../../../lib/terminal-backends/select.js';
+
 const mockedSessionExists = vi.mocked(sessionExists);
+
+// The conversation liveness door reads the host backend once (a real dynamic
+// import); memoize it before any test installs fake timers.
+beforeAll(async () => {
+  await hostTerminalBackendName();
+});
 
 describe('pending-respawn registry', () => {
   beforeEach(() => {
