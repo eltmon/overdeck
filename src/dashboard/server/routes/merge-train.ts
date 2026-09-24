@@ -655,16 +655,22 @@ export async function getAutoMergePolicyPayload(): Promise<{
   const { loadIssueStatesForProject } = await import('../services/derived-issue-state.js');
   const IN_FLIGHT = new Set(['working', 'in-review', 'changes-requested', 'ready']);
 
-  const issues: Array<{ issueId: string; autoMerge: boolean }> = [];
-  for (const { config } of listProjectsSync()) {
+  // PAN-3925: the projects derive in parallel, each over its PR listing
+  // served stale-while-revalidate, so one slow `gh pr list` no longer
+  // serializes behind every other project's.
+  const perProject = await Promise.all(listProjectsSync().map(async ({ config }) => {
     const projectPath = resolve(config.path);
-    let states;
     try {
-      states = await loadIssueStatesForProject(projectPath, await listCandidateIssueIds(projectPath));
+      return await loadIssueStatesForProject(projectPath, await listCandidateIssueIds(projectPath));
     } catch (error) {
       console.warn(`[merge-train] auto-merge policy for ${config.name} failed: ${error instanceof Error ? error.message : String(error)}`);
-      continue;
+      return null;
     }
+  }));
+
+  const issues: Array<{ issueId: string; autoMerge: boolean }> = [];
+  for (const states of perProject) {
+    if (!states) continue;
     for (const [issueId, derived] of states) {
       if (!IN_FLIGHT.has(derived.state)) continue;
       const held = shouldHoldForUat(
@@ -680,8 +686,8 @@ export async function getAutoMergePolicyPayload(): Promise<{
 
 /** Issue ids with an open PR in the project — the only ones the train can route. */
 async function listCandidateIssueIds(projectPath: string): Promise<string[]> {
-  const { listRepoPullRequests, issueIdFromBranch } = await import('../services/derived-issue-state.js');
-  const rows = await listRepoPullRequests(projectPath);
+  const { listRepoPullRequestsStaleOk, issueIdFromBranch } = await import('../services/derived-issue-state.js');
+  const rows = await listRepoPullRequestsStaleOk(projectPath);
   return rows.flatMap((row) => {
     const issueId = issueIdFromBranch(row.headRefName);
     return issueId ? [issueId] : [];

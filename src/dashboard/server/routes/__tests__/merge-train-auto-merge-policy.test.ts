@@ -42,7 +42,7 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
 vi.mock('../../services/derived-issue-state.js', () => ({
   getDerivedIssueState: vi.fn(),
   listReadyIssuesForProject: vi.fn(async () => []),
-  listRepoPullRequests: vi.fn(async () => [
+  listRepoPullRequestsStaleOk: vi.fn(async () => [
     { headRefName: 'feature/pan-1' },
     { headRefName: 'feature/pan-2' },
     { headRefName: 'feature/pan-3' },
