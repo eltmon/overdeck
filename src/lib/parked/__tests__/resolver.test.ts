@@ -20,13 +20,17 @@ vi.mock('../../agents/queries.js', async (importOriginal) => {
 // PAN-3849 (W32): the sweeper's "live" filter is the liveness oracle now. Map
 // each fixture's tmuxActive flag to the verdict it stood for, so every case
 // keeps its original intent.
+// PAN-3926: the oracle is the async, backend-aware `isAlive`. A fixture may
+// set `verdict` to state the oracle's answer directly (e.g. indeterminate).
 vi.mock('../../agents/liveness.js', () => ({
-  isAliveSync: (agentId: string) => (
-    (gather.liveAgents as { id: string; tmuxActive?: boolean }[])
-      .some((a) => a.id === agentId && a.tmuxActive === true)
+  isAlive: async (agentId: string) => {
+    const row = (gather.liveAgents as { id: string; tmuxActive?: boolean; verdict?: unknown }[])
+      .find((a) => a.id === agentId);
+    if (row?.verdict) return row.verdict;
+    return row?.tmuxActive === true
       ? { alive: true, paneAlive: true }
-      : { alive: false, reason: 'no-session' }
-  ),
+      : { alive: false, reason: 'no-session' };
+  },
   // Mirrors the real isConfirmedDead: only a confirmed absence is death.
   isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
     !verdict.alive && verdict.reason !== 'runtime-indeterminate',
@@ -229,6 +233,34 @@ describe('resolveParkedPopulation', () => {
     const rows = await resolveParkedPopulation({ now: NOW, isClosed: async () => true });
 
     expect(rows.map((row) => row.orbit)).toEqual(['zombie-session']);
+  });
+
+  it('a Herdr agent (no tmux session) is live when the backend-aware oracle says so (PAN-3926)', async () => {
+    const herdr = {
+      ...baseAgent({ id: 'agent-pan-505', issueId: 'PAN-505' }),
+      tmuxActive: false,
+      verdict: { alive: true, paneAlive: true },
+    };
+    gather.agents = [herdr];
+    gather.liveAgents = [herdr];
+
+    const rows = await resolveParkedPopulation({ now: NOW, isClosed: async () => true });
+
+    expect(rows.map((row) => row.orbit)).toEqual(['zombie-session']);
+  });
+
+  it('an indeterminate probe counts as live — never park an issue out from under an unobserved agent', async () => {
+    const unobserved = {
+      ...baseAgent({ id: 'agent-pan-506', issueId: 'PAN-506' }),
+      tmuxActive: false,
+      verdict: { alive: false, reason: 'runtime-indeterminate' },
+    };
+    gather.agents = [unobserved];
+    gather.liveAgents = [unobserved];
+
+    const rows = await resolveParkedPopulation({ now: NOW, isClosed: async () => false });
+
+    expect(rows.map((row) => `${row.issueId}:${row.orbit}`)).toEqual(['PAN-506:idle-running']);
   });
 
   it('status gate survives the oracle migration: a stopped agent with a live session is not live', async () => {

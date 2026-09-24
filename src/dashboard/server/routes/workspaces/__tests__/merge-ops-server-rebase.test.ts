@@ -60,7 +60,7 @@ vi.mock('../../../../../lib/agents/agent-state.js', async importOriginal => ({
   getAgentState: vi.fn(() => null),
 }));
 vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
-  getWorkAgentLifecycleStateSync: vi.fn(() => ({
+  getWorkAgentLifecycleState: vi.fn(() => ({
     hasLiveTmuxSession: true,
     canStartFresh: false,
     canResumeSession: false,

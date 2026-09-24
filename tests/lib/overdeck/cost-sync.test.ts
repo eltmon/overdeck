@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   insertCostEvent,
   getTodayCost,
+  getTodayCostSummary,
   getCostsByIssue,
   getCostForIssueAggregate,
   getAgentCostStats,
@@ -69,6 +70,36 @@ describe('getTodayCost', () => {
     }));
 
     expect(getTodayCost(new Date('2026-06-25T23:59:00.000Z'))).toBeCloseTo(1.5, 8);
+  });
+});
+
+describe('getTodayCostSummary (PAN-4052)', () => {
+  it('derives the Metrics daily total and top spenders from today\'s cost_events', () => {
+    insertCostEvent(costEvent({ ts: '2026-06-24T23:00:00.000Z', cost: 50, agentId: 'agent-old', issueId: 'PAN-1', requestId: 'yesterday' }));
+    insertCostEvent(costEvent({ ts: '2026-06-25T01:00:00.000Z', cost: 1, agentId: 'agent-a', issueId: 'pan-2', requestId: 't1' }));
+    insertCostEvent(costEvent({ ts: '2026-06-25T02:00:00.000Z', cost: 2, agentId: 'agent-a', issueId: 'PAN-2', requestId: 't2' }));
+    insertCostEvent(costEvent({ ts: '2026-06-25T03:00:00.000Z', cost: 5, agentId: 'agent-b', issueId: 'PAN-3', requestId: 't3' }));
+    insertCostEvent(costEvent({ ts: '2026-06-25T04:00:00.000Z', cost: 0.5, requestId: 't4' }));
+
+    const summary = getTodayCostSummary(new Date('2026-06-25T20:00:00.000Z'));
+
+    expect(summary.dailyTotal).toBeCloseTo(8.5, 8);
+    expect(summary.topAgents).toEqual([
+      { agentId: 'agent-b', cost: 5 },
+      { agentId: 'agent-a', cost: 3 },
+    ]);
+    expect(summary.topIssues).toEqual([
+      { issueId: 'PAN-3', cost: 5 },
+      { issueId: 'PAN-2', cost: 3 },
+    ]);
+  });
+
+  it('caps each ranking at the limit', () => {
+    for (let i = 1; i <= 4; i++) {
+      insertCostEvent(costEvent({ ts: '2026-06-25T05:00:00.000Z', cost: i, agentId: `agent-${i}`, requestId: `cap-${i}` }));
+    }
+    const summary = getTodayCostSummary(new Date('2026-06-25T20:00:00.000Z'), 2);
+    expect(summary.topAgents.map((a) => a.agentId)).toEqual(['agent-4', 'agent-3']);
   });
 });
 

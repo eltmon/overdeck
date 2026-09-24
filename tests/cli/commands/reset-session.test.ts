@@ -26,7 +26,7 @@ vi.mock('../../../src/lib/overdeck/agents.js', () => ({
 }));
 
 vi.mock('../../../src/lib/work-agent-lifecycle.js', () => ({
-  getWorkAgentLifecycleStateSync: () => ({ hasLiveTmuxSession: false }),
+  getWorkAgentLifecycleState: () => ({ hasLiveTmuxSession: false }),
 }));
 
 vi.mock('../../../src/lib/issue-id.js', () => ({

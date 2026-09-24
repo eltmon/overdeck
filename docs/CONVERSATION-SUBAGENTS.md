@@ -112,6 +112,43 @@ conversation's transcript. Overdeck records them as **external agents** (`~/.ove
 and lists them in the Agents Directory under the conversation that launched them. See
 `reference/workers.mdx` "Externally spawned agents" and DASHBOARD-ARCHITECTURE.md "Agents Directory".
 
+### Child activity
+
+Selected subagent transcripts show the same animated “Working for …” row as
+main conversations, including the tool activity icon. Codex child activity comes
+from its own task lifecycle in the subagent list: Codex transcript snapshots have
+`streaming: false`, so that field cannot override a running child. Claude Code
+also uses the child stream's activity. Ended or disconnected parent sessions do
+not display stale child activity. The main agent's busy state does not determine
+whether a selected child is working.
+
+### Direct child composer
+
+The bottom composer appears only when the live Codex app-server host has
+classified the selected child as a descendant of its owner thread (announced by
+a `thread/started` naming an in-tree parent, or adopted from an in-tree
+`spawnAgent` item) and Codex reports it loaded with an idle or active turn.
+Owner, foreign (a native `/new` or `/fork` from an attached Codex CLI), and
+unannounced threads never accept input. Active turns receive `turn/steer` with
+the exact expected turn ID; idle children receive `turn/start` with the child's
+thread ID. Child notifications do not replace the host's owner thread or active
+turn. Input inherits the child's existing model and permissions. An attached
+native Codex CLI is a second client of the same app-server; child input from the
+dashboard does not change which thread that CLI shows.
+
+`GET /api/conversations/:name/subagents/:agentId/input` checks capability.
+`POST` to the same route accepts `{ "message": "..." }` and revalidates membership
+and availability. Input is literal text, including slash-prefixed text; parent
+composer commands are not intercepted. Drafts use a separate per-child key.
+The UI clears a draft only after the host acknowledges the selected recipient.
+An uncertain send is never automatically retried.
+
+Claude Code PTY sessions, Codex TUI sessions, old hosts, and unloaded children
+remain read-only. There is no relay through the parent, automatic replacement
+thread, or second process resuming a live transcript. A host upgrade requires
+restarting that conversation before its new operations are available; reloading
+the dashboard alone does not update an already-running host.
+
 ## Agent subagents (PAN-3920)
 
 Overdeck agents (work, review, plan, …) spawn subagents too — the foreman's same-family workers

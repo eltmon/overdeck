@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import {
   fetchProjectPipelineMembership,
+  fetchProjects,
   groupProjects,
   isUnscopedConversation,
   refreshProjectPipelineMembership,
@@ -167,5 +168,22 @@ describe('groupProjects', () => {
     ]);
 
     expect(projects.map((project) => project.name)).toEqual(['Alpha', 'Zeta']);
+  });
+});
+
+describe('fetchProjects (PAN-3527)', () => {
+  it('bounds both requests with a timeout so a hung fetch cannot pin the query', async () => {
+    fetchMock.mockImplementation(async (input: unknown) => new Response(
+      JSON.stringify(input === '/api/registered-projects' ? [{ key: 'overdeck', name: 'Overdeck', path: '/p' }] : []),
+      { status: 200 },
+    ));
+
+    await expect(fetchProjects()).resolves.toEqual([
+      expect.objectContaining({ key: 'overdeck', name: 'Overdeck' }),
+    ]);
+
+    for (const url of ['/api/issues/resource-allocated', '/api/registered-projects']) {
+      expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    }
   });
 });

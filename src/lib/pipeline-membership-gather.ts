@@ -1,3 +1,10 @@
+/**
+ * Pipeline-membership gatherer: collects the durable lens signals for one
+ * project (tracker issues, open PRs/MRs, branch refs, xBRIEF specs, then the
+ * batched GitHub GraphQL oracles). GraphQL subprocess handling (stderr capture,
+ * retry-once) lives in ./github-graphql-run.ts (PAN-3924). Never import
+ * disposable-state or sync-process modules here; see the import-graph test.
+ */
 import { execFile } from 'node:child_process';
 import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -13,6 +20,7 @@ import {
 } from './github-app.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimit } from './concurrency.js';
 import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
+import { runGitHubGraphql } from './github-graphql-run.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
@@ -22,6 +30,7 @@ import { getRepoForge, inferProjectForge } from './project-repos.js';
 import { parseIssueIdFromText } from './resource-utils.js';
 import { createTracker } from './tracker/factory.js';
 import type { Issue, TrackerType } from './tracker/interface.js';
+import { issueIdFromTrackerIssue } from './tracker/issue-id.js';
 
 const execFileAsync = promisify(execFile);
 const GRAPHQL_ALIAS_CHUNK_SIZE = 50;
@@ -84,33 +93,6 @@ interface MergedHeadGraphqlResponse {
       nodes?: Array<{ headRepository?: { name?: string; owner?: { login?: string } } | null }>;
     }>;
   };
-}
-
-async function runGitHubGraphql(query: string): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync('gh', ['api', 'graphql', '-f', `query=${query}`], {
-      encoding: 'utf-8',
-      timeout: 30_000,
-      maxBuffer: 4 * 1024 * 1024,
-    });
-    return stdout;
-  } catch (error) {
-    // gh exits non-zero when the GraphQL envelope carries per-field errors
-    // (e.g. `issue(number: N)` where N is a PR — strike branches can point at
-    // PR numbers), but it still prints the full response with partial data to
-    // stdout. Surface that envelope so callers can use the resolvable fields
-    // instead of failing the whole gather (the zero-membership regression).
-    const stdout = (error as { stdout?: string }).stdout;
-    if (typeof stdout === 'string' && stdout.length > 0) {
-      try {
-        const parsed = JSON.parse(stdout) as { data?: unknown };
-        if (parsed.data !== undefined && parsed.data !== null) return stdout;
-      } catch {
-        // stdout is not a GraphQL envelope — fall through to the original error
-      }
-    }
-    throw error;
-  }
 }
 
 export async function listMergedPullRequestHeadsBatched(
@@ -235,9 +217,23 @@ async function listProjectTrackerIssues(project: ProjectConfig): Promise<Project
     includeClosed: true,
   }));
 
-  return issues.flatMap((issue: Issue) => {
-    const issueId = issue.ref.toUpperCase();
-    if (!issueId.startsWith(`${issuePrefix}-`)) return [];
+  return projectTrackerIssueRows(issues, trackerType, issuePrefix);
+}
+
+/**
+ * Pure row mapping for the tracker lens. GitHub's `ref` is a bare `#<n>`;
+ * `issueIdFromTrackerIssue` prefixes it, so GitHub-tracked projects are no
+ * longer filtered to nothing (PAN-3924).
+ */
+export function projectTrackerIssueRows(
+  issues: readonly Issue[],
+  trackerType: TrackerType,
+  issuePrefix: string,
+): ProjectTrackerIssueRow[] {
+  const prefix = issuePrefix.toUpperCase();
+  return issues.flatMap((issue) => {
+    const issueId = issueIdFromTrackerIssue(issue, trackerType, prefix);
+    if (!issueId.startsWith(`${prefix}-`)) return [];
     return [{
       issueId,
       state: issue.state === 'closed' ? 'closed' as const : 'open' as const,

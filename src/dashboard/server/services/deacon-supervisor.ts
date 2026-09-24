@@ -19,12 +19,18 @@ export interface DeaconSupervisorDeps {
   shutdownGraceMs?: number;
 }
 
+export interface DeaconPatrolReport {
+  at: string;
+  error: string | null;
+}
+
 export interface DeaconSupervisor {
   startDeaconChild(): Promise<boolean>;
   stopDeaconChild(): Promise<void>;
   sendPatrolNow(): boolean;
   reloadConfig(): boolean;
   isChildRunning(): boolean;
+  lastPatrolReport(): DeaconPatrolReport | null;
 }
 
 const DEFAULT_RESTART_WINDOW_MS = 60_000;
@@ -75,6 +81,7 @@ export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}): DeaconS
   let stopping = false;
   let restartTimer: ReturnType<typeof setTimeout> | null = null;
   let restartTimestamps: number[] = [];
+  let lastPatrol: DeaconPatrolReport | null = null;
 
   function pruneRestartWindow(): void {
     const cutoff = now() - restartWindowMs;
@@ -114,6 +121,13 @@ export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}): DeaconS
     child = next;
     console.log(`[deacon-supervisor] Started deacon child pid=${next.pid ?? 'unknown'}`);
     emit('info', `Deacon child started${next.pid ? ` (pid ${next.pid})` : ''}`);
+
+    next.on('message', (message: unknown) => {
+      if (typeof message !== 'object' || message === null) return;
+      const patrol = message as { type?: unknown; at?: unknown; error?: unknown };
+      if (patrol.type !== 'patrol-done' || typeof patrol.at !== 'string') return;
+      lastPatrol = { at: patrol.at, error: typeof patrol.error === 'string' ? patrol.error : null };
+    });
 
     next.once('exit', (code, signal) => {
       if (child === next) child = null;
@@ -200,6 +214,10 @@ export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}): DeaconS
     isChildRunning(): boolean {
       return child !== null && !child.killed;
     },
+
+    lastPatrolReport(): DeaconPatrolReport | null {
+      return lastPatrol;
+    },
   };
 }
 
@@ -210,3 +228,4 @@ export const stopDeaconChild = defaultSupervisor.stopDeaconChild;
 export const sendPatrolNow = defaultSupervisor.sendPatrolNow;
 export const reloadDeaconConfig = defaultSupervisor.reloadConfig;
 export const isChildRunning = defaultSupervisor.isChildRunning;
+export const lastPatrolReport = defaultSupervisor.lastPatrolReport;

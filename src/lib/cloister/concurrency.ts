@@ -20,7 +20,7 @@ import { Effect } from 'effect';
 import { loadCloisterConfigSync } from './config.js';
 import {
   listRunningAgentsSync, listRunningAgents,
-  stopAgentSync,
+  stopAgent,
   getAgentRuntimeStateSync,
 } from '../agents.js';
 import { isIdle } from '../agents/liveness.js';
@@ -101,23 +101,46 @@ function countRunningSwarmSlots(
 }
 
 /**
- * Count tmux-ALIVE swarm-slot work agents for one issue (agent-<issue>-slot-N).
- * Stale agents-table rows whose tmux session is dead do NOT count — counting
- * them blocked all dispatch at zero live slots after a reset (PAN-2214).
+ * Whether an agent row is live on the selected terminal backend (PAN-3926):
+ * present in its inventory. The rows' `tmuxActive` flag is false for every
+ * Herdr agent, so it cannot answer this. A `null` inventory (backend
+ * unreadable) fails open — every `running` row counts, as in
+ * countRunningAgents — because the callers are ceilings and a brake whose job
+ * is to hold work back.
+ */
+function isLiveOnBackend(
+  agent: { id: string; status?: string },
+  liveIds: ReadonlySet<string> | null,
+): boolean {
+  return liveIds === null ? agent.status === 'running' : liveIds.has(agent.id);
+}
+
+/**
+ * Count LIVE swarm-slot work agents for one issue (agent-<issue>-slot-N).
+ * Liveness is the backend inventory (`isLiveOnBackend`), so Herdr slots count
+ * and swarm dispatch no longer over-admits under Herdr. Stale rows absent from
+ * the inventory do NOT count: counting them blocked all dispatch at zero live
+ * slots after a reset (PAN-2214).
  */
 export function countRunningSwarmSlotsForIssue(
   issueId: string,
-  agents: ReturnType<typeof listRunningAgentsSync> = listRunningAgentsSync(),
+  agents: ReturnType<typeof listRunningAgentsSync>,
+  liveIds: ReadonlySet<string> | null,
   isTerminalSlot: (agent: ReturnType<typeof listRunningAgentsSync>[number]) => boolean = isTerminalSwarmSlotAgent,
 ): number {
   const prefix = `agent-${issueId.toLowerCase()}-slot-`;
   return agents.filter(
-    a => a.tmuxActive
+    a => isLiveOnBackend(a, liveIds)
       && a.role === 'work'
       && SWARM_SLOT_ID.test(a.id)
       && a.id.startsWith(prefix)
       && !isTerminalSlot(a),
   ).length;
+}
+
+/** The live per-issue swarm-slot count against the selected backend's inventory (PAN-3926). */
+export async function countLiveSwarmSlotsForIssue(issueId: string): Promise<number> {
+  return countRunningSwarmSlotsForIssue(issueId, listRunningAgentsSync(), await listLiveAgentIds());
 }
 
 /**
@@ -244,9 +267,12 @@ export interface BrakeResult {
   remaining: number;
 }
 
-export function emergencyBrake(): BrakeResult {
+export async function emergencyBrake(): Promise<BrakeResult> {
   const { maxWorkAgents, exemptOperatorStarted } = getConcurrencyLimits();
-  const runningWork = listRunningAgentsSync().filter(a => a.tmuxActive && a.role === 'work');
+  // Live = present in the selected backend's inventory (PAN-3926), not the
+  // tmux-only `tmuxActive` flag, which is false for every Herdr agent.
+  const liveIds = await listLiveAgentIds();
+  const runningWork = listRunningAgentsSync().filter(a => isLiveOnBackend(a, liveIds) && a.role === 'work');
   const excess = runningWork.length - maxWorkAgents;
   if (excess <= 0) {
     return { before: runningWork.length, cap: maxWorkAgents, stopped: [], remaining: runningWork.length };
@@ -272,8 +298,9 @@ export function emergencyBrake(): BrakeResult {
     try {
       // 'system' cause (the default) leaves stoppedByUser unset so the deacon
       // re-admits this agent when a slot frees — the brake trims to the cap, it
-      // does not retire the work.
-      stopAgentSync(agent.id, 'system');
+      // does not retire the work. The async stop terminates through the
+      // terminal backend, so it also closes a Herdr pane.
+      await Effect.runPromise(stopAgent(agent.id, 'system'));
       stopped.push(agent.id);
     } catch {
       // best effort — skip agents that fail to stop cleanly

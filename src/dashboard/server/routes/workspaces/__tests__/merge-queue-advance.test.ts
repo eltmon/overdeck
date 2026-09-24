@@ -22,7 +22,7 @@ vi.mock('../../../../../lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
 vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
-  getWorkAgentLifecycleStateSync: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
+  getWorkAgentLifecycleState: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
 }));
 
 const { advanceMergeQueue, mergeGateRefusal } = await import('../merge-strike.js');

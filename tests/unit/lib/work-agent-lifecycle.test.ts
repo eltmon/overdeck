@@ -8,14 +8,24 @@ const mocks = vi.hoisted(() => ({
   claudeSessionTranscriptExists: vi.fn(),
   getPrFacts: vi.fn(),
   sessionExistsSync: vi.fn(),
+  isAlive: vi.fn(),
 }));
 
-vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentState: mocks.getAgentState,
-  getAgentRuntimeStateSync: mocks.getAgentRuntimeStateSync,
-  getLatestSessionId: mocks.getLatestSessionId,
-  getAgentRuntimeState: vi.fn(),
-  normalizeAgentId: (id: string) => id,
+vi.mock('../../../src/lib/agents.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    getAgentState: mocks.getAgentState,
+    getLatestSessionId: mocks.getLatestSessionId,
+    getAgentRuntimeState: () => Effect.succeed(mocks.getAgentRuntimeStateSync()),
+    normalizeAgentId: (id: string) => id,
+  };
+});
+
+// PAN-3926: the classifier asks the backend-aware oracle; never probe the
+// host's real terminal backend from a unit test.
+vi.mock('../../../src/lib/agents/liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/agents/liveness.js')>()),
+  isAlive: mocks.isAlive,
 }));
 
 vi.mock('../../../src/lib/agents/supervisor-channels.js', () => ({
@@ -37,7 +47,7 @@ vi.mock('../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(),
 }));
 
-import { getWorkAgentLifecycleStateSync, issueOwesRework } from '../../../src/lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleState, issueOwesRework } from '../../../src/lib/work-agent-lifecycle.js';
 
 describe('issueOwesRework', () => {
   beforeEach(() => {
@@ -58,7 +68,7 @@ describe('issueOwesRework', () => {
   });
 });
 
-describe('getWorkAgentLifecycleStateSync after handoff (PAN-3334)', () => {
+describe('getWorkAgentLifecycleState after handoff (PAN-3334)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAgentState.mockReturnValue({
@@ -72,24 +82,26 @@ describe('getWorkAgentLifecycleStateSync after handoff (PAN-3334)', () => {
     mocks.getAgentRuntimeStateSync.mockReturnValue(null);
     mocks.getLatestSessionId.mockReturnValue('session-3846');
     mocks.sessionExistsSync.mockReturnValue(false);
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+    mocks.getPrFacts.mockResolvedValue({ changesRequested: false });
     mocks.claudeSessionTranscriptExists.mockReturnValue(true);
     mocks.hasCompletionMarkerForAgent.mockReturnValue(true);
   });
 
-  it('reports the handed-off agent as warm-resumable without asking the forge (supersedes PAN-3334)', () => {
-    const state = getWorkAgentLifecycleStateSync('agent-pan-3846');
+  it('reports the handed-off agent as warm-resumable when its PR owes no rework (supersedes PAN-3334)', async () => {
+    const state = await getWorkAgentLifecycleState('agent-pan-3846');
 
     expect(state.handedOff).toBe(true);
     expect(state.canResumeSession).toBe(true);
     expect(state.recommendedAction).toBe('resume');
     expect(state.reason).toContain('handed off');
-    expect(mocks.getPrFacts).not.toHaveBeenCalled();
+    expect(mocks.getPrFacts).toHaveBeenCalledWith('PAN-3846');
   });
 
-  it('leaves a non-handed-off stopped agent resumable', () => {
+  it('leaves a non-handed-off stopped agent resumable', async () => {
     mocks.hasCompletionMarkerForAgent.mockReturnValue(false);
 
-    const state = getWorkAgentLifecycleStateSync('agent-pan-3846');
+    const state = await getWorkAgentLifecycleState('agent-pan-3846');
 
     expect(state.handedOff).toBe(false);
     expect(state.canResumeSession).toBe(true);

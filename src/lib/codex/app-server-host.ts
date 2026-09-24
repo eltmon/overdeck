@@ -47,6 +47,8 @@ interface AppServerHostManager extends EventEmitter {
   resumeThread(threadId: string, options: ThreadOptions, resumeOptions?: { strict?: boolean }): Promise<unknown>;
   startTurn(text: string, options?: TurnOptions): Promise<unknown>;
   interruptTurn(): Promise<unknown>;
+  readSubagentInput?(threadId: string): Promise<{ direct: boolean; activeTurnId?: string }>;
+  sendSubagentMessage?(threadId: string, text: string): Promise<unknown>;
   answerApproval(id: string | number, decision: string): void;
   answerUserInput(id: string | number, answers: Record<string, string[]>): void;
 }
@@ -236,6 +238,18 @@ export class CodexAppServerHost {
         }
         this.effort = body.effort;
         return { status: 200, body: { ok: true, effort: this.effort } };
+      }
+      if (name === 'subagent-input' || name === 'subagent-message') {
+        const threadId = body.threadId;
+        if (typeof threadId !== 'string' || !threadId) return { status: 400, body: { error: 'threadId is required' } };
+        if (!this.manager.readSubagentInput || !this.manager.sendSubagentMessage) return { status: 200, body: { direct: false } };
+        if (name === 'subagent-input') return { status: 200, body: await this.manager.readSubagentInput(threadId) };
+        if (typeof body.content !== 'string' || !body.content.trim() || body.content.length > 50_000) {
+          return { status: 400, body: { error: 'A message of at most 50000 characters is required' } };
+        }
+        await this.manager.sendSubagentMessage(threadId, body.content);
+        await this.appendEvent('op/subagent-message', { threadId });
+        return { status: 200, body: { ok: true, threadId } };
       }
       if (name === 'message') return await this.handleMessageOp(body);
       if (name === 'prepare-terminal') return await this.handlePrepareTerminalOp();

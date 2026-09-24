@@ -23,8 +23,9 @@ pan rollout retry <issue-id>
 
 ## What It Does
 
-`pan rollout status` prints the issue's `releaseStatus` and each configured
-component's key, release order, and current status.
+`pan rollout status` prints the release set's overall `status` (`pending`,
+`releasing`, `passed`, `failed`, `partial`, `rolled_back`, `skipped`) and each
+configured component's key, release order, and current status.
 
 `pan rollout retry` re-runs the release engine for the issue (health checks,
 version checks, smoke tests, rollback if configured) and prints the resulting

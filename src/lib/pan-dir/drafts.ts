@@ -233,8 +233,8 @@ export interface PromoteWorkspacePrdDraftResult {
 }
 
 /**
- * Promote a workspace-authored PRD draft to the canonical drafts/ location on
- * the state plane. Planning agents author the PRD at
+ * Promote a workspace-authored PRD draft to the canonical `.pan/drafts/`
+ * location in the plan home. Planning agents author the PRD at
  * `<workspace>/.pan/drafts/<ISSUE>.md`; the PRD-first gate accepts it there,
  * but the workspace is disposable — without this promotion the PRD is lost on
  * workspace teardown and invisible at the canonical location (the PAN-2858
@@ -244,7 +244,8 @@ export interface PromoteWorkspacePrdDraftResult {
  * canonical copy may carry operator edits the workspace copy predates.
  *
  * A successful promotion also removes the workspace copy: the identical content
- * is committed and pushed on the state plane, and the leftover untracked file
+ * is now a tracked file in the plan home (the agent that wrote it commits it on
+ * its own branch, PAN-3917), and the leftover untracked file
  * tripped the spawn-time dirty-workspace gate, stranding the planning→work
  * auto-handoff with `planning_auto_handoff_failed` (PAN-3042). Removal is
  * best-effort — the spawn gate exempts Overdeck-owned `.pan/` paths anyway.
@@ -289,8 +290,8 @@ export function promoteWorkspacePrdDraft(args: {
           rmSync(source)
           sourceRemoved = true
         } catch {
-          // Best effort: the canonical copy is already committed and pushed, so
-          // a failed unlink must not fail promotion.
+          // Best effort: the canonical copy is already written to the plan
+          // home, so a failed unlink must not fail promotion.
         }
         return { promoted: true, reason: 'promoted', path, source, sourceRemoved }
       }),
