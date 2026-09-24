@@ -30,6 +30,9 @@ const mutations: ConversationMutations = {
   retitle: vi.fn(),
   isRetitlePending: vi.fn(() => false),
   toggleFavorite: vi.fn(),
+  move: vi.fn(),
+  linkPullRequest: vi.fn(),
+  unlinkPullRequest: vi.fn(),
   openForkModal: vi.fn(),
   submitFork: vi.fn(),
   forkTarget: null,
@@ -211,5 +214,29 @@ describe('ConversationRow pull request badge (PAN-3822)', () => {
   it('renders no badge when the conversation has no linked PR', () => {
     renderRow({ pullRequest: null });
     expect(screen.queryByRole('link', { name: /#\d+/ })).not.toBeInTheDocument();
+  });
+
+  it('links a pull request from the action menu inline input', () => {
+    vi.mocked(mutations.linkPullRequest).mockClear();
+    renderRow({ pullRequest: null });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(screen.queryByText(/^Unlink #/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Link pull request…'));
+    const input = screen.getByLabelText('Pull request URL or #42');
+    fireEvent.change(input, { target: { value: ' #42 ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(mutations.linkPullRequest).toHaveBeenCalledWith({ name: 'test-conversation', ref: '#42' });
+    expect(screen.queryByRole('menu', { name: 'Actions for Test conversation' })).not.toBeInTheDocument();
+  });
+
+  it('unlinks the effective pull request from the action menu', () => {
+    vi.mocked(mutations.unlinkPullRequest).mockClear();
+    renderRow({ pullRequest: link });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(screen.getByText('Unlink #42'));
+
+    expect(mutations.unlinkPullRequest).toHaveBeenCalledWith({ name: 'test-conversation', ref: 'https://github.com/eltmon/overdeck/pull/42' });
   });
 });

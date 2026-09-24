@@ -355,12 +355,48 @@ default branch is never linked by branch. The same sweep refreshes the stored
 state of linked PRs, so the badge renders without a live GitHub call. Merged PRs
 are final and are not re-read.
 
+### Linking a pull request by hand
+
+Open a conversation's actions (the row's `⋮`, a right-click on the row, or a
+right-click on its tab) and choose **Link pull request…**. Type a PR URL, a
+GitLab merge request URL, `#42`, or `owner/repo#42`, then press Enter. `#42`
+means PR 42 of the conversation's project repository. When the conversation
+shows a PR, the same menu offers **Unlink #42**.
+
+Agents and scripts use the CLI. `<query>` is the conversation name, or a title
+fragment that matches exactly one conversation (`pan conv current` prints the
+one you're in):
+
+```bash
+pan conv link-pr <query> <url|#42|owner/repo#42>   # --source agent|manual
+pan conv unlink-pr <query> <url|#42|owner/repo#42>
+pan conv prs <query> [--json]                      # * marks the PR shown
+```
+
+`link-pr` records the source `agent` when it runs inside an agent
+(`OVERDECK_AGENT_ID` is set) and `manual` otherwise. The verbs go through the
+dashboard, so every open client updates at once. With the dashboard down they
+write the link directly. They exit 2 when no conversation matches, and 1 on any
+other error.
+
+Rules:
+
+- Only a repository configured for the conversation's project can be linked:
+  the project's `github_repo` or `gitlab_repo`, a URL-shaped
+  `workspace.repos[].remote`, or the `origin` remote of the project checkout or
+  of the conversation's working directory. Anything else is refused, and
+  nothing is stored.
+- A PR you link by hand wins over one found by branch detection.
+- Unlinking hides the link, and branch detection won't add that PR back. Linking
+  the same PR by hand again restores it.
+- A new link fetches the PR's state within seconds, so it doesn't wait for the
+  next sweep.
+
 Linking never archives or stops a conversation.
 
 Not yet shipped (tracked in [#3822](https://github.com/eltmon/overdeck/issues/3822)):
-linking or unlinking a PR by hand (dialog, transcript right-click, `pan conv
-link-pr`), pipeline-created links, GitLab merge requests, the Pull requests page,
-and search by PR number.
+transcript right-click, pipeline-created links, GitLab merge request status,
+the Pull requests page, and search by PR number.
 
 ## See also
 

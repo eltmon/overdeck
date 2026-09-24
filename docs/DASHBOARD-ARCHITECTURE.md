@@ -246,7 +246,15 @@ door that does not exist; a real record read door would be a separate change.
   `conversation.pull_requests_changed` event, which bumps `conversationsListRevision`.
   `GET /api/conversations` rows carry `pullRequest` (the effective link from
   `resolveEffectivePullRequest`) and `pullRequestCount`, read with one SQL query per
-  page. The door is `src/lib/overdeck/conversation-pull-requests.ts`. A new table
+  page. The door is `src/lib/overdeck/conversation-pull-requests.ts`. Explicit links
+  go through `conversation-pull-request-commands.ts`, which parses the ref
+  (`pull-request-ref.ts`: PR/MR URL, `#42`, `owner/repo#42`) and refuses a
+  repository not configured for the conversation's project
+  (`foreign_repository`). The dashboard routes
+  (`GET/POST/DELETE /api/conversations/:name/pull-requests`, the DELETE takes
+  `?ref=`) and `pan conv link-pr`/`unlink-pr`/`prs` both call it. An unlink always
+  sets `dismissed_at` rather than deleting, so the sweep cannot re-add the PR. A
+  `manual`/`agent` relink clears it; a `created` link does not. A new table
   goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
   and bumps `OVERDECK_TABLE_COUNT`.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered

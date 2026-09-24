@@ -13,6 +13,7 @@ import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
 import { jsonlAction } from './jsonl.js';
 import { moveAction } from './move.js';
+import { linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
 import { healAction } from './heal.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
@@ -105,6 +106,22 @@ export function registerConversationsCommands(program: Command): void {
     .command('move <query> <projectKey>')
     .description('Reassign a conversation to a different project (exact name, then fuzzy title match)')
     .action((query: string, projectKey: string) => moveAction(query, projectKey));
+
+  // ── pull requests (PAN-3822) ────────────────────────────────────────────────
+  conversations
+    .command('link-pr <query> <ref>')
+    .description('Link a pull request (URL, #42, or owner/repo#42) to a conversation')
+    .option('--source <source>', 'agent or manual (default: agent inside an agent, else manual)')
+    .action((query: string, ref: string, opts: { source?: string }) => linkPrAction(query, ref, opts));
+  conversations
+    .command('unlink-pr <query> <ref>')
+    .description('Unlink a pull request from a conversation (the sweep will not re-add it)')
+    .action((query: string, ref: string) => unlinkPrAction(query, ref));
+  conversations
+    .command('prs <query>')
+    .description('List the pull requests linked to a conversation (* = the one shown)')
+    .option('--json', 'Output { links, effective } as JSON')
+    .action((query: string, opts: { json?: boolean }) => prsAction(query, opts));
 
   conversations
     .command('heal <query>')

@@ -16,12 +16,12 @@ import { getProjectSync, listProjectsSync } from '../../../lib/projects.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 
-interface ResolveResult {
+export interface ResolveResult {
   conversation: LegacyConversation | null;
   candidates: LegacyConversation[];
 }
 
-function resolveConversation(query: string): ResolveResult {
+export function resolveConversation(query: string): ResolveResult {
   const exact = getConversationByName(query);
   if (exact) return { conversation: exact, candidates: [] };
 

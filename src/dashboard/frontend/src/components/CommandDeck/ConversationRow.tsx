@@ -14,6 +14,7 @@ import type { RegisteredProject } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
+import { PullRequestMenuItems } from './PullRequestMenuItems';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
 import styles from './styles/command-deck.module.css';
 
@@ -596,6 +597,7 @@ export function ConversationRow({
               )}
             </span>
           )}
+          <PullRequestMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />
           {conv.claudeSessionId && !conv.forkStatus && (
             <MenuItemButton
               onClick={() => { mutations.openForkModal(conv, { mode: 'handoff' }); setMenuOpen(false); }}
