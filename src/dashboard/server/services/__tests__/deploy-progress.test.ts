@@ -111,7 +111,7 @@ describe('createDeployProgressObserver', () => {
       readLastStatus: async () => null,
       resolveProjectKey: async () => 'overdeck',
       resolveLogPath: async () => undefined,
-      emit: (deploys) => emitted.push(deploys),
+      emit: async (deploys) => { emitted.push(deploys); return true; },
       now: () => now,
     });
 
@@ -134,7 +134,7 @@ describe('createDeployProgressObserver', () => {
       readLastStatus: async () => null,
       resolveProjectKey: async () => 'overdeck',
       resolveLogPath: async () => undefined,
-      emit: (deploys) => emitted.push(deploys),
+      emit: async (deploys) => { emitted.push(deploys); return true; },
       now: () => T0,
     });
     await observer.tick();
@@ -145,6 +145,53 @@ describe('createDeployProgressObserver', () => {
     });
     const state = applyEvent(INITIAL_READ_MODEL_STATE, event);
     expect(state.deployByProjectKey.overdeck?.phase).toBe('building');
+  });
+
+  it('keeps the log path and tail of a reload that failed after it exited', async () => {
+    let lock: RestartLockHolder | null = holder;
+    let lastStatus: RestartStatus | null = null;
+    const emitted: DeployProjection[] = [];
+    const observer = createDeployProgressObserver({
+      readLockHolder: async () => lock,
+      readGate: async () => idleGate,
+      readLastStatus: async () => lastStatus,
+      resolveProjectKey: async () => 'overdeck',
+      resolveLogPath: async (pid) => (pid === PID ? '/x/reload.log' : undefined),
+      readTail: async () => ['✗ build failed'],
+      emit: async (deploys) => { emitted.push(deploys); return true; },
+      now: () => T0,
+    });
+    await observer.tick();
+
+    lock = null;
+    lastStatus = status({ phase: 'failed', error: 'build failed — old dashboard left running' });
+    await observer.tick();
+    expect(emitted.at(-1)?.overdeck).toMatchObject({
+      phase: 'failed', error: 'build failed — old dashboard left running',
+      logPath: '/x/reload.log', logTail: ['✗ build failed'],
+    });
+  });
+
+  it('retries the publish until the event store accepts it', async () => {
+    let ready = false;
+    const emitted: DeployProjection[] = [];
+    const observer = createDeployProgressObserver({
+      readLockHolder: async () => holder,
+      readGate: async () => idleGate,
+      readLastStatus: async () => null,
+      resolveProjectKey: async () => 'overdeck',
+      resolveLogPath: async () => undefined,
+      emit: async (deploys) => {
+        if (!ready) return false;
+        emitted.push(deploys);
+        return true;
+      },
+      now: () => T0,
+    });
+    await observer.tick();
+    ready = true;
+    await observer.tick();
+    expect(emitted).toHaveLength(1);
   });
 });
 

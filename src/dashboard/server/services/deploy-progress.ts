@@ -76,7 +76,7 @@ export function deriveDeployProjection(obs: DeployObservation): DeployProjection
       return {
         [obs.projectKey]: {
           projectKey: obs.projectKey, trigger: RELOAD_CALLER, phase: 'failed', startedAt: last.ts,
-          ...(last.error ? { error: last.error } : {}),
+          ...(last.error ? { error: last.error } : {}), ...log,
         },
       };
     }
@@ -129,24 +129,25 @@ export interface DeployProgressDeps {
   resolveProjectKey?: (pid: number | undefined) => Promise<string | null>;
   resolveLogPath?: (pid: number) => Promise<string | undefined>;
   readTail?: (path: string) => Promise<string[]>;
-  emit?: (deploys: DeployProjection) => void;
+  /** Resolves true once the projection reached subscribers. */
+  emit?: (deploys: DeployProjection) => Promise<boolean>;
   now?: () => number;
 }
 
-function emitThroughEventStore(deploys: DeployProjection): void {
-  void (async () => {
-    try {
-      const { getEventStore } = await import('../event-store.js');
-      // emitOnly, never append: deploy progress is runtime-plane, re-derived every boot.
-      getEventStore().emitOnly({
-        type: 'project.deploy_changed',
-        timestamp: new Date().toISOString(),
-        payload: { deploys },
-      });
-    } catch {
-      // Event store not ready yet — the next tick republishes.
-    }
-  })();
+async function emitThroughEventStore(deploys: DeployProjection): Promise<boolean> {
+  try {
+    const { getEventStore } = await import('../event-store.js');
+    // emitOnly, never append: deploy progress is runtime-plane, re-derived every boot.
+    getEventStore().emitOnly({
+      type: 'project.deploy_changed',
+      timestamp: new Date().toISOString(),
+      payload: { deploys },
+    });
+    return true;
+  } catch {
+    // Event store not ready yet (it initialises asynchronously at boot) — the next tick retries.
+    return false;
+  }
 }
 
 export interface DeployProgressObserver {
@@ -165,6 +166,9 @@ export function createDeployProgressObserver(deps: DeployProgressDeps = {}): Dep
   const now = deps.now ?? Date.now;
 
   let firstSeen: { pid: number; at: string } | null = null;
+  // The last live reload's stdout file, kept after it exits so a failure can
+  // still point at its log. In memory only: a server restart forgets it.
+  let lastReload: { pid: number; logPath?: string } | null = null;
   let published: string | null = null;
 
   return {
@@ -182,11 +186,17 @@ export function createDeployProgressObserver(deps: DeployProgressDeps = {}): Dep
         && nowMs - Date.parse(lastStatus.ts) < FAILED_VISIBLE_MS;
       let projection: DeployProjection = {};
       if (reloadHolder || recentFailure) {
-        const [gate, projectKey, logPath] = await Promise.all([
+        const [gate, projectKey, liveLogPath] = await Promise.all([
           reloadHolder ? readGate() : Promise.resolve(null),
           resolveProjectKey(reloadHolder?.pid),
           reloadHolder ? resolveLogPath(reloadHolder.pid) : Promise.resolve(undefined),
         ]);
+        if (reloadHolder) {
+          lastReload = { pid: reloadHolder.pid, ...(liveLogPath ? { logPath: liveLogPath } : {}) };
+        }
+        const logPath = reloadHolder
+          ? liveLogPath
+          : lastStatus?.pid !== undefined && lastStatus.pid === lastReload?.pid ? lastReload.logPath : undefined;
         projection = deriveDeployProjection({
           lockHolder: reloadHolder, gate, lastStatus, projectKey,
           firstSeenAt: firstSeen?.at ?? new Date(nowMs).toISOString(),
@@ -195,9 +205,8 @@ export function createDeployProgressObserver(deps: DeployProgressDeps = {}): Dep
         });
       }
       const serialized = JSON.stringify(projection);
-      if (serialized !== published) {
+      if (serialized !== published && await emit(projection)) {
         published = serialized;
-        emit(projection);
       }
       return projection;
     },
