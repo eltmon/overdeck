@@ -51,7 +51,6 @@ describe('configuration precedence for role model routing', () => {
     expect(resolveModel('plan', undefined, config)).toBe('claude-opus-4-8');
     // PAN-1048 R4: default workhorse:mid tracks the current Sonnet.
     expect(resolveModel('work', undefined, config)).toBe('claude-sonnet-5');
-    expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku-4-5');
     expect(resolveModel('review', 'requirements', config)).toBe('claude-sonnet-5');
   });
 
@@ -64,10 +63,11 @@ describe('configuration precedence for role model routing', () => {
       },
       roles: {
         plan: { model: 'workhorse:expensive' },
-        work: {
-          model: 'workhorse:mid',
+        work: { model: 'workhorse:mid' },
+        review: {
+          model: 'workhorse:expensive',
           sub: {
-            inspect: { model: 'workhorse:cheap' },
+            correctness: { model: 'workhorse:cheap' },
           },
         },
       },
@@ -75,7 +75,7 @@ describe('configuration precedence for role model routing', () => {
 
     expect(resolveModel('plan', undefined, config)).toBe('gpt-5.6-sol');
     expect(resolveModel('work', undefined, config)).toBe('glm-5.1');
-    expect(resolveModel('work', 'inspect', config)).toBe('minimax-m2.7-highspeed');
+    expect(resolveModel('review', 'correctness', config)).toBe('minimax-m2.7-highspeed');
   });
 
   it('rejects nested workhorse references', () => {

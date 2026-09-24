@@ -17,13 +17,7 @@ const settingsPayload = {
   },
   roles: {
     plan: { model: 'workhorse:expensive' },
-    work: {
-      model: 'workhorse:mid',
-      sub: {
-        inspect: { model: 'workhorse:cheap' },
-        'inspect-deep': { model: 'workhorse:mid' },
-      },
-    },
+    work: { model: 'workhorse:mid' },
     review: {
       model: 'workhorse:expensive',
       sub: {
@@ -169,14 +163,14 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Work model')).toBeInTheDocument();
   });
 
-  it('expands work and review cards to show configured sub-role defaults', async () => {
+  it('expands the review card to show configured sub-role defaults; work has no sub-roles', async () => {
     const user = userEvent.setup();
     renderPanel();
 
     const cards = await screen.findAllByTestId('role-card');
-    await user.click(within(cards[1]).getByRole('button', { name: /show sub-roles/i }));
-    expect(await screen.findByLabelText('Work Inspect model')).toHaveValue('workhorse:cheap');
-    expect(screen.getByLabelText('Work Inspect Deep model')).toHaveValue('workhorse:mid');
+    // work.inspect / work.inspect-deep were deleted with the inspect gate (#3927).
+    expect(within(cards[1]).queryByRole('button', { name: /show sub-roles/i })).toBeNull();
+    expect(screen.queryByLabelText('Work Inspect model')).toBeNull();
 
     await user.click(within(cards[3]).getByRole('button', { name: /show sub-roles/i }));
     expect(await screen.findByLabelText('Review Security model')).toHaveValue('workhorse:expensive');
