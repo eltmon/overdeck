@@ -60,6 +60,43 @@ describe('deacon-swarm merged slot GC', () => {
     );
   });
 
+  it('tears down the slot Docker stack before removing its worktree (PAN-3900)', async () => {
+    const order: string[] = [];
+    const base = deps();
+    const fakeDeps = {
+      ...base,
+      runGitCommand: vi.fn(async (command: string, cwd: string) => {
+        if (command.startsWith('git worktree remove')) order.push('worktree-remove');
+        return base.runGitCommand(command, cwd);
+      }),
+      teardownSlotDocker: vi.fn(async (id: string) => {
+        order.push(`docker:${id}`);
+      }),
+    };
+
+    await gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps);
+
+    expect(fakeDeps.teardownSlotDocker).toHaveBeenCalledWith('pan-2203-slot-1');
+    expect(order).toEqual(['docker:pan-2203-slot-1', 'worktree-remove']);
+  });
+
+  it('still removes the slot worktree when the Docker teardown fails (PAN-3900)', async () => {
+    const fakeDeps = {
+      ...deps(),
+      teardownSlotDocker: vi.fn(async () => {
+        throw new Error('docker daemon unreachable');
+      }),
+    };
+
+    const actions = await gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps);
+
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-1"',
+      '/repo/workspaces/feature-pan-2203',
+    );
+    expect(actions.some((a) => a.includes('docker teardown for pan-2203-slot-1 failed'))).toBe(true);
+  });
+
   it('preserves running and failed-merge slots', async () => {
     const fakeDeps = deps();
 

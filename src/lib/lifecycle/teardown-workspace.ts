@@ -206,6 +206,25 @@ async function stopDockerImpl(
 }
 
 /**
+ * Tear down an issue's Docker stack and networks by compose project name when
+ * the workspace directory no longer exists (PAN-3900).
+ */
+function teardownDockerByName(issueLower: string): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: async () => {
+      const { teardownWorkspaceDockerByName } = await import('../workspace-manager/docker.js');
+      const result = await teardownWorkspaceDockerByName(issueLower);
+      return stepOk('teardown:docker', result.steps);
+    },
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch(() =>
+      Effect.succeed(stepSkipped('teardown:docker', ['Docker teardown by name skipped (not running or failed)'])),
+    ),
+  );
+}
+
+/**
  * Detect whether a PID belongs to a process running inside a Docker container.
  * Container processes appear in host lsof output when paths are bind-mounted.
  */
@@ -781,6 +800,11 @@ export function teardownWorkspace(
       }
     } else {
       results.push(stepSkipped('teardown:workspace', ['No workspace found to clean up']));
+      // PAN-3900: the directory can be gone (removed out of band) while its
+      // Docker stack and compose networks remain. Tear them down by name.
+      if (shouldDeleteWorkspace && !opts.skipDocker) {
+        results.push(yield* teardownDockerByName(issueLower));
+      }
     }
 
     // 9b. Strike worktrees are residue once the strike branch is merged —
