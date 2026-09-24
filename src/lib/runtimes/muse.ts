@@ -16,11 +16,32 @@ import { parseMuseSession } from '../cost-parsers/muse-parser.js';
 import { museSessionId, resolveMuseSessionPath, resolveMuseSessionPathSync } from './storage/muse.js';
 import { getRuntimeBehavior } from './behavior.js';
 import { appendSessionIdToHistory } from '../session-history.js';
-import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
+import { tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
+import { agentPaneExists, closeBackendPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
+import { launchRuntimePane, runtimeUsesSupervisor } from './runtime-pane-launch.js';
 import type { Agent, AgentRuntimeSync, CostBreakdown, Heartbeat, Session, SpawnConfig } from './types.js';
+
+export interface MuseRuntimeOptions {
+  /** The backend a spawn launches into. Defaults to the host's (`resolveLaunchBackend`). */
+  readonly resolveBackend?: () => Promise<TerminalBackend>;
+}
+
+/**
+ * Muse readiness on the launch backend. The prompt scan reads the pane; on
+ * Herdr a TUI drawn on the alternate screen reads back as empty text, so a
+ * healthy agent could time out there. After the bounded scan, a Herdr pane that
+ * is still present and has written its durable session log counts as started.
+ */
+async function waitForMuseStarted(agentId: string, backend: TerminalBackend): Promise<boolean> {
+  if (await waitForPromptReady(agentId, 'muse', 60)) return true;
+  if (backend.name !== 'herdr') return false;
+  return await agentPaneExists(agentId, backend) && (await resolveMuseSessionPath(agentId)) !== null;
+}
 
 export class MuseRuntimeSync implements AgentRuntimeSync {
   readonly name = 'muse' as const;
+  constructor(private readonly options: MuseRuntimeOptions = {}) {}
   getHarnessBehavior() { return getRuntimeBehavior(this.name); }
   getSessionPath(agentId: string) { return resolveMuseSessionPathSync(agentId); }
   getLastActivity(agentId: string): Date | null {
@@ -56,23 +77,33 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
   async isRunning(agentId: string): Promise<boolean> { return tmuxSessionExists(agentId); }
   async spawnAgent(config: SpawnConfig): Promise<Agent> {
     if (!config.model) throw new Error('Muse requires an explicitly configured model');
-    if (await this.isRunning(config.agentId)) throw new Error(`Agent ${config.agentId} is already running`);
+    const backend = await (this.options.resolveBackend ?? resolveLaunchBackend)();
+    const running = backend.name === 'herdr'
+      ? await agentPaneExists(config.agentId, backend)
+      : await this.isRunning(config.agentId);
+    if (running) throw new Error(`Agent ${config.agentId} is already running`);
     const launch = await prepareHarnessLaunch('muse');
     const dir = join(getOverdeckHome(), 'agents', config.agentId);
     await mkdir(dir, { recursive: true });
-    await writePtyToken(config.agentId);
+    // PAN-3936: the PTY supervisor is tmux-only.
+    const useSupervisor = runtimeUsesSupervisor(backend);
+    if (useSupervisor) await writePtyToken(config.agentId);
     const launcher = join(dir, 'launcher.sh');
     const script = generateLauncherScript({
       role: 'work', workingDir: config.workspace, harness: 'muse', museModel: config.model, museEffort: config.effort,
       museContextFile: await materializeMuseContext(config.agentId, config.workspace),
       museResumeSessionId: config.sessionId, overdeckEnv: { agentId: config.agentId },
-      extraEnvExports: [launch.pathExport], useSupervisor: true,
-      supervisorScriptPath: resolvePtySupervisorScriptPath(),
+      extraEnvExports: [launch.pathExport], useSupervisor,
+      ...(useSupervisor ? { supervisorScriptPath: resolvePtySupervisorScriptPath() } : {}),
     });
     await writeFile(launcher, script, { mode: 0o700 });
-    await tmuxCreateSession(config.agentId, config.workspace, `bash '${launcher.replace(/'/g, "'\\''")}'`, config.env);
+    let pane: AgentPaneRef | null = null;
     try {
-      if (!await waitForPromptReady(config.agentId, 'muse', 60)) throw new Error('Muse startup timed out');
+      pane = await launchRuntimePane({
+        agentId: config.agentId, workspace: config.workspace, harness: 'muse', model: config.model,
+        launcherScript: launcher, env: config.env, backend,
+      });
+      if (!await waitForMuseStarted(config.agentId, backend)) throw new Error('Muse startup timed out');
       const path = await resolveMuseSessionPath(config.agentId);
       if (!path) throw new Error('Muse started without a durable session log');
       appendSessionIdToHistory(config.agentId, museSessionId(path), 'launcher', { harness: 'muse', model: config.model, path });
@@ -80,6 +111,7 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
       return { id: config.agentId, sessionId: museSessionId(path), runtime: 'muse',
         model: config.model, workspace: config.workspace, startedAt: new Date() };
     } catch (error) {
+      await closeBackendPane(pane);
       await this.killAgent(config.agentId);
       throw error;
     }
