@@ -20,6 +20,13 @@ vi.mock('../tmux.js', () => ({
   sessionExists: () => Effect.succeed(mockSessionExists()),
 }));
 
+// The classifier's liveness read goes to the host's terminal backend
+// (PAN-3926); these stopped fixtures have no live pane on any backend.
+vi.mock('../agents/liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agents/liveness.js')>()),
+  isAlive: async () => ({ alive: false, reason: 'no-session' }),
+}));
+
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return { ...actual, existsSync: (path: string) => mockExistsSync(path) };
@@ -52,7 +59,6 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 import {
   assertCanStartFresh,
   getWorkAgentLifecycleState,
-  getWorkAgentLifecycleStateSync,
 } from '../work-agent-lifecycle.js';
 
 function stoppedAgentState(harness: string | undefined = 'claude-code') {
@@ -89,10 +95,10 @@ beforeEach(() => {
 });
 
 describe('Claude transcript resumability probe (PAN-3194)', () => {
-  it('routes a missing Claude transcript to a fresh start', () => {
+  it('routes a missing Claude transcript to a fresh start', async () => {
     configureLifecycle({ transcriptExists: false });
 
-    const lifecycle = getWorkAgentLifecycleStateSync('agent-pan-3194');
+    const lifecycle = await getWorkAgentLifecycleState('agent-pan-3194');
 
     expect(lifecycle).toMatchObject({
       hasSavedSession: true,
@@ -106,10 +112,10 @@ describe('Claude transcript resumability probe (PAN-3194)', () => {
     expect(lifecycle.reason).toContain('jsonl-missing');
   });
 
-  it('preserves resume behavior when the Claude transcript exists', () => {
+  it('preserves resume behavior when the Claude transcript exists', async () => {
     configureLifecycle({ transcriptExists: true });
 
-    const lifecycle = getWorkAgentLifecycleStateSync('agent-pan-3194');
+    const lifecycle = await getWorkAgentLifecycleState('agent-pan-3194');
 
     expect(lifecycle).toMatchObject({
       hasSavedSession: true,
@@ -122,39 +128,19 @@ describe('Claude transcript resumability probe (PAN-3194)', () => {
     });
   });
 
-  it('allows pan start to proceed without --fresh when the transcript is missing', () => {
+  it('allows pan start to proceed without --fresh when the transcript is missing', async () => {
     configureLifecycle({ transcriptExists: false });
 
-    expect(() => assertCanStartFresh('agent-pan-3194')).not.toThrow();
-    expect(assertCanStartFresh('agent-pan-3194').recommendedAction).toBe('start');
+    await expect(assertCanStartFresh('agent-pan-3194')).resolves.toMatchObject({ recommendedAction: 'start' });
   });
 
-  it('does not require a Claude JSONL for a non-Claude harness', () => {
+  it('does not require a Claude JSONL for a non-Claude harness', async () => {
     configureLifecycle({ transcriptExists: false, harness: 'codex' });
 
-    const lifecycle = getWorkAgentLifecycleStateSync('agent-pan-3194');
+    const lifecycle = await getWorkAgentLifecycleState('agent-pan-3194');
 
     expect(lifecycle.hasResumableTranscript).toBe(true);
     expect(lifecycle.canResumeSession).toBe(true);
     expect(lifecycle.recommendedAction).toBe('resume');
-  });
-
-  it('keeps sync and async snapshots aligned for missing and present transcripts', async () => {
-    for (const transcriptExists of [false, true]) {
-      configureLifecycle({ transcriptExists });
-
-      const syncLifecycle = getWorkAgentLifecycleStateSync('agent-pan-3194');
-      const asyncLifecycle = await getWorkAgentLifecycleState('agent-pan-3194');
-
-      expect(asyncLifecycle).toMatchObject({
-        hasSavedSession: syncLifecycle.hasSavedSession,
-        hasResumableTranscript: syncLifecycle.hasResumableTranscript,
-        recommendedAction: syncLifecycle.recommendedAction,
-        canStartFresh: syncLifecycle.canStartFresh,
-        canResumeSession: syncLifecycle.canResumeSession,
-        canResetSession: syncLifecycle.canResetSession,
-        requiresSessionResetBeforeFreshStart: syncLifecycle.requiresSessionResetBeforeFreshStart,
-      });
-    }
   });
 });

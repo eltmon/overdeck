@@ -89,7 +89,7 @@ import {
 import { spawnRemoteAgent, isRemoteAgentRunning, createFlyProviderFromConfig, checkRemoteSpendCap, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
-import { assertCanStartFresh, getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
+import { assertCanStartFresh, getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 import { normalizeModelOverride } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 import type { IssueOptions } from './start-options.js';
@@ -791,7 +791,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
   // No-op with exit 0 when the work agent is already live and running.
   // Paused/troubled cases are handled above; stopped-but-resumable cases are
-  // left for assertCanStartFreshSync below so the user sees the resume/fresh
+  // left for assertCanStartFresh below so the user sees the resume/fresh
   // guidance unchanged (hazard H2).
   //
   // PAN-3150: --fresh is an explicit request to REPLACE the current session, so
@@ -799,7 +799,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   // as `isRunning`, and the flywheel is forbidden `pan kill` — without this the
   // only recovery door for a frozen agent is closed to the one role that runs
   // unattended.
-  const lifecycleState = getWorkAgentLifecycleStateSync(agentId);
+  const lifecycleState = await getWorkAgentLifecycleState(agentId);
   const swarmActive = resolveSwarmPolicy(id).mode === 'always';
   if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck && !options.fresh) {
     console.log(chalk.green(`Work agent for ${id} is already running.`));
@@ -935,7 +935,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     } else if (!swarmActive) {
       try {
-        assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
+        await assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
       } catch (error) {
         if (workspacePath || isRemote) {
           throw error;

@@ -9,7 +9,7 @@ vi.mock('../../../lib/state-auto-migrate.js', () => ({
 }));
 
 const lifecycleMocks = vi.hoisted(() => ({
-  getWorkAgentLifecycleStateSync: vi.fn(),
+  getWorkAgentLifecycleState: vi.fn(),
   assertCanStartFresh: vi.fn(),
 }));
 
@@ -118,7 +118,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     delete process.env['OVERDECK_FLYWHEEL_RUN_ID'];
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-2407-running-'));
 
-    lifecycleMocks.getWorkAgentLifecycleStateSync.mockReset();
+    lifecycleMocks.getWorkAgentLifecycleState.mockReset();
     lifecycleMocks.assertCanStartFresh.mockReset();
     agentMocks.getAgentState.mockReset();
     agentMocks.clearAgentPaused.mockReset();
@@ -169,13 +169,13 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     vi.resetModules();
   });
 
-  function mockLifecycle(partial: Partial<ReturnType<typeof lifecycleMocks.getWorkAgentLifecycleStateSync>>) {
-    lifecycleMocks.getWorkAgentLifecycleStateSync.mockReturnValue({
+  function mockLifecycle(partial: Partial<ReturnType<typeof lifecycleMocks.getWorkAgentLifecycleState>>) {
+    lifecycleMocks.getWorkAgentLifecycleState.mockReturnValue({
       agentId: 'agent-pan-x',
       isRunning: false,
       isRunningButStuck: false,
       ...partial,
-    } as ReturnType<typeof lifecycleMocks.getWorkAgentLifecycleStateSync>);
+    } as ReturnType<typeof lifecycleMocks.getWorkAgentLifecycleState>);
   }
 
   it('exits 0 with a no-op message when the work agent is already running', async () => {
@@ -235,7 +235,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     const written = allConsoleOutput(stderrSpy);
     expect(written).toContain('paused');
     expect(written).toContain('pan unpause PAN-X');
-    expect(lifecycleMocks.getWorkAgentLifecycleStateSync).not.toHaveBeenCalled();
+    expect(lifecycleMocks.getWorkAgentLifecycleState).not.toHaveBeenCalled();
   });
 
   it('preserves exit 1 and troubled refusal when the agent is troubled', async () => {
@@ -254,7 +254,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     const written = allConsoleOutput(stderrSpy);
     expect(written).toContain('troubled');
     expect(written).toContain('pan untroubled PAN-X');
-    expect(lifecycleMocks.getWorkAgentLifecycleStateSync).not.toHaveBeenCalled();
+    expect(lifecycleMocks.getWorkAgentLifecycleState).not.toHaveBeenCalled();
   });
 
   it('preserves the resume/reset refusal for a stopped agent with a resumable session', async () => {

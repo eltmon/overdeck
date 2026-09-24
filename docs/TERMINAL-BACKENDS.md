@@ -510,8 +510,15 @@ the remediators would reap the fleet. On Herdr the oracle is `probeHerdrAgentLiv
 did not answer" (`runtime-indeterminate`, never a death). `isAliveOnTmux` is exported so the tmux
 adapter's own inventory keeps probing tmux on either host.
 
-**Known gap:** `isAliveSync` is still tmux-only — there is no synchronous Herdr client — so its
-callers (`work-agent-lifecycle.ts`, `parked/resolver.ts`) read a Herdr agent as `no-session`.
+There is no synchronous liveness door (PAN-3926). Herdr answers over an async socket, so a sync
+probe could only ask tmux, and it read every live Herdr agent as `no-session`. The lifecycle
+classifier (`getWorkAgentLifecycleState`, and the `assertCanStartFresh` / `assertCanResumeSession`
+guards behind `pan start`, `pan resume`, `pan unpause`, `pan reset-session` and the merge-strike
+route) and the parked sweeper (`parked/resolver.ts`) all await `isAlive`. The swarm counters in
+`cloister/concurrency.ts` (per-issue slot capacity, the emergency brake) read `listLiveAgentIds()`
+the same way `countRunningAgents` does. An unreadable inventory (`null`) fails open and every
+`running` row counts. The brake stops agents through the async `stopAgent`, so on Herdr it closes
+the pane.
 
 `runtimes/muse.ts`, `runtimes/kimi-code.ts` and `overdeck/conversation-runtime.ts` still hardcode
 `useSupervisor: true`, but that is no longer a launch failure: those harnesses are launched
