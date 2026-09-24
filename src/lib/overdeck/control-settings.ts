@@ -226,10 +226,6 @@ export const ConfigResolverLive = Layer.succeed(
   }),
 );
 
-// ── HTTP API groups ──────────────────────────────────────────────────────────
-// Runtime-control endpoints (startFlywheel, pauseFlywheel, resumeFlywheel,
-// abortFlywheel, emergencyStop, brake) are omitted pending workspace-lf582.
-
 // ── Sync helpers (for call sites that cannot use Effect) ─────────────────────
 
 function overdeckDb() {

@@ -15,10 +15,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { mkdtemp, rm } from 'fs/promises'
 import { Effect } from 'effect'
-import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner'
-import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
-import * as NodePath from '@effect/platform-node/NodePath'
-import { CheckpointError, GitError, InvalidAgentIdError, VcsError } from '../errors.js'
+import { CheckpointError, InvalidAgentIdError, VcsError } from '../errors.js'
 import { PAN_RUNTIME_SUBDIRS } from '../state-plane.js'
 
 const execFileAsync = promisify(execFile)
@@ -569,15 +566,4 @@ export function listCheckpoints(
     yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.promise(() => listCheckpointsPromise(cwd, agentId))
   })
-}
-
-// ─── Effect-native git runner (for callers that want typed GitError) ──────────
-//
-// Exposed for downstream perf-driver work. Internal use only for now —
-// existing call sites remain on execFileAsync until they migrate.
-
-interface CheckpointGitResult {
-  readonly stdout: string
-  readonly stderr: string
-  readonly exitCode: number
 }

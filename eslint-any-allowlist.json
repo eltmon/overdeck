@@ -150,7 +150,6 @@
   "src/lib/remote/remote-completion.ts",
   "src/lib/review-artifacts.ts",
   "src/lib/review-status.ts",
-  "src/lib/runtime/metrics.ts",
   "src/lib/settings.ts",
   "src/lib/shadow-engineering/observer-agent.ts",
   "src/lib/shadow-state.ts",

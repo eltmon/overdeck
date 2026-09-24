@@ -22,13 +22,6 @@ export interface ProviderEnvConflict {
   source: string;
 }
 
-interface OverlayResult {
-  settingsPath: string;
-  backedUp: boolean;
-  backupPath?: string;
-  keysInjected: string[];
-}
-
 /**
  * Permission deny patterns for Overdeck shared infrastructure. Work agents have
  * NO legitimate reason to delete or modify these — they're the orchestration substrate

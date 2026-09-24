@@ -188,19 +188,6 @@ export interface MergeResult {
 }
 
 /**
- * Merge history entry
- */
-interface MergeHistoryEntry {
-  timestamp: string;
-  issueId: string;
-  sourceBranch: string;
-  targetBranch: string;
-  conflictFiles: string[];
-  result: MergeResult;
-  sessionId?: string;
-}
-
-/**
  * Timeout for merge agent in milliseconds (15 minutes)
  */
 /**

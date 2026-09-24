@@ -15,7 +15,6 @@
 import { promises as fs } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import { encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { listProjectsSync } from '../projects.js';
 
@@ -174,9 +173,3 @@ async function addCandidateRoot(candidates: Set<string>, dir: string): Promise<v
     // Permission denied or non-existent directory — skip
   }
 }
-
-// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
-//
-// Additive Effect surface — wraps the existing class method so Effect-native
-// callers can use HashResolver with a typed error channel. The Promise-based
-// `resolve()` method remains canonical.
