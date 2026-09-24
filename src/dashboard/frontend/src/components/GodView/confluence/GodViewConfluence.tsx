@@ -9,7 +9,8 @@ import { IssueRail } from './IssueRail';
 import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
 import { useConfluenceChoreography, useSweepChoreography } from './useConfluenceChoreography';
-import { withObservedLiveness, type ConfluenceData, type ConfluenceOrb } from './useConfluenceData';
+import { withObservedLiveness } from './liveness';
+import type { ConfluenceData, ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
 
 interface HoverState {
