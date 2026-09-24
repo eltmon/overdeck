@@ -78,6 +78,8 @@ function toAgentSnapshot(state: AgentState & { tmuxActive?: boolean }): AgentSna
     phase: state.phase || undefined,
     workType: state.workType || undefined,
     roleRunHead: state.roleRunHead || undefined,
+    hasLivePane: state.tmuxActive,
+    // Deprecated alias of `hasLivePane` (#4105).
     hasLiveTmuxSession: state.tmuxActive,
     stoppedByUser: state.stoppedByUser,
     paused: state.paused,

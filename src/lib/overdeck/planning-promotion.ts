@@ -747,7 +747,7 @@ export async function completePlanningForIssue(options: {
           {
             type: 'agent.status_changed',
             timestamp: new Date().toISOString(),
-            payload: { agentId: sessionName, status: 'stopped', previousStatus, hasLiveTmuxSession },
+            payload: { agentId: sessionName, status: 'stopped', previousStatus, hasLivePane: hasLiveTmuxSession, hasLiveTmuxSession },
           },
         );
         console.log(`[complete-planning] Marked ${sessionName} as stopped (hasLiveTmuxSession=${hasLiveTmuxSession})`);

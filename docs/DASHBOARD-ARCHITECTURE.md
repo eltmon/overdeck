@@ -62,7 +62,9 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   that, a failed read keeps the last-good panes. Stored `stopped`/`error` and the `paused`
   / `stoppedByUser` intent fields pass through unchanged. Only `agent-`, `planning-` and
   `strike-` ids are derived, the set the inventory answers for
-  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`).
+  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`). A row served
+  `stopped` this way also has `hasLivePane` (and its deprecated alias
+  `hasLiveTmuxSession`) served `false`; a row served `unknown` keeps its stored flags.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 - The Command Deck project list (`command-deck-projects`), project registry

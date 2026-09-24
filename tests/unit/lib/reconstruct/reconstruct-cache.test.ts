@@ -90,6 +90,7 @@ describe('reconstructCache', () => {
     const result = await reconstructCache(fakeDb());
     expect(result.agentsEnumerated).toBe(2);
     expect(result.agentsById['agent-pan-1920']?.issueId).toBe('PAN-1920');
+    expect(result.agentsById['agent-pan-1920']).toMatchObject({ hasLivePane: true, hasLiveTmuxSession: true });
     expect(result.agentRuntimeById['agent-pan-1920']?.activity).toBe('working');
   });
 
@@ -107,6 +108,7 @@ describe('reconstructCache', () => {
 
     const result = await reconstructCache(fakeDb());
     expect(result.agentsById['agent-pan-1919']?.status).toBe('stopped');
+    expect(result.agentsById['agent-pan-1919']).toMatchObject({ hasLivePane: false, hasLiveTmuxSession: false });
     expect(result.agentRuntimeById['agent-pan-1919']?.activity).toBe('stopped');
   });
 

@@ -319,6 +319,12 @@ export const AgentSnapshot = Schema.Struct({
   phase: Schema.optional(Schema.String),
   workType: Schema.optional(Schema.String),
   roleRunHead: Schema.optional(Schema.String),
+  /** The agent has a live pane on its terminal backend (Herdr or tmux). */
+  hasLivePane: Schema.optional(Schema.Boolean),
+  /**
+   * @deprecated Misnamed alias of `hasLivePane`: true for a live pane on either
+   * backend, not only a tmux session. Still populated for compatibility (#4105).
+   */
   hasLiveTmuxSession: Schema.optional(Schema.Boolean),
   stoppedByUser: Schema.optional(Schema.Boolean),
   paused: Schema.optional(Schema.Boolean),

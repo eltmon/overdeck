@@ -220,7 +220,7 @@ describe('FleetAgentsView', () => {
           status: 'unknown',
           role: 'strike',
           startedAt: '2026-05-01T00:00:00.000Z',
-          hasLiveTmuxSession: false,
+          hasLivePane: false,
           lastFailureReason: 'No live tmux session found for registered agent',
         }),
       },
