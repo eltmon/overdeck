@@ -1,6 +1,7 @@
 /**
  * Read the Deacon/resume boot gates of the dashboard that is running now, so
- * `pan reload` can hand them to the server that replaces it (PAN-3899).
+ * `pan reload` can hand its resume gate to the server that replaces it
+ * (PAN-3899). Deacon is never carried: reload always boots it on.
  *
  * The gates live nowhere but the running process: `applyBootGateEnv` stamps
  * them into the server's env at spawn. `/api/health` reports them
@@ -28,14 +29,39 @@ const GATE_ENV_KEYS = [
 ];
 
 export interface RunningBootGatesDeps {
-  readonly fetchHealth?: (url: string) => Promise<unknown>;
+  readonly fetchHealth?: (url: string, timeoutMs: number) => Promise<unknown>;
   readonly readEnviron?: (pid: number) => Promise<string>;
+  /**
+   * Budget of each health read. The second read is the retry: a dashboard under
+   * load can miss the first budget, and the reload has already waited for
+   * approval, so a longer second try costs nothing.
+   */
+  readonly attemptTimeoutsMs?: readonly number[];
 }
 
-async function defaultFetchHealth(url: string): Promise<unknown> {
-  // An incoherent (503) server still reports its gates, so read the body either way.
-  const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
-  return res.json();
+/** The gates, or why they could not be read. */
+export type RunningBootGatesRead =
+  | { readonly gates: BootGateState; readonly reason?: undefined }
+  | { readonly gates: null; readonly reason: string };
+
+const DEFAULT_ATTEMPT_TIMEOUTS_MS = [2_000, 8_000] as const;
+
+/**
+ * GET the health body with a hard budget. An incoherent (503) server still
+ * reports its gates, so the body is read whatever the status. A non-JSON body
+ * or a missed budget throws.
+ */
+export async function fetchHealthBody(url: string, timeoutMs: number): Promise<unknown> {
+  // AbortController + setTimeout rather than AbortSignal.timeout so the budget
+  // runs on the timers tests can drive.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error(`no answer within ${timeoutMs}ms`)), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function defaultReadEnviron(pid: number): Promise<string> {
@@ -53,34 +79,53 @@ function gatesFromEnviron(environ: string): BootGateState {
   return resolveBootGates({}, env);
 }
 
+function describeError(error: unknown): string {
+  const cause = error instanceof Error ? (error.cause ?? error) : error;
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
 /**
- * The boot gates of the dashboard serving `apiPort`, or null when no dashboard
- * answers, the one that answers serves another checkout than `repoRoot`, or its
- * gates cannot be read.
+ * The boot gates of the dashboard serving `apiPort`. Misses (with the reason)
+ * when no dashboard answers within two tries, the answer is not JSON, it
+ * serves another checkout than `repoRoot`, or its gates cannot be read.
  */
 export async function readRunningDashboardBootGates(
   apiPort: number,
   repoRoot: string,
   deps: RunningBootGatesDeps = {},
-): Promise<BootGateState | null> {
+): Promise<RunningBootGatesRead> {
+  const url = `http://127.0.0.1:${apiPort}/api/health`;
+  const fetchHealth = deps.fetchHealth ?? fetchHealthBody;
+  const budgets = deps.attemptTimeoutsMs ?? DEFAULT_ATTEMPT_TIMEOUTS_MS;
   let body: unknown;
-  try {
-    body = await (deps.fetchHealth ?? defaultFetchHealth)(`http://127.0.0.1:${apiPort}/api/health`);
-  } catch {
-    return null;
+  let lastError = 'no health read attempted';
+  let answered = false;
+  for (const timeoutMs of budgets) {
+    try {
+      body = await fetchHealth(url, timeoutMs);
+      answered = true;
+      break;
+    } catch (error) {
+      lastError = describeError(error);
+    }
   }
-  if (!body || typeof body !== 'object') return null;
+  if (!answered) return { gates: null, reason: `${url} unreadable after ${budgets.length} tries: ${lastError}` };
+  if (!body || typeof body !== 'object') return { gates: null, reason: `${url} returned no health object` };
   const payload = body as Record<string, unknown>;
-  if (typeof payload.repoRoot !== 'string' || resolve(payload.repoRoot) !== resolve(repoRoot)) return null;
+  if (typeof payload.repoRoot !== 'string' || resolve(payload.repoRoot) !== resolve(repoRoot)) {
+    return { gates: null, reason: `the dashboard on port ${apiPort} serves ${String(payload.repoRoot)}, not ${repoRoot}` };
+  }
 
   const reported = parseBootGateState(payload.bootGates);
-  if (reported) return reported;
+  if (reported) return { gates: reported };
 
   const pid = payload.pid;
-  if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return null;
+  if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) {
+    return { gates: null, reason: 'the running dashboard reports neither its gates nor a pid' };
+  }
   try {
-    return gatesFromEnviron(await (deps.readEnviron ?? defaultReadEnviron)(pid));
-  } catch {
-    return null;
+    return { gates: gatesFromEnviron(await (deps.readEnviron ?? defaultReadEnviron)(pid)) };
+  } catch (error) {
+    return { gates: null, reason: `could not read /proc/${pid}/environ: ${describeError(error)}` };
   }
 }

@@ -250,11 +250,12 @@ export type SystemctlRunner = (args: readonly string[]) => string;
 
 export interface DashboardSpawnOptions extends BootGateOptions {
   /**
-   * Gates of the server being replaced. They seed the spawn env before the
-   * explicit flags apply, so precedence is flag > running server > shell env
-   * > default (PAN-3899).
+   * An already-resolved gate state, stamped into the spawn env verbatim so the
+   * invoking shell's gate env cannot change it. `pan reload` passes one: Deacon
+   * forced on, resume carried from the server it replaces (PAN-3899). Explicit
+   * `deacon`/`resume` options still apply on top.
    */
-  readonly inheritBootGates?: BootGateState | null;
+  readonly bootGates?: BootGateState;
   readonly serverPath?: string;
   readonly repoRoot?: string;
   readonly runSystemctl?: SystemctlRunner;
@@ -269,7 +270,7 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardS
     });
   }
   const baseEnv = { ...process.env };
-  if (opts?.inheritBootGates) writeBootGateEnv(baseEnv, opts.inheritBootGates);
+  if (opts?.bootGates) writeBootGateEnv(baseEnv, opts.bootGates);
   const env = applyBootGateEnv(baseEnv, opts);
   scrubAgentIdentityFromDashboardEnv(env);
   const traefikEnv = config.traefikEnabled
