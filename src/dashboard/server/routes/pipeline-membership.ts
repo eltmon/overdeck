@@ -1,4 +1,8 @@
-import type { PipelineMembershipUnavailableBody } from '@overdeck/contracts';
+import {
+  PIPELINE_MEMBERSHIP_LOADING_CODE,
+  type PipelineMembershipLoadingBody,
+  type PipelineMembershipUnavailableBody,
+} from '@overdeck/contracts';
 
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
@@ -20,6 +24,13 @@ import {
   refreshMembershipSnapshotsForProjects,
 } from '../services/pipeline-membership.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+
+/**
+ * PAN-3527 — seconds a client should wait before re-reading a snapshot that is
+ * still loading. Boot warms every project's snapshot in the background, so the
+ * answer changes within seconds, not minutes.
+ */
+export const PIPELINE_MEMBERSHIP_LOADING_RETRY_AFTER_SECONDS = 5;
 
 // ─── Route: GET /api/pipeline/membership ──────────────────────────────────────
 
@@ -47,7 +58,19 @@ const getPipelineMembershipRoute = HttpRouter.add(
       };
       return jsonResponse(body);
     }
-    return jsonResponse({ error: 'Pipeline membership snapshot is loading' }, { status: 503 });
+    // PAN-3527: "not gathered yet" is temporary, not an answer about the
+    // project. A typed code and Retry-After let the dashboard retry it instead
+    // of latching it as the settled "could not be loaded" banner.
+    const loading: PipelineMembershipLoadingBody = {
+      status: 'loading',
+      code: PIPELINE_MEMBERSHIP_LOADING_CODE,
+      error: 'Pipeline membership snapshot is loading',
+      projectKey,
+    };
+    return jsonResponse(loading, {
+      status: 503,
+      headers: { 'Retry-After': String(PIPELINE_MEMBERSHIP_LOADING_RETRY_AFTER_SECONDS) },
+    });
   })),
 );
 
