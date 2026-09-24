@@ -2,11 +2,13 @@
  * PAN-3917 W6: `/api/flywheel/config` and `/api/flywheel/auto-merge/*` moved
  * to `/api/merge-train/*` (D3). The gate moved with them: scheduling an
  * auto-merge no longer asks a flywheel run or a review-status record, it asks
- * the derived issue state — approvals plus green checks plus mergeability.
+ * the merge gate (#4040, #3983) — approvals (a forge review or a trusted
+ * verdict marker) plus green checks plus mergeability.
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import type { DerivedIssueState } from '@overdeck/contracts';
+import type { MergeGateResult } from '../../../../lib/cloister/merge-gate.js';
+import type { PrFacts } from '../../../../lib/cloister/pr-facts.js';
 
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
 // W5 owns these; they still reach the record plane in this tree, so the route
@@ -47,19 +49,32 @@ const {
 } = await import('../merge-train.js');
 const controlSettings = await import('../../../../lib/overdeck/control-settings.js');
 
-function derived(overrides: Partial<DerivedIssueState> = {}): DerivedIssueState {
-  return {
-    issueId: 'PAN-3917',
-    state: 'ready',
-    pr: {
-      url: 'https://github.com/eltmon/overdeck/pull/42',
-      number: 42,
-      reviewState: 'approved',
-      checks: 'green',
-      mergeable: true,
-    },
-    ...overrides,
-  };
+const READY_FACTS: PrFacts = {
+  issueId: 'PAN-3917',
+  forge: 'github',
+  url: 'https://github.com/eltmon/overdeck/pull/42',
+  number: 42,
+  exists: true,
+  open: true,
+  merged: false,
+  closed: false,
+  draft: false,
+  headSha: 'abc123',
+  headBranch: 'feature/pan-3917',
+  reviewDecision: 'APPROVED',
+  approved: true,
+  changesRequested: false,
+  mergeable: true,
+  mergeableState: 'mergeable',
+  checks: 'green',
+  testChecks: 'green',
+  testJobSucceeded: true,
+  uatVerdict: null,
+};
+
+/** What the merge gate answers: ready on READY_FACTS unless told otherwise. */
+function gate(facts: Partial<PrFacts> = {}, readiness: { ready: boolean; reason?: string } = { ready: true }): MergeGateResult {
+  return { ...readiness, facts: { ...READY_FACTS, ...facts } };
 }
 
 const baseDeps = {
@@ -74,11 +89,11 @@ const baseDeps = {
 };
 
 describe('POST /api/merge-train/auto-merge/schedule', () => {
-  it('schedules a ready issue from the derived PR facts', async () => {
+  it("schedules a ready issue from the merge gate's PR facts", async () => {
     const schedule = vi.fn(() => ({ created: true, entry: { id: 1, issueId: 'PAN-3917', status: 'pending' } }));
     const result = await postAutoMergeSchedulePayload({ issueId: 'pan-3917' }, {
       ...baseDeps,
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: schedule as never,
     });
     expect(result.status).toBe(200);
@@ -91,21 +106,21 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
     }));
   });
 
-  it('refuses an issue that does not derive to ready', async () => {
+  it('refuses an issue the merge gate says is not ready', async () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
-      derivedState: async () => derived({ state: 'changes-requested' }),
+      mergeGate: async () => gate({ changesRequested: true, approved: false }, { ready: false, reason: 'latest review requested changes' }),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(422);
-    expect(result.body).toEqual({ error: 'PAN-3917 is changes-requested, not ready to merge' });
+    expect(result.body).toEqual({ error: 'PAN-3917 is not ready to merge: latest review requested changes' });
   });
 
   it('refuses while UAT is still required', async () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
       isRequireUatBeforeMerge: () => true,
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(412);
@@ -118,7 +133,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
       isRequireUatBeforeMerge: () => true,
       getProjectAutoMergeDefault: () => 'hold',
       getIssueLabels: () => ['auto-merge'],
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: schedule as never,
     });
     expect(result.status).toBe(200);
@@ -131,7 +146,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
       isRequireUatBeforeMerge: () => false,
       getProjectAutoMergeDefault: () => 'auto',
       getIssueLabels: () => ['hold-for-uat'],
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(412);
@@ -142,7 +157,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
       isMergeTrainEnabled: () => false,
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(412);
@@ -153,7 +168,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
       isEligible: async () => ({ eligible: false, reason: 'do-not-merge label' }) as const,
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(422);
@@ -163,9 +178,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
   it('rejects a PR URL that is not a recognized forge artifact', async () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
-      derivedState: async () => derived({
-        pr: { url: 'https://example.com/nope', number: 42, reviewState: 'approved', checks: 'green', mergeable: true },
-      }),
+      mergeGate: async () => gate({ url: 'https://example.com/nope' }),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(422);

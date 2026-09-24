@@ -19,8 +19,8 @@ vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', () => ({
   isAutoMergeEligible: vi.fn(async () => ({ eligible: true })),
 }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
-vi.mock('../derived-issue-state.js', () => ({
-  getDerivedIssueState: vi.fn(async (issueId: string) => ({ issueId, state: 'ready' })),
+vi.mock('../../../../lib/cloister/merge-gate.js', () => ({
+  evaluateIssueMergeGate: vi.fn(async () => ({ ready: true })),
 }));
 
 import {
@@ -31,7 +31,6 @@ import {
   stopAutoMergeExecutor,
   tickAutoMergeExecutor,
 } from '../auto-merge-executor.js';
-import type { DerivedIssueState, IssueState } from '@overdeck/contracts';
 import type { PendingAutoMerge } from '../../../../lib/overdeck/merge-types.js';
 
 const NOW = new Date('2026-05-25T10:00:00.000Z');
@@ -76,7 +75,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry({ scheduledMergeAt: '2026-05-25T10:00:01.000Z' })],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       transition,
       mergeIssue,
@@ -113,7 +112,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry(), pendingEntry({ id: 2, issueId: 'PAN-1487' })],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => deployQueued,
       isEligible,
       transition,
@@ -145,7 +144,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD abc123' }),
       markBlocked,
@@ -164,7 +163,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => false,
@@ -185,7 +184,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -210,7 +209,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -244,7 +243,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -281,7 +280,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -312,7 +311,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -341,7 +340,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -367,7 +366,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => ({ ready: true }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -431,17 +430,13 @@ describe('auto-merge executor', () => {
       isEligible: async () => ({ eligible: true }),
       // A push landed between scheduling and the cooldown expiring, so checks
       // went back to pending — the forge, not a stored row, decides.
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({
-        issueId,
-        state: 'in-review',
-        pr: { url: 'u', number: 1486, reviewState: 'approved', checks: 'pending', mergeable: true },
-      }),
+      mergeGate: async () => ({ ready: false, reason: 'CI checks still pending on PR HEAD abc123' }),
       markBlocked,
       transition,
       mergeIssue,
     });
 
-    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is in-review, not ready to merge');
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is not ready to merge: CI checks still pending on PR HEAD abc123');
     expect(transition).not.toHaveBeenCalled();
     expect(mergeIssue).not.toHaveBeenCalled();
   });
@@ -455,7 +450,7 @@ describe('auto-merge executor', () => {
       isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true as const }),
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' as IssueState }),
+      mergeGate: async () => ({ ready: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: false, retryable: true, error: 'transient' }),
       requeueToPending,

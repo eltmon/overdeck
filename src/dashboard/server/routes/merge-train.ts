@@ -56,7 +56,8 @@ import {
   type ScheduleAutoMergeInput,
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
-import { getDerivedIssueState, listReadyIssuesForProject, type IssueStateLoaderDeps } from '../services/derived-issue-state.js';
+import { listReadyIssuesForProject } from '../services/derived-issue-state.js';
+import { evaluateIssueMergeGate, type MergeGateResult } from '../../../lib/cloister/merge-gate.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import type { PipelineMembership } from '../../../lib/pipeline-membership.js';
 
@@ -484,7 +485,8 @@ export interface AutoMergeScheduleDeps {
   isRequireUatBeforeMerge?: () => boolean;
   isMergeTrainEnabled?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
-  derivedState?: (issueId: string, deps?: IssueStateLoaderDeps) => ReturnType<typeof getDerivedIssueState>;
+  /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
+  mergeGate?: (issueId: string) => Promise<MergeGateResult>;
   resolveProject?: (issueId: string) => ResolvedProject | null;
   schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
   announce?: (issueId: string, entry: PendingAutoMerge) => void;
@@ -534,9 +536,37 @@ function announceAutoMergeCancelled(issueId: string): void {
   });
 }
 
+type AutoMergePolicyDeps = Pick<
+  AutoMergeScheduleDeps,
+  'getIssueLabels' | 'getProjectAutoMergeDefault' | 'isRequireUatBeforeMerge' | 'isMergeTrainEnabled'
+>;
+
 /**
- * Schedule an auto-merge. The gate is the forge: the issue must derive to
- * `ready`, which is approved plus green checks plus `mergeable` (FR-9).
+ * The schedule door's policy check, which reads no forge: the issue's UAT hold
+ * (its `auto-merge` / `hold-for-uat` label (PAN-3932), then the project
+ * default, then global) and the merge-train switch. The scheduler (#3983) asks
+ * it first, so a held PR costs no forge read per tick.
+ */
+export function autoMergePolicyRefusal(
+  issueId: string,
+  deps: AutoMergePolicyDeps = {},
+): { status: 412; body: { error: string } } | null {
+  const labels = (deps.getIssueLabels ?? cachedIssueLabels)(issueId);
+  const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
+  const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();
+  if (shouldHoldForUat(autoMergeFromLabels(labels), projectDefault, globalRequireUat)) {
+    return { status: 412, body: { error: 'UAT is still required before merge' } };
+  }
+  if (!(deps.isMergeTrainEnabled ?? isMergeTrainEnabled)()) {
+    return { status: 412, body: { error: 'Merge train is disabled' } };
+  }
+  return null;
+}
+
+/**
+ * Schedule an auto-merge. The gate is the one merge gate, `evaluateIssueMergeGate`
+ * (#4040): approved (a forge review or a trusted verdict marker), green checks,
+ * and `mergeable` on the PR the gate links to the issue (FR-9).
  */
 export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoMergeScheduleDeps = {}) {
   if (!isJsonObject(payload)) {
@@ -548,16 +578,12 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   }
   const issueId = rawIssueId.trim().toUpperCase();
 
-  // PAN-1691/1695 tiers: the issue's `auto-merge` / `hold-for-uat` label
-  // (PAN-3932), then the project default, then global.
-  const labels = (deps.getIssueLabels ?? cachedIssueLabels)(issueId);
-  const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
-  const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();
-  if (shouldHoldForUat(autoMergeFromLabels(labels), projectDefault, globalRequireUat)) {
-    return { status: 412, body: { error: 'UAT is still required before merge' } };
-  }
-  if (!(deps.isMergeTrainEnabled ?? isMergeTrainEnabled)()) {
-    return { status: 412, body: { error: 'Merge train is disabled' } };
+  const refusal = autoMergePolicyRefusal(issueId, deps);
+  if (refusal) return refusal;
+
+  const gate = await (deps.mergeGate ?? evaluateIssueMergeGate)(issueId);
+  if (!gate.ready) {
+    return { status: 422, body: { error: `${issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}` } };
   }
 
   const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(issueId);
@@ -565,15 +591,11 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
     return { status: 422, body: { error: eligibility.reason } };
   }
 
-  const derived = await (deps.derivedState ?? getDerivedIssueState)(issueId);
-  if (derived.state !== 'ready') {
-    return { status: 422, body: { error: `${issueId} is ${derived.state}, not ready to merge` } };
-  }
-  const pr = derived.pr;
-  if (!pr || !pr.url) {
+  const prUrl = gate.facts.url;
+  if (!prUrl) {
     return { status: 422, body: { error: `No pull request for ${issueId}` } };
   }
-  const artifactRef = parseArtifactRef(pr.url);
+  const artifactRef = parseArtifactRef(prUrl);
   if (artifactRef === null) {
     return { status: 422, body: { error: `Pull request URL for ${issueId} is not a recognized forge artifact` } };
   }
@@ -585,7 +607,7 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   const scheduledMergeAt = new Date(scheduledAt.getTime() + AUTO_MERGE_COOLDOWN_MS);
   const result = (deps.schedule ?? scheduleAutoMergeWithResult)({
     issueId,
-    prUrl: pr.url,
+    prUrl,
     prNumber: artifactRef.number,
     projectKey: project.projectKey,
     forge: artifactRef.forge,

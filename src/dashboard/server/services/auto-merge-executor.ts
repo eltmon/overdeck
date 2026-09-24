@@ -12,7 +12,8 @@ import {
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 import { isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
-import { getDerivedIssueState } from './derived-issue-state.js';
+import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
+import type { MergeReadiness } from '../../../lib/cloister/pr-facts.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
 
@@ -62,7 +63,8 @@ export interface AutoMergeExecutorDeps {
   /** The merge train must be on for auto-merge to act. */
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
-  derivedState?: (issueId: string) => ReturnType<typeof getDerivedIssueState>;
+  /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
+  mergeGate?: (issueId: string) => Promise<MergeReadiness>;
   hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
@@ -144,13 +146,13 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
       continue;
     }
 
-    // FR-9/D3: the merge gate is the forge — approvals, green checks, and
-    // mergeability — which is exactly `ready`. Re-read on every tick, because
-    // a push or a failing check between scheduling and the cooldown expiring
-    // must stop the merge.
-    const derived = await (deps.derivedState ?? getDerivedIssueState)(entry.issueId);
-    if (derived.state !== 'ready') {
-      const reason = `${entry.issueId} is ${derived.state}, not ready to merge`;
+    // FR-9/D3: the merge gate is the forge — approvals (a forge review or a
+    // trusted verdict marker), green checks, and mergeability (#4040, #3983).
+    // Re-read on every tick, because a push or a failing check between
+    // scheduling and the cooldown expiring must stop the merge.
+    const gate = await (deps.mergeGate ?? evaluateIssueMergeGate)(entry.issueId);
+    if (!gate.ready) {
+      const reason = `${entry.issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}`;
       if (!(deps.markBlocked ?? markBlocked)(entry.id, reason)) {
         log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
       }
