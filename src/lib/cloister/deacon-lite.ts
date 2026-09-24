@@ -302,7 +302,7 @@ async function recoverDeadSynthesis(issueId: string, workspacePath: string, runI
   // The cooldown starts BEFORE the relaunch, so no tick can act while it runs.
   lastReviewRedispatchAt.set(issueId, now);
   try {
-    const { redispatchReviewSynthesis } = await import('./review-agent.js');
+    const { redispatchReviewSynthesis } = await import('./review-synthesis-recovery.js');
     const result = await redispatchReviewSynthesis(issueId, { workspace: workspacePath, runId, source: 'deacon-lite' });
     if (!result.success) {
       // One attempt per cooldown window: a spawn that failed is not retried

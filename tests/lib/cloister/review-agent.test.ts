@@ -25,8 +25,6 @@ import {
   buildConvoyPrompt,
   buildReviewRolePrompt,
   recoverMissingConvoyReviewers,
-  redispatchReviewSynthesis,
-  __resetSynthesisRecoveryForTests,
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
@@ -35,6 +33,10 @@ import {
   spawnReviewRoleForIssue,
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
+import {
+  redispatchReviewSynthesis,
+  __resetSynthesisRecoveryForTests,
+} from '../../../src/lib/cloister/review-synthesis-recovery.js';
 import { appendPipelineEntry } from '../../../src/lib/cloister/pipeline-journal.js';
 
 const {

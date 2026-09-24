@@ -128,8 +128,9 @@ const postWorkspaceReviewPurgeRoute = HttpRouter.add(
 //
 // Kill all running reviewer tmux sessions for an issue. Does NOT message the
 // work agent — leaves the worker idle. Use this to stop a runaway or stuck
-// review without triggering a resubmit. PAN-3917: killing the sessions is the
-// whole effect; the PR keeps whatever review state the forge holds.
+// review without triggering a resubmit. PAN-3917: killing the sessions (plus a
+// `review.aborted` journal entry, #4134) is the whole effect; the PR keeps
+// whatever review state the forge holds.
 
 const postWorkspaceAbortReviewRoute = HttpRouter.add(
   'POST',

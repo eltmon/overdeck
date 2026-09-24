@@ -33,7 +33,7 @@ vi.mock('../../agents/liveness.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../agents/liveness.js')>()),
   isAlive: mocks.isAlive,
 }));
-vi.mock('../review-agent.js', () => ({ redispatchReviewSynthesis: mocks.redispatchReviewSynthesis }));
+vi.mock('../review-synthesis-recovery.js', () => ({ redispatchReviewSynthesis: mocks.redispatchReviewSynthesis }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: mocks.emitActivityEntry }));
 
 const { appendPipelineEntry, readPipelineJournal } = await import('../pipeline-journal.js');
