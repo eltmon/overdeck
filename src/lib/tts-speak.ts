@@ -73,6 +73,7 @@ function resolveVoiceId(options: ResolveAndSpeakOptions, config: NormalizedTtsDa
   return config.voice;
 }
 
+/** Build a TTS speak payload from a voice + text. Pure. */
 export function buildTtsSpeakPayloadSync(
   voice: TtsVoice,
   text: string,
@@ -192,13 +193,3 @@ export async function resolveAndSpeak(
 
   return postSpeakPayload(buildTtsSpeakPayloadSync(voice, text, config), config, deps);
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Build a TTS speak payload from a voice + text. Pure. */
-export const buildTtsSpeakPayload = (
-  voice: TtsVoice,
-  text: string,
-  config: NormalizedTtsDaemonConfig,
-): Effect.Effect<TtsSpeakPayload> =>
-  Effect.sync(() => buildTtsSpeakPayloadSync(voice, text, config));

@@ -82,7 +82,7 @@ vi.mock('../../../../lib/harness-resolve.js', () => ({
 }));
 
 vi.mock('../../../../lib/workspace-manager.js', () => ({
-  preTrustDirectory: vi.fn(),
+  preTrustDirectorySync: vi.fn(),
 }));
 
 vi.mock('../../event-store.js', () => ({

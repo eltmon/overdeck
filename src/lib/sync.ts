@@ -2,14 +2,12 @@ import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync,
 import { execSync } from 'child_process';
 import { join, basename, dirname, relative } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import {
   SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, CLAUDE_DIR,
   SYNC_SOURCES,
   CACHE_AGENTS_DIR, CACHE_RULES_DIR, CACHE_MANIFEST,
   SYNC_TARGET, isDevMode,
 } from './paths.js';
-import { FsError } from './errors.js';
 import {
   buildManifestFromDirectory, writeManifestSync, readManifestSync, hashFileSync,
   setManifestEntry, collectSourceFilesSync, pruneStaleManifestEntriesSync,
@@ -1027,14 +1025,3 @@ export function syncPiSettingsSync(): PiSettingsSyncResult {
   };
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-const toSyncFsError = (op: string, cause: unknown): FsError =>
-  new FsError({ path: SYNC_TARGET.skills, operation: op, cause });
-
-/** Render the global + project context layers into harness CLAUDE.md files. */
-export const syncContextLayers = (): Effect.Effect<ContextLayerSyncResult, FsError> =>
-  Effect.try({
-    try: () => syncContextLayersSync(),
-    catch: (cause) => toSyncFsError('syncContextLayers', cause),
-  });

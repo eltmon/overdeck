@@ -5,7 +5,6 @@
  * Legacy presets are no longer supported - all selection is now smart/capability-based.
  */
 
-import { Effect } from 'effect';
 import { readFileSync, writeFileSync, existsSync, renameSync, readdirSync, lstatSync, readlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -285,16 +284,3 @@ export function migrateSyncTargetsSync(): { migrated: boolean; hadNonClaudeTarge
     return { migrated: false, hadNonClaudeTargets: false };
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// One-shot config-migration helpers. Each is run at most once per install at
-// CLI startup. Errors are caught internally (return false / empty result), so
-// Effect.sync is appropriate here.
-
-/** True when legacy settings.json exists and config.yaml doesn't. Pure. */
-export const needsMigration = (): Effect.Effect<boolean> =>
-  Effect.sync(() => needsMigrationSync());
-
-/** True if any legacy settings.json is present (with or without yaml). Pure. */
-export const hasLegacySettings = (): Effect.Effect<boolean> =>
-  Effect.sync(() => hasLegacySettingsSync());

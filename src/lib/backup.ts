@@ -1,8 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, cpSync, rmSync, lstatSync } from 'fs';
 import { join, basename } from 'path';
-import { Effect } from 'effect';
 import { BACKUPS_DIR } from './paths.js';
-import { FsError } from './errors.js';
 
 export interface BackupInfo {
   timestamp: string;
@@ -14,6 +12,10 @@ export function createBackupTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
+/**
+ * Create a timestamped backup of the supplied source directories. Throws on a
+ * copy failure.
+ */
 export function createBackupSync(sourceDirs: string[]): BackupInfo {
   const timestamp = createBackupTimestamp();
   const backupPath = join(BACKUPS_DIR, timestamp);
@@ -126,18 +128,3 @@ export function cleanOldBackupsSync(keepCount: number = 10): number {
 
   return removed;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Create a timestamped backup of the supplied source directories.
- * Effect-native. Fails with FsError on copy failure.
- */
-export const createBackup = (
-  sourceDirs: readonly string[],
-): Effect.Effect<BackupInfo, FsError> =>
-  Effect.try({
-    try: () => createBackupSync([...sourceDirs]),
-    catch: (cause) =>
-      new FsError({ path: BACKUPS_DIR, operation: 'createBackup', cause }),
-  });

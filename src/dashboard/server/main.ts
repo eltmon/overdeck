@@ -41,7 +41,7 @@ import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier } from '../../lib/cloister/deacon-lite.js';
-import { getAgentState, type AgentState } from '../../lib/agents.js';
+import { getAgentStateSync, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
@@ -450,7 +450,7 @@ setAgentStoppedNotifier((agentId) => {
   void (async () => {
     try {
       const es = getEventStore();
-      const state = await Effect.runPromise(getAgentState(agentId));
+      const state = getAgentStateSync(agentId);
       if (state) {
         // heartbeat_dead only updates runtime snapshot; emit it directly.
         es.append({

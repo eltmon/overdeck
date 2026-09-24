@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { KNOWN_HARNESSES } from '@overdeck/contracts';
 import type { RuntimeName } from '../../runtimes/types.js';
@@ -54,7 +53,7 @@ vi.mock('../../transcript-landing.js', () => ({
 }));
 vi.mock('../../agents.js', () => ({
   deliverAgentMessage: mocks.deliverAgentMessage,
-  getAgentState: mocks.getAgentState,
+  getAgentStateSync: mocks.getAgentState,
   injectPiConversationMemory: vi.fn(async (_context, message) => message),
   messageAgent: mocks.messageAgent,
 }));
@@ -122,7 +121,7 @@ function decodeJsonResponse(response: { body: unknown }) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getConversationByName.mockImplementation(() => conversation(mocks.activeHarness as RuntimeName));
-  mocks.getAgentState.mockImplementation(() => Effect.succeed({
+  mocks.getAgentState.mockImplementation(() => ({
     harness: mocks.activeHarness,
     workspace: `/tmp/agent-${mocks.activeHarness}`,
     issueId: 'PAN-999',
@@ -161,11 +160,11 @@ describe('composer command harness interception matrix (all KNOWN_HARNESSES)', (
     const results = [];
     for (const harness of HARNESSES) {
       mocks.activeHarness = harness;
-      mocks.getAgentState.mockReturnValue(Effect.succeed({
+      mocks.getAgentState.mockReturnValue({
         harness,
         workspace: `/tmp/agent-${harness}`,
         issueId: 'PAN-999',
-      }));
+      });
 
       const response = await handleAgentMessage(
         `agent-matrix-${harness}`,

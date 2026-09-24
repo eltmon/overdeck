@@ -101,7 +101,6 @@ vi.mock('../../../src/lib/tmux.js', async () => {
 });
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentState: (...args: Parameters<typeof mockGetAgentState>) => Effect.sync(() => mockGetAgentState(...args)),
   getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
   messageAgent: mockMessageAgent,
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
@@ -122,7 +121,6 @@ vi.mock('../../../src/lib/agents/agent-state.js', () => ({
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: mockLoadConfigSync,
   resolveModel: vi.fn(() => 'configured-reviewer-model'),
 }));

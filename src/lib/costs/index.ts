@@ -42,8 +42,6 @@ export {
   migrateAllSessionsSync,
   needsMigrationSync,
   migrateIfNeededSync,
-  // Effect variants (PAN-1249)
-  needsMigration,
   type MigrationStats,
 } from './migration.js';
 
@@ -58,8 +56,6 @@ export {
   pruneOldEventsSync,
   needsPruningSync,
   getRetentionStatusSync,
-  // Effect variants (PAN-1249)
-  needsPruning,
   type RetentionStats,
 } from './retention.js';
 

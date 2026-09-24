@@ -96,7 +96,6 @@ vi.mock('../../../../../src/lib/cloister/service.js', () => ({ getCloisterServic
 vi.mock('../../../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn().mockReturnValue([]),
   listRunningAgentsSync: vi.fn().mockReturnValue([]),
-  getAgentState: vi.fn(),
   getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),

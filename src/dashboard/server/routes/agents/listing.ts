@@ -9,7 +9,7 @@ import { HttpRouter } from 'effect/unstable/http';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
-  getAgentState,
+  getAgentStateSync,
   getAgentRuntimeState,
   listAgentStates,
   type AgentState,
@@ -268,7 +268,7 @@ export const getAgentGitInfoRoute = HttpRouter.add(
       return jsonResponse({ error: 'missing agent id' }, { status: 400 });
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentStateSync(id);
     if (!agentHasResolvableWorkspace(agentState)) {
       // PAN-1718: unknown session id / no workspace bound → "unknown", not
       // "worktree missing". Return the benign shape so the chip hides instead of

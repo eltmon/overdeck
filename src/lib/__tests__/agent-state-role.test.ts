@@ -75,12 +75,6 @@ describe('AgentState role persistence', () => {
       const actual = await importOriginal<typeof import('../config-yaml.js')>();
       return {
         ...actual,
-        loadConfig: () => ({
-          config: {
-            workhorses: actual.DEFAULT_WORKHORSES,
-            roles: actual.DEFAULT_ROLES,
-          },
-        }),
         loadConfigSync: () => ({
           config: {
             workhorses: actual.DEFAULT_WORKHORSES,
@@ -360,7 +354,6 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
     }));
     const { recordDockerContainerLifecycleSnapshot } = await import('../docker-stats.js');
@@ -417,7 +410,6 @@ describe('AgentState role persistence', () => {
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
     }));
 
@@ -487,7 +479,6 @@ describe('AgentState role persistence', () => {
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
       emitActivityTts: vi.fn(),
       emitActivityTtsSync: vi.fn(),
@@ -561,7 +552,6 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
       emitActivityTts: vi.fn(),
       emitActivityTtsSync: vi.fn(),
@@ -571,7 +561,7 @@ describe('AgentState role persistence', () => {
       resolveHarness: vi.fn(async () => 'ohmypi'),
     }));
     vi.doMock('../workspace-manager.js', () => ({
-      preTrustDirectory: vi.fn(),
+      preTrustDirectorySync: vi.fn(),
     }));
     vi.doMock('../github-app.js', () => ({
       isGitHubAppConfigured: vi.fn(() => false),
@@ -665,7 +655,6 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
     }));
 
@@ -694,7 +683,6 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
     }));
 
@@ -722,7 +710,6 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
     }));
 

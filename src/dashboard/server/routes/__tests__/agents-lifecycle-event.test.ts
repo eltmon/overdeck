@@ -25,7 +25,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   getAgentStateProgram: vi.fn(),
   stopAgent: vi.fn(),
   stopAgentProgram: vi.fn(),
@@ -36,7 +36,6 @@ vi.mock('../../services/agent-projection.js', () => ({
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
-  emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
 }));
 
@@ -47,10 +46,10 @@ vi.mock('../origin-validation.js', () => ({
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import { createAgentStopHandler } from '../agents.js';
-import { getAgentState, stopAgent } from '../../../../lib/agents.js';
+import { getAgentStateSync, stopAgent } from '../../../../lib/agents.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 
-const mockGetAgentState = vi.mocked(getAgentState);
+const mockGetAgentState = vi.mocked(getAgentStateSync);
 const mockStopAgent = vi.mocked(stopAgent);
 const mockSaveAgentStateAndEmitEventProgram = vi.mocked(saveAgentStateAndEmitEventProgram);
 
@@ -96,10 +95,10 @@ function getLastAppendedLogLine(): { event?: string } | null {
 describe('createAgentStopHandler lifecycle events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAgentState.mockReturnValue(Effect.succeed({
+    mockGetAgentState.mockReturnValue({
       issueId: 'PAN-TEST',
       role: 'work',
-    } as any));
+    } as any);
     mockStopAgent.mockReturnValue(Effect.void);
     mockAppendFile.mockResolvedValue(undefined);
     mockMkdir.mockResolvedValue(undefined);

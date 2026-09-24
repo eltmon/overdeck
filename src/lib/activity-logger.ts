@@ -13,7 +13,6 @@
  */
 
 import { randomUUID } from 'crypto';
-import { Effect } from 'effect';
 import type { DomainEvent } from '@overdeck/contracts';
 import type { Role } from './agents/role.js';
 import { getDashboardApiUrlSync } from './config.js';
@@ -383,14 +382,3 @@ export function emitDashboardLifecycleSync(
     // Non-fatal
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native emit of an activity.entry domain event. Non-failing — the
- * underlying append is fire-and-forget and silently swallows any event-store
- * errors to match the Promise contract.
- */
-export const emitActivityEntry = (
-  options: EmitActivityOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityEntrySync(options));

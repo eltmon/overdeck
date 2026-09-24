@@ -18,7 +18,7 @@ import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
 import { capturePane, sendRawKeystroke } from '../tmux.js';
 import {
   getAgentDir,
-  getAgentState,
+  getAgentStateSync,
   recordAgentFailure,
   saveAgentState,
   saveAgentStateSync,
@@ -109,7 +109,7 @@ export function markKickoffRedelivered(state: AgentState): void {
 
 export async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<void> {
   await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
-  const failedState = await Effect.runPromise(getAgentState(state.id));
+  const failedState = getAgentStateSync(state.id);
   if (failedState) {
     failedState.status = 'running';
     failedState.kickoffDelivered = false;

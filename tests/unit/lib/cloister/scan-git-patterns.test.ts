@@ -19,7 +19,6 @@ vi.mock('../../../../src/lib/git-activity.js', () => ({
 const mockEmitActivityEntry = vi.fn();
 const mockEmitDashboardLifecycle = vi.fn();
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntry: (...args: unknown[]) => mockEmitActivityEntry(...args),
   emitActivityEntrySync: (...args: unknown[]) => mockEmitActivityEntry(...args),
   emitDashboardLifecycle: (...args: unknown[]) => mockEmitDashboardLifecycle(...args),
   emitActivityTts: vi.fn(),
@@ -43,7 +42,6 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssue: vi.fn(),
   resolveGitHubIssueSync: vi.fn(),
 }));
 

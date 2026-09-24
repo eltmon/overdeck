@@ -27,9 +27,9 @@ const mockCleanupMergedLabels = vi.hoisted(() => vi.fn(() => Effect.succeed({ su
 const mockSetAgentPaused = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
   agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
 )));
-const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
+const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) =>
   agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
-)));
+));
 const mockSessionExists = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(agentId === 'strike-pan-399')));
 const mockKillSession = vi.hoisted(() => vi.fn(() => Effect.void));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
@@ -141,7 +141,6 @@ vi.mock('../../../../src/lib/paths.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
   resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
   resolveTrackerTypeSync: vi.fn().mockReturnValue('github'),
@@ -212,8 +211,7 @@ vi.mock('../../../../src/lib/workspace-manager/docker.js', () => ({
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   setAgentPaused: mockSetAgentPaused,
-  getAgentState: mockGetAgentState,
-  getAgentStateSync: vi.fn().mockReturnValue(null),
+  getAgentStateSync: mockGetAgentState,
 }));
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({

@@ -93,7 +93,6 @@ vi.mock('../../../../lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentState: vi.fn(),
   getAgentStateSync: vi.fn(),
   saveAgentStateSync: mockSaveAgentStateSync,
   getProviderAuthMode: vi.fn(() => Promise.resolve('api')),

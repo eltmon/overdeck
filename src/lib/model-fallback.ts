@@ -6,7 +6,6 @@
  * Overdeck always works even without configuring external providers.
  */
 
-import { Effect } from 'effect';
 import { ModelId, AnthropicModel } from './settings.js';
 import { resolveModelIdSync, MODEL_CAPABILITIES, MODEL_DEPRECATIONS } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
@@ -557,11 +556,3 @@ export function getAvailableModelsSync(enabledProviders: Set<ModelProvider>): Mo
     .filter(([id, capability]) => !(id in MODEL_DEPRECATIONS) && !capability.displayName.includes('(deprecated)') && isProviderEnabled(capability.provider, enabledProviders))
     .map(([id]) => id as ModelId);
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure-sync provider/fallback resolution — additive Effect.sync wrappers.
-
-/** Detect enabled providers from configured API keys. Pure. */
-export const detectEnabledProviders = (
-  apiKeys: Parameters<typeof detectEnabledProvidersSync>[0],
-): Effect.Effect<Set<ModelProvider>> => Effect.sync(() => detectEnabledProvidersSync(apiKeys));

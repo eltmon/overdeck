@@ -3,7 +3,7 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import {
   getAgentRuntimeState,
-  getAgentState,
+  getAgentStateSync,
   type AgentRuntimeState,
   type AgentState,
 } from '../agents.js';
@@ -138,8 +138,8 @@ async function getTranscriptStat(path: string): Promise<{ size: number; mtimeMs:
   return { size: fileStat.size, mtimeMs: fileStat.mtimeMs };
 }
 
-function getAgentStateFromStore(agentId: string): Promise<AgentState | null> {
-  return Effect.runPromise(getAgentState(agentId));
+async function getAgentStateFromStore(agentId: string): Promise<AgentState | null> {
+  return getAgentStateSync(agentId);
 }
 
 function getAgentRuntimeStateFromStore(agentId: string): Promise<AgentRuntimeState | null> {

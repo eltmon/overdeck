@@ -262,7 +262,7 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   try {
     const state = JSON.parse(content) as Partial<AgentState>;
     if (!isRole(state.role)) {
-      // Roleless states are invisible to getAgentState; cleanup is handled
+      // Roleless states are invisible to getAgentStateSync; cleanup is handled
       // by warnOnBareNumericIssueIds / dropLegacyAgentStatesMissingRoleAsync.
       return null;
     }
@@ -273,6 +273,10 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   }
 }
 
+/**
+ * Read one agent's `state.json`. Returns null when the file is absent, unparsable, or
+ * roleless; throws only when reading an existing file fails (e.g. EACCES).
+ */
 export function getAgentStateSync(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
   const stateFile = getAgentStateFilePath(normalizedId);

@@ -13,7 +13,7 @@ import { getGitHubConfig, getRallyConfig } from '../../dashboard/server/services
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { getAgentState } from '../agents.js';
+import { getAgentStateSync } from '../agents.js';
 import { extractPrefixSync } from '../issue-id.js';
 import { reopenWorkspaceState } from '../reopen.js';
 import { removeCompletionMarker } from './workspace-hygiene.js';
@@ -332,7 +332,7 @@ export function abortIssueTransition(options: {
     // be projected through the transactional boundary after the reset succeeds.
     const workAgentId = `agent-${id.toLowerCase()}`;
     const planningAgentId = `planning-${id.toLowerCase()}`;
-    const workAgentStateBeforeAbort = yield* getAgentState(workAgentId);
+    const workAgentStateBeforeAbort = getAgentStateSync(workAgentId);
 
     const result = yield* Effect.promise(() => runDestructiveIssueLifecycle(id, 'reset', { deleteWorkspace: true }));
 
@@ -389,7 +389,7 @@ export function resetIssueTransition(options: {
     // be projected through the transactional boundary after the reset succeeds.
     const workAgentId = `agent-${id.toLowerCase()}`;
     const planningAgentId = `planning-${id.toLowerCase()}`;
-    const workAgentStateBeforeReset = yield* getAgentState(workAgentId);
+    const workAgentStateBeforeReset = getAgentStateSync(workAgentId);
 
     const encoder = new TextEncoder();
     const nodeStream = new ReadableStream<Uint8Array>({

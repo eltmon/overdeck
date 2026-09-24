@@ -61,7 +61,7 @@ vi.mock('../../../../lib/providers.js', () => ({
 }));
 
 vi.mock('../../../../lib/workspace-manager.js', () => ({
-  preTrustDirectory: vi.fn(),
+  preTrustDirectorySync: vi.fn(),
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({

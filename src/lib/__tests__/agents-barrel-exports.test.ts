@@ -37,7 +37,6 @@ const EXPECTED_EXPORTS = Object.freeze([
   'getAgentRuntimeBaseCommand',
   'getAgentRuntimeState',
   'getAgentRuntimeStateSync',
-  'getAgentState',
   'getAgentStateFilePath',
   'getAgentStateSync',
   'getLatestSessionId',

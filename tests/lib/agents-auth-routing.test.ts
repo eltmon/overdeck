@@ -21,7 +21,6 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/config-yaml.js')>();
   return {
     ...actual,
-    loadConfig: mockLoadYamlConfig,
     loadConfigSync: mockLoadYamlConfig,
   };
 });

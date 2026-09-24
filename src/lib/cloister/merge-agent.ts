@@ -423,7 +423,7 @@ export async function postMergeLifecycle(
 
     // 3. Pause work/planning/strike agents and close their terminals to free resources.
     try {
-      const { setAgentPaused, getAgentState } = await import('../agents.js');
+      const { setAgentPaused, getAgentStateSync } = await import('../agents.js');
       // A failed backend close must never skip pausing the remaining agents.
       const closeAgentTerminal = async (agentId: string): Promise<boolean> => {
         try {
@@ -449,10 +449,10 @@ export async function postMergeLifecycle(
           // No state.json for this agent — nothing to pause (e.g. planning never ran).
           continue;
         }
-        let verify = await Effect.runPromise(getAgentState(agentId));
+        let verify = getAgentStateSync(agentId);
         if (verify?.paused !== true) {
           await Effect.runPromise(setAgentPaused(agentId, reason, true));
-          verify = await Effect.runPromise(getAgentState(agentId));
+          verify = getAgentStateSync(agentId);
         }
         if (verify?.paused === true) {
           console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);

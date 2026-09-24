@@ -419,8 +419,8 @@ async function spawnRunWithoutConsentClaim(
   console.log(`[claude-invoke] purpose=role-run | role=${role} | model=${state.model} | source=agents.ts:spawnRun | session=${agentId} | command="${claudeCmd}"`);
 
   try {
-    const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-    preTrustDirectory(workspace);
+    const { preTrustDirectorySync } = await import('../workspace-manager.js');
+    preTrustDirectorySync(workspace);
   } catch { /* non-fatal */ }
 
   // PAN-1594: clear any stale ready.json before launch so waitForReadySignal()
@@ -828,8 +828,8 @@ async function spawnAgentWithoutConsentClaim(
 
   // Pre-trust workspace directory in Claude Code to avoid the trust prompt
   try {
-    const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-    preTrustDirectory(options.workspace);
+    const { preTrustDirectorySync } = await import('../workspace-manager.js');
+    preTrustDirectorySync(options.workspace);
   } catch { /* non-fatal */ }
 
   // Configure workspace for GitHub App bot identity (PAN-536)

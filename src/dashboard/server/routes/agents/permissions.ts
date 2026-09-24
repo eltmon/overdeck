@@ -5,7 +5,7 @@ import {
   deliverAgentMessage,
   deliverAgentPermissionDecision,
   getAgentRuntimeState,
-  getAgentState,
+  getAgentStateSync,
 } from '../../../../lib/agents.js';
 import { getAgentJsonlPath, scanPendingInputsPromise } from '../../../../lib/agent-enrichment.js';
 import { deliverPlanActionToSession } from '../../../../lib/overdeck/conversation-delivery.js';
@@ -64,7 +64,7 @@ export async function handlePostAgentPaneChoice(
 ): Promise<SessionPaneChoiceResult> {
   if (!agentId.trim()) return { body: { error: 'missing agent id' }, status: 400 };
   const readAgentState = deps.getAgentState
-    ?? ((id: string) => Effect.runPromise(getAgentState(id)));
+    ?? (async (id: string) => getAgentStateSync(id));
   const agentState = await readAgentState(agentId);
   if (!agentState) return { body: { error: `Agent ${agentId} not found` }, status: 404 };
 
@@ -196,7 +196,12 @@ export const postAgentPlanActionRoute = HttpRouter.add(
     const action = typeof body['action'] === 'string' ? body['action'] : '';
     const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
 
-    const agentState = yield* getAgentState(id).pipe(Effect.catch(() => Effect.succeed(null)));
+    let agentState: ReturnType<typeof getAgentStateSync>;
+    try {
+      agentState = getAgentStateSync(id);
+    } catch {
+      agentState = null;
+    }
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -264,7 +269,7 @@ export const postInternalAgentPermissionRequestRoute = HttpRouter.add(
       return jsonResponse({ ok: true, duplicate: true });
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentStateSync(id);
     if (!agentState) {
       return jsonResponse({ ok: false, error: `agent ${id} not found` }, { status: 404 });
     }

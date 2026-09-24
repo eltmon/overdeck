@@ -8,7 +8,7 @@ import { getRallyConfig } from '../../dashboard/server/services/tracker-config.j
 import type { LifecycleContext, StepResult, WorkflowResult } from '../lifecycle/types.js';
 import type { DodRowId } from '../lifecycle/dod.js';
 import { withConcurrencyLimit } from '../concurrency.js';
-import { getAgentState, normalizeAgentId } from '../agents.js';
+import { getAgentStateSync, normalizeAgentId } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
@@ -211,10 +211,10 @@ async function hasActiveAgentForIssue(issueId: string, allowPausedMerged = false
     if (VALID_TMUX_NAME_RE.test(agentId) && (yield* sessionExists(agentId))) return true;
     if (VALID_TMUX_NAME_RE.test(planningId) && (yield* sessionExists(planningId))) return true;
 
-    const agentState = yield* getAgentState(agentId);
+    const agentState = getAgentStateSync(agentId);
     if (agentState && !isInactiveAgentStatus(agentState.status) && !isPausedMergedAgentSafe(agentState, allowPausedMerged)) return true;
 
-    const planningState = yield* getAgentState(planningId);
+    const planningState = getAgentStateSync(planningId);
     if (planningState && !isInactiveAgentStatus(planningState.status) && !isPausedMergedAgentSafe(planningState, allowPausedMerged)) return true;
 
     return false;

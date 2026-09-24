@@ -8,11 +8,9 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { appendCostEventSync, CostEvent, eventsFileExists, getLastEventMetadataSync } from './events.js';
 import { getPricingSync, calculateCostSync, TokenUsage } from '../cost.js';
-import { FsError } from '../errors.js';
 
 // ============== Types ==============
 
@@ -506,12 +504,3 @@ export function migrateIfNeededSync(): MigrationStats | null {
 
   return migrateAllSessionsSync();
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of needsMigration. */
-export const needsMigration = (): Effect.Effect<boolean, FsError> =>
-  Effect.try({
-    try: () => needsMigrationSync(),
-    catch: (cause) => new FsError({ path: '<events>', operation: 'needsMigration', cause }),
-  });

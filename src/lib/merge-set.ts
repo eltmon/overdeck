@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import {
   deleteMergeSet as dbDelete,
   getAllMergeSetsFromDb,
@@ -50,6 +49,7 @@ export function upsertMergeSetSync(mergeSet: MergeSet): void {
   dbUpsert({ ...mergeSet, issueId: resolveIssueIdSync(mergeSet.issueId) });
 }
 
+/** Fetch a merge-set by issue id; throws on a merge-set DB failure. */
 export function getMergeSetSync(issueId: string): MergeSet | null {
   return getMergeSetFromDb(resolveIssueIdSync(issueId));
 }
@@ -151,16 +151,3 @@ export function patchMergeSetRepoSync(
 export function patchMergeSetReposSync(issueId: string, patches: MergeSetRepoPatch[]): boolean {
   return dbPatchRepos(resolveIssueIdSync(issueId), patches);
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// All operations delegate to the SQLite-backed merge-set DB. The underlying
-// merge-set-db is synchronous; these wrappers preserve the contract
-// and route exceptions through Effect.try so callers in Effect graphs get a
-// typed error channel instead of an unchecked throw.
-
-/** Fetch a merge-set by issue id. */
-export const getMergeSet = (issueId: string): Effect.Effect<MergeSet | null, Error> =>
-  Effect.try({
-    try: () => getMergeSetSync(issueId),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });

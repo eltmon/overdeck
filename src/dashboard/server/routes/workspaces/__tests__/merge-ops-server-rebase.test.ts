@@ -51,7 +51,7 @@ vi.mock('node:fs', async importOriginal => ({
   existsSync: mocks.existsSync,
 }));
 vi.mock('../../../../../lib/agents.js', () => ({
-  getAgentState: vi.fn(() => Effect.succeed(null)),
+  getAgentStateSync: vi.fn(() => null),
   messageAgent: mocks.messageAgent,
   spawnAgent: vi.fn(),
 }));

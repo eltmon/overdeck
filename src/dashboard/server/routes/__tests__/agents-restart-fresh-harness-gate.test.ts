@@ -23,7 +23,7 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/agents.js')>()
   return {
     ...actual,
-    getAgentState: mocks.getAgentState,
+    getAgentStateSync: mocks.getAgentState,
     wipeAgentStateDirs: mocks.wipeAgentStateDirs,
     getProviderAuthMode: mocks.getProviderAuthMode,
     saveAgentStateSync: mocks.saveAgentStateSync,
@@ -125,7 +125,7 @@ async function postRestartFresh(body: Record<string, unknown>) {
 describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837 review fix)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.getAgentState.mockReturnValue(Effect.succeed(agentState as any))
+    mocks.getAgentState.mockReturnValue(agentState as any)
     mocks.getIssueStageSync.mockReturnValue(null)
     mocks.detectPendingOperatorDecision.mockResolvedValue(null)
     mocks.getWorkAgentLifecycleState.mockResolvedValue({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list

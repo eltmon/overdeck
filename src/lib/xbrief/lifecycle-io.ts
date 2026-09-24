@@ -31,7 +31,6 @@ import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
 import { readContinueState, updateContinueState, writeContinueState } from './continue-state.js';
-import { FsError } from '../errors.js';
 
 // PAN-1249: pan-dir/specs.ts migrated `findSpecByIssue`, `writeSpecForIssue`,
 // and `updateSpecStatus` to return Effects. The sync surface in this module
@@ -186,6 +185,7 @@ function findLegacyXBriefByIssue(projectRoot: string, issueId: string): FoundXBr
   return null;
 }
 
+/** Find the issue's xBRIEF: its `.pan/specs` entry first, else a legacy lifecycle xBRIEF. Throws on an I/O failure. */
 export function findXBriefByIssueSync(projectRoot: string, issueId: string): FoundXBrief | null {
   const spec = findSpecByIssueSync(projectRoot, issueId);
   if (spec) {
@@ -386,20 +386,3 @@ export function clearFeedbackForIssue(
     feedback: [],
   }));
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Effect-channel adapters around the existing sync/Promise helpers so callers
-// composing xBRIEF lifecycle ops with other Effect code can stay on the
-// channel. Follows the additive-variant pattern established for io.ts /
-// xbrief-index.ts / auto-synthesize.ts in commit 3783c7003.
-
-/** Effect variant of `findXBriefByIssue` — failures surface as typed errors. */
-export const findXBriefByIssue = (
-  projectRoot: string,
-  issueId: string,
-): Effect.Effect<FoundXBrief | null, FsError> =>
-  Effect.try({
-    try: () => findXBriefByIssueSync(projectRoot, issueId),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'findXBriefByIssue', cause }),
-  });

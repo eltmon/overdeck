@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents.js', () => ({
-  getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
 }));

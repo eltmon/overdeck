@@ -115,7 +115,7 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/agents.js')>();
   return {
     ...actual,
-    getAgentState: agentMocks.getAgentState,
+    getAgentStateSync: agentMocks.getAgentState,
     setAgentPaused: agentMocks.setAgentPaused,
     saveAgentState: agentMocks.saveAgentState,
     saveAgentRuntimeState: agentMocks.saveAgentRuntimeState,
@@ -311,7 +311,7 @@ describe('operator.intervention dashboard routes', () => {
     vi.clearAllMocks();
     fsMocks.appendFile.mockResolvedValue(undefined);
     fsMocks.mkdir.mockResolvedValue(undefined);
-    agentMocks.getAgentState.mockReturnValue(Effect.succeed(agentState));
+    agentMocks.getAgentState.mockReturnValue(agentState);
     agentMocks.setAgentPaused.mockReturnValue(Effect.succeed({ ...agentState, paused: true, status: 'stopped' }));
     agentMocks.saveAgentState.mockReturnValue(Effect.succeed(undefined));
     agentMocks.saveAgentRuntimeState.mockResolvedValue(undefined);
@@ -373,7 +373,7 @@ describe('operator.intervention dashboard routes', () => {
   });
 
   it('does not emit an intervention when the agent request fails', async () => {
-    agentMocks.getAgentState.mockReturnValue(Effect.succeed(null));
+    agentMocks.getAgentState.mockReturnValue(null);
 
     const { response, appendedEvents } = await requestAgents('/api/agents/agent-pan-missing/pause', {
       body: JSON.stringify({ reason: 'operator' }),
@@ -412,9 +412,7 @@ describe('operator.intervention dashboard routes', () => {
   // event — and must refuse (not silently no-op) when clearGates is absent.
 
   it('preserves the troubled gate when post-gate spawn validation fails', async () => {
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, troubled: true, consecutiveFailures: 2 }),
-    );
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, troubled: true, consecutiveFailures: 2 });
 
     const { appendedEvents } = await requestAgents('/api/agents', {
       body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
@@ -426,9 +424,7 @@ describe('operator.intervention dashboard routes', () => {
   });
 
   it('preserves the paused gate when post-gate spawn validation fails', async () => {
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
-    );
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pausedReason: 'operator' });
 
     const { appendedEvents } = await requestAgents('/api/agents', {
       body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
@@ -440,9 +436,7 @@ describe('operator.intervention dashboard routes', () => {
   });
 
   it('refuses a gated spawn without clearGates and clears nothing (AC3)', async () => {
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
-    );
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pausedReason: 'operator' });
 
     const { response } = await requestAgents('/api/agents', {
       body: JSON.stringify({ issueId: 'PAN-1' }),
@@ -460,9 +454,7 @@ describe('operator.intervention dashboard routes', () => {
     dashboardAuthMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(
       jsonResponse({ error: 'Invalid CSRF token' }, { status: 403 }),
     );
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
-    );
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pausedReason: 'operator' });
 
     const { response } = await requestAgents('/api/agents', {
       headers: { origin: 'http://localhost' },

@@ -123,7 +123,6 @@ describe('config', () => {
       vi.resetModules();
       vi.doMock('../../src/lib/paths.js', () => ({ CONFIG_FILE: configPath }));
       vi.doMock('../../src/lib/config-yaml.js', () => ({
-        loadConfig: () => ({ config: {}, migration: null }),
         loadConfigSync: () => ({ config: {}, migration: null }),
       }));
       const { loadConfigSync } = await import('../../src/lib/config.js');

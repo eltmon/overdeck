@@ -1,7 +1,6 @@
-import { Effect } from 'effect';
 import { randomUUID } from 'node:crypto';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
-import { getAgentState, type AgentState } from '../../lib/agents.js';
+import { getAgentStateSync, type AgentState } from '../../lib/agents.js';
 import { setCloisterEventStoreProvider, getCloisterService } from '../../lib/cloister/service.js';
 import {
   runDeaconLite,
@@ -70,7 +69,7 @@ setCloisterEventStoreProvider(() => eventClient);
 setAgentStoppedNotifier((agentId) => {
   void (async () => {
     try {
-      const state = await Effect.runPromise(getAgentState(agentId));
+      const state = getAgentStateSync(agentId);
       if (state) {
         append(domainEvent('agent.heartbeat_dead', { agentId, issueId: state.issueId, sessionId: state.sessionId }));
         // PAN-2633: heartbeat_dead means the deacon has determined the tmux

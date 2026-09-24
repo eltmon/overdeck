@@ -25,7 +25,6 @@ vi.mock('readline/promises', () => ({
 // spawnAgent without breaking the default path.
 vi.mock('../../../lib/agents.js', () => ({
   spawnAgent: vi.fn(async () => ({ id: 'agent-x', issueId: 'PAN-X', workspace: '/tmp', model: 'm', startedAt: new Date().toISOString() })),
-  getAgentState: agentMocks.getAgentState,
   getAgentStateSync: agentMocks.getAgentState,
   clearAgentPaused: agentMocks.clearAgentPaused,
   getProviderAuthMode: agentMocks.getProviderAuthMode,
