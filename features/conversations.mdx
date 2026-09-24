@@ -369,6 +369,12 @@ GitLab merge request URL, `#42`, or `owner/repo#42`, then press Enter. `#42`
 means PR 42 of the conversation's project repository. When the conversation
 shows a PR, the same menu offers **Unlink #42**.
 
+**Pull requests…** in the same menu opens a dialog that lists every PR linked to
+the conversation. It shows why each one is linked (`manual`, `agent`, `created`,
+`branch-detected`, or `unlinked`) and which one the badge shows. From there you
+can link another PR, unlink or relink one, and refresh their status from the
+forge.
+
 Agents and scripts use the CLI. `<query>` is the conversation name, or a title
 fragment that matches exactly one conversation (`pan conv current` prints the
 one you're in):

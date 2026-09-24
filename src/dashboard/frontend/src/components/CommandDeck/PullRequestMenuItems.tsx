@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { GitPullRequest, Unlink } from 'lucide-react';
+import { GitPullRequest, ListTree, Unlink } from 'lucide-react';
 import type { PullRequestLink } from '@overdeck/contracts';
 import { MenuItemButton } from '../shared/ContextMenu';
+import { openPullRequestsDialog } from '../chat/LinkPullRequestDialog';
 import styles from './styles/command-deck.module.css';
 
 interface PullRequestMenuItemsProps {
@@ -16,8 +17,8 @@ interface PullRequestMenuItemsProps {
 }
 
 /**
- * PAN-3822: "Link pull request…" (an inline input, like rename) and, when the
- * conversation shows a PR, "Unlink #n". Shared by the row's overflow menu and
+ * PAN-3822: "Link pull request…" (an inline input, like rename), "Pull
+ * requests…" (the full dialog), and, when the conversation shows a PR, "Unlink #n". Shared by the row's overflow menu and
  * the tab/header action menu so both offer the same items.
  */
 export function PullRequestMenuItems({ conversation, mutations, onClose }: PullRequestMenuItemsProps) {
@@ -60,6 +61,10 @@ export function PullRequestMenuItems({ conversation, mutations, onClose }: PullR
       <MenuItemButton onClick={() => { setDraft(''); setLinking(true); }}>
         <GitPullRequest size={14} />
         Link pull request…
+      </MenuItemButton>
+      <MenuItemButton onClick={() => { openPullRequestsDialog(conversation.name); onClose(); }}>
+        <ListTree size={14} />
+        Pull requests…
       </MenuItemButton>
       {effective && (
         <MenuItemButton

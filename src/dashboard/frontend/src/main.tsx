@@ -7,6 +7,7 @@ import App from './App';
 import { installRecovery, RootErrorBoundary } from './recovery';
 import { useDesignLanguage } from './hooks/useDesignLanguage';
 import { installQueryRecovery } from './lib/queryRecovery';
+import { LinkPullRequestDialogHost } from './components/chat/LinkPullRequestDialog';
 import './index.css';
 
 void initTelemetry();
@@ -59,6 +60,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <DialogProvider>
           <App />
+          <LinkPullRequestDialogHost />
         </DialogProvider>
       </QueryClientProvider>
     </RootErrorBoundary>
