@@ -19,6 +19,8 @@ import {
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
+import { readRunningDashboardBootGates } from '../../lib/deploy/running-boot-gates.js';
+import { formatBootGateState, resolveBootGates, writeBootGateEnv } from '../../lib/boot-gates.js';
 import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
@@ -69,6 +71,7 @@ export interface ReloadOptions {
   skipBuild?: boolean;
   healthTimeout?: string;
   deacon?: boolean;
+  resume?: boolean;
   force?: boolean;
 }
 
@@ -208,6 +211,17 @@ async function runReload(
     }
 
     const config = readPlatformConfig();
+    // PAN-3899: a reload replaces the server, it does not re-choose its gates.
+    // Read the running server's Deacon/resume gates now, while it is certainly
+    // up, and hand them to the replacement; explicit flags still win.
+    const inheritBootGates = await readRunningDashboardBootGates(config.dashboardApiPort);
+    const gateOptions = { deacon: options.deacon, resume: options.resume };
+    const bootGateEnv = { ...process.env };
+    if (inheritBootGates) writeBootGateEnv(bootGateEnv, inheritBootGates);
+    const bootGates = resolveBootGates(gateOptions, bootGateEnv);
+    console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}${inheritBootGates
+      ? ' (carried from the running dashboard)'
+      : ' (running dashboard did not report its gates)'}`));
     let repoRoot = process.cwd();
     let deployment: DashboardDeployment | null = null;
     let activation: DashboardDeploymentActivation | null = null;
@@ -328,12 +342,15 @@ async function runReload(
       // persistence fails, abort while the old dashboard is still running.
       await recordReloadStatus(startedAt, false, undefined, 'stopping');
       restartResult = await restartDashboard(config, () => spawnDashboardDetached(config, {
-        deacon: options.deacon,
+        ...gateOptions,
+        inheritBootGates,
         serverPath: deployment?.serverPath,
         repoRoot,
       }), {
         healthTimeoutMs,
-        expectedIdentity: { repoRoot, mode: 'primary' },
+        // A Deacon-off server identifies as a peer (isPeerDashboardProcess), so
+        // carrying a Deacon-off gate must not turn the identity check red.
+        expectedIdentity: { repoRoot, mode: bootGates.deacon.enabled ? 'primary' : 'peer' },
       });
     } catch (error) {
       if (deployment) {

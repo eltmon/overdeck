@@ -37,7 +37,10 @@ export function registerReloadAndRestartCommands(program: Command): void {
     .option('--skip-build', 'Skip npm run build and restart the existing bundle')
     .option('--force', 'Bypass the agent deploy-window gate (agent-initiated reloads are otherwise refused while deploy-window block reasons are active)')
     .option('--health-timeout <duration>', 'Dashboard /api/health wait budget — ms, or Ns/Nm suffix (default 30s; floor 1000ms)')
-    .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload')
+    .option('--deacon', 'Start Cloister/Deacon on the reloaded dashboard (default: keep the running dashboard\'s Deacon gate)')
+    .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload (default: keep the running dashboard\'s Deacon gate)')
+    .option('--resume', 'Enable agent auto-resume on the reloaded dashboard (default: keep the running dashboard\'s resume gate)')
+    .option('--no-resume', 'Disable agent auto-resume on the reloaded dashboard (default: keep the running dashboard\'s resume gate)')
     .action(reloadCommand);
 
   // Scoped restart: `pan restart` defaults to the dashboard only and never
