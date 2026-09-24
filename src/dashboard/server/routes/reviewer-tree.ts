@@ -274,49 +274,6 @@ export async function readReviewerRounds(
   };
 }
 
-/**
- * Find the most-recent `.pan/review/review-<ISSUEID>-<TIMESTAMP>/` directory
- * for an issue. Returns the absolute path or null if none exist.
- *
- * Used to disambiguate between "round just completed (output file present)" and
- * "new round in progress (output file not yet written)" when the canonical
- * reviewer tmux session is alive across rounds (PAN-915).
- */
-async function findLatestReviewRunDir(
-  workspacePath: string,
-  issueId: string,
-): Promise<string | null> {
-  try {
-    const reviewRoot = join(workspacePath, '.pan', 'review');
-    const entries = await readdir(reviewRoot);
-    const upper = issueId.toUpperCase();
-    const lower = issueId.toLowerCase();
-    let bestDir: string | null = null;
-    let bestTs = -Infinity;
-    for (const entry of entries) {
-      // Pattern: review-<ISSUEID>-<unixMillis>
-      // Tolerant of either case in the prefix segment
-      const upperPrefix = `review-${upper}-`;
-      const lowerPrefix = `review-${lower}-`;
-      const trailing = entry.startsWith(upperPrefix)
-        ? entry.slice(upperPrefix.length)
-        : entry.startsWith(lowerPrefix)
-          ? entry.slice(lowerPrefix.length)
-          : null;
-      if (trailing === null) continue;
-      const ts = Number(trailing);
-      if (!Number.isFinite(ts)) continue;
-      if (ts > bestTs) {
-        bestTs = ts;
-        bestDir = join(reviewRoot, entry);
-      }
-    }
-    return bestDir;
-  } catch {
-    return null;
-  }
-}
-
 /** Read `reviewRunId` from an agent's state.json under `agentsRoot`. Reads the
  *  file directly: getAgentState would escape the agentsDirOverride test seam. */
 async function readReviewRunId(agentsRoot: string, agentId: string): Promise<string | undefined> {
@@ -327,6 +284,27 @@ async function readReviewRunId(agentsRoot: string, agentId: string): Promise<str
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The current review run's `.pan/review/<runId>/` directory, or null when the
+ * review parent names no run or the run has not created its directory yet.
+ *
+ * `runId` is the review parent's `reviewRunId` (`agent-<issue>-review-<head8>`),
+ * the directory the convoy writes each `<role>.md` report into. Used to tell
+ * "round just completed (output file present)" from "new round in progress
+ * (output file not yet written)" when the canonical reviewer session is alive
+ * across rounds (PAN-915).
+ */
+async function currentReviewRunDir(
+  agentsRoot: string,
+  issueId: string,
+  workspacePath: string,
+): Promise<string | null> {
+  const runId = await readReviewRunId(agentsRoot, `agent-${issueId.toLowerCase()}-review`);
+  if (!runId) return null;
+  const dir = join(workspacePath, '.pan', 'review', runId);
+  return existsSync(dir) ? dir : null;
 }
 
 /**
@@ -381,14 +359,14 @@ export async function buildReviewerNodes(
   // or Quick against config, and nothing persists that choice.
   if (!(await currentRunIsConvoy(opts.issueId, opts.workspacePath, agentsRoot))) return [];
 
-  // PAN-915 — current-round output dir disambiguates "zombie session from prior
+  // PAN-915 — the current run's output dir disambiguates "zombie session from prior
   // round" vs "alive session for the round currently in progress". When the
   // canonical session is reused (sendKeys delivers a new prompt to the same
   // tmux pane), `readReviewerRounds` still reports the previous round's
   // archived status because the new round hasn't archived yet. Without this
   // check, an in-progress round looks like a completed-zombie and renders as
   // stopped in the dashboard.
-  const latestReviewRunDir = await findLatestReviewRunDir(opts.workspacePath, opts.issueId);
+  const reviewRunDir = await currentReviewRunDir(agentsRoot, opts.issueId, opts.workspacePath);
 
   const nodes = await Promise.all(
     CONVOY_REVIEWER_ROLES.map(async (role) => {
@@ -407,10 +385,10 @@ export async function buildReviewerNodes(
         agentsDirOverride: opts.agentsDirOverride,
       });
 
-      // PAN-915 — definitive "this round is in progress" signal: the latest
-      // review-run dir exists but this role's output file hasn't landed yet.
-      const latestRunOutputExists = latestReviewRunDir
-        ? existsSync(join(latestReviewRunDir, `${role}.md`))
+      // PAN-915 — definitive "this round is in progress" signal: the current
+      // run's dir exists but this role's output file hasn't landed yet.
+      const runOutputExists = reviewRunDir
+        ? existsSync(join(reviewRunDir, `${role}.md`))
         : false;
 
       // PAN-3675: a lane with no session, no state row, no round artifact, no
@@ -418,9 +396,9 @@ export async function buildReviewerNodes(
       // fabricates a phantom reviewer — the PAN-3668 tree showed
       // "4 reviewers · clean" for a run that died before any reviewer launched.
       const everExisted = isLive || hasStateRow || roundMetadata !== undefined
-        || jsonlPath !== null || latestRunOutputExists;
+        || jsonlPath !== null || runOutputExists;
       if (!everExisted) return null;
-      const inProgressThisRound = isLive && latestReviewRunDir !== null && !latestRunOutputExists;
+      const inProgressThisRound = isLive && reviewRunDir !== null && !runOutputExists;
 
       // PAN-2690 — codex reviewers stay alive at their prompt after the notify
       // hook signals REVIEWER_READY. The marker is cleared before every new
@@ -474,15 +452,15 @@ export async function buildReviewerNodes(
       //   - dead without round metadata but has JSONL → completed (ran but no round artifact)
       //   - dead without round metadata or JSONL → parent status fallback
       // PAN-1048 sub-reviewers are subagents with no tmux session, so we can't
-      // read liveness from tmux. Their report (.md) landing in the latest
-      // review-run dir is the authoritative "done" signal — prefer it over the
+      // read liveness from tmux. Their report (.md) landing in the current
+      // run's dir is the authoritative "done" signal — prefer it over the
       // orchestrator status, which would otherwise leave a finished reviewer
       // showing "running" (with no terminal) until the parent synthesizer exits.
       const rawStatus = hasApiError
         ? 'error'
         : (isLive && !isZombie)
           ? 'running'
-          : (latestRunOutputExists
+          : (runOutputExists
               ? 'completed'
               : (roundMetadata?.latestStatus ?? (jsonlPath ? 'completed' : opts.status)));
       const status = normalizeAgentStatus(rawStatus);
