@@ -40,6 +40,7 @@ import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { runPreflightChecks } from '../../lib/work/done-preflight.js';
 import { updateContinueState } from '../../lib/xbrief/continue-state.js';
 import { commitPlanArtifacts, planArtifactCommitMessage } from '../../lib/overdeck/plan-artifact-commit.js';
+import { linkCreatedPullRequestToIssueConversations } from '../../lib/overdeck/conversation-pull-requests.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -238,6 +239,8 @@ export async function openOrUpdatePullRequests(issueId: string, workspacePath: s
       cwd: root.dir,
     });
     opened.push({ repoKey: root.repoKey, url: artifact.url, id: artifact.id, created: artifact.created });
+    // PAN-3822: the issue's agent conversations show this PR at once.
+    linkCreatedPullRequestToIssueConversations(issueId, artifact.url);
 
     // "Review requested" is derived from the PR being open and not a draft —
     // there is no reviewer row to write. `gh pr ready` is a no-op on a PR that

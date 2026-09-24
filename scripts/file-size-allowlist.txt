@@ -113,3 +113,5 @@
 # Two registration lines; implementation is in the extracted child input route module.
 1072 src/dashboard/server/routes/conversations.ts # PAN-3787
 1096 src/lib/config-yaml/schema.ts # PAN-4160
+# Typed PR-link methods on the ConversationsResolver/ConversationWriter service interfaces (types only).
+1094 src/lib/overdeck/conversations.ts # PAN-3822

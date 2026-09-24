@@ -15,6 +15,7 @@ import {
   type MergeSetRepoState,
 } from './merge-set.js';
 import { emitActivityEntry } from './activity-logger.js';
+import { linkCreatedPullRequestToIssueConversations } from './overdeck/conversation-pull-requests.js';
 
 const execAsync = promisify(exec);
 
@@ -136,6 +137,7 @@ export async function createReviewArtifactsForIssue(
 
     if (artifact.url) {
       mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifact.url, artifact.id);
+      linkCreatedPullRequestToIssueConversations(issueId, artifact.url);
     }
     mergeSet = withRepoState(mergeSet, repo.repoKey, {
       artifactId: artifact.id,

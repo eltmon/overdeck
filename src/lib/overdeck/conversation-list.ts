@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 
+import { resolveEffectivePullRequest } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
@@ -17,6 +18,7 @@ import {
   conversationSessionAliveFromState,
 } from './conversation-runtime.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
+import { listPullRequestLinksForConversations } from './conversation-pull-requests.js';
 import {
   listConversations,
   listFavoritedIds,
@@ -103,6 +105,8 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   ]);
   const ledgerCosts = new Map(ledgerEntries);
   const liveSessionNames = new Set(sessionNames);
+  // PAN-3822: one query for the whole page's PR links, never one per row.
+  const pullRequestLinks = listPullRequestLinksForConversations(conversations.map((conv) => conv.name));
   return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
@@ -205,6 +209,8 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         lastActivityAt,
         branch: gitInfo.branch,
         isWorktree: gitInfo.isWorktree,
+        pullRequest: resolveEffectivePullRequest(pullRequestLinks.get(row.name) ?? []),
+        pullRequestCount: (pullRequestLinks.get(row.name) ?? []).filter((link) => link.dismissedAt === null).length,
         pendingInputCount,
         pendingInputKinds,
         pendingAskUserQuestion,

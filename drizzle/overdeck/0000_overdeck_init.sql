@@ -65,6 +65,21 @@ CREATE TABLE `conversation_files` (
 );
 --> statement-breakpoint
 CREATE INDEX `conv_files_conv_idx` ON `conversation_files` (`conversation_id`);--> statement-breakpoint
+CREATE TABLE `conversation_pull_requests` (
+	`conversation_id` text NOT NULL,
+	`host` text NOT NULL,
+	`repository` text NOT NULL,
+	`number` integer NOT NULL,
+	`url` text NOT NULL,
+	`source` text NOT NULL,
+	`linked_at` integer NOT NULL,
+	`dismissed_at` integer,
+	`snapshot_json` text,
+	PRIMARY KEY(`conversation_id`, `host`, `repository`, `number`),
+	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_conversation_pull_requests_key` ON `conversation_pull_requests` (`host`, `repository`, `number`);--> statement-breakpoint
 CREATE TABLE `conversations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,

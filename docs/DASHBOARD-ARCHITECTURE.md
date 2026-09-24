@@ -242,6 +242,39 @@ door that does not exist; a real record read door would be a separate change.
   exist yet) is retried on the next event fired by a surviving watcher — there is no
   timer or poll. If every watch attempt fails, the stream stays in `discovering`
   until an operator or later launch creates one of the watched roots.
+- Pull requests on conversations (PAN-3822): the `conversation_pull_requests` table
+  holds PR links keyed by host/repository/number with a `source`, a `dismissed_at`
+  tombstone, and a `snapshot_json`. The pull-request sync sweep
+  (`services/pull-request-sync-service.ts`, primary dashboard only, boot +30 s then
+  every 60 s) reads each GitHub project's `gh pr list` once per sweep, links every PR
+  whose head branch equals a conversation's branch (`resolveConversationBranch`; never
+  the default branch) as a `branch` link, and refreshes stored snapshots of linked PRs
+  by due rule: unsynced and open every sweep, closed every 15 min, merged never. A
+  due GitHub link no listing covered gets one `gh pr view` (the fallback), and 3
+  consecutive failed reads skip that repository for 15 min. The last-read times
+  and failure counts are in memory only. A change emits the in-memory
+  `conversation.pull_requests_changed` event, which bumps `conversationsListRevision`.
+  `GET /api/conversations` rows carry `pullRequest` (the effective link from
+  `resolveEffectivePullRequest`) and `pullRequestCount`, read with one SQL query per
+  page. The door is `src/lib/overdeck/conversation-pull-requests.ts`. Explicit links
+  go through `conversation-pull-request-commands.ts`, which parses the ref
+  (`packages/contracts/src/pull-request-ref.ts`, shared with the dashboard: PR/MR URL, `#42`, `owner/repo#42`) and refuses a
+  repository not configured for the conversation's project
+  (`foreign_repository`). The dashboard routes
+  (`GET/POST/DELETE /api/conversations/:name/pull-requests`, the DELETE takes
+  `?ref=`) and `pan conv link-pr`/`unlink-pr`/`prs` both call it. An unlink always
+  sets `dismissed_at` rather than deleting, so the sweep cannot re-add the PR. A
+  `manual`/`agent` relink clears it; a `created` link does not. `created` links
+  come from `linkCreatedPullRequestToIssueConversations`, called after
+  `createReviewArtifact` in `review-artifacts.ts` and `pan done`: every
+  non-archived agent conversation with that `issue_id` gets the PR. Other reads,
+  all in `routes/conversation-pull-requests.ts`: `POST …/pull-requests/sync`
+  (forced `gh pr view` refresh of every live, unmerged link), `GET
+  /api/pull-requests?state=&project=` (every live link, with its conversation and
+  effective project), `GET /api/pull-requests/conversations?url=` (reverse index),
+  and `pullRequest` + `pullRequests` on `GET /api/conversations/:id`. A new table
+  goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
+  and bumps `OVERDECK_TABLE_COUNT`.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
   rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
   indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
