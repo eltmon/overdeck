@@ -1,5 +1,7 @@
 import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import {
   aggregateDiscoveredSessionCost,
@@ -142,11 +144,53 @@ export function formatSlowJobLine(input: {
   return `[db-jobs] slow: op=${input.op} lane=${input.lane} waitMs=${input.waitMs} runMs=${input.runMs} depth=${input.depth}${bytes}`;
 }
 
-function workerScriptUrl(): URL {
-  return import.meta.url.endsWith('.ts')
-    ? new URL('./dashboard-db-worker.ts', import.meta.url)
-    : new URL('./dashboard-db-worker.js', import.meta.url);
+// The dashboard runs from dist only: the server bundle and `dashboard-db-worker.js`
+// are sibling entries of `dist/dashboard/` (src/dashboard/server/tsdown.config.ts).
+// Resolve from the dist root so the worker is found wherever the bundler puts the
+// chunk that contains this module. Same pattern as `memoryFtsWorkerUrl` (fts-db.ts).
+function workerScriptUrl(moduleUrl = import.meta.url): URL {
+  if (moduleUrl.endsWith('.ts')) return new URL('./dashboard-db-worker.ts', moduleUrl);
+
+  const distMarker = '/dist/';
+  const distIndex = moduleUrl.lastIndexOf(distMarker);
+  if (distIndex !== -1) {
+    return new URL('dashboard/dashboard-db-worker.js', moduleUrl.slice(0, distIndex + distMarker.length));
+  }
+
+  return new URL('./dashboard-db-worker.js', moduleUrl);
 }
+
+// Source mode only (Vitest, tsx). Node strips the worker's types but does not rewrite
+// its `.js` import specifiers to `.ts`, so a raw `.ts` worker dies on its first
+// relative import. Loader flags in `execArgv` (`--import tsx`) do not reach worker
+// threads either, so the worker registers tsx itself before importing the entry.
+// Bun runs `.ts` workers natively. The dist worker never takes this path.
+function sourceWorkerBootstrap(workerUrl: URL, moduleUrl = import.meta.url): string {
+  const tsxApiUrl = pathToFileURL(createRequire(moduleUrl).resolve('tsx/esm/api')).href;
+  return `import(${JSON.stringify(tsxApiUrl)})`
+    + `.then((tsx) => { tsx.register(); return import(${JSON.stringify(workerUrl.href)}); })`
+    + `.catch((err) => { setImmediate(() => { throw err; }); });`;
+}
+
+function spawnDashboardDbWorker(): Worker {
+  const workerUrl = workerScriptUrl();
+  const execArgv = process.execArgv.filter((arg) => !arg.startsWith('--inspect'));
+  if (workerUrl.pathname.endsWith('.ts') && !process.versions['bun']) {
+    return new Worker(sourceWorkerBootstrap(workerUrl), { eval: true, execArgv });
+  }
+  return new Worker(workerUrl, { execArgv } as ConstructorParameters<typeof Worker>[1]);
+}
+
+// Workers are never unref()'d, so a test that boots a real one must terminate it.
+async function terminateWorkers(): Promise<void> {
+  for (const lane of Object.keys(workers) as WorkerLane[]) {
+    const worker = workers[lane];
+    workers[lane] = null;
+    if (worker) await worker.terminate();
+  }
+}
+
+export const __testInternals = { workerScriptUrl, terminateWorkers };
 
 function failPendingForLane(lane: WorkerLane, err: Error): void {
   for (const [id, job] of pending.entries()) {
@@ -202,9 +246,7 @@ function getWorker(lane: WorkerLane): Worker {
   const existing = workers[lane];
   if (existing) return existing;
 
-  const worker = new Worker(workerScriptUrl(), {
-    execArgv: process.execArgv.filter((arg) => !arg.startsWith('--inspect')),
-  } as ConstructorParameters<typeof Worker>[1]);
+  const worker = spawnDashboardDbWorker();
   workers[lane] = worker;
 
   worker.on('message', (message: WorkerResponse) => {
