@@ -102,7 +102,7 @@ describe('dashboard lifecycle verbs reject stray positionals (PAN-3912)', () => 
 });
 
 describe('pan reload boot-gate flags (PAN-3899)', () => {
-  it('leaves the gates unset without flags, so reload carries the running dashboard\'s gates', async () => {
+  it('leaves the gates unset without flags, so reload decides them (Deacon on, resume carried)', async () => {
     await parse('reload');
     expect(mocks.reloadCommand.mock.calls[0][0]).toEqual({});
   });

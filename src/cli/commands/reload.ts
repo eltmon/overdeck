@@ -165,7 +165,7 @@ async function runReload(
     console.error(chalk.red(
       'Refusing `pan reload --no-deacon`: a Deacon-off dashboard runs as a read-only peer, and a peer cannot '
         + 'hold the host dashboard port, so the reload would stop the running dashboard and leave none. '
-        + 'Nothing was built or stopped. To keep Deacon off while diagnosing, see the pan-dashboard-restart skill.',
+        + 'Nothing was built or stopped. Run `pan reload` without --no-deacon; the reloaded dashboard runs Deacon.',
     ));
     process.exitCode = 2;
     return;

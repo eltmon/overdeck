@@ -37,8 +37,8 @@ export function registerReloadAndRestartCommands(program: Command): void {
     .option('--skip-build', 'Skip npm run build and restart the existing bundle')
     .option('--force', 'Bypass the agent deploy-window gate (agent-initiated reloads are otherwise refused while deploy-window block reasons are active)')
     .option('--health-timeout <duration>', 'Dashboard /api/health wait budget — ms, or Ns/Nm suffix (default 30s; floor 1000ms)')
-    .option('--deacon', 'Start Cloister/Deacon on the reloaded dashboard (default: keep the running dashboard\'s Deacon gate)')
-    .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload (default: keep the running dashboard\'s Deacon gate)')
+    .option('--deacon', 'Start Cloister/Deacon on the reloaded dashboard (always on after a reload)')
+    .option('--no-deacon', 'Refused: a Deacon-off dashboard is a peer and cannot hold the host dashboard port')
     .option('--resume', 'Enable agent auto-resume on the reloaded dashboard (default: keep the running dashboard\'s resume gate)')
     .option('--no-resume', 'Disable agent auto-resume on the reloaded dashboard (default: keep the running dashboard\'s resume gate)')
     .action(reloadCommand);
