@@ -31,6 +31,7 @@ import {
   type PrerequisiteResolver,
 } from '../../lib/system-prerequisites.js';
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
+import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkHerdr } from './doctor-herdr.js';
@@ -815,7 +816,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     });
   }
 
-  checks.push(checkDeployedHooksDrift());
+  checks.push(checkDeployedHooksDrift(), await checkSyncSourceCheckout()); // PAN-3327, PAN-3881
   checks.push(await checkCliGenerationLink());
 
   // Check environment variables

@@ -36,14 +36,15 @@ export type PipelineJournalEntryType =
   | 'review.aborted' | 'review.synthesis-gave-up'
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
-  | 'strike.landed';
+  | 'strike.landed'
+  | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned';
 
 export interface PipelineJournalEntry {
   /** ISO timestamp, stamped at append time. */
   at: string;
   type: PipelineJournalEntryType;
   issueId: string;
-  /** Who acted, e.g. 'pan-done' | 'pan-review-request' | 'webhook' | 'deacon-lite' | 'merge-button'. */
+  /** Who acted, e.g. 'pan-done' | 'pan-review-request' | 'webhook' | 'deacon-lite' | 'merge-button' | 'complete-planning'. */
   source?: string;
   data?: Record<string, unknown>;
 }

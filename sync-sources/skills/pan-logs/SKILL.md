@@ -36,8 +36,8 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -100
 # View dashboard logs
 cat ~/.overdeck/logs/dashboard.log
 
-# View all recent activity
-pan logs
+# View an issue's agent state and recent pipeline journal entries
+pan show ISSUE-123
 ```
 
 ## Agent Logs

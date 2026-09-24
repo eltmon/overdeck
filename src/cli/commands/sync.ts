@@ -38,6 +38,7 @@ import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
 import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
 import { renderHerdrReport } from '../herdr-report.js';
 import { checkSyncSourceFreshness } from '../../lib/sync-source-freshness.js';
+import { pruneDanglingGitHookLinks } from '../../lib/git-hooks.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -572,6 +573,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     const gitHooksSpinner = ora('Installing git hooks in registered projects...').start();
     let totalInstalled = 0;
     let projectsUpdated = 0;
+    const prunedGitHooks: string[] = [];
 
     for (const { config } of projects) {
       if (!existsSync(config.path)) continue;
@@ -603,6 +605,11 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         const hooksTarget = join(gitDir, 'hooks');
         if (!existsSync(hooksTarget)) {
           mkdirSync(hooksTarget, { recursive: true });
+        }
+
+        // PAN-3881: drop symlinks to git hooks deleted from sync-sources/.
+        for (const hook of pruneDanglingGitHookLinks(hooksTarget, BUNDLED_GIT_HOOKS_DIR)) {
+          prunedGitHooks.push(join(hooksTarget, hook));
         }
 
         try {
@@ -641,6 +648,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       gitHooksSpinner.succeed(`Installed git hooks in ${projectsUpdated} project(s)`);
     } else {
       gitHooksSpinner.info('Git hooks already up to date');
+    }
+    if (prunedGitHooks.length > 0) {
+      console.log(chalk.cyan(`  Removed ${prunedGitHooks.length} git hook link(s) whose source was deleted: ${prunedGitHooks.join(', ')}`));
     }
   }
 

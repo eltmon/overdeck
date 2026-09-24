@@ -9,7 +9,7 @@ import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw } fr
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore, selectAgents } from '../lib/store';
-import { EMERGENCY_STOP_HOTKEY_LABEL } from './EmergencyStopOverlay';
+import { EMERGENCY_STOP_HOTKEY_LABEL, runEmergencyStop } from './EmergencyStopOverlay';
 import { fetchWithTimeout } from '../lib/apiFetch';
 import { PopoverSurface } from './shared/ContextMenu';
 
@@ -73,12 +73,6 @@ async function startCloister(): Promise<void> {
 async function stopCloister(): Promise<void> {
   const res = await fetch('/api/cloister/stop', { method: 'POST' });
   if (!res.ok) throw new Error('Failed to stop Cloister');
-}
-
-async function emergencyStop(): Promise<{ killedAgents: string[] }> {
-  const res = await fetch('/api/cloister/emergency-stop', { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to execute emergency stop');
-  return res.json();
 }
 
 async function fetchConversations(): Promise<{ sessionAlive: boolean }[]> {
@@ -261,8 +255,8 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
   };
 
   const handleEmergencyStop = async () => {
-    await emergencyStop();
-    setShowEmergencyConfirm(false);
+    // Same result toast as the hotkey overlay: success, unconfirmed warning, or error.
+    if (await runEmergencyStop()) setShowEmergencyConfirm(false);
     refetch();
   };
 

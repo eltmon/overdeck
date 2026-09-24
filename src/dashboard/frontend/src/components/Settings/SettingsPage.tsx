@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import {
   Loader2,
-  AlertTriangle,
 } from 'lucide-react';
 import { SettingsConfig, type VoiceHardwareSettings, type VoiceSettings } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
@@ -371,14 +369,6 @@ export function SettingsPage() {
   useEffect(() => {
     if (settings && !formData) {
       setFormData(settings);
-      // Show toast for deprecation warnings
-      if (settings.deprecation_warnings && settings.deprecation_warnings.length > 0) {
-        const count = settings.deprecation_warnings.length;
-        toast.warning(
-          `${count} deprecated model${count > 1 ? 's' : ''} detected. Click "Migrate now" in the Settings banner to update them.`,
-          { duration: 10000 }
-        );
-      }
     }
   }, [settings, formData]);
 
@@ -490,38 +480,6 @@ export function SettingsPage() {
         />
       }
     >
-      {/* Deprecation Warning Banner */}
-      {formData.deprecation_warnings && formData.deprecation_warnings.length > 0 && (
-        <div className="bg-warning/10 border border-warning/25 rounded-lg px-4 py-3 mb-6">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-warning text-sm font-medium mb-1">
-                Deprecated model IDs detected
-              </p>
-              <div className="space-y-0.5">
-                {formData.deprecation_warnings.map((warning, idx) => (
-                  <p key={idx} className="text-muted-foreground text-xs">
-                    <code className="font-mono">{warning.workType}</code>
-                    {': '}
-                    <code className="font-mono line-through">{warning.from}</code>
-                    {' → '}
-                    <code className="font-mono">{warning.to}</code>
-                  </p>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => scheduleAutosave({ settings: formData, voiceSettings: voiceFormData })}
-                className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-warning/20 text-warning hover:bg-warning/30 transition-colors"
-              >
-                Migrate now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Model Routing */}
       <section id="model-routing" className="py-6 scroll-mt-4">
         <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">

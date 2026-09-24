@@ -1,4 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const CONNECTION_LOST_FIXTURE = fileURLToPath(
+  new URL('../../../fixtures/claude-code-connection-lost.jsonl', import.meta.url),
+);
 
 const mocks = vi.hoisted(() => ({
   listAgentStates: vi.fn(),
@@ -178,6 +185,7 @@ describe('deacon-lite', () => {
     });
 
     it('resumes exactly once when a provider error is showing at the prompt', async () => {
+      mocks.isIdle.mockReturnValue(true);
       mocks.capturePaneText.mockReturnValue('API Error: Overloaded\n❯ ');
 
       const actions = await checkApiErrorAgents();
@@ -189,6 +197,48 @@ describe('deacon-lite', () => {
         expect.any(String),
         'deacon-lite:checkApiErrorAgents',
       );
+    });
+
+    // PAN-3948: Claude Code's "Connection lost mid-response" error, the exact
+    // text of a real transcript record (tests/fixtures/claude-code-connection-lost.jsonl),
+    // rendered in the pane above the idle prompt.
+    function connectionLostPane(): string {
+      const record = JSON.parse(readFileSync(CONNECTION_LOST_FIXTURE, 'utf8').trim()) as {
+        message: { content: Array<{ text: string }> };
+      };
+      return `● Working on it…\n  ⎿  ${record.message.content[0]!.text}\n\n❯ `;
+    }
+
+    it('resumes an idle planning agent left at the prompt by "Connection lost mid-response"', async () => {
+      mocks.liveAgentInventory.mockResolvedValue(inventory(['planning-pan-3937']));
+      mocks.isIdle.mockReturnValue(true);
+      mocks.capturePaneText.mockReturnValue(connectionLostPane());
+
+      const actions = await checkApiErrorAgents();
+
+      expect(mocks.isIdle).toHaveBeenCalledWith('planning-pan-3937', expect.any(Number), expect.any(Number));
+      expect(actions).toHaveLength(1);
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+        'planning-pan-3937',
+        expect.any(String),
+        'deacon-lite:checkApiErrorAgents',
+      );
+
+      // Rate-limited like every other pattern: the next tick inside the cooldown is a no-op.
+      const second = await checkApiErrorAgents();
+      expect(second).toEqual([]);
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('never nudges a working agent whose pane still shows the error', async () => {
+      mocks.isIdle.mockReturnValue(false);
+      mocks.capturePaneText.mockReturnValue(connectionLostPane());
+
+      const actions = await checkApiErrorAgents();
+
+      expect(actions).toEqual([]);
+      expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
     });
   });
 

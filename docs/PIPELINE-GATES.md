@@ -349,13 +349,30 @@ Auto-resume is intentionally suppressible:
   leaves it unset so autonomous recovery stays eligible. Recording an OOM
   kill as an operator stop is what once turned a transient resource event
   into a permanent stall.
-- **Memory gate (PAN-2500):** the resource governor gates every autonomous
-  resume/dispatch path — boot recovery, deacon-lite's own nudges, and
-  review/test dispatch — on live memory pressure, not just agent count and
-  CPU load. Below the SOFT reserve it defers new admissions; below HARD it
-  sheds (stops merged/closed Docker stacks, then pauses idle work agents);
-  it never re-admits until memory clears RECOVERY. This is separate from
-  `--no-resume`, which suppresses resume outright regardless of memory.
+- **Memory gate (PAN-2500):** the hysteresis resource governor
+  (`assessMemoryPressure` in `cloister/memory-governor.ts`) has two
+  consumers: the preemptive scheduler (`preemption.ts`) and the
+  memory-pressure patrol (`memory-pressure-patrol.ts`). Below the SOFT
+  reserve they defer new admissions; below HARD the patrol sheds (stops
+  merged/closed Docker stacks, then pauses idle work agents); neither
+  re-admits until memory clears RECOVERY. It does **not** gate every
+  dispatch path: no spawn path reads `getCachedMemoryVerdict`. POST
+  `/api/agents` — the operator's start, the planning auto-handoff and its
+  deferred retry — sees memory only through `evaluateSpawnGuardrails`
+  (`routes/agents/shared.ts`), which classifies free RAM against the
+  `memoryWarnGb`/`memoryBlockGb` thresholds with no hysteresis. This is
+  separate from `--no-resume`, which suppresses resume outright regardless
+  of memory.
+- **Deferred planning hand-off (PAN-4155):** when planning finalizes with
+  auto-start, the first POST `/api/agents` acknowledges tight RAM and a high
+  agent count only (PAN-3977). If a guardrail still refuses it (the agent
+  ceiling, leaked specialists, critical RAM, a stale health snapshot), the
+  hand-off is journaled as `handoff.deferred` instead of `planning.failed`,
+  and deacon-lite's `retryDeferredHandoffs` re-sends the spawn with **no**
+  acknowledgement at all, so a machine never waives a health warning on a
+  retry. Only a refusal whose response carries a guardrail decision is
+  deferred; the start gate and the dirty-tree guard also answer 409 and stay
+  failures. See "Deacon-lite" below for the schedule and stop conditions.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -408,23 +425,30 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
+| `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail refused the auto-start |
+| `handoff.retried` / `.started` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
 
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
 
-## Deacon-lite: five routines
+## Deacon-lite: six routines
 
-`runDeaconLite()` runs on a 60s tick and holds five routines, all of which only
+`runDeaconLite()` runs on a 60s tick and holds six routines, all of which only
 observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
    unpushed commits.
-2. `checkApiErrorAgents` — nudges an agent wedged on an API error.
+2. `checkApiErrorAgents` — nudges a work, specialist, or planning agent wedged
+   on a provider error (including Claude Code's "API Error: Connection lost
+   mid-response"), once per 5 minutes, and only when liveness.ts `isIdle`
+   says its work activity has been stale for 2 minutes.
 3. `reconcileAgentLiveness` — corrects the dashboard's in-memory cache against
    the selected backend's inventory.
 4. `reapClosedIssueAgents` — reaps agents for issues the tracker has closed.
-5. `recoverStalledReviews` — the one recovery routine, and the only timer added
-   by the journal work.
+5. `recoverStalledReviews` — re-dispatches a review convoy whose reviewers
+   are all gone.
+6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
+   re-sends a planning hand-off a spawn guardrail refused.
 
 `recoverStalledReviews` reads the journal and nothing else — no GitHub call, no
 tracker call. It acts only when an issue's **last** entry is `review.dispatched`,
@@ -498,3 +522,22 @@ enough to count verdicts later. A quick-mode review writes no `review.dispatched
 entry, so a dead quick reviewer is not recovered either. And a server death
 between `verification.started` and its outcome leaves `verification.*` last,
 which the rule above deliberately skips.
+
+`retryDeferredHandoffs` acts only when an issue's last `handoff.*` entry is
+`handoff.deferred` or `handoff.retried`. Each of those entries carries the
+schedule (`deferredAt`, `attempt`, `nextRetryAt`), so a dashboard or deacon
+restart resumes the backoff where it stood; nothing is held in memory. Retries
+run 2, 4, 8 and 16 minutes apart, then every 20 minutes. Each one POSTs
+`/api/agents` through `spawnWorkAgentThroughAgentsEndpoint` with
+`autoSpawnConsentRequired: true` and no acknowledgement, so a success spends
+the operator's auto-start consent exactly as the first attempt would have.
+
+It stands down (a `handoff.abandoned` entry with `outcome: 'stood-down'` and an
+info activity line, no failure) when the operator already acted: an
+`agent-<issue>` pane is live, the work agent is paused, running or starting,
+it was started or stopped after the deferral, planning was restarted, the
+auto-start consent is no longer `granted`, or the retried spawn answers
+`paused`, `troubled` or closed-issue. Two hours after the first refusal, or on
+an `unauthorized` answer, it gives up: a `handoff.abandoned` entry with
+`outcome: 'gave-up'`, a `planning.failed` event with `stage: 'auto-handoff'`,
+and a warn-level activity line that tells the operator to run `pan start`.

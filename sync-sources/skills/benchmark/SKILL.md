@@ -47,7 +47,7 @@ per-workspace for comparison across runs.
 1. Reads the issue template from `benchmarks/templates/quantumllama.md`
 2. Creates a GitHub issue titled: `Benchmark: QuantumLlama — <scenario description>`
 3. Labels it with `benchmark` (creates the label if it doesn't exist)
-4. Reports the issue number so the user can proceed with `pan issue PAN-XXX`
+4. Reports the issue number so the user can proceed with `pan start PAN-XXX`
 
 ## Execution Steps
 
@@ -92,7 +92,7 @@ Tell the user the issue number and how to run it:
 Created PAN-XXX: Benchmark: QuantumLlama — <scenario>
 
 To run the benchmark:
-  pan issue PAN-XXX
+  pan start PAN-XXX
 ```
 
 ## Important Notes
@@ -100,6 +100,6 @@ To run the benchmark:
 - **Never merge** benchmark branches — they exist only for measurement
 - Each run creates a separate issue + workspace, making A/B comparison straightforward
 - Cost and token data are tracked automatically by Overdeck per-workspace
-- Clean up old benchmark workspaces with `pan workspace delete` when done comparing
+- Clean up old benchmark workspaces with `pan workspace destroy` when done comparing
 - The spec file at `benchmarks/specs/quantumllama.md` is referenced in the issue body —
   the agent reads it during implementation

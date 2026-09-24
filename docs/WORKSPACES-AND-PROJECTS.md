@@ -471,6 +471,28 @@ is the wrong tool for bounding that: it interrupts the effect and would kill the
 child the operator just asked for. If a template ever names a foreground
 process, the fix is a spawn-and-detach primitive in `src/lib/browser.ts`.
 
+## An unfinished issue-worktree setup (PAN-4171)
+
+`createWorkspace` (`src/lib/workspace-manager/create.ts`) writes
+`<workspace>/.overdeck/setup-incomplete` as soon as the git worktree exists and
+removes it after the last setup step has run. When the dependency install, the
+pre-rebase hook install or a workspace package build fails, the create returns
+`success: false` and the worktree keeps the marker. The next `createWorkspace`
+for that issue sees the marker, keeps the worktree and whatever it holds, and
+runs the setup steps again instead of refusing with "already exists". It either
+completes the workspace or fails with the same error.
+
+Every caller that skips creation for an existing directory asks
+`workspaceNeedsSetup(path)` (or `isWorkspaceSetupIncomplete(path)`) from
+`src/lib/workspace-manager/setup-marker.ts` instead of `existsSync`, so no
+agent starts in a half-built worktree: `pan start`, the dashboard agent spawn
+route, `WorkspaceService.create`, the planning session, `pan swarm` and remote
+completion. `pan start` never rolls back a worktree whose setup it resumed.
+A worktree with no marker is a finished workspace, including every workspace
+created before the marker existed. Soft setup failures (port assignment,
+devcontainer render, tunnel, Hume, Docker) are reported but do not keep the
+marker, so a retry does not repeat them.
+
 ## User-facing surfaces vs. pipeline worktrees (PAN-3286)
 
 `backfillIssueWorkspaces()` enrolls *every* `feature-*` worktree as a

@@ -2,8 +2,10 @@
  * Deacon-lite (PAN-3917 W4): the surviving watcher.
  *
  * Replaces the 3,400-line `deacon.ts` (~60 awaited patrol routines writing to
- * the record plane) with five routines that only observe and nudge/notify —
- * never reconcile a stored copy. See docs/PIPELINE-GATES.md and the PAN-3917
+ * the record plane) with a handful of routines that only observe and
+ * nudge/notify — never reconcile a stored copy. Two of them recover from the
+ * pipeline journal: `recoverStalledReviews` and `retryDeferredHandoffs`
+ * (PAN-4155, in deferred-handoff.ts). See docs/PIPELINE-GATES.md and the PAN-3917
  * PRD ("The patrol loop", FR-11, D1/D4/D5/D6/D7).
  *
  * No heartbeat file, no patrol-result aggregation, no firing budgets, no
@@ -26,8 +28,9 @@ import { listWorkspaces } from '../workspaces/resolver.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { appendPipelineEntry, lastPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
+import { retryDeferredHandoffs } from './deferred-handoff.js';
 
-export { checkApiErrorAgents };
+export { checkApiErrorAgents, retryDeferredHandoffs };
 
 // ============================================================================
 // checkStuckWorkAgents (FR-11): a work agent idle for N minutes whose feature
@@ -163,7 +166,7 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
 export const reapClosedIssueAgents = reconcileClosedIssueAgents;
 
 // ============================================================================
-// recoverStalledReviews: the one recovery routine, driven by the pipeline
+// recoverStalledReviews: the review recovery routine, driven by the pipeline
 // journal. A dashboard restart mid-convoy used to lose the convoy with nothing
 // left to re-dispatch from, and a dead reviewer pane blocked re-dispatch
 // forever (PAN-3939). The journal says what Overdeck last DID for an issue; if
@@ -363,7 +366,8 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     let journalData: Record<string, unknown> = { reason };
     try {
       const { recoverMissingConvoyReviewers } = await import('./review-convoy.js');
-      const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });      outcome = recovery.message;
+      const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
+      outcome = recovery.message;
       if (!recovery.success && /no review parent state|missing workspace\/runId/i.test(recovery.message)) {
         const { getRequestReviewStarter } = await import('./request-review-pipeline.js');
         const startReview = getRequestReviewStarter();
@@ -447,6 +451,8 @@ export async function runDeaconLite(): Promise<void> {
   await reconcileAgentLiveness();
   await reapClosedIssueAgents();
   await recoverStalledReviews();
+  // PAN-4155: re-send a planning hand-off a spawn guardrail refused.
+  await retryDeferredHandoffs();
 }
 
 // ============================================================================

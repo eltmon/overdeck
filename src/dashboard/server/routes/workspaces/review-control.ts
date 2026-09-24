@@ -126,7 +126,8 @@ const postWorkspaceReviewPurgeRoute = HttpRouter.add(
 );
 // ─── Route: POST /api/review/:issueId/abort ────────────────────────────────
 //
-// Kill all running reviewer tmux sessions for an issue. Does NOT message the
+// Close every reviewer for an issue through the terminal backend (tmux or
+// Herdr) and mark its row stopped; closes that failed come back in `failed`. Does NOT message the
 // work agent — leaves the worker idle. Use this to stop a runaway or stuck
 // review without triggering a resubmit. PAN-3917: killing the sessions (plus a
 // `review.aborted` journal entry, #4134) is the whole effect; the PR keeps
@@ -161,7 +162,7 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
 
     console.log(
       `[abort-review] Aborted ${killed.length} reviewer session(s) for ${issueId}` +
-      (failed.length ? ` (${failed.length} kill failed)` : '')
+      (failed.length ? ` (could not stop: ${failed.join(', ')})` : '')
     );
     // The abort is an operator hold: journal it, so stalled-review recovery
     // does not re-synthesize the review the operator just stopped (#4134).

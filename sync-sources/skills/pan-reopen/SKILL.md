@@ -41,7 +41,6 @@ If the issue is **already In Progress** and one of these is true, use the listed
 | Situation | Command |
 | --- | --- |
 | Reviewers are stuck / errored / silently exited and you want fresh ones | `pan review restart <id>` |
-| You want to force review/test/merge cycles back to pending (human override) | `pan review reset <id>` |
 | You want to kill running reviewers and leave the worker idle | `pan review abort <id>` |
 | Work agent should pick up where it left off, no state reset needed | just `pan start <id>` |
 

@@ -99,7 +99,18 @@ const {
 
 vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
   agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
+  // PAN-3939: reviewer kills close through the terminal backend. By default the
+  // close stands in for the tmux kill the assertions below count (see beforeEach).
   closeAgentPaneDetailed: (agentId: string) => mockCloseAgentPaneDetailed(agentId),
+}));
+
+// PAN-3939: the synthesis dispatch guard asks the liveness oracle (mocked below
+// through mockIsAlive, which defaults to no reviewer alive); the backend paths are
+// covered end to end in src/lib/cloister/__tests__/review-agent-terminal-backend.test.ts.
+
+vi.mock('../../../src/lib/overdeck/agents.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/overdeck/agents.js')>(),
+  listAgentIdsByPrefix: vi.fn(() => []),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -238,7 +249,10 @@ beforeEach(() => {
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockClearFeedbackFiles.mockResolvedValue(undefined);
   mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
-  mockCloseAgentPaneDetailed.mockResolvedValue({ outcome: 'absent' });
+  mockCloseAgentPaneDetailed.mockImplementation(async (agentId: string) => {
+    await mockKillSessionAsync(agentId);
+    return { outcome: 'closed' };
+  });
   mockIsAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
   mockRemoveAgentStateDir.mockResolvedValue({ removedFiles: 0, preservedTranscripts: 0, removedDir: true });
 });

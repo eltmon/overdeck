@@ -64,8 +64,8 @@ describe('Muse model and harness support', () => {
       expect(canUseHarness('claude-code', model, undefined).allowed).toBe(false);
     }
     expect(canUseHarness('muse', 'claude-sonnet-5', undefined).allowed).toBe(false);
-    expect(applyFallback(models[0], new Set(['meta']))).toBe(models[0]);
-    expect(() => applyFallback(models[0], new Set(['anthropic']))).toThrow('Meta (Muse) is disabled');
+    expect(applyFallback(models[0], new Set(['meta']), 'claude-sonnet-5')).toBe(models[0]);
+    expect(() => applyFallback(models[0], new Set(['anthropic']), 'claude-sonnet-5')).toThrow('Meta (Muse) is disabled');
     expect(getAvailableModelsApi().meta[1].name).toContain('training data');
   });
 
@@ -83,7 +83,7 @@ describe('Muse model and harness support', () => {
     );
     expect(config.enabledProviders.has('meta')).toBe(false);
     expect(explicitlyDisabled.has('meta')).toBe(true);
-    expect(() => applyFallback(models[0], config.enabledProviders)).toThrow('Meta (Muse) is disabled');
+    expect(() => applyFallback(models[0], config.enabledProviders, 'claude-sonnet-5')).toThrow('Meta (Muse) is disabled');
   });
 
   it.each(models)('routes the command helper for %s to native Muse', model => {

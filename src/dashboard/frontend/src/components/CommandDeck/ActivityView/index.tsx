@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { isBackendOutage } from '../../../lib/backendOutageState';
 import { AgentSection } from './AgentSection';
 import { IsolationMode } from './IsolationMode';
 import { useState, useEffect, useRef } from 'react';
@@ -288,7 +289,7 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
   // Escape key to close isolation
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isolatedSection) {
+      if (e.key === 'Escape' && isolatedSection && !isBackendOutage()) {
         handleCloseIsolation();
       }
     };
