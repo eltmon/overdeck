@@ -65,8 +65,7 @@
               "cli/core-commands",
               "cli/hygiene",
               "cli/agent-commands",
-              "cli/workspace-commands",
-              "cli/convoy-commands"
+              "cli/workspace-commands"
             ]
           }
         ]

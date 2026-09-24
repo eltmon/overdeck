@@ -20,7 +20,11 @@ import { COMPOSER_COMMAND_MANIFEST } from '../../../packages/contracts/src/compo
 
 const ROOT = process.cwd();
 
-/** Agent-facing text roots. Hooks are scanned whole; Markdown only in code spans and fences. */
+/**
+ * Agent-facing text roots: hooks, prompts, bundled agents, rules and skills,
+ * plus the user-facing .mdx CLI and feature docs. Hooks are scanned whole;
+ * Markdown only in code spans and fences.
+ */
 const HOOK_ROOTS = ['sync-sources/hooks'];
 const MARKDOWN_ROOTS = [
   'roles',
@@ -33,6 +37,15 @@ const MARKDOWN_ROOTS = [
   'features',
   'reference',
 ];
+
+/**
+ * Files that name unbuilt verbs on purpose. Each entry says why; the test
+ * proves the file still exists so a stale exclusion cannot linger.
+ */
+const PROPOSAL_DOCS: Record<string, string> = {
+  'reference/template-conversations.mdx':
+    'research proposal: sketches `pan bundle` / `pan template` and says they do not exist yet',
+};
 
 /**
  * Hidden commands are registered but absent from the manifest (it lists only
@@ -147,7 +160,7 @@ function scan(): string[] {
   }
   for (const root of MARKDOWN_ROOTS) {
     for (const file of walk(join(ROOT, root))) {
-      if (!/\.mdx?$/.test(file)) continue;
+      if (!/\.mdx?$/.test(file) || relative(ROOT, file) in PROPOSAL_DOCS) continue;
       for (const { line, code } of markdownCode(readFileSync(file, 'utf-8'))) check(file, line, code);
     }
   }
@@ -155,7 +168,7 @@ function scan(): string[] {
 }
 
 describe('agent-facing text names only registered pan commands (PAN-3868, PAN-3934)', () => {
-  it('resolves every pan command in hooks, role prompts, runtime prompts, agents and rules', () => {
+  it('resolves every pan command in hooks, prompts, agents, rules, skills and CLI docs', () => {
     expect(scan()).toEqual([]);
   });
 
@@ -163,6 +176,12 @@ describe('agent-facing text names only registered pan commands (PAN-3868, PAN-39
     const registry = buildRegistry();
     expect(unregistered(['work', 'done'], registry)).toBe('pan work');
     expect(unregistered(['done'], registry)).toBeNull();
+  });
+
+  it('keeps each proposal-doc exclusion pointing at a real file', () => {
+    for (const file of Object.keys(PROPOSAL_DOCS)) {
+      expect(statSync(join(ROOT, file)).isFile()).toBe(true);
+    }
   });
 
   it('keeps each hidden-command exception backed by its registration', () => {
