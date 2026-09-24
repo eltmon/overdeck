@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T19:28:02.399Z · model: claude-opus-5 · open: 821_
+_Last sequenced: 2026-09-24T19:40:38.007Z · model: claude-opus-5 · open: 823_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,6 +9,7 @@ _Last sequenced: 2026-09-24T19:28:02.399Z · model: claude-opus-5 · open: 821_
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
 | 9 | PAN-4109 | M | critical | ok |  |  | Nine readers still filter on tmuxActive: on Herdr the health loop, emergencyStop and the memory governor's shed all see zero agents |
 | 10 | PAN-4116 | M | critical | ok |  |  | Every runtime's isRunning asks tmux only, so on the default Herdr backend live agents read stuck, pokes never fire and crashes miscount |
+| 11 | PAN-4121 | S | critical | ok |  |  | Poke escalation fingerprints panes with a hard-coded tmux capture-pane, so on Herdr an uncommitted working agent pauses as idle-alive |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
@@ -406,6 +407,7 @@ _Last sequenced: 2026-09-24T19:28:02.399Z · model: claude-opus-5 · open: 821_
 | 444 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 445 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 447 | PAN-4123 | S | medium | ok |  | PAN-4118 | Reviewer tree shows convoy lanes from roles.review.mode, so a per-run Full hides its four lanes and a per-run Quick shows four dead ones |
 | 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 449 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
 | 450 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
@@ -845,6 +847,10 @@ Filed 2026-09-24, placed at rank 9 — freed when PAN-4097 closed — so it inhe
 
 New since the prior pass and the direct sibling of PAN-4109 — the same tmux-only liveness blindness, one layer down in the runtimes. Herdr is the default backend, so isRunning returns false for every live agent: pokeAgentWithEscalation bails before it can unstick anything, getAgentHealth reports a working agent as stuck (feeding kill_on_stuck), and handleAgentCrash counts crashes without consulting the liveness oracle. The fix pattern is already landed in #4088/#4103/#4107 — route through isAlive in liveness.ts and require confirmed-dead before any crash action — so this is a small, well-specified change guarding the pipeline against killing healthy agents. Ranked at 10, immediately after PAN-4109.
 
+### PAN-4121 (rank 11)
+
+New since the prior pass and the third member of the Herdr-blindness wave that PAN-4109 (rank 9) and PAN-4116 (rank 10) open, so it takes rank 11 and nothing renumbers. progressFingerprint in src/lib/cloister/service-crash.ts reads the agent's pane tail with execFileAsync('tmux', ['-L', managedSocket, 'capture-pane', …]) instead of the backend-aware readAgentPaneText in src/lib/terminal-backends/agent-pane-io.ts that #4103 already routed /api/agents/:id/output through. A Herdr agent has no tmux session, the catch swallows the failure, and the pane half hashes the empty string forever — an unreadable pane is indistinguishable from an unchanged one — leaving the workspace HEAD as the only live input. An agent that is working but has not committed therefore holds one fingerprint across every poke, the third poke accuses it of making no observable progress and the fifth pauses it with needs-you: idle-alive. It is critical rather than high because the damage is inflicted on healthy work on the default backend: the pipeline stops agents that are doing their job. It also must land with or right after PAN-4116, because isRunning is currently false on Herdr and pokeAgentWithEscalation bails before the fingerprint is ever consulted — the moment that gate becomes backend-aware the pokes start firing and this constant fingerprint begins pausing live agents. The body names the file, the exact call, the safety rule (a failed or empty read makes the fingerprint unknown, an unknown fingerprint sends no poke and never advances the ineffective counter) and a backend-independent third input, transcript growth from the runtime heartbeat, so the change is small and fully specified.
+
 ### PAN-3930 (rank 15)
 
 In pipeline — rank pinned.
@@ -1136,10 +1142,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T19:28:02.399Z",
+  "generatedAt": "2026-09-24T19:40:38.007Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 821,
+  "openCount": 823,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11297,6 +11303,34 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "New since the prior pass. A post-Cut (PAN-3917 W6) leftover: the trigger route still validates reviewMode but spawnReviewRoleForIssue never receives it, so the operator's Full/Quick/None choice silently loses to roles.review.mode while the toast and docs/ISSUE-VIEW.md both claim it took effect. Nothing wedges — the run falls back to config — so it is medium, not high. The body carries a complete fix outline (optional reviewMode on spawnReviewRoleForIssue, pass it from the route, correct the doc) with verified file paths, so it is a cheap, self-contained win. Placed in the medium 62-63 band beside comparable operator-facing correctness bugs; no renumbering.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4121",
+      "rank": 11,
+      "size": "S",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Poke escalation fingerprints panes with a hard-coded tmux capture-pane, so on Herdr an uncommitted working agent pauses as idle-alive",
+      "rationale": "New since the prior pass and the third member of the Herdr-blindness wave that PAN-4109 (rank 9) and PAN-4116 (rank 10) open, so it takes rank 11 and nothing renumbers. progressFingerprint in src/lib/cloister/service-crash.ts reads the agent's pane tail with execFileAsync('tmux', ['-L', managedSocket, 'capture-pane', …]) instead of the backend-aware readAgentPaneText in src/lib/terminal-backends/agent-pane-io.ts that #4103 already routed /api/agents/:id/output through. A Herdr agent has no tmux session, the catch swallows the failure, and the pane half hashes the empty string forever — an unreadable pane is indistinguishable from an unchanged one — leaving the workspace HEAD as the only live input. An agent that is working but has not committed therefore holds one fingerprint across every poke, the third poke accuses it of making no observable progress and the fifth pauses it with needs-you: idle-alive. It is critical rather than high because the damage is inflicted on healthy work on the default backend: the pipeline stops agents that are doing their job. It also must land with or right after PAN-4116, because isRunning is currently false on Herdr and pokeAgentWithEscalation bails before the fingerprint is ever consulted — the moment that gate becomes backend-aware the pokes start firing and this constant fingerprint begins pausing live agents. The body names the file, the exact call, the safety rule (a failed or empty read makes the fingerprint unknown, an unknown fingerprint sends no poke and never advances the ineffective counter) and a backend-independent third input, transcript growth from the runtime heartbeat, so the change is small and fully specified.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4123",
+      "rank": 447,
+      "size": "S",
+      "importance": "medium",
+      "score": 59,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4118"
+      ],
+      "why": "Reviewer tree shows convoy lanes from roles.review.mode, so a per-run Full hides its four lanes and a per-run Quick shows four dead ones",
+      "rationale": "New since the prior pass and a follow-on that only bites once PAN-4118 lands, so it sits behind it in the medium band at the free rank 447: buildReviewerNodes in src/dashboard/server/routes/reviewer-tree.ts gates convoy lanes on isExtendedReviewEnabled(issueId), which reads config, so a run whose mode came from the Request review menu renders the wrong lane set — display-only, nothing wedges, and the body already proposes inferring the mode from the run (convoy agent records or .pan/review/<runId>/) rather than persisting per-issue state the Cut removed.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12433,6 +12467,20 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4116",
+      "to": "PAN-4121",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4118",
+      "to": "PAN-4123",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
