@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T21:40:22.399Z · model: claude-opus-5 · open: 816_
+_Last sequenced: 2026-09-24T21:47:15.262Z · model: claude-opus-5 · open: 814_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -131,7 +131,6 @@ _Last sequenced: 2026-09-24T21:40:22.399Z · model: claude-opus-5 · open: 816_
 | 155 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
 | 156 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
 | 157 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
-| 158 | PAN-4167 | XS | high | ok |  |  | Fork spawn-pending test sleeps 10ms instead of awaiting the mock: a false CI red that stalls the merge gate; fix is a vi.waitFor |
 | 159 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
 | 160 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
 | 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
@@ -438,7 +437,6 @@ _Last sequenced: 2026-09-24T21:40:22.399Z · model: claude-opus-5 · open: 816_
 | 477 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
 | 478 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
 | 480 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 481 | PAN-3867 | S | medium | ok |  |  | /projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test |
 | 482 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
 | 483 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
 | 484 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
@@ -1131,10 +1129,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T21:40:22.399Z",
+  "generatedAt": "2026-09-24T21:47:15.262Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 816,
+  "openCount": 814,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -6471,19 +6469,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-3867",
-      "rank": 481,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "/projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test",
-      "rationale": "New this run: medium/50 — /projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-538",
       "rank": 482,
       "size": "S",
@@ -11179,20 +11164,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-4167",
-      "rank": 158,
-      "size": "XS",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fork spawn-pending test sleeps 10ms instead of awaiting the mock: a false CI red that stalls the merge gate; fix is a vi.waitFor",
-      "rationale": "Inserted at 158, in the high test-reliability band beside PAN-2421 (route-test flake) and PAN-2656: a single-file, fully specified fix — clear the mock history and await vi.waitFor on authorHandoffExternal instead of a 10ms real sleep — for a flake that already reported a false red on PR #4141 and burned its retry on a timeout.",
-      "gate": "auto",
-      "planning": "skip",
-      "isEpic": false
-    },
-    {
       "issue": "PAN-4169",
       "rank": 4,
       "size": "M",
@@ -11344,8 +11315,8 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "from": "PAN-2350",
       "to": "PAN-3762",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
+      "source": "github-ref",
+      "confidence": 1
     },
     {
       "from": "PAN-1641",
@@ -12042,13 +12013,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-3762",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-3862",
       "type": "informs",
       "source": "github-ref",
@@ -12318,7 +12282,7 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "to": "PAN-4151",
       "type": "unblocks",
       "source": "github-ref",
-      "confidence": 0.95
+      "confidence": 1
     },
     {
       "from": "PAN-3921",
@@ -12335,13 +12299,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 0.5
     },
     {
-      "from": "PAN-1824",
-      "to": "PAN-4167",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-3923",
       "to": "PAN-4169",
       "type": "unblocks",
@@ -12352,13 +12309,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "from": "PAN-3905",
       "to": "PAN-4171",
       "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3822",
-      "to": "PAN-4151",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
