@@ -498,6 +498,34 @@ describe('listScheduleCandidates (#3983)', () => {
 });
 
 describe('runAutoMergeSchedulerTick (#3983)', () => {
+  it('lets an abandoned pass that wakes up later start no forge read and write nothing', async () => {
+    vi.useFakeTimers();
+    try {
+      let releaseList!: (ids: readonly string[]) => void;
+      const { deps, insert, factsReads } = world({ labels: ['auto-merge'] });
+      let calls = 0;
+      deps.listCandidates = vi.fn(async (): Promise<readonly string[]> => {
+        calls += 1;
+        // The first pass hangs on its listing; the next tick's pass lists nothing.
+        return calls === 1 ? new Promise((resolve) => { releaseList = resolve; }) : [];
+      });
+
+      const stale = runAutoMergeSchedulerTick(deps, 1_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(stale).resolves.toEqual([]);
+      const next = runAutoMergeSchedulerTick(deps, 1_000);
+      await next;
+
+      // The hung listing finally answers, long after the pass was abandoned.
+      releaseList(['PAN-42']);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(factsReads).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('abandons a hung pass with a log line so the next tick runs', async () => {
     vi.useFakeTimers();
     try {

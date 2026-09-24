@@ -57,6 +57,12 @@ export interface AutoMergeSchedulerDeps {
   log?: (message: string) => void;
   /** Read for the `OVERDECK_DISABLE_AUTO_MERGE=1` kill switch; `process.env` by default. */
   env?: NodeJS.ProcessEnv;
+  /**
+   * False once the tick has abandoned this pass. Checked before every forge
+   * read and inside the insert, so an abandoned pass that wakes up later does
+   * nothing more. Set by {@link runAutoMergeSchedulerTick}.
+   */
+  isCurrent?: () => boolean;
 }
 
 export interface AutoMergeScheduleOutcome {
@@ -200,9 +206,11 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
   const policyRefusal = deps.policyRefusal ?? await defaultPolicyRefusal();
   const mergeGate = deps.mergeGate ?? defaultMergeGate;
   const schedule = deps.schedule ?? defaultSchedule;
+  const isCurrent = deps.isCurrent ?? (() => true);
 
   const outcomes: AutoMergeScheduleOutcome[] = [];
   for (const { key, config } of listProjects()) {
+    if (!isCurrent()) return outcomes;
     if (!isTrainEnabledForProject(config)) continue;
     const projectPath = resolve(config.path);
 
@@ -222,6 +230,7 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
     }
 
     for (const rawIssueId of candidates) {
+      if (!isCurrent()) return outcomes;
       const issueId = rawIssueId.toUpperCase();
       const skip = (reason: string) => outcomes.push({ projectKey: key, issueId, scheduled: false, reason });
       try {
@@ -250,10 +259,12 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
           skip(`auto-merge ${latest?.status} for this PR head`);
           continue;
         }
+        if (!isCurrent()) return outcomes;
 
         let refusedInInsert: PendingAutoMerge | null = null;
         const result = await schedule(issueId, (fresh) => {
-          const allowed = latestAutoMergeAllowsSchedule(fresh, gate.facts);
+          // An abandoned pass writes nothing, even mid-door.
+          const allowed = isCurrent() && latestAutoMergeAllowsSchedule(fresh, gate.facts);
           if (!allowed) refusedInInsert = fresh;
           return allowed;
         });
@@ -279,12 +290,14 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
 /**
  * A pass that runs longer than this is abandoned: the tick logs it and releases
  * the single-flight slot, so a hung forge read cannot stop scheduling silently.
- * An abandoned pass that later resumes is harmless: the insert re-checks the
- * issue's latest row.
+ * An abandoned pass that later resumes starts no forge read and writes no row:
+ * its generation is no longer current.
  */
 export const AUTO_MERGE_SCHEDULER_PASS_TIMEOUT_MS = 5 * 60_000;
 
 let activePass: Promise<AutoMergeScheduleOutcome[]> | null = null;
+/** The generation of the pass allowed to act; bumped when a pass is abandoned. */
+let passGeneration = 0;
 
 /**
  * Single-flight: a tick that lands while the previous pass is still reading the
@@ -296,15 +309,18 @@ export function runAutoMergeSchedulerTick(
 ): Promise<AutoMergeScheduleOutcome[]> {
   if (activePass) return activePass;
   const log = deps.log ?? console.log;
+  const generation = ++passGeneration;
+  const isCurrent = () => generation === passGeneration;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timedOut = new Promise<AutoMergeScheduleOutcome[]>((resolveTimeout) => {
     timer = setTimeout(() => {
+      passGeneration += 1;
       log(`[auto-merge-scheduler] pass still running after ${timeoutMs}ms; abandoning it so the next tick can run`);
       resolveTimeout([]);
     }, timeoutMs);
     timer.unref?.();
   });
-  const pass: Promise<AutoMergeScheduleOutcome[]> = Promise.race([scheduleReadyAutoMerges(deps), timedOut])
+  const pass: Promise<AutoMergeScheduleOutcome[]> = Promise.race([scheduleReadyAutoMerges({ ...deps, isCurrent }), timedOut])
     .finally(() => {
       clearTimeout(timer);
       if (activePass === pass) activePass = null;
