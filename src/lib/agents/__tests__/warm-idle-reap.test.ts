@@ -11,13 +11,14 @@ import { reapWarmIdleRoleRun } from '../warm-idle-reap.js';
 
 const AGENT = 'agent-pan-3966-review';
 
-function deps(verdict: LivenessVerdict | Error) {
+function deps(verdict: LivenessVerdict | Error, status: string | undefined = 'running') {
   const stop = vi.fn(async () => undefined);
   const isAlive = vi.fn(async () => {
     if (verdict instanceof Error) throw verdict;
     return verdict;
   });
-  return { stop, isAlive };
+  const readStatus = vi.fn(() => status);
+  return { stop, isAlive, readStatus };
 }
 
 describe('reapWarmIdleRoleRun', () => {
@@ -42,6 +43,40 @@ describe('reapWarmIdleRoleRun', () => {
       const d = deps(verdict);
       await expect(reapWarmIdleRoleRun(AGENT, d)).resolves.toBe(false);
       expect(d.stop).not.toHaveBeenCalled();
+    }
+  });
+
+  // PAN-3923: an interactive role run never exits on its own. A finished one
+  // is a live harness idle at its prompt (Herdr) or a pane with no harness.
+  it('reaps a Herdr harness that finished its prompt (idle or done, past starting)', async () => {
+    for (const backendState of ['idle', 'done'] as const) {
+      const d = deps({ alive: true, paneAlive: true, backendState }, 'running');
+      await expect(reapWarmIdleRoleRun(AGENT, d)).resolves.toBe(true);
+      expect(d.readStatus).toHaveBeenCalledWith(AGENT);
+      expect(d.stop).toHaveBeenCalledWith(AGENT);
+    }
+  });
+
+  it('keeps a Herdr harness that is working, blocked, unknown, or idle before its prompt landed', async () => {
+    const cases = [
+      ['working', 'running'],
+      ['blocked', 'running'],
+      ['unknown', 'running'],
+      ['idle', 'starting'],
+      ['done', 'starting'],
+    ] as const;
+    for (const [backendState, status] of cases) {
+      const d = deps({ alive: true, paneAlive: true, backendState }, status);
+      await expect(reapWarmIdleRoleRun(AGENT, d)).resolves.toBe(false);
+      expect(d.stop).not.toHaveBeenCalled();
+    }
+  });
+
+  it('reaps a pane with no live harness in it, not only a dead pane', async () => {
+    for (const reason of ['runtime-missing', 'no-session'] as const) {
+      const d = deps({ alive: false, reason });
+      await expect(reapWarmIdleRoleRun(AGENT, d)).resolves.toBe(true);
+      expect(d.stop).toHaveBeenCalledWith(AGENT);
     }
   });
 

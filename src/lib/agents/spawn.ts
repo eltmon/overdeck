@@ -177,10 +177,10 @@ async function spawnRunWithoutConsentClaim(
   if (await agentPaneExists(agentId)) {
     // PAN-2579 (warm-by-default lifecycle): a session alive at dispatch time may
     // be a warm-idle leftover from the PREVIOUS cycle rather than an active run.
-    // Reap it here — at the moment its slot is needed — when that is provable:
-    // the pane process has exited. A live pane is a genuinely active run, so
-    // keep throwing and let the operator message it (PAN-3917 removed the
-    // stored phase verdict that used to be the second signal).
+    // Reap it here — at the moment its slot is needed — when the liveness
+    // oracle proves it finished: no live harness, or (Herdr) a harness idle
+    // at its prompt after its prompt was delivered (PAN-3923). Anything else
+    // is an active run, so keep throwing and let the operator message it.
     if (!(await reapWarmIdleRoleRun(agentId))) {
       throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
     }

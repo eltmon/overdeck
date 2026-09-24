@@ -38,7 +38,7 @@ import { listPaneValues, listPaneValuesSync, sessionExists } from '../tmux.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { hostTerminalBackendName } from '../terminal-backends/select.js';
 import type { HerdrLivenessProbe } from '../terminal-backends/herdr.js';
-import type { TerminalBackendName } from '../terminal-backends/types.js';
+import type { AgentState as BackendAgentState, TerminalBackendName } from '../terminal-backends/types.js';
 import { getAgentState } from './agent-state.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
@@ -82,7 +82,14 @@ function getTranscriptHeartbeatMs(agentId: string): number | null {
 }
 
 export type LivenessVerdict =
-  | { alive: true; paneAlive: true; runtimePid?: number }
+  /**
+   * `backendState` is the backend's own per-pane state (Herdr's
+   * `agent_status`: `idle`, `working`, `blocked`, `done`, `unknown`). Only a
+   * Herdr verdict carries it; tmux has no such state. A finished role run is
+   * `alive` with `backendState: 'idle' | 'done'` (the harness sits at its
+   * prompt), which is how `warm-idle-reap.ts` tells it from a working one.
+   */
+  | { alive: true; paneAlive: true; runtimePid?: number; backendState?: BackendAgentState }
   | { alive: false; reason: 'no-session' | 'pane-dead' | 'runtime-missing' | 'runtime-indeterminate' };
 
 /**
@@ -222,7 +229,7 @@ async function isAliveOnHerdr(agentId: string, deps: LivenessAsyncDeps): Promise
     reason: 'herdr probe threw',
   }));
   switch (result.kind) {
-    case 'alive': return { alive: true, paneAlive: true };
+    case 'alive': return { alive: true, paneAlive: true, backendState: result.state };
     case 'exited': return { alive: false, reason: 'pane-dead' };
     case 'absent': return { alive: false, reason: 'no-session' };
     default: return { alive: false, reason: 'runtime-indeterminate' };

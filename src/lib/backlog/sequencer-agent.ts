@@ -11,6 +11,7 @@ import {
   stopAgent,
 } from '../agents.js';
 import { isAlive } from '../agents/liveness.js';
+import { isFinishedRoleRun } from '../agents/warm-idle-reap.js';
 import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
 import type { PassMode } from './types.js';
@@ -23,7 +24,7 @@ export type SequencerRunStatus = {
   running: boolean;
   done: boolean;
   startedAt: string | null;
-  doneReason: 'fresh-sequence' | 'idle' | 'pane-dead' | null;
+  doneReason: 'fresh-sequence' | 'idle' | 'pane-dead' | 'pane-finished' | null;
 };
 
 export type SpawnSequencerOptions = {
@@ -66,7 +67,14 @@ export async function getSequencerRunStatus(projectRoot: string): Promise<Sequen
 
   const runtimeState = alive ? getAgentRuntimeStateSync(SEQUENCER_AGENT_ID)?.state ?? null : null;
   const idle = runtimeState === 'idle' || runtimeState === 'stopped' || runtimeState === 'suspended';
-  const doneReason = paneDead ? 'pane-dead' : freshSequence ? 'fresh-sequence' : idle ? 'idle' : null;
+  // PAN-3923: the runtime mirror is in-process and empty after a dashboard
+  // restart, and a pass that failed before writing leaves no fresh sequence.
+  // The backend still knows: a Herdr harness idle at its prompt after its
+  // prompt was delivered has finished (the same rule spawnRun's reap uses).
+  const paneFinished = verdict.alive && isFinishedRoleRun(verdict, getAgentState(SEQUENCER_AGENT_ID)?.status);
+  const doneReason = paneDead
+    ? 'pane-dead'
+    : freshSequence ? 'fresh-sequence' : idle ? 'idle' : paneFinished ? 'pane-finished' : null;
   const done = alive && doneReason !== null;
 
   return {

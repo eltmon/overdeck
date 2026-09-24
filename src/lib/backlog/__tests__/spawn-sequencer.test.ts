@@ -10,6 +10,7 @@ vi.mock('../../../lib/agents.js', () => ({
 
 vi.mock('../../agents/liveness.js', () => ({
   isAlive: vi.fn().mockResolvedValue({ alive: false, reason: 'no-session' }),
+  isConfirmedDead: (v: { alive: boolean; reason?: string }) => !v.alive && v.reason !== 'runtime-indeterminate',
 }));
 
 vi.mock('../../terminal-backends/launch.js', () => ({
@@ -220,6 +221,33 @@ describe('spawnSequencerAgent', () => {
       done: true,
       doneReason: 'pane-dead',
     });
+  });
+
+  // PAN-3923: the runtime mirror is in-process (empty after a dashboard
+  // restart) and a failed pass writes no sequence, so the backend's own state
+  // has to be able to say "finished".
+  it('treats a Herdr pane idle at its prompt after delivery as done with no mirror or fresh file', async () => {
+    vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true, backendState: 'idle' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ status: 'running', startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({
+      alive: true,
+      running: false,
+      done: true,
+      doneReason: 'pane-finished',
+    });
+  });
+
+  it('keeps a Herdr pane running while it works or before its prompt is delivered', async () => {
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    for (const [backendState, status] of [['working', 'running'], ['blocked', 'running'], ['idle', 'starting']] as const) {
+      vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true, backendState });
+      (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ status, startedAt: '2026-01-01T00:00:01.000Z' });
+      expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ alive: true, running: true, done: false, doneReason: null });
+    }
   });
 
   it('reaps a finished lingering pass before spawning the next one', async () => {
