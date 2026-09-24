@@ -264,6 +264,24 @@ describe('finding a pane-bound agent', () => {
     }]);
   });
 
+  it('reports a pane-bound pane whose shell is back at its prompt as exited (PAN-3921)', async () => {
+    const { api } = paneBoundApi([], idleShellProcessInfo);
+    const agents = await listHerdrAgents(api as never);
+    expect(agents).toHaveLength(1);
+    expect(agents[0]).toMatchObject({ agentId: 'agent-pan-3705-review', state: 'exited', paneBound: true });
+  });
+
+  it('keeps the reported state when the process probe cannot answer (PAN-3921)', async () => {
+    const { api } = fakeApi(({ method }) => {
+      if (method === 'agent.list') return { agents: [] };
+      if (method === 'session.snapshot') return { snapshot: { panes: [boundPane] } };
+      if (method === 'pane.process_info') return new HerdrApiError({ method, code: 'timeout', message: 'timed out' });
+      return {};
+    });
+    const agents = await listHerdrAgents(api as never);
+    expect(agents[0]).toMatchObject({ state: 'unknown', paneBound: true });
+  });
+
   it('counts a pane Herdr later detected once, not twice', async () => {
     // Herdr names a detected agent itself; the agentId token is what keys it.
     const detected = { ...boundPane, agent: 'codex', agent_status: 'working', name: 'codex-1' };
