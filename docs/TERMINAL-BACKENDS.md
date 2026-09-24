@@ -275,10 +275,16 @@ commands, plain dashboard terminals and the codex auth login are not agents.
 A graceful restart's 60-second warning reaches a Herdr agent through `deliverAgentMessage`; on tmux
 it is still Escape twice and a tmux paste (`src/lib/graceful-restart.ts`).
 
-**Known gaps on Herdr** (readers, not spawners): `detectCrashedAgents` (`pan recover --all`,
-`autoRecoverAgents`) still filters on the sync, tmux-only `tmuxActive`, so on Herdr it lists live
-agents as crashed — `recoverAgent`'s `isAlive` gate then answers `already-running` for them, so
-nothing is double-spawned, but they are reported as failed. The Claude resume-summary gate crossing
+**Crash detection and the start conflict check ask `isAlive`** (#4105). `detectCrashedAgents`
+(`pan recover`, `pan recover --all`, `autoRecoverAgents`) lists a `running` agent as crashed only
+when `isConfirmedDead` holds, so a live Herdr agent is not crashed and a `runtime-indeterminate`
+answer (backend unreachable) is never a crash. `findConflictingWorkAgents` (the `pan start` "other
+work sessions are still live" refusal) counts every other work agent for the issue that is not
+confirmed dead, so an unanswered probe blocks the start. Neither reads the tmux-only `tmuxActive`.
+`GET /api/agents` reports pane liveness as `hasLivePane`; `hasLiveTmuxSession` is a deprecated
+alias with the same value, true for a live pane on either backend.
+
+**Known gaps on Herdr** (readers, not spawners): the Claude resume-summary gate crossing
 (`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the
 tmux pane, so on Herdr they see no menu and fall through (the AskUserQuestion transcript check
 still runs).
