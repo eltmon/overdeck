@@ -14,6 +14,7 @@
  */
 import { existsSync } from 'node:fs';
 
+import { emitActivityEntry } from '../activity-logger.js';
 import type { AgentState } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents.js';
 import { isAlive, isConfirmedDead, isIdle } from '../agents/liveness.js';
@@ -197,6 +198,8 @@ const lastReviewRedispatchAt = new Map<string, number>();
 /** Test seam: clear the per-issue re-dispatch cooldown between test cases. */
 export function __resetStalledReviewCooldownForTests(): void {
   lastReviewRedispatchAt.clear();
+  loggedUnknownSynthesisLiveness.clear();
+  synthesisRecoveryInFlight.clear();
 }
 
 /**
@@ -240,28 +243,77 @@ function verdictJournaledForRun(workspacePath: string, runId: string): boolean {
 type SynthesisGate =
   | { action: 'redispatched'; outcome: string }
   | { action: 'cool-down' }
-  | { action: 'retry' };
+  | { action: 'retry' }
+  | { action: 'skip' };
+
+/** Synthesis re-dispatches allowed per run before recovery gives up on it. */
+const SYNTHESIS_REDISPATCH_CAP = 3;
+/** How long an indeterminate liveness probe waits before the next one. */
+const SYNTHESIS_UNKNOWN_BACKOFF_MS = 5 * 60_000;
+/** Issues whose current indeterminate-liveness streak was already logged. */
+const loggedUnknownSynthesisLiveness = new Set<string>();
+/** Issues with a synthesis recovery in flight: an overlapping patrol tick does nothing. */
+const synthesisRecoveryInFlight = new Set<string>();
 
 /**
  * The synthesis step of a convoy whose lanes all reported (#4134). Re-runs it
- * only when no verdict is journaled for the run and the parent is CONFIRMED
- * dead; an indeterminate probe retries on the next tick instead of cooling down.
+ * only when no verdict is journaled for the run, the run has not used up its
+ * re-dispatches, and the parent is CONFIRMED dead. An indeterminate probe
+ * backs off a few minutes, not the full cooldown. `redispatchReviewSynthesis`
+ * re-checks liveness, the run, the head and the operator gates under the
+ * per-issue lock.
  */
-async function recoverDeadSynthesis(issueId: string, workspacePath: string, runId: string): Promise<SynthesisGate> {
+async function recoverDeadSynthesis(issueId: string, workspacePath: string, runId: string, now: number): Promise<SynthesisGate> {
   if (verdictJournaledForRun(workspacePath, runId)) return { action: 'cool-down' };
-  const parentId = `agent-${issueId.toLowerCase()}-review`;
-  const verdict = await isAlive(parentId);
-  if (verdict.alive) return { action: 'cool-down' };
-  if (!isConfirmedDead(verdict)) return { action: 'retry' };
-
-  const { redispatchReviewSynthesis } = await import('./review-agent.js');
-  const result = await redispatchReviewSynthesis(issueId, { workspace: workspacePath, runId, source: 'deacon-lite' });
-  if (!result.success) {
-    // One attempt per cooldown window: a spawn that failed is not retried every tick.
-    console.warn(`[deacon-lite] Synthesis recovery declined for ${issueId}: ${result.message}`);
+  const attempts = readPipelineJournal(workspacePath).filter((entry) => entry.type === 'review.redispatched'
+    && entry.data?.['via'] === 'synthesis-recovery' && entry.data?.['runId'] === runId).length;
+  if (attempts >= SYNTHESIS_REDISPATCH_CAP) {
+    // Journaled once: `review.synthesis-gave-up` is the tail from now on, and
+    // stalledReviewReason ignores it, so this issue is not patrolled again.
+    const message = `${issueId}: review synthesis for run ${runId} died ${attempts} times after recovery — giving up; the review needs the operator`;
+    console.warn(`[deacon-lite] ${message}`);
+    emitActivityEntry({ source: 'review', level: 'warn', message, issueId });
+    appendPipelineEntry(workspacePath, {
+      type: 'review.synthesis-gave-up', issueId, source: 'deacon-lite', data: { runId, attempts },
+    });
     return { action: 'cool-down' };
   }
-  return { action: 'redispatched', outcome: result.message };
+
+  const parentId = `agent-${issueId.toLowerCase()}-review`;
+  const verdict = await isAlive(parentId);
+  if (!isConfirmedDead(verdict) && !verdict.alive) {
+    if (!loggedUnknownSynthesisLiveness.has(issueId)) {
+      loggedUnknownSynthesisLiveness.add(issueId);
+      console.warn(`[deacon-lite] ${issueId}: liveness of ${parentId} is unknown — synthesis recovery waits for a definite answer`);
+    }
+    return { action: 'retry' };
+  }
+  loggedUnknownSynthesisLiveness.delete(issueId);
+  if (verdict.alive) return { action: 'cool-down' };
+
+  // An overlapping tick that got this far finds the first one in flight, or
+  // its cooldown, and does nothing.
+  const lastRedispatch = lastReviewRedispatchAt.get(issueId);
+  if (synthesisRecoveryInFlight.has(issueId)
+    || (lastRedispatch !== undefined && now - lastRedispatch < STALLED_REVIEW_COOLDOWN_MS)) {
+    return { action: 'skip' };
+  }
+  synthesisRecoveryInFlight.add(issueId);
+  // The cooldown starts BEFORE the relaunch, so no tick can act while it runs.
+  lastReviewRedispatchAt.set(issueId, now);
+  try {
+    const { redispatchReviewSynthesis } = await import('./review-agent.js');
+    const result = await redispatchReviewSynthesis(issueId, { workspace: workspacePath, runId, source: 'deacon-lite' });
+    if (!result.success) {
+      // One attempt per cooldown window: a spawn that failed is not retried
+      // every tick. A hold logs once where it is decided.
+      if (!result.held) console.warn(`[deacon-lite] Synthesis recovery declined for ${issueId}: ${result.message}`);
+      return { action: 'cool-down' };
+    }
+    return { action: 'redispatched', outcome: result.message };
+  } finally {
+    synthesisRecoveryInFlight.delete(issueId);
+  }
 }
 
 export async function recoverStalledReviews(now = Date.now()): Promise<string[]> {
@@ -311,8 +363,7 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     let journalData: Record<string, unknown> = { reason };
     try {
       const { recoverMissingConvoyReviewers } = await import('./review-convoy.js');
-      const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
-      outcome = recovery.message;
+      const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });      outcome = recovery.message;
       if (!recovery.success && /no review parent state|missing workspace\/runId/i.test(recovery.message)) {
         const { getRequestReviewStarter } = await import('./request-review-pipeline.js');
         const startReview = getRequestReviewStarter();
@@ -345,12 +396,16 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
           }
           continue;
         }
-        const synthesis = await recoverDeadSynthesis(issueId, workspace.path, recovery.runId);
+        const synthesis = await recoverDeadSynthesis(issueId, workspace.path, recovery.runId, now);
         if (synthesis.action !== 'redispatched') {
-          // Cool down so the next tick does not re-probe the same convoy —
-          // except after an indeterminate probe, which must not buy the wedge
-          // an extra hour.
+          // Cool down so the next tick does not re-probe the same convoy. An
+          // indeterminate probe must not buy the wedge an extra hour, but must
+          // not re-probe (and rewrite the parent's state.json) every minute
+          // either: it backs off a few minutes.
           if (synthesis.action === 'cool-down') lastReviewRedispatchAt.set(issueId, now);
+          if (synthesis.action === 'retry') {
+            lastReviewRedispatchAt.set(issueId, now - STALLED_REVIEW_COOLDOWN_MS + SYNTHESIS_UNKNOWN_BACKOFF_MS);
+          }
           continue;
         }
         via = 'synthesis-recovery';

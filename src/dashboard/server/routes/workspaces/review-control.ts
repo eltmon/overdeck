@@ -162,6 +162,19 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       `[abort-review] Aborted ${killed.length} reviewer session(s) for ${issueId}` +
       (failed.length ? ` (${failed.length} kill failed)` : '')
     );
+    // The abort is an operator hold: journal it, so stalled-review recovery
+    // does not re-synthesize the review the operator just stopped (#4134).
+    if (workspaceInfo.localPath) {
+      const { appendPipelineEntry } = yield* Effect.promise(() =>
+        import('../../../../lib/cloister/pipeline-journal.js'),
+      );
+      appendPipelineEntry(workspaceInfo.localPath, {
+        type: 'review.aborted',
+        issueId,
+        source: 'review-abort',
+        data: { killed, failed },
+      });
+    }
 
     return jsonResponse({
       success: true,
