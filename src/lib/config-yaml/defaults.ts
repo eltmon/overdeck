@@ -67,7 +67,6 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),
   tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
-  overrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
   conversations: {

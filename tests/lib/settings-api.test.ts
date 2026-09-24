@@ -34,7 +34,6 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
         apiKeys: {
           openai: 'sk-test-123',
         },
-        overrides: {},
         geminiThinkingLevel: 3,
         tmux: {
           configMode: 'managed',
@@ -49,7 +48,6 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
         trackerKeys: {},
         tts: makeTtsConfig(),
       },
-      migration: null,
     })),
     getGlobalConfigPath: vi.fn(() => '/test/config.yaml'),
     clearConfigCache: vi.fn(),
@@ -122,7 +120,6 @@ describe('settings-api', () => {
           preset: 'balanced',
           enabledProviders: new Set(['kimi']),
           apiKeys: {},
-          overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' },
           ui: { openInEditorCommand: null, theme: 'broadsheet' },
@@ -130,7 +127,6 @@ describe('settings-api', () => {
           trackerKeys: {},
           tts: makeTtsConfig(),
         },
-        migration: null,
       } as any);
       const settings = loadSettingsApi();
       expect(settings.models.providers.anthropic).toBe(false);
@@ -151,7 +147,6 @@ describe('settings-api', () => {
           preset: 'balanced',
           enabledProviders: new Set(['anthropic']),
           apiKeys: {},
-          overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' },
           ui: { openInEditorCommand: null, theme: 'broadsheet' },
@@ -160,7 +155,6 @@ describe('settings-api', () => {
           tts: makeTtsConfig(),
           remote: { resiliencyTier: 'durable', maxConcurrentAgents: 5 },
         },
-        migration: null,
       } as any);
       const settings = loadSettingsApi();
       expect(settings.remote).toEqual({
@@ -175,7 +169,6 @@ describe('settings-api', () => {
           preset: 'balanced',
           enabledProviders: new Set(['anthropic']),
           apiKeys: {},
-          overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' },
           ui: { openInEditorCommand: null, theme: 'broadsheet' },
@@ -204,7 +197,6 @@ describe('settings-api', () => {
             },
           },
         },
-        migration: null,
       } as any);
 
       const settings = loadSettingsApi();
@@ -234,12 +226,11 @@ describe('settings-api', () => {
           trackerKeys: {},
           tts: makeTtsConfig(),
         },
-        migration: null,
       } as any);
 
       const settings = loadSettingsApi();
 
-      expect(settings.models.overrides).toBeUndefined();
+      expect(settings.models).not.toHaveProperty('overrides');
       expect(settings.roles?.review?.sub?.security?.model).toBe('workhorse:expensive');
       expect(settings.roles?.review?.sub?.correctness?.model).toBe('workhorse:mid');
     });
@@ -260,7 +251,6 @@ describe('settings-api', () => {
           nous: false,
           dashscope: false,
         },
-        overrides: {},
         gemini_thinking_level: 3,
       },
       api_keys: {
@@ -469,7 +459,7 @@ describe('settings-api', () => {
     it('should cover all unified roles without legacy model-route overrides', () => {
       const settings = getMiniMaxDefaultsApi();
 
-      expect(settings.models.overrides).toBeUndefined();
+      expect(settings.models).not.toHaveProperty('overrides');
       for (const role of ['plan', 'work', 'review', 'test', 'ship'] as const) {
         expect(settings.roles?.[role]?.model).toBeDefined();
       }
@@ -484,7 +474,7 @@ describe('settings-api', () => {
       expect(settings).toHaveProperty('roles');
       expect(settings).toHaveProperty('models');
       expect(settings).toHaveProperty('models.providers');
-      expect(settings.models.overrides).toBeUndefined();
+      expect(settings.models).not.toHaveProperty('overrides');
       expect(settings).toHaveProperty('api_keys');
       expect(settings).toHaveProperty('tracker_keys');
     });
@@ -556,7 +546,6 @@ describe('settings-api', () => {
             nous: false,
             dashscope: false,
           },
-          overrides: {},
           default_conversation_model: 'gpt-5.4',
         },
         api_keys: {},
@@ -586,7 +575,6 @@ describe('settings-api', () => {
           provider_harnesses: {
             openai: 'codex',
           },
-          overrides: {},
         },
         api_keys: {},
       };
@@ -606,7 +594,6 @@ describe('settings-api', () => {
           preset: 'balanced',
           enabledProviders: new Set(['openai']),
           apiKeys: {},
-          overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' as const },
           ui: { openInEditorCommand: null, theme: 'broadsheet' as const },
@@ -616,7 +603,6 @@ describe('settings-api', () => {
           openrouterFavorites: [],
           defaultConversationModel: 'claude-haiku-4-5',
         } as any,
-        migration: null,
       });
       const model = getDefaultConversationModelApi();
       expect(model).toBe('claude-haiku-4-5');
@@ -637,7 +623,6 @@ describe('settings-api', () => {
             nous: false,
             dashscope: true,
           },
-          overrides: {},
           gemini_thinking_level: 4,
         },
         api_keys: {
@@ -686,7 +671,6 @@ describe('settings-api', () => {
             nous: false,
             dashscope: false,
           },
-          overrides: {},
         },
         api_keys: {},
         remote: {
@@ -720,7 +704,6 @@ describe('settings-api', () => {
             nous: false,
             dashscope: false,
           },
-          overrides: {},
         },
         api_keys: {},
         background_ai: {
@@ -757,7 +740,6 @@ models:
             nous: false,
             dashscope: false,
           },
-          overrides: {},
         },
         api_keys: {},
         tiered_execution: validTieredExecution,
@@ -793,7 +775,6 @@ models:
             nous: false,
             dashscope: false,
           },
-          overrides: {},
         },
         api_keys: {},
         tiered_execution: {
@@ -817,7 +798,6 @@ models:
           preset: 'balanced',
           enabledProviders: new Set(['openai', 'minimax']),
           apiKeys: {},
-          overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' as const },
           ui: { openInEditorCommand: null, theme: 'broadsheet' as const },
@@ -827,7 +807,6 @@ models:
           openrouterFavorites: [],
           defaultConversationModel: 'claude-haiku-4-5',
         } as any,
-        migration: null,
       });
       const model = getDefaultConversationModelApi();
       expect(model).toBe('claude-haiku-4-5');
@@ -839,7 +818,6 @@ models:
           preset: 'balanced',
           enabledProviders: new Set(['openai', 'minimax', 'google']),
           apiKeys: {},
-          overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' as const },
           ui: { openInEditorCommand: null, theme: 'broadsheet' as const },
@@ -848,7 +826,6 @@ models:
           tts: makeTtsConfig(),
           openrouterFavorites: [],
         } as any,
-        migration: null,
       });
       expect(getDefaultConversationModelApi()).toBeUndefined();
     });
@@ -862,7 +839,6 @@ describe('OpenRouter favorites', () => {
     preset: 'balanced' as const,
     enabledProviders: new Set(['anthropic']) as Set<string>,
     apiKeys: {},
-    overrides: {},
     geminiThinkingLevel: 3,
     tmux: { configMode: 'managed' as const },
     ui: { openInEditorCommand: null, theme: 'broadsheet' as const },
@@ -881,7 +857,6 @@ describe('OpenRouter favorites', () => {
     it('returns favorites stored in config', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: { ...baseConfig, openrouterFavorites: ['openai/gpt-4o', 'openai/o3'] } as any,
-        migration: null,
       });
       expect(getOpenRouterFavorites()).toEqual(['openai/gpt-4o', 'openai/o3']);
     });
@@ -889,7 +864,6 @@ describe('OpenRouter favorites', () => {
     it('returns empty array when no favorites are configured', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: { ...baseConfig, openrouterFavorites: [] } as any,
-        migration: null,
       });
       expect(getOpenRouterFavorites()).toEqual([]);
     });
@@ -900,7 +874,6 @@ describe('OpenRouter favorites', () => {
       // loadSettingsApi (called inside saveOpenRouterFavorites) + saveSettingsApi each call loadConfig
       vi.mocked(loadConfigSync).mockReturnValue({
         config: { ...baseConfig, openrouterFavorites: [] } as any,
-        migration: null,
       });
 
       await saveOpenRouterFavorites(['openai/gpt-4o', 'openai/o3']);
@@ -915,7 +888,6 @@ describe('OpenRouter favorites', () => {
     it('persists an empty array when clearing favorites', async () => {
       vi.mocked(loadConfigSync).mockReturnValue({
         config: { ...baseConfig, openrouterFavorites: ['openai/gpt-4o'] } as any,
-        migration: null,
       });
 
       await saveOpenRouterFavorites([]);
@@ -942,7 +914,6 @@ describe('OpenRouter favorites', () => {
           nous: false,
           dashscope: false,
         },
-        overrides: {},
         gemini_thinking_level: 3,
       },
     };

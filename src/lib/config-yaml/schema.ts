@@ -488,9 +488,6 @@ export interface YamlConfig {
     /** Provider enable/disable and API keys */
     providers?: Partial<Record<ConfigurableProvider, ProviderConfig | boolean>>;
 
-    /** Per-work-type overrides (explicit model for specific tasks) */
-    overrides?: Partial<Record<string, ModelId>>;
-
     /** Gemini thinking level (1-4) */
     gemini_thinking_level?: 1 | 2 | 3 | 4;
 
@@ -840,9 +837,6 @@ export interface NormalizedConfig {
    * nothing else may throw over it. */
   tieredExecutionInvalid?: { reason: string };
 
-  /** Per-work-type overrides */
-  overrides: Partial<Record<string, ModelId>>;
-
   /** Gemini thinking level */
   geminiThinkingLevel: 1 | 2 | 3 | 4;
 
@@ -1060,37 +1054,15 @@ export interface NormalizedTldrConfig {
   enabled: boolean;
 }
 
-/**
- * Model ID migration result
- *
- * Returned when deprecated model IDs are automatically migrated
- * during config load.
- */
 export type RuntimeConversationsConfig = NormalizedConfig['conversations'] & {
   apiKeys?: NormalizedConfig['apiKeys'];
   enabledProviders?: NormalizedConfig['enabledProviders'];
 };
 
-export interface MigrationResult {
-  /** List of migrated model IDs */
-  migrated: Array<{
-    /** Work type that was migrated */
-    workType: string;
-    /** Old (deprecated) model ID */
-    from: string;
-    /** New (current) model ID */
-    to: string;
-  }>;
-  /** Whether config.yaml was backed up before migration */
-  backedUp: boolean;
-}
-
 /**
- * Config load result (config + optional migration info)
+ * Config load result
  */
 export interface ConfigLoadResult {
   /** Normalized configuration */
   config: NormalizedConfig;
-  /** Migration result (if any deprecated models were migrated) */
-  migration?: MigrationResult;
 }
