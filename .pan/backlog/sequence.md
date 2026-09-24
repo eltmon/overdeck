@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T21:26:13.188Z · model: claude-opus-5 · open: 818_
+_Last sequenced: 2026-09-24T21:29:56.162Z · model: claude-opus-5 · open: 817_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -451,7 +451,6 @@ _Last sequenced: 2026-09-24T21:26:13.188Z · model: claude-opus-5 · open: 818_
 | 491 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 492 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 493 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 494 | PAN-3827 | S | medium | ok |  |  | Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript |
 | 495 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 496 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 497 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -1133,10 +1132,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T21:26:13.188Z",
+  "generatedAt": "2026-09-24T21:29:56.162Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 818,
+  "openCount": 817,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -6646,19 +6645,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-3827",
-      "rank": 494,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript",
-      "rationale": "New this run: medium/48 — Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-863",
       "rank": 495,
       "size": "M",
@@ -11859,13 +11845,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 0.9
     },
     {
-      "from": "PAN-3827",
-      "to": "PAN-3831",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
       "from": "PAN-3853",
       "to": "PAN-3854",
       "type": "informs",
@@ -12401,6 +12380,13 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "from": "PAN-3905",
       "to": "PAN-4171",
       "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3822",
+      "to": "PAN-4151",
+      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     }
