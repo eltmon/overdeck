@@ -435,8 +435,12 @@ function loadReposForMergeSet(db: ReturnType<typeof getOverdeckDatabase>, issueI
   return rowToMergeSetRepos(rows);
 }
 
-/** Drop-in for upsertMergeSet() from merge-set-db.ts. */
-export function upsertMergeSet(mergeSet: MergeSet): void {
+/**
+ * Insert or replace a merge-set row and its repo rows, as given. Callers
+ * normally go through `upsertMergeSet` in `merge-set.ts`, which canonicalizes
+ * the issue id first.
+ */
+export function upsertMergeSetRow(mergeSet: MergeSet): void {
   const db = getOverdeckDatabase();
   const createdAtMs = millisFromIso(mergeSet.createdAt) ?? nowMillis();
   const updatedAtMs = millisFromIso(mergeSet.updatedAt) ?? nowMillis();

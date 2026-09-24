@@ -22,7 +22,7 @@
   (in `npm run lint`) fails CI on drift.
 - **Dashboard = Node 22 from `dist/`** — `npm run build` before restarting it;
   never Bun, never tsx (node-pty addon + circular ESM).
-- Do not weaken `canUseHarnessSync` (ToS gate) or the `in-flight-guard` test
+- Do not weaken `canUseHarness` (ToS gate) or the `in-flight-guard` test
   (postMergeLifecycle idempotency).
 
 ## Frontend

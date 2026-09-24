@@ -478,7 +478,7 @@ export function migrateAllSessions(): MigrationStats {
 /**
  * Check if migration is needed
  */
-export function needsMigration(): boolean {
+export function costsNeedMigration(): boolean {
   // If events file doesn't exist, we need migration
   if (!eventsFileExists()) {
     return true;
@@ -497,7 +497,7 @@ export function needsMigration(): boolean {
  * Migrate only if needed
  */
 export function migrateIfNeeded(): MigrationStats | null {
-  if (!needsMigration()) {
+  if (!costsNeedMigration()) {
     console.log('Migration not needed - events file already exists with data');
     return null;
   }
