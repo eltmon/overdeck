@@ -157,6 +157,7 @@ export class ConversationSearchWatcher {
       // Capture and clear: a later error starts a new outage window.
       modifiedSince = (this.outageStartedAt ?? Date.now()) - CATCH_UP_MARGIN_MS;
       this.outageStartedAt = null;
+      this.catchUpPending = false;
     }
     const startupT0 = performance.now();
     this.startupTask = this.indexAll({ config: this.config, roots: this.roots, signal, ...(modifiedSince != null ? { modifiedSince } : {}) })
@@ -184,7 +185,6 @@ export class ConversationSearchWatcher {
       .finally(() => {
         this.startupTask = null;
         if (this.catchUpPending && !this.stopped && this.watcher) {
-          this.catchUpPending = false;
           this.runFullIndex('catch-up');
           return;
         }
