@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:57:53.345Z · model: claude-opus-5 · open: 818_
+_Last sequenced: 2026-09-24T21:02:15.922Z · model: claude-opus-5 · open: 819_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
+| 4 | PAN-4169 | M | critical | ok |  | PAN-3923 | Herdr reaps only claude-code panes, so finished codex/GPT, kimi, pi and ACP role runs are refused 'already running' on every re-dispatch |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
@@ -834,6 +835,10 @@ In pipeline (workspace exists) — rank pinned at the top tier. The last big spa
 
 In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.
 
+### PAN-4169 (rank 4)
+
+New this run, filed as the residual gap after PAN-3966 closed and PR #4162 (PAN-3923) went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. Ranked 4, immediately behind its parent PAN-3923 at rank 3, and marked dependsOn PAN-3923 because PR #4162 is still open: the reap path this work extends has not landed yet. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.
+
 ### PAN-3930 (rank 15)
 
 In pipeline — rank pinned.
@@ -1133,10 +1138,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:57:53.345Z",
+  "generatedAt": "2026-09-24T21:02:15.922Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 818,
+  "openCount": 819,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11258,6 +11263,21 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "gate": "auto",
       "planning": "skip",
       "isEpic": false
+    },
+    {
+      "issue": "PAN-4169",
+      "rank": 4,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3923"
+      ],
+      "why": "Herdr reaps only claude-code panes, so finished codex/GPT, kimi, pi and ACP role runs are refused 'already running' on every re-dispatch",
+      "rationale": "New this run, filed as the residual gap after PAN-3966 closed and PR #4162 (PAN-3923) went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. Ranked 4, immediately behind its parent PAN-3923 at rank 3, and marked dependsOn PAN-3923 because PR #4162 is still open: the reap path this work extends has not landed yet. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12394,6 +12414,13 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-3923",
+      "to": "PAN-4169",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.95
     }
   ]
 }
