@@ -70,7 +70,22 @@ and there is no marker.
 ## Review modes
 
 `spawnReviewRoleForIssue()` resolves the review mode at the single review entry
-point, so manual requests, automatic dispatch, and recovery use the same mode.
+point, so manual requests, automatic dispatch, and recovery use the same mode:
+`roles.review.mode` from merged project and global config, defaulting to `quick`.
+A caller may pass `reviewMode` for one run. The dashboard's Request review menu
+(Full, Quick, None) sends it through `POST /api/review/:id/trigger`. It takes
+precedence over config for that run only and is never persisted, so the next
+dispatch resolves config again.
+
+Because a run's mode can differ from config, the dashboard's reviewer tree
+reads the mode from the run itself (`currentRunIsConvoy` in
+`src/dashboard/server/routes/reviewer-tree.ts`). The review parent's
+`reviewRunId` names the current run. The tree shows the four convoy lanes only
+when a lane's state row carries that `reviewRunId`, or its `<role>.md` report
+is in `.pan/review/<runId>/`. A self-review writes into the same run directory,
+so the directory alone does not show the mode. Each lane's status comes from
+that same directory: a lane whose `<role>.md` is there is done, and a live
+reviewer whose report isn't there yet is working on the current round.
 
 | Mode | Behavior |
 | --- | --- |

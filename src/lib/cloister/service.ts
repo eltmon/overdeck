@@ -560,9 +560,9 @@ export class CloisterService {
     return pokeAgentWithHost(this.crashHost(), agentId);
   }
 
-  /** PAN-2452: fingerprint of observable progress — workspace HEAD + pane tail.
-   * Unchanged fingerprint across pokes = the poke did nothing. */
-  private async progressFingerprint(agentId: string): Promise<string> {
+  /** PAN-2452: fingerprint of observable progress — workspace HEAD, pane tail,
+   * heartbeat. Unchanged across pokes = the poke did nothing; null = unknown (#4121). */
+  private async progressFingerprint(agentId: string): Promise<string | null> {
     return progressFingerprintWithHost(this.crashHost(), agentId);
   }
 

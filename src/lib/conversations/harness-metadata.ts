@@ -349,7 +349,7 @@ function recordTimestamp(result: SessionMetadata, ts: unknown): void {
 }
 
 function isAcpTranscriptRole(role: unknown): role is AcpTranscriptEntry['role'] {
-  return role === 'user' || role === 'assistant' || role === 'tool' || role === 'system';
+  return role === 'user' || role === 'assistant' || role === 'thought' || role === 'tool' || role === 'system';
 }
 
 function normalizeModel(provider: unknown, model: unknown): string | null {

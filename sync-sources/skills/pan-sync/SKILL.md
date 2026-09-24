@@ -46,7 +46,7 @@ Agent receives global, project, workspace, role, and briefing context
 **Key points:**
 - Skill bundles are copied recursively, including their scripts, references, and templates; empty source directories are ignored.
 - Manifest ownership lets `pan sync` update Overdeck-managed files without overwriting user-owned skills.
-- When a bundled skill, agent, or rule is removed, the next sync prunes its managed cache and harness copies.
+- When a bundled skill, agent, rule, or hook is removed, the next sync prunes its managed cache and harness copies. Hooks in `~/.overdeck/bin/` are tracked by `~/.overdeck/bin/.overdeck-manifest.json`; only hooks sync wrote are ever removed (PAN-3881).
 - User-modified stale files are preserved, released from manifest ownership, and listed in the sync output.
 - Claude Code discovers `~/.claude/skills/`; Codex, Pi, and Oh My Pi discover the shared Agent Skills standard directory at `~/.agents/skills/`.
 - New harness sessions see changes after `pan sync`; already-running sessions keep the skill catalog loaded at launch.
@@ -119,6 +119,17 @@ If no checkout is recorded, sync warns that it is about to distribute the frozen
 copy and that merged fixes will not deploy — run `pan reload` first. To check
 deployed hooks against the source tree at any time, run `pan doctor` and read the
 **Deployed Hooks** row.
+
+When sync distributes from a git checkout, it fetches that checkout's upstream
+and warns when the checkout is behind it, or is on a branch other than the
+remote's default branch (PAN-3881). It only warns; it never pulls or switches
+branches, because the checkout may hold unpushed or uncommitted work:
+
+```
+WARNING: pan sync is distributing from /home/you/Projects/overdeck/sync-sources, which may be stale:
+  - sync sources checkout /home/you/Projects/overdeck is 12 commits behind origin/main (and 1 ahead); merged skill, rule, agent, and hook changes (including deletions) will not be distributed.
+  Update that checkout (e.g. `git -C /home/you/Projects/overdeck pull --ff-only` on main) and re-run `pan sync`.
+```
 
 ### Startup Sync (Skip When Unchanged)
 

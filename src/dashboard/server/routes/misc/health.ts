@@ -9,7 +9,7 @@ import {
   type SpecialistLifecycle,
   type SystemHealthSnapshot as SystemHealthSnapshotType,
 } from '@overdeck/contracts';
-import { Effect, Layer, Schema } from 'effect';
+import { Data, Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
@@ -58,6 +58,11 @@ export async function readHealthLiveAgentIds(
   if (live === null) throw new Error('Terminal backend inventory is unreadable');
   return [...new Set([...census, ...live])];
 }
+
+/** The live-pane read failed, so /api/health/agents answers unavailable (#4109). */
+class HealthLiveAgentsUnavailable extends Data.TaggedError('HealthLiveAgentsUnavailable')<{
+  readonly cause: unknown;
+}> {}
 
 function unavailableSystemHealthResponse() {
   return jsonResponse({
@@ -322,7 +327,10 @@ const getHealthAgentsRoute = HttpRouter.add(
     const readModel = yield* ReadModelService;
     return yield* buildHealthAgentsResponse({
       snapshot: readModel.getSnapshot,
-      sessionNames: Effect.tryPromise(() => readHealthLiveAgentIds()),
+      sessionNames: Effect.tryPromise({
+        try: () => readHealthLiveAgentIds(),
+        catch: (cause) => new HealthLiveAgentsUnavailable({ cause }),
+      }),
     });
   }),
 );
