@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T16:09:56.733Z · model: claude-opus-5 · open: 849_
+_Last sequenced: 2026-09-24T16:23:28.263Z · model: claude-opus-5 · open: 847_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -14,7 +14,6 @@ _Last sequenced: 2026-09-24T16:09:56.733Z · model: claude-opus-5 · open: 849_
 | 9 | PAN-3924 | S | medium | ok |  |  | pipeline-membership: gh graphql failure drops stderr and toasts; retry once; listProjectTrackerIssues blind to GitHub-tracked projects |
 | 11 | PAN-3929 | S | medium | ok |  |  | Five SKILL.md files still tell agents to read deleted status fields; rewrite to the derived model and widen the guard's Markdown patterns |
 | 12 | PAN-3927 | S | medium | ok |  |  | lint-prompts.sh still requires the deleted pan inspect verb in the work item loop; rewrite the rule and the three prompts together |
-| 13 | PAN-3941 | M | medium | ok |  |  | Unify dashboard menus, popovers and semantic color styling onto the shared primitives (in review) |
 | 14 | PAN-3932 | XS | low | ok |  |  | AutoMergeToggle is read-only post-cut; make it set/clear the auto-merge label or explain the label in the tooltip |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 16 | PAN-3928 | XS | low | ok |  |  | pan start prints a tmux attach hint for Herdr panes; print backend, pane id and the Herdr attach command |
@@ -22,7 +21,6 @@ _Last sequenced: 2026-09-24T16:09:56.733Z · model: claude-opus-5 · open: 849_
 | 18 | PAN-3966 | S | critical | ok |  |  | stopAgent/warm-idle reap are tmux-only: a lingering Herdr pane blocks every role-run re-dispatch with "already running" (749 refusals) |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 20 | PAN-3679 | M | critical | ok |  |  | Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running |
-| 21 | PAN-3968 | S | critical | ok |  |  | Every pan close still deletes state.json/sessions.json (close-out.ts step 5 never moved to pruneAgentStateDir); PAN-3950 AC-1 unmet |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
 | 23 | PAN-3981 | M | critical | ok |  | PAN-3966 | Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision) |
 | 25 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
@@ -893,10 +891,6 @@ In pipeline — rank pinned.
 
 In pipeline — rank pinned.
 
-### PAN-3941 (rank 13)
-
-In pipeline — rank pinned; already in review.
-
 ### PAN-3932 (rank 14)
 
 In pipeline — rank pinned.
@@ -924,10 +918,6 @@ New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-me
 ### PAN-3679 (rank 20)
 
 Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
-
-### PAN-3968 (rank 21)
-
-Regression of the transcript-discoverability fix that just merged: close-out.ts step 5 still calls removeAgentStateDir, so every pan close the flywheel runs destroys that agent's session index while printing the new 'state kept' message. The 'freshest JSONL' fallback was deliberately removed in PAN-3950, so each close-out now leaves an agent whose transcript route returns nothing. Cause, fix, regression test and acceptance are spelled out; S-sized. The backfill for already-pruned agents is shared with PAN-3959 (in pipeline), so land this on top of it.
 
 ### PAN-3939 (rank 22)
 
@@ -1177,6 +1167,14 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 
 Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
 
+### PAN-2337 (rank 89)
+
+Reload/build atomicity — an in-place npm run build under a live dashboard breaks new PTY-supervisor chunks.
+
+### PAN-2422 (rank 90)
+
+Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1184,10 +1182,10 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T16:09:56.733Z",
+  "generatedAt": "2026-09-24T16:23:28.263Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 849,
+  "openCount": 847,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1307,19 +1305,6 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "planning": "auto"
     },
     {
-      "issue": "PAN-3941",
-      "rank": 13,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Unify dashboard menus, popovers and semantic color styling onto the shared primitives (in review)",
-      "rationale": "In pipeline — rank pinned; already in review.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3932",
       "rank": 14,
       "size": "XS",
@@ -1407,19 +1392,6 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "dependsOn": [],
       "why": "Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running",
       "rationale": "Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3968",
-      "rank": 21,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Every pan close still deletes state.json/sessions.json (close-out.ts step 5 never moved to pruneAgentStateDir); PAN-3950 AC-1 unmet",
-      "rationale": "Regression of the transcript-discoverability fix that just merged: close-out.ts step 5 still calls removeAgentStateDir, so every pan close the flywheel runs destroys that agent's session index while printing the new 'state kept' message. The 'freshest JSONL' fallback was deliberately removed in PAN-3950, so each close-out now leaves an agent whose transcript route returns nothing. Cause, fix, regression test and acceptance are spelled out; S-sized. The backfill for already-pruned agents is shared with PAN-3959 (in pipeline), so land this on top of it.",
       "gate": "auto",
       "planning": "auto"
     },
