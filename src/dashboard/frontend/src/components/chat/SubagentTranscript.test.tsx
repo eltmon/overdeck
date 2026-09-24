@@ -9,10 +9,15 @@ const hookMocks = vi.hoisted(() => ({ useSubagentTranscript: vi.fn(), timelinePr
 vi.mock('./useConversationMessagesStream', () => ({
   useSubagentTranscript: hookMocks.useSubagentTranscript,
 }));
+vi.mock('./SubagentComposer', () => ({ SubagentComposer: () => null }));
 vi.mock('./MessagesTimeline', () => ({
-  MessagesTimeline: (props: { messages: Array<{ text: string }> }) => {
+  MessagesTimeline: (props: { messages: Array<{ text: string }>; streaming: boolean }) => {
     hookMocks.timelineProps(props);
-    return <div data-testid="subagent-timeline">{props.messages.map((message) => message.text).join(' ')}</div>;
+    return (
+      <div data-testid="subagent-timeline" data-working={props.streaming}>
+        {props.messages.map((message) => message.text).join(' ')}
+      </div>
+    );
   },
 }));
 
@@ -54,13 +59,26 @@ describe('SubagentTranscript', () => {
     });
   });
 
-  it('renders the selected subagent transcript without a composer', () => {
+  it('renders the selected subagent transcript', () => {
     render(<SubagentTranscript conversation={conversation} subagent={subagent} onBack={vi.fn()} />);
 
     expect(screen.getByText(/Explore/)).toHaveTextContent('Explore · Trace the conversation parser');
     expect(screen.getByTestId('subagent-timeline')).toHaveTextContent('Subagent transcript');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(hookMocks.useSubagentTranscript).toHaveBeenLastCalledWith(conversation, 'alpha');
+  });
+
+  it.each(['codex', 'claude-code'] as const)('shows activity for a running %s child despite a non-streaming snapshot, and clears it on completion', (harness) => {
+    const parent = { ...conversation, harness };
+    const { rerender } = render(<SubagentTranscript conversation={parent} subagent={subagent} onBack={vi.fn()} />);
+    expect(screen.getByTestId('subagent-timeline')).toHaveAttribute('data-working', 'true');
+    rerender(<SubagentTranscript conversation={parent} subagent={{ ...subagent, status: 'done' }} onBack={vi.fn()} />);
+    expect(screen.getByTestId('subagent-timeline')).toHaveAttribute('data-working', 'false');
+  });
+
+  it('does not show stale activity after the parent session ends', () => {
+    render(<SubagentTranscript conversation={{ ...conversation, endedAt: '2026-07-18T00:02:00Z', sessionAlive: false }} subagent={subagent} onBack={vi.fn()} />);
+    expect(screen.getByTestId('subagent-timeline')).toHaveAttribute('data-working', 'false');
   });
 
   it('gives the timeline a flex-column parent so it can scroll', () => {

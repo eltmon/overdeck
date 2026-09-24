@@ -5,7 +5,6 @@ import { DEFAULT_CLOISTER_CONFIG } from '../../../src/lib/cloister/config.js';
 
 vi.mock('../../../src/lib/cloister/cost-monitor.js', () => ({
   checkCostLimits: vi.fn(),
-  getCostSummary: vi.fn(() => ({ dailyTotal: 0, topAgents: [], topIssues: [] })),
 }));
 
 import { checkCostLimits } from '../../../src/lib/cloister/cost-monitor.js';

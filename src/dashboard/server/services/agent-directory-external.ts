@@ -30,7 +30,7 @@ import {
 } from '../../../lib/agents/external-registry.js';
 import { checkTranscriptPath } from '../../../lib/agents/external-paths.js';
 import { resolveAgentTranscriptCandidate } from '../../../lib/agents/transcript-resolver.js';
-import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
+import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { TranscriptCandidate, TranscriptCandidateKind } from '../../../lib/session-history.js';
 
 /** A registration still writing its transcript this recently counts as working when it has no pid. */
@@ -128,7 +128,7 @@ export async function listExternalCandidates(
   sources: ExternalDirectorySources = defaultExternalDirectorySources,
 ): Promise<ExternalDirectoryCandidate[]> {
   const registrations = await sources.listRegistrations();
-  return withConcurrencyLimitPromise(
+  return withConcurrencyLimit(
     registrations.map((registration) => () => externalCandidate(registration, now, sources)),
     EXTERNAL_CONCURRENCY,
   );

@@ -4,7 +4,6 @@ import { dirname, join, resolve } from 'node:path';
 import { acquireRestartLock, readRestartLockHolder } from '../lib/restart-lock.js';
 import { writeRestartStatus } from '../lib/restart-status.js';
 import { getOverdeckHome } from '../lib/paths.js';
-import { getBootReconciliationState } from '../lib/overdeck/control-settings.js';
 import { evictPortHolders, type PortEvictionResult } from './port-eviction.js';
 
 export interface SupervisorWatchdogConfig {
@@ -44,7 +43,6 @@ export interface SupervisorWatchdogStatus {
 export type SpawnRestartResult = { pid: number | null; error: string | null; done?: Promise<void> };
 export type SpawnRestart = (options?: {
   restartLockHeld?: boolean;
-  bootId?: string | null;
 }) => SpawnRestartResult | Promise<SpawnRestartResult>;
 export type LogFn = (msg: string) => void | Promise<void>;
 
@@ -143,14 +141,6 @@ export function readWatchdogConfig(
     requestTimeoutMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_TIMEOUT_MS, 10_000),
     bootGraceMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_BOOT_GRACE_MS, 5 * 60_000),
   };
-}
-
-export function readBootReconciliationBootIdForRestart(): string | null {
-  try {
-    return getBootReconciliationState().bootId ?? process.env.OVERDECK_BOOT_ID ?? null;
-  } catch {
-    return process.env.OVERDECK_BOOT_ID ?? null;
-  }
 }
 
 /** AbortSignal.timeout() rejects fetch with a TimeoutError (AbortError on older
@@ -454,10 +444,7 @@ export class SupervisorWatchdog {
 
     let restartError: string | null = null;
     try {
-      const result = await this.spawnRestart({
-        restartLockHeld: true,
-        bootId: readBootReconciliationBootIdForRestart(),
-      });
+      const result = await this.spawnRestart({ restartLockHeld: true });
       if (result.error) {
         restartError = result.error;
       } else {
@@ -541,24 +528,23 @@ export class SupervisorWatchdog {
       return null;
     }
 
-    const config = record.config && typeof record.config === 'object' ? record.config as Record<string, unknown> : {};
-    const state = record.state && typeof record.state === 'object' ? record.state as Record<string, unknown> : {};
-    const interval = typeof config.patrolIntervalMs === 'number' && Number.isFinite(config.patrolIntervalMs) && config.patrolIntervalMs > 0
-      ? config.patrolIntervalMs
-      : 60_000;
-    const staleAfterMs = interval * 3;
     // PAN-3917: deacon-lite keeps no heartbeat file and the dashboard process
     // only reports a run timestamp when the deacon child has relayed one. A
     // missing timestamp is therefore not evidence of a dead deacon (the
     // pre-cut "heartbeat missing" verdict restart-looped the dashboard every
     // three minutes after the cut). Only a reported-but-stale or invalid
     // timestamp is a failure; liveness of the child is `isRunning` above.
+    // PAN-3922: the interval and the run timestamp come from the relayed
+    // deaconLite shape only — the top-level record's now-removed
+    // pre-cut interval/timestamp fields are never read.
     const deaconLite = record.deaconLite && typeof record.deaconLite === 'object'
       ? record.deaconLite as Record<string, unknown>
       : {};
-    const lastPatrol = typeof state.lastPatrol === 'string'
-      ? state.lastPatrol
-      : typeof deaconLite.lastRunAt === 'string' ? deaconLite.lastRunAt : null;
+    const interval = typeof deaconLite.intervalMs === 'number' && Number.isFinite(deaconLite.intervalMs) && deaconLite.intervalMs > 0
+      ? deaconLite.intervalMs
+      : 60_000;
+    const staleAfterMs = interval * 3;
+    const lastPatrol = typeof deaconLite.lastRunAt === 'string' ? deaconLite.lastRunAt : null;
 
     if (!lastPatrol) {
       this.state.patrolUnhealthySince = null;

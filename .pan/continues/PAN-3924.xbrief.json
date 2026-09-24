@@ -1,0 +1,49 @@
+{
+  "version": "1",
+  "issueId": "PAN-3924",
+  "created": "2026-09-19T13:26:25.608Z",
+  "updated": "2026-09-24T12:50:00.000Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "gh-run-stderr": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3924",
+      "claimedAt": "2026-09-19T13:26:25.607Z",
+      "doneAt": "2026-09-19T13:31:05.947Z"
+    },
+    "gh-run-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3924",
+      "claimedAt": "2026-09-19T13:31:16.153Z",
+      "doneAt": "2026-09-19T13:34:12.263Z"
+    },
+    "tracker-issue-id-lib": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3924",
+      "claimedAt": "2026-09-19T13:34:17.132Z",
+      "doneAt": "2026-09-24T12:50:00.000Z"
+    },
+    "tracker-rows-github-prefix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3924",
+      "claimedAt": "2026-09-24T12:50:00.000Z",
+      "doneAt": "2026-09-24T12:50:00.000Z"
+    },
+    "last-good-regression": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3924",
+      "claimedAt": "2026-09-24T12:50:00.000Z",
+      "doneAt": "2026-09-24T12:50:00.000Z"
+    },
+    "docs-membership-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3924",
+      "claimedAt": "2026-09-24T12:50:00.000Z",
+      "doneAt": "2026-09-24T12:50:00.000Z"
+    }
+  }
+}

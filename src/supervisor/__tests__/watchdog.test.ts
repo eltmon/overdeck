@@ -8,17 +8,6 @@ import {
   type SpawnRestart,
   type SupervisorWatchdogConfig,
 } from '../watchdog.js';
-import { BOOT_RECONCILIATION_BOOT_ID_KEY, BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, setSetting } from '../../lib/overdeck/control-settings.js';
-
-// Moved here from src/lib/overdeck/control-settings.ts, which no production code called (PAN-3958 CH-8).
-function stampBootReconciliation(bootId: string, graceDeadline: string, bootStartedAt: string): void {
-  setSetting(BOOT_RECONCILIATION_BOOT_ID_KEY, bootId);
-  setSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, bootStartedAt);
-  setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
-  // A fresh boot starts with a fresh extension budget.
-  setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, '0');
-}
-
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 let testHome: string;
 
@@ -60,8 +49,7 @@ function makeWatchdog(overrides: Partial<{
   const healthBody = overrides.healthBody;
   const deaconStatus = overrides.deaconStatus ?? {
     isRunning: true,
-    config: { patrolIntervalMs: 60_000 },
-    state: { lastPatrol: '2026-05-17T15:29:00.000Z' },
+    deaconLite: { running: true, intervalMs: 60_000, lastRunAt: '2026-05-17T15:29:00.000Z', lastRunError: null },
   };
   return new SupervisorWatchdog({
     config: overrides.config ?? config,
@@ -229,8 +217,7 @@ describe('SupervisorWatchdog', () => {
             statusText: 'OK',
             json: async () => ({
               isRunning: true,
-              config: { patrolIntervalMs: 60_000 },
-              state: { lastPatrol: '2026-05-17T15:29:00.000Z' },
+              deaconLite: { running: true, intervalMs: 60_000, lastRunAt: '2026-05-17T15:29:00.000Z', lastRunError: null },
             }),
           };
         }
@@ -425,8 +412,7 @@ describe('SupervisorWatchdog', () => {
       now: () => Date.parse('2026-05-17T15:35:00.000Z'),
       deaconStatus: {
         isRunning: true,
-        config: { patrolIntervalMs: 60_000 },
-        state: { lastPatrol: '2026-05-17T15:30:00.000Z' },
+        deaconLite: { running: true, intervalMs: 60_000, lastRunAt: '2026-05-17T15:30:00.000Z', lastRunError: null },
       },
     });
 
@@ -468,8 +454,7 @@ describe('SupervisorWatchdog', () => {
       now: () => Date.parse('2026-05-17T15:35:00.000Z'),
       deaconStatus: {
         isRunning: true,
-        config: { patrolIntervalMs: 60_000 },
-        state: { lastPatrol: '2026-05-17T15:30:00.000Z' },
+        deaconLite: { running: true, intervalMs: 60_000, lastRunAt: '2026-05-17T15:30:00.000Z', lastRunError: null },
       },
     });
 
@@ -500,8 +485,7 @@ describe('SupervisorWatchdog', () => {
             statusText: 'OK',
             json: async () => ({
               isRunning: true,
-              config: { patrolIntervalMs: 60_000 },
-              state: { lastPatrol: '2026-05-17T15:30:00.000Z' },
+              deaconLite: { running: true, intervalMs: 60_000, lastRunAt: '2026-05-17T15:30:00.000Z', lastRunError: null },
             }),
           };
         }
@@ -536,8 +520,30 @@ describe('SupervisorWatchdog', () => {
       deaconStatus: {
         isRunning: true,
         deaconLite: { running: true, intervalMs: 60_000, lastRunAt: null, lastRunError: null },
-        config: { patrolIntervalMs: 60_000 },
-        state: {},
+      },
+    });
+
+    await watchdog.checkOnce();
+    now += 3_600_000;
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status().lastError ?? '').not.toContain('heartbeat');
+  });
+
+  it('ignores the deleted config/state fields', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      config: { ...config, busyFailThreshold: 1 },
+      now: () => now,
+      deaconStatus: {
+        isRunning: true,
+        config: { patrolIntervalMs: 1_000 },
+        state: { lastPatrol: '2020-01-01T00:00:00.000Z' },
+        deaconLite: { running: true, intervalMs: 60_000, lastRunAt: null, lastRunError: null },
       },
     });
 
@@ -560,8 +566,6 @@ describe('SupervisorWatchdog', () => {
       deaconStatus: {
         isRunning: true,
         deaconLite: { running: true, intervalMs: 60_000, lastRunAt: '2026-05-17T15:29:00.000Z', lastRunError: null },
-        config: { patrolIntervalMs: 60_000 },
-        state: {},
       },
     });
 
@@ -571,6 +575,28 @@ describe('SupervisorWatchdog', () => {
     await watchdog.checkOnce();
     expect(spawns.count).toBe(1);
     expect(watchdog.status().lastError).toContain('deacon patrol heartbeat stale');
+  });
+
+  it('uses the relayed interval for the staleness threshold', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      config: { ...config, busyFailThreshold: 1 },
+      now: () => now,
+      deaconStatus: {
+        isRunning: true,
+        deaconLite: { running: true, intervalMs: 30_000, lastRunAt: '2026-05-17T15:29:00.000Z', lastRunError: null },
+      },
+    });
+
+    await watchdog.checkOnce(); // 60s old: within 3 * 30s = 90s
+    expect(spawns.count).toBe(0);
+    now += 40_000; // 100s old: past the 90s threshold
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(1);
+    expect(watchdog.status().lastError).toContain('stale for 100s');
   });
 
   it('preserves the restart cap across supervisor restarts', async () => {
@@ -625,8 +651,7 @@ describe('SupervisorWatchdog', () => {
             statusText: 'OK',
             json: async () => ({
               isRunning: true,
-              config: { patrolIntervalMs: 60_000 },
-              state: { lastPatrol: new Date(now).toISOString() },
+              deaconLite: { running: true, intervalMs: 60_000, lastRunAt: new Date(now).toISOString(), lastRunError: null },
             }),
           };
         }
@@ -714,23 +739,6 @@ describe('SupervisorWatchdog', () => {
     expect(logs).toContain('watchdog restart skipped: restart lock held by PID 1 (pan reload)');
   });
 
-  it('passes the persisted boot id to watchdog restart spawns', async () => {
-    mkdirSync(testHome, { recursive: true });
-    stampBootReconciliation(
-      'boot-watchdog',
-      '2026-05-17T15:30:30.000Z',
-      '2026-05-17T15:30:00.000Z',
-    );
-    const spawnOptions: Array<Parameters<SpawnRestart>[0]> = [];
-
-    await makeWatchdog({ spawnOptions }).checkOnce();
-
-    expect(spawnOptions[0]).toMatchObject({
-      restartLockHeld: true,
-      bootId: 'boot-watchdog',
-    });
-  });
-
   it('parses supervisor boot-grace environment configuration', () => {
     expect(readWatchdogConfig({}, 3011).bootGraceMs).toBe(300_000);
     expect(readWatchdogConfig({ OVERDECK_SUPERVISOR_BOOT_GRACE_MS: '45000' }, 3011).bootGraceMs).toBe(45_000);
@@ -774,8 +782,7 @@ describe('SupervisorWatchdog', () => {
               statusText: 'OK',
               json: async () => ({
                 isRunning: true,
-                config: { patrolIntervalMs: 60_000 },
-                state: { lastPatrol: '2026-05-17T15:29:00.000Z' },
+                deaconLite: { running: true, intervalMs: 60_000, lastRunAt: '2026-05-17T15:29:00.000Z', lastRunError: null },
               }),
             };
           }

@@ -38,7 +38,7 @@ describe('supervisor restart spawner', () => {
       spawnFn: spawnFn as never,
     });
 
-    const result = await spawnRestart({ restartLockHeld: true, bootId: 'boot-test' });
+    const result = await spawnRestart({ restartLockHeld: true });
 
     expect(result).toMatchObject({ pid: 4242, error: null });
     expect(spawnFn).toHaveBeenCalledWith('pan', buildSupervisorRestartArgs(), expect.objectContaining({
@@ -49,7 +49,6 @@ describe('supervisor restart spawner', () => {
         OVERDECK_RESTART_LOCK_HELD: '1',
         OVERDECK_RESTART_INITIATOR: 'supervisor-watchdog',
         OVERDECK_SKIP_SUPERVISOR_CYCLE: '1',
-        OVERDECK_BOOT_ID: 'boot-test',
       }),
     }));
     expect(buildSupervisorRestartArgs()).toEqual([

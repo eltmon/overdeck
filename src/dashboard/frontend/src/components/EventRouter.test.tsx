@@ -418,6 +418,77 @@ describe('EventRouter memory updates', () => {
     error.mockRestore()
   })
 
+  it('clears the reconnect banner after a restart even when live events arrive before the retry fires', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const reconnected = vi.fn()
+    window.addEventListener(BACKEND_RECONNECTED_EVENT, reconnected)
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    // Dashboard restart: the stream errors, then comes back on the new server,
+    // but the first snapshot fetch against the warming server fails.
+    const restartedRequest = vi.fn()
+      .mockRejectedValueOnce(new Error('snapshot unavailable'))
+      .mockResolvedValue(snapshot)
+    wsTransport.currentTransport = { request: restartedRequest, subscribe }
+    act(() => {
+      wsTransport.subscribeOptions!.onRetry!(1)
+      wsTransport.subscribeOptions!.onReconnect!()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(restartedRequest).toHaveBeenCalledTimes(1)
+    expect(reconnected).not.toHaveBeenCalled()
+
+    // The healthy stream keeps delivering heartbeats (every 15s) before and
+    // after the 2s retry is due. They must not cancel the pending recovery.
+    for (let i = 0; i < 4; i += 1) {
+      act(() => {
+        wsTransport.subscribed!(systemHeartbeatEvent())
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000)
+      })
+    }
+
+    // Failed snapshot + retried snapshot (+ the replay a failed recovery requests).
+    expect(restartedRequest.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(reconnected).toHaveBeenCalledTimes(1)
+    window.removeEventListener(BACKEND_RECONNECTED_EVENT, reconnected)
+    random.mockRestore()
+    error.mockRestore()
+  })
+
+  it('re-bootstraps from a live event when reconnecting with nothing scheduled', async () => {
+    const reconnected = vi.fn()
+    window.addEventListener(BACKEND_RECONNECTED_EVENT, reconnected)
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    // The stream retried (banner up) but recovered without emitting onReconnect
+    // data first; a live heartbeat is the first proof the backend is back.
+    act(() => {
+      wsTransport.subscribeOptions!.onRetry!(1)
+    })
+    await act(async () => {
+      wsTransport.subscribed!(systemHeartbeatEvent())
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(reconnected).toHaveBeenCalledTimes(1)
+    window.removeEventListener(BACKEND_RECONNECTED_EVENT, reconnected)
+  })
+
   it('shows an actionable retry overlay after repeated reconnect failures', async () => {
     let resolveBootstrap: (value: DashboardSnapshot) => void = () => undefined
     request.mockReturnValueOnce(new Promise<DashboardSnapshot>((resolve) => {

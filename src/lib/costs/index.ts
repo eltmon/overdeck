@@ -40,7 +40,7 @@ export {
 // Historical data migration
 export {
   migrateAllSessions,
-  needsMigration,
+  costsNeedMigration,
   migrateIfNeeded,
   type MigrationStats,
 } from './migration.js';

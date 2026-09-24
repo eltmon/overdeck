@@ -24,6 +24,8 @@ The kit currently owns these reusable pieces:
 
 `useIssueView`, `IssueViewModel`, the shared derivations, and the public components are exported through `components/issue-view/index.ts`.
 
+A closed-out issue derives as `closed`, because the tracker outranks the PR in the derived-state precedence. `isShipped` therefore treats `merged`, or `closed` with a PR, as shipped. The forge attaches only an open or merged PR. A shipped issue renders the Ship step and ship status as merged, shows "Merged and closed out", and raises no `stopped` needs-you item for its finished work agent. A `closed` issue without a PR was cancelled, so it stays unshipped. `pan show` derives the CV outcome for the issue the same way: a shipped issue's `in_progress` entry counts as a success. Nothing is written back to `cv.json` (PAN-3420).
+
 ## Density model
 
 `densitySections.ts` owns `DENSITY_SECTIONS`, the declarative membership map for `rail`, `cockpit`, and `console`. Density changes layout and section visibility; it does not create three component trees or three versions of status logic. A shell wraps its existing routing and interaction glue around `<IssueView density="…">`.

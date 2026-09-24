@@ -14,7 +14,7 @@ import { basename } from 'node:path';
 
 import { Effect } from 'effect';
 
-import { withConcurrencyLimitPromise } from '../concurrency.js';
+import { withConcurrencyLimit } from '../concurrency.js';
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
@@ -368,7 +368,7 @@ export async function getConversationsPendingInputFeed(
     const alive = conversations.filter(
       (conv) => !conv.forkStatus && liveSessionNames.has(conv.tmuxSession),
     );
-    const rows = await withConcurrencyLimitPromise(
+    const rows = await withConcurrencyLimit(
       alive.map((conv) => async () => {
         const convSf = await deps.resolveSessionFile(conv);
         let pending: PendingAskUserQuestionSnapshot | undefined;

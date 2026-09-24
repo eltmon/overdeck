@@ -8,13 +8,13 @@
  * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
  * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
  * as sync) and cannot await:
- * - `getProjectSync` (async: `getProject`): 28 sites in cli/commands/admin/seed-uat-fixtures.ts,
+ * - `getProjectSync` (async: `getProject`): 24 sites in cli/commands/admin/seed-uat-fixtures.ts,
  *   cli/commands/conversations/move.ts, cli/commands/doctor-duplicate-stacks.ts, cli/commands/orders.ts,
  *   cli/commands/strike.ts, cli/commands/task.ts, dashboard/server/routes/issues.ts,
  *   dashboard/server/routes/orders.ts, dashboard/server/routes/projects.ts,
  *   dashboard/server/routes/workspace-registry.ts, dashboard/server/routes/workspaces/uat-stack-actions.ts,
  *   lib/cloister/auto-merge-policy.ts, lib/cloister/merge-eligibility.ts, lib/cloister/merge-gate.ts,
- *   lib/cloister/merge-train.ts, lib/cloister/specialist-context.ts, lib/cloister/verification-tests-mode.ts,
+ *   lib/cloister/merge-train.ts, lib/cloister/verification-tests-mode.ts,
  *   lib/overdeck/issue-projects.ts, lib/pan-dir/migrate-plan-home.ts, lib/project-repos.ts, lib/projects.ts,
  *   lib/swarm-policy.ts, lib/workspace/ensure-devcontainer.ts, lib/workspace/rebuild-stack.ts,
  *   lib/workspace/stack-health.ts.
@@ -73,6 +73,7 @@ import {
 } from './projects-config-write.js';
 import { extractPrefix, parseIssueId } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
+import { findContainingProject } from './projects/path-containment.js';
 import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
@@ -134,11 +135,11 @@ export interface TestConfig {
  * Specialist configuration for per-project specialists
  */
 export interface SpecialistConfig {
-  /** Number of recent runs to include in context digest (default: 5) */
+  /** @deprecated Not read: specialist run logs and context digests were removed (PAN-4052). */
   context_runs?: number;
-  /** Model to use for generating context digests (null = same as specialist) */
+  /** @deprecated Not read: specialist run logs and context digests were removed (PAN-4052). */
   digest_model?: string | null;
-  /** Log retention policy */
+  /** @deprecated Not read: specialist run logs and context digests were removed (PAN-4052). */
   retention?: {
     /** Maximum days to keep logs */
     max_days: number;
@@ -787,22 +788,12 @@ export function findProjectByTeam(teamPrefix: string): ProjectConfig | null {
 }
 
 /**
- * Find project by workspace path.
- * Matches any project whose root path is an ancestor of the given path.
+ * Find project by workspace path: the project whose root contains it, deepest
+ * root first. `~` is expanded and symlinks resolved on both sides (PAN-4046).
  * Used to resolve the tracker (GitHub/GitLab) from a workspace directory.
  */
 export function findProjectByPath(workspacePath: string): ProjectConfig | null {
-  const config = loadProjectsConfigSync();
-  const normalizedTarget = resolve(workspacePath);
-
-  for (const [, projectConfig] of Object.entries(config.projects)) {
-    const normalizedProject = resolve(projectConfig.path);
-    if (normalizedTarget === normalizedProject || normalizedTarget.startsWith(normalizedProject + '/')) {
-      return projectConfig;
-    }
-  }
-
-  return null;
+  return findContainingProject(loadProjectsConfigSync().projects, workspacePath)?.[1] ?? null;
 }
 
 
@@ -1014,54 +1005,6 @@ projects:
     }
   });
   console.log(`Created example projects config at ${PROJECTS_CONFIG_FILE}`);
-}
-
-/**
- * Default specialist configuration values
- */
-const DEFAULT_SPECIALIST_CONFIG: Required<SpecialistConfig> = {
-  context_runs: 5,
-  digest_model: null,
-  retention: {
-    max_days: 30,
-    max_runs: 50,
-  },
-  prompts: {},
-};
-
-/**
- * Get specialist configuration for a project with defaults
- *
- * @param projectKey - Project key
- * @returns Specialist config with defaults applied
- */
-function getSpecialistConfig(projectKey: string): Required<SpecialistConfig> {
-  const project = getProjectSync(projectKey);
-
-  if (!project || !project.specialists) {
-    return DEFAULT_SPECIALIST_CONFIG;
-  }
-
-  return {
-    context_runs: project.specialists.context_runs ?? DEFAULT_SPECIALIST_CONFIG.context_runs,
-    digest_model: project.specialists.digest_model ?? DEFAULT_SPECIALIST_CONFIG.digest_model,
-    retention: {
-      max_days: project.specialists.retention?.max_days ?? DEFAULT_SPECIALIST_CONFIG.retention.max_days,
-      max_runs: project.specialists.retention?.max_runs ?? DEFAULT_SPECIALIST_CONFIG.retention.max_runs,
-    },
-    prompts: project.specialists.prompts ?? DEFAULT_SPECIALIST_CONFIG.prompts,
-  };
-}
-
-/**
- * Get retention policy for a project's specialists
- *
- * @param projectKey - Project key
- * @returns Retention policy
- */
-export function getSpecialistRetention(projectKey: string): { max_days: number; max_runs: number } {
-  const config = getSpecialistConfig(projectKey);
-  return config.retention;
 }
 
 /**

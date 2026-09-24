@@ -7,7 +7,8 @@ import {
   Hammer, Loader2, History, Mic, FileText, BookOpen, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
+import { fetchRegisteredProjects } from './CommandDeck/UnknownProjectState';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './CommandDeck/projectsData';
 import { OverdeckMark } from './OverdeckMark';
 import { fetchConversations } from './CommandDeck/ConversationList';
 import { useConversationMutations } from './CommandDeck/useConversationMutations';
@@ -229,14 +230,12 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     queryFn: fetchConversations,
     refetchInterval: 10000,
   });
+  // PAN-3527: share the throwing fetcher with the CommandDeck. Turning a failed
+  // request into an empty list cached it as a settled answer, which skipped the
+  // retry and emptied the deck's conversation partition.
   const { data: registeredProjects = [] } = useQuery({
     queryKey: ['registered-projects'],
-    queryFn: async (): Promise<RegisteredProjectLite[]> => {
-      const res = await fetch('/api/registered-projects');
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    },
+    queryFn: fetchRegisteredProjects,
     staleTime: 60000,
   });
   const hasUnscopedConversations = useMemo(
