@@ -871,8 +871,7 @@ async function spawnAgentWithoutConsentClaim(
   }, launchBackend).then((pane) => {
     launchedPane = pane;
     // W12: a failure after this point is still addressable.
-    state.backend = pane.backend;
-    state.paneId = pane.paneId;
+    Object.assign(state, { backend: pane.backend, paneId: pane.paneId, terminalId: pane.terminalId });
     saveAgentStateSync(state);
   });
 

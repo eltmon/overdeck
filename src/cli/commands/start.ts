@@ -10,6 +10,7 @@ import { exec, execFile, execFileSync, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
+import { attachHintLines, resolveAttach } from '../../lib/terminal-backends/attach-hint.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
@@ -805,7 +806,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(chalk.green(`Work agent for ${id} is already running.`));
     console.log('');
     console.log(chalk.dim('Message it:'), chalk.cyan(`pan tell ${id} "..."`));
-    console.log(chalk.dim('Attach:  '), chalk.cyan(`tmux -L overdeck attach -t ${agentId}`));
+    console.log(chalk.dim('Attach:  '), chalk.cyan((await resolveAttach(existingAgentState ?? { id: agentId })).command));
     process.exitCode = 0;
     return;
   }
@@ -1251,7 +1252,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     console.log('');
     console.log(chalk.dim('Commands:'));
-    console.log(`  Attach:   tmux attach -t ${agent.id}`);
+    for (const line of await attachHintLines(agent)) console.log(line);
     console.log(`  Message:  pan tell ${id} "your message"`);
     console.log(`  Kill:     pan kill ${id}`);
 
