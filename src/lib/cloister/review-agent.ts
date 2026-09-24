@@ -687,8 +687,12 @@ export async function killAllReviewerSessions(
   const killed: string[] = [];
   const failed: string[] = [];
 
+  // A failed tmux listing may hide a live legacy session: the backend closes
+  // below still run, but the parent is reported as not stopped.
+  let listFailed = false;
   const tmuxSessions = await Effect.runPromise(listSessionNames()).catch((err: unknown) => {
     console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
+    listFailed = true;
     return [] as readonly string[];
   });
   const candidates = [...new Set([
@@ -718,6 +722,8 @@ export async function killAllReviewerSessions(
       });
     }
   }
+  const parent = `agent-${issueId.toLowerCase()}-review`;
+  if (listFailed && !killed.includes(parent) && !failed.includes(parent)) failed.push(parent);
   return { killed, failed };
 }
 

@@ -45,6 +45,9 @@ export async function abortReviewCommand(id: string): Promise<void> {
     }
     if (result.failed && result.failed.length > 0) {
       console.log(chalk.yellow(`  Warning: ${result.failed.length} session(s) could not be killed`));
+      for (const s of result.failed) {
+        console.log(chalk.yellow(`  still running: ${s}`));
+      }
     }
 
   } catch (error: any) {
