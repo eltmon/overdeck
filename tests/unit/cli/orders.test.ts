@@ -106,7 +106,7 @@ describe('pan orders commands', () => {
       { issue: 'PAN-3', lane: 'B', order: 3, reVerify: false },
     ]);
 
-    const shown = runOrdersShow(created.id, deps);
+    const shown = await runOrdersShow(created.id, deps);
     expect(formatBook(shown)).toContain('"issue": "PAN-2"');
     expect(formatBookList(runOrdersList(deps))).toContain('2026-07-18-refactor-campaign');
 
@@ -196,7 +196,7 @@ describe('pan orders commands', () => {
 
     const queued = await runOrdersQueue(created.id, deps);
     expect(queued.status).toBe('ready');
-    expect(runOrdersShow(created.id, deps).status).toBe('ready');
+    expect((await runOrdersShow(created.id, deps)).status).toBe('ready');
   });
 
   it('rejects queueing a non-draft book', async () => {
@@ -221,7 +221,7 @@ describe('pan orders commands', () => {
     });
     const queued = await runOrdersQueue(created.id, { projectKey: 'other-project' });
     expect(queued.status).toBe('ready');
-    expect(runOrdersShow(created.id, { projectKey: 'other-project' }).status).toBe('ready');
+    expect((await runOrdersShow(created.id, { projectKey: 'other-project' })).status).toBe('ready');
   });
 
   it('starts the Flywheel with cwd set to the selected --project, not the caller cwd', async () => {

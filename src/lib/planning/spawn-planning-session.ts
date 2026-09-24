@@ -52,7 +52,6 @@ export {
   autoSpawnOnFinalizeFlagPath,
   claimAutoSpawnConsentForWorkStart,
   completeAutoSpawnConsentClaim,
-  readAutoSpawnOnFinalizeFlag,
   readAutoSpawnOnFinalizeFlagAsync,
   releaseAutoSpawnConsentClaim,
   withAutoSpawnConsentClaim,

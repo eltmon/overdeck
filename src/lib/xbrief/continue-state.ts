@@ -12,6 +12,14 @@
  * branch must not be ahead of its upstream.
  */
 
+/**
+ * Sync twins (PAN-3958): `readItemStatuses` (async: `readItemStatusesAsync`) exists because these callers
+ * run in synchronous contexts and cannot await: src/lib/xbrief/io.ts:331 (behind `readWorkspacePlanSync`)
+ * and src/lib/cloister/swarm-slot-lifecycle.ts:20 (the sync `isTerminalSwarmSlotAgent`, which the sync
+ * counters in cloister/concurrency.ts call, kept sync by the #4048 decision).
+ * Do not add new synchronous callers; server-reachable code uses the async variant.
+ */
+
 import { execFile } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';

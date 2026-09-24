@@ -133,7 +133,7 @@ describe('remote agent provenance', () => {
   });
 
   it('spends autonomous consent when remote setup fails after tmux accepts the session', async () => {
-    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import(
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlagAsync } = await import(
       '../../../src/lib/planning/auto-spawn-consent.js'
     );
     const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
@@ -157,7 +157,7 @@ describe('remote agent provenance', () => {
       tier: 'ephemeral',
     })).rejects.toThrow('Failed to start push daemon');
 
-    expect(readAutoSpawnOnFinalizeFlag('PAN-3113')).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-3113')).resolves.toBe(false);
   });
 
   it('exports provenance in the direct remote command without a prompt', async () => {

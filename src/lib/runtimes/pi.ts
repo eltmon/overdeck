@@ -1,7 +1,7 @@
 /**
  * Pi Coding Agent helpers (PAN-636).
  *
- * The Pi runtime adapter classes (PiRuntimeSync, PiRuntime) were never constructed
+ * The Pi runtime adapter classes (sync and Effect) were never constructed
  * after PAN-1989 and were deleted in PAN-3958 (#4007). What remains is used by the
  * live pi harness paths: PiSpawnTimeout and the PiSpawnConfig shape. The session
  * layout (piSessionsRoot, findPiTranscriptPath) lives in `storage/pi.ts` (PAN-3958 CH-7).

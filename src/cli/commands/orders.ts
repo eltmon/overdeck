@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { Command, InvalidArgumentError } from 'commander';
 import { dirname, join } from 'node:path';
 
-import { getBook, listBooks, normalizeOrderIssueId } from '../../lib/orders/resolver.js';
+import { getBookAsync, listBooks, normalizeOrderIssueId } from '../../lib/orders/resolver.js';
 import {
   addItems,
   createBook,
@@ -69,8 +69,8 @@ async function commitOrders(panDir: string, subject: string): Promise<void> {
   await commitPlanArtifacts({ cwd: dirname(panDir), paths: [join(panDir, 'orders')], message: subject });
 }
 
-function requireBook(panDir: string, bookId: string): OrderBook {
-  const book = getBook(panDir, bookId);
+async function requireBook(panDir: string, bookId: string): Promise<OrderBook> {
+  const book = await getBookAsync(panDir, bookId);
   if (!book) throw new Error(`Order book not found: ${bookId}`);
   return book;
 }
@@ -83,11 +83,11 @@ function slugify(value: string): string {
   return slug || 'order-book';
 }
 
-function nextBookId(panDir: string, name: string, now: Date): string {
+async function nextBookId(panDir: string, name: string, now: Date): Promise<string> {
   const base = `${now.toISOString().slice(0, 10)}-${slugify(name)}`;
-  if (!getBook(panDir, base)) return base;
+  if (!await getBookAsync(panDir, base)) return base;
   let suffix = 2;
-  while (getBook(panDir, `${base}-${suffix}`)) suffix += 1;
+  while (await getBookAsync(panDir, `${base}-${suffix}`)) suffix += 1;
   return `${base}-${suffix}`;
 }
 
@@ -140,7 +140,7 @@ export async function runOrdersCreate(name: string, deps: OrdersCommandDeps = {}
   if (!trimmed) throw new Error('Order book name cannot be empty');
   const panDir = panDirFor(deps);
   const book = await createBook(panDir, {
-    id: nextBookId(panDir, trimmed, (deps.now ?? (() => new Date()))()),
+    id: await nextBookId(panDir, trimmed, (deps.now ?? (() => new Date()))()),
     name: trimmed,
   });
   await commitOrders(panDir, `chore(orders): create order book ${book.id}`);
@@ -151,7 +151,7 @@ export function runOrdersList(deps: OrdersCommandDeps = {}): OrderBook[] {
   return listBooks(panDirFor(deps));
 }
 
-export function runOrdersShow(bookId: string, deps: OrdersCommandDeps = {}): OrderBook {
+export async function runOrdersShow(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
   return requireBook(panDirFor(deps), bookId);
 }
 
@@ -163,7 +163,7 @@ export async function runOrdersAdd(
 ): Promise<OrderBook> {
   if (issueIds.length === 0) throw new Error('At least one issue is required');
   const panDir = panDirFor(deps);
-  const book = requireBook(panDir, bookId);
+  const book = await requireBook(panDir, bookId);
   const targetLane = options.lane ?? 'A';
   const actor = deps.actor ?? process.env['OVERDECK_AGENT_ID'] ?? 'operator';
   const laneItems = book.items
@@ -215,7 +215,7 @@ export async function runOrdersMove(
   deps: OrdersCommandDeps = {},
 ): Promise<OrderBook> {
   const panDir = panDirFor(deps);
-  const book = requireBook(panDir, bookId);
+  const book = await requireBook(panDir, bookId);
   const item = book.items.find((candidate) => candidate.issue.toUpperCase() === issueId.toUpperCase());
   if (!item) throw new Error(`Issue ${issueId.toUpperCase()} is not in order book ${bookId}`);
   if (options.lane === undefined && options.order === undefined) {
@@ -234,13 +234,13 @@ export async function runOrdersMove(
 
 export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<{ runId: string }> {
   const resolved = resolveOrdersProject(deps);
-  requireBook(resolved.panDir, bookId);
+  await requireBook(resolved.panDir, bookId);
   return (deps.startOrderBook ?? ((id: string) => defaultStartOrderBook(id, resolved.projectConfig)))(bookId);
 }
 
 export async function runOrdersQueue(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
   const panDir = panDirFor(deps);
-  const book = requireBook(panDir, bookId);
+  const book = await requireBook(panDir, bookId);
   if (book.status !== 'draft') throw new Error(`Order book ${bookId} must be draft before it can be queued`);
   const queued = await setStatus(panDir, bookId, 'ready');
   await commitOrders(panDir, `chore(orders): queue order book ${bookId}`);
@@ -281,7 +281,7 @@ export function createOrdersCommand(): Command {
     .description('Show an order book')
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, options: { project?: string }) => commandAction(async () => {
-      console.log(formatBook(runOrdersShow(id, { projectKey: options.project })));
+      console.log(formatBook(await runOrdersShow(id, { projectKey: options.project })));
     }));
 
   orders

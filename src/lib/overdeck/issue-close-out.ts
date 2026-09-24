@@ -7,7 +7,6 @@ import { EventStoreService } from '../../dashboard/server/services/domain-servic
 import { getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../lifecycle/types.js';
 import type { DodRowId } from '../lifecycle/dod.js';
-import { withConcurrencyLimit } from '../concurrency.js';
 import { getAgentStateSync, normalizeAgentId } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -259,7 +258,7 @@ export function bulkCloseOut(body: Record<string, unknown>) {
     type CloseOutTask = { id: string; ctx: LifecycleContext } | { id: string; skipped: true; error: string };
     const tasks: CloseOutTask[] = [];
 
-    const agentChecks = yield* withConcurrencyLimit(
+    const agentChecks = yield* Effect.all(
       issueIds.map(id => Effect.promise(async () => {
         const cachedIssue = issueDataService.getIssues().find(
           (issue: any) => (issue.identifier || '').toUpperCase() === id.toUpperCase(),
@@ -274,7 +273,7 @@ export function bulkCloseOut(body: Record<string, unknown>) {
         const hasActiveAgent = await hasActiveAgentForIssue(id, allowPausedMerged);
         return { id, hasActiveAgent };
       })),
-      10
+      { concurrency: 10 },
     );
 
     for (const { id, hasActiveAgent } of agentChecks) {
@@ -337,7 +336,7 @@ export function bulkCloseOut(body: Record<string, unknown>) {
         }
       }));
 
-    const closeOutResults = yield* withConcurrencyLimit(closeOutTasks, 3);
+    const closeOutResults = yield* Effect.all(closeOutTasks, { concurrency: 3 });
 
     const results: Array<{ issueId: string; success: boolean; error?: string; skipped: boolean }> = [];
     for (const { id, closeResult } of closeOutResults) {

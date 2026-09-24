@@ -43,7 +43,7 @@ import {
 
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
-import { withConcurrencyLimit } from '../../../lib/concurrency.js';
+import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
 import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodeType } from '@overdeck/contracts';
@@ -580,8 +580,8 @@ export async function fetchProjectSessionTree(
       issueId: issueLower.toUpperCase(),
     }));
 
-    const results = await Effect.runPromise(withConcurrencyLimit(
-      featureCandidates.map((c) => Effect.promise(async () => {
+    const results = await withConcurrencyLimitPromise(
+      featureCandidates.map((c) => async () => {
         const agentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}`);
         const planningAgentDir = join(getOverdeckHome(), 'agents', `planning-${c.issueLower}`);
         const planRunAgentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}-plan`);
@@ -609,9 +609,9 @@ export async function fetchProjectSessionTree(
           console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
           return null;
         }
-      })),
+      }),
       15,
-    ));
+    );
 
     features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
   }

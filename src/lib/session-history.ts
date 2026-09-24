@@ -6,6 +6,17 @@
  * transcript before the next launch has established a new session identity.
  * Entries may also carry the absolute transcript path recorded at session
  * start, letting resolvers skip per-harness path guessing.
+ *
+ * Sync twins (PAN-3958): `appendSessionIdToHistory` (async: `appendSessionIdToHistoryAsync`) stays for
+ * the launch and capture paths, which record a session's identity at the moment it is known (#4038),
+ * and for synchronous contexts that cannot await:
+ * - launch: src/lib/agents/spawn.ts:352, src/lib/runtimes/muse.ts:78, src/lib/acp/host.ts:176,
+ *   src/lib/session-history.ts (`createFreshSessionIdentity`, sync);
+ * - capture: src/lib/runtimes/codex.ts:214, src/lib/runtimes/kimi-code.ts:172,
+ *   src/lib/codex/app-server-host.ts:353, src/lib/agents/activity.ts:85 (`saveSessionId`, sync);
+ * - src/dashboard/server/services/agent-state-service.ts:74 (`observeSessionIndexEvent`, called from
+ *   the event store's synchronous subscriber so lines land in event order).
+ * Do not add new synchronous callers elsewhere; other server-reachable code uses the async variant.
  */
 import { randomUUID } from 'crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';

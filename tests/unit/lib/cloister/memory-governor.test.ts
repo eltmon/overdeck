@@ -65,7 +65,7 @@ vi.mock('node:os', async (importOriginal) => ({
   loadavg: (...args: unknown[]) => osMocks.loadavg(...args),
 }));
 
-import { assessMemoryPressure, classifyMemoryPressure, nextGovernorMode, resetGovernorModeForTests, getCachedMemoryVerdict, selectStackShedCandidates, selectAgentToPause, shed, type GovernorReserves, readGovernorReserves   } from '../../../../src/lib/cloister/memory-governor.js';
+import { assessMemoryPressure, classifyMemoryPressure, nextGovernorMode, resetGovernorModeForTests, getCachedMemoryVerdict, selectStackShedCandidates, selectAgentToPause, shed, type GovernorReserves, readGovernorReserves } from '../../../../src/lib/cloister/memory-governor.js';
 import {
   type ResourceStack,
   type StackContainerResource,

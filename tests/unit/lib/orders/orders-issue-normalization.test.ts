@@ -33,7 +33,7 @@ vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
   };
 });
 
-import { getBook, getBookAsync, listBooks } from '../../../../src/lib/orders/resolver.js';
+import { getBookAsync, listBooks } from '../../../../src/lib/orders/resolver.js';
 import { addItems, removeItem } from '../../../../src/lib/orders/writer.js';
 
 const at = '2026-08-09T12:00:00.000Z';
@@ -97,25 +97,23 @@ describe('order-book issue id normalization', () => {
     projectMocks.findProjectByPathSync.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
     writeBook(root, book([item('2351', ['2350']), item('PAN-1166')]));
 
-    const read = getBook(root, '2026-08-09-anywhere');
+    const read = await getBookAsync(root, '2026-08-09-anywhere');
     expect(read?.items.map((entry) => entry.issue)).toEqual(['PAN-2351', 'PAN-1166']);
     expect(read?.items[0]?.prereqs).toEqual(['PAN-2350']);
     expect(listBooks(root)[0]?.items.map((entry) => entry.issue)).toEqual(['PAN-2351', 'PAN-1166']);
-    const asyncRead = await getBookAsync(root, '2026-08-09-anywhere');
-    expect(asyncRead?.items.map((entry) => entry.issue)).toEqual(['PAN-2351', 'PAN-1166']);
     // The stored file is untouched — read-door normalization is not surgery.
     expect(storedBook(root, '2026-08-09-anywhere').items.map((entry) => entry.issue)).toEqual(['2351', 'PAN-1166']);
   });
 
-  it('leaves ids untouched when no project prefix is derivable', () => {
+  it('leaves ids untouched when no project prefix is derivable', async () => {
     const root = panRoot();
     projectMocks.findProjectByPathSync.mockReturnValue(null);
     writeBook(root, book([item('2351')]));
 
-    expect(getBook(root, '2026-08-09-anywhere')?.items.map((entry) => entry.issue)).toEqual(['2351']);
+    expect((await getBookAsync(root, '2026-08-09-anywhere'))?.items.map((entry) => entry.issue)).toEqual(['2351']);
   });
 
-  it('derives the prefix from the checkout that contains the pan directory', () => {
+  it('derives the prefix from the checkout that contains the pan directory', async () => {
     const root = join(fakeHome, 'Projects', 'legacy-checkout', '.pan');
     roots.push(root);
     mkdirSync(join(root, 'orders'), { recursive: true });
@@ -123,7 +121,7 @@ describe('order-book issue id normalization', () => {
     projectMocks.findProjectByPathSync.mockReturnValue({ name: 'legacy', path: root, issue_prefix: 'LEG' });
     writeBook(root, book([item('42')]));
 
-    expect(getBook(root, '2026-08-09-anywhere')?.items[0]?.issue).toBe('LEG-42');
+    expect((await getBookAsync(root, '2026-08-09-anywhere'))?.items[0]?.issue).toBe('LEG-42');
   });
 
   it('canonicalizes bare numbers at the write door (addItems)', async () => {

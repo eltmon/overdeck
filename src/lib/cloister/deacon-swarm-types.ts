@@ -80,7 +80,7 @@ export interface CoordinateSwarmSlotsDeps {
    */
   getIssueHold?: (issueId: string, workspacePath: string) => { reason: string } | null;
   /** Item id → status from the issue's continue file — the one home for item progress. */
-  readItemStatuses?: (workspacePath: string, issueId: string) => Record<string, string>;
+  readItemStatuses?: (workspacePath: string, issueId: string) => Promise<Record<string, string>>;
   /** Per-slot completion marker written by `pan done`. */
   readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => SwarmSlotCompletion | undefined;
   /** Delete a stale durable marker that does not belong to the active item. */

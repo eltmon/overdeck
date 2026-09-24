@@ -10,7 +10,7 @@ import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { analyzeSwarmReadiness } from '../../lib/xbrief/swarm-readiness.js';
 import { applyItemStatuses } from '../../lib/xbrief/io.js';
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
-import { readItemStatuses } from '../../lib/xbrief/continue-state.js';
+import { readItemStatusesAsync } from '../../lib/xbrief/continue-state.js';
 import { readSwarmHold } from '../../lib/cloister/deacon-swarm-record.js';
 import {
   classifyInFlightSlots,
@@ -113,7 +113,7 @@ export async function swarmDispatchCommand(
     return { ok: false, actions: [], workspacePath };
   }
 
-  const itemStatuses = readItemStatuses(resolvePlanHome(workspacePath), issue);
+  const itemStatuses = await readItemStatusesAsync(resolvePlanHome(workspacePath), issue);
   const doc = Object.keys(itemStatuses).length > 0
     ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;
@@ -161,7 +161,7 @@ export async function swarmMergeCommand(
     return { ok: false, actions: [], workspacePath };
   }
 
-  const itemStatuses = readItemStatuses(resolvePlanHome(workspacePath), issue);
+  const itemStatuses = await readItemStatusesAsync(resolvePlanHome(workspacePath), issue);
   const doc = Object.keys(itemStatuses).length > 0
     ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;

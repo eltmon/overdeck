@@ -118,8 +118,9 @@ storage code. Landing order is fixed: the ratchet first, then one child at a tim
 | 21e | CH-5 | Promise-native cluster K3b: config, projects, settings, shadow, costs, conversations, xbrief, memory | **LANDED** #4043 |
 | 21f | CH-6 | Live Shape B callers + Shape C twins C4–C6 + no blocking sync in server code | **LANDED** #4044, #4048 |
 | 21g | CH-7 | One owner per harness for transcript/session/home paths (skips ohmypi, removed by #4003) | **LANDED** #4049 |
-| 21h | CH-8 | Dead exports, `export` pruning, alias shims (CH-8a deletions in two PRs; CH-8b `export` pruning and the comment-blind scan) | **LANDED** #4050, #4051; CH-8b in review |
-| 21i | follow-up | Twin pairs AC-W8 still lists: `withConcurrencyLimit`/`withConcurrencyLimitPromise` and eight `foo`/`fooAsync` pairs without a C6 header note (ledger, CH-8b) | open |
+| 21h | CH-8 | Dead exports, `export` pruning, alias shims (CH-8a deletions in two PRs; CH-8b `export` pruning and the comment-blind scan) | **LANDED** #4050, #4051, #4055 |
+| 21i | CH-9 | The nine twin pairs AC-W8 still listed after CH-8b: four variants deleted (the Effect `withConcurrencyLimit`, sync `getBook`, sync `readAutoSpawnOnFinalizeFlag`, the Effect `listProjects`), the other five pairs C6 with header notes; parser-exact comment stripping for the dead-export scan | in review |
+| 21j | follow-up | AC-W6: 26 `async function …Promise(` names left in cluster modules outside Oh My Pi. 12 are the only variant left (their Effect twin was deleted as dead), so the suffix is stale: rename to the bare name. 14 are private bodies behind a kept Effect export: rename `…Body`, as CH-4 did. Candidate scope for #4002 (ledger, CH-9) | open |
 
 ## Related in-pipeline items being shepherded alongside (not queue members)
 

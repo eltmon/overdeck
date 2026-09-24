@@ -2,11 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-describe('chooseDispatchTier', () => {
-
-
-
-
+describe('dispatch-tier.ts', () => {
   it('does not contain issue-id special cases', () => {
     // Doc comments cite the feature's issue id as provenance (repo
     // convention); the hazard is CODE branching on a specific issue.

@@ -20,7 +20,7 @@ import {
   getDispatchableItems,
   type PersistedTaskOperation,
 } from '../xbrief/dag.js';
-import { readItemStatuses, setItemStatus } from '../xbrief/continue-state.js';
+import { readItemStatusesAsync, setItemStatus } from '../xbrief/continue-state.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
 import { applyItemStatuses } from '../xbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../xbrief/swarm-readiness.js';
@@ -205,9 +205,9 @@ function planHomeForWorkspace(workspacePath: string): string {
 }
 
 /** Item id → status, from the issue's continue file. */
-function defaultReadItemStatuses(workspacePath: string, issueId: string): Record<string, string> {
+async function defaultReadItemStatuses(workspacePath: string, issueId: string): Promise<Record<string, string>> {
   try {
-    return readItemStatuses(planHomeForWorkspace(workspacePath), issueId);
+    return await readItemStatusesAsync(planHomeForWorkspace(workspacePath), issueId);
   } catch {
     return {};
   }
@@ -302,7 +302,7 @@ export async function coordinateSwarmSlots(
       if (!spec) continue;
       const planStatus = spec.document.plan.status;
       if (planStatus === 'completed' || planStatus === 'cancelled') continue;
-      const itemStatuses = (deps.readItemStatuses ?? defaultReadItemStatuses)(workspace.workspacePath, issueId);
+      const itemStatuses = await (deps.readItemStatuses ?? defaultReadItemStatuses)(workspace.workspacePath, issueId);
       const doc = Object.keys(itemStatuses).length > 0
         ? applyItemStatuses(spec.document, itemStatuses)
         : spec.document;
