@@ -447,7 +447,9 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   } catch (installErr: any) {
     const msg = `Dependency install failed (${pkgManager}): ${installErr.message?.slice(0, 200)}`;
     result.errors.push(msg);
-    progress('Installing dependencies', 'Failed — workspace creation aborted', 'complete');
+    // PAN-3905: an aborted setup is a failed create, not a ready workspace.
+    result.success = false;
+    progress('Installing dependencies', 'Failed — workspace creation aborted', 'error');
     return result;
   }
 
@@ -465,6 +467,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   } catch (hookErr: any) {
     result.errors.push(`Pre-rebase guard install failed: ${hookErr.message?.slice(0, 200)}`);
+    result.success = false;
     return result;
   }
 
@@ -480,7 +483,8 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       } catch (buildErr: any) {
         const msg = `Workspace package build failed (${pkg.path}): ${buildErr.message?.slice(0, 200)}`;
         result.errors.push(msg);
-        progress('Building workspace packages', `Failed on ${pkg.path} — workspace creation aborted`, 'complete');
+        result.success = false;
+        progress('Building workspace packages', `Failed on ${pkg.path} — workspace creation aborted`, 'error');
         return result;
       }
     }
