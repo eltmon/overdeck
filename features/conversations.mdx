@@ -47,6 +47,24 @@ click:
   alt="The composer model and harness picker, showing Claude Code / Pi / Codex harnesses over Anthropic and other provider models with per-million pricing"
 />
 
+### Starting a bare conversation
+
+Two checkboxes sit under the `+` in the Command Deck header. Your browser
+remembers what you last chose.
+
+- **No context** starts the conversation without Overdeck's context: no
+  bundled rules, no project or workspace layers, no session briefing, no memory
+  injection on each prompt, and no resume message. It starts faster and costs
+  fewer tokens per turn. The conversation still shows up in the dashboard with
+  live activity, and resuming or forking it keeps it bare.
+- **Skip CLAUDE.md** (Claude Code only) also turns off Claude Code's own
+  memory: `~/.claude/CLAUDE.md`, project `CLAUDE.md` files and auto memory.
+  Without it, a bare conversation still reads those files, because Claude Code
+  loads them itself.
+
+See [Bare conversations](https://github.com/eltmon/overdeck/blob/main/docs/CONTEXT-LAYERS.md#bare-conversations-no-overdeck-context)
+for the full list of what is skipped and what keeps running.
+
 ### Native OpenCode CLI in Terminal
 
 For an OpenCode conversation, **Terminal** attaches OpenCode's own interactive

@@ -78,6 +78,7 @@ import {
 import { kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/storage/kimi-code.js';
 import { codexSessionsRoot, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
+import { conversationContextEnvExports, conversationLaunchContext, type ConversationLaunchContext } from './conversation-launch-context.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -552,8 +553,9 @@ export async function spawnConversationSession(
   resume = false,
   harness: RuntimeName = 'claude-code',
   plainFork = false,
-  launch: { role?: AgentRole; backend?: TerminalBackend } = {},
+  launch: { role?: AgentRole; backend?: TerminalBackend } & ConversationLaunchContext = {},
 ): Promise<void> {
+  const bareContext = launch.bareContext === true;
   const behavior = getHarnessBehavior(harness);
   const harnessLaunch = await prepareHarnessLaunch(harness);
   const stateDir = conversationStateDir(tmuxSession);
@@ -588,7 +590,7 @@ export async function spawnConversationSession(
     harness: 'muse' as const,
     museModel: model,
     museEffort: effort,
-    museContextFile: await materializeMuseContext(tmuxSession, cwd),
+    museContextFile: bareContext ? undefined : await materializeMuseContext(tmuxSession, cwd),
     museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
   } : undefined;
   let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; kimiContextDelivery: 'initial-message'; kimiCodeEffort?: string; resumeSessionId?: string } | undefined;
@@ -603,6 +605,7 @@ export async function spawnConversationSession(
     await rm(sessionIdPath, { force: true }); // PAN-3357: not a dir removal
     acpFields = {
       ...getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', effort),
+      ...(bareContext ? { acpContextFile: undefined } : {}),
       resumeSessionId,
     };
     runtimeCommand = 'acp-host';
@@ -774,11 +777,15 @@ export async function spawnConversationSession(
           `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
           // PAN-3920: every harness knows its conversation, so `pan worker run` can name its parent.
           `export OVERDECK_CONVERSATION=${JSON.stringify(tmuxSession)}`,
+          ...conversationContextEnvExports(launch, harness),
         ],
         providerExports: providerExportsStr || undefined,
         trapHup: true,
         baseCommand: runtimeCommand,
-        appendSystemPromptFiles: piFields
+        // PAN-4185: bare = no launch bundle, so no compose or receipt step either.
+        appendSystemPromptFiles: bareContext
+          ? []
+          : piFields
           ? await piConversationSystemPromptFiles(cwd)
           : codexFields
             ? await codexConversationSystemPromptFiles(cwd)
@@ -805,7 +812,7 @@ export async function spawnConversationSession(
     await rename(launcherTmp, launcherScript);
     await closeCompanionTerminalForOwner(tmuxSession); // PAN-3974: a respawned owner gets a new generation
     await closeConversationPane(tmuxSession);
-    console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}" | backend=${backend.name}`);
+    console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | bareContext=${bareContext} | command="${runtimeCommand}" | backend=${backend.name}`);
     // PAN-3921 FR-2: the pane goes through the launch door with the live agent
     // name `conv-<name>` and the conversation's tokens. On tmux this is the
     // same createSession call as before (same session name, cwd, env, launcher).
@@ -940,6 +947,7 @@ export async function handleConversationCreate(
     const harness = await resolveAllowedHarness(body['harness'], model);
     const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
     const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
+    const launchContext: ConversationLaunchContext = { bareContext: body['bareContext'] === true, skipClaudeMd: body['skipClaudeMd'] === true };
     if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
     if (model && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
     if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
@@ -961,16 +969,16 @@ export async function handleConversationCreate(
     console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
     const MAX_TITLE_LEN = 60;
     const title = message ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '') : 'New conversation';
-    const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort, harness, projectKey: canonicalProjectKey });
+    const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort, harness, projectKey: canonicalProjectKey, ...launchContext });
     getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
     void (async () => {
       try {
-        await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
+        await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness, false, launchContext);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
         await waitForConversationRuntimeReady(tmuxSession, harness, 'spawn');
-        if (message || harness === 'kimi-code') {
+        if (message || (harness === 'kimi-code' && !launchContext.bareContext)) {
           const method = resolveConversationDeliveryMethod(conv);
-          const delivery = harness === 'kimi-code'
+          const delivery = harness === 'kimi-code' && !launchContext.bareContext
             ? await deliverAgentMessage(
                 tmuxSession,
                 message,
@@ -1055,7 +1063,7 @@ export async function handleConversationResume(
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', reattached: true });
     }
-    const oldSessionId = conv.claudeSessionId, resumeCause = conv.status === 'ended' ? 'operator' : 'system', sendResumeContract = body['sendResumeContract'] !== false;
+    const oldSessionId = conv.claudeSessionId, resumeCause = conv.status === 'ended' ? 'operator' : 'system', sendResumeContract = body['sendResumeContract'] !== false && !conv.bareContext;
     const harness: RuntimeName = conv.harness ?? 'claude-code';
     const modelChanged = !!model && model !== conv.model;
     if (!(await validateCwdContainment(conv.cwd))) return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
@@ -1071,11 +1079,11 @@ export async function handleConversationResume(
     }
     const respawn = markRespawnPending(conv.tmuxSession);
     try {
-      await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
+      await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness, false, conversationLaunchContext(conv));
       await waitForTmuxSession(conv.tmuxSession);
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
       const method = resolveConversationDeliveryMethod(conv);
-      if (harness === 'kimi-code') {
+      if (harness === 'kimi-code' && !conv.bareContext) {
         await deliverMandatoryKimiResumeContext(conv.tmuxSession, conv.cwd, method);
       }
       // The harness may open its own blocking gate on resume. The operator owns
@@ -1144,11 +1152,11 @@ export async function handleConversationRestartAll(
         const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
-        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
+        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness, false, conversationLaunchContext(conv));
         if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
         }
-        if (harness === 'kimi-code') {
+        if (harness === 'kimi-code' && !conv.bareContext) {
           await deliverMandatoryKimiResumeContext(
             conv.tmuxSession, conv.cwd, resolveConversationDeliveryMethod(conv),
           );

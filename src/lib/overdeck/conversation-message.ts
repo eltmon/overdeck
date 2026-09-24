@@ -533,7 +533,8 @@ export async function handleConversationMessage(
 
     try {
       const method = resolveConversationDeliveryMethod(conv);
-      if (harness === 'kimi-code') {
+      // PAN-4185: a bare Kimi conversation gets the operator's text without the context envelope.
+      if (harness === 'kimi-code' && !conv.bareContext) {
         // The composer enables the moment the tmux session exists, but the
         // spawn path may still be diffing Kimi's session bucket to capture the
         // session id (up to 60s). Wait for the pointer file — bounded under the

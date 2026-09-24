@@ -262,6 +262,10 @@ export interface LegacyConversation {
   workspaceId: string | null;
   /** Explicit project assignment override. Null = fall back to deriving the project from cwd. */
   projectKey: string | null;
+  /** PAN-4185: launch without any Overdeck-injected context (launch bundle, briefing, memory hooks, resume contract). */
+  bareContext: boolean;
+  /** PAN-4185: Claude Code skips native CLAUDE.md and auto-memory loading (CLAUDE_CODE_DISABLE_CLAUDE_MDS). */
+  skipClaudeMd: boolean;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -351,6 +355,8 @@ interface LegacyConversationRow {
   spawn_error: string | null;
   workspace_id: string | null;
   project_key: string | null;
+  bare_context: number | null;
+  skip_claude_md: number | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -386,6 +392,8 @@ const LEGACY_CONVERSATION_SELECT = `
     c.spawn_error,
     c.workspace_id,
     c.project_key,
+    c.bare_context,
+    c.skip_claude_md,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -499,6 +507,8 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     forkRetryCount: row.fork_retry_count ?? 0,
     workspaceId: row.workspace_id ?? null,
     projectKey: row.project_key ?? null,
+    bareContext: row.bare_context === 1,
+    skipClaudeMd: row.skip_claude_md === 1,
   };
 }
 
@@ -799,6 +809,10 @@ export function createConversation(opts: {
   workspaceId?: string | null;
   /** Explicit registered-project association; never inferred from cwd at write time. */
   projectKey?: string | null;
+  /** PAN-4185: see LegacyConversation.bareContext. */
+  bareContext?: boolean;
+  /** PAN-4185: see LegacyConversation.skipClaudeMd. */
+  skipClaudeMd?: boolean;
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
@@ -813,8 +827,9 @@ export function createConversation(opts: {
     db.prepare(`
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
-         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?)
+         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key,
+         bare_context, skip_claude_md)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -832,6 +847,8 @@ export function createConversation(opts: {
       null,  // spawn_error starts null
       workspaceId,
       opts.projectKey ?? null,
+      opts.bareContext ? 1 : 0,
+      opts.skipClaudeMd ? 1 : 0,
     );
     if (opts.claudeSessionId) {
       db.prepare(`

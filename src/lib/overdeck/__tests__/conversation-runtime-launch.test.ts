@@ -15,6 +15,7 @@ const launcherConfigs = vi.hoisted(() => [] as Array<Record<string, unknown>>);
 const writePtyToken = vi.hoisted(() => vi.fn(async () => {}));
 const setOption = vi.hoisted(() => vi.fn(() => Effect.succeed(undefined)));
 const closeConversationPane = vi.hoisted(() => vi.fn(async () => {}));
+const claudeSystemPromptFiles = vi.hoisted(() => vi.fn(async (): Promise<string[]> => []));
 
 vi.mock('../../harness-binary.js', () => ({
   prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/usr/bin/claude', pathExport: "export PATH='/usr/bin':\"$PATH\"" })),
@@ -46,7 +47,7 @@ vi.mock('../../agents.js', () => ({
 }));
 vi.mock('../../agents/runtime-command.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../agents/runtime-command.js')>()),
-  claudeSystemPromptFiles: vi.fn(async () => []),
+  claudeSystemPromptFiles,
 }));
 vi.mock('../../briefing-freshness.js', () => ({
   ensureSessionContextBriefingFile: vi.fn(async () => undefined),
@@ -211,5 +212,42 @@ describe('conversationUsesSupervisor per harness (PAN-3921, review of #4104 F3)'
     const options = codexTransport ? { codexTransport } : {};
     expect(conversationUsesSupervisor(harness, 'tmux', options)).toBe(onTmux);
     expect(conversationUsesSupervisor(harness, 'herdr', options)).toBe(onHerdr);
+  });
+});
+
+describe('bare conversations launch without Overdeck context (PAN-4185)', () => {
+  const launchBare = (backend: TerminalBackend, context: { bareContext?: boolean; skipClaudeMd?: boolean }) =>
+    spawnConversationSession('conv-b', overdeckHome, '11111111-1111-4111-8111-111111111111', undefined, 'high', undefined, false, 'claude-code', false, { backend, ...context });
+
+  beforeEach(() => {
+    claudeSystemPromptFiles.mockReset();
+    claudeSystemPromptFiles.mockResolvedValue(['/ctx/claude-code-layers.md', '/ctx/session-context.md']);
+  });
+
+  it('includes the managed launch bundle for a normal conversation', async () => {
+    await launchBare(fakeBackend('herdr').backend, {});
+
+    expect(claudeSystemPromptFiles).toHaveBeenCalled();
+    expect(launcherConfigs[0]!['appendSystemPromptFiles']).toEqual(['/ctx/claude-code-layers.md', '/ctx/session-context.md']);
+    expect(launcherConfigs[0]!['extraEnvExports']).not.toContain('export OVERDECK_BARE_CONTEXT=1');
+  });
+
+  it('omits the launch bundle, skips its composition, and flags the hooks when bare', async () => {
+    await launchBare(fakeBackend('herdr').backend, { bareContext: true });
+
+    expect(claudeSystemPromptFiles).not.toHaveBeenCalled();
+    expect(launcherConfigs[0]!['appendSystemPromptFiles']).toEqual([]);
+    expect(launcherConfigs[0]!['extraEnvExports']).toContain('export OVERDECK_BARE_CONTEXT=1');
+    // Observing identity the hooks need is still exported.
+    expect((launcherConfigs[0]!['overdeckEnv'] as { agentId?: string }).agentId).toBe('conv-b');
+  });
+
+  it('exports the documented Claude Code switches when native CLAUDE.md is skipped', async () => {
+    await launchBare(fakeBackend('herdr').backend, { bareContext: true, skipClaudeMd: true });
+
+    expect(launcherConfigs[0]!['extraEnvExports']).toEqual(expect.arrayContaining([
+      'export CLAUDE_CODE_DISABLE_CLAUDE_MDS=1',
+      'export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1',
+    ]));
   });
 });
