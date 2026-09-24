@@ -24,9 +24,12 @@ vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
   setFlywheelRequireUatBeforeMerge: vi.fn(),
   setMergeTrainEnabled: vi.fn(),
 }));
+const projects = vi.hoisted(() => ({
+  list: [{ key: 'overdeck', config: { name: 'Overdeck', path: '/repos/overdeck' } }] as Array<{ key: string; config: { name: string; path: string } }>,
+}));
 vi.mock('../../../../lib/projects.js', () => ({
   getProjectSync: vi.fn(() => null),
-  listProjectsSync: vi.fn(() => [{ key: 'overdeck', config: { name: 'Overdeck', path: '/repos/overdeck' } }]),
+  listProjectsSync: vi.fn(() => projects.list),
   resolveProjectFromIssueSync: vi.fn(() => null),
 }));
 vi.mock('../../../../lib/cloister/auto-merge-policy.js', async (importOriginal) => ({
@@ -54,12 +57,49 @@ vi.mock('../../services/derived-issue-state.js', () => ({
 }));
 
 const { getAutoMergePolicyPayload } = await import('../merge-train.js');
+const derivedStateModule = await import('../../services/derived-issue-state.js');
 
 describe('GET /api/merge-train/auto-merge (PAN-3932)', () => {
   beforeEach(() => {
     for (const key of Object.keys(labelsByIssue)) delete labelsByIssue[key];
     for (const key of Object.keys(projectDefaultByIssue)) delete projectDefaultByIssue[key];
     globalRequireUat = true;
+    projects.list = [{ key: 'overdeck', config: { name: 'Overdeck', path: '/repos/overdeck' } }];
+  });
+
+  it('derives the projects concurrently and skips only a failing one (PAN-3925)', async () => {
+    projects.list = [
+      { key: 'overdeck', config: { name: 'Overdeck', path: '/repos/overdeck' } },
+      { key: 'myn', config: { name: 'MYN', path: '/repos/myn' } },
+      { key: 'broken', config: { name: 'Broken', path: '/repos/broken' } },
+    ];
+    projectDefaultByIssue['PAN-1'] = 'auto';
+    const started: string[] = [];
+    const release: Array<() => void> = [];
+    const load = vi.mocked(derivedStateModule.loadIssueStatesForProject);
+    load.mockImplementation((path: string) => {
+      started.push(path);
+      if (path === '/repos/broken') return Promise.reject(new Error('gh unreachable'));
+      const id = path === '/repos/overdeck' ? 'PAN-1' : 'MIN-1';
+      return new Promise((resolve) => {
+        release.push(() => resolve(new Map([[id, { issueId: id, state: 'in-review' }]]) as never));
+      });
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const pending = getAutoMergePolicyPayload();
+    await vi.waitFor(() => expect(started).toHaveLength(3));
+    for (const done of release) done();
+    const { issues } = await pending;
+
+    expect(Object.fromEntries(issues.map((entry) => [entry.issueId, entry.autoMerge]))).toEqual({
+      'PAN-1': true,
+      'MIN-1': false,
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    load.mockImplementation(async (_path: string, ids: string[]) =>
+      new Map(ids.map((id) => [id, { issueId: id, state: 'in-review' }])) as never);
   });
 
   it('lets the issue label beat the project default and the global setting', async () => {
