@@ -30,8 +30,6 @@ import { jsonResponse } from '../http-helpers.js';
 import { refreshPullRequestLinkNow } from '../services/pull-request-sync-service.js';
 import { validateOrigin } from './origin-validation.js';
 
-const ROUTE = '/api/conversations/:name/pull-requests';
-
 function respond<T>(result: PullRequestCommandResult<T>) {
   return jsonResponse(result.body, { status: result.status });
 }
@@ -40,7 +38,7 @@ function conversationName(params: Readonly<Record<string, string | undefined>>):
   return decodeURIComponent(params['name'] ?? '');
 }
 
-const getRoute = HttpRouter.add('GET', ROUTE, Effect.gen(function* () {
+const getRoute = HttpRouter.add('GET', '/api/conversations/:name/pull-requests', Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const originCheck = validateOrigin(request);
   if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
@@ -48,7 +46,7 @@ const getRoute = HttpRouter.add('GET', ROUTE, Effect.gen(function* () {
   return respond(getConversationPullRequests(conversationName(params)));
 }));
 
-const postRoute = HttpRouter.add('POST', ROUTE, Effect.gen(function* () {
+const postRoute = HttpRouter.add('POST', '/api/conversations/:name/pull-requests', Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const originCheck = validateOrigin(request);
   if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
@@ -77,7 +75,7 @@ const postRoute = HttpRouter.add('POST', ROUTE, Effect.gen(function* () {
   });
 }));
 
-const deleteRoute = HttpRouter.add('DELETE', ROUTE, Effect.gen(function* () {
+const deleteRoute = HttpRouter.add('DELETE', '/api/conversations/:name/pull-requests', Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const originCheck = validateOrigin(request);
   if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
@@ -91,7 +89,7 @@ const deleteRoute = HttpRouter.add('DELETE', ROUTE, Effect.gen(function* () {
   });
 }));
 
-const syncRoute = HttpRouter.add('POST', `${ROUTE}/sync`, Effect.gen(function* () {
+const syncRoute = HttpRouter.add('POST', '/api/conversations/:name/pull-requests/sync', Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const originCheck = validateOrigin(request);
   if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
