@@ -126,7 +126,7 @@ async function preTrustClaudeCodeCwd(request: LaunchPaneRequest): Promise<void> 
     // Lazy: this module is imported almost everywhere; keep workspace-manager
     // out of its static import graph.
     const { preTrustDirectory } = await import('../workspace-manager/worktree-ops.js');
-    preTrustDirectory(request.cwd);
+    await preTrustDirectory(request.cwd);
   } catch {
     // Non-fatal.
   }

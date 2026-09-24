@@ -1,5 +1,5 @@
 import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
-import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, statSync, renameSync, rmSync, realpathSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, statSync, renameSync, rmSync, rmdirSync, realpathSync } from 'fs';
 import { join, dirname, extname, relative, resolve } from 'path';
 import { homedir } from 'os';
 import { exec, execFile } from 'child_process';
@@ -397,10 +397,126 @@ export function copyProjectTemplateDirs(
  * Claude Code binary — strings(claude.exe) confirms it as the persistence
  * key checked by both the bypass-mode dialog and the headless --bg gate.
  */
-export function preTrustDirectory(dirPath: string): void {
+export async function preTrustDirectory(dirPath: string): Promise<void> {
   const claudeJsonPath = join(homedir(), '.claude.json');
   if (!existsSync(claudeJsonPath)) return;
+  if (isTrustCached(claudeJsonPath, dirPath)) return;
 
+  const lockDir = `${claudeJsonPath}.lock`;
+  for (let attempt = 0; !tryAcquireClaudeJsonLock(lockDir); attempt++) {
+    const delay = CLAUDE_JSON_LOCK_BACKOFF_MS[attempt];
+    if (delay === undefined) {
+      throw new Error(`${lockDir} is held by another process; ${dirPath} was not pre-trusted`);
+    }
+    await new Promise<void>(resolveSleep => setTimeout(resolveSleep, delay));
+  }
+  // Everything under the lock is synchronous, so two calls in one process
+  // cannot interleave here either.
+  try {
+    writeTrustUnderLock(claudeJsonPath, dirPath);
+  } finally {
+    releaseClaudeJsonLock(lockDir);
+  }
+}
+
+/**
+ * Claude Code's lock on ~/.claude.json, as its bundled proper-lockfile takes
+ * it (2.1.x: `lock(configPath, { lockfilePath: `${configPath}.lock` })`): a
+ * directory made with mkdir, stale once its mtime is 10 s old; a live holder
+ * refreshes it every 5 s. Claude Code re-reads the file under the lock and
+ * applies only its own change. A writer that takes the same lock and does the
+ * same loses nobody's update, and nobody loses its update (PAN-3905).
+ */
+const CLAUDE_JSON_LOCK_STALE_MS = 10_000;
+/** About 3 s in total: Claude Code holds the lock for one file write. */
+const CLAUDE_JSON_LOCK_BACKOFF_MS = [50, 100, 200, 400, 800, 1600] as const;
+
+function errorCode(error: unknown): string | undefined {
+  return (error as NodeJS.ErrnoException | null)?.code;
+}
+
+function mkdirLock(lockDir: string): boolean {
+  try {
+    mkdirSync(lockDir);
+    return true;
+  } catch (error) {
+    if (errorCode(error) === 'EEXIST') return false;
+    throw error;
+  }
+}
+
+function tryAcquireClaudeJsonLock(lockDir: string): boolean {
+  if (mkdirLock(lockDir)) return true;
+  let lockMtimeMs: number;
+  try {
+    lockMtimeMs = statSync(lockDir).mtimeMs;
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') return mkdirLock(lockDir);
+    throw error;
+  }
+  if (lockMtimeMs >= Date.now() - CLAUDE_JSON_LOCK_STALE_MS) return false;
+  // Stale: its holder died without releasing it. Break it, as proper-lockfile does.
+  try {
+    rmdirSync(lockDir);
+  } catch (error) {
+    if (errorCode(error) !== 'ENOENT') throw error;
+  }
+  return mkdirLock(lockDir);
+}
+
+function releaseClaudeJsonLock(lockDir: string): void {
+  try {
+    rmdirSync(lockDir);
+  } catch {
+    // Already gone. A lock left behind goes stale after 10 s.
+  }
+}
+
+interface ClaudeJsonTrust {
+  readonly bypassPermissionsModeAccepted?: unknown;
+  readonly projects?: Record<string, { readonly hasTrustDialogAccepted?: unknown } | null>;
+}
+
+/**
+ * What the last read of ~/.claude.json said, keyed on the file's mtime and
+ * size. The file can be megabytes, so a launch whose cwd is already trusted
+ * costs one stat, not a parse.
+ */
+let trustCache: {
+  readonly path: string;
+  readonly mtimeMs: number;
+  readonly size: number;
+  readonly bypassAccepted: boolean;
+  readonly trusted: ReadonlySet<string>;
+} | null = null;
+
+function isTrustCached(claudeJsonPath: string, dirPath: string): boolean {
+  if (!trustCache || trustCache.path !== claudeJsonPath) return false;
+  const stats = statSync(claudeJsonPath);
+  return stats.mtimeMs === trustCache.mtimeMs
+    && stats.size === trustCache.size
+    && trustCache.bypassAccepted
+    && trustCache.trusted.has(dirPath);
+}
+
+function rememberTrust(claudeJsonPath: string, data: ClaudeJsonTrust): void {
+  const stats = statSync(claudeJsonPath);
+  const trusted = new Set<string>();
+  for (const [path, project] of Object.entries(data.projects ?? {})) {
+    if (project?.hasTrustDialogAccepted === true) trusted.add(path);
+  }
+  trustCache = {
+    path: claudeJsonPath,
+    mtimeMs: stats.mtimeMs,
+    size: stats.size,
+    bypassAccepted: data.bypassPermissionsModeAccepted === true,
+    trusted,
+  };
+}
+
+/** Read-modify-write of ~/.claude.json. Call it only while holding the lock. */
+function writeTrustUnderLock(claudeJsonPath: string, dirPath: string): void {
+  if (!existsSync(claudeJsonPath)) return;
   const data = JSON.parse(readFileSync(claudeJsonPath, 'utf8'));
   let dirty = false;
 
@@ -435,10 +551,17 @@ export function preTrustDirectory(dirPath: string): void {
     // PAN-3905: every Claude Code session on the machine reads this file, and
     // spawns now call this too. Write a sibling temp file and rename it over
     // the real one (resolved through a symlink, keeping its mode), so no
-    // reader ever sees a half-written file.
+    // reader ever sees a half-written file. A failed write or rename removes
+    // the temp file, which is a full copy of the config.
     const target = realpathSync(claudeJsonPath);
     const tmpPath = `${target}.tmp-${process.pid}`;
-    writeFileSync(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf8', mode: statSync(target).mode & 0o777 });
-    renameSync(tmpPath, target);
+    try {
+      writeFileSync(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf8', mode: statSync(target).mode & 0o777 });
+      renameSync(tmpPath, target);
+    } catch (error) {
+      rmSync(tmpPath, { force: true });
+      throw error;
+    }
   }
+  rememberTrust(claudeJsonPath, data);
 }

@@ -768,7 +768,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt
   try {
-    preTrustDirectory(workspacePath);
+    await preTrustDirectory(workspacePath);
     result.steps.push('Pre-trusted workspace in Claude Code');
   } catch {
     // Non-fatal — agent can still work, user will just see trust prompt

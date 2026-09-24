@@ -112,7 +112,7 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
   if (harness === 'claude-code') {
     try {
       const { preTrustDirectory } = await import('../../lib/workspace-manager/worktree-ops.js');
-      preTrustDirectory(cwd);
+      await preTrustDirectory(cwd);
     } catch {
       // Non-fatal: the worker still starts and the prompt is visible.
     }
