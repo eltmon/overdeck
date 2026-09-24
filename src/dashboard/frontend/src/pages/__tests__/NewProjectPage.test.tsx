@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../lib/wsTransport.js', () => ({
@@ -19,6 +19,7 @@ vi.mock('../../lib/apiFetch.js', () => ({ fetchWithTimeout: fetchMock }));
 vi.mock('../../lib/telemetry.js', () => ({ capture: vi.fn() }));
 
 import { NewProjectPage } from '../NewProjectPage.js';
+import { BackendConnectionBoundary } from '../../App/BackendConnectionBoundary.js';
 import type { ResolvedProjectIntent } from '../../components/project/new/projectCreateTypes.js';
 
 function intentFixture(overrides: Partial<ResolvedProjectIntent> = {}): ResolvedProjectIntent {
@@ -294,5 +295,79 @@ describe('keyboard', () => {
     );
 
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/projects')).toHaveLength(0);
+  });
+});
+
+describe('keystrokes typed before the first resolve lands (PAN-3867)', () => {
+  /** What the server answers for an untouched `new` form. */
+  const emptyNewForm = intentFixture({
+    mode: 'new',
+    key: null,
+    name: '',
+    path: null,
+    findings: [{ field: 'name', code: 'name-invalid', message: 'Name must contain a letter or number.' }],
+  });
+
+  it('keeps a name typed while the initial resolve is still in flight', async () => {
+    window.history.replaceState({}, '', '/projects/new?mode=new');
+    const pending: Array<(response: Response) => void> = [];
+    fetchMock.mockImplementation(() => new Promise<Response>((resolve) => pending.push(resolve)));
+    renderPage();
+    const user = userEvent.setup();
+
+    // The first resolve is on the wire before the operator types.
+    await waitFor(() => expect(pending).toHaveLength(1));
+    await user.type(screen.getByTestId('new-project-name-input'), 'widget');
+
+    // The late answer describes the empty form it was asked about.
+    await act(async () => pending[0]!(json(emptyNewForm)));
+
+    expect((screen.getByTestId('new-project-name-input') as HTMLInputElement).value).toBe('widget');
+    expect(screen.queryByText('Name must contain a letter or number.')).not.toBeInTheDocument();
+  });
+
+  it('ignores a stale resolve whose body arrives after a newer edit', async () => {
+    window.history.replaceState({}, '', '/projects/new?mode=new');
+    let releaseStaleBody!: (body: unknown) => void;
+    const staleBody = new Promise<unknown>((resolve) => {
+      releaseStaleBody = resolve;
+    });
+    let calls = 0;
+    fetchMock.mockImplementation(() => {
+      calls += 1;
+      // The first response's headers arrive at once; its body is slow.
+      if (calls === 1) {
+        return Promise.resolve({ ok: true, status: 200, json: () => staleBody } as Response);
+      }
+      return Promise.resolve(json(intentFixture({ mode: 'new' })));
+    });
+    renderPage();
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(calls).toBe(1));
+    await user.type(screen.getByTestId('new-project-name-input'), 'widget');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create project' })).toBeEnabled());
+
+    await act(async () => releaseStaleBody(emptyNewForm));
+
+    expect(screen.queryByText('Name must contain a letter or number.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create project' })).toBeEnabled();
+  });
+
+  it('keeps typed fields through a backend-health blip right after load', async () => {
+    const user = userEvent.setup();
+    routeFetch();
+    const page = <NewProjectPage onCancel={vi.fn()} onCreated={vi.fn()} />;
+    const { rerender } = render(
+      <BackendConnectionBoundary backendDown={false} restarting={false}>{page}</BackendConnectionBoundary>,
+    );
+    await user.type(screen.getByLabelText('Repository URL'), 'acme/widget');
+
+    // A loaded server misses two health polls, then answers again.
+    rerender(<BackendConnectionBoundary backendDown restarting={false}>{page}</BackendConnectionBoundary>);
+    expect(screen.getByRole('status')).toHaveTextContent('Waiting for backend data');
+    rerender(<BackendConnectionBoundary backendDown={false} restarting={false}>{page}</BackendConnectionBoundary>);
+
+    expect((screen.getByLabelText('Repository URL') as HTMLInputElement).value).toBe('acme/widget');
   });
 });
