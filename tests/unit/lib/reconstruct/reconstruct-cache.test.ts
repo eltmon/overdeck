@@ -25,6 +25,11 @@ vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
   listAgentStatesSync: vi.fn(),
 }));
 
+// Fake terminal backend: the live inventory behind hasLiveTmuxSession (#4109).
+vi.mock('../../../../src/lib/terminal-backends/inventory.js', () => ({
+  listLiveAgentIds: vi.fn(),
+}));
+
 vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: vi.fn(),
 }));
@@ -43,6 +48,7 @@ vi.mock('../../../../src/lib/overdeck/pull-requests.js', () => ({
 }));
 
 import { listRunningAgents } from '../../../../src/lib/agents.js';
+import { listLiveAgentIds } from '../../../../src/lib/terminal-backends/inventory.js';
 import { listAgentStatesSync } from '../../../../src/lib/agents/agent-state.js';
 import { listProjectsSync } from '../../../../src/lib/projects.js';
 import { enumerateInFlightIssuesFromSources } from '../../../../src/lib/reconstruct/enumerate-in-flight.js';
@@ -50,6 +56,7 @@ import { getSharedIssueService, startSharedIssueService } from '../../../../src/
 import { fetchIssuePullRequest } from '../../../../src/lib/overdeck/pull-requests.js';
 
 const listRunningAgentsMock = vi.mocked(listRunningAgents);
+const listLiveAgentIdsMock = vi.mocked(listLiveAgentIds);
 const listAgentStatesMock = vi.mocked(listAgentStatesSync);
 const listProjectsMock = vi.mocked(listProjectsSync);
 const enumerateMock = vi.mocked(enumerateInFlightIssuesFromSources);
@@ -64,6 +71,7 @@ function fakeDb(): any {
 beforeEach(() => {
   vi.resetAllMocks();
   listRunningAgentsMock.mockReturnValue(Effect.succeed([]) as any);
+  listLiveAgentIdsMock.mockResolvedValue(new Set());
   listAgentStatesMock.mockReturnValue([]);
   listProjectsMock.mockReturnValue([]);
   enumerateMock.mockResolvedValue(new Set());
@@ -91,6 +99,26 @@ describe('reconstructCache', () => {
     expect(result.agentsEnumerated).toBe(2);
     expect(result.agentsById['agent-pan-1920']?.issueId).toBe('PAN-1920');
     expect(result.agentRuntimeById['agent-pan-1920']?.activity).toBe('working');
+  });
+
+  it('#4109: marks a live Herdr agent (tmuxActive false) as having a live pane', async () => {
+    listRunningAgentsMock.mockReturnValue(Effect.succeed([
+      agentState({ id: 'agent-herdr', issueId: 'PAN-1', tmuxActive: false } as never),
+      agentState({ id: 'agent-gone', issueId: 'PAN-2', tmuxActive: true } as never),
+    ]) as any);
+    listLiveAgentIdsMock.mockResolvedValue(new Set(['agent-herdr']));
+
+    const result = await reconstructCache(fakeDb());
+    expect(result.agentsById['agent-herdr']?.hasLiveTmuxSession).toBe(true);
+    expect(result.agentsById['agent-gone']?.hasLiveTmuxSession).toBe(false);
+  });
+
+  it('#4109: leaves pane liveness unknown when the backend inventory is unreadable', async () => {
+    listRunningAgentsMock.mockReturnValue(Effect.succeed([agentState({ id: 'agent-herdr' })]) as any);
+    listLiveAgentIdsMock.mockResolvedValue(null);
+
+    const result = await reconstructCache(fakeDb());
+    expect(result.agentsById['agent-herdr']?.hasLiveTmuxSession).toBeUndefined();
   });
 
   it('falls back to the agent state files when listRunningAgents fails', async () => {
