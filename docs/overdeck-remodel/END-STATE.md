@@ -270,7 +270,9 @@ pipeline keeps.** The minimum-gate audit settled the answer the schema now
 encodes: **review, test, and verification** all stay on the merge path, and each
 is one outcome column on the issue. **Inspect leaves the merge path** — it
 becomes an opt-in check during the work phase, scoped per bead, never a merge
-blocker. The old `uat_status` field is dropped, because it was never actually
+blocker. *(Since dropped: the inspection gate, `pan inspect` and its
+`work.inspect` / `work.inspect-deep` sub-roles are deleted outright; see
+[`THE-CUT.md`](../THE-CUT.md).)* The old `uat_status` field is dropped, because it was never actually
 persisted. The human UAT batch-train is a different thing entirely and **stays**;
 it lives in the Merge domain, not here.
 
@@ -616,7 +618,9 @@ These are decisions for the operator, not gaps in the design:
 1. **Which gates the pipeline keeps.** The recommendation, encoded in the schema,
    is review + test + verification on the merge path, with inspect off it
    (opt-in, work-phase, per-bead) and the UAT batch-train retained in Merge.
-   Confirm before finalizing the Issues entity.
+   Confirm before finalizing the Issues entity. *(Since dropped: the opt-in
+   inspect step and `pan inspect` are deleted outright; see
+   [`THE-CUT.md`](../THE-CUT.md).)*
 2. **The conversation-compaction read-only fix.** Convert
    `conversation-compaction.ts` from appending into the live Claude JSONL to the
    fork pattern, so the Transcript layer is strictly read-only.

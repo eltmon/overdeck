@@ -281,6 +281,9 @@ report is never reused for a new commit.
 # What the pipeline last did for the issue
 pan show PAN-123
 
+# Which reviewers are alive (either terminal backend)
+pan status --json   # read each agent's `alive`
+
 # Recent output of a reviewer
 curl -s "http://localhost:3011/api/agents/agent-pan-123-review-security/output?lines=100"
 
