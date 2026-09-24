@@ -86,7 +86,9 @@ vi.mock('../../../../lib/tmux.js', () => ({
   // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   listSessionNames: mockListSessionNames,
   killSession: vi.fn(() => Effect.void),
   sessionExists: vi.fn(() => Effect.succeed(false)),

@@ -1,3 +1,13 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `stopAgentSync` (async: `stopAgent`): src/cli/commands/swarm.ts:140,147,401,698,
+ *   src/lib/cloister/concurrency.ts:385.
+ * It blocks on a child process: never call it from src/dashboard/** or src/lib/cloister/** (FR-8).
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { readFileSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { mkdir as mkdirAsync, rm, writeFile as writeFileAsync } from 'fs/promises';
 import { exec, execSync } from 'child_process';

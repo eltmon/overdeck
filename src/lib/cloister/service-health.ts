@@ -1,5 +1,6 @@
 /** Cloister health monitoring seam. */
-import { getAgentStateSync, listRunningAgentsSync } from '../agents.js';
+import { Effect } from 'effect';
+import { getAgentStateSync, listRunningAgents } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import type { HealthState } from '../runtimes/types.js';
 import { writeHealthEvent } from '../overdeck/health-events.js';
@@ -50,7 +51,7 @@ export interface HealthHost {
  */
 export async function performHealthCheck(host: HealthHost): Promise<void> {
     try {
-      const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
+      const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
       const agentIds = runningAgents.map((a) => a.id);
       const currentRunningSet = new Set(agentIds);
 

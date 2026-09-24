@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -14,7 +15,7 @@ const lifecycleMocks = vi.hoisted(() => ({
 
 const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
+  clearAgentPaused: vi.fn(),
   stopAgentSync: vi.fn(),
   wipeAgentStateDirs: vi.fn(async () => ({ removed: ['agent-pan-x'], path: '/tmp/agents/agent-pan-x' })),
   spawnAgent: vi.fn(async () => ({
@@ -58,7 +59,7 @@ vi.mock('../../../lib/agents.js', async () => {
   return {
     ...actual,
     getAgentStateSync: agentMocks.getAgentStateSync,
-    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
+    clearAgentPaused: agentMocks.clearAgentPaused,
     stopAgentSync: agentMocks.stopAgentSync,
     wipeAgentStateDirs: agentMocks.wipeAgentStateDirs,
     spawnAgent: agentMocks.spawnAgent,
@@ -110,7 +111,8 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     lifecycleMocks.getWorkAgentLifecycleStateSync.mockReset();
     lifecycleMocks.assertCanStartFreshSync.mockReset();
     agentMocks.getAgentStateSync.mockReset();
-    agentMocks.clearAgentPausedSync.mockReset();
+    agentMocks.clearAgentPaused.mockReset();
+    agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
     agentMocks.stopAgentSync.mockReset();
     agentMocks.wipeAgentStateDirs.mockReset();
     agentMocks.wipeAgentStateDirs.mockResolvedValue({ removed: ['agent-pan-x'], path: '/tmp/agents/agent-pan-x' });

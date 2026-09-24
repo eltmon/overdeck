@@ -4,9 +4,6 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import {
-  preTrustDirectorySync,
-} from './workspace-manager/worktree-ops.js';
 export type {
   AddNewRepoToWorkspaceOptions,
   AddReposToWorkspaceOptions,

@@ -192,7 +192,7 @@ async function resurrectAgentForFeedback(
   workspacePath: string | undefined,
 ): Promise<boolean> {
   try {
-    const { getAgentStateSync, clearAgentPausedSync, clearAgentTroubledSync } = await import('../agents/agent-state.js');
+    const { getAgentStateSync, clearAgentPaused, clearAgentTroubled } = await import('../agents/agent-state.js');
     const state = getAgentStateSync(agentId);
     if (!state) {
       console.warn(`[feedback-target] Cannot resume ${agentId} for ${issueId} feedback: agent registry row is missing; trying the start path`);
@@ -209,7 +209,7 @@ async function resurrectAgentForFeedback(
         return false;
       }
       console.log(`[feedback-target] ${agentId} is pipeline-paused (${reason || 'scheduler yield'}) — unpausing to deliver feedback for ${issueId}`);
-      clearAgentPausedSync(agentId);
+      await Effect.runPromise(clearAgentPaused(agentId));
     }
 
     if (state.troubled === true || (state.consecutiveFailures ?? 0) > 0) {
@@ -218,7 +218,7 @@ async function resurrectAgentForFeedback(
         `failures=${state.consecutiveFailures ?? 0}) — clearing for one resurrection attempt to ` +
         `deliver ${issueId} feedback; failure tracking re-trips the gate on another crash`,
       );
-      clearAgentTroubledSync(agentId);
+      await Effect.runPromise(clearAgentTroubled(agentId));
     }
 
     const { resumeAgent } = await import('../agents/resume.js');

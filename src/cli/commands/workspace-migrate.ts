@@ -34,7 +34,7 @@ import {
 } from '../../lib/remote/index.js';
 import { PAN_CONTEXT_FILENAME, PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_FEEDBACK_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import { createWorkspace, removeWorkspace } from '../../lib/workspace-manager.js';
-import { stopAgentSync, setAgentPausedSync } from '../../lib/agents.js';
+import { stopAgentSync, setAgentPaused } from '../../lib/agents.js';
 import { sessionExistsSync } from '../../lib/tmux.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { RemoteProvider } from '../../lib/remote/interface.js';
@@ -341,7 +341,7 @@ export async function migrateLocalToRemote(
       stopAgentSync(agentId);
       result.steps.push(`Stopped local agent ${agentId}`);
     }
-    setAgentPausedSync(agentId, 'migrated to remote (fly.io)');
+    await Effect.runPromise(setAgentPaused(agentId, 'migrated to remote (fly.io)'));
     result.steps.push('Paused local agent (deacon resume gate)');
 
     // 6. Make sure ALL local work reaches origin before anything else:

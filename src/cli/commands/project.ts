@@ -9,7 +9,7 @@ import {
   getProjectSync,
   initializeProjectsConfigSync,
   PROJECTS_CONFIG_FILE,
-  renameProjectSync,
+  renameProject,
   ProjectConfig,
   IssueRoutingRule,
   getIssuePrefix,
@@ -511,7 +511,7 @@ export async function projectRenameCommand(key: string, newName: string): Promis
     if (!project) throw new Error(`Unknown project: ${key}`);
 
     const oldName = project.name;
-    renameProjectSync(key, newName);
+    await renameProject(key, newName);
     console.log(chalk.green(`✓ Renamed project: ${oldName} → ${newName.trim()}`));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -18,7 +18,6 @@ vi.mock('../agents.js', () => ({
   getAgentRuntimeStateSync: () => mockGetAgentRuntimeState(),
   getAgentRuntimeState: () => Effect.succeed(mockGetAgentRuntimeState()),
   getLatestSessionIdSync: () => mockGetLatestSessionId(),
-  getLatestSessionId: () => Effect.succeed(mockGetLatestSessionId()),
   normalizeAgentId: (id: string) => id,
 }));
 

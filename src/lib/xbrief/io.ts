@@ -16,6 +16,22 @@
  * `updateSubItemStatus` write ONLY to the continue file.
  */
 
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `findPlanSync` (async: `findPlan`): 8 sites in cli/commands/plan-finalize.ts, cli/commands/scope.ts,
+ *   cli/commands/start-status.ts, cli/commands/start.ts, lib/xbrief/io.ts.
+ * - `findWorkspaceDraftPlanSync` (async: `findWorkspaceDraftPlan`): src/lib/xbrief/io.ts:229.
+ * - `readPlanSync` (async: `readPlan`): 10 sites in cli/commands/plan-finalize.ts, cli/commands/scope.ts,
+ *   lib/xbrief/io.ts, lib/xbrief/lifecycle-io.ts.
+ * - `readWorkspacePlanSync` (async: `readWorkspacePlan`): 9 sites in cli/commands/task.ts,
+ *   lib/agents/registered-slot-spawn.ts, lib/agents/spawn-prep.ts, lib/cloister/handoff-context.ts,
+ *   lib/cloister/swarm-slot-lifecycle.ts, lib/work/done-preflight.ts, lib/xbrief/acceptance-criteria.ts.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';

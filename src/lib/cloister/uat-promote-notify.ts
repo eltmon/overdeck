@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { messageAgent } from '../agents.js';
-import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
+import { getFlywheelActiveRunIdSync, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import { sessionExists } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID } from './flywheel.js';
@@ -9,7 +9,7 @@ import type { PromoteResult } from './uat-promote.js';
 type SessionExists = (name: string) => boolean | Promise<boolean>;
 
 export interface NotifyDeps {
-  getActiveRunId?: typeof getFlywheelActiveRunId;
+  getActiveRunId?: typeof getFlywheelActiveRunIdSync;
   isPaused?: typeof isFlywheelGloballyPaused;
   sessionExists?: SessionExists;
   message?: typeof messageAgent;
@@ -37,7 +37,7 @@ export async function notifyFlywheelOfUatPromote(result: PromoteResult, deps: No
   try {
     if (result.success !== true) return;
 
-    const getActiveRunId = deps.getActiveRunId ?? getFlywheelActiveRunId;
+    const getActiveRunId = deps.getActiveRunId ?? getFlywheelActiveRunIdSync;
     const isPaused = deps.isPaused ?? isFlywheelGloballyPaused;
     const sessionExistsDep = deps.sessionExists ?? ((name: string) => Effect.runPromise(sessionExists(name)));
     const message = deps.message ?? messageAgent;

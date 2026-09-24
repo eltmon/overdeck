@@ -203,9 +203,9 @@ describe('restartDashboard — scope contract', () => {
     // catch it at runtime: we fail the test if any of those symbols get
     // touched. This is the primary scope guard.
     const cliproxySpies = {
-      stopCliproxy: vi.fn(),
-      startCliproxy: vi.fn(),
-      isCliproxyRunning: vi.fn().mockReturnValue(true),
+      stopCliproxy: vi.fn(async () => {}),
+      startCliproxy: vi.fn(async () => {}),
+      isCliproxyRunning: vi.fn().mockResolvedValue(true),
     };
     const startHook = vi.fn().mockResolvedValue(undefined);
 
@@ -281,9 +281,9 @@ describe('parseHealthTimeoutMs (#3099)', () => {
 describe('restartCliproxy — scope contract', () => {
   it('stops and starts CLIProxy; never dashboard or Traefik', async () => {
     const cliproxy = {
-      stopCliproxy: vi.fn(),
-      startCliproxy: vi.fn(),
-      isCliproxyRunning: vi.fn().mockReturnValue(true),
+      stopCliproxy: vi.fn(async () => {}),
+      startCliproxy: vi.fn(async () => {}),
+      isCliproxyRunning: vi.fn().mockResolvedValue(true),
     };
 
     await restartCliproxy(cliproxy, { verifyTimeoutMs: 1000 });
@@ -300,9 +300,9 @@ describe('restartCliproxy — scope contract', () => {
 
   it('throws StageError if CLIProxy never confirms running', async () => {
     const cliproxy = {
-      stopCliproxy: vi.fn(),
-      startCliproxy: vi.fn(),
-      isCliproxyRunning: vi.fn().mockReturnValue(false),
+      stopCliproxy: vi.fn(async () => {}),
+      startCliproxy: vi.fn(async () => {}),
+      isCliproxyRunning: vi.fn().mockResolvedValue(false),
     };
 
     await expect(restartCliproxy(cliproxy, { verifyTimeoutMs: 300 })).rejects.toBeInstanceOf(StageError);

@@ -617,14 +617,14 @@ async function restartDashboardBody(
 
 async function restartCliproxyBody(
   cliproxy: {
-    stopCliproxy: () => void;
-    startCliproxy: () => void;
-    isCliproxyRunning: () => boolean;
-    installCliproxy?: (force?: boolean) => void;
+    stopCliproxy: () => Promise<void>;
+    startCliproxy: () => Promise<void>;
+    isCliproxyRunning: () => Promise<boolean>;
+    installCliproxy?: (force?: boolean) => Promise<void>;
   },
   opts: { verifyTimeoutMs?: number; force?: boolean } = {},
 ): Promise<void> {
-  cliproxy.stopCliproxy();
+  await cliproxy.stopCliproxy();
   // Small wait so the port releases before we re-bind.
   await sleep(200);
 
@@ -635,15 +635,15 @@ async function restartCliproxyBody(
         reason: 'force=true was requested but cliproxy module does not export installCliproxy',
       });
     }
-    cliproxy.installCliproxy(true);
+    await cliproxy.installCliproxy(true);
   }
 
-  cliproxy.startCliproxy();
+  await cliproxy.startCliproxy();
 
   const timeoutMs = opts.verifyTimeoutMs ?? 5000;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (cliproxy.isCliproxyRunning()) return;
+    if (await cliproxy.isCliproxyRunning()) return;
     await sleep(100);
   }
   throw new StageError({
@@ -741,15 +741,15 @@ export function restartDashboard(
 }
 
 /**
- * Restart CLIProxy through the supplied sync primitives and verify it comes back.
+ * Restart CLIProxy through the supplied async primitives and verify it comes back.
  * Rejects only with {@link StageError}.
  */
 export function restartCliproxy(
   cliproxy: {
-    stopCliproxy: () => void;
-    startCliproxy: () => void;
-    isCliproxyRunning: () => boolean;
-    installCliproxy?: (force?: boolean) => void;
+    stopCliproxy: () => Promise<void>;
+    startCliproxy: () => Promise<void>;
+    isCliproxyRunning: () => Promise<boolean>;
+    installCliproxy?: (force?: boolean) => Promise<void>;
   },
   opts: { verifyTimeoutMs?: number; force?: boolean } = {},
 ): Promise<void> {

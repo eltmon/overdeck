@@ -155,7 +155,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
   '/api/metrics/summary',
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
-    const status = readDurableCloisterStatus();
+    const status = yield* Effect.promise(() => readDurableCloisterStatus());
 
     const costSummary = service.getCostSummary();
     const todayCost = getTodayCostSync();
@@ -198,7 +198,7 @@ const getMetricsStuckRoute = HttpRouter.add(
   '/api/metrics/stuck',
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
-    const status = readDurableCloisterStatus();
+    const status = yield* Effect.promise(() => readDurableCloisterStatus());
     const runningAgents = yield* Effect.promise(() => listRunningPanes());
     const current = computeStuckCount(
       status.agentsNeedingAttention,

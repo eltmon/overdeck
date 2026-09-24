@@ -11,7 +11,7 @@ import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deac
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
   readSwarmHold: vi.fn(),
-  isDeaconGloballyPausedSync: vi.fn(() => false),
+  isDeaconGloballyPaused: vi.fn(() => false),
 }));
 
 vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
@@ -50,7 +50,7 @@ vi.mock(import('../../../../src/lib/cloister/deacon-swarm-record.js'), async (im
 
 vi.mock('../../../../src/lib/overdeck/control-settings.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../src/lib/overdeck/control-settings.js')>()),
-  isDeaconGloballyPausedSync: mocks.isDeaconGloballyPausedSync,
+  isDeaconGloballyPaused: mocks.isDeaconGloballyPaused,
 }));
 
 let tempRoot: string;
@@ -62,8 +62,8 @@ beforeEach(async () => {
   mocks.listProjectsSync.mockReset();
   mocks.readSwarmHold.mockReset();
   mocks.readSwarmHold.mockReturnValue(undefined);
-  mocks.isDeaconGloballyPausedSync.mockReset();
-  mocks.isDeaconGloballyPausedSync.mockReturnValue(false);
+  mocks.isDeaconGloballyPaused.mockReset();
+  mocks.isDeaconGloballyPaused.mockReturnValue(false);
 });
 
 afterEach(async () => {
@@ -223,7 +223,7 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
     const doc = makeDoc('PAN-105', 3);
     const deps = dispatchDeps({
       spawnRun: vi.fn(async () => {
-        mocks.isDeaconGloballyPausedSync.mockReturnValue(true);
+        mocks.isDeaconGloballyPaused.mockReturnValue(true);
       }),
     });
 
@@ -289,7 +289,7 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
     const workspacePath = join(projectPath, 'workspaces', 'feature-pan-107');
     recordFailedMergeBlock({ issueId: 'PAN-107', itemId: 'wi-1', slotIndex: 1, note: 'test block' });
     mocks.readSwarmHold.mockReturnValue(undefined);
-    mocks.isDeaconGloballyPausedSync.mockReturnValue(true);
+    mocks.isDeaconGloballyPaused.mockReturnValue(true);
     const doc = makeDoc('PAN-107', 1);
     const deps = dispatchDeps();
 

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const agentMocks = vi.hoisted(() => ({
   resolveAgentTargetSync: vi.fn(),
   getAgentStateSync: vi.fn(),
-  setAgentPausedSync: vi.fn(),
+  setAgentPaused: vi.fn(),
   stopAgent: vi.fn(),
   // PAN-3917: agents/slot-reconcile.ts (listSlotAgents) is gone; pause.ts
   // inlines the swarm-slot pattern match over listAgentStates instead.
@@ -45,6 +45,7 @@ vi.mock('../../../../src/lib/operator-interventions.js', () => ({
 }));
 
 beforeEach(() => {
+  agentMocks.setAgentPaused.mockReturnValue(Effect.succeed(null));
   vi.clearAllMocks();
   agentMocks.stopAgent.mockReturnValue(Effect.void);
   tmuxMocks.sessionExistsSync.mockReturnValue(false);
@@ -78,7 +79,7 @@ describe('pan pause on a swarm issue (PAN-2214)', () => {
     expect(stderr).toContain('pan swarm freeze PAN-1791');
     expect(stderr).toContain('swarm of 2 slot agent(s)');
     expect(stderr).toContain('no single agent');
-    expect(agentMocks.setAgentPausedSync).not.toHaveBeenCalled();
+    expect(agentMocks.setAgentPaused).not.toHaveBeenCalled();
     expect(agentMocks.stopAgent).not.toHaveBeenCalled();
   });
 
@@ -117,7 +118,7 @@ describe('pan pause single-agent regression (PAN-2214)', () => {
     const { pauseCommand } = await import('../../../../src/cli/commands/pause.js');
     await pauseCommand('PAN-1723', { reason: 'ram' });
 
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('agent-pan-1723', 'ram', true);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1723', 'ram', true);
     expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-1723', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),

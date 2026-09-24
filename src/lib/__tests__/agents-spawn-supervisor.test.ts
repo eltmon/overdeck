@@ -187,7 +187,6 @@ function mockSpawnDependencies(): void {
   }));
   vi.doMock('../openai-auth.js', () => ({
     getOpenAIAuthStatus: vi.fn(async () => ({ loggedIn: true, hasOpenAIApiKey: false })),
-    getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: true, hasOpenAIApiKey: false })),
   }));
   vi.doMock('../cliproxy.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../cliproxy.js')),
@@ -203,7 +202,6 @@ function mockSpawnDependencies(): void {
     const actual = await importOriginal<typeof import('../overdeck/control-settings.js')>();
     return {
       ...actual,
-      getFlywheelActiveRunId: () => activeFlywheelRunId,
       getFlywheelActiveRunIdSync: () => activeFlywheelRunId,
     };
   });

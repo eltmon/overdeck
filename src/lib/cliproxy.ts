@@ -16,12 +16,9 @@
  */
 
 import {
-  chmodSync,
-  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
-  rmSync,
   statSync,
   writeFileSync,
 } from 'fs';
@@ -154,68 +151,10 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
 
 /**
  * Read ~/.codex/auth.json and write cliproxy's credential file format into
- * ~/.overdeck/cliproxy/auth/codex-primary.json. Returns true if the file
- * was written (including "already up-to-date" writes), false if the source
- * was missing or malformed.
+ * ~/.overdeck/cliproxy/auth/codex-primary.json. Resolves true if the file was
+ * written (including "already up-to-date"), false if the source was missing or
+ * malformed or the write failed. Safe for the event loop.
  */
-export function bridgeCodexAuthToCliproxySync(): boolean {
-  const codexPath = getCodexAuthPath();
-  if (!existsSync(codexPath)) return false;
-
-  let raw: CodexAuthFile;
-  try {
-    raw = JSON.parse(readFileSync(codexPath, 'utf8')) as CodexAuthFile;
-  } catch {
-    return false;
-  }
-
-  const accessToken = typeof raw.tokens?.access_token === 'string' ? raw.tokens.access_token : null;
-  const idToken = typeof raw.tokens?.id_token === 'string' ? raw.tokens.id_token : null;
-  const refreshToken = typeof raw.tokens?.refresh_token === 'string' ? raw.tokens.refresh_token : null;
-  const accountId = typeof raw.tokens?.account_id === 'string' ? raw.tokens.account_id : null;
-  const lastRefresh = typeof raw.last_refresh === 'string' ? raw.last_refresh : new Date().toISOString();
-
-  if (!accessToken || !idToken || !refreshToken || !accountId) return false;
-
-  const idClaims = decodeJwtPayload(idToken) ?? {};
-  const email = typeof idClaims.email === 'string' ? idClaims.email : '';
-  const accessClaims = decodeJwtPayload(accessToken) ?? {};
-  const expSec = typeof accessClaims.exp === 'number'
-    ? accessClaims.exp
-    : (typeof idClaims.exp === 'number' ? idClaims.exp : Math.floor(Date.now() / 1000) + 3600);
-  const expiredIso = new Date(expSec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
-
-  const creds: CliproxyCodexCredentials = {
-    access_token: accessToken,
-    id_token: idToken,
-    refresh_token: refreshToken,
-    account_id: accountId,
-    last_refresh: lastRefresh,
-    email,
-    type: 'codex',
-    expired: expiredIso,
-    disabled: false,
-  };
-
-  ensureDirs();
-  const target = getCliproxyCodexCredPath();
-
-  // Skip rewrite if content is byte-identical (avoids touching mtime every status poll).
-  const serialized = JSON.stringify(creds, null, 2) + '\n';
-  if (existsSync(target)) {
-    try {
-      const existing = readFileSync(target, 'utf8');
-      if (existing === serialized) return true;
-    } catch {
-      // fall through and overwrite
-    }
-  }
-
-  writeFileSync(target, serialized, { mode: 0o600 });
-  return true;
-}
-
-/** Async counterpart of bridgeCodexAuthToCliproxySync — safe for the event loop. */
 export async function bridgeCodexAuthToCliproxy(): Promise<boolean> {
   const codexPath = getCodexAuthPath();
   if (!existsSync(codexPath)) return false;
@@ -504,20 +443,6 @@ export function execFailureStdout(err: unknown): string {
  * trust a mystery binary. CLIProxyAPI v7.2.113 deliberately does not define
  * `--version`: it prints this banner then exits 2, which avoids starting a server.
  */
-function isCliproxyUpToDateSync(): boolean {
-  if (!isCliproxyInstalled()) return false;
-  try {
-    const out = execSync(`"${getCliproxyBinary()}" --version`, {
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 5_000,
-    }).toString();
-    return parseCliproxyVersion(out) === expectedCliproxyVersion();
-  } catch (err) {
-    return parseCliproxyVersion(execFailureStdout(err)) === expectedCliproxyVersion();
-  }
-}
-
-/** Async variant of isCliproxyUpToDateSync — safe for the event loop. */
 async function isCliproxyUpToDateTask(): Promise<boolean> {
   if (!isCliproxyInstalled()) return false;
   try {
@@ -529,49 +454,11 @@ async function isCliproxyUpToDateTask(): Promise<boolean> {
 }
 
 /**
- * Download + extract the cliproxy binary into ~/.overdeck/bin/cliproxy.
- * Uses curl + tar because that's already a hard dep of pan install. Throws
- * with a clear message on unsupported platforms.
- */
-export function installCliproxySync(force = false): void {
-  ensureDirs();
-  if (!force && isCliproxyUpToDateSync()) return;
-
-  const asset = detectPlatformAsset();
-  if (!asset) {
-    throw new Error(
-      `CLIProxyAPI does not publish a prebuilt binary for ${process.platform}/${process.arch}. `
-      + `GPT subscription routing requires linux, darwin, or windows on amd64/arm64.`,
-    );
-  }
-
-  const url = `https://github.com/router-for-me/CLIProxyAPI/releases/download/${CLIPROXY_RELEASE_VERSION}/${asset.archive}`;
-  const tmpDir = join(getCliproxyDir(), 'tmp');
-  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
-  const archivePath = join(tmpDir, asset.archive);
-
-  execSync(`curl -fsSL -o "${archivePath}" "${url}"`, { stdio: 'pipe' });
-  execSync(`tar -xf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
-
-  const extracted = join(tmpDir, extractedBinaryName());
-  if (!existsSync(extracted)) {
-    throw new Error(`cliproxy archive did not contain expected ${extractedBinaryName()} binary`);
-  }
-
-  const target = getCliproxyBinary();
-  rmSync(target, { force: true });
-  copyFileSync(extracted, target);
-  chmodSync(target, 0o755);
-  try {
-    rmSync(tmpDir, { recursive: true, force: true });
-  } catch { /* non-fatal */ }
-}
-
-/**
- * Async counterpart of installCliproxySync — safe for the event loop.
- * Downloads and unpacks the cliproxy binary from GitHub releases; rejects on a
- * network or extraction failure. Uses execAsync instead of execSync so it won't
- * block the dashboard server.
+ * Download + extract the cliproxy binary into ~/.overdeck/bin/cliproxy from
+ * GitHub releases (curl + tar, already hard deps of pan install). Skips the
+ * download when the installed binary already matches the pinned version unless
+ * `force`. Rejects with a clear message on an unsupported platform, and on a
+ * network or extraction failure. Uses execAsync so it never blocks the event loop.
  */
 export async function installCliproxy(force = false): Promise<void> {
   ensureDirs();
@@ -635,97 +522,6 @@ export function netstatShowsListener(output: string, port: number): boolean {
   });
 }
 
-export function isCliproxyRunningSync(): boolean {
-  const pid = readPidFile();
-  if (pid && isProcessAlive(pid)) return true;
-  // Fallback: something may be listening on the port without our pidfile.
-  // Use bash /dev/tcp instead of lsof — busybox lsof on Alpine ignores -t/-i
-  // and returns all processes, making this check both incorrect and dangerous.
-  try {
-    if (process.platform === 'win32') {
-      const output = execSync('netstat -ano -p TCP', {
-        encoding: 'utf8',
-        stdio: 'pipe',
-        timeout: 5_000,
-      });
-      return netstatShowsListener(output, CLIPROXY_PORT);
-    }
-    execSync(`bash -c 'echo >/dev/tcp/127.0.0.1/${CLIPROXY_PORT}'`, {
-      encoding: 'utf8',
-      stdio: 'pipe',
-      timeout: 1000,
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Start cliproxy in the background. Idempotent — returns immediately if an
- * instance is already running. Ensures config + auth-dir + codex bridge are
- * up-to-date before spawning.
- */
-export function startCliproxySync(): void {
-  ensureDirs();
-  ensureConfigFile();
-  // Best-effort bridge; if the user hasn't logged into Codex yet, cliproxy
-  // will still start but subscription auth won't be available until they do.
-  try { bridgeCodexAuthToCliproxySync(); } catch { /* non-fatal */ }
-
-  if (isCliproxyRunningSync()) return;
-
-  // Upgrade in place when the on-disk binary doesn't match the pinned version,
-  // not just when it's missing — otherwise a version bump never reaches an
-  // existing install (PAN-1584).
-  if (!isCliproxyUpToDateSync()) {
-    installCliproxySync();
-  }
-
-  const bin = getCliproxyBinary();
-  const config = getCliproxyConfigPath();
-  const logPath = getCliproxyLogPath();
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { openSync } = require('fs') as typeof import('fs');
-  const logFd = openSync(logPath, 'a');
-
-  const child = spawn(bin, ['-config', config], {
-    detached: true,
-    stdio: ['ignore', logFd, logFd],
-    cwd: getCliproxyDir(),
-  });
-
-  if (!child.pid) {
-    throw new Error('Failed to spawn cliproxy');
-  }
-
-  writeFileSync(getCliproxyPidPath(), String(child.pid));
-  child.unref();
-}
-
-export function stopCliproxySync(): void {
-  const pid = readPidFile();
-  if (pid && isProcessAlive(pid)) {
-    try { process.kill(pid, 'SIGTERM'); } catch { /* ignore */ }
-  }
-  // Also clear anything else bound to the port (stale / manually-started instances).
-  // Use fuser instead of lsof | xargs kill — busybox lsof on Alpine ignores -t/-i
-  // and lists ALL processes, which xargs then tries to kill (including PID 1).
-  try {
-    execSync(`fuser -k -TERM ${CLIPROXY_PORT}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (existsSync(getCliproxyPidPath())) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { unlinkSync } = require('fs') as typeof import('fs');
-      unlinkSync(getCliproxyPidPath());
-    }
-  } catch { /* ignore */ }
-}
-
 /**
  * Env vars to inject into Claude Code (or any Anthropic-compatible client) so
  * that it routes model calls through the local cliproxy sidecar.
@@ -782,14 +578,21 @@ async function checkCliproxyPortTask(): Promise<boolean> {
   });
 }
 
-/** Async counterpart of isCliproxyRunningSync — safe for the event loop. */
+/**
+ * Whether cliproxy is running: our pidfile's process is alive, or something is
+ * listening on the cliproxy port without our pidfile. Safe for the event loop.
+ */
 export async function isCliproxyRunning(): Promise<boolean> {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) return true;
   return checkCliproxyPortTask();
 }
 
-/** Async counterpart of stopCliproxySync — best-effort SIGTERM via the pidfile; safe for the event loop. */
+/**
+ * Stop cliproxy: best-effort SIGTERM via the pidfile, then clear anything else
+ * bound to the port (stale or manually started instances) and remove the
+ * pidfile. Safe for the event loop.
+ */
 export async function stopCliproxy(): Promise<void> {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) {
@@ -810,12 +613,18 @@ export async function stopCliproxy(): Promise<void> {
   } catch { /* ignore */ }
 }
 
-/** Async counterpart of startCliproxySync — safe for the event loop.
- *  Auto-installs cliproxy if missing (non-blocking download). */
+/**
+ * Start cliproxy in the background. Idempotent: returns immediately if an
+ * instance is already running. Ensures config, auth dir and the Codex bridge are
+ * up to date before spawning, and installs or upgrades the binary (non-blocking
+ * download) when it is missing or not the pinned version. Safe for the event loop.
+ */
 export async function startCliproxy(): Promise<void> {
   ensureDirs();
   ensureConfigFile();
-  try { bridgeCodexAuthToCliproxySync(); } catch { /* non-fatal */ }
+  // Best-effort bridge; if the user hasn't logged into Codex yet, cliproxy
+  // will still start but subscription auth won't be available until they do.
+  try { await bridgeCodexAuthToCliproxy(); } catch { /* non-fatal */ }
 
   if (await isCliproxyRunning()) return;
 

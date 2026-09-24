@@ -1,3 +1,14 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `getAgentRuntimeStateSync` (async: `getAgentRuntimeState`): 15 sites in lib/agents/activity.ts,
+ *   lib/agents/liveness.ts, lib/cloister/concurrency.ts, lib/cloister/health.ts, lib/cloister/memory-governor.ts,
+ *   lib/overdeck/conversation-forks.ts, lib/work-agent-lifecycle.ts.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { readFile, mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';

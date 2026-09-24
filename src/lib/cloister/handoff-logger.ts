@@ -5,10 +5,7 @@
  */
 
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
-import { mkdir, readFile } from 'fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
-import { FsError } from '../errors.js';
 import { OVERDECK_HOME } from '../paths.js';
 import type { HandoffContext } from './handoff-context.js';
 import type { TriggerType } from './triggers.js';
@@ -254,35 +251,3 @@ export function getHandoffStats(): {
 
   return stats;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Async, typed-error variants of the handoff log helpers. The sync variants
-// are preserved for the CLI surfaces (e.g. `pan show`) that already run inside
-// a one-shot Node process where blocking is acceptable; the Effect variants
-// are appropriate for the dashboard server's request handlers.
-
-const ensureLogDirAsync = (): Effect.Effect<void, FsError> => {
-  const logDir = join(OVERDECK_HOME, 'logs');
-  return Effect.tryPromise({
-    try: () => mkdir(logDir, { recursive: true }),
-    catch: (cause) => new FsError({ path: logDir, operation: 'mkdir', cause }),
-  });
-};
-
-/** Effect variant of `readHandoffEvents`. */
-export const readHandoffEvents = (limit?: number): Effect.Effect<HandoffEvent[], FsError> =>
-  Effect.gen(function* () {
-    yield* ensureLogDirAsync();
-    if (!existsSync(HANDOFF_LOG_FILE)) return [];
-
-    const content = yield* Effect.tryPromise({
-      try: () => readFile(HANDOFF_LOG_FILE, 'utf-8'),
-      catch: (cause) => new FsError({ path: HANDOFF_LOG_FILE, operation: 'readFile', cause }),
-    });
-
-    const lines = content.trim().split('\n').filter((line) => line.trim());
-    const events = lines.map((line) => JSON.parse(line) as HandoffEvent);
-    events.reverse();
-    return limit ? events.slice(0, limit) : events;
-  });

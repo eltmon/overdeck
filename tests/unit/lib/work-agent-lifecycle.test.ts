@@ -15,7 +15,6 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeStateSync: mocks.getAgentRuntimeStateSync,
   getLatestSessionIdSync: mocks.getLatestSessionIdSync,
   getAgentRuntimeState: vi.fn(),
-  getLatestSessionId: vi.fn(),
   normalizeAgentId: (id: string) => id,
 }));
 

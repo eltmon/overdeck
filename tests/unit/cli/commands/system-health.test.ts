@@ -31,8 +31,6 @@ const mockIsCliproxyRunning = vi.fn();
 vi.mock('../../../../src/lib/cliproxy.js', () => ({
   isCliproxyRunning: (...args: Parameters<typeof mockIsCliproxyRunning>) =>
     mockIsCliproxyRunning(...args),
-  isCliproxyRunningSync: (...args: Parameters<typeof mockIsCliproxyRunning>) =>
-    mockIsCliproxyRunning(...args),
 }));
 
 import { systemHealthCommand } from '../../../../src/cli/commands/system-health.ts';
@@ -52,7 +50,7 @@ describe('systemHealthCommand', () => {
   it('shows dashboard as healthy when HTTP 200', async () => {
     mockFetch.mockResolvedValue({ status: 200 });
     mockExistsSync.mockReturnValue(false);
-    mockIsCliproxyRunning.mockReturnValue(false);
+    mockIsCliproxyRunning.mockResolvedValue(false);
 
     await systemHealthCommand();
 
@@ -65,7 +63,7 @@ describe('systemHealthCommand', () => {
   it('shows dashboard as unhealthy on non-200 status', async () => {
     mockFetch.mockResolvedValue({ status: 503 });
     mockExistsSync.mockReturnValue(false);
-    mockIsCliproxyRunning.mockReturnValue(false);
+    mockIsCliproxyRunning.mockResolvedValue(false);
 
     await systemHealthCommand();
 
@@ -77,7 +75,7 @@ describe('systemHealthCommand', () => {
   it('shows dashboard as unhealthy when fetch fails', async () => {
     mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
     mockExistsSync.mockReturnValue(false);
-    mockIsCliproxyRunning.mockReturnValue(false);
+    mockIsCliproxyRunning.mockResolvedValue(false);
 
     await systemHealthCommand();
 
@@ -89,7 +87,7 @@ describe('systemHealthCommand', () => {
   it('shows smee as not-configured when smee-url file is missing', async () => {
     mockFetch.mockResolvedValue({ status: 200 });
     mockExistsSync.mockReturnValue(false);
-    mockIsCliproxyRunning.mockReturnValue(false);
+    mockIsCliproxyRunning.mockResolvedValue(false);
 
     await systemHealthCommand();
 
@@ -102,7 +100,7 @@ describe('systemHealthCommand', () => {
     mockFetch.mockResolvedValue({ status: 200 });
     mockExistsSync.mockReturnValue(true);
     mockIsSmeeProcessRunning.mockReturnValue(true);
-    mockIsCliproxyRunning.mockReturnValue(false);
+    mockIsCliproxyRunning.mockResolvedValue(false);
 
     await systemHealthCommand();
 
@@ -115,7 +113,7 @@ describe('systemHealthCommand', () => {
     mockFetch.mockResolvedValue({ status: 200 });
     mockExistsSync.mockReturnValue(true);
     mockIsSmeeProcessRunning.mockReturnValue(false);
-    mockIsCliproxyRunning.mockReturnValue(false);
+    mockIsCliproxyRunning.mockResolvedValue(false);
 
     await systemHealthCommand();
 
@@ -127,7 +125,7 @@ describe('systemHealthCommand', () => {
   it('shows CLIProxy as healthy when running', async () => {
     mockFetch.mockResolvedValue({ status: 200 });
     mockExistsSync.mockReturnValue(false);
-    mockIsCliproxyRunning.mockReturnValue(true);
+    mockIsCliproxyRunning.mockResolvedValue(true);
 
     await systemHealthCommand();
 
@@ -139,7 +137,7 @@ describe('systemHealthCommand', () => {
   it('shows CLIProxy as degraded when not running', async () => {
     mockFetch.mockResolvedValue({ status: 200 });
     mockExistsSync.mockReturnValue(false);
-    mockIsCliproxyRunning.mockReturnValue(false);
+    mockIsCliproxyRunning.mockResolvedValue(false);
 
     await systemHealthCommand();
 

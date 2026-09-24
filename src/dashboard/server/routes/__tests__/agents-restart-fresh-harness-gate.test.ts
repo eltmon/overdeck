@@ -131,7 +131,9 @@ describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837
     mocks.getWorkAgentLifecycleState.mockResolvedValue({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
  hasLiveTmuxSession: false } as any)
     mocks.killSession.mockReturnValue(Effect.succeed(undefined))
     mocks.wipeAgentStateDirs.mockResolvedValue({ removed: [], path: '/tmp/pan-1837-agent-dir' })

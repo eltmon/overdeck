@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 // are both injected per call, so neither real module needs to load.
 vi.mock('../../../lib/agents.js', () => ({
   messageAgent: vi.fn(async () => {}),
-  getAgentStateSync: vi.fn(() => ({ _tag: 'Succeed', value: null })),
+  getAgentStateSync: vi.fn(() => null),
 }));
 
 vi.mock('../services/derived-issue-state.js', () => ({

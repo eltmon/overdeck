@@ -76,9 +76,9 @@ export async function startPostLaunchSidecars(config: {
   projectRoot: string;
 }): Promise<void> {
   try {
-    const { startCliproxySync, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
+    const { startCliproxy, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
     console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
-    startCliproxySync();
+    await startCliproxy();
     console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
   } catch (error: unknown) {
     console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), errorMessage(error));

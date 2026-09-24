@@ -9,11 +9,11 @@ const mocks = vi.hoisted(() => ({
   liveAgentInventory: vi.fn(),
   capturePaneText: vi.fn(() => ''),
   reconcileClosedIssueAgents: vi.fn(async () => [] as string[]),
-  isDeaconGloballyPausedSync: vi.fn(() => false),
+  isDeaconGloballyPaused: vi.fn(() => false),
 }));
 
 vi.mock('../../../../src/lib/overdeck/control-settings.js', () => ({
-  isDeaconGloballyPausedSync: mocks.isDeaconGloballyPausedSync,
+  isDeaconGloballyPaused: mocks.isDeaconGloballyPaused,
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
@@ -101,7 +101,7 @@ describe('deacon-lite', () => {
     mocks.reconcileClosedIssueAgents.mockResolvedValue([]);
     __resetStuckWorkAgentCooldownForTests();
     __resetApiErrorRecoveryStateForTests();
-    mocks.isDeaconGloballyPausedSync.mockReturnValue(false);
+    mocks.isDeaconGloballyPaused.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -291,7 +291,7 @@ describe('deacon-lite', () => {
     });
 
     it('runs none of the four routines while globally paused', async () => {
-      mocks.isDeaconGloballyPausedSync.mockReturnValue(true);
+      mocks.isDeaconGloballyPaused.mockReturnValue(true);
       mocks.listAgentStates.mockReturnValue([workAgent()]);
 
       await expect(runDeaconLite()).resolves.toBeUndefined();

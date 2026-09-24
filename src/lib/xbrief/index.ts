@@ -51,7 +51,6 @@ export { getDispatchableItems, getTaskGraphView } from './dag.js';
 
 // Acceptance Criteria
 export {
-  extractAcceptanceCriteriaSync,
   extractACFromDocument,
   formatAcceptanceCriteria,
 } from './acceptance-criteria.js';

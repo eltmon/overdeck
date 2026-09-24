@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
-  extractAcceptanceCriteriaSync,
+  extractAcceptanceCriteria,
   extractACFromDocument,
   formatAcceptanceCriteria,
 } from '../acceptance-criteria.js';
@@ -61,17 +62,17 @@ afterEach(() => {
 });
 
 describe('extractAcceptanceCriteria', () => {
-  it('returns empty array when no plan exists', () => {
-    expect(extractAcceptanceCriteriaSync(WORKSPACE_PATH)).toEqual([]);
+  it('returns empty array when no plan exists', async () => {
+    expect(await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH))).toEqual([]);
   });
 
-  it('returns empty array when plan has no subItems', () => {
+  it('returns empty array when plan has no subItems', async () => {
     const doc = makePlanWithAC([{ id: 'item-1', title: 'Task 1' }]);
     writePlan(doc);
-    expect(extractAcceptanceCriteriaSync(WORKSPACE_PATH)).toEqual([]);
+    expect(await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH))).toEqual([]);
   });
 
-  it('extracts AC subItems with parent context', () => {
+  it('extracts AC subItems with parent context', async () => {
     const doc = makePlanWithAC([{
       id: 'item-1',
       title: 'Build module',
@@ -82,7 +83,7 @@ describe('extractAcceptanceCriteria', () => {
     }]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
+    const result = await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH));
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({
       itemId: 'item-1',
@@ -93,7 +94,7 @@ describe('extractAcceptanceCriteria', () => {
     });
   });
 
-  it('only extracts subItems with kind=acceptance_criterion', () => {
+  it('only extracts subItems with kind=acceptance_criterion', async () => {
     const doc = makePlanWithAC([{
       id: 'item-1',
       title: 'Task',
@@ -104,12 +105,12 @@ describe('extractAcceptanceCriteria', () => {
     }]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
+    const result = await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH));
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe('AC item');
   });
 
-  it('skips acceptance criteria from deferred items', () => {
+  it('skips acceptance criteria from deferred items', async () => {
     const doc = makePlanWithAC([
       {
         id: 'active-item',
@@ -126,12 +127,12 @@ describe('extractAcceptanceCriteria', () => {
     ]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
+    const result = await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH));
     expect(result).toHaveLength(1);
     expect(result[0].itemId).toBe('active-item');
   });
 
-  it('extracts AC from multiple items', () => {
+  it('extracts AC from multiple items', async () => {
     const doc = makePlanWithAC([
       {
         id: 'item-1',
@@ -146,7 +147,7 @@ describe('extractAcceptanceCriteria', () => {
     ]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
+    const result = await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH));
     expect(result).toHaveLength(2);
     expect(result[0].itemTitle).toBe('First task');
     expect(result[1].itemTitle).toBe('Second task');

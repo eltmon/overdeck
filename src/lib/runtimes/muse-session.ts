@@ -1,4 +1,13 @@
 /** Muse Code 1.0.2 durable sessions, isolated by Overdeck agent identity. */
+
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `resolveMuseSessionPathSync` (async: `resolveMuseSessionPath`): src/lib/agents/recovery.ts:107,
+ *   src/lib/runtimes/muse.ts:25.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
 import { readdir, stat } from 'node:fs/promises';
 import { readdirSync, statSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';

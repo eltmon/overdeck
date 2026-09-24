@@ -360,17 +360,9 @@ export function startMyService() {
 
 Duplicate service instances cause duplicate event emissions, double API calls, and subtle race conditions that are extremely hard to debug.
 
-### Always pre-trust directories before spawning agents
+### Directories are pre-trusted when they are created or registered
 
-Before spawning any Claude Code process in a directory, call `preTrustDirectory(path)`. Without this, Claude Code prompts "Do you trust this folder?" and the session hangs indefinitely waiting for input.
-
-```typescript
-import { preTrustDirectory } from '../workspace-manager.js';
-preTrustDirectory(targetPath);
-// then spawn tmux session
-```
-
-This applies to both `spawnSpecialist()` and `initializeSpecialist()` paths. Reference: PAN-502.
+Claude Code prompts "Do you trust this folder?" for an untrusted directory, and a session waiting on that prompt never starts. Overdeck pre-trusts a directory once, where it comes into being: workspace creation (`workspace-manager/create.ts`) and project registration (`project-registration.ts`, `projects/create-perform.ts`) call `preTrustDirectorySync(path)`. Spawns do not pre-trust: `preTrustDirectorySync` rewrites `~/.claude.json`, which every Claude Code session on the machine shares, without an atomic rename, so calling it on every spawn could race. A new code path that creates a directory for Claude Code to run in pre-trusts it at creation. References: PAN-502, PAN-4012.
 
 ### SQLite is the authoritative state store
 
@@ -508,7 +500,7 @@ mergeStatus:  pending → merging → merged
 Specialists (review-agent, test-agent, inspect-agent) are Claude Code processes in their own tmux sessions. They initialize once at server startup via `initializeSpecialist()`. Requirements:
 
 1. Run from the project root (`getDevrootPath()`)
-2. Have their directory pre-trusted (`preTrustDirectory()`)
+2. Have their directory pre-trusted, which project registration does (`preTrustDirectorySync()`)
 3. Guard against double-init with a module-level `running` flag
 
 ---
@@ -602,7 +594,7 @@ These properties must be preserved across all changes. A change that would viola
 |-----------|---------------|
 | `mergeStatus: 'merging'` is cleared on server restart | Pending merges are in-memory only. Stale `merging` permanently disables the Merge button. |
 | `.overdeck/continue.json` is never committed | It is mutable workspace runtime state; committing it creates false authoritative state and merge conflicts. |
-| `preTrustDirectory()` is called before every agent/specialist spawn | Without it, Claude Code hangs asking "Do you trust this folder?" — the session never starts. |
+| Workspace creation and project registration call `preTrustDirectorySync()`; spawns do not | An untrusted directory makes Claude Code hang asking "Do you trust this folder?". Pre-trusting on every spawn would race on the shared `~/.claude.json`. |
 | `maxForks: 4` in all Vitest configs | 24 cores × 3.5 GB = OOM. Non-negotiable. |
 | Node 22 is the production runtime | The production server path must explicitly use the Node 22 binary, not the system default. |
 | `execSync` is never used in server-reachable modules | Blocks the event loop, stalls all concurrent requests. |

@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const readProcMemoryMock = vi.fn();
@@ -5,10 +6,10 @@ const loadConfigSyncMock = vi.fn();
 const getStatsMock = vi.fn();
 const resolveProjectFromIssueSyncMock = vi.fn();
 const loadCloisterConfigSyncMock = vi.fn();
-const listRunningAgentsSyncMock = vi.fn();
+const listRunningAgentsMock = vi.fn();
 const getAgentRuntimeStateSyncMock = vi.fn();
-const setAgentPausedSyncMock = vi.fn();
-const stopAgentSyncMock = vi.fn();
+const setAgentPausedMock = vi.fn();
+const stopAgentMock = vi.fn();
 const osMocks = vi.hoisted(() => ({
   cpus: vi.fn(),
   loadavg: vi.fn(),
@@ -38,7 +39,7 @@ vi.mock('../../../../src/lib/cloister/config.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/queries.js', () => ({
-  listRunningAgentsSync: (...args: unknown[]) => listRunningAgentsSyncMock(...args),
+  listRunningAgents: (...args: unknown[]) => Effect.sync(() => listRunningAgentsMock(...args)),
 }));
 
 vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
@@ -46,12 +47,12 @@ vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
-  setAgentPausedSync: (...args: unknown[]) => setAgentPausedSyncMock(...args),
+  setAgentPaused: (...args: unknown[]) => Effect.sync(() => { setAgentPausedMock(...args); return null; }),
   GOVERNOR_SLOT_PAUSE_REASON_PREFIX: '[governor-slot]',
 }));
 
 vi.mock('../../../../src/lib/agents/termination.js', () => ({
-  stopAgentSync: (...args: unknown[]) => stopAgentSyncMock(...args),
+  stopAgent: (...args: unknown[]) => Effect.sync(() => { stopAgentMock(...args); }),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -663,8 +664,8 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     });
     loadCloisterConfigSyncMock.mockReturnValue({ concurrency: { exempt_operator_started: true } });
     execFileMock.mockClear();
-    setAgentPausedSyncMock.mockClear();
-    stopAgentSyncMock.mockClear();
+    setAgentPausedMock.mockClear();
+    stopAgentMock.mockClear();
   });
 
   it('stops both merged stacks first, then pauses the idle agent only if still HARD afterward (PRD AC-4)', async () => {
@@ -672,7 +673,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     const stacks = [mergedStack('PAN-1', 1 * GIB, 'pan-1-svc'), mergedStack('PAN-2', 1 * GIB, 'pan-2-svc')];
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
 
-    listRunningAgentsSyncMock.mockReturnValue([
+    listRunningAgentsMock.mockReturnValue([
       { id: 'agent-pan-3', issueId: 'PAN-3', role: 'work', tmuxActive: true, flywheelRunId: 'run-1' },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
@@ -686,13 +687,13 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     expect(execFileMock).toHaveBeenCalledWith('docker', ['stop', '--time', '30', 'pan-2-svc'], expect.anything(), expect.anything());
     expect(execFileMock).not.toHaveBeenCalledWith('docker', expect.arrayContaining(['pause']), expect.anything(), expect.anything());
     expect(result.pausedAgents).toEqual(['agent-pan-3']);
-    expect(setAgentPausedSyncMock).toHaveBeenCalledWith('agent-pan-3', expect.stringContaining('[governor-slot]'), true);
-    expect(stopAgentSyncMock).toHaveBeenCalledWith('agent-pan-3');
+    expect(setAgentPausedMock).toHaveBeenCalledWith('agent-pan-3', expect.stringContaining('[governor-slot]'), true);
+    expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-3');
   });
 
   it('never sheds an operator-attached (no flywheelRunId) agent even under sustained HARD pressure', async () => {
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue([]);
-    listRunningAgentsSyncMock.mockReturnValue([
+    listRunningAgentsMock.mockReturnValue([
       { id: 'agent-operator', issueId: 'PAN-4', role: 'work', tmuxActive: true, flywheelRunId: undefined },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
@@ -701,6 +702,6 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     const result = await shed();
 
     expect(result.pausedAgents).toEqual([]);
-    expect(setAgentPausedSyncMock).not.toHaveBeenCalled();
+    expect(setAgentPausedMock).not.toHaveBeenCalled();
   });
 });

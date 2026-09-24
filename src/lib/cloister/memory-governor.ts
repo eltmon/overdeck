@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
 import { promisify } from 'node:util';
@@ -7,10 +8,10 @@ import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { listRunningAgentsSync } from '../agents/queries.js';
+import { listRunningAgents } from '../agents/queries.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
-import { setAgentPausedSync, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
-import { stopAgentSync } from '../agents/termination.js';
+import { setAgentPaused, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
+import { stopAgent } from '../agents/termination.js';
 import {
   getCachedMemoryVerdict,
   setCachedMemoryVerdict,
@@ -446,7 +447,7 @@ export async function shed(): Promise<ShedResult> {
 
   const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
   const stacks = await getResourceStacks(containers);
-  const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
+  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
   const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLiveTmuxSession: a.tmuxActive }));
 
   for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
@@ -499,8 +500,8 @@ export async function shed(): Promise<ShedResult> {
       exemptOperatorStarted ?? true,
     );
     if (!next) break;
-    setAgentPausedSync(next.id, `${GOVERNOR_SLOT_PAUSE_REASON_PREFIX} memory pressure — shed under HARD reserve`, true);
-    stopAgentSync(next.id);
+    await Effect.runPromise(setAgentPaused(next.id, `${GOVERNOR_SLOT_PAUSE_REASON_PREFIX} memory pressure — shed under HARD reserve`, true));
+    await Effect.runPromise(stopAgent(next.id));
     paused.add(next.id);
     result.pausedAgents.push(next.id);
     verdict = await assessMemoryPressure();

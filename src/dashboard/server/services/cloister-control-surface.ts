@@ -1,4 +1,5 @@
-import { listRunningAgentsSync } from '../../../lib/agents.js';
+import { Effect } from 'effect';
+import { listRunningAgents } from '../../../lib/agents.js';
 import { loadCloisterConfigSync } from '../../../lib/cloister/config.js';
 import { getDeaconLiteStatus, type DeaconLiteStatus } from '../../../lib/cloister/deacon-lite.js';
 import { generateHealthSummary, getAgentHealth, getAgentsNeedingAttention } from '../../../lib/cloister/health.js';
@@ -30,10 +31,10 @@ export interface CloisterControlDeps {
  * aggregation, so status here is derived from its in-memory
  * running/lastRunAt/lastRunError only — never from a stored artifact.
  */
-export function readDurableCloisterStatus(deps: CloisterControlDeps = {}): CloisterStatus {
+export async function readDurableCloisterStatus(deps: CloisterControlDeps = {}): Promise<CloisterStatus> {
   const cloisterState = (deps.readCloisterStateFile ?? readCloisterStateFile)();
   const deaconLite = (deps.readDeaconLiteStatus ?? getDeaconLiteStatus)();
-  const agentHealths = listRunningAgentsSync()
+  const agentHealths = (await Effect.runPromise(listRunningAgents()))
     .filter((agent) => agent.tmuxActive)
     .flatMap((agent) => {
       const runtime = getRuntimeForAgent(agent.id);

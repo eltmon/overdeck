@@ -70,22 +70,6 @@ export function getXBriefACStatusSync(workspacePath: string): XBriefACStatus | n
 }
 
 /**
- * Extract all acceptance criteria from an xBRIEF plan.
- *
- * Reads the merged xBRIEF plan and returns all child items
- * where metadata.kind === 'acceptance_criterion', enriched with parent
- * task context.
- *
- * @returns Array of acceptance criteria, or empty array if no plan exists
- *          or no AC are found (legacy workspace compatibility).
- */
-export function extractAcceptanceCriteriaSync(workspacePath: string): AcceptanceCriterion[] {
-  const doc = readWorkspacePlanSync(workspacePath);
-  if (!doc) return [];
-  return extractACFromDocument(doc);
-}
-
-/**
  * Extract AC from an already-loaded document (avoids re-reading the file).
  */
 function isDeferredOrCancelledItem(item: XBriefItem): boolean {
@@ -162,7 +146,16 @@ export function formatAcceptanceCriteria(criteria: AcceptanceCriterion[]): strin
 // blocking the event loop. extractACFromDocument and the AC-completion logic
 // itself are pure-sync — only the plan read is wrapped.
 
-/** Effect variant of `extractAcceptanceCriteria`. */
+/**
+ * Extract all acceptance criteria from an xBRIEF plan.
+ *
+ * Reads the merged xBRIEF plan and returns all child items
+ * where metadata.kind === 'acceptance_criterion', enriched with parent
+ * task context.
+ *
+ * @returns Array of acceptance criteria, or empty array if no plan exists
+ *          or no AC are found (legacy workspace compatibility).
+ */
 export const extractAcceptanceCriteria = (
   workspacePath: string,
 ): Effect.Effect<AcceptanceCriterion[], XBriefReadError> =>

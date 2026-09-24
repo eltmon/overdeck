@@ -15,7 +15,7 @@ import { runWithPool } from '../work-pool.js';
 import { createConfiguredClaudeApi, enrichSession, resolveEnrichmentModel } from './enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
 import type { EnrichSessionOptions } from './enrich-session.js';
-import { getConversationsConfigSync } from '../../config-yaml.js';
+import { getConversationsConfig } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EnrichmentTier } from './model-fallback.js';
 import { isBackgroundFeatureEnabled } from '../../background-ai/features.js';
@@ -131,7 +131,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   // Cost is still recorded per enriched session for the Background AI cost view.
 
   const tier = opts.tier ?? 1;
-  const config = opts.config ?? getConversationsConfigSync();
+  const config = opts.config ?? await Effect.runPromise(getConversationsConfig());
   const tierConfig = {
     quickModel: config.enrichment.quickModel,
     deepModel: config.enrichment.deepModel,

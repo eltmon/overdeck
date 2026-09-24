@@ -6,6 +6,7 @@
  * in the test environment. Need to refactor the service to be more testable.
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   CloisterService,
@@ -18,7 +19,7 @@ import { DEFAULT_CLOISTER_CONFIG } from '../../../src/lib/cloister/config.js';
 
 // Mock runtime and dependencies
 vi.mock('../../../src/lib/agents.js', () => ({
-  listRunningAgents: vi.fn(() => []),
+  listRunningAgents: vi.fn(() => Effect.succeed([])),
   listRunningAgentsSync: vi.fn(() => []),
 }));
 
@@ -126,8 +127,8 @@ describe.skip('CloisterService', () => {
   });
 
   describe('getStatus', () => {
-    it('should return correct status when not running', () => {
-      const status = service.getStatus();
+    it('should return correct status when not running', async () => {
+      const status = await service.getStatus();
 
       expect(status.running).toBe(false);
       expect(status.lastCheck).toBeNull();
@@ -135,8 +136,8 @@ describe.skip('CloisterService', () => {
       expect(status.agentsNeedingAttention).toEqual([]);
     });
 
-    it('should include config in status', () => {
-      const status = service.getStatus();
+    it('should include config in status', async () => {
+      const status = await service.getStatus();
 
       expect(status.config).toBeDefined();
       expect(status.config.thresholds).toBeDefined();
@@ -150,7 +151,7 @@ describe.skip('CloisterService', () => {
       // Wait for first health check
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const status = service.getStatus();
+      const status = await service.getStatus();
       expect(status.lastCheck).not.toBeNull();
 
       service.stop();
@@ -165,22 +166,22 @@ describe.skip('CloisterService', () => {
   });
 
   describe('getAllAgentHealth', () => {
-    it('should return empty array when no agents running', () => {
-      const healths = service.getAllAgentHealth();
+    it('should return empty array when no agents running', async () => {
+      const healths = await service.getAllAgentHealth();
       expect(healths).toEqual([]);
     });
   });
 
   // TODO(PAN-48): Fix config tests - service doesn't maintain running state in test mode
   describe.skip('reloadConfig', () => {
-    it('should reload configuration', () => {
-      const statusBefore = service.getStatus();
+    it('should reload configuration', async () => {
+      const statusBefore = await service.getStatus();
       const configBefore = statusBefore.config;
 
       // Reload config (loads from disk, which will have default check_interval)
       service.reloadConfig();
 
-      const statusAfter = service.getStatus();
+      const statusAfter = await service.getStatus();
       const configAfter = statusAfter.config;
 
       // Config should be reloaded - check_interval will be 60 (default) instead of 1 (test config)
@@ -194,7 +195,7 @@ describe.skip('CloisterService', () => {
     it('should restart monitoring loop if running', async () => {
       service.start();
 
-      const statusBefore = service.getStatus();
+      const statusBefore = await service.getStatus();
       const lastCheckBefore = statusBefore.lastCheck;
 
       // Wait a bit
@@ -205,7 +206,7 @@ describe.skip('CloisterService', () => {
       // Wait for new check
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const statusAfter = service.getStatus();
+      const statusAfter = await service.getStatus();
       const lastCheckAfter = statusAfter.lastCheck;
 
       // Last check should be updated after reload
@@ -216,7 +217,7 @@ describe.skip('CloisterService', () => {
   });
 
   describe.skip('updateConfig', () => {
-    it('should update configuration', () => {
+    it('should update configuration', async () => {
       const newConfig: CloisterConfig = {
         ...DEFAULT_CLOISTER_CONFIG,
         thresholds: {
@@ -228,7 +229,7 @@ describe.skip('CloisterService', () => {
 
       service.updateConfig(newConfig);
 
-      const status = service.getStatus();
+      const status = await service.getStatus();
       expect(status.config.thresholds.stale).toBe(10);
       expect(status.config.thresholds.warning).toBe(20);
       expect(status.config.thresholds.stuck).toBe(40);

@@ -17,10 +17,11 @@
  * prevents reaping a workspace before the agent has committed any work.
  */
 
+import { Effect } from 'effect';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { sessionExistsSync } from '../tmux.js';
+import { sessionExists } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -64,7 +65,7 @@ export async function reapMergedStrikeWorkspaces(projectRoot: string = process.c
     if (!issueId) continue;
 
     // A live strike is using this worktree — leave it alone.
-    if (sessionExistsSync(`strike-${issueId}`)) continue;
+    if (await Effect.runPromise(sessionExists(`strike-${issueId}`))) continue;
 
     // Reap only when the branch is fully merged (0 commits ahead of origin/main),
     // so unmerged strike work is never lost.

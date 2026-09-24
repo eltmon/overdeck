@@ -1,10 +1,11 @@
-import { querySessionSync, type SessionQueryResult } from '../tmux.js';
+import { Effect } from 'effect';
+import { querySession, type SessionQueryResult } from '../tmux.js';
 import { supervisorProcessAliveSync } from '../agents/supervisor-liveness.js';
 
 const consecutiveMisses = new Map<string, number>();
 
-export function queryConfirmedSession(agentId: string): [SessionQueryResult, string?] {
-  const query = querySessionSync(agentId);
+export async function queryConfirmedSession(agentId: string): Promise<[SessionQueryResult, string?]> {
+  const query = await Effect.runPromise(querySession(agentId));
   if (query.status === 'error') {
     consecutiveMisses.delete(agentId);
     return [query, `skipped — tmux query failed (${query.detail})`];

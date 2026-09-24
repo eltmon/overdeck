@@ -7,6 +7,7 @@
  *  - isInsideGitWorkTree: the up-front cwd guard so a handoff in a non-git
  *    directory fails loudly instead of spawning a session that immediately dies.
  */
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -133,7 +134,9 @@ describe('waitForPiTuiReady (PAN-1793)', () => {
     paneSnapshots.values = Array.from({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
  length: 8 }, () => 'oh-my-pi starting...\nloading extensions\n');
 
     const ready = waitForPiTuiReady('conv-pi', 1000);

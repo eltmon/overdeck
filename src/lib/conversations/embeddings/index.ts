@@ -17,7 +17,7 @@ import type { DiscoveredSession } from '../../overdeck/discovered-sessions.js';
 import { Effect } from 'effect';
 import { runWithPool } from '../work-pool.js';
 import { embed } from './providers.js';
-import { getConversationsConfigSync } from '../../config-yaml.js';
+import { getConversationsConfig } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EmbeddingProviderName } from './providers.js';
 import { recordBackgroundAiCost } from '../../background-ai/cost.js';
@@ -133,7 +133,7 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
   const startTs = Date.now();
   const result: EmbedResult = { embedded: 0, skipped: 0, errors: 0, durationMs: 0, errorMessages: [] };
 
-  const config = opts.config ?? getConversationsConfigSync();
+  const config = opts.config ?? await Effect.runPromise(getConversationsConfig());
   const provider = (opts.provider ?? config.embeddingProvider) as EmbeddingProviderName;
   const providerDefaultModel = provider === 'voyage' ? 'voyage-code-3' : provider === 'ollama' ? 'nomic-embed-text' : 'text-embedding-3-small';
   const model = opts.model ?? (opts.provider || provider !== config.embeddingProvider ? providerDefaultModel : config.embeddingModel);

@@ -1,6 +1,7 @@
+import { Effect } from 'effect';
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { clearAgentPausedSync, getAgentStateSync, resolveAgentTargetSync } from '../../lib/agents.js';
+import { clearAgentPaused, getAgentStateSync, resolveAgentTargetSync } from '../../lib/agents.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 import { resumeAgent } from '../../lib/agents/resume.js';
@@ -26,7 +27,7 @@ export async function unpauseCommand(id: string): Promise<void> {
 
   try {
     const wasPaused = state.paused === true;
-    clearAgentPausedSync(agentId);
+    await Effect.runPromise(clearAgentPaused(agentId));
 
     if (wasPaused) {
       await appendOperatorInterventionEvent({ issueId, kind: 'unpause', source: 'pan unpause' });

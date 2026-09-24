@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -89,7 +90,7 @@ describe('concurrency governor — config + counting', () => {
   it('counts backend-live running agents, grouped into work vs advancing', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [
+      listRunningAgents: () => Effect.succeed([
         { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
         { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running' },
         { id: 'agent-pan-3-ship', role: 'ship', issueId: 'PAN-3', status: 'running' },
@@ -97,7 +98,7 @@ describe('concurrency governor — config + counting', () => {
         // PAN-3917: a crashed agent's state file still says `running` — nothing
         // rewrites it. Only the backend inventory can retire it from the ceiling.
         { id: 'agent-pan-5', role: 'work', issueId: 'PAN-5', status: 'running' },
-      ],
+      ]),
     }));
     mockLiveAgents(['agent-pan-1', 'agent-pan-2-review', 'agent-pan-3-ship', 'planning-pan-4']);
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
@@ -107,10 +108,10 @@ describe('concurrency governor — config + counting', () => {
   it('counts every running state file when the backend inventory cannot be read', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [
+      listRunningAgents: () => Effect.succeed([
         { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
         { id: 'agent-pan-5', role: 'work', issueId: 'PAN-5', status: 'running' },
-      ],
+      ]),
     }));
     mockLiveAgents(null);
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
@@ -121,10 +122,10 @@ describe('concurrency governor — config + counting', () => {
   it('excludes terminal swarm slots from both the swarm reserve and regular work count', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [
+      listRunningAgents: () => Effect.succeed([
         { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
         { id: 'agent-pan-2-slot-1', role: 'work', issueId: 'PAN-2', status: 'running' },
-      ],
+      ]),
     }));
     vi.doMock('../../../src/lib/cloister/swarm-slot-lifecycle.js', () => ({
       isTerminalSwarmSlotAgent: (agent: { id: string }) => agent.id === 'agent-pan-2-slot-1',
@@ -139,12 +140,12 @@ describe('concurrency governor — config + counting', () => {
   it('excludes warm-idle advancing sessions from the ceiling (PAN-2579, PAN-3917)', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [
+      listRunningAgents: () => Effect.succeed([
         { id: 'agent-pan-9', role: 'work', issueId: 'PAN-9', status: 'running' },
         { id: 'agent-pan-1-review', role: 'review', issueId: 'PAN-1', status: 'running' },
         { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running' },
         { id: 'agent-pan-3-test', role: 'test', issueId: 'PAN-3', status: 'running' },
-      ],
+      ]),
     }));
     mockLiveAgents(['agent-pan-9', 'agent-pan-1-review', 'agent-pan-2-review', 'agent-pan-3-test']);
     // PAN-3917: warm-idle is the pane's own liveness, not a stored verdict.

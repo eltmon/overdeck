@@ -244,7 +244,7 @@ export const CloisterRuntimeLive = Layer.succeed(
       try: () => areDurableSpawnsPaused(),
       catch: (error) => error instanceof Error ? error : new Error(String(error)),
     }),
-    getStatus: Effect.try({
+    getStatus: Effect.tryPromise({
       try: () => readDurableCloisterStatus(),
       catch: (error) => error instanceof Error ? error : new Error(String(error)),
     }),

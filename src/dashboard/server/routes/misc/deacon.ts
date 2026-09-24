@@ -2,8 +2,8 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
-  isDeaconGloballyPausedSync as isDeaconGloballyPaused,
-  setDeaconGloballyPausedSync as setDeaconGloballyPaused,
+  isDeaconGloballyPaused,
+  setDeaconGloballyPaused,
 } from '../../../../lib/overdeck/control-settings.js';
 import {
   readDurableDeaconLogs,
