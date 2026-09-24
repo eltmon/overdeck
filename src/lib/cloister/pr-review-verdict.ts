@@ -42,6 +42,20 @@ export interface PostReviewVerdictInput {
   body: string;
   /** Skips the forge lookup when the caller already has the facts. */
   facts?: PrFacts;
+  /**
+   * #3853: the commit the reviewer actually reviewed (a full or abbreviated
+   * sha, from its run id). The verdict marker names the head (`sha=`) only
+   * when the head is still this commit. A head that moved during the review,
+   * or an unknown reviewed commit, leaves the marker without `sha=`: it then
+   * proves nothing, and the verdict guard never refuses on it.
+   */
+  reviewedHead?: string | null;
+}
+
+/** The head sha when it is the reviewed commit, else null. */
+function reviewedHeadSha(headSha: string | null | undefined, reviewedHead: string | null | undefined): string | null {
+  if (!headSha || !reviewedHead) return null;
+  return headSha.toLowerCase().startsWith(reviewedHead.toLowerCase()) ? headSha : null;
 }
 
 export type PostReviewVerdictResult =
@@ -166,7 +180,7 @@ export async function postReviewVerdict(
       try {
         await runGh([
           'pr', 'comment', String(ref.number), '--repo', repo,
-          '--body', `${formatVerdictMarker(marker, facts.headSha)}\n\n${input.body}`,
+          '--body', `${formatVerdictMarker(marker, reviewedHeadSha(facts.headSha, input.reviewedHead))}\n\n${input.body}`,
         ], options);
       } catch (commentCause) {
         return {

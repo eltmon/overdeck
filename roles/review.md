@@ -208,9 +208,11 @@ pan admin specialists done review <issueId> --status blocked --notes "<one-line 
 
 The command may refuse a `blocked` verdict when the exact head commit already
 carries an approval and the operator did not ask for this run (#3853): an
-agent cannot reverse an approval on the commit it approved. Record `passed`
-with the findings as advisories, or ask the operator. Never claim operator
-authorization in `--notes`.
+agent cannot reverse an approval on the commit it approved. The refusal is
+journaled for the operator. Then stop: record no verdict (never re-record it as
+`passed`), post your findings as a plain PR comment for the operator
+(`gh pr comment <pr-url> --body-file <your report>`), and exit. Never claim
+operator authorization in `--notes`.
 
 If the command says the verdict went to the workspace fallback because the
 journal is contended, it is durable; do not re-signal. The host folds it later.

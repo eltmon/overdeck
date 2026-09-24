@@ -37,6 +37,19 @@ export function isIssueReviewSession(agentId: string, issueId: string): boolean 
   return agentId === parent || agentId.startsWith(`${parent}-`);
 }
 
+/**
+ * The commit a review run reviewed, from its run id
+ * (`agent-<issue>-review-<head8>`, stamped at dispatch from the workspace
+ * HEAD), or null. A polyrepo run id carries a hash of the composite anchor
+ * rather than a commit, so it never prefix-matches a real head.
+ */
+export function reviewedHeadFromRunId(runId: string | null | undefined, issueId: string): string | null {
+  const prefix = `agent-${issueId.toLowerCase()}-review-`;
+  if (!runId?.startsWith(prefix)) return null;
+  const head = runId.slice(prefix.length).toLowerCase();
+  return /^[0-9a-f]{7,40}$/.test(head) ? head : null;
+}
+
 export interface ReviewVerdictGuardInput {
   readonly caller: VerdictCaller;
   readonly issueId: string;

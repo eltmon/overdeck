@@ -22,6 +22,7 @@ const {
   mockAppendPipelineEntry,
   mockForgeApprovalAtHead,
   mockGetAgentState,
+  mockEmitActivityEntry,
 } = vi.hoisted(() => ({
   mockDiscoverArtifact: vi.fn(),
   mockCommentOnArtifact: vi.fn(),
@@ -34,6 +35,11 @@ const {
   mockAppendPipelineEntry: vi.fn(),
   mockForgeApprovalAtHead: vi.fn(),
   mockGetAgentState: vi.fn(),
+  mockEmitActivityEntry: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/activity-logger.js', () => ({
+  emitActivityEntry: mockEmitActivityEntry,
 }));
 
 vi.mock('../../../../src/lib/cloister/uat-failure-feedback.js', () => ({
@@ -225,6 +231,7 @@ describe('specialists done command', () => {
       issueId: 'PAN-1059',
       verdict: 'request-changes',
       body: expect.stringContaining('review verdict: blocked'),
+      reviewedHead: 'abcdef12',
     });
     expect(mockPostReviewVerdict.mock.calls[0][0].body).toContain('correctness blocker');
     expect(mockCommentOnArtifact).not.toHaveBeenCalled();
@@ -277,12 +284,31 @@ describe('specialists done command', () => {
       expect(mockForgeApprovalAtHead).toHaveBeenCalledWith(FORGE_APPROVED);
       expect(exit).toHaveBeenCalledWith(1);
       expect(stderr).toContain('cannot reverse an approval on the commit it approved');
-      expect(stderr).toContain('Record `passed` with the findings as advisories, or ask the operator.');
-      // The refusal must not teach the bypass.
+      // The refusal must not teach the bypass, and must not steer the agent to
+      // re-record its blocker as a pass (a wrong refusal would then turn a real
+      // blocker into an approval). It stops and leaves the operator a comment.
       expect(stderr).not.toMatch(/conv-|OVERDECK_AGENT_ID|outside any agent session/);
+      expect(stderr).not.toMatch(/record\s+`?passed/i);
+      expect(stderr).toContain('record no verdict');
+      expect(stderr).toContain(`gh pr comment ${ARTIFACT_URL}`);
       expect(mockPostReviewVerdict).not.toHaveBeenCalled();
-      expect(mockAppendPipelineEntry).not.toHaveBeenCalled();
       expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+      // The refusal leaves a durable trace for the operator.
+      expect(mockAppendPipelineEntry).toHaveBeenCalledOnce();
+      expect(mockAppendPipelineEntry).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059', {
+        type: 'review.verdict-refused',
+        issueId: 'PAN-1059',
+        source: 'pan-specialists-done',
+        data: expect.objectContaining({
+          status: 'blocked',
+          caller: 'agent-pan-1059-review',
+          runId: 'agent-pan-1059-review-abcdef12',
+          reason: expect.stringContaining('cannot reverse an approval'),
+        }),
+      });
+      expect(mockEmitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+        level: 'warn', issueId: 'PAN-1059',
+      }));
     });
 
     it('refuses on a verdict marker proven at head without reading reviews again', async () => {
@@ -311,6 +337,7 @@ describe('specialists done command', () => {
         verdict: 'request-changes',
         body: expect.stringContaining('new blocker'),
         facts: FORGE_APPROVED,
+        reviewedHead: 'abcdef12',
       });
     });
 
@@ -344,6 +371,36 @@ describe('specialists done command', () => {
 
       expect(mockForgeApprovalAtHead).not.toHaveBeenCalled();
       expect(mockPostReviewVerdict).toHaveBeenCalledWith(expect.objectContaining({ verdict: 'approve' }));
+    });
+
+    // #3853: the marker's sha= must be the commit the run reviewed. done.ts
+    // hands postReviewVerdict the head from the run id; postReviewVerdict
+    // names the head only when it still is that commit.
+    it('passes the reviewed head from --run-id, not the head at post time', async () => {
+      mockGetPrFacts.mockResolvedValue({ ...FORGE_APPROVED, headSha: 'bbbbbbbb00000000000000000000000000000000' });
+
+      await recordAsSynthesizer('passed', 'lgtm');
+
+      expect(mockPostReviewVerdict.mock.calls[0][0]).toMatchObject({ reviewedHead: 'abcdef12' });
+    });
+
+    it('falls back to the review parent\'s current run when --run-id is absent', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
+      mockGetAgentState.mockReturnValue({ id: 'agent-pan-1059-review', reviewRunId: 'agent-pan-1059-review-1234abcd' });
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'lgtm' });
+
+      expect(mockPostReviewVerdict.mock.calls[0][0]).toMatchObject({ reviewedHead: '1234abcd' });
+    });
+
+    it('passes no reviewed head when the run id names no commit', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'lgtm', runId: 'agent-pan-1059-review' });
+
+      expect(mockPostReviewVerdict.mock.calls[0][0]).not.toHaveProperty('reviewedHead');
     });
 
     it('refuses a non-review agent session recording any review verdict', async () => {
