@@ -164,9 +164,9 @@ export function registerWorkspaceCommands(program: Command): void {
 
   workspace
     .command('reap')
-    .description('List or remove orphaned unhealthy workspace Docker stacks')
+    .description('List or remove orphaned unhealthy workspace Docker stacks and orphaned workspace networks')
     .option('--days <days>', 'Minimum age in days', '7')
-    .option('--apply', 'Run docker compose down -v --remove-orphans for candidates')
+    .option('--apply', 'Run docker compose down -v --remove-orphans for stack candidates and remove orphaned workspace networks')
     .option('--yes', 'Skip confirmation when using --apply')
     .action(async (opts: { days?: string; apply?: boolean; yes?: boolean }) => {
       const { workspaceReapCommand } = await import('./workspace-reap.js');

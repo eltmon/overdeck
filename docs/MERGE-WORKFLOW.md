@@ -204,6 +204,29 @@ workspaces accumulate and eventually block new workspace creation ("all
 predefined address pools have been fully subnetted" — Docker's default pool
 supports ~31 bridge networks). NEVER remove this cleanup step.
 
+Every workspace teardown path removes the stack's compose networks, not only
+its containers (PAN-3900). `docker compose down` alone leaks the network when
+shared infra (overdeck-traefik) is still attached or the compose files are
+gone, so `stopWorkspaceDocker` and `teardownWorkspaceDockerByName`
+([`src/lib/workspace-manager/docker.ts`](../src/lib/workspace-manager/docker.ts))
+finish with `removeComposeProjectNetworks`: every network labeled with the
+compose project (`_devnet`, `_default`, custom names) is freed (its own
+containers removed, foreign ones only disconnected) and removed. Paths that
+remove a worktree out of band tear the stack down by name first: swarm slot
+GC (`<issue>-slot-<n>` stacks), the dashboard's orphaned-issue cleanup, and
+lifecycle teardown when the workspace directory is already gone.
+
+Networks leaked before this, or by a manual `git worktree remove`, are swept
+by `pan workspace reap`. The dry run lists them; `--apply` removes them (after
+the typed-count confirmation, or `--yes`). A network qualifies only when all
+of these hold, so nothing that is not an Overdeck workspace network is
+touched: it carries a compose project label of the form
+`<prefix>-feature-<issue>[-slot-<n>]` whose issue prefix belongs to a
+registered project, its name is `<label>_<network>`, no container
+(running or stopped) is attached, the `feature-<issue>[-slot-<n>]` workspace
+directory does not exist, and no agent is active on the issue. Attachment is
+re-checked immediately before each removal.
+
 The durable, verified teardown owner is **close-out**: `pan close <id>` /
 dashboard Close Out stops and removes the remaining workspace Docker stack,
 verifies the network is gone, completes the xBRIEF, archives planning

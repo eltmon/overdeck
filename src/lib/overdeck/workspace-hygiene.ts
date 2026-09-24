@@ -73,6 +73,17 @@ export async function cleanupWorkspaceForIssue(rawId: string, eventStore: EventS
   const issueLower = id.toLowerCase();
   const projectRoot = resolveIssueProjectPath(id) || null;
 
+  // PAN-3900: tear the workspace's Docker stack and compose networks down
+  // before the worktree goes. Removing only the directory leaks the stack's
+  // bridge network, and nothing reaches it by path afterwards.
+  try {
+    const { teardownWorkspaceDockerByName } = await import('../workspace-manager/docker.js');
+    const teardown = await teardownWorkspaceDockerByName(issueLower);
+    cleanupLog.push(...teardown.steps);
+  } catch (error) {
+    cleanupLog.push(`Docker teardown attempted (${error instanceof Error ? error.message.split('\n')[0] : String(error)})`);
+  }
+
   // Git worktree/workspace and agent dir cleanup (all async with meaningful branching on error)
   if (projectRoot) {
     const workspacePath = join(projectRoot, 'workspaces', `feature-${issueLower}`);

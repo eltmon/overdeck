@@ -58,6 +58,7 @@
 1358 src/cli/index.ts # PAN-3673
 1141 src/lib/review-status.ts # PAN-3674
 1062 src/lib/cloister/deacon-swarm.ts # PAN-3690
+1063 src/lib/cloister/deacon-swarm.ts # PAN-3900
 1370 src/cli/index.ts # PAN-3729
 1371 src/cli/index.ts # PAN-3768
 1070 src/dashboard/server/routes/conversations.ts # PAN-3766
