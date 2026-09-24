@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getBook } from '../../../../src/lib/orders/resolver.js';
+import { getBookAsync } from '../../../../src/lib/orders/resolver.js';
 import { addItems, createBook, moveItem, setItemRequirements, setStatus } from '../../../../src/lib/orders/writer.js';
 
 const roots: string[] = [];
@@ -42,7 +42,7 @@ describe('orders writer', () => {
     await setStatus(root, '2026-07-17-first', 'running', { at, runId: 'RUN-1' });
     await setStatus(root, '2026-07-17-first', 'ready', { at, runId: null });
 
-    expect(getBook(root, '2026-07-17-first')).toMatchObject({
+    expect(await getBookAsync(root, '2026-07-17-first')).toMatchObject({
       id: '2026-07-17-first',
       status: 'ready',
       items: [
@@ -50,7 +50,7 @@ describe('orders writer', () => {
         { issue: 'PAN-2', lane: 'B', order: 1, prereqs: ['PAN-3'], reVerify: false, planAtPickup: true, addedAt: at, addedBy: 'operator' },
       ],
     });
-    expect(getBook(root, '2026-07-17-first')?.runId).toBeUndefined();
+    expect((await getBookAsync(root, '2026-07-17-first'))?.runId).toBeUndefined();
     const index = JSON.parse(readFileSync(join(root, 'orders', 'index.json'), 'utf8')) as Array<{ id: string }>;
     expect(index.map((entry) => entry.id)).toEqual(['2026-07-17-first', '2026-07-17-second']);
   });

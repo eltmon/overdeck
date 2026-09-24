@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
-import { withConcurrencyLimit } from '../concurrency.js';
+import { withConcurrencyLimitPromise } from '../concurrency.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { isHarnessProcessAlive, listSessionNames } from '../tmux.js';
 import { resolveConversationGitInfo } from '../../dashboard/server/services/git-info.js';
@@ -103,8 +103,8 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   ]);
   const ledgerCosts = new Map(ledgerEntries);
   const liveSessionNames = new Set(sessionNames);
-  return Effect.runPromise(withConcurrencyLimit(
-    conversations.map((conv) => Effect.promise(async () => {
+  return withConcurrencyLimitPromise(
+    conversations.map((conv) => async () => {
       let row = conv;
       const tmuxSessionAlive = liveSessionNames.has(conv.tmuxSession);
       let sessionAlive = conversationSessionAliveFromState(row, tmuxSessionAlive);
@@ -211,7 +211,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         transcriptMissing: conversationTranscriptMissing(row, sessionAlive, convSf),
         needsTerminal: await conversationNeedsTerminal(row, sessionAlive, convSf),
       };
-    })),
+    }),
     CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
-  ));
+  );
 }

@@ -415,7 +415,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
   it('spends autonomous consent when runtime setup fails after tmux accepts the session', async () => {
     writeSupervisorArtifact();
-    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlagAsync } = await import('../planning/auto-spawn-consent.js');
     const { spawnAgent } = await import('../agents.js');
     await writeAutoSpawnOnFinalizeFlag('PAN-1405', true);
     emitAgentEventMock.mockReturnValue(Effect.fail(new Error('runtime state persistence failed')));
@@ -430,7 +430,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
     })).rejects.toThrow('runtime state persistence failed');
 
     expect(createSessionMock).toHaveBeenCalledOnce();
-    expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1405')).resolves.toBe(false);
   });
 
   it('pins and persists a fresh Claude work-agent session before hooks run', async () => {
@@ -529,7 +529,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
   it('claims planning consent for fresh autonomous spawnRun work launches', async () => {
     writeSupervisorArtifact();
-    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlagAsync } = await import('../planning/auto-spawn-consent.js');
     const { spawnRun } = await import('../agents.js');
     await writeAutoSpawnOnFinalizeFlag('PAN-1405', true);
 
@@ -540,7 +540,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
       autoSpawnConsentRequired: true,
     });
 
-    expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1405')).resolves.toBe(false);
   });
 
   it('does not inspect planning consent for specialist spawnRun launches', async () => {

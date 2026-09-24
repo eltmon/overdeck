@@ -11,7 +11,7 @@ import { basename } from 'node:path';
 
 import { Effect } from 'effect';
 
-import { withConcurrencyLimit } from '../concurrency.js';
+import { withConcurrencyLimitPromise } from '../concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
@@ -347,8 +347,8 @@ export async function getConversationsPendingInputFeed(
     const alive = conversations.filter(
       (conv) => !conv.forkStatus && liveSessionNames.has(conv.tmuxSession),
     );
-    const rows = await Effect.runPromise(withConcurrencyLimit(
-      alive.map((conv) => Effect.promise(async () => {
+    const rows = await withConcurrencyLimitPromise(
+      alive.map((conv) => async () => {
         const convSf = await deps.resolveSessionFile(conv);
         let pending: PendingAskUserQuestionSnapshot | undefined;
         // PAN-1520 (FR-2) — pending ExitPlanMode plan payload, so the plan
@@ -396,9 +396,9 @@ export async function getConversationsPendingInputFeed(
           ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
           ...(paneChoice ? { pendingPaneChoice: paneChoice } : {}),
         };
-      })),
+      }),
       8,
-    ));
+    );
     return result(rows.filter((row) => row !== null));
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);

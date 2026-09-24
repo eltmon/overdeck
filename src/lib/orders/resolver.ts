@@ -156,19 +156,14 @@ export function listBooks(panDir: string): OrderBook[] {
   });
 }
 
-export function getBook(panDir: string, bookId: string): OrderBook | null {
-  const book = readOrderBook(panDir, bookId);
-  return book ? normalizeBookIssues(panDir, book) : null;
-}
-
 export function getBookAsync(panDir: string, bookId: string): Promise<OrderBook | null> {
   return readOrderBookAsync(panDir, bookId).then((book) => (book ? normalizeBookIssues(panDir, book) : null));
 }
 
 /** The first 'ready' book in index.json queue order, or null if none is ready. */
-export function firstReadyBookInQueue(panDir: string): OrderBook | null {
+export async function firstReadyBookInQueue(panDir: string): Promise<OrderBook | null> {
   for (const entry of readOrderBookIndex(panDir)) {
-    const book = getBook(panDir, entry.id);
+    const book = await getBookAsync(panDir, entry.id);
     if (book?.status === 'ready') return book;
   }
   return null;

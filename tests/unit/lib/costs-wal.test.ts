@@ -38,7 +38,6 @@ function makeCostEvent(overrides: Partial<CostEvent> = {}): CostEvent {
 // ============== wal.ts: resolveWalDir ==============
 
 vi.mock('../../../src/lib/projects.js', () => ({
-  listProjects: hoistedMockListProjects,
   listProjectsSync: hoistedMockListProjects,
 }));
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PiSpawnTimeout } from '../pi.js'
 
-// The PiRuntimeSync / PiRuntime adapter classes and their tests were deleted in
+// The Pi runtime adapter classes (sync and Effect) and their tests were deleted in
 // PAN-3958 (#4007): nothing constructed them after PAN-1989. PiSpawnTimeout survives.
 describe('PiSpawnTimeout', () => {
   // PiSpawnTimeout is a typed error class — verify it is exported and

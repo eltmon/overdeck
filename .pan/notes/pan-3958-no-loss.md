@@ -2284,3 +2284,102 @@ Supersedes the CH-8a part 2 list. Exported `…Sync` functions in `src/lib` (tes
 | `xbrief/io.ts` | `findSpecByIssueSync` (9) |
 | `xbrief/lifecycle-io.ts` | `findXBriefByIssueSync` (7) |
 | `xbrief/lifecycle.ts` | `ensureXBriefDirsSync` (3) |
+
+
+## CH-9: the last AC-W8 twin pairs, parser-exact comment stripping, epic close-out (#3958)
+
+PRD W8 (the nine pairs CH-6 did not inventory), the #4055 review nits, and the full section 11 re-run. Rules as in
+CH-6b: a twin whose callers can all move is deleted; server-reachable callers use the async variant; a sync twin
+that stays gets a `Sync twins (PAN-3958)` header naming its synchronous callers. Survivors keep their names
+(renames are #4002's scope).
+
+### The nine pairs
+
+| Module | Pair | Decision | Callers moved |
+| --- | --- | --- | --- |
+| `concurrency.ts` | `withConcurrencyLimit` (Effect) / `withConcurrencyLimitPromise` | Effect variant deleted (it was `Effect.all(tasks, { concurrency })`) | `overdeck/conversation-reads.ts`, `overdeck/conversation-list.ts`, `routes/projects.ts`, `services/agent-output-service.ts`, `services/agent-enrichment-service.ts` → `withConcurrencyLimitPromise`; `overdeck/issue-close-out.ts` (2 generator sites) → `Effect.all(…, { concurrency })`; unused imports dropped from `routes/issues.ts`, `routes/command-deck.ts` |
+| `planning/auto-spawn-consent.ts` | `readAutoSpawnOnFinalizeFlag` / `…Async` | sync deleted (no production caller) with private `readConsentRecordSync`; `spawn-planning-session.ts` drops the re-export | tests only (below) |
+| `projects.ts` | `listProjects` (Effect) / `listProjectsAsync` (and `listProjectsSync`) | Effect variant deleted; its body is inlined into `listProjectsAsync` | `routes/context.ts` `loadProjectsForRoute` → `Effect.tryPromise(() => listProjectsAsync())` (same error message: `runPromise` rejects with the typed error itself) |
+| `orders/resolver.ts` | `getBook` / `getBookAsync` | sync deleted | `routes/orders.ts` `requireBook`, `nextBookId`, `getOrderPayload`; `orders/writer.ts` `requireBook`, `createBook`; `resolver.ts` `firstReadyBookInQueue` (now `async`, only caller `advanceQueue`); `cli/commands/orders.ts` `requireBook`, `nextBookId`, `runOrdersShow` (now `async`) |
+| `orders/io.ts` | `readOrderBook` / `readOrderBookAsync` | C6: sync kept for `listBooks` (sync read door, 15 callers, a file read: FR-8 does not reach it) | `writeOrderBookState` (async) → `readOrderBookAsync` |
+| `runtimes/storage/kimi-code.ts` | `findKimiWirePath` / `…Async`, `findLatestKimiSession` / `…Async` | C6: `KimiCodeRuntime.getSessionPath` and `listSessions` are sync by the runtime interface; `findLatestKimiSession` is `findKimiWirePath`'s fallback | — |
+| `session-history.ts` | `appendSessionIdToHistory` / `…Async` | C6 per #4038: launch and capture paths, `saveSessionId` and `createFreshSessionIdentity` (sync), and `observeSessionIndexEvent`, called from the event store's synchronous subscriber so index lines land in event order | — |
+| `xbrief/continue-state.ts` | `readItemStatuses` / `…Async` | C6: `xbrief/io.ts:331` (behind `readWorkspacePlanSync`) and `cloister/swarm-slot-lifecycle.ts:20` (sync `isTerminalSwarmSlotAgent`, used by the sync counters #4048 kept) | `cloister/deacon-swarm.ts` default reader and `DeaconSwarmDeps.readItemStatuses` (now Promise-typed); `cli/commands/swarm-gates.ts` (2); `cli/commands/swarm-status.ts` default and `SwarmStatusCommandDeps.readItemStatuses` (now Promise-typed) |
+
+After this PR the audit's `twinPairs` has no `Promise` row, and every `Async` row other than `sendKeys` sits in a
+module with a `Sync twins (PAN-3958)` header: `orders/io.ts`, `runtimes/storage/kimi-code.ts`, `session-history.ts`,
+`xbrief/continue-state.ts`.
+
+Ratchet: A 1, B 4, C 32 → 31 (`projects.ts` C 4 → 3). The C drop is the audit losing sight of a pair, not a pair
+removed: `listProjectsSync` and `listProjectsAsync` still coexist (the C6 header in `projects.ts` names them), and the
+audit only pairs `foo` with `foo<Suffix>`, so with the bare `listProjects` gone it sees neither. Effect diagnostics
+231, circular dependencies 64, both unchanged. File-size caps lowered: `projects.ts` 1218 → 1210,
+`routes/command-deck.ts` 1332 → 1331.
+
+### The scan's comment stripper (#4055 review)
+
+`.pan/notes/pan-3958-dead-exports.py` now gets comment-free text from `.pan/notes/pan-3958-strip-comments.mjs`, which
+blanks the comment ranges the TypeScript parser reports (leading and trailing trivia of every token, JSX text
+excluded), keeping newlines. Regex literals after keywords, nested template literals and type positions are exact;
+`transpile` with `removeComments` was not used because it erases type positions and would make type-only names look
+dead. The only change in the scan's output: `runtimes/ohmypi-fifo.ts` `writeOhmypiCommand` and `destroyOhmypiFifo`
+move from OWNFILE to DEAD (their only in-file mentions are doc comments the hand stripper missed). Both are Oh My Pi
+(#4003), so the "0 DEAD outside Oh My Pi" statement stands, but the #4055 claim of 0 DEAD overall was wrong.
+
+### Other #4055 review nits
+
+`dispatch-tier.test.ts`: the `describe` is named for the module (`chooseDispatchTier` is deleted) and the stray blank
+lines are gone. `memory-governor.test.ts`: import spacing.
+
+### Tests
+
+No `it()`/`test()` call is added or removed; six become `async`. Ports: `auto-spawn-consent.test.ts`,
+`resolve-auto-spawn-on-finalize.test.ts`, `agents-spawn-supervisor.test.ts`, `complete-planning.test.ts` and
+`remote-agent-provenance.test.ts` read the flag with `await readAutoSpawnOnFinalizeFlagAsync`;
+`orders-writer.test.ts` and `orders-issue-normalization.test.ts` read with `getBookAsync` (the normalization test's
+sync/async comparison becomes one async read); `orders-resolver.test.ts` and `cli/orders.test.ts` await
+`firstReadyBookInQueue` and `runOrdersShow`. Mock shapes: the `readItemStatuses` dependency mocks in
+`deacon-swarm-doneness.test.ts`, `swarm-wait.test.ts` and `swarm.test.ts` resolve; `costs-wal.test.ts`,
+`sync-mirror.test.ts` and `routes/projects.test.ts` drop the `listProjects` key from their `projects.js` factories.
+No test-removal waiver is needed.
+
+### Section 11 re-run on this branch
+
+| AC | Result |
+| --- | --- |
+| W1 | pass: `lint-effect-facades.test.ts` and `lint-ratchet-audit.test.ts` pass; `npm run lint` runs `lint:effect-facades`; the baseline exists |
+| W2 | pass except Oh My Pi: no dead Shape B row; `Effect variants (PAN-1249)` only in `cost-parsers/ohmypi-parser.ts`, `runtimes/ohmypi-fifo.ts`, `runtimes/ohmypi.ts` |
+| W3 | pass: no dead Shape A row |
+| W4 | pass except Oh My Pi: the grep hits only `runtimes/ohmypi*.ts`, `ohmypi.test.ts`, the Oh My Pi re-exports in `runtimes/index.ts`, and `AgentRuntime`/`AgentRuntimeError` in `runtimes/types.ts`, kept for Oh My Pi until #4003. Two prose mentions in `pi.ts` and `pi.test.ts` are reworded. `npx vitest run src/lib/runtimes tests/unit/lib/pan-330-dead-session.test.ts` passes |
+| W5 | pass: no C1–C3 row left |
+| W6 | **fails outside Oh My Pi**: A 0 except Oh My Pi, but `git grep -nE "async function \w+Promise\(" -- src/lib` still prints 27 lines, one of them Oh My Pi (below) |
+| W7 | pass except Oh My Pi: B 4, all Oh My Pi |
+| W8 | pass: see above; the blocking-sync grep over `src/dashboard` and `src/lib/cloister` prints nothing |
+| W9 | pass: `lint:harness-storage` and its fixture test pass; no new cycle |
+| W10 | pass except Oh My Pi: DEAD and OWNFILE rows are all Oh My Pi; every TESTONLY row is a seam; no `as …Shared` alias |
+| W11 | pass: every doc string the AC names is present; `lint-skills.sh` passes inside `npm run lint` |
+
+AC-W6 residual (REFACTOR-QUEUE row 21j). These predate CH-9. CH-2 to CH-5 did not rename them, and the PRs for those
+clusters did not report the grep:
+
+- 12 are the only variant left. Their Effect twin was deleted as dead in CH-1b or CH-8a before W6 could make the bare
+  name the async function, so the `Promise` suffix is stale. Exported: `agent-enrichment.ts` `scanPendingInputsPromise`,
+  `cloister/review-convoy.ts` `launchConvoyReviewersPromise`, `cloister/review-monitor.ts`
+  `waitForReviewerOutputsPromise`, `git-utils.ts` `isValidBranchNamePromise`, `assertValidBranchNamePromise`,
+  `renderWorkspaceGitShowPromise` and `snapshotWorkspaceHeadsPromise`, `github-app.ts`
+  `listIssuesWithAnyLabelPromise`, `work/done-preflight.ts` `checkIncompletePlanItemsPromise`,
+  `workspace-manager/docker.ts` `teardownWorkspaceDockerByNamePromise`. Private: `codex-auth.ts`
+  `checkCliproxyCodexAuthStatusPromise`, `work/done-preflight.ts` `checkUncommittedChangesPromise`.
+- 14 are private bodies behind an exported Effect function that CH-3 and CH-4 kept for its typed error (Q2). CH-4
+  renamed its own equivalents `…Body`. These are `checkpoint/checkpoint-manager.ts` (6), `health.ts` (3),
+  `github-app.ts` (2), `cloister/merge-rebase.ts`, `cloister/review-agent.ts` and `cloister/validation.ts`.
+- The Oh My Pi one is `runtimes/ohmypi-fifo.ts` `createOhmypiFifoPromise` (#4003).
+
+This is rename work of the #4002 kind. The exported renames reach about 25 caller files. It is left out of this PR and
+proposed as an extension of #4002 ("`…Sync` and `…Promise` names with no twin") or as a CH-10.
+
+### Surviving `…Sync` functions with no async twin: final (scope for #4002)
+
+This PR re-ran the CH-8b computation against the new audit. The set and every production reference count are
+unchanged: 356 functions, one of them Oh My Pi. The CH-8b table above is the final list. `listProjectsSync` is not on
+it, because its module still defines `listProjectsAsync`.

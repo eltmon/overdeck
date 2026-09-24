@@ -6,6 +6,13 @@
  * Leaf module: imports only `node:*`, so any layer can import it without
  * creating a cycle. `npm run lint:harness-storage` keeps these paths from being
  * rebuilt anywhere else.
+ *
+ * Sync twins (PAN-3958): `findKimiWirePath` and `findLatestKimiSession` (async: `…Async`) exist because
+ * these callers run in synchronous contexts and cannot await:
+ * - `findKimiWirePath`: src/lib/runtimes/kimi-code.ts:451 (`getSessionPath`) and :625 (`listSessions`),
+ *   both sync by the runtime interface.
+ * - `findLatestKimiSession`: src/lib/runtimes/storage/kimi-code.ts:48 (`findKimiWirePath`'s fallback).
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, statSync } from 'node:fs';
@@ -79,10 +86,9 @@ export function kimiSessionsRoot(kimiHome: string, workDir: string): string {
  * Async twin of {@link findKimiWirePath} (PAN-1837 review fix, P2). The
  * dashboard's transcript resolver runs on the event loop and Command Deck
  * polling re-resolves the same session repeatedly, so the sync
- * readdirSync/statSync walk here would block the loop on every poll as a
- * session's history grows. Runtime-side sync callers (kill/spawn lifecycle)
- * keep using the sync versions above — this pair exists only for dashboard
- * routes, per the runtime's own documented sync contract.
+ * readdirSync/statSync walk would block the loop on every poll as a
+ * session's history grows. The runtime's sync interface methods keep the
+ * sync versions above (see the module header).
  */
 export async function findKimiWirePathAsync(
   kimiHome: string,

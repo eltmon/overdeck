@@ -84,7 +84,6 @@ vi.mock('../../../src/lib/config.js', () => ({
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
-  listProjects: mockListProjects,
   listProjectsSync: mockListProjects,
 }));
 

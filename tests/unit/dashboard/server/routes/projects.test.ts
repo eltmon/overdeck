@@ -9,7 +9,6 @@ import type { AgentState } from '../../../../../src/lib/agents.js';
 // Stub the chain entry so the module under test loads.
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
-  listProjects: vi.fn(),
   listProjectsSync: vi.fn(),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'overdeck' })),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck' })),

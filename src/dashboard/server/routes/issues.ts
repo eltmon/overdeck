@@ -83,7 +83,6 @@ import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichm
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
-import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import {
   getCachedResourceAllocatedIssues,

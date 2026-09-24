@@ -18,7 +18,7 @@
  *   lib/overdeck/issue-projects.ts, lib/pan-dir/migrate-plan-home.ts, lib/project-repos.ts, lib/projects.ts,
  *   lib/swarm-policy.ts, lib/workspace/ensure-devcontainer.ts, lib/workspace/rebuild-stack.ts,
  *   lib/workspace/stack-health.ts.
- * - `listProjectsSync` (async: `listProjects`): 29 sites in scripts/reconcile-work-model-stamps.ts,
+ * - `listProjectsSync` (async: `listProjectsAsync`): 29 sites in scripts/reconcile-work-model-stamps.ts,
  *   cli/commands/conversations/move.ts, cli/commands/doctor-plan-home-ignore.ts, cli/commands/doctor.ts,
  *   cli/commands/workspace-list.ts, dashboard/server/routes/misc/meta.ts,
  *   dashboard/server/routes/misc/trackers.ts, dashboard/server/routes/orders.ts,
@@ -1125,24 +1125,16 @@ export const loadProjectsConfig = (): Effect.Effect<ProjectsConfig, ConfigParseE
     return config;
   });
 
-/** Effect variant of {@link listProjectsSync}. */
-export const listProjects = (): Effect.Effect<Array<{ key: string; config: ProjectConfig }>, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(
-    Effect.map((config) =>
-      Object.entries(config.projects).map(([key, projectConfig]) => ({ key, config: projectConfig })),
-    ),
-  );
-
 /**
- * Promise variant of {@link listProjectsSync}, for server-reachable callers.
+ * Async variant of {@link listProjectsSync}, for server-reachable callers.
  *
  * `listProjectsSync` reads and parses projects.yaml on the calling thread; on
- * the dashboard's single event loop that stalls every other request. This
- * wraps the Effect loader so callers that only need a promise do not have to
- * take an Effect dependency (PAN-3330 review).
+ * the dashboard's single event loop that stalls every other request
+ * (PAN-3330 review).
  */
 export async function listProjectsAsync(): Promise<Array<{ key: string; config: ProjectConfig }>> {
-  return Effect.runPromise(listProjects());
+  const config = await Effect.runPromise(loadProjectsConfig());
+  return Object.entries(config.projects).map(([key, projectConfig]) => ({ key, config: projectConfig }));
 }
 
 /**

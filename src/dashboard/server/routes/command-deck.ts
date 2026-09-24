@@ -42,7 +42,6 @@ import { capturePane, listSessionNames } from '../../../lib/tmux.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { getBackendPanesForIssue } from '../services/backend-inventory.js';
 import { getDerivedIssueState } from '../services/derived-issue-state.js';
-import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { AgentSnapshot, BackendPane, SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';

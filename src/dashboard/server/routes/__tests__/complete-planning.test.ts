@@ -26,7 +26,7 @@ import {
   recordPlanningAutoHandoffFailure,
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
-import { readAutoSpawnOnFinalizeFlag, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
+import { readAutoSpawnOnFinalizeFlagAsync, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
@@ -467,7 +467,7 @@ describe('completePlanningArtifacts', () => {
       workAgentSkipReason: 'unauthorized',
     });
     expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
-    expect(readAutoSpawnOnFinalizeFlag('PAN-1146')).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1146')).resolves.toBe(true);
   });
 
   // PAN-3917: there is no stored pipeline state to mark stuck — the failure is
