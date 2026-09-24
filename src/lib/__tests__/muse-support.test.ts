@@ -18,6 +18,9 @@ import { renderForHarness } from '../context-layers/harness.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
 import { readSessionIndex } from '../session-history.js';
 import { MuseRuntimeSync } from '../runtimes/muse.js';
+import { tmuxCreateSession } from '../runtimes/tmux-cli.js';
+import { waitForPromptReady } from '../agents/runtime-command.js';
+import { fakeTerminalBackend } from '../../../tests/helpers/fake-terminal-backend.js';
 
 vi.mock('../harness-binary.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../harness-binary.js')>();
@@ -35,6 +38,11 @@ vi.mock('../runtimes/tmux-cli.js', async (importOriginal) => {
 vi.mock('../agents/runtime-command.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../agents/runtime-command.js')>();
   return { ...actual, waitForPromptReady: vi.fn(async () => true) };
+});
+const launchMocks = vi.hoisted(() => ({ agentPaneExists: vi.fn(async () => false) }));
+vi.mock('../terminal-backends/launch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../terminal-backends/launch.js')>();
+  return { ...actual, agentPaneExists: launchMocks.agentPaneExists };
 });
 vi.mock('../runtimes/muse-context.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../runtimes/muse-context.js')>();
@@ -172,7 +180,8 @@ describe('Muse model and harness support', () => {
       const sessionLogPath = join(sessionDir, 'session.jsonl');
       await writeFile(sessionLogPath, '{}\n');
 
-      const runtime = new MuseRuntimeSync();
+      const backend = fakeTerminalBackend('tmux');
+      const runtime = new MuseRuntimeSync({ resolveBackend: async () => backend });
       const agent = await runtime.spawnAgent({
         agentId,
         workspace: '/tmp/muse-workspace',
@@ -190,9 +199,75 @@ describe('Muse model and harness support', () => {
           path: sessionLogPath,
         }),
       ]);
+      // PAN-3936: tmux keeps the PTY supervisor, launched through launchAgentPane.
+      expect(tmuxCreateSession).not.toHaveBeenCalled();
+      const launcher = join(root, 'agents', agentId, 'launcher.sh');
+      expect(backend.starts).toHaveLength(1);
+      expect(backend.starts[0]!.spec).toMatchObject({ name: agentId, argv: ['bash', launcher], tokens: { harness: 'muse' } });
+      expect(await readFile(launcher, 'utf8')).toContain('pty-supervisor');
     } finally {
       if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
       else process.env.OVERDECK_HOME = originalOverdeckHome;
     }
+  });
+
+  async function withMuseHome(agentId: string, run: (root: string) => Promise<void>): Promise<void> {
+    const root = await mkdtemp(join(tmpdir(), 'muse-herdr-')); temporary.push(root);
+    const originalOverdeckHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = root;
+    try {
+      const sessionDir = join(museDataHome(agentId, join(root, 'agents')), 'muse', 'sessions', '2026', '09', '24', '01-herdr');
+      await mkdir(sessionDir, { recursive: true });
+      await writeFile(join(sessionDir, 'session.jsonl'), '{}\n');
+      await run(root);
+    } finally {
+      if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = originalOverdeckHome;
+    }
+  }
+
+  it('launches on Herdr through launchAgentPane with no PTY supervisor (PAN-3936)', async () => {
+    const agentId = 'agent-muse-herdr-test';
+    await withMuseHome(agentId, async (root) => {
+      vi.mocked(tmuxCreateSession).mockClear();
+      const backend = fakeTerminalBackend('herdr');
+      const agent = await new MuseRuntimeSync({ resolveBackend: async () => backend }).spawnAgent({
+        agentId, workspace: '/tmp/muse-workspace', runtime: 'muse', model: 'muse-spark-1.3',
+      });
+      expect(agent.sessionId).toBe('01-herdr');
+      expect(tmuxCreateSession).not.toHaveBeenCalled();
+      const launcher = join(root, 'agents', agentId, 'launcher.sh');
+      expect(backend.starts).toHaveLength(1);
+      expect(backend.starts[0]!.spec).toMatchObject({
+        name: agentId, cwd: '/tmp/muse-workspace', argv: ['bash', launcher], detection: 'not-required',
+        tokens: { harness: 'muse', model: 'muse-spark-1.3' },
+      });
+      expect(await readFile(launcher, 'utf8')).not.toContain('pty-supervisor');
+    });
+  });
+
+  it('on Herdr, accepts a present pane with a session log when the prompt scan reads nothing (PAN-3936)', async () => {
+    const agentId = 'agent-muse-herdr-fullscreen';
+    await withMuseHome(agentId, async () => {
+      vi.mocked(waitForPromptReady).mockResolvedValueOnce(false);
+      launchMocks.agentPaneExists.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      const backend = fakeTerminalBackend('herdr');
+      const agent = await new MuseRuntimeSync({ resolveBackend: async () => backend }).spawnAgent({
+        agentId, workspace: '/tmp/muse-workspace', runtime: 'muse', model: 'muse-spark-1.3',
+      });
+      expect(agent.sessionId).toBe('01-herdr');
+      expect(backend.closes).toEqual([]);
+    });
+  });
+
+  it('on tmux, still fails a spawn whose prompt never appears', async () => {
+    const agentId = 'agent-muse-tmux-timeout';
+    await withMuseHome(agentId, async () => {
+      vi.mocked(waitForPromptReady).mockResolvedValueOnce(false);
+      const backend = fakeTerminalBackend('tmux');
+      await expect(new MuseRuntimeSync({ resolveBackend: async () => backend }).spawnAgent({
+        agentId, workspace: '/tmp/muse-workspace', runtime: 'muse', model: 'muse-spark-1.3',
+      })).rejects.toThrow('Muse startup timed out');
+    });
   });
 });
