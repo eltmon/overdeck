@@ -38,7 +38,8 @@ vi.mock('../../../../lib/overdeck/derived-issue-state.js', async (importOriginal
   };
 });
 
-const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+const { setConversationsAutoArchiveOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
 const { closeOverdeckDatabase, getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
 const {
   linkConversationPullRequest,
@@ -313,6 +314,78 @@ describe('runPullRequestSyncOnce — slow lane, fallback, backoff (WI-4)', () =>
     await runPullRequestSyncOnce(T0, read);
 
     expect(read).not.toHaveBeenCalled();
+  });
+});
+
+describe('runPullRequestSyncOnce — auto-archive on merge (WI-11)', () => {
+  const T0 = Date.parse('2026-09-24T00:00:00Z');
+  const merged = (number: number, head: string) => pr(number, head, { state: 'MERGED', mergedAt: '2026-09-24T00:00:00Z' });
+  const noLiveSessions = async () => [] as string[];
+
+  async function openThenMerge(branch: string, opts: { name?: string; issueId?: string } = {}, live = noLiveSessions) {
+    const name = conversation(branch, opts);
+    prRows = [pr(20, branch)];
+    await runPullRequestSyncOnce(T0, async () => null, live);
+    prRows = [merged(20, branch)];
+    await runPullRequestSyncOnce(T0 + 60_000, async () => null, live);
+    return name;
+  }
+
+  function archivedAt(name: string): string | null {
+    return getConversationByName(name)?.archivedAt ?? null;
+  }
+
+  afterEach(() => {
+    setConversationsAutoArchiveOnMerge(false);
+  });
+
+  it('is off by default: a merged PR never archives the conversation', async () => {
+    const name = await openThenMerge('feature/off');
+    expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('merged');
+    expect(archivedAt(name)).toBeNull();
+  });
+
+  it('when on, archives an operator conversation once its only PR merges and its session is gone', async () => {
+    setConversationsAutoArchiveOnMerge(true);
+    const name = await openThenMerge('feature/on');
+    expect(archivedAt(name)).not.toBeNull();
+    expect(emitOnlyMock).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ conversationName: name }) }));
+  });
+
+  it('never archives an agent conversation', async () => {
+    setConversationsAutoArchiveOnMerge(true);
+    const name = await openThenMerge('feature/agent', { name: 'agent-pan-77', issueId: 'PAN-77' });
+    expect(archivedAt(name)).toBeNull();
+  });
+
+  it('never archives a conversation whose terminal session is alive', async () => {
+    setConversationsAutoArchiveOnMerge(true);
+    const name = await openThenMerge('feature/live', { name: 'live-chat' }, async () => ['conv-live-chat']);
+    expect(archivedAt(name)).toBeNull();
+  });
+
+  it('waits while another linked PR is still open', async () => {
+    setConversationsAutoArchiveOnMerge(true);
+    const name = conversation('feature/two');
+    linkConversationPullRequest(name, {
+      host: 'github.com', repository: 'eltmon/overdeck', number: 21, url: 'https://github.com/eltmon/overdeck/pull/21',
+    }, 'manual', T0);
+    prRows = [pr(20, 'feature/two'), pr(21, 'feature/other')];
+    await runPullRequestSyncOnce(T0, async () => null, noLiveSessions);
+    prRows = [merged(20, 'feature/two'), pr(21, 'feature/other')];
+    await runPullRequestSyncOnce(T0 + 60_000, async () => null, noLiveSessions);
+    expect(archivedAt(name)).toBeNull();
+  });
+
+  it('does not archive on the first read of a PR that was already merged', async () => {
+    setConversationsAutoArchiveOnMerge(true);
+    const name = conversation('feature/late');
+    linkConversationPullRequest(name, {
+      host: 'github.com', repository: 'eltmon/overdeck', number: 22, url: 'https://github.com/eltmon/overdeck/pull/22',
+    }, 'manual', T0);
+    await runPullRequestSyncOnce(T0, async () => merged(22, 'feature/whatever') as never, noLiveSessions);
+    expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('merged');
+    expect(archivedAt(name)).toBeNull();
   });
 });
 

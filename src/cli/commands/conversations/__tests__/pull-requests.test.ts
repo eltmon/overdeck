@@ -192,6 +192,29 @@ describe('prsAction', () => {
   });
 });
 
+describe('autoArchiveOnMergeAction', () => {
+  it('shows off by default, sets on and off, and rejects anything else', async () => {
+    const { autoArchiveOnMergeAction } = await import('../pull-requests.js');
+    const { isConversationsAutoArchiveOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
+    const { logs } = captureConsole();
+    const exitSpy = mockExit();
+
+    await autoArchiveOnMergeAction();
+    expect(logs.at(-1)).toBe('off');
+
+    await autoArchiveOnMergeAction('on');
+    expect(isConversationsAutoArchiveOnMerge()).toBe(true);
+    await autoArchiveOnMergeAction();
+    expect(logs.at(-1)).toBe('on');
+
+    await autoArchiveOnMergeAction('off');
+    expect(isConversationsAutoArchiveOnMerge()).toBe(false);
+
+    await expect(autoArchiveOnMergeAction('yes')).rejects.toThrow('exit 1');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+});
+
 describe('registerConversationsCommands', () => {
   it('registers link-pr, unlink-pr, and prs', async () => {
     const { registerConversationsCommands } = await import('../index.js');
@@ -204,5 +227,6 @@ describe('registerConversationsCommands', () => {
     expect(args('link-pr')).toEqual(['query', 'ref']);
     expect(args('unlink-pr')).toEqual(['query', 'ref']);
     expect(args('prs')).toEqual(['query']);
+    expect(args('auto-archive-on-merge')).toEqual(['value']);
   });
 });

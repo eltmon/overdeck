@@ -31,6 +31,7 @@ pan conversations move <query> <projectKey>
 pan conversations link-pr <query> <url|#42|owner/repo#42> [--source agent|manual]
 pan conversations unlink-pr <query> <url|#42|owner/repo#42>
 pan conversations prs <query> [--json]
+pan conversations auto-archive-on-merge [on|off]
 pan conversations current [--json]
 pan conversations cost [--since <time>] [--workspace <path>] [--by <field>] [--json]
 pan conversations embed [ids...] [--regenerate] [--status] [--provider <name>] [--model <name>] [--max-parallel <n>]
@@ -69,6 +70,9 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   configured for the conversation's project is accepted (`#42` = that repo).
   Inside an agent the source is `agent`. Unlinking hides the PR from branch
   detection too. Works with the dashboard down (writes the link directly).
+  `auto-archive-on-merge` (default off) archives an operator conversation once
+  all its linked PRs are merged or closed; never agent conversations, never a
+  live session.
 - **`enrich`**/**`embed`** call out to an LLM/embedding provider and cost money;
   `enrich` prompts for confirmation unless `--yes` is passed. `--tier 3`
   (`--deep`) and `--full` are the expensive, most-thorough options.

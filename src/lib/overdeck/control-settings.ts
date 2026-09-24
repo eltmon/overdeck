@@ -197,6 +197,21 @@ export function setFlywheelAutoPickupBacklog(enabled: boolean): void {
   setSetting(FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY, enabled ? 'true' : 'false');
 }
 
+/**
+ * PAN-3822: archive an operator conversation when its linked pull requests
+ * are all merged or closed (the PR sync sweep, on the transition). Default off;
+ * never stops a session and never touches agent conversations.
+ */
+export const CONVERSATIONS_AUTO_ARCHIVE_ON_MERGE_KEY = 'conversations.auto_archive_on_merge';
+
+export function isConversationsAutoArchiveOnMerge(): boolean {
+  return getSetting(CONVERSATIONS_AUTO_ARCHIVE_ON_MERGE_KEY) === 'true';
+}
+
+export function setConversationsAutoArchiveOnMerge(enabled: boolean): void {
+  setSetting(CONVERSATIONS_AUTO_ARCHIVE_ON_MERGE_KEY, enabled ? 'true' : 'false');
+}
+
 /** Drop-in for isFlywheelRequireUatBeforeMerge() from app-settings.ts. */
 export function isFlywheelRequireUatBeforeMerge(): boolean {
   const val = getSetting(FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY);

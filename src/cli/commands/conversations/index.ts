@@ -13,7 +13,7 @@ import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
 import { jsonlAction } from './jsonl.js';
 import { moveAction } from './move.js';
-import { linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
+import { autoArchiveOnMergeAction, linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
 import { healAction } from './heal.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
@@ -122,6 +122,10 @@ export function registerConversationsCommands(program: Command): void {
     .description('List the pull requests linked to a conversation (* = the one shown)')
     .option('--json', 'Output { links, effective } as JSON')
     .action((query: string, opts: { json?: boolean }) => prsAction(query, opts));
+  conversations
+    .command('auto-archive-on-merge [value]')
+    .description('Show or set (on|off) archiving operator conversations once all their linked PRs are merged or closed (default off)')
+    .action((value?: string) => autoArchiveOnMergeAction(value));
 
   conversations
     .command('heal <query>')

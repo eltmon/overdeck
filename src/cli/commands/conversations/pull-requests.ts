@@ -23,6 +23,10 @@ import {
   unlinkPullRequestFromConversation,
   type PullRequestCommandResult,
 } from '../../../lib/overdeck/conversation-pull-request-commands.js';
+import {
+  isConversationsAutoArchiveOnMerge,
+  setConversationsAutoArchiveOnMerge,
+} from '../../../lib/overdeck/control-settings.js';
 import { resolveConversation } from './move.js';
 
 type LinkSource = 'agent' | 'manual';
@@ -102,6 +106,25 @@ export async function unlinkPrAction(query: string, ref: string): Promise<void> 
   if (!result.ok) return failWith(result.status, result.body as { error?: string });
   const { link } = result.body as { link: PullRequestLink };
   console.log(chalk.green(`✓ Unlinked ${link.repository}#${link.number} from ${name}`));
+}
+
+/**
+ * `pan conv auto-archive-on-merge [on|off]` — read or set
+ * `conversations.auto_archive_on_merge` (default off).
+ */
+export async function autoArchiveOnMergeAction(value?: string): Promise<void> {
+  if (value === undefined) {
+    console.log(isConversationsAutoArchiveOnMerge() ? 'on' : 'off');
+    return;
+  }
+  if (value !== 'on' && value !== 'off') {
+    console.error(chalk.red(`Error: expected "on" or "off", got "${value}"`));
+    return exitCli(1);
+  }
+  setConversationsAutoArchiveOnMerge(value === 'on');
+  console.log(chalk.green(value === 'on'
+    ? '✓ Operator conversations are archived once all their linked PRs are merged or closed (live sessions are never touched)'
+    : '✓ Auto-archive on merge is off'));
 }
 
 export async function prsAction(query: string, opts: { json?: boolean } = {}): Promise<void> {

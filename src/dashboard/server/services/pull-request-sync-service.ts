@@ -29,12 +29,20 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { Effect } from 'effect';
 import type { PullRequestKey, PullRequestLink, PullRequestSnapshot } from '@overdeck/contracts';
 
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { resolveConversationBranch } from '../../../lib/overdeck/conversation-branch.js';
 import {
+  archiveConversation,
+  getConversationByName,
+  isAgentConversationName,
+} from '../../../lib/overdeck/conversations.js';
+import { isConversationsAutoArchiveOnMerge } from '../../../lib/overdeck/control-settings.js';
+import {
   emitConversationPullRequestsChanged,
+  listConversationPullRequests,
   listConversationsForPullRequestSync,
   listPullRequestLinksForConversations,
   setPullRequestLinkSnapshot,
@@ -50,6 +58,7 @@ import {
 } from '../../../lib/overdeck/derived-issue-state.js';
 import { getRepoTargetBranch } from '../../../lib/project-repos.js';
 import { findProjectByPath, type ProjectConfig } from '../../../lib/projects.js';
+import { listSessionNames } from '../../../lib/tmux.js';
 
 export const PR_SYNC_BOOT_DELAY_MS = 30_000;
 export const PR_SYNC_INTERVAL_MS = 60_000;
@@ -123,6 +132,8 @@ interface SweepContext {
   readonly changedNames: Set<string>;
   /** PR keys already handled this sweep (refreshed, or not due). */
   readonly handled: Set<string>;
+  /** Conversations with a link that went from open to merged/closed this sweep. */
+  readonly settled: Set<string>;
 }
 
 /**
@@ -143,9 +154,44 @@ function isDue(link: PullRequestLink, now: number): boolean {
 
 function applySnapshot(link: PullRequestLink, row: GhPrRow, ctx: SweepContext): number {
   lastReadAt.set(keyString(link), ctx.now);
-  const changed = setPullRequestLinkSnapshot(link, snapshotFromGhRow(row, ctx.syncedAt));
-  for (const name of changed) ctx.changedNames.add(name);
+  const snapshot = snapshotFromGhRow(row, ctx.syncedAt);
+  const changed = setPullRequestLinkSnapshot(link, snapshot);
+  // Only an observed open → merged/closed transition counts (a first read of an
+  // already-settled PR does not), so auto-archive can't fire on a fresh link.
+  const settledNow = snapshot.state !== 'open' && link.snapshot?.state === 'open';
+  for (const name of changed) {
+    ctx.changedNames.add(name);
+    if (settledNow) ctx.settled.add(name);
+  }
   return changed.length;
+}
+
+/**
+ * `conversations.auto_archive_on_merge` (default off): archive an operator
+ * conversation whose PR just settled when every live link is now merged or
+ * closed and no terminal session is alive. Acting only on the transition makes
+ * it happen at most once, so an operator who unarchives is left alone. Agent
+ * conversations belong to the pipeline and are never archived here; nothing is
+ * ever stopped.
+ */
+async function autoArchiveSettledConversations(
+  ctx: SweepContext,
+  listLiveSessions: () => Promise<readonly string[]>,
+): Promise<string[]> {
+  const candidates = [...ctx.settled].filter((name) => !isAgentConversationName(name));
+  if (candidates.length === 0 || !isConversationsAutoArchiveOnMerge()) return [];
+  const live = new Set(await listLiveSessions());
+  const archived: string[] = [];
+  for (const name of candidates) {
+    const conversation = getConversationByName(name);
+    if (!conversation || conversation.archivedAt || live.has(conversation.tmuxSession)) continue;
+    const links = listConversationPullRequests(name).filter((link) => link.dismissedAt === null);
+    if (links.length === 0 || links.some((link) => link.snapshot?.state !== 'merged' && link.snapshot?.state !== 'closed')) continue;
+    archiveConversation(name);
+    archived.push(name);
+  }
+  if (archived.length > 0) console.log(`${LOG_PREFIX} auto-archived ${archived.length} conversation(s) whose PRs settled`);
+  return archived;
 }
 
 async function syncProject(
@@ -282,12 +328,18 @@ export async function refreshPullRequestLinkNow(
   return setPullRequestLinkSnapshot(link, snapshotFromGhRow(row, new Date(now).toISOString()));
 }
 
-/** One full sweep. Exported for tests; `readPullRequest` is the `gh pr view` fallback. */
+/**
+ * One full sweep. Exported for tests; `readPullRequest` is the `gh pr view`
+ * fallback and `listLiveSessions` the terminal sessions auto-archive checks.
+ */
 export async function runPullRequestSyncOnce(
   now: number = Date.now(),
   readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
+  listLiveSessions: () => Promise<readonly string[]> = () => Effect.runPromise(listSessionNames()),
 ): Promise<PullRequestSyncResult> {
-  const ctx: SweepContext = { now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set() };
+  const ctx: SweepContext = {
+    now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set(), settled: new Set(),
+  };
   const conversations = listConversationsForPullRequestSync();
   const groups = new Map<string, { project: ProjectConfig; conversations: PullRequestSyncConversation[] }>();
   for (const conversation of conversations) {
@@ -313,6 +365,11 @@ export async function runPullRequestSyncOnce(
     updated += await refreshUnlistedLinks(conversations, ctx, readPullRequest);
   } catch (error) {
     console.warn(`${LOG_PREFIX} fallback refresh failed:`, error);
+  }
+  try {
+    await autoArchiveSettledConversations(ctx, listLiveSessions);
+  } catch (error) {
+    console.warn(`${LOG_PREFIX} auto-archive failed:`, error);
   }
   for (const name of ctx.changedNames) emitConversationPullRequestsChanged(name);
   return { inserted, updated };

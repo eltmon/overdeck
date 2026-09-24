@@ -407,7 +407,19 @@ The other direction works too: an issue's **Code** card lists every conversation
 linked to the issue's PR, with why it's linked (opened by the pipeline, linked
 by hand, linked by an agent, or on the same branch). Click one to open it.
 
-Linking never archives or stops a conversation.
+Linking never archives or stops a conversation unless you turn on auto-archive:
+
+```bash
+pan conv auto-archive-on-merge        # prints on or off (default: off)
+pan conv auto-archive-on-merge on     # or off
+```
+
+When it's on, an operator conversation is archived when a linked PR goes from
+open to merged or closed and every PR still linked to it is merged or closed.
+It happens once, at that change, so a conversation you unarchive stays. A
+conversation whose terminal session is still alive is never archived, nothing is
+ever stopped, and agent conversations are never archived (the pipeline owns
+them).
 
 Not yet shipped (tracked in [#3822](https://github.com/eltmon/overdeck/issues/3822)):
 transcript right-click, GitLab merge request status,
