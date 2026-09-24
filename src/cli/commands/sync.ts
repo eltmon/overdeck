@@ -37,6 +37,7 @@ import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
 import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
 import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
 import { renderHerdrReport } from '../herdr-report.js';
+import { checkSyncSourceFreshness } from '../../lib/sync-source-freshness.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -118,6 +119,22 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     if (!gate.needed) {
       console.log(chalk.dim('[sync] skipped — inputs unchanged'));
       return;
+    }
+  }
+
+  // PAN-3881: the sources may come from the primary checkout (PAN-3327). When
+  // that checkout is behind its upstream or on a feature branch, sync would
+  // silently distribute an old tree. Warn only — never pull. A frozen
+  // generation's own copy is already covered by the warning above.
+  const syncingFrozenGeneration = isDeploymentGenerationRoot(packageRoot)
+    && SYNC_SOURCES.root === join(packageRoot, 'sync-sources');
+  if (!syncingFrozenGeneration) {
+    const freshness = await timeAsync('source-freshness', () => checkSyncSourceFreshness(SYNC_SOURCES.root));
+    if (freshness && freshness.warnings.length > 0) {
+      console.log(chalk.yellow.bold(`WARNING: pan sync is distributing from ${SYNC_SOURCES.root}, which may be stale:`));
+      for (const warning of freshness.warnings) console.log(chalk.yellow(`  - ${warning}`));
+      console.log(chalk.dim(`  Update that checkout (e.g. \`git -C ${freshness.checkout} pull --ff-only\` on ${freshness.defaultBranch}) and re-run \`pan sync\`.`));
+      console.log('');
     }
   }
 
