@@ -119,6 +119,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
     mockGetRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
     mockRefreshRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
     mockHostBackend.mockResolvedValue('tmux');
+    // A tmux host normally has no Herdr to ask.
+    mockListHerdrAgents.mockRejectedValue(new Error('no herdr socket'));
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
@@ -1023,5 +1025,44 @@ describe('ConversationLifecycleService — peer dashboard', () => {
 
     await vi.advanceTimersByTimeAsync(10_000);
     expect(mockListConversations).toHaveBeenCalled();
+  });
+});
+
+describe('ConversationLifecycleService — rollback to tmux (PAN-3921)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetConversationByName.mockReset();
+    mockHostBackend.mockResolvedValue('tmux');
+    mockIsRespawnPending.mockReturnValue(false);
+    mockIsHarnessProcessAlive.mockResolvedValue(false);
+    mockListPaneValues.mockResolvedValue([]);
+    mockGetRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
+    mockRefreshRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
+  });
+
+  it('keeps a conversation still running in a Herdr pane after the host flips to tmux', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'on-herdr', tmuxSession: 'conv-on-herdr', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed([]));
+    mockListHerdrAgents.mockResolvedValue([{ agentId: 'conv-on-herdr', state: 'idle' }]);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  it('still ends a conversation that neither tmux nor Herdr holds', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'gone', tmuxSession: 'conv-gone', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed([]));
+    mockListHerdrAgents.mockResolvedValue([]);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
   });
 });

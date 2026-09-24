@@ -14,7 +14,7 @@ import type { AgentPaneRef, PaneTokens, StartAgentSpec, TerminalBackend } from '
 const launcherConfigs = vi.hoisted(() => [] as Array<Record<string, unknown>>);
 const writePtyToken = vi.hoisted(() => vi.fn(async () => {}));
 const setOption = vi.hoisted(() => vi.fn(() => Effect.succeed(undefined)));
-const closeAgentPane = vi.hoisted(() => vi.fn(async () => true));
+const closeConversationPane = vi.hoisted(() => vi.fn(async () => {}));
 
 vi.mock('../../harness-binary.js', () => ({
   prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/usr/bin/claude', pathExport: "export PATH='/usr/bin':\"$PATH\"" })),
@@ -62,9 +62,9 @@ vi.mock('../../tmux.js', async (importOriginal) => ({
   killSession: vi.fn(() => Effect.succeed(undefined)),
   sessionExists: vi.fn(() => Effect.succeed(true)),
 }));
-vi.mock('../../terminal-backends/launch.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../terminal-backends/launch.js')>()),
-  closeAgentPane,
+vi.mock('../conversation-liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../conversation-liveness.js')>()),
+  closeConversationPane,
 }));
 
 const { spawnConversationSession } = await import('../conversation-runtime.js');
@@ -124,7 +124,7 @@ beforeEach(() => {
   launcherConfigs.length = 0;
   writePtyToken.mockClear();
   setOption.mockClear();
-  closeAgentPane.mockClear();
+  closeConversationPane.mockClear();
 });
 
 afterEach(() => {
@@ -175,11 +175,11 @@ describe('spawnConversationSession through the launch door (PAN-3921)', () => {
     expect(setOption).toHaveBeenCalledWith(expect.stringContaining('conv-x'), 'remain-on-exit', 'on');
   });
 
-  it('closes the previous pane of the same name on the chosen backend before launching', async () => {
+  it('closes the previous pane of the same name on either backend before launching', async () => {
     const { backend } = fakeBackend('herdr');
     await spawn('conv-x', backend);
 
-    expect(closeAgentPane).toHaveBeenCalledWith('conv-x', backend);
+    expect(closeConversationPane).toHaveBeenCalledWith('conv-x');
   });
 
   it('persists a launch role and stamps it on every later spawn of that conversation', async () => {

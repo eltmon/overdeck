@@ -343,6 +343,25 @@ tmux census only for a conversation Herdr does not hold. When Herdr does not ans
 nothing. Readiness reads the pane through `readAgentPaneText` (Herdr `pane.read` or tmux
 `capture-pane`). The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only.
 
+**On a tmux host the door still asks Herdr** when its socket answers, and only a Herdr `alive`
+counts there (an unreachable Herdr is the normal state of a tmux host). The poller does the same
+with `listHerdrAgents`. Stop, respawn, restart-all and `pan flywheel start --fresh` close a
+conversation through `closeConversationPane`, which closes its Herdr pane and its tmux session
+whichever backend is selected. Without this, a conversation launched on Herdr would read as dead
+after a flip to tmux while `claude` kept running in its pane, and a Resume would start a second
+harness on the same transcript.
+
+**Rolling conversations back to tmux.** Close the Herdr conversation panes first, then flip:
+
+1. `herdr --session overdeck agent list` and note the pane id of every `conv-*` agent.
+2. `herdr --session overdeck pane close <pane_id>` for each of them.
+3. Set `terminal.backend: tmux` in `~/.overdeck/config.yaml` (or revert the release) and run
+   `pan reload`.
+4. Resume the affected conversations from the dashboard; they relaunch as tmux sessions.
+
+Messages cannot reach a Herdr-hosted Claude Code conversation from a tmux host (it has no PTY
+supervisor), which is why step 2 comes before the flip rather than after it.
+
 ## The prompt guard (FR-17)
 
 `src/lib/terminal-backends/prompt-guard.ts`, run by **both** adapters inside `prompt`, and by

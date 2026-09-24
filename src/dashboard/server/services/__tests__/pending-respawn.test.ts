@@ -14,6 +14,12 @@ vi.mock('../../../../lib/tmux.js', () => ({
   sessionExistsSync: vi.fn(),
 }));
 
+// A tmux host also asks Herdr about a conversation tmux does not hold
+// (PAN-3921 rollback safety); these cases have no Herdr.
+vi.mock('../../../../lib/terminal-backends/herdr.js', () => ({
+  probeHerdrAgentLiveness: vi.fn(async () => ({ kind: 'absent' })),
+}));
+
 import { sessionExists } from '../../../../lib/tmux.js';
 import {
   isRespawnPending,

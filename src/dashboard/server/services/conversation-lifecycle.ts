@@ -132,7 +132,9 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * One tick's liveness verdicts (PAN-3921 FR-8). On tmux it is the runtime
- * census, exactly as before. On Herdr it is Herdr's agent inventory, with the
+ * census, plus Herdr's inventory when its socket answers: after a flip back to
+ * tmux, a conversation launched on Herdr still runs there and must not be
+ * ended while its harness lives (rollback safety). On Herdr it is Herdr's agent inventory, with the
  * tmux census consulted only for a conversation Herdr does not hold — one
  * launched before the host moved to Herdr still runs in its tmux session.
  */
@@ -166,14 +168,16 @@ async function readHerdrConversationInventory(): Promise<HerdrConversationInvent
   }
 }
 
-function tmuxView(census: RuntimeCensus): ConversationLivenessView {
+function tmuxView(census: RuntimeCensus, herdr: HerdrConversationInventory | null): ConversationLivenessView {
+  const onHerdr = (name: string) => herdr?.alive.has(name) ?? false;
   return {
     sampledAt: census.sampledAt,
     census,
     graceMs: SPAWN_GRACE_PERIOD_MS,
-    sessionGone: (name) => !census.sessionNames.has(name),
-    harnessGone: async (name) => census.sessionNames.has(name) && !(await runtimeCensusHasHarnessProcess(census, name)),
-    harnessAlive: (name) => isHarnessProcessAlive(name),
+    sessionGone: (name) => !census.sessionNames.has(name) && !onHerdr(name),
+    harnessGone: async (name) => !onHerdr(name) && census.sessionNames.has(name)
+      && !(await runtimeCensusHasHarnessProcess(census, name)),
+    harnessAlive: async (name) => (await isHarnessProcessAlive(name)) || onHerdr(name),
   };
 }
 
@@ -197,7 +201,9 @@ function herdrView(inventory: HerdrConversationInventory, census: RuntimeCensus,
 /** The tick's liveness view, or null when the backend could not be read (mark nothing). */
 async function readLivenessView(fresh: boolean): Promise<ConversationLivenessView | null> {
   const census = fresh ? await refreshRuntimeCensus() : await getRuntimeCensus();
-  if ((await hostTerminalBackendName()) !== 'herdr') return census.available ? tmuxView(census) : null;
+  if ((await hostTerminalBackendName()) !== 'herdr') {
+    return census.available ? tmuxView(census, await readHerdrConversationInventory()) : null;
+  }
   const sampledAt = Date.now();
   const inventory = await readHerdrConversationInventory();
   return inventory ? herdrView(inventory, census, sampledAt) : null;

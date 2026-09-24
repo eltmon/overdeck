@@ -96,8 +96,8 @@ async function defaultTmuxSessionExists(session: string): Promise<boolean> {
 }
 
 async function defaultKillSession(session: string): Promise<void> {
-  const { closeAgentPane } = await import('../terminal-backends/launch.js');
-  await closeAgentPane(session);
+  const { closeConversationPane } = await import('../overdeck/conversation-liveness.js');
+  await closeConversationPane(session);
 }
 
 async function defaultResolveModelAndHarness(opts: { model?: string; harness?: string }): Promise<{ model: string; harness: RuntimeName }> {

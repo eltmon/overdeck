@@ -32,11 +32,11 @@ import {
 } from './conversations.js';
 import { capturePane, findManagedServerPid } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
-import { closeAgentPane, keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import { keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
 import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
-import { conversationHarnessAlive, conversationSessionAlive, listLiveConversationSessions, waitForConversationSession } from './conversation-liveness.js';
+import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, listLiveConversationSessions, waitForConversationSession } from './conversation-liveness.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -173,7 +173,7 @@ async function killConversationRuntimeProcesses(conv: Conversation): Promise<voi
 export async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
   if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) return;
   await closeCompanionTerminalForOwner(conv.tmuxSession); // PAN-3974: the companion goes with its runtime
-  await closeAgentPane(conv.tmuxSession);
+  await closeConversationPane(conv.tmuxSession);
   try {
     await killConversationRuntimeProcesses(conv);
   } catch (error: unknown) {
@@ -802,7 +802,7 @@ export async function spawnConversationSession(
     );
     await rename(launcherTmp, launcherScript);
     await closeCompanionTerminalForOwner(tmuxSession); // PAN-3974: a respawned owner gets a new generation
-    await closeAgentPane(tmuxSession, backend);
+    await closeConversationPane(tmuxSession);
     console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}" | backend=${backend.name}`);
     // PAN-3921 FR-2: the pane goes through the launch door with the live agent
     // name `conv-<name>` and the conversation's tokens. On tmux this is the
@@ -1136,7 +1136,7 @@ export async function handleConversationRestartAll(
       const respawn = markRespawnPending(conv.tmuxSession);
       let attemptedHarness: RuntimeName = conv.harness ?? 'claude-code';
       try {
-        await closeAgentPane(conv.tmuxSession);
+        await closeConversationPane(conv.tmuxSession);
         const oldSessionId = conv.claudeSessionId;
         const sessionFileForResume = await deps.resolveSessionFile(conv);
         const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);

@@ -37,12 +37,26 @@ describe('conversationSessionAlive (PAN-3921)', () => {
     expect(legacy.sessionExists).toHaveBeenCalledWith('conv-x');
   });
 
-  it('asks tmux on a tmux host and never probes Herdr', async () => {
+  it('answers from tmux on a tmux host without probing Herdr when the session exists', async () => {
     const probeHerdr = vi.fn();
     const sessionExists = vi.fn(async () => true);
     await expect(conversationSessionAlive('conv-x', { backend: 'tmux', probeHerdr, sessionExists })).resolves.toBe(true);
     expect(sessionExists).toHaveBeenCalledWith('conv-x');
     expect(probeHerdr).not.toHaveBeenCalled();
+  });
+
+  it('on a tmux host, sees a conversation still running in a Herdr pane (rollback safety)', async () => {
+    const tmuxHost = (probe: HerdrLivenessProbe): ConversationLivenessDeps => ({
+      backend: 'tmux',
+      sessionExists: async () => false,
+      harnessAlive: async () => false,
+      probeHerdr: async () => probe,
+    });
+    await expect(conversationSessionAlive('conv-x', tmuxHost({ kind: 'alive', paneId: 'p', state: 'idle' }))).resolves.toBe(true);
+    await expect(conversationHarnessAlive('conv-x', tmuxHost({ kind: 'alive', paneId: 'p', state: 'idle' }))).resolves.toBe(true);
+    // An unreachable Herdr is the normal state of a tmux host, not evidence of life.
+    await expect(conversationSessionAlive('conv-x', tmuxHost({ kind: 'indeterminate', reason: 'no socket' }))).resolves.toBe(false);
+    await expect(conversationHarnessAlive('conv-x', tmuxHost({ kind: 'exited', paneId: 'p' }))).resolves.toBe(false);
   });
 });
 
@@ -77,9 +91,24 @@ describe('listLiveConversationSessions (PAN-3921)', () => {
     expect(names).toBeNull();
   });
 
-  it('returns the tmux session names on a tmux host', async () => {
-    const names = await listLiveConversationSessions({ backend: 'tmux', listSessionNames: async () => ['conv-a'] });
-    expect(names && [...names]).toEqual(['conv-a']);
+  it('returns the tmux session names on a tmux host, plus live conv-* Herdr panes when Herdr answers', async () => {
+    const names = await listLiveConversationSessions({
+      backend: 'tmux',
+      listSessionNames: async () => ['conv-a'],
+      listHerdr: async () => [
+        { agentId: 'conv-b', state: 'idle' },
+        { agentId: 'conv-c', state: 'exited' },
+        { agentId: 'agent-pan-1', state: 'working' },
+      ],
+    });
+    expect(names && [...names].sort()).toEqual(['conv-a', 'conv-b']);
+
+    const withoutHerdr = await listLiveConversationSessions({
+      backend: 'tmux',
+      listSessionNames: async () => ['conv-a'],
+      listHerdr: async () => { throw new Error('no socket'); },
+    });
+    expect(withoutHerdr && [...withoutHerdr]).toEqual(['conv-a']);
   });
 });
 
@@ -91,7 +120,7 @@ describe('waitForConversationSession (PAN-3921)', () => {
   it('resolves once the pane comes up before the deadline', async () => {
     vi.useFakeTimers();
     let alive = false;
-    const deps: ConversationLivenessDeps = { backend: 'tmux', sessionExists: async () => alive };
+    const deps: ConversationLivenessDeps = { backend: 'tmux', sessionExists: async () => alive, probeHerdr: async () => ({ kind: 'absent' }) };
     const waiting = waitForConversationSession('conv-x', 5_000, deps);
     await vi.advanceTimersByTimeAsync(1_000);
     alive = true;
@@ -101,7 +130,11 @@ describe('waitForConversationSession (PAN-3921)', () => {
 
   it('rejects after the timeout when the pane never comes up', async () => {
     vi.useFakeTimers();
-    const waiting = waitForConversationSession('conv-x', 5_000, { backend: 'tmux', sessionExists: async () => false });
+    const waiting = waitForConversationSession('conv-x', 5_000, {
+      backend: 'tmux',
+      sessionExists: async () => false,
+      probeHerdr: async () => ({ kind: 'absent' }),
+    });
     const assertion = expect(waiting).rejects.toThrow('Timed out waiting for conversation session conv-x');
     await vi.advanceTimersByTimeAsync(5_250);
     await assertion;
