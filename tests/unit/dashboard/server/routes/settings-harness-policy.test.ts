@@ -19,7 +19,10 @@ import {
   buildHarnessPolicyDecisions,
   parseHarnessPolicyModels,
 } from '../../../../../src/lib/harness-policy-decisions.js';
-import { OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../../../../../src/lib/harness-policy.js';
+import {
+  OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON,
+  POLICY_RUNTIME_NAMES,
+} from '../../../../../src/lib/harness-policy.js';
 import type { AuthMode } from '../../../../../src/lib/subscription-types.js';
 
 type Resolver = (model: string) => Promise<AuthMode | undefined>;
@@ -70,6 +73,16 @@ describe('buildHarnessPolicyDecisions', () => {
       expect(perModel).toHaveProperty('codex');
       expect(perModel).toHaveProperty('acp');
       expect(perModel).toHaveProperty('kimi-code');
+    }
+  });
+
+  it('emits a decision for every RuntimeName, so no harness falls back to allowed', async () => {
+    const decisions = await buildHarnessPolicyDecisions(
+      [ANTHROPIC_MODEL, OPENAI_MODEL],
+      authModeResolver('subscription'),
+    );
+    for (const model of [ANTHROPIC_MODEL, OPENAI_MODEL]) {
+      expect(Object.keys(decisions[model] ?? {}).sort()).toEqual([...POLICY_RUNTIME_NAMES].sort());
     }
   });
 
