@@ -12,6 +12,8 @@
  *   2. ohmypi running an Anthropic model under Anthropic *subscription* auth is
  *      blocked (Claude Code subscription terms forbid using the Anthropic
  *      subscription with non-Anthropic harnesses). (Formerly applied to 'pi'.)
+ *   3. A harness with no explicit rule below is denied, never allowed by
+ *      default, so a new RuntimeName cannot bypass rule 2 silently.
  *
  * Allowed cells:
  *   - claude-code + any provider + any authMode -> allowed (modulo rule 1)
@@ -32,6 +34,21 @@ export type HarnessPolicyDecision = {
 }
 
 const ALLOWED: HarnessPolicyDecision = { allowed: true }
+
+/**
+ * Every RuntimeName the policy covers. The `satisfies` clause makes a new
+ * RuntimeName without an entry here a type error; tests iterate this list to
+ * check that each harness has a real decision.
+ */
+export const POLICY_RUNTIME_NAMES = Object.keys({
+  'claude-code': true,
+  ohmypi: true,
+  codex: true,
+  acp: true,
+  'kimi-code': true,
+  opencode: true,
+  muse: true,
+} satisfies Record<RuntimeName, true>) as RuntimeName[]
 
 const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
   allowed: false,
@@ -142,6 +159,17 @@ export function canUseHarness(
     return ALLOWED
   }
 
-  // harness === 'pi' (legacy — normalizer converts 'pi' → 'ohmypi' at settings load)
-  return ALLOWED
+  // Legacy 'pi' is normally rewritten to 'ohmypi' at settings load; a raw value
+  // that slips through gets the ohmypi rules, never a free pass.
+  if ((harness as string) === 'pi') {
+    return canUseHarness('ohmypi', model, authMode)
+  }
+
+  // Every RuntimeName is handled above. A harness that reaches this point has
+  // no policy decision, so it is denied until one is added here.
+  const unlisted: never = harness
+  return {
+    allowed: false,
+    reason: `Harness "${String(unlisted)}" has no harness-policy decision. Add an explicit rule in src/lib/harness-policy.ts before it can run.`,
+  }
 }
