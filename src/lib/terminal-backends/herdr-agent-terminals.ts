@@ -21,6 +21,7 @@
 
 import { getHerdrApiClient, type HerdrApiClient } from './herdr-api.js';
 import { AGENT_ID_TOKEN } from './herdr.js';
+import { workspaceBelongsToIssue } from './herdr-workspaces.js';
 
 /** A lookup must never hold up a stop. */
 const LOOKUP_TIMEOUT_MS = 2_000;
@@ -108,9 +109,7 @@ export async function findHerdrAgentTerminals(
   try {
     const listed = await api.call<{ workspaces?: WorkspaceInfo[] }>('workspace.list', {}, { timeoutMs: LOOKUP_TIMEOUT_MS });
     for (const workspace of listed.workspaces ?? []) {
-      const issue = workspace.tokens?.issue?.toLowerCase();
-      const label = workspace.label?.toLowerCase();
-      if (issue === wanted || (!issue && label === wanted)) workspaceIds.push(workspace.workspace_id);
+      if (workspaceBelongsToIssue(workspace, wanted)) workspaceIds.push(workspace.workspace_id);
     }
   } catch {
     // No workspace listing: close the panes one by one.
