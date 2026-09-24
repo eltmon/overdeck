@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BackendConnectionBoundary } from '../../App/BackendConnectionBoundary'
 import { useStageShortcuts } from './useStageShortcuts'
 import {
   usePanesStore,
@@ -103,6 +105,30 @@ describe('useStageShortcuts', () => {
     field.focus()
     fireEvent.keyDown(field, { key: 't', metaKey: true })
     expect(panes()).toHaveLength(1) // ⌘T suppressed
+  })
+
+  it('does not fire while the backend-outage boundary hides the page (PAN-3867)', () => {
+    const homeId = panes()[0].paneId
+    const d = usePanesStore.getState().addPane(WS, { paneType: 'docs', label: 'D' })
+    const open = () => selectThreadTerminalState(useTerminalStateStore.getState().terminalStateByThreadId, WS).terminalOpen
+    const queryClient = new QueryClient()
+    const page = (backendDown: boolean) => (
+      <QueryClientProvider client={queryClient}>
+        <BackendConnectionBoundary backendDown={backendDown} restarting={false}><Host /></BackendConnectionBoundary>
+      </QueryClientProvider>
+    )
+    const { rerender } = render(page(true))
+
+    meta('w')
+    meta('t')
+    expect(panes()).toHaveLength(2) // ⌘W suppressed: the hidden pane survives
+    expect(activeId()).toBe(d)
+    expect(open()).toBe(false) // ⌘T suppressed
+
+    rerender(page(false))
+    meta('w')
+    expect(panes()).toHaveLength(1)
+    expect(activeId()).toBe(homeId)
   })
 
   it('ignores combos without the meta key', () => {

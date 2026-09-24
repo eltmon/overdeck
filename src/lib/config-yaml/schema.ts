@@ -173,6 +173,8 @@ export interface ConversationsConfig {
   rich_compaction?: boolean;
   /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
   title_model?: ModelId;
+  /** Model that writes the one-shot summary seeding a summary or handoff fork when the request names none (default: claude-sonnet-5, PAN-4160). */
+  fork_summary_model?: ModelId;
   /** Model used to author external handoff docs (`pan handoff`) when no per-call model is given. Required for `pan handoff` to work — there is no default (PAN-3860); unset fails the handoff loudly. */
   handoff_author_model?: ModelId;
   watch_dirs?: string[];
@@ -494,6 +496,8 @@ export interface YamlConfig {
 
     /** Persisted default conversation model (overrides dynamic provider-based selection) */
     default_conversation_model?: ModelId;
+    /** Model for the Command Deck status review (default: claude-sonnet-5, PAN-4160) */
+    status_review_model?: ModelId;
   };
 
   /** OpenRouter-specific configuration */
@@ -841,6 +845,8 @@ export interface NormalizedConfig {
 
   /** Persisted default conversation model (overrides dynamic provider-based selection) */
   defaultConversationModel?: ModelId;
+  /** Command Deck status-review model; documented default in defaults.ts (PAN-4160) */
+  statusReviewModel: ModelId;
 
   /** Tracker API keys */
   trackerKeys: {
@@ -856,6 +862,8 @@ export interface NormalizedConfig {
     manualCompactMode: ManualCompactMode;
     richCompaction: boolean;
     titleModel: ModelId;
+    /** Fork-summary model when the fork request names none (PAN-4160). */
+    forkSummaryModel: ModelId;
     /** PAN-3860: deliberately no default — unset means the handoff pipeline
      * must fail loudly (HandoffAuthorModelNotConfiguredError) rather than
      * hardcode a fallback model. */

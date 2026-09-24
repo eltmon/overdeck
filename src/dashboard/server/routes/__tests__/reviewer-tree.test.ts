@@ -8,6 +8,7 @@ import {
   readReviewerRounds,
   readSynthesisRounds,
   buildReviewerNodes,
+  currentRunIsConvoy,
 } from '../reviewer-tree.js';
 import { REVIEWER_ROLES, getReviewerSessionName } from '../../../../lib/cloister/specialists.js';
 import { getAgentState } from '../../../../lib/agents.js';
@@ -16,29 +17,32 @@ vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(() => null),
 }));
 
-// buildReviewerNodes is gated by isExtendedReviewEnabled() (PAN-1981): convoy lanes
-// are only built when extended review is on. Default the mock to TRUE so the existing
-// node-building tests exercise the (parked-but-preserved) convoy logic; the gate's
-// false-path has its own dedicated test below.
-const { isExtendedReviewEnabledMock } = vi.hoisted(() => ({
-  isExtendedReviewEnabledMock: vi.fn(() => true),
-}));
-vi.mock('../../../../lib/cloister/review-agent.js', () => ({
-  isExtendedReviewEnabled: isExtendedReviewEnabledMock,
-}));
-
 const PROJECT_KEY = 'overdeck';
 const ISSUE_ID = 'pan-830';
 const WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-830';
+/** The current review run: the review parent's `reviewRunId` (PAN-4123). */
+const RUN_ID = `agent-${ISSUE_ID}-review-abcd1234`;
+const PARENT_ID = `agent-${ISSUE_ID}-review`;
+
+type ConvoyRole = 'correctness' | 'security' | 'performance' | 'requirements';
 
 let testDir: string;
 let agentsDir: string;
 
+/** Write the review parent's state row, which names the current run. */
+async function seedParentRun(runId: string = RUN_ID): Promise<void> {
+  await mkdir(join(agentsDir, PARENT_ID), { recursive: true });
+  await writeFile(
+    join(agentsDir, PARENT_ID, 'state.json'),
+    JSON.stringify({ id: PARENT_ID, role: 'review', status: 'running', reviewRunId: runId }),
+  );
+}
+
 beforeEach(async () => {
-  isExtendedReviewEnabledMock.mockReturnValue(true);
   testDir = join(tmpdir(), `pan-reviewer-tree-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   agentsDir = join(testDir, 'overdeck', 'agents');
   await mkdir(agentsDir, { recursive: true });
+  await seedParentRun();
 });
 
 afterEach(async () => {
@@ -48,16 +52,21 @@ afterEach(async () => {
 
 
 /** PAN-3675: lanes render only with evidence the reviewer exists. Seed a
- *  minimal state row per convoy role so these tests model a real run. */
-async function seedStateRow(role: 'correctness' | 'security' | 'performance' | 'requirements'): Promise<void> {
+ *  minimal state row per convoy role so these tests model a real run. The row
+ *  carries the run it was launched for (PAN-4123), which is how the tree
+ *  knows the current run is a convoy run. */
+async function seedStateRow(role: ConvoyRole, runId: string = RUN_ID): Promise<void> {
   const sessionId = getReviewerSessionName(role, PROJECT_KEY, ISSUE_ID);
   await mkdir(join(agentsDir, sessionId), { recursive: true });
-  await writeFile(join(agentsDir, sessionId, 'state.json'), JSON.stringify({ id: sessionId, status: 'stopped' }));
+  await writeFile(
+    join(agentsDir, sessionId, 'state.json'),
+    JSON.stringify({ id: sessionId, status: 'stopped', reviewRunId: runId }),
+  );
 }
 
-async function seedAllStateRows(): Promise<void> {
+async function seedAllStateRows(runId: string = RUN_ID): Promise<void> {
   for (const role of ['correctness', 'security', 'performance', 'requirements'] as const) {
-    await seedStateRow(role);
+    await seedStateRow(role, runId);
   }
 }
 
@@ -174,22 +183,57 @@ describe('readReviewerRounds (PAN-830)', () => {
   });
 });
 
-describe('buildReviewerNodes (PAN-830)', () => {
-  it('returns [] when extended (convoy) review is disabled — quick mode hides phantom lanes (PAN-1981)', async () => {
-    isExtendedReviewEnabledMock.mockReturnValue(false);
-    const nodes = await buildReviewerNodes({
-      issueId: ISSUE_ID,
-      projectKey: PROJECT_KEY,
-      workspacePath: WORKSPACE_PATH,
-      tmuxSessionNames: new Set(),
-      startedAt: '2026-01-01T00:00:00Z',
-      status: 'completed',
-      agentsDirOverride: agentsDir,
-    });
-    expect(nodes).toEqual([]);
-    expect(isExtendedReviewEnabledMock).toHaveBeenCalledWith(ISSUE_ID);
+describe('PAN-4123: convoy lanes follow the run, not roles.review.mode', () => {
+  const build = (workspacePath: string = WORKSPACE_PATH) => buildReviewerNodes({
+    issueId: ISSUE_ID,
+    projectKey: PROJECT_KEY,
+    workspacePath,
+    tmuxSessionNames: new Set(),
+    startedAt: '2026-01-01T00:00:00Z',
+    status: 'running',
+    agentsDirOverride: agentsDir,
   });
 
+  it('shows all four lanes when the current run launched the convoy (Full run under quick config)', async () => {
+    await seedAllStateRows(RUN_ID);
+    const nodes = await build();
+    expect(nodes.map(n => n.role)).toEqual(['correctness', 'security', 'performance', 'requirements']);
+  });
+
+  it('hides lanes left over from an earlier convoy run (Quick run under full config)', async () => {
+    // The previous HEAD ran a convoy; the current run is a self-review on a new HEAD.
+    await seedAllStateRows(`agent-${ISSUE_ID}-review-00000000`);
+    const nodes = await build();
+    expect(nodes).toEqual([]);
+  });
+
+  it('counts a reviewer report in the current run dir as convoy evidence', async () => {
+    // A lane whose state row is gone still proves the convoy ran through its report.
+    const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
+    const runDir = join(workspacePath, '.pan', 'review', RUN_ID);
+    await mkdir(runDir, { recursive: true });
+    await writeFile(join(runDir, 'security.md'), '# security review');
+    expect(await currentRunIsConvoy(ISSUE_ID, workspacePath, agentsDir)).toBe(true);
+  });
+
+  it('a self-review synthesis in the run dir is not convoy evidence', async () => {
+    // Quick and Full both write into .pan/review/<runId>/, so the dir alone proves nothing.
+    const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
+    const runDir = join(workspacePath, '.pan', 'review', RUN_ID);
+    await mkdir(runDir, { recursive: true });
+    await writeFile(join(runDir, 'synthesis.md'), '# self-review');
+    expect(await currentRunIsConvoy(ISSUE_ID, workspacePath, agentsDir)).toBe(false);
+    expect(await build(workspacePath)).toEqual([]);
+  });
+
+  it('shows no lanes when the review parent names no run', async () => {
+    await rm(join(agentsDir, PARENT_ID), { recursive: true, force: true });
+    await seedAllStateRows(RUN_ID);
+    expect(await build()).toEqual([]);
+  });
+});
+
+describe('buildReviewerNodes (PAN-830)', () => {
   it('returns exactly four convoy nodes without a synthesis child', async () => {
     await seedAllStateRows();
     const nodes = await buildReviewerNodes({
@@ -226,6 +270,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('marks presence "active" when tmux live and parent status running', async () => {
+    await seedAllStateRows();
     const liveSet = new Set<string>(REVIEWER_ROLES.map(r => getReviewerSessionName(r, PROJECT_KEY, ISSUE_ID)));
 
     const nodes = await buildReviewerNodes({
@@ -242,6 +287,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('marks presence "idle" when tmux live but parent status not running', async () => {
+    await seedAllStateRows();
     const liveSet = new Set<string>(REVIEWER_ROLES.map(r => getReviewerSessionName(r, PROJECT_KEY, ISSUE_ID)));
 
     const nodes = await buildReviewerNodes({
@@ -259,7 +305,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
 
   it('marks a live reviewer warm-idle after REVIEWER_READY is signaled (PAN-2690)', async () => {
     const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
-    await mkdir(join(agentsDir, correctness), { recursive: true });
+    await seedStateRow('correctness');
     await writeFile(join(agentsDir, correctness, 'reviewer-signaled'), '');
 
     const nodes = await buildReviewerNodes({
@@ -330,7 +376,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
     // not inherit the orchestrator's "running" status (which left it showing
     // "working" with no terminal). The report .md is the authoritative signal.
     const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
-    const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+    const reviewRunDir = join(workspacePath, '.pan', 'review', RUN_ID);
     await mkdir(reviewRunDir, { recursive: true });
     await writeFile(join(reviewRunDir, 'correctness.md'), '# correctness review');
 
@@ -457,6 +503,8 @@ describe('buildReviewerNodes (PAN-830)', () => {
   });
 
   it('falls back to latest round endedAt when state.json is missing', async () => {
+    // A sibling lane's row marks the current run as a convoy run.
+    await seedStateRow('security');
     const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
     await mkdir(join(agentsDir, correctness), { recursive: true });
     await writeFile(
@@ -495,6 +543,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
         status: 'running',
         startedAt: '2026-01-01T00:00:00Z',
         stoppedAt: '2026-01-01T00:05:00Z', // stale — process is actually live
+        reviewRunId: RUN_ID,
       }),
     );
 
@@ -530,8 +579,9 @@ describe('buildReviewerNodes (PAN-830)', () => {
 
   // ─── PAN-915: in-progress round disambiguates from completed-zombie ─────
   describe('PAN-915 in-progress round detection', () => {
-    it('reports running when session is alive, prior round archived as completed, AND a newer review-run dir exists with no output file yet', async () => {
+    it('reports running when session is alive, prior round archived as completed, AND the current run dir exists with no output file yet', async () => {
       const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+      await seedStateRow('correctness');
       // Archive a prior round as completed (would normally trigger zombie)
       await mkdir(join(agentsDir, correctness), { recursive: true });
       await writeFile(
@@ -539,9 +589,9 @@ describe('buildReviewerNodes (PAN-830)', () => {
         JSON.stringify({ round: 1, status: 'completed', success: true }),
       );
 
-      // Spin up a workspace dir with a NEW round folder but no <role>.md yet
+      // The current run's folder (the parent's reviewRunId) exists, but no <role>.md yet
       const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
-      const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+      const reviewRunDir = join(workspacePath, '.pan', 'review', RUN_ID);
       await mkdir(reviewRunDir, { recursive: true });
 
       const liveSet = new Set<string>([correctness]);
@@ -562,8 +612,9 @@ describe('buildReviewerNodes (PAN-830)', () => {
       expect(node.tmuxSession).toBe(correctness);
     });
 
-    it('reports zombie (idle) when session alive, prior round completed, AND output file already exists in latest run dir', async () => {
+    it('reports zombie (idle) when session alive, prior round completed, AND output file already exists in the current run dir', async () => {
       const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+      await seedStateRow('correctness');
       await mkdir(join(agentsDir, correctness), { recursive: true });
       await writeFile(
         join(agentsDir, correctness, 'round-1.json'),
@@ -571,7 +622,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
       );
 
       const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
-      const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+      const reviewRunDir = join(workspacePath, '.pan', 'review', RUN_ID);
       await mkdir(reviewRunDir, { recursive: true });
       // Output file exists — round done, session is a zombie
       await writeFile(join(reviewRunDir, 'correctness.md'), '# done');
@@ -595,8 +646,38 @@ describe('buildReviewerNodes (PAN-830)', () => {
       expect(node.tmuxSession).toBeUndefined();
     });
 
+    it('ignores a report in an old-named review-<ISSUE>-<millis> dir: only the current run counts', async () => {
+      const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+      await seedStateRow('correctness');
+      await writeFile(
+        join(agentsDir, correctness, 'round-1.json'),
+        JSON.stringify({ round: 1, status: 'completed', success: true }),
+      );
+
+      const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
+      await mkdir(join(workspacePath, '.pan', 'review', RUN_ID), { recursive: true });
+      const legacyDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+      await mkdir(legacyDir, { recursive: true });
+      await writeFile(join(legacyDir, 'correctness.md'), '# stale');
+
+      const nodes = await buildReviewerNodes({
+        issueId: ISSUE_ID,
+        projectKey: PROJECT_KEY,
+        workspacePath,
+        tmuxSessionNames: new Set<string>([correctness]),
+        startedAt: '2026-01-01T00:00:00Z',
+        status: 'completed',
+        agentsDirOverride: agentsDir,
+      });
+
+      const node = nodes.find(n => n.role === 'correctness')!;
+      expect(node.status).toBe('running');
+      expect(node.presence).toBe('active');
+    });
+
     it('falls back to legacy zombie detection when no review-run dir exists in workspace', async () => {
       const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+      await seedStateRow('correctness');
       await mkdir(join(agentsDir, correctness), { recursive: true });
       await writeFile(
         join(agentsDir, correctness, 'round-1.json'),

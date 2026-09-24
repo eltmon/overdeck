@@ -14,6 +14,7 @@ import { writeThreadId as _writeThreadId } from '../runtimes/codex.js';
 import { codexAgentHome, findRolloutPath } from '../runtimes/storage/codex.js';
 import { compressJsonlBuffer } from './compress.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
+import { isListedOrRunning, listLiveAgentIds } from '../terminal-backends/inventory.js';
 
 export interface TranscriptEntry {
   agentId: string;
@@ -37,7 +38,8 @@ export interface TranscriptSource {
   parseDelta(buffer: Buffer | string, fromOffset?: number): TurnEvent[];
 }
 
-type RunningAgent = AgentState & { tmuxActive: boolean };
+/** An agent row plus whether it has a live pane on the selected backend (Herdr or tmux). */
+type RunningAgent = AgentState & { hasLivePane: boolean };
 
 interface ClaudeCodeTranscriptSourceOptions {
   listAgents?: () => Promise<RunningAgent[]>;
@@ -76,7 +78,7 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
     const agents = await this.listAgents();
     const entries = await Promise.all(
       agents
-        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && (agent.harness ?? 'claude-code') === 'claude-code')
+        .filter((agent) => agent.hasLivePane && agent.status === 'running' && agent.role === 'work' && (agent.harness ?? 'claude-code') === 'claude-code')
         .map((agent) => this.resolveAgentTranscript(agent)),
     );
     return entries.filter((entry): entry is TranscriptEntry => entry !== null);
@@ -136,7 +138,7 @@ export class PiTranscriptSource implements TranscriptSource {
     const agents = await this.listAgents();
     const entries = await Promise.all(
       agents
-        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && agent.harness === 'ohmypi')
+        .filter((agent) => agent.hasLivePane && agent.status === 'running' && agent.role === 'work' && agent.harness === 'ohmypi')
         .map((agent) => this.resolveAgentTranscript(agent)),
     );
     return entries.filter((entry): entry is TranscriptEntry => entry !== null);
@@ -205,7 +207,7 @@ export class CodexTranscriptSource implements TranscriptSource {
     const agents = await this.listAgents();
     const entries = await Promise.all(
       agents
-        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && agent.harness === 'codex')
+        .filter((agent) => agent.hasLivePane && agent.status === 'running' && agent.role === 'work' && agent.harness === 'codex')
         .map((agent) => this.resolveAgentTranscript(agent)),
     );
     return entries.filter((entry): entry is TranscriptEntry => entry !== null);
@@ -296,8 +298,12 @@ export async function getActiveTranscriptEntries(
   return registry.getActiveTranscripts();
 }
 
-function listRunningAgentsFromStore(): Promise<RunningAgent[]> {
-  return Effect.runPromise(listRunningAgents());
+async function listRunningAgentsFromStore(): Promise<RunningAgent[]> {
+  // Live = in the selected backend's inventory, not the tmux-only tmuxActive
+  // flag (#4109). Ingestion only reads, so an unreadable inventory falls back
+  // to the running rows.
+  const [agents, liveIds] = await Promise.all([Effect.runPromise(listRunningAgents()), listLiveAgentIds()]);
+  return agents.map((agent) => ({ ...agent, hasLivePane: isListedOrRunning(agent, liveIds) }));
 }
 
 async function readPiSessionId(agent: RunningAgent): Promise<string | null> {

@@ -232,9 +232,9 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   }, []);
 
   const sendResizeIfNeeded = useCallback(() => {
-    // Fit the terminal to its container so xterm.js renders at the right size.
-    // Skip while the user has an active selection — fit() can call term.resize()
-    // which clears the selection mid-drag (a1a91528 broke this).
+    if (!terminalRef.current?.clientWidth || !terminalRef.current.clientHeight) return; // hidden (display: none): a fit could shrink a live PTY
+    // Fit the terminal to its container so xterm.js renders at the right size. Skip while the
+    // user has a selection: fit() can call term.resize(), which clears it mid-drag (a1a91528).
     const term = terminalInstance.current;
     const fit = fitAddon.current;
     if (term && !term.hasSelection()) {

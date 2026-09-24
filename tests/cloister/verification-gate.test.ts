@@ -194,6 +194,35 @@ describe('runQualityGates — SSH remote support', () => {
       expect(call[1]?.env?.DASHBOARD_URL).toBeUndefined();
     }
   });
+
+  it('does not leak the dashboard OVERDECK_* boot state into gate processes (PAN-3902)', async () => {
+    vi.stubEnv('OVERDECK_NO_RESUME', '1');
+    vi.stubEnv('OVERDECK_TERMINAL_BACKEND', 'herdr');
+    vi.stubEnv('OVERDECK_VERIFICATION_WORKER', '1');
+    vi.stubEnv('OVERDECK_HOME', '/home/operator/.overdeck');
+
+    try {
+      await runQualityGates({
+        ...DEFAULT_GATES,
+        custom: { command: 'npm run custom', env: { OVERDECK_TERMINAL_BACKEND: 'tmux' } },
+      }, workspacePath);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    expect(execMock).toHaveBeenCalledTimes(4);
+    for (const call of execMock.mock.calls) {
+      const env = call[1]?.env ?? {};
+      expect(env.OVERDECK_NO_RESUME).toBeUndefined();
+      expect(env.OVERDECK_VERIFICATION_WORKER).toBeUndefined();
+      // The host locator stays: a gate command that calls `pan` must find the same home.
+      expect(env.OVERDECK_HOME).toBe('/home/operator/.overdeck');
+      expect(env.OVERDECK_GATE_ADMITTED).toBe('1');
+    }
+    // A gate opts a key back in through gate.env; the others never see it.
+    const backends = execMock.mock.calls.map(([, opts]) => opts?.env?.OVERDECK_TERMINAL_BACKEND);
+    expect(backends).toEqual([undefined, undefined, undefined, 'tmux']);
+  });
 });
 
 describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {

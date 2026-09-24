@@ -22,6 +22,7 @@ import {
   restartAgent,
   getProviderAuthMode,
   listRunningAgents,
+  resolveRoutedSpawnModel,
   wipeAgentStateDirs,
 } from '../../../../lib/agents.js';
 import { canUseHarness } from '../../../../lib/harness-policy.js';
@@ -30,6 +31,7 @@ import { operatorInterventionEvent } from '../../../../lib/operator-intervention
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { killSession } from '../../../../lib/tmux.js';
+import { listLiveAgentIds } from '../../../../lib/terminal-backends/inventory.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -483,14 +485,28 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     // afterward — an invalid selection destroyed the work agent's session
     // pointers and runtime files without spawning a replacement. Resolve
     // spawnModel and check policy here, before killSession/wipeAgentStateDirs.
-    const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-5';
+    const projectPath = agentState.workspace
+      ? dirname(agentState.workspace)
+      : undefined;
+    const projectConfig = resolveProjectFromIssueSync(issueId);
+    const projectRoot = projectConfig?.projectPath ?? projectPath ?? process.cwd();
+    const workspacePath = agentState.workspace ?? join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    // PAN-4145: no explicit/recorded model → the model `pan start` staffs via
+    // role/tier routing, never a literal; routing failure 400s before the wipe.
+    let spawnModel: string | undefined;
+    try {
+      spawnModel = wantsSpawn ? newModel ?? agentState.model ?? resolveRoutedSpawnModel({ role: 'work', issueId, workspace: workspacePath }) : undefined;
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
     let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null = null;
-    if (wantsSpawn && harness) {
+    if (wantsSpawn && harness && spawnModel) {
+      const policyModel = spawnModel;
       const harnessDecision = yield* Effect.promise(async () =>
-        canUseHarness(harness, spawnModel, await getProviderAuthMode(spawnModel)),
+        canUseHarness(harness, policyModel, await getProviderAuthMode(policyModel)),
       );
       if (!harnessDecision.allowed) {
-        return jsonResponse({ error: harnessDecision.reason ?? `Harness "${harness}" is not allowed for model "${spawnModel}".` }, { status: 400 });
+        return jsonResponse({ error: harnessDecision.reason ?? `Harness "${harness}" is not allowed for model "${policyModel}".` }, { status: 400 });
       }
       effectiveHarness = harness;
     }
@@ -551,12 +567,6 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     // (spawnModel/effectiveHarness were already resolved and validated above,
     // before the kill/wipe mutations.)
     const agentSessionName = `agent-${issueId.toLowerCase()}`;
-    const projectPath = agentState.workspace
-      ? dirname(agentState.workspace)
-      : undefined;
-    const projectConfig = resolveProjectFromIssueSync(issueId);
-    const projectRoot = projectConfig?.projectPath ?? projectPath ?? process.cwd();
-    const workspacePath = agentState.workspace ?? join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
 
     const args = buildPanStartArgs({
       issueId,
@@ -645,7 +655,10 @@ export const postAgentsRestartAllRoute = HttpRouter.add(
     const { force = false } = body as { force?: boolean };
     return yield* Effect.promise(async () => {
       try {
-        const running = (await Effect.runPromise(listRunningAgents())).filter(a => a.tmuxActive);
+        // Live = in the backend inventory, not tmux-only tmuxActive (#4109); unreadable restarts nothing.
+        const liveIds = await listLiveAgentIds();
+        if (liveIds === null) return jsonResponse({ error: 'Terminal backend inventory unreadable; nothing restarted' }, { status: 503 });
+        const running = (await Effect.runPromise(listRunningAgents())).filter(a => liveIds.has(a.id));
         const results: Array<{
           id: string;
           issueId: string;
@@ -783,17 +796,12 @@ export interface RestartConfigChangeItem {
 }
 
 async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]> {
-  const agents = await Effect.runPromise(listRunningAgents());
-
+  const [agents, liveIds] = await Promise.all([Effect.runPromise(listRunningAgents()), listLiveAgentIds()]);
   const items: RestartConfigChangeItem[] = [];
 
   for (const agent of agents) {
-    if (!agent.issueId) continue;
-
-    // Only include actually running agents with active tmux sessions
-    if (!((agent as any).tmuxActive === true)) {
-      continue;
-    }
+    // Only agents live in the backend inventory (#4109); unreadable lists none (this list gates restarts).
+    if (!agent.issueId || !liveIds?.has(agent.id)) continue;
 
     // Skip paused/troubled agents (their gates stand)
     if ((agent as any).paused || (agent as any).troubled) {

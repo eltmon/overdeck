@@ -3,7 +3,10 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { listRunningAgentsSync } from '../../lib/agents.js';
+import type { AgentState } from '../../lib/agents.js';
+import { normalizeAgentId } from '../../lib/agents/identity.js';
+import { listAgentStates } from '../../lib/agents/queries.js';
+import { isAlive, isConfirmedDead, type LivenessAsyncDeps, type LivenessVerdict } from '../../lib/agents/liveness.js';
 import {
   extractTeamPrefix,
   findProjectByTeam,
@@ -80,6 +83,28 @@ interface UpdateOptions {
   force?: boolean;
 }
 
+/**
+ * The running agent whose harness is live in `workspacePath`, if any (#4109).
+ * Liveness comes from the backend-aware oracle, never the tmux-only
+ * `tmuxActive` flag, which reads every Herdr agent as gone. A probe that could
+ * not answer counts as live: the guard blocks the update rather than rewrite a
+ * workspace under a running agent.
+ */
+export async function findLiveAgentInWorkspace(
+  workspacePath: string,
+  agents: AgentState[] = listAgentStates({ status: 'running' }),
+  livenessDeps: LivenessAsyncDeps = {},
+): Promise<AgentState | undefined> {
+  const candidates = agents.filter((agent) => agent.workspace === workspacePath && agent.status === 'running');
+  for (const agent of candidates) {
+    const verdict = await isAlive(normalizeAgentId(agent.id), livenessDeps).catch(
+      (): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }),
+    );
+    if (!isConfirmedDead(verdict)) return agent;
+  }
+  return undefined;
+}
+
 export async function updateCommand(issueId: string, options: UpdateOptions): Promise<void> {
   const spinner = ora('Updating workspace skills...').start();
 
@@ -106,10 +131,7 @@ export async function updateCommand(issueId: string, options: UpdateOptions): Pr
     }
 
     // Check if an agent is running in this workspace
-    const runningAgents = listRunningAgentsSync();
-    const agentInWorkspace = runningAgents.find(
-      a => a.workspace === workspacePath && a.tmuxActive && a.status === 'running'
-    );
+    const agentInWorkspace = await findLiveAgentInWorkspace(workspacePath);
 
     if (agentInWorkspace && !options.force) {
       spinner.fail(`Agent ${agentInWorkspace.id} is running in this workspace`);

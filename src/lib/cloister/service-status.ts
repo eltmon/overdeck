@@ -9,6 +9,7 @@ import {
 } from './health.js';
 import { listRunningAgents } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
+import { isListedOrRunning, listLiveAgentIds } from '../terminal-backends/inventory.js';
 
 /**
  * Cloister service status
@@ -45,7 +46,10 @@ export function getServiceAgentHealth(_host: StatusHost, agentId: string): Agent
  * Get health for all running agents
  */
 export async function getAllAgentHealth(_host: StatusHost): Promise<AgentHealth[]> {
-  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
+  // Live = in the selected backend's inventory, not the tmux-only tmuxActive
+  // flag (#4109). A display: an unreadable inventory shows the running rows.
+  const [agents, liveIds] = await Promise.all([Effect.runPromise(listRunningAgents()), listLiveAgentIds()]);
+  const runningAgents = agents.filter((a) => isListedOrRunning(a, liveIds));
   const agentHealths: AgentHealth[] = [];
 
   for (const agent of runningAgents) {

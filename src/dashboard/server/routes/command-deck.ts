@@ -49,7 +49,7 @@ import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { findPrdAnywhere, readPrdContent } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
-import { loadSettingsApi } from '../../../lib/settings-api.js';
+import { resolveStatusReviewModel } from '../../../lib/status-review-model.js';
 import { getAgentCommand } from '../../../lib/settings.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -966,9 +966,7 @@ Produce a comprehensive status review in markdown format with these sections:
 
 Be specific: reference actual file names, function names, requirement text, discussion quotes, and transcript highlights. This review should give a reader who hasn't seen the code a clear picture of exactly where things stand.`;
 
-  const apiSettings = loadSettingsApi();
-  const statusModelId = (apiSettings.models?.overrides as Record<string, string>)?.['status-review']
-    || 'claude-sonnet-5';
+  const statusModelId = resolveStatusReviewModel(loadYamlConfig().config);
   const { command: cliCmd, args: cliArgs } = getAgentCommand(statusModelId);
   const modelFlag = cliArgs.length > 0 ? ` ${cliArgs.join(' ')}` : '';
   const promptFile = join(planningDir, '.status-review-prompt.tmp');

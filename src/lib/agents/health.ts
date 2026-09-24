@@ -138,6 +138,8 @@ function buildSnapshot(
     kind: agentKind(state.role),
     status,
     lifecycle: lifecycleFor(input, state),
+    hasLivePane: input.liveSessions.has(input.agentId),
+    // Deprecated alias of `hasLivePane` (#4109).
     tmuxActive: input.liveSessions.has(input.agentId),
     ...(lastActivityAt ? { lastActivityAt } : {}),
     ...(observations?.consecutiveFailures !== undefined
@@ -188,8 +190,8 @@ export function classifyAgentHealth(
   const startupGraceElapsed = startedAt !== null
     && input.nowMs - startedAt >= STARTUP_GRACE_MS;
   const expectsLiveSession = state.status === 'running' || state.status === 'starting';
-  const tmuxActive = input.liveSessions.has(input.agentId);
-  if (!tmuxActive && expectsLiveSession && startupGraceElapsed) {
+  const hasLivePane = input.liveSessions.has(input.agentId);
+  if (!hasLivePane && expectsLiveSession && startupGraceElapsed) {
     return buildSnapshot(input, state, 'dead', [reason(
       'agent.tmux.missing',
       'critical',

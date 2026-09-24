@@ -9,7 +9,7 @@ import {
   type SpecialistLifecycle,
   type SystemHealthSnapshot as SystemHealthSnapshotType,
 } from '@overdeck/contracts';
-import { Effect, Layer, Schema } from 'effect';
+import { Data, Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
@@ -19,6 +19,7 @@ import {
 } from '../../../../lib/agents/health.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import { getRuntimeCensusSnapshot } from '../../../../lib/runtime-census.js';
+import { listLiveAgentIds } from '../../../../lib/terminal-backends/inventory.js';
 import { checkAgentHealth } from '../../../lib/health-filtering.js';
 import { ReadModelService } from '../../read-model.js';
 import {
@@ -41,6 +42,27 @@ export function readHealthSessionNames(
   if (!census) throw new Error('Runtime census snapshot is warming');
   return [...census.sessionNames];
 }
+
+/**
+ * Agents with a live pane (#4109): the selected backend's inventory plus the
+ * tmux census, which still covers agents launched in tmux before the host moved
+ * to Herdr. The census alone reads every Herdr agent as dead. An unreadable
+ * inventory throws, so the route answers unavailable instead.
+ */
+export async function readHealthLiveAgentIds(
+  readSnapshot: () => { sessionNames: ReadonlySet<string> } | null = getRuntimeCensusSnapshot,
+  listLive: () => Promise<ReadonlySet<string> | null> = listLiveAgentIds,
+): Promise<readonly string[]> {
+  const census = readHealthSessionNames(readSnapshot);
+  const live = await listLive();
+  if (live === null) throw new Error('Terminal backend inventory is unreadable');
+  return [...new Set([...census, ...live])];
+}
+
+/** The live-pane read failed, so /api/health/agents answers unavailable (#4109). */
+class HealthLiveAgentsUnavailable extends Data.TaggedError('HealthLiveAgentsUnavailable')<{
+  readonly cause: unknown;
+}> {}
 
 function unavailableSystemHealthResponse() {
   return jsonResponse({
@@ -305,7 +327,10 @@ const getHealthAgentsRoute = HttpRouter.add(
     const readModel = yield* ReadModelService;
     return yield* buildHealthAgentsResponse({
       snapshot: readModel.getSnapshot,
-      sessionNames: Effect.sync(() => readHealthSessionNames()),
+      sessionNames: Effect.tryPromise({
+        try: () => readHealthLiveAgentIds(),
+        catch: (cause) => new HealthLiveAgentsUnavailable({ cause }),
+      }),
     });
   }),
 );

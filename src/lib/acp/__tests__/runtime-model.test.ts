@@ -421,4 +421,25 @@ describe("AcpRuntimeModel", () => {
     ]);
   });
 
+  it("parses agent_thought_chunk text into a ThoughtDelta and ignores non-text thoughts", () => {
+    const thought = {
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "agent_thought_chunk",
+        content: { type: "text", text: "considering the diff" },
+      },
+    } satisfies EffectAcpSchema.SessionNotification;
+
+    expect(parseSessionUpdateEvent(thought).events).toEqual([
+      { _tag: "ThoughtDelta", text: "considering the diff", rawPayload: thought },
+    ]);
+    expect(parseSessionUpdateEvent({
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "agent_thought_chunk",
+        content: { type: "image", data: "", mimeType: "image/png" },
+      },
+    }).events).toEqual([]);
+  });
+
 });
