@@ -297,6 +297,8 @@ This setup requires both Linear credentials and authenticated GitHub access. Ove
 
 If a Linear-tracked, GitHub-hosted project reports a GitHub Issues request such as `/repos/myorg/myapp/issues?...labels=planning` instead, check for a missing `tracker: linear`. Without that explicit setting, tracker inference may select GitHub Issues from `github_repo`. A GitHub 404 can be misleading here because private repositories also return 404 when the selected GitHub credential lacks access.
 
+Pipeline membership is refreshed in the background and cached per project. If a GitHub GraphQL call fails without returning a response (a network error, a `gh` crash, or a 30-second timeout), Overdeck retries it once after one second. If the refresh still fails, the last successful membership snapshot keeps serving the dashboard and the server log records `[pipeline-membership] refresh failed for <project>; keeping last-good snapshot:` followed by `gh`'s own error output (exit code or timeout, attempt number, and stderr), so the cause is visible without re-running the query by hand. A GraphQL response that carries only `errors` is not retried.
+
 ### Different Trackers Across Projects
 
 A separate pattern is using different trackers for different projects:
