@@ -496,6 +496,8 @@ export interface YamlConfig {
 
     /** Persisted default conversation model (overrides dynamic provider-based selection) */
     default_conversation_model?: ModelId;
+    /** Model for the Command Deck status review (default: claude-sonnet-5, PAN-4160) */
+    status_review_model?: ModelId;
   };
 
   /** OpenRouter-specific configuration */
@@ -843,6 +845,8 @@ export interface NormalizedConfig {
 
   /** Persisted default conversation model (overrides dynamic provider-based selection) */
   defaultConversationModel?: ModelId;
+  /** Command Deck status-review model; documented default in defaults.ts (PAN-4160) */
+  statusReviewModel: ModelId;
 
   /** Tracker API keys */
   trackerKeys: {

@@ -653,6 +653,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.models?.default_conversation_model) {
       result.defaultConversationModel = config.models.default_conversation_model;
     }
+    if (config.models?.status_review_model) {
+      result.statusReviewModel = resolveModelId(config.models.status_review_model);
+    }
 
     // Merge tracker keys
     if (config.tracker_keys) {

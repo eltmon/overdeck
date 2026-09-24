@@ -51,6 +51,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   // This is the explicit product default, shown and changeable in Settings —
   // a user-set models.default_conversation_model always overrides it.
   defaultConversationModel: 'claude-sonnet-5',
+  // PAN-4160: documented default for the Command Deck status review
+  // (`models.status_review_model`); replaces a literal in command-deck.ts.
+  statusReviewModel: 'claude-sonnet-5',
   apiKeys: {},
   providerAuth: {},
   providerPlan: {},
