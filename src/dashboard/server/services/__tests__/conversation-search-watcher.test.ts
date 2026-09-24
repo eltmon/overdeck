@@ -172,6 +172,7 @@ describe('conversation search watcher', () => {
     expect(removeFile).toHaveBeenCalledTimes(1);
     expect(removeFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/tmp/conversations/session-a.jsonl', config: config() }));
     expect(indexFile).not.toHaveBeenCalled();
+    expect(getConversationSearchHealth().lastErrorAt).toBeNull();
   });
 
   it('treats a transcript deleted mid-index as a skip, not a search failure (PAN-3915)', async () => {
@@ -327,7 +328,7 @@ describe('conversation search watcher', () => {
       await watcher.stop();
     });
 
-    it('backs off exponentially up to the cap, and a delivered event resets the backoff', async () => {
+    it('backs off exponentially up to the cap, and resets only after a watcher stays up for the cap', async () => {
       const { watcher, watchers, watchFactory } = restartableWatcher();
       watcher.start();
       await vi.advanceTimersByTimeAsync(0);
@@ -341,10 +342,19 @@ describe('conversation search watcher', () => {
         expect(watchFactory).toHaveBeenCalledTimes(attempt + 2);
       }
 
+      // Events in between do not reset the backoff: the loop stays at the cap.
       watchers[4]!.emit('change', '/tmp/conversations/session-a.jsonl');
-      watchers[4]!.emitError(new Error('after recovery'));
-      await vi.advanceTimersByTimeAsync(1_000);
+      watchers[4]!.emitError(new Error('flapping'));
+      await vi.advanceTimersByTimeAsync(3_999);
+      expect(watchFactory).toHaveBeenCalledTimes(5);
+      await vi.advanceTimersByTimeAsync(1);
       expect(watchFactory).toHaveBeenCalledTimes(6);
+
+      // A watcher that stayed up for a full cap starts the backoff over.
+      await vi.advanceTimersByTimeAsync(4_000);
+      watchers[5]!.emitError(new Error('after recovery'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(watchFactory).toHaveBeenCalledTimes(7);
 
       await watcher.stop();
     });

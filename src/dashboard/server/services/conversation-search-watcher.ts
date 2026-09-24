@@ -92,8 +92,9 @@ export class ConversationSearchWatcher {
   private abortController: AbortController | null = null;
   private startupTask: Promise<void> | null = null;
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Consecutive watcher errors with no file event in between; drives the backoff. */
+  /** Watcher errors in a row, each within `restartMaxDelayMs` of the last re-arm; drives the backoff. */
   private consecutiveWatcherErrors = 0;
+  private lastArmedAt = 0;
   private readonly activeTasks = new Set<Promise<void>>();
   private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly queued = new Set<string>();
@@ -169,6 +170,7 @@ export class ConversationSearchWatcher {
       },
     });
     this.watcher = watcher;
+    this.lastArmedAt = Date.now();
     watcher
       .on('add', (filePath) => this.onFileEvent(watcher, filePath, 'index'))
       .on('change', (filePath) => this.onFileEvent(watcher, filePath, 'index'))
@@ -178,8 +180,6 @@ export class ConversationSearchWatcher {
 
   private onFileEvent(watcher: WatcherLike, filePath: string, action: 'index' | 'remove'): void {
     if (watcher !== this.watcher) return;
-    // A delivered event proves the re-armed watcher works; the next error starts the backoff over.
-    this.consecutiveWatcherErrors = 0;
     if (action === 'index') this.schedule(filePath);
     else this.remove(filePath);
   }
@@ -192,6 +192,9 @@ export class ConversationSearchWatcher {
   private onWatcherError(watcher: WatcherLike, error: unknown): void {
     if (this.stopped || watcher !== this.watcher) return;
     this.watcher = null;
+    // Only a watcher that stayed up for a full backoff cap starts the backoff over,
+    // so an error loop (even one with events in between) cannot restart faster.
+    if (Date.now() - this.lastArmedAt >= this.restartMaxDelayMs) this.consecutiveWatcherErrors = 0;
     const delayMs = Math.min(this.restartMaxDelayMs, this.restartBaseDelayMs * 2 ** this.consecutiveWatcherErrors);
     this.consecutiveWatcherErrors += 1;
     recordConversationSearchWatcherError(error, delayMs);
