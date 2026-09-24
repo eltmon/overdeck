@@ -11,12 +11,18 @@
  *      (`resolveConversationBranch`; never the default branch) becomes a
  *      `branch` link. A dismissed row blocks re-insertion. A link whose PR drops
  *      out of the listing is never deleted (the listing is capped at 200).
- *   4. Snapshot refresh: every linked PR found in the listing gets a fresh
- *      snapshot; a write (and a `conversation.pull_requests_changed` event)
- *      happens only when the snapshot changed. Merged snapshots are final.
+ *   4. Snapshot refresh of every due linked PR: never synced or open → every
+ *      sweep; closed → the 15-minute slow lane; merged → never (final).
+ *      Dismissed links are not refreshed. A write (and a
+ *      `conversation.pull_requests_changed` event) happens only when the
+ *      snapshot changed.
+ *   5. Fallback: a due linked GitHub PR no listing covered (beyond the 200-row
+ *      cap, another repository, or a conversation outside every GitHub
+ *      project) gets one `gh pr view`. Three failed reads in a row skip that
+ *      repository for 15 minutes.
  *
  * Boot +30 s, then every 60 s. Timers are unref()'d; a sweep never overlaps the
- * previous one. GitHub projects only in this slice; GitLab projects are skipped.
+ * previous one. GitHub only; GitLab projects and MR links are skipped.
  * Started only by a primary dashboard (a peer dashboard never writes).
  */
 
@@ -47,6 +53,10 @@ import { findProjectByPath, type ProjectConfig } from '../../../lib/projects.js'
 
 export const PR_SYNC_BOOT_DELAY_MS = 30_000;
 export const PR_SYNC_INTERVAL_MS = 60_000;
+/** Closed PRs are re-read at most this often; also the per-repo backoff window. */
+export const PR_SYNC_SLOW_INTERVAL_MS = 15 * 60_000;
+/** Consecutive failed `gh pr view` reads before a repository is skipped. */
+export const PR_SYNC_FAILURE_THRESHOLD = 3;
 const BRANCH_READ_CONCURRENCY = 8;
 const LOG_PREFIX = '[pr-sync]';
 
@@ -57,6 +67,11 @@ let bootTimer: ReturnType<typeof setTimeout> | null = null;
 let intervalTimer: ReturnType<typeof setInterval> | null = null;
 let running = false;
 let stopped = false;
+// In-memory sweep bookkeeping (cleared on stop; a restart just re-reads once).
+/** PR key → when this process last read it from the forge (ms). */
+const lastReadAt = new Map<string, number>();
+/** `host/owner/repo` → consecutive failed reads and the backoff deadline. */
+const repoFailures = new Map<string, { count: number; skipUntil: number }>();
 
 export interface PullRequestSyncResult {
   readonly inserted: number;
@@ -101,11 +116,42 @@ function keyString(key: PullRequestKey): string {
   return `${key.host}/${key.repository}#${key.number}`;
 }
 
+/** One sweep's shared bookkeeping. */
+interface SweepContext {
+  readonly now: number;
+  readonly syncedAt: string;
+  readonly changedNames: Set<string>;
+  /** PR keys already handled this sweep (refreshed, or not due). */
+  readonly handled: Set<string>;
+}
+
+/**
+ * Whether a link's snapshot should be re-read this sweep: never synced →
+ * yes; open → every sweep; closed → the slow lane (15 min since this process
+ * last read it, or since its stored `syncedAt`); merged → never. Dismissed
+ * links are not refreshed.
+ */
+function isDue(link: PullRequestLink, now: number): boolean {
+  if (link.dismissedAt !== null) return false;
+  const snapshot = link.snapshot;
+  if (snapshot === null) return true;
+  if (snapshot.state === 'merged') return false;
+  if (snapshot.state === 'open') return true;
+  const lastRead = lastReadAt.get(keyString(link)) ?? (Date.parse(snapshot.syncedAt) || 0);
+  return now - lastRead >= PR_SYNC_SLOW_INTERVAL_MS;
+}
+
+function applySnapshot(link: PullRequestLink, row: GhPrRow, ctx: SweepContext): number {
+  lastReadAt.set(keyString(link), ctx.now);
+  const changed = setPullRequestLinkSnapshot(link, snapshotFromGhRow(row, ctx.syncedAt));
+  for (const name of changed) ctx.changedNames.add(name);
+  return changed.length;
+}
+
 async function syncProject(
   project: ProjectConfig,
   conversations: readonly PullRequestSyncConversation[],
-  syncedAt: string,
-  changedNames: Set<string>,
+  ctx: SweepContext,
 ): Promise<PullRequestSyncResult> {
   const rows = await listRepoPullRequests(project.path);
   if (rows.length === 0) return { inserted: 0, updated: 0 };
@@ -135,31 +181,75 @@ async function syncProject(
     const branch = branches[index];
     if (!branch) return;
     for (const { key, row } of byHead.get(branch) ?? []) {
-      if (upsertBranchPullRequestLink(conversation.id, key, snapshotFromGhRow(row, syncedAt))) {
+      if (upsertBranchPullRequestLink(conversation.id, key, snapshotFromGhRow(row, ctx.syncedAt))) {
         inserted += 1;
-        changedNames.add(conversation.name);
+        lastReadAt.set(keyString(key), ctx.now);
+        ctx.changedNames.add(conversation.name);
       }
     }
   });
 
-  // Snapshot refresh — one write pass per distinct linked PR in the listing.
+  // Snapshot refresh from the listing — one write pass per distinct due PR.
+  // PRs not in the listing are left for the `gh pr view` fallback pass.
   const links = listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name));
-  const refreshed = new Set<string>();
   let updated = 0;
   for (const conversationLinks of links.values()) {
     for (const link of conversationLinks) {
       const id = keyString(link);
-      if (refreshed.has(id)) continue;
-      refreshed.add(id);
-      if (link.snapshot?.state === 'merged') continue;
       const entry = byKey.get(id);
-      if (!entry) continue;
-      const changed = setPullRequestLinkSnapshot(link, snapshotFromGhRow(entry.row, syncedAt));
-      updated += changed.length;
-      for (const name of changed) changedNames.add(name);
+      if (!entry || ctx.handled.has(id)) continue;
+      ctx.handled.add(id);
+      if (isDue(link, ctx.now)) updated += applySnapshot(link, entry.row, ctx);
     }
   }
   return { inserted, updated };
+}
+
+function repoInBackoff(repo: string, now: number): boolean {
+  const failures = repoFailures.get(repo);
+  return failures !== undefined && failures.skipUntil > now;
+}
+
+function recordRepoFailure(repo: string, now: number): void {
+  const count = (repoFailures.get(repo)?.count ?? 0) + 1;
+  const backingOff = count >= PR_SYNC_FAILURE_THRESHOLD;
+  repoFailures.set(repo, { count: backingOff ? 0 : count, skipUntil: backingOff ? now + PR_SYNC_SLOW_INTERVAL_MS : 0 });
+  if (backingOff) {
+    console.warn(`${LOG_PREFIX} ${repo}: ${PR_SYNC_FAILURE_THRESHOLD} failed reads in a row; skipping it for 15 min`);
+  }
+}
+
+/**
+ * Fallback for linked GitHub PRs no project listing covered this sweep: PRs
+ * beyond the 200-row listing, in another repository than the project's, or on
+ * a conversation outside every GitHub project. One `gh pr view` per distinct
+ * due PR, at most once per sweep. After 3 consecutive failed reads a
+ * repository is skipped for 15 minutes.
+ */
+async function refreshUnlistedLinks(
+  conversations: readonly PullRequestSyncConversation[],
+  ctx: SweepContext,
+  readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null>,
+): Promise<number> {
+  const links = listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name));
+  let updated = 0;
+  for (const conversationLinks of links.values()) {
+    for (const link of conversationLinks) {
+      const id = keyString(link);
+      if (ctx.handled.has(id) || !isDue(link, ctx.now) || !/\/pull\/\d+$/.test(link.url)) continue;
+      ctx.handled.add(id);
+      const repo = `${link.host}/${link.repository}`;
+      if (repoInBackoff(repo, ctx.now)) continue;
+      const row = await readPullRequest(link);
+      if (!row) {
+        recordRepoFailure(repo, ctx.now);
+        continue;
+      }
+      repoFailures.delete(repo);
+      updated += applySnapshot(link, row, ctx);
+    }
+  }
+  return updated;
 }
 
 /** `gh pr view` for one PR by key; null when the read fails. */
@@ -177,9 +267,8 @@ async function readGithubPullRequest(key: PullRequestKey): Promise<GhPrRow | nul
 /**
  * Forced refresh right after an explicit link, outside the sweep schedule, so
  * the badge fills in within seconds, including PRs outside the 200-row listing.
- * GitHub PRs only; one `gh pr view`. Writes
- * the snapshot and returns the conversations whose link changed (no event:
- * the caller emits).
+ * GitHub PRs only; one `gh pr view`. Writes the snapshot and returns the
+ * conversations whose link changed (no event: the caller emits).
  */
 export async function refreshPullRequestLinkNow(
   link: PullRequestLink,
@@ -189,14 +278,19 @@ export async function refreshPullRequestLinkNow(
   if (!/\/pull\/\d+$/.test(link.url)) return [];
   const row = await readPullRequest(link);
   if (!row) return [];
+  lastReadAt.set(keyString(link), now);
   return setPullRequestLinkSnapshot(link, snapshotFromGhRow(row, new Date(now).toISOString()));
 }
 
-/** One full sweep. Exported for tests and for a future forced refresh. */
-export async function runPullRequestSyncOnce(now: number = Date.now()): Promise<PullRequestSyncResult> {
-  const syncedAt = new Date(now).toISOString();
+/** One full sweep. Exported for tests; `readPullRequest` is the `gh pr view` fallback. */
+export async function runPullRequestSyncOnce(
+  now: number = Date.now(),
+  readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
+): Promise<PullRequestSyncResult> {
+  const ctx: SweepContext = { now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set() };
+  const conversations = listConversationsForPullRequestSync();
   const groups = new Map<string, { project: ProjectConfig; conversations: PullRequestSyncConversation[] }>();
-  for (const conversation of listConversationsForPullRequestSync()) {
+  for (const conversation of conversations) {
     const project = findProjectByPath(conversation.cwd);
     if (!project || forgeForProject(project.path) !== 'github') continue;
     const group = groups.get(project.path) ?? { project, conversations: [] };
@@ -204,19 +298,23 @@ export async function runPullRequestSyncOnce(now: number = Date.now()): Promise<
     groups.set(project.path, group);
   }
 
-  const changedNames = new Set<string>();
   let inserted = 0;
   let updated = 0;
-  for (const { project, conversations } of groups.values()) {
+  for (const { project, conversations: projectConversations } of groups.values()) {
     try {
-      const result = await syncProject(project, conversations, syncedAt, changedNames);
+      const result = await syncProject(project, projectConversations, ctx);
       inserted += result.inserted;
       updated += result.updated;
     } catch (error) {
       console.warn(`${LOG_PREFIX} sweep failed for ${project.path}:`, error);
     }
   }
-  for (const name of changedNames) emitConversationPullRequestsChanged(name);
+  try {
+    updated += await refreshUnlistedLinks(conversations, ctx, readPullRequest);
+  } catch (error) {
+    console.warn(`${LOG_PREFIX} fallback refresh failed:`, error);
+  }
+  for (const name of ctx.changedNames) emitConversationPullRequestsChanged(name);
   return { inserted, updated };
 }
 
@@ -259,4 +357,6 @@ export function stopPullRequestSyncService(): void {
     intervalTimer = null;
   }
   stopped = true;
+  lastReadAt.clear();
+  repoFailures.clear();
 }

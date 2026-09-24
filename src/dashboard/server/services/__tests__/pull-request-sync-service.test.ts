@@ -40,13 +40,19 @@ vi.mock('../../../../lib/overdeck/derived-issue-state.js', async (importOriginal
 
 const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
 const { closeOverdeckDatabase, getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
-const { listConversationPullRequests } = await import('../../../../lib/overdeck/conversation-pull-requests.js');
+const {
+  linkConversationPullRequest,
+  listConversationPullRequests,
+  setPullRequestLinkSnapshot,
+} = await import('../../../../lib/overdeck/conversation-pull-requests.js');
 const { getEnrichedConversationList, invalidateConversationListEnrichmentCache } = await import('../../../../lib/overdeck/conversation-list.js');
 const {
   PR_SYNC_BOOT_DELAY_MS,
   PR_SYNC_INTERVAL_MS,
+  PR_SYNC_SLOW_INTERVAL_MS,
   githubPullRequestKeyFromUrl,
   runPullRequestSyncOnce,
+  snapshotFromGhRow,
   startPullRequestSyncService,
   stopPullRequestSyncService,
 } = await import('../pull-request-sync-service.js');
@@ -220,6 +226,93 @@ describe('runPullRequestSyncOnce — snapshots', () => {
 
     expect(result.updated).toBe(0);
     expect(listConversationPullRequests(name)[0]?.snapshot?.title).toBe('PR 5');
+  });
+});
+
+describe('runPullRequestSyncOnce — slow lane, fallback, backoff (WI-4)', () => {
+  const T0 = Date.parse('2026-09-24T00:00:00Z');
+  const MINUTE = 60_000;
+  const OUT_OF_PROJECT_CWD = join(TEST_HOME, 'elsewhere');
+
+  function linkExplicitly(name: string, number: number): void {
+    linkConversationPullRequest(name, {
+      host: 'github.com', repository: 'eltmon/overdeck', number, url: `https://github.com/eltmon/overdeck/pull/${number}`,
+    }, 'manual', T0);
+  }
+
+  it('re-reads a closed PR only every 15 minutes', async () => {
+    const name = conversation('feature/closed');
+    prRows = [pr(11, 'feature/closed', { state: 'CLOSED', closedAt: '2026-09-23T00:00:00Z' })];
+    await runPullRequestSyncOnce(T0, async () => null);
+    expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('closed');
+
+    prRows = [pr(11, 'feature/closed', { state: 'CLOSED', closedAt: '2026-09-23T00:00:00Z', title: 'renamed' })];
+    expect((await runPullRequestSyncOnce(T0 + MINUTE, async () => null)).updated).toBe(0);
+    expect((await runPullRequestSyncOnce(T0 + PR_SYNC_SLOW_INTERVAL_MS - 1, async () => null)).updated).toBe(0);
+    expect((await runPullRequestSyncOnce(T0 + PR_SYNC_SLOW_INTERVAL_MS, async () => null)).updated).toBe(1);
+    expect(listConversationPullRequests(name)[0]?.snapshot?.title).toBe('renamed');
+  });
+
+  it('reads a linked PR missing from the listing with one gh pr view per sweep, even when shared', async () => {
+    const a = conversation('feature/a');
+    const b = conversation('feature/b');
+    linkExplicitly(a, 900);
+    linkExplicitly(b, 900);
+    prRows = [pr(1, 'feature/unrelated')];
+    const read = vi.fn(async () => pr(900, 'feature/old', { title: 'Old PR beyond the listing' }) as never);
+
+    const result = await runPullRequestSyncOnce(T0, read);
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ repository: 'eltmon/overdeck', number: 900 }));
+    expect(result.updated).toBe(2);
+    expect(listConversationPullRequests(a)[0]?.snapshot?.title).toBe('Old PR beyond the listing');
+    expect(emitOnlyMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes links on a conversation outside every GitHub project through the fallback', async () => {
+    branchByCwd.set(OUT_OF_PROJECT_CWD, null);
+    createConversation({ name: 'outside', tmuxSession: 'conv-outside', cwd: OUT_OF_PROJECT_CWD, title: 'outside' });
+    linkExplicitly('outside', 901);
+    const read = vi.fn(async () => pr(901, 'x') as never);
+
+    await runPullRequestSyncOnce(T0, read);
+
+    expect(listRepoPullRequestsMock).not.toHaveBeenCalled();
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(listConversationPullRequests('outside')[0]?.snapshot?.state).toBe('open');
+  });
+
+  it('skips a repository for 15 minutes after 3 failed reads in a row', async () => {
+    const name = conversation('feature/flaky');
+    linkExplicitly(name, 902);
+    const read = vi.fn(async () => null);
+
+    for (let sweep = 0; sweep < 3; sweep += 1) await runPullRequestSyncOnce(T0 + sweep * MINUTE, read);
+    expect(read).toHaveBeenCalledTimes(3);
+
+    await runPullRequestSyncOnce(T0 + 3 * MINUTE, read);
+    await runPullRequestSyncOnce(T0 + 2 * MINUTE + PR_SYNC_SLOW_INTERVAL_MS - 1, read);
+    expect(read).toHaveBeenCalledTimes(3);
+
+    await runPullRequestSyncOnce(T0 + 2 * MINUTE + PR_SYNC_SLOW_INTERVAL_MS, read);
+    expect(read).toHaveBeenCalledTimes(4);
+    expect(listConversationPullRequests(name)[0]?.snapshot).toBeNull();
+  });
+
+  it('never reads a merged or dismissed link through the fallback', async () => {
+    const name = conversation('feature/final');
+    linkExplicitly(name, 903);
+    linkExplicitly(name, 904);
+    setPullRequestLinkSnapshot({ host: 'github.com', repository: 'eltmon/overdeck', number: 903 }, {
+      ...snapshotFromGhRow(pr(903, 'x', { state: 'MERGED', mergedAt: '2026-09-20T00:00:00Z' }) as never, '2026-09-20T00:00:00Z'),
+    });
+    getOverdeckDatabase().prepare('UPDATE conversation_pull_requests SET dismissed_at = ? WHERE number = 904').run(T0);
+    const read = vi.fn(async () => null);
+
+    await runPullRequestSyncOnce(T0, read);
+
+    expect(read).not.toHaveBeenCalled();
   });
 });
 

@@ -353,8 +353,12 @@ requests once and links every PR whose head branch equals the branch a
 conversation's working directory is on. Agent conversations whose workspace
 cannot be read fall back to `feature/<issue>`. A conversation on the project's
 default branch is never linked by branch. The same sweep refreshes the stored
-state of linked PRs, so the badge renders without a live GitHub call. Merged PRs
-are final and are not re-read.
+state of linked PRs, so the badge renders without a live GitHub call. Open PRs
+refresh on every sweep, closed PRs at most every 15 minutes, and merged PRs are
+final and never re-read. A linked PR the project listing doesn't include (older
+than its 200 most recent PRs, in another repository, or on a conversation
+outside any GitHub project) is read on its own. After three failed reads in a
+row, Overdeck skips that repository for 15 minutes.
 
 ### Linking a pull request by hand
 

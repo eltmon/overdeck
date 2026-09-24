@@ -244,7 +244,10 @@ door that does not exist; a real record read door would be a separate change.
   every 60 s) reads each GitHub project's `gh pr list` once per sweep, links every PR
   whose head branch equals a conversation's branch (`resolveConversationBranch`; never
   the default branch) as a `branch` link, and refreshes stored snapshots of linked PRs
-  (merged snapshots are final). A change emits the in-memory
+  by due rule: unsynced and open every sweep, closed every 15 min, merged never. A
+  due GitHub link no listing covered gets one `gh pr view` (the fallback), and 3
+  consecutive failed reads skip that repository for 15 min. The last-read times
+  and failure counts are in memory only. A change emits the in-memory
   `conversation.pull_requests_changed` event, which bumps `conversationsListRevision`.
   `GET /api/conversations` rows carry `pullRequest` (the effective link from
   `resolveEffectivePullRequest`) and `pullRequestCount`, read with one SQL query per
