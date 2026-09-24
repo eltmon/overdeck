@@ -8,7 +8,6 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { getClaudePermissionFlagsString, ensureClaudePermissionFlag } from '../claude-permissions.js';
@@ -31,18 +30,13 @@ import {
   hasOtherActiveConversationOnTmuxSession,
   type LegacyConversation as Conversation,
 } from './conversations.js';
-import {
-  capturePane,
-  sessionExists,
-  isHarnessProcessAlive,
-  killSession,
-  createSession,
-  setOption,
-  exactPaneTarget,
-  listSessionNames,
-  findManagedServerPid,
-} from '../tmux.js';
+import { capturePane, findManagedServerPid } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
+import { detectionPolicyFor, keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../terminal-backends/types.js';
+import type { AgentRole } from '@overdeck/contracts';
+import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
+import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, listLiveConversationSessions, waitForConversationSession } from './conversation-liveness.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -180,17 +174,13 @@ async function killConversationRuntimeProcesses(conv: Conversation): Promise<voi
 export async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
   if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) return;
   await closeCompanionTerminalForOwner(conv.tmuxSession); // PAN-3974: the companion goes with its runtime
-  await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+  await closeConversationPane(conv.tmuxSession);
   try {
     await killConversationRuntimeProcesses(conv);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.warn(`[conversations] failed to cleanup runtime processes for ${name}: ${msg}`);
   }
-}
-/** Quote a string for safe use in a bash script using single-quote wrapping. */
-function shellQuote(str: string): string {
-  return "'" + str.replace(/'/g, "'\"'\"'") + "'";
 }
 // Canonical model-id shape lives in model-validation.ts — it permits the
 // square-bracket context suffix (e.g. `k3[1m]`) that a local copy of this
@@ -234,6 +224,15 @@ async function validateCwdContainment(cwd: string): Promise<boolean> {
     return false;
   }
 }
+/**
+ * The conversation pane's screen on the host's backend (PAN-3921): tmux
+ * `capture-pane`, or Herdr `pane.read`. `''` when it cannot be read yet — a
+ * readiness waiter keeps polling until its own deadline.
+ */
+async function readConversationPane(tmuxSession: string, lines: number): Promise<string> {
+  const { readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
+  return readAgentPaneText(tmuxSession, lines, undefined, 'visible').catch(() => '');
+}
 function isPiTuiInputReady(snapshot: string): boolean {
   return /^\s*[❯›>]\s/m.test(snapshot)
     || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot);
@@ -242,7 +241,7 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000)
   const deadline = Date.now() + timeoutMs;
   let stableV17FooterPolls = 0;
   while (Date.now() < deadline) {
-    const snapshot = await capturePane(tmuxSession, 40).catch(() => '');
+    const snapshot = await readConversationPane(tmuxSession, 40);
     const mcpConnecting = /Connecting to MCP servers/i.test(snapshot) && !/MCP finished/i.test(snapshot);
     // omp v17 paints its footer before MCP startup and redraws again afterward.
     stableV17FooterPolls = /⬢[^\n]*[◕◉]/.test(snapshot) && !mcpConnecting ? stableV17FooterPolls + 1 : 0;
@@ -284,16 +283,12 @@ function generateConversationName(): string {
 function sanitizeName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 64);
 }
+/** Is the conversation's pane alive on the host's backend (PAN-3921: the conversation liveness door)? */
 export async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  return Effect.runPromise(sessionExists(sessionName));
+  return conversationSessionAlive(sessionName);
 }
 export async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (await Effect.runPromise(sessionExists(sessionName))) return;
-    await new Promise(r => setTimeout(r, 250));
-  }
-  throw new Error(`Timed out waiting for tmux session ${sessionName}`);
+  return waitForConversationSession(sessionName, timeoutMs);
 }
 export function shouldUseSupervisorForConversation(
   harness: RuntimeName,
@@ -302,13 +297,28 @@ export function shouldUseSupervisorForConversation(
   if (harness === 'codex' && options.codexTransport === 'app-server') return false;
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
 }
+/**
+ * PTY supervisor for a conversation (PAN-3921). On Herdr it is refused only
+ * around a harness Herdr must detect (claude-code): node-pty would hide it
+ * from the foreground-process detector (PAN-3917 W12). A pane-bound harness
+ * (kimi-code, muse, codex TUI) has no Herdr agent record, so `agent.prompt`
+ * cannot reach it and the supervisor socket stays its delivery path.
+ */
+export function conversationUsesSupervisor(
+  harness: RuntimeName,
+  backend: TerminalBackendName,
+  options: { codexTransport?: 'app-server' | 'tui' } = {},
+): boolean {
+  if (!shouldUseSupervisorForConversation(harness, options)) return false;
+  return backend === 'tmux' || detectionPolicyFor(harness) !== 'required';
+}
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
   if (harness === 'muse') {
     if (!await waitForPromptReady(tmuxSession, harness, 60)) throw new Error('Muse Code did not become interactive within 60 seconds');
     return;
   }
   if (harness === 'acp' || harness === 'opencode') {
-    await waitForAcpHostReady(tmuxSession, 30, { sessionExists: tmuxSessionExists }); // conversations are tmux on every host until PAN-3921
+    await waitForAcpHostReady(tmuxSession, 30, { sessionExists: tmuxSessionExists }); // the conversation liveness door, not the agent oracle
     return;
   }
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;
@@ -542,11 +552,14 @@ export async function spawnConversationSession(
   resume = false,
   harness: RuntimeName = 'claude-code',
   plainFork = false,
+  launch: { role?: AgentRole; backend?: TerminalBackend } = {},
 ): Promise<void> {
   const behavior = getHarnessBehavior(harness);
   const harnessLaunch = await prepareHarnessLaunch(harness);
-  const stateDir = join(getOverdeckHome(), 'conversations', tmuxSession);
+  const stateDir = conversationStateDir(tmuxSession);
   await mkdir(stateDir, { recursive: true });
+  if (launch.role) await writeConversationPaneRole(tmuxSession, launch.role);
+  const role: AgentRole = launch.role ?? await readConversationPaneRole(tmuxSession);
   clearReadySignal(tmuxSession);
   const launcherScript = join(stateDir, 'launcher.sh');
   const permissionFlags = getClaudePermissionFlagsString();
@@ -692,7 +705,8 @@ export async function spawnConversationSession(
   if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) {
     throw new Error('Invalid effort level');
   }
-  const useSupervisor = shouldUseSupervisorForConversation(harness, { codexTransport });
+  const backend = launch.backend ?? await resolveLaunchBackend();
+  const useSupervisor = conversationUsesSupervisor(harness, backend.name, { codexTransport });
   let supervisorScriptPath: string | undefined;
   if (useSupervisor) {
     supervisorScriptPath = resolvePtySupervisorScriptPath();
@@ -724,6 +738,7 @@ export async function spawnConversationSession(
   // one cwd never snapshot the same "existing sessions" set and race for the
   // same newest directory. Non-kimi harnesses run this closure directly,
   // unaffected by the lock.
+  let pane: AgentPaneRef | null = null;
   const launchTmuxAndCaptureSession = async (): Promise<void> => {
     // Conversations have no AgentState row, so the dashboard can't resolve
     // their wire.jsonl without a conversation-owned captured session id —
@@ -752,7 +767,8 @@ export async function spawnConversationSession(
         setTerminalEnv: true,
         unsetProviderEnv: true,
         managedStateKey: tmuxSession,
-        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+        // Hooks attribute by OVERDECK_AGENT_ID when there is no $TMUX to read (Herdr).
+        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor || backend.name !== 'tmux') ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [
           harnessLaunch.pathExport,
           `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
@@ -777,7 +793,8 @@ export async function spawnConversationSession(
           sessionId: resume ? undefined : claudeSessionId,
         }),
         extraArgs: !piFields && !acpFields && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
-        keepAlive: true,
+        keepAlive: backend.name === 'tmux', // a sleep loop in a Herdr pane reads as a live harness (#3992)
+        execConversationHarness: backend.name !== 'tmux',
         fileMode: 0o700,
         channelsBridgeMcpConfig,
         useSupervisor,
@@ -787,17 +804,31 @@ export async function spawnConversationSession(
     );
     await rename(launcherTmp, launcherScript);
     await closeCompanionTerminalForOwner(tmuxSession); // PAN-3974: a respawned owner gets a new generation
-    await Effect.runPromise(killSession(tmuxSession)).catch(() => undefined);
-    console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
+    await closeConversationPane(tmuxSession);
+    console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}" | backend=${backend.name}`);
+    // PAN-3921 FR-2: the pane goes through the launch door with the live agent
+    // name `conv-<name>` and the conversation's tokens. On tmux this is the
+    // same createSession call as before (same session name, cwd, env, launcher).
     try {
-      await Effect.runPromise(createSession(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
+      pane = await launchAgentPane({
+        ...(issueId ? { issueId } : {}),
+        cwd,
+        agentId: tmuxSession,
+        argv: ['bash', launcherScript],
         env: {
           ...BLANKED_PROVIDER_ENV,
           TERM: 'xterm-256color',
         },
-      }));
+        tokens: {
+          ...(issueId ? { issue: issueId } : {}),
+          role,
+          harness,
+          model: model ?? 'default',
+        },
+      }, backend);
     } catch (err) {
-      if ((err as { code?: string })?.code === 'ENOENT') {
+      const code = (err as { code?: string })?.code ?? (err as { cause?: { code?: string } })?.cause?.code;
+      if (backend.name === 'tmux' && code === 'ENOENT') {
         throw new Error(
           'tmux is not installed. Install it with: brew install tmux (macOS) or sudo apt-get install tmux (Linux)',
         );
@@ -857,8 +888,7 @@ export async function spawnConversationSession(
       console.error(`[conversations] dismissDevChannelsDialog failed for ${tmuxSession}: ${msg}`);
     });
   }
-  await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
+  await keepTmuxSessionOpen(pane);
 }
 export interface ResolvedRegisteredProject {
   key: string;
@@ -1019,7 +1049,7 @@ export async function handleConversationResume(
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
     const model = typeof body['model'] === 'string' && body['model'].trim() ? body['model'].trim() : (conv.model ?? undefined);
     const effort = typeof body['effort'] === 'string' && body['effort'].trim() ? body['effort'].trim() : (conv.effort ?? undefined);
-    const claudeAlive = await isHarnessProcessAlive(conv.tmuxSession);
+    const claudeAlive = await conversationHarnessAlive(conv.tmuxSession);
     if (claudeAlive) {
       updateLastAttached(name);
       markConversationActive(name);
@@ -1100,14 +1130,15 @@ export async function handleConversationRestartAll(
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
     const allConvs = listConversations();
-    const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
+    const liveSessionNames = await listLiveConversationSessions();
+    if (!liveSessionNames) return jsonResponse({ error: 'Terminal backend did not answer; no conversation restarted' }, { status: 503 });
     const convs = allConvs.filter((c) => liveSessionNames.has(c.tmuxSession));
     const results: { name: string; model: string | null; status: string }[] = [];
     for (const conv of convs) {
       const respawn = markRespawnPending(conv.tmuxSession);
       let attemptedHarness: RuntimeName = conv.harness ?? 'claude-code';
       try {
-        await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+        await closeConversationPane(conv.tmuxSession);
         const oldSessionId = conv.claudeSessionId;
         const sessionFileForResume = await deps.resolveSessionFile(conv);
         const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);

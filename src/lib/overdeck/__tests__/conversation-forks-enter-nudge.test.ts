@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   capturePaneViewport: vi.fn(),
   deliverAgentMessage: vi.fn(),
   sendKeysAsync: vi.fn(),
+  tmuxSessionExists: vi.fn(),
 }));
 
 vi.mock('../../tmux.js', async (importOriginal) => ({
@@ -15,6 +17,7 @@ vi.mock('../../tmux.js', async (importOriginal) => ({
   capturePane: mocks.capturePaneText,
   capturePaneViewport: mocks.capturePaneViewport,
   sendKeysAsync: mocks.sendKeysAsync,
+  sessionExists: () => Effect.succeed(mocks.tmuxSessionExists()),
 }));
 
 vi.mock('../../agents.js', async (importOriginal) => ({
@@ -44,8 +47,37 @@ describe('injectForkSummary standalone Enter recovery', () => {
     vi.useFakeTimers();
     mocks.capturePaneText.mockReset();
     mocks.capturePaneViewport.mockReset().mockResolvedValue(null);
-    mocks.deliverAgentMessage.mockReset().mockResolvedValue(undefined);
+    mocks.deliverAgentMessage.mockReset().mockResolvedValue({ ok: true, path: 'tmux' });
     mocks.sendKeysAsync.mockReset().mockResolvedValue(undefined);
+    mocks.tmuxSessionExists.mockReset().mockReturnValue(true);
+  });
+
+  it('fails the fork when the delivery is refused instead of dropping it (PAN-3921)', async () => {
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: false, path: 'herdr', failure: 'refused: agent_blocked' });
+
+    await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
+      .rejects.toThrow('fork summary not delivered to fork-conv: refused: agent_blocked');
+    expect(mocks.sendKeysAsync).not.toHaveBeenCalled();
+  });
+
+  it('treats a Herdr agent.prompt delivery as submitted without the tmux composer check (PAN-3921)', async () => {
+    vi.spyOn(forks, 'confirmForkPromptAccepted').mockResolvedValue('still-idle');
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
+
+    await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
+      .resolves.toBe('submitted');
+    expect(mocks.capturePaneText).not.toHaveBeenCalled();
+    expect(mocks.sendKeysAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not strand a fork whose pane has no tmux session to read (Herdr, PAN-3921)', async () => {
+    vi.spyOn(forks, 'confirmForkPromptAccepted').mockResolvedValue('still-idle');
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'supervisor' });
+    mocks.tmuxSessionExists.mockReturnValue(false);
+
+    await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
+      .resolves.toBe('submitted');
+    expect(mocks.sendKeysAsync).not.toHaveBeenCalled();
   });
 
   afterEach(() => {

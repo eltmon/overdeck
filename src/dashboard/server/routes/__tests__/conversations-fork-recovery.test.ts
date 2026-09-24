@@ -96,7 +96,7 @@ beforeEach(async () => {
   spawnCalls.length = 0;
   waitCalls.length = 0;
 
-  mocks.deliverAgentMessage.mockReset().mockResolvedValue(undefined);
+  mocks.deliverAgentMessage.mockReset().mockResolvedValue({ ok: true, path: 'tmux' });
   mocks.waitForReadySignal.mockReset().mockResolvedValue(true);
   mocks.getAgentRuntimeStateSync.mockReset().mockImplementation((sessionName: string) => (
     harnessAlive.get(sessionName) ? { state: 'active' } : null
@@ -307,6 +307,7 @@ describe('fork pipeline recovery and re-entry', () => {
         await new Promise<void>((deliveryResolve) => {
           releaseDelivery = deliveryResolve;
         });
+        return { ok: true, path: 'tmux' };
       });
     });
 

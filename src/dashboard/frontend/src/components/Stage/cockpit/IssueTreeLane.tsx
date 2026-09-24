@@ -13,9 +13,11 @@ import { AgentsLane } from './AgentsLane'
  * PAN-3917 FR-5: the issue tree's rows ARE the backend panes in the issue
  * workspace. A pane's `role` metadata token decides which row it is — so a
  * reviewer spawned by `pan handoff --issue` renders as the Review row, never as
- * a loose conversation.
+ * a loose conversation. An issue-scoped conversation (role `conversation`,
+ * PAN-3921) is not a tree row at all: it is neither the work pane nor a
+ * specialist, and no row type exists for it.
  */
-const PANE_ROLE_TO_SESSION_TYPE: Record<BackendPane['role'], SessionNode['type']> = {
+const PANE_ROLE_TO_SESSION_TYPE: Record<BackendPane['role'], SessionNode['type'] | null> = {
   plan: 'planning',
   work: 'work',
   worker: 'work',
@@ -23,6 +25,7 @@ const PANE_ROLE_TO_SESSION_TYPE: Record<BackendPane['role'], SessionNode['type']
   test: 'test',
   uat: 'test',
   strike: 'strike',
+  conversation: null,
 }
 
 /** The backend owns pane state; this is the only place it becomes a row status. */
@@ -37,10 +40,12 @@ function paneStatus(state: BackendPane['state']): { status: SessionNode['status'
   }
 }
 
-function paneToSession(pane: BackendPane): SessionNode {
+function paneToSession(pane: BackendPane): SessionNode | null {
+  const type = PANE_ROLE_TO_SESSION_TYPE[pane.role]
+  if (!type) return null
   const { status, presence } = paneStatus(pane.state)
   return {
-    type: PANE_ROLE_TO_SESSION_TYPE[pane.role],
+    type,
     role: pane.role,
     sessionId: pane.id,
     model: pane.model,
@@ -204,7 +209,7 @@ export function IssueTreeLane({
   const sessions = useMemo(() => {
     // Live rows come from the backend's pane inventory; the transcript-derived
     // activity sections fill in the finished sessions the backend no longer owns.
-    const base = panes.map(paneToSession)
+    const base = panes.map(paneToSession).filter((session): session is SessionNode => session !== null)
     const paneTypes = new Set(base.map((session) => session.type))
     for (const section of activity.data?.sections ?? []) {
       const session = toCockpitSession(section)

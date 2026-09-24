@@ -110,9 +110,12 @@
 1158 src/lib/overdeck/conversation-runtime.ts # PAN-3920
 1162 src/lib/tmux.ts # PAN-4012
 1210 src/lib/projects.ts # PAN-4012
+1178 src/lib/overdeck/conversation-runtime.ts # PAN-3921
 1124 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3982
 # Two registration lines; implementation is in the extracted child input route module.
 1072 src/dashboard/server/routes/conversations.ts # PAN-3787
+1061 src/lib/agents/delivery.ts # PAN-3921
+1031 src/dashboard/frontend/src/components/XTerminal.tsx # PAN-3921
 1096 src/lib/config-yaml/schema.ts # PAN-4160
 # Typed PR-link methods on the ConversationsResolver/ConversationWriter service interfaces (types only).
 1094 src/lib/overdeck/conversations.ts # PAN-3822

@@ -275,8 +275,8 @@ async function waitForKimiCodeTuiReady(agentId: string, timeoutSec = 30): Promis
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
     try {
-      if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
-      const pane = await capturePane(agentId, 80);
+      const pane = await readTuiPane(agentId);
+      if (pane === null) return false;
       const hasInputPrompt = /[│|]\s*>\s*[│|]?/.test(pane);
       const hasStatusLine = /context:\s*\d+%/.test(pane);
       if (hasInputPrompt && hasStatusLine) {
@@ -303,7 +303,7 @@ async function readTuiPane(agentId: string): Promise<string | null> {
   const presence = await probeAgentPane(agentId);
   if (presence === 'gone') return null;
   if (presence === 'unknown') throw new Error(`could not tell whether ${agentId}'s pane is still there`);
-  return await readAgentPaneText(agentId, 80);
+  return await readAgentPaneText(agentId, 80, undefined, 'visible');
 }
 
 async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {

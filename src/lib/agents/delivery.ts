@@ -48,14 +48,28 @@ async function loadTerminalBackendConfig(): Promise<{ terminal?: { backend?: 'he
 }
 
 /**
+ * The target's harness: its agent state, or — for a conversation, which has no
+ * agent state — the conversation row (PAN-3921, review of #4104 F4).
+ */
+async function targetHarness(agentId: string, state: AgentState | null): Promise<RuntimeName | undefined> {
+  if (state?.harness) return state.harness;
+  if (!agentId.startsWith('conv-')) return undefined;
+  try {
+    const { getConversationByTmuxSession } = await import('../overdeck/conversations.js');
+    return getConversationByTmuxSession(agentId)?.harness ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Does this agent run behind a host process with its own delivery socket?
  * codex app-server (the default codex transport) and ACP/opencode do; codex in
  * `transport: tui` mode does not.
  */
-async function isHostBackedTarget(state: AgentState | null): Promise<boolean> {
-  if (!state) return false;
-  if (state.harness === 'acp' || state.harness === 'opencode') return true;
-  if (state.harness !== 'codex') return false;
+async function isHostBackedTarget(harness: RuntimeName | undefined): Promise<boolean> {
+  if (harness === 'acp' || harness === 'opencode') return true;
+  if (harness !== 'codex') return false;
   try {
     const { loadConfigSync } = await import('../config-yaml.js');
     const loaded = loadConfigSync() as { config?: { codex?: { transport?: string } } };
@@ -398,7 +412,7 @@ export async function deliverAgentMessage(
   // the pane, where the host's stdin reader treats every line as its own
   // message — the PAN-3705 kickoff arrived as 97 one-line threads that way.
   // Their socket tiers below are the only correct door.
-  const herdrAgent = !(await isHostBackedTarget(state)) && (await deliveryBackendName()) === 'herdr'
+  const herdrAgent = !(await isHostBackedTarget(await targetHarness(normalizedId, state))) && (await deliveryBackendName()) === 'herdr'
     ? await (await import('../terminal-backends/herdr.js')).findHerdrAgent(normalizedId)
     : null;
   if (herdrAgent) {

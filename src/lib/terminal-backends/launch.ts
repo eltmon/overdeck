@@ -10,10 +10,11 @@
  * previous pane used. This module is the one place
  * that resolves the backend (D10 selection), finds or creates the workspace,
  * and starts the pane — so a launcher is three lines and cannot forget the
- * tokens. `pan handoff --issue` does not route through here yet — the forked
- * conversation still inherits its parent's cwd (or an explicit `--cwd`), not
- * the issue's workspace; giving it the same pane placement is a post-release
- * follow-up (docs/THE-CUT.md).
+ * tokens. Conversations, forks and handoffs, and `pan flywheel start` route
+ * through `launchAgentPane` too (PAN-3921): the pane is named `conv-<name>`
+ * and stamped with role `conversation` unless `pan handoff --role` says
+ * otherwise, so a handoff started with `--issue X --role review` is X's
+ * Review row.
  *
  * Importing it registers both adapters.
  */

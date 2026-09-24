@@ -1,0 +1,784 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-19T12:04:40.358Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3921: Route conversations and pan handoff through the terminal backend (Herdr) with role tokens; PTY supervisor off on Herdr",
+    "updated": "2026-09-19T13:25:36.372Z"
+  },
+  "plan": {
+    "id": "pan-3921",
+    "title": "Route conversations and pan handoff through the terminal backend (Herdr) with role tokens; PTY supervisor off on Herdr",
+    "status": "running",
+    "uid": "8dd98032-a62a-4a63-8924-df514d65b681",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 3,
+    "created": "2026-09-19T12:04:40.358Z",
+    "updated": "2026-09-19T13:25:36.372Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3921",
+        "label": "PAN-3921",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917 (parent, FR-5/W8)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3936",
+        "label": "PAN-3936 (sibling: muse/kimi runtime adapters)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-3921.md",
+        "label": "PRD",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "terminal-backend",
+      "herdr",
+      "conversations",
+      "handoff",
+      "pty-supervisor",
+      "liveness"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/pan-3921.md",
+      "sizeJustification": "25 files, at the limit. The subsystem count reads 7 only because the two documentation files (docs/TERMINAL-BACKENDS.md, docs/THE-CUT.md) sit directly under docs/ and the first-two-segments rule counts each as its own subsystem; the real subsystems are six (packages/contracts, src/lib, src/dashboard, src/cli, sync-sources/skills, docs). The separable slice (runtimes/muse.ts, runtimes/kimi-code.ts) was already split into sibling PAN-3936. What remains is one behavior: a conversation pane on Herdr must be launched, kept alive, delivered to, waited on, and ended by the same backend — landing the launch without the liveness door mass-ends every conversation, so these items cannot ship as separate issues.",
+      "canonicalFilename": "2026-09-19-PAN-3921-route-conversations-and-pan-handoff-through-the-terminal-backend-herdr-with-role-tokens-pty-supervisor-off-on-herdr.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Conversations, pan handoff, and pan flywheel start still create their pane with tmux createSession (conversation-runtime.ts:808) and wrap the harness in the PTY supervisor (:705). On a Herdr host the pane never reaches Herdr, so a handoff cannot render as the issue's Review row (PAN-3917 FR-5); if the pane were redirected to Herdr today, the supervisor wrapper would hide the harness from Herdr's foreground-process detector and startAgent would close the pane after 60s (the pan start PAN-3705 failure). Every conversation liveness read (reads, list, delivery gate, fork seams, respawn wait, lifecycle poller, flywheel kickoff) is tmux-only, so a Herdr-hosted conversation would read as dead everywhere and the poller would end it 30s after creation.",
+      "Proposal": "Launch conversations through the existing launch door (launchAgentPane) with the live agent name conv-<name> and pane tokens { issue?, role, harness, model }; add a `conversation` role to the contracts; decide the PTY supervisor by backend (tmux-only); persist a conversation's pane role in ~/.overdeck/conversations/<conv>/pane-role; add `pan handoff --role` (default conversation; review makes the handoff the Review row) and default `--issue` cwd to the issue workspace when no --cwd is given; add one backend-aware conversation liveness door (conversation-liveness.ts) and route every conversation liveness read through it, with Herdr `indeterminate` reading as alive; make pollConversations read listHerdrAgents on a Herdr host with a 90s grace; wait for readiness with herdr agent.wait for harnesses whose tmux readiness is a pane scrape; deliver the flywheel kickoff through deliverAgentMessage. Delivery and the terminal WebSocket already resolve Herdr agents by name, so they need no change.",
+      "NonGoals": "- No change to src/lib/runtimes/muse.ts or src/lib/runtimes/kimi-code.ts (sibling PAN-3936).\n- No per-harness fallback to tmux on a Herdr host; an acp conversation fails Herdr detection exactly as work agents do today.\n- No DB migration for the pane role; it is a state-dir file.\n- conversation-pane-choice.ts (numbered-menu capture) and captureCorpseDiagnostics stay tmux-only.\n- No frontend changes beyond the contracts literal; no new row type for `conversation` panes.\n- isAliveSync stays tmux-only (PAN-3917 known gap).\n- The FR-17 prompt guard is not widened: a `conversation` role with an issue token is not the issue's work pane.\n- No change to how deliverAgentMessage or the terminal WebSocket resolve a Herdr agent by name."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add a `conversation` value to AgentRole / BackendPane.role instead of reusing `work` for conversation panes.",
+        "rationale": "PaneTokens.role is a required closed literal. Stamping `work` on an issue-scoped conversation would render a second Work row and let it prompt the issue's workers under the FR-17 guard; `conversation` keeps the guard's operator/work distinction intact."
+      },
+      {
+        "summary": "Persist the pane role in ~/.overdeck/conversations/<conv>/pane-role rather than a conversations-table column.",
+        "rationale": "The conversations table sits behind two migration systems; a state-dir file is created by the same code that writes launcher.sh, survives respawn/resume/restart-all/fork recovery, and needs no migration."
+      },
+      {
+        "summary": "`pan handoff --issue <id>` defaults the successor cwd to workspaces/feature-<id> when it exists and no --cwd was given.",
+        "rationale": "PAN-3917 FR-5 says the handoff pane is placed in the issue workspace; the workspace is a git worktree so the existing isInsideGitWorkTree check passes, and an explicit --cwd still wins."
+      },
+      {
+        "summary": "Split the muse.ts / kimi-code.ts runtime-adapter fix into sibling issue PAN-3936.",
+        "rationale": "Their only live callers are specialist rotation and crash respawn, the change depends on nothing in this plan, and keeping them here pushes the plan past the finalize surface gate (25 files / 6 subsystems)."
+      },
+      {
+        "summary": "No per-harness tmux fallback when Herdr cannot detect a harness.",
+        "rationale": "Parity with work agents, which already launch every harness through launchAgentPane without fallback; a mixed placement would make the inventory read the tmux-hosted pane as dead."
+      },
+      {
+        "summary": "On a Herdr host, readiness for ohmypi/muse/kimi-code/codex-tui conversations uses herdr agent.wait(['idle','blocked']) instead of tmux pane scrapes.",
+        "rationale": "Herdr's agent states are the oracle for any detected kind; waitForPiTuiReady and friends read tmux panes that do not exist on Herdr."
+      },
+      {
+        "summary": "Herdr `indeterminate` (socket did not answer) reads as alive in the conversation liveness door.",
+        "rationale": "Same rule isAliveOnHerdr applies to agents: a Herdr outage must never end every conversation at once."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-conversation-role",
+        "title": "Add the `conversation` pane role to the contracts and toPaneRole",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3921",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conversation-launch-door",
+            "handoff-role-flag"
+          ],
+          "files_scope": [
+            "packages/contracts/src/terminal-backend.ts",
+            "packages/contracts/src/backend-pane.ts",
+            "src/lib/terminal-backends/prompt-guard.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build --workspace packages/contracts",
+            "node -e \"const c=require('./packages/contracts/dist/index.cjs'); const {Schema}=require('effect'); if(!c.AGENT_ROLES.includes('conversation')||!c.isAgentRole('conversation')) throw new Error('role missing'); Schema.decodeUnknownSync(c.BackendPane)({id:'w1:p1',role:'conversation',harness:'claude-code',model:'m',state:'idle'}); console.log('ok')\"",
+            "npm run typecheck",
+            "grep -rn \"role === '\" src/dashboard/frontend/src src/lib/overdeck/derived-issue-state.ts | grep -c conversation; test $? -eq 1"
+          ],
+          "expected_outputs": [
+            "contracts build completes",
+            "the node one-liner prints ok (AGENT_ROLES contains conversation, isAgentRole accepts it, BackendPane decodes role conversation)",
+            "typecheck completes without errors",
+            "the role === consumer grep counts zero matches on conversation"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In packages/contracts/src/terminal-backend.ts append \"conversation\" to the AgentRole union (line 18) and to AGENT_ROLES (line 50); update the PaneTokens doc comment (lines 20-24) to say an operator conversation carries role `conversation` and no `issue` token, and an issue-scoped conversation carries role `conversation` plus the issue. In packages/contracts/src/backend-pane.ts append \"conversation\" to the role Schema.Literals (line 16). In src/lib/terminal-backends/prompt-guard.ts add `case 'conversation':` to the pass-through cases of toPaneRole (line 30). Rebuild packages/contracts (npm run build --workspace packages/contracts) so src/ sees the new literal. Grep every `role === '` consumer (useDrawerData.ts:172, KanbanCards.tsx:615, useConfluenceData.ts:310, derived-issue-state.ts:147) and confirm none matches `conversation`; no code change is expected there. Verification is the node one-liner in verify_commands against the built dist plus typecheck; the toPaneRole('conversation') assertion lives in the conversation-launch-door test file (src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts) so this item adds no test file of its own."
+        },
+        "items": [
+          {
+            "id": "contracts-conversation-role.ac1",
+            "title": "Given a BackendPane payload with role 'conversation', Schema decoding accepts it and isAgentRole('conversation') returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-conversation-role.ac2",
+            "title": "toPaneRole('conversation') returns 'conversation' and toPaneRole('ship') still returns 'uat'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-conversation-role.ac3",
+            "title": "AGENT_ROLES exported from the built @overdeck/contracts contains 'conversation' and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-conversation-role.ac4",
+            "title": "grep of role === consumers (useDrawerData.ts, KanbanCards.tsx, useConfluenceData.ts, derived-issue-state.ts) produces no match on 'conversation', so a conversation pane renders as neither a review, test, uat, work nor worker row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-launch-door",
+        "title": "spawnConversationSession launches through launchAgentPane; supervisor tmux-only; pane role persisted",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3921",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conversation-liveness-door",
+            "conversation-readiness-herdr",
+            "handoff-role-flag",
+            "flywheel-start-herdr",
+            "docs-terminal-backends-conversations"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/terminal-backends/launch.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts tests/unit/lib/overdeck tests/unit/lib/agents/spawn-failure-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-runtime-launch.test.ts passes with the Herdr, tmux, role-persistence and stop cases",
+            "existing conversation-runtime tests under tests/unit/lib/overdeck still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-9"
+          ],
+          "readinessReason": "Parallel-safe once contracts-conversation-role lands: it is the only item that edits launch.ts and, until the liveness door starts, the only editor of conversation-runtime.ts; the blocks edges serialize every later editor of those files."
+        },
+        "narrative": {
+          "Action": "PRD W2, before/after snippets are in the PRD. (1) src/lib/terminal-backends/launch.ts: add `closeAgentPaneByName(agentId, backend?)` next to agentPaneExists (line 97) — on Herdr findHerdrAgent(agentId) then backend.close({paneId}); on tmux killSession(agentId); both swallow errors. Rewrite the module header (lines 1-15) so it no longer says pan handoff --issue does not route through the door. (2) src/lib/overdeck/conversation-runtime.ts spawnConversationSession (line 545): add a trailing `launch: { role?: AgentRole; backend?: TerminalBackend } = {}` parameter (the nine positional parameters stay). After stateDir is created (line 557) resolve the role: launch.role, else the trimmed contents of <stateDir>/pane-role when isAgentRole, else 'conversation'; when launch.role is given write it to <stateDir>/pane-role (mode 0600). Export `writeConversationPaneRole(tmuxSession, role)` (mkdir stateDir + write pane-role) for the fork route. Replace line 705 with `const backend = launch.backend ?? await resolveLaunchBackend(); const useSupervisor = backend.name === 'tmux' && shouldUseSupervisorForConversation(harness, { codexTransport });` so no pty-token is written and no supervisor wrapper is generated on Herdr. Replace the killSession at line 799 with `await closeAgentPaneByName(tmuxSession, backend)`. Replace the createSession call at lines 808-820 with `launchAgentPane({ issueId (only when defined), cwd, agentId: tmuxSession, argv: ['bash', launcherScript], env: { ...BLANKED_PROVIDER_ENV, TERM: 'xterm-256color' }, tokens: { issue (only when issueId), role, harness, model: model ?? 'default' } }, backend)`, keeping the tmux-not-installed ENOENT message only when backend.name === 'tmux'. Keep `if (useSupervisor) await waitForPtySupervisorOrFallback(tmuxSession)`. Guard the two setOption calls at the function tail with `if (pane.backend === 'tmux')` (declare `let pane: AgentPaneRef | null` before launchTmuxAndCaptureSession and assign inside). Append `| backend=${backend.name}` to the [claude-invoke] log line. (3) stopConversationRuntime (line 174): replace the killSession call with `await closeAgentPaneByName(conv.tmuxSession)`; keep killConversationRuntimeProcesses. (4) Imports: launchAgentPane/closeAgentPaneByName/resolveLaunchBackend from ../terminal-backends/launch.js, AgentPaneRef/TerminalBackend types, isAgentRole/AgentRole from @overdeck/contracts; drop createSession from the tmux import if unused. (5) Tests in src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts with a fake TerminalBackend object passed via launch.backend and vi.mock for ../harness-binary.js, ../launcher-generator.js (capture the config), ../agents.js, ../pty-token.js, and the dashboard imports: Herdr → startAgent called with name 'conv-x', tokens.role 'conversation', no issue key without issueId and issue 'PAN-1' with it, launcher config useSupervisor false, writePtyToken not called, setOption not called; tmux + claude-code → useSupervisor true and both setOption calls; launch.role 'review' writes pane-role and a later call without launch.role stamps review; stopConversationRuntime on Herdr calls close with the pane id findHerdrAgent returned and killSession on tmux. (6) Implementation checkpoint C1 (PRD): launch one throwaway conversation on the live Herdr session and confirm `herdr --session overdeck agent list` shows conv-<name> as agent claude within 60s; record the result in docs/TERMINAL-BACKENDS.md (docs item). Fallback if not detected: on Herdr generate the conversation launcher with keepAlive false and `exec` before the harness command."
+        },
+        "items": [
+          {
+            "id": "conversation-launch-door.ac1",
+            "title": "Given a fake Herdr backend, spawnConversationSession('conv-x', …) calls startAgent with name 'conv-x' and tokens { role: 'conversation', harness, model } with no issue key, and with issueId 'PAN-1' the tokens carry issue 'PAN-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-launch-door.ac2",
+            "title": "Given a fake Herdr backend, the generated launcher config carries useSupervisor false, writePtyToken is never called, and setOption is never called; given a fake tmux backend with claude-code the config carries useSupervisor true and destroy-unattached/remain-on-exit are both set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-launch-door.ac3",
+            "title": "spawnConversationSession(…, { role: 'review' }) persists <stateDir>/pane-role containing 'review', and a subsequent call without launch.role stamps tokens.role 'review'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-launch-door.ac4",
+            "title": "stopConversationRuntime on a Herdr host closes the pane whose paneId findHerdrAgent('conv-x') returned, and on tmux closes the session 'conv-x' through killSession; the launch.ts module header contains no statement that pan handoff does not route through launchAgentPane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-launch-door.ac5",
+            "title": "Checkpoint C1: a live throwaway conversation launched on the Herdr session appears in `herdr --session overdeck agent list` as agent 'claude' named conv-<name> within 60s, or the exec/no-keep-alive fallback is applied and the launcher emits `exec claude` on Herdr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-liveness-door",
+        "title": "One backend-aware conversation liveness door replaces every tmux liveness read in the conversation code paths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3921",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-liveness.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/services/pending-respawn.ts",
+            "src/lib/overdeck/__tests__/conversation-liveness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-liveness.test.ts src/lib/overdeck/__tests__ tests/unit/lib/overdeck tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+            "grep -n \"Effect.runPromise(sessionExists\\|listSessionNames()\\|isHarnessProcessAlive(\" src/lib/overdeck/conversation-reads.ts src/lib/overdeck/conversation-list.ts src/lib/overdeck/conversation-delivery.ts src/lib/overdeck/conversation-forks.ts src/dashboard/server/routes/conversations.ts src/dashboard/server/services/pending-respawn.ts; test $? -eq 1",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-liveness.test.ts passes (alive/indeterminate true, absent/exited false, null inventory on probe error, wait rejects after timeout under fake timers)",
+            "the grep exits 1 (no direct tmux liveness call remains in the six files)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9"
+          ],
+          "readinessReason": "Parallel-safe once conversation-launch-door lands: every later editor of conversation-runtime.ts and conversation-forks.ts (readiness, role flag, issue cwd) is behind a blocks edge from this item, and the new conversation-liveness.ts has no other editor."
+        },
+        "narrative": {
+          "Action": "PRD W5 (table of call sites is in the PRD). Create src/lib/overdeck/conversation-liveness.ts exporting conversationSessionAlive(tmuxSession, deps?), listLiveConversationSessions(deps?) → ReadonlySet<string> | null, conversationHarnessAlive(tmuxSession, deps?), and waitForConversationSession(tmuxSession, timeoutMs = 30000, deps?) with a ConversationLivenessDeps seam { backend?, probeHerdr?, listHerdr?, sessionExists?, listSessionNames?, harnessAlive?, sleep? }. Backend comes from hostTerminalBackendName() unless injected. On Herdr: conversationSessionAlive = probeHerdrAgentLiveness(name).kind is 'alive' or 'indeterminate'; listLiveConversationSessions = names from listHerdrAgents() whose state is not 'exited' (null when the call throws); conversationHarnessAlive = probe kind 'alive' or 'indeterminate'. On tmux: sessionExists, listSessionNames, isHarnessProcessAlive from ../tmux.js. waitForConversationSession polls conversationSessionAlive every 250ms via the injectable sleep until the deadline, then throws `Timed out waiting for conversation session <name>`. Then swap call sites: conversation-runtime.ts tmuxSessionExists (line 297) delegates to conversationSessionAlive (keep the export name; four modules import it), waitForTmuxSession (line 300) delegates to waitForConversationSession, the respawn reattach check at line 1038 uses conversationHarnessAlive, restart-all (lines 1119-1126) uses listLiveConversationSessions (skip when null) and closeAgentPaneByName instead of listSessionNames/killSession; conversation-list.ts lines 101-112 use listLiveConversationSessions (null → treat liveness as unknown and keep the row's stored status) and conversationHarnessAlive; conversation-forks.ts defaults at lines 268, 274, 291 become conversationSessionAlive, conversationHarnessAlive, waitForConversationSession (the __setForkPipelineRuntimeOverridesForTest seam is unchanged); routes/conversations.ts conversationReadDependencies (lines 182-186) keep tmuxSessionExists (now door-backed) and set listSessionNames to `async () => [...((await listLiveConversationSessions()) ?? [])]`; pending-respawn.ts waitForSessionRespawn (lines 70-76) replaces each sessionExists call with conversationSessionAlive and drops the tmux import. conversation-delivery.ts line 188 keeps calling tmuxSessionExists, which now routes through the door. conversation-pane-choice.ts stays tmux-only (NonGoal). Tests in src/lib/overdeck/__tests__/conversation-liveness.test.ts with vi.useFakeTimers: Herdr alive → true, indeterminate → true, absent → false, exited → false; tmux path calls the injected sessionExists; listLiveConversationSessions returns only names whose state is not exited and null when listHerdr throws; waitForConversationSession resolves once the probe flips within the deadline and rejects after advanceTimersByTimeAsync(timeout)."
+        },
+        "items": [
+          {
+            "id": "conversation-liveness-door.ac1",
+            "title": "conversationSessionAlive returns true when the Herdr probe reports alive or indeterminate and false when it reports absent or exited; on tmux it returns the injected sessionExists answer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-liveness-door.ac2",
+            "title": "listLiveConversationSessions returns the set of Herdr agent names whose state is not exited, and returns null when listHerdrAgents throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-liveness-door.ac3",
+            "title": "Under fake timers, waitForConversationSession resolves when the probe flips to alive before the deadline and rejects with 'Timed out waiting for conversation session' after advanceTimersByTimeAsync(timeout)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-liveness-door.ac4",
+            "title": "grep for Effect.runPromise(sessionExists, listSessionNames(), or isHarnessProcessAlive( across conversation-reads.ts, conversation-list.ts, conversation-delivery.ts, conversation-forks.ts, routes/conversations.ts and pending-respawn.ts returns no match, and the existing fork-pipeline and conversation-runtime tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-poller-herdr",
+        "title": "pollConversations reads the Herdr inventory on a Herdr host with a 90s grace",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3921",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-lifecycle.ts",
+            "src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-lifecycle.test.ts passes including the new Herdr block (absent+old → ended, exited → ended, idle → active, absent+45s → active, probe throws → nothing marked)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In src/dashboard/server/services/conversation-lifecycle.ts pollConversations (line 128): resolve `backend = await hostTerminalBackendName()` (src/lib/terminal-backends/select.ts). On Herdr call a new module-local `readHerdrConversationInventory()` that calls listHerdrAgents() from src/lib/terminal-backends/herdr.ts and returns { alive: Set<name with state !== 'exited'>, exited: Set<name with state === 'exited'> } or null on any error; return early when it is null (a Herdr outage must not end conversations). On tmux keep getRuntimeCensus() exactly as today. Derive per conversation: Herdr sessionGone = !alive.has(name) && !exited.has(name), harnessGone = exited.has(name); tmux unchanged. The revalidation block (lines 207-211) re-reads the same source (refresh the Herdr inventory once, or refreshRuntimeCensus on tmux). Grace: on Herdr use a module-local `const HERDR_SPAWN_GRACE_PERIOD_MS = 90_000; // AGENT_DETECT_TIMEOUT_MS (60s, terminal-backends/herdr.ts) + SPAWN_GRACE_PERIOD_MS` for both the age check (line 155) and the lastAliveSignal check (line 205); do not edit herdr.ts (outside this item's files_scope); tmux keeps 30000. captureCorpseDiagnostics stays tmux-only (skip when census is null). Extend src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts with a Herdr describe block: mock ../../../../lib/terminal-backends/select.js hostTerminalBackendName → 'herdr' and ../../../../lib/terminal-backends/herdr.js listHerdrAgents; cases: conversation absent from the inventory and created 120s ago → markConversationEnded called; present with state idle → not called and an ended row is resurrected via markConversationRunning; present with state exited → markConversationEnded called (keep-alive corpse count); absent but created 45s ago → not called; listHerdrAgents rejects → nothing marked."
+        },
+        "items": [
+          {
+            "id": "conversation-poller-herdr.ac1",
+            "title": "On a Herdr host, pollConversations marks ended a conversation absent from listHerdrAgents that was created more than 90s ago, and marks nothing for one absent but created 45s ago",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-poller-herdr.ac2",
+            "title": "On a Herdr host, pollConversations marks ended a conversation whose Herdr agent state is exited (keep-alive corpse), marks running an ended row whose Herdr agent is idle, and marks nothing for an active conversation whose agent is idle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-poller-herdr.ac3",
+            "title": "When listHerdrAgents rejects, pollConversations returns without marking any conversation ended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-poller-herdr.ac4",
+            "title": "On a tmux host pollConversations produces the same ended/active verdicts as before: the existing census-based cases in conversation-lifecycle.test.ts run with no assertion changed and stay green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-role-flag",
+        "title": "pan handoff --role and the fork route's role field persist the pane role",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3921",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/fork-client.ts",
+            "src/lib/overdeck/conversation-forks.ts",
+            "sync-sources/skills/pan-handoff/SKILL.md",
+            "src/cli/commands/__tests__/handoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/handoff.test.ts tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+            "bash scripts/lint-skills.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "handoff.test.ts passes including --role forwarding, invalid --role exit 1, and no role key without the flag",
+            "lint-skills.sh reports no drift between pan handoff --help and sync-sources/skills/pan-handoff/SKILL.md",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. src/cli/index.ts: after the `--issue <id>` option of the handoff command (line 449) add `.option('--role <role>', 'Pane role for the new conversation: conversation (default), work, review, test, plan. With --issue, review makes the handoff the issue\\'s Review row')`. src/cli/commands/handoff.ts: add `role?: string` to HandoffOptions; define `const HANDOFF_ROLES = ['conversation', 'work', 'review', 'test', 'plan'] as const`; when options.role is given and not in HANDOFF_ROLES print `Invalid --role: <value>. Expected one of conversation, work, review, test, plan.` in yellow and return exitCli(1) before any fork call; pass `role` to forkConversationViaServer; print `  Role: <role>` in the summary block near line 156. src/cli/commands/fork-client.ts: add `role?: AgentRole` to ForkViaServerOptions and `if (opts.role) body['role'] = opts.role;` in the body builder (lines 83-97). src/lib/overdeck/conversation-forks.ts handleConversationSummaryFork: after the issueId validation (line 749) read body['role']; when defined and !isAgentRole(value) return 400 { error: 'Invalid role' }; `const paneRole = isAgentRole(value) ? value : 'conversation'`; after createConversation (line 835) and before setForkRequest call `await writeConversationPaneRole(newTmux, paneRole)` (exported by conversation-runtime.ts in item conversation-launch-door) so every later spawn of that conversation reads the role from <stateDir>/pane-role — runForkPipeline and ensureForkSessionReady need no new parameter. sync-sources/skills/pan-handoff/SKILL.md: add `--role` to the flag documentation near lines 71-84 with the example `pan handoff self --issue PAN-1234 --role review \"review the PR\"` and the sentence 'A handoff with --issue and --role review appears as that issue's Review row in the dashboard; without --role it is an issue-scoped conversation.' (same commit as the CLI flag; scripts/lint-skills.sh enforces lockstep). Tests in src/cli/commands/__tests__/handoff.test.ts following the existing --issue cases (line 234): `--role review` forwards role 'review'; `--role bogus` exits 1 and never calls the fork server; no --role sends no role key."
+        },
+        "items": [
+          {
+            "id": "handoff-role-flag.ac1",
+            "title": "pan handoff self --issue PAN-1 --role review \"x\" sends role 'review' to the fork endpoint and prints Role: review; without --role the request body contains no role key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-role-flag.ac2",
+            "title": "pan handoff --role bogus prints 'Invalid --role' and exits 1 without calling the fork server; the fork route rejects body role 'bogus' with 400 Invalid role",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-role-flag.ac3",
+            "title": "After the fork route creates a conversation with role 'review', the file ~/.overdeck/conversations/conv-<name>/pane-role contains 'review' before runForkPipeline starts, and the spawned pane's tokens carry role 'review' with issue 'PAN-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-role-flag.ac4",
+            "title": "pan handoff --help lists --role and scripts/lint-skills.sh exits 0 against sync-sources/skills/pan-handoff/SKILL.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-issue-cwd",
+        "title": "pan handoff --issue defaults the successor cwd to the issue workspace when no --cwd is given",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3921",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-cwd.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-cwd.test.ts tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-forks-cwd.test.ts passes (existing workspace wins over parent cwd; explicit cwd wins over workspace; missing workspace falls back to parent cwd)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In src/lib/overdeck/conversation-forks.ts handleConversationSummaryFork replace line 803 `const effectiveCwd = cwd || conv.cwd || process.cwd();` with `const issueWorkspaceCwd = !cwd && explicitIssueId ? await existingIssueWorkspace(explicitIssueId) : undefined; const effectiveCwd = cwd || issueWorkspaceCwd || conv.cwd || process.cwd();` and add a module-local `async function existingIssueWorkspace(issueId)` that returns getIssueWorkspacePath(issueId) (import from ./issue-projects.js) when stat() says it is a directory, else undefined. Change the createConversation call at line 835 to `cwd: effectiveCwd` instead of repeating `cwd || conv.cwd || process.cwd()`. The handoff git check at line 804 already runs against effectiveCwd. Tests in src/lib/overdeck/__tests__/conversation-forks-cwd.test.ts: mock ./issue-projects.js getIssueWorkspacePath and node:fs/promises stat, mock the conversations/createConversation and pipeline entry points as tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts does; cases: issueId 'PAN-1' with an existing directory and no cwd → createConversation receives that directory; body cwd present → body cwd; directory missing → conv.cwd."
+        },
+        "items": [
+          {
+            "id": "handoff-issue-cwd.ac1",
+            "title": "Given issueId 'PAN-1' and no cwd in the fork body, when workspaces/feature-pan-1 exists, createConversation receives that directory as cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-issue-cwd.ac2",
+            "title": "Given an explicit cwd in the fork body alongside issueId, createConversation receives the explicit cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-issue-cwd.ac3",
+            "title": "Given issueId 'PAN-1' with no such workspace directory, createConversation receives the parent conversation's cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-readiness-herdr",
+        "title": "waitForConversationRuntimeReady uses herdr agent.wait for pane-scrape harnesses on a Herdr host",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3921",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the readiness cases pass (Herdr+ohmypi calls wait with ['idle','blocked'] and throws on timedOut; Herdr+claude-code does not call wait)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. At the top of waitForConversationRuntimeReady in src/lib/overdeck/conversation-runtime.ts (line 315) add: when `await hostTerminalBackendName()` is 'herdr' and the harness is in HERDR_WAIT_HARNESSES (ohmypi, muse, kimi-code, plus codex when loadConfigSync().config.codex?.transport === 'tui'), import herdrBackend from ../terminal-backends/herdr.js and run `Effect.runPromise(herdrBackend.wait({ agentName: tmuxSession }, ['idle', 'blocked'], HERDR_READY_TIMEOUT_MS))` with HERDR_READY_TIMEOUT_MS = 60000; throw `<displayName> did not become interactive in <session> within 60s (herdr agent.wait)` when the result isUnsupported or timedOut, otherwise return. claude-code (waitForClaudeReady/waitForReadySignal hook file), acp/opencode (waitForAcpHostReady socket) and codex app-server (socket) keep their existing branches. Accept an injectable backend name for tests the same way the launch item does (a module-level `__setConversationRuntimeBackendForTest` seam or a deps parameter) so no test reads the live host. Checkpoint C2: confirm from the recorded herdr-adapter fixtures that wait with until ['idle','blocked'] returns rather than errors when the agent is already idle; fallback is polling probeHerdrAgentLiveness for state idle or blocked with fake-timer-friendly setTimeout. Tests added to src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts: Herdr + ohmypi → wait called with ['idle','blocked'], resolves on { state: 'idle', timedOut: false }, throws on timedOut true; Herdr + claude-code → wait not called."
+        },
+        "items": [
+          {
+            "id": "conversation-readiness-herdr.ac1",
+            "title": "On a Herdr host, waitForConversationRuntimeReady('conv-x', 'ohmypi', 'spawn') calls herdrBackend.wait with until ['idle','blocked'] and resolves when the result is { state: 'idle', timedOut: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-readiness-herdr.ac2",
+            "title": "On a Herdr host, when the wait result has timedOut true, waitForConversationRuntimeReady throws an error naming the harness display name and 'herdr agent.wait'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-readiness-herdr.ac3",
+            "title": "On a Herdr host with harness claude-code, waitForConversationRuntimeReady resolves through the ready-signal path and never routes through herdrBackend.wait; on a tmux host no harness routes through wait",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-start-herdr",
+        "title": "pan flywheel start waits through the liveness door and delivers its kickoff through deliverAgentMessage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3921",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n \"sendKeysAsync\\|waitForTmuxSession\" src/cli/commands/flywheel.ts; test $? -eq 1",
+            "node dist/cli/index.js flywheel start --help"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the grep exits 1 (no sendKeysAsync or waitForTmuxSession import remains in flywheel.ts)",
+            "flywheel start --help prints unchanged flags"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. In src/cli/commands/flywheel.ts replace `await waitForTmuxSession(FLYWHEEL_CONVERSATION_SESSION)` (line 85) with `await waitForConversationSession(FLYWHEEL_CONVERSATION_SESSION)` from ../../lib/overdeck/conversation-liveness.js, and replace the two sendKeysAsync calls (lines 92-93) with `const delivery = await deliverAgentMessage(FLYWHEEL_CONVERSATION_SESSION, prompt, 'pan flywheel start'); if (!delivery.ok) { console.log(chalk.red(`Flywheel kickoff not delivered: ${delivery.failure ?? delivery.path}`)); return exitCli(1); }` (deliverAgentMessage from ../../lib/agents.js already routes to herdrBackend.prompt by agent name and falls through to the supervisor/tmux cascade on tmux). Remove the now-unused sendKeysAsync and waitForTmuxSession imports. No flag changes, so the pan-flywheel skill needs no edit; run scripts/lint-skills.sh anyway as part of npm run lint."
+        },
+        "items": [
+          {
+            "id": "flywheel-start-herdr.ac1",
+            "title": "flywheel.ts no longer imports sendKeysAsync or waitForTmuxSession; it awaits waitForConversationSession and then deliverAgentMessage for the kickoff prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-start-herdr.ac2",
+            "title": "When deliverAgentMessage returns ok false, pan flywheel start prints 'Flywheel kickoff not delivered' with the failure text and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-start-herdr.ac3",
+            "title": "pan flywheel start --help prints the same flags as before and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-terminal-backends-conversations",
+        "title": "Docs: conversations and handoffs on the terminal backend, conversation liveness door, THE-CUT follow-up closed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:04:40.358Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3921",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/THE-CUT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Conversations and handoffs\" docs/TERMINAL-BACKENDS.md",
+            "grep -n \"Conversation liveness\" docs/TERMINAL-BACKENDS.md",
+            "grep -n \"PAN-3936\" docs/TERMINAL-BACKENDS.md",
+            "grep -c \"post-release follow-up\" docs/THE-CUT.md; grep -n \"PAN-3921\" docs/THE-CUT.md"
+          ],
+          "expected_outputs": [
+            "TERMINAL-BACKENDS.md contains a 'Conversations and handoffs' paragraph under Pane metadata and a 'Conversation liveness' subsection naming src/lib/overdeck/conversation-liveness.ts",
+            "the Known-gap paragraph names PAN-3936 and no longer says conversation-runtime.ts hardcodes useSupervisor: true",
+            "THE-CUT.md bullet at the former line 214 names PAN-3921 and no longer contains 'post-release follow-up'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. docs/TERMINAL-BACKENDS.md: under '## Pane metadata (FR-5)' (line 73) add a paragraph titled 'Conversations and handoffs' stating that every conversation (dashboard, pan fork, pan handoff, pan flywheel start) launches through launchAgentPane with live agent name conv-<name>, role `conversation` by default, that `pan handoff --role review --issue X` stamps role review and issue X so the handoff renders as X's Review row, and that the pane role persists in ~/.overdeck/conversations/conv-<name>/pane-role. Add a subsection '### Conversation liveness' naming src/lib/overdeck/conversation-liveness.ts (conversationSessionAlive, listLiveConversationSessions, conversationHarnessAlive, waitForConversationSession), the rule that a Herdr `indeterminate` probe reads as alive, and that pollConversations reads listHerdrAgents with a 90s grace on a Herdr host. Rewrite the 'Known gap' paragraph (lines 189-191) so it names only isAliveSync and points the muse.ts / kimi-code.ts adapters at PAN-3936. Append the checkpoint C1 live record (detection of the non-exec'd conversation launcher, or the exec fallback applied) under '## Live verification record'. docs/THE-CUT.md: replace the bullet at line 214 with '**`pan handoff --issue` places its pane in the issue's workspace (PAN-3921).** The conversation-fork path routes through `launchAgentPane`; `--issue` defaults the successor cwd to `workspaces/feature-<issue>` when it exists, and `--role review` makes the handoff the issue's Review row.' (The launch.ts header and the pan-handoff skill are edited in their own items.)"
+        },
+        "items": [
+          {
+            "id": "docs-terminal-backends-conversations.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md renders a 'Conversations and handoffs' paragraph under Pane metadata that names launchAgentPane, the conv-<name> agent name, the default role conversation, pan handoff --role review, and the pane-role file path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-terminal-backends-conversations.ac2",
+            "title": "docs/TERMINAL-BACKENDS.md renders a 'Conversation liveness' subsection naming src/lib/overdeck/conversation-liveness.ts, the indeterminate-is-alive rule, and the 90s Herdr grace of pollConversations, plus the checkpoint C1 live record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-terminal-backends-conversations.ac3",
+            "title": "The Known-gap paragraph of docs/TERMINAL-BACKENDS.md contains 'PAN-3936' for muse.ts/kimi-code.ts and contains no statement that conversation-runtime.ts hardcodes useSupervisor: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-terminal-backends-conversations.ac4",
+            "title": "docs/THE-CUT.md states that pan handoff --issue placement landed in PAN-3921 with the --issue cwd default and --role review row behavior, and contains no 'post-release follow-up' wording for handoff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-conversation-role",
+        "to": "conversation-launch-door",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-launch-door",
+        "to": "conversation-liveness-door",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-liveness-door",
+        "to": "handoff-role-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-role-flag",
+        "to": "handoff-issue-cwd",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-launch-door",
+        "to": "conversation-readiness-herdr",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-liveness-door",
+        "to": "conversation-readiness-herdr",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-liveness-door",
+        "to": "flywheel-start-herdr",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-launch-door",
+        "to": "docs-terminal-backends-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-liveness-door",
+        "to": "docs-terminal-backends-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-liveness-door",
+        "to": "handoff-issue-cwd",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

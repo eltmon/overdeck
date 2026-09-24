@@ -820,12 +820,19 @@ describe('XTerminal - patient reconnect', () => {
     expect(MockWebSocket.instances).toHaveLength(2);
   });
 
-  it('treats close code 4404 as fatal without scheduling a retry', async () => {
+  it('retries a 4404 once, then treats a second 4404 as fatal (PAN-3921)', async () => {
     const onDisconnect = vi.fn();
     render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
     await act(async () => vi.advanceTimersByTimeAsync(0));
 
     act(() => MockWebSocket.instances[0].onclose?.({ code: 4404, reason: 'missing' }));
+    await act(async () => vi.advanceTimersByTimeAsync(3_000));
+
+    // The first 4404 may be a respawn gap: one reconnect, no "has ended" yet.
+    expect(MockWebSocket.instances).toHaveLength(2);
+    expect(onDisconnect).not.toHaveBeenCalled();
+
+    act(() => MockWebSocket.instances[1].onclose?.({ code: 4404, reason: 'missing' }));
     await act(async () => vi.runOnlyPendingTimersAsync());
 
     const term = (Terminal as unknown as {
@@ -833,8 +840,7 @@ describe('XTerminal - patient reconnect', () => {
     }).instances[0];
     expect(term.writeln).toHaveBeenCalledWith(expect.stringContaining('has ended'));
     expect(onDisconnect).toHaveBeenCalledOnce();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 });
 

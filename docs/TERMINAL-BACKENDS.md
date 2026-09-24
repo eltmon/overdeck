@@ -291,9 +291,24 @@ sees the pane gone.
 
 Every launcher stamps four tokens on its pane: `issue`, `role`, `harness`, `model`, plus `agentId` —
 the Overdeck agent id. `role` is one of
-`work`, `worker`, `review`, `test`, `uat`, `strike`, `plan`. An operator conversation carries **no**
-`issue` token — that absence is also how the prompt guard recognizes an operator sender.
-Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
+`work`, `worker`, `review`, `test`, `uat`, `strike`, `plan`, `conversation`. An operator conversation
+carries role `conversation` and **no** `issue` token — that absence is also how the prompt guard
+recognizes an operator sender. Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
+
+**Conversations and handoffs (PAN-3921).** Every conversation — dashboard, `pan fork`,
+`pan handoff`, `pan flywheel start` — launches through `launchAgentPane` with the live agent name
+`conv-<name>` and role `conversation` by default; an issue-scoped conversation also carries the
+`issue` token. `pan handoff --issue X --role review` stamps role `review` and issue `X`, so the
+handoff renders as X's Review row. The role is persisted in
+`~/.overdeck/conversations/conv-<name>/pane-role` and re-stamped on every respawn, resume and
+restart-all of that conversation. With `--issue` and no `--cwd`, the handoff starts in
+`workspaces/feature-<issue>` when it exists. On Herdr the PTY supervisor is refused only for
+Claude Code, the one conversation harness Herdr must detect; kimi-code, muse and the codex TUI are
+pane-bound (no Herdr agent record, so `agent.prompt` cannot reach them) and keep the supervisor as
+their delivery path (`conversationUsesSupervisor`). The launcher exports `OVERDECK_AGENT_ID` on Herdr (the hooks have no `$TMUX` to read the name
+from), and the keep-alive sleep loop is tmux-only, as for planners. On Herdr the launcher `exec`s
+Claude Code, so the pane's foreground process is `claude` and Herdr's detection sees it (see
+"supervisor vs direct exec" below); on tmux Claude Code still runs as the launcher's child.
 
 An issue workspace is created with `label: <issueId>` and stamped with the `issue` token. A Herdr
 session restore drops every workspace and pane token and keeps the labels (seen live on 2026-09-24:
@@ -328,6 +343,7 @@ the backend the host selects **now** and stamps the same four tokens. None of th
 | Restart (dashboard Restart and restart-all) | `restartAgent` in `src/lib/agents/recovery.ts` | the agent's role |
 | Crash recovery (`pan recover`, dashboard Recover, the health force-kill path) | `recoverAgent` in `src/lib/agents/recovery.ts` | the agent's role |
 | Message-triggered fallback relaunch (only while `ALLOW_SESSION_ROTATION_ON_RESUME` is on; it is off) | `messageAgent` in `src/lib/agents/messaging.ts` | the agent's role |
+| Conversations (dashboard, `pan fork`, `pan handoff`, `pan flywheel start`; resume, switch-model, restart-all) | `spawnConversationSession` in `src/lib/overdeck/conversation-runtime.ts` | `conversation`, or the `pan handoff --role` value |
 
 **Resume, restart and recovery relaunch on the host's backend, not the old pane's.** An agent that
 last ran in a tmux session is relaunched as a Herdr pane on a Herdr host, and the other way round.
@@ -367,7 +383,7 @@ readiness is the new session directory under the kimi home, which does not depen
 muse's is its prompt scan; on Herdr, where a TUI on the alternate screen reads back empty, a pane
 that is still present and has written its session log counts as started once the 60 s scan ends.
 
-**Not yet routed** (tracked elsewhere): operator conversations and `pan handoff` (#3921); the
+**Not yet routed** (tracked elsewhere): the
 runtime-class `spawnAgent` of the codex, acp, ohmypi and pi runtimes — the claude-code runtime
 delegates to `spawnAgent` and is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
 commands, plain dashboard terminals and the codex auth login are not agents.
@@ -453,6 +469,50 @@ The tmux adapter's inventory reports a failed ps/pgrep probe (`runtime-indetermi
 (`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the
 tmux pane, so on Herdr they see no menu and fall through (the AskUserQuestion transcript check
 still runs).
+
+### Conversation liveness (PAN-3921)
+
+A conversation on a Herdr host has no tmux session, so every conversation liveness read goes
+through one door, `src/lib/overdeck/conversation-liveness.ts`:
+
+| Function | Herdr | tmux |
+| --- | --- | --- |
+| `conversationSessionAlive(name)` | `probeHerdrAgentLiveness`: `alive` or `indeterminate` is alive, `exited` is dead, `absent` asks tmux | `has-session` |
+| `conversationHarnessAlive(name)` | the same probe; `absent` asks tmux for the session and its harness process | `isHarnessProcessAlive` |
+| `listLiveConversationSessions()` | `listHerdrAgents` names not `exited`, plus every tmux session; `null` when Herdr does not answer | `list-sessions` |
+| `waitForConversationSession(name)` | polls `conversationSessionAlive` | same |
+
+`indeterminate` (the socket did not answer) reads as alive, the rule `isAlive` applies to agents:
+a Herdr outage must never end every conversation at once. `absent` falls back to tmux because a
+conversation launched before the host moved to Herdr still runs in its tmux session. A caller that
+gets `null` from the inventory treats liveness as unknown: the conversation list keeps each row's
+stored status, and restart-all refuses rather than restarting nothing.
+
+The lifecycle poller (`pollConversations`) reads `listHerdrAgents` once per tick on a Herdr host,
+with a 90 s spawn grace (Herdr's 60 s detection window plus the 30 s tmux grace), and consults the
+tmux census only for a conversation Herdr does not hold. When Herdr does not answer it marks
+nothing. Readiness reads the pane through `readAgentPaneText` (Herdr `pane.read` with
+`source: visible`, or tmux `capture-pane`): `recent` is empty while a full-screen TUI (omp, kimi,
+muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only.
+
+**On a tmux host the door still asks Herdr** when its socket answers, and only a Herdr `alive`
+counts there (an unreachable Herdr is the normal state of a tmux host). The poller does the same
+with `listHerdrAgents`. Stop, respawn, restart-all and `pan flywheel start --fresh` close a
+conversation through `closeConversationPane`, which closes its Herdr pane and its tmux session
+whichever backend is selected. Without this, a conversation launched on Herdr would read as dead
+after a flip to tmux while `claude` kept running in its pane, and a Resume would start a second
+harness on the same transcript.
+
+**Rolling conversations back to tmux.** Close the Herdr conversation panes first, then flip:
+
+1. `herdr --session overdeck agent list` and note the pane id of every `conv-*` agent.
+2. `herdr --session overdeck pane close <pane_id>` for each of them.
+3. Set `terminal.backend: tmux` in `~/.overdeck/config.yaml` (or revert the release) and run
+   `pan reload`.
+4. Resume the affected conversations from the dashboard; they relaunch as tmux sessions.
+
+Messages cannot reach a Herdr-hosted Claude Code conversation from a tmux host (it has no PTY
+supervisor), which is why step 2 comes before the flip rather than after it.
 
 ## The prompt guard (FR-17)
 
@@ -549,7 +609,7 @@ socket, and so on). Adapters: OpenCode `opencode attach` (PAN-3974) and Codex
 | UI | `src/dashboard/frontend/src/components/chat/ConversationTerminalView.tsx` |
 
 **Session.** One companion per owner, named `companion-<ownerSession>` on the managed tmux
-socket (conversations are tmux on every host until PAN-3921). The prefix is ignored by the
+socket, on either host. The prefix is ignored by the
 backend inventory, `isAgentSessionName`, and every reaper. The pane runs
 `exec <absolute binary> …`, so the session ends when the native client exits. The dashboard
 streams it through the ordinary `/ws/terminal?session=` path; a browser disconnect only drops the
@@ -710,11 +770,11 @@ the same way `countRunningAgents` does. An unreadable inventory (`null`) fails o
 `running` row counts. The brake stops agents through the async `stopAgent`, so on Herdr it closes
 the pane.
 
-`overdeck/conversation-runtime.ts` still hardcodes `useSupervisor: true` (the muse and kimi-code
-runtime adapters decide it with `runtimeUsesSupervisor` since #3936, and keep it), but that is no
-longer a launch failure: those harnesses are launched pane-bound, so nothing waits for a detection the supervisor's second pty
-would have hidden, and their delivery already goes through the supervisor socket. Only `claude-code` needs the supervisor
-refused on Herdr, and `decideSupervisorForWorkAgent` does that.
+The muse and kimi-code runtime adapters decide the supervisor with `runtimeUsesSupervisor` (#3936)
+and conversations with `conversationUsesSupervisor` (PAN-3921), the same rule: those harnesses are
+launched pane-bound, so nothing waits for a detection the supervisor's second pty would have hidden,
+and their delivery already goes through the supervisor socket, so they keep it. Only `claude-code` needs the supervisor
+refused on Herdr: `decideSupervisorForWorkAgent` does that for work agents, `conversationUsesSupervisor` for conversations.
 
 A detection failure now carries the pane's foreground process and its last 20 lines of output, so
 the next one names its own cause. (A full-screen harness renders on the alternate screen, where

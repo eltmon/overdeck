@@ -13,6 +13,7 @@ interface HandoffOptions {
   cwd?: string;
   project?: string;
   issue?: string;
+  role?: string;
   author?: string;
   authorModel?: string;
   authorHarness?: string;
@@ -27,6 +28,9 @@ function resolveConversation(convRef: string) {
 }
 
 const SELF_REFS = new Set(['self', '.', 'current', 'me']);
+const HANDOFF_ROLES = ['conversation', 'work', 'review', 'test', 'plan'] as const;
+type HandoffRole = typeof HANDOFF_ROLES[number];
+const isHandoffRole = (value: string): value is HandoffRole => (HANDOFF_ROLES as readonly string[]).includes(value);
 
 function looksLikeBareFocusText(convRef: string, focusArgs: string[]): boolean {
   return focusArgs.length > 0 || /\s/.test(convRef) || /[.!?]/.test(convRef) || /^[A-Z]/.test(convRef);
@@ -97,6 +101,11 @@ export async function handoffCommand(
     }
     issueId = parsed.raw;
   }
+  const role = options.role?.trim();
+  if (role !== undefined && !isHandoffRole(role)) {
+    console.log(chalk.yellow(`Invalid --role: ${options.role}. Expected one of ${HANDOFF_ROLES.join(', ')}.`));
+    return exitCli(1);
+  }
   console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
   console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=provider-default)` : ' (in-source agent)'}`));
   if (focus) {
@@ -106,6 +115,7 @@ export async function handoffCommand(
   if (customTitle) {
     console.log(chalk.gray(`  Title: ${customTitle} (--title)`));
   }
+  if (role) console.log(chalk.gray(`  Role: ${role}`));
   console.log(chalk.gray('  Authoring the handoff and spawning the session — this can take a minute…'));
 
   // PAN-1568: route through the dashboard server, which authors the doc AND
@@ -118,6 +128,7 @@ export async function handoffCommand(
       cwd: options.cwd,
       projectKey: options.project,
       issueId,
+      ...(role ? { role } : {}),
       forkMode: 'handoff',
       focus,
       title: customTitle,
