@@ -300,6 +300,28 @@ confirmed dead, so an unanswered probe blocks the start. Neither reads the tmux-
 `GET /api/agents` reports pane liveness as `hasLivePane`; `hasLiveTmuxSession` is a deprecated
 alias with the same value, true for a live pane on either backend.
 
+**No reader filters on `tmuxActive`** (#4109). `listRunningAgents()` still returns the flag, but it
+is tmux session presence only, so it is `false` for every Herdr agent. The former readers now read
+the selected backend's live inventory (`listLiveAgentIds` / `listLiveAgentPanes` in
+`src/lib/terminal-backends/inventory.ts`) or await `isAlive`, and `scripts/lint-liveness.sh` bans
+`.tmuxActive` reads in them. What each does when the inventory is unreadable (`null`) depends on
+whether it acts:
+
+- **Does not act on unknown:** the memory governor's `shed()` skips the merged-stack shed and the
+  work-agent pause. The Cloister health loop skips the round and keeps its previous running set,
+  so an outage never reads as every agent crashing. `POST /api/agents/restart-all` answers 503 and
+  restarts nothing, and the restart-with-current-config list is empty.
+- **Treats unknown as live:** `pan workspace update` (`findLiveAgentInWorkspace`, via `isAlive`)
+  refuses to run under a probe that did not answer. `pan show --health ping|check` (`lib/health.ts`)
+  reports an unanswered probe as a `warning` that never counts toward the force-kill threshold.
+  Cloister `emergencyStop` stops every `running` row, through `stopAgent`, so it closes Herdr panes.
+- **Displays and read-only feeds fall back to the `running` rows** (`isListedOrRunning`): the
+  Cloister agent-health lists, the memory transcript sources and the boot telemetry count. The
+  all-output feed discovers nothing and still captures explicit subscriptions; it reads panes
+  through `captureLiveAgentPaneText`. `GET /api/health/agents` combines the inventory with the tmux
+  census and answers unavailable when the inventory is unreadable; its snapshots carry
+  `hasLivePane`, with `tmuxActive` kept as a deprecated alias.
+
 **Known gaps on Herdr** (readers, not spawners): the Claude resume-summary gate crossing
 (`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the
 tmux pane, so on Herdr they see no menu and fall through (the AskUserQuestion transcript check
