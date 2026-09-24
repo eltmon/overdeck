@@ -314,7 +314,7 @@ function builtInProviderHarnesses(): BuiltInProviderHarnessesConfig {
 }
 
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
-  review: ['security', 'performance', 'correctness', 'requirements', 'synthesis'],
+  review: ['security', 'performance', 'correctness', 'requirements'],
 };
 function seededWorkhorses(config: Pick<ReturnType<typeof loadConfigSync>['config'], 'workhorses'>): WorkhorsesConfig {
   return { ...DEFAULT_WORKHORSES, ...(config.workhorses ?? {}) };
