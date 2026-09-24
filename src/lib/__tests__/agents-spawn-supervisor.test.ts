@@ -640,6 +640,53 @@ describe('spawnAgent PTY supervisor wiring', () => {
     vi.doUnmock('../agents/liveness.js');
   });
 
+  // PAN-3923 review 2 (positive control for the refusal above): a finished
+  // sequencer — idle at its prompt on two probes with stale work activity — is
+  // reaped through stopAgent and relaunched by the real spawnRun.
+  it('reaps a finished sequencer idle on Herdr and relaunches it', async () => {
+    // The id and call shape startSequencerAgent uses (sequencer-agent.ts).
+    const agentId = 'sequencer-runner';
+    const isAliveMock = vi.fn(async () => ({ alive: true as const, paneAlive: true as const, backendState: 'idle' as const }));
+    // Present at dispatch, gone once the reap has stopped it.
+    const agentPaneExistsMock = vi.fn(async () => stopAgentMock.mock.calls.length === 0);
+    vi.doMock('../terminal-backends/launch.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../terminal-backends/launch.js')),
+      agentPaneExists: agentPaneExistsMock,
+    }));
+    vi.doMock('../agents/liveness.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../agents/liveness.js')),
+      isAlive: isAliveMock,
+      idleAgeMs: vi.fn(() => 60 * 60_000),
+    }));
+    // Skip only the 5 s wait before the second probe; every other timer is real.
+    const realSetTimeout = globalThis.setTimeout;
+    const reprobeWaits: number[] = [];
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      handler: (...args: unknown[]) => void,
+      ms?: number,
+      ...args: unknown[]
+    ) => {
+      if (ms === 5_000) reprobeWaits.push(ms);
+      return realSetTimeout(handler, ms === 5_000 ? 0 : ms, ...args);
+    }) as typeof setTimeout);
+    try {
+      const { spawnRun, saveAgentStateSync } = await import('../agents.js');
+      saveAgentStateSync(baseState({ id: agentId, issueId: agentId, role: 'sequencer', status: 'running' }));
+
+      await spawnRun(agentId, 'sequencer', { agentId, workspace, model: 'claude-sonnet-4-6', prompt: 'rank the backlog' });
+
+      expect(reprobeWaits).toEqual([5_000]);
+      expect(isAliveMock.mock.calls.filter(([id]) => id === agentId)).toHaveLength(2);
+      expect(stopAgentMock).toHaveBeenCalledWith(agentId);
+      expect(createSessionMock).toHaveBeenCalledWith(agentId, workspace, expect.any(String), expect.anything());
+      expect(stopAgentMock.mock.invocationCallOrder[0]).toBeLessThan(createSessionMock.mock.invocationCallOrder[0]);
+    } finally {
+      setTimeoutSpy.mockRestore();
+      vi.doUnmock('../terminal-backends/launch.js');
+      vi.doUnmock('../agents/liveness.js');
+    }
+  });
+
   it('persists fresh role-run session origin beside the Claude session id', async () => {
     const { spawnRun } = await import('../agents.js');
 
