@@ -1158,7 +1158,7 @@ program
         console.log(chalk.green(`✓ Stopped ${killed.length} review session(s)`));
       }
       if (failed.length > 0) {
-        console.log(chalk.yellow(`⚠ Failed to stop ${failed.length} review session(s)`));
+        console.log(chalk.yellow(`⚠ Failed to stop ${failed.length} review session(s): ${failed.join(', ')}`));
       }
       if (killed.length === 0 && failed.length === 0) {
         console.log(chalk.dim('  No review sessions running'));
