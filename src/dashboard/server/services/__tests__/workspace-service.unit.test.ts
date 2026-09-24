@@ -95,7 +95,7 @@ describe('WorkspaceService — integration', () => {
     });
 
     it('is idempotent — returns path without calling createWorkspace when already exists', async () => {
-      mockExistsSync.mockReturnValue(true);
+      mockExistsSync.mockImplementation((path: string) => !path.endsWith('.overdeck/setup-incomplete'));
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 
       const program = Effect.gen(function* () {
@@ -106,6 +106,21 @@ describe('WorkspaceService — integration', () => {
       const path = await runProgram(program);
       expect(path).toContain('feature-pan-1');
       expect(mockCreateWorkspace).not.toHaveBeenCalled();
+    });
+
+    it('calls createWorkspace to resume setup when the workspace exists but its setup never finished (PAN-4171)', async () => {
+      mockExistsSync.mockReturnValue(true);
+      const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
+
+      const program = Effect.gen(function* () {
+        const ws = yield* WorkspaceService;
+        return yield* ws.create('PAN-1');
+      }).pipe(Effect.provide(WorkspaceServiceLive));
+
+      const path = await runProgram(program);
+      expect(path).toContain('feature-pan-1');
+      expect(mockExistsSync).toHaveBeenCalledWith(expect.stringMatching(/feature-pan-1\/\.overdeck\/setup-incomplete$/));
+      expect(mockCreateWorkspace).toHaveBeenCalledWith(expect.objectContaining({ featureName: 'pan-1' }));
     });
 
     it('fails with WorkspaceCreateError when no project configured', async () => {
