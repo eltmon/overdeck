@@ -317,9 +317,11 @@ If a work type is configured to use a disabled provider:
 
 **Example**:
 ```yaml
-models:
-  preset: premium  # Uses gpt-5.2-codex for implementation
+roles:
+  work:
+    model: gpt-5.2-codex
 
+models:
   providers:
     openai: false  # OpenAI disabled (no API key)
 
@@ -432,8 +434,9 @@ When API keys are missing or providers disabled, Overdeck falls back to Anthropi
 
 **Configuration**:
 ```yaml
-models:
-  preset: premium  # Uses gpt-5.2-codex for implementation
+roles:
+  work:
+    model: gpt-5.2-codex
 ```
 
 **Missing API key**: `OPENAI_API_KEY` not configured
