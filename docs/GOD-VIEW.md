@@ -48,10 +48,11 @@ and status grounded in dashboard state.
   fullscreen. Missing sources render `—` instead of a fabricated zero.
 - **Memory pressure is PSI, not swap fill.** The PSI meter (top bar and
   sidebar gauge) reads `/proc/pressure/memory` `some` avg10. It turns amber at
-  `some` ≥ 5% or swap in/out ≥ 64 MiB/min and red at `full` ≥ 1% or swap in/out
-  ≥ 256 MiB/min, the bands the host collector uses. Swap occupancy appears only
-  in the hover detail: a full swap of cold pages is not pressure and can never
-  color the meter.
+  `some` ≥ 5% and red at `full` ≥ 1%. Swap in/out adds amber at ≥ 64 MiB/min and
+  red at ≥ 256 MiB/min only while admission is `soft` or `blocked` (memory
+  below reserve). These are the bands and the gate the host evaluator uses.
+  Swap occupancy appears only in the hover detail: a full swap of cold pages is
+  not pressure and can never color the meter.
 
 ## Glyph language
 

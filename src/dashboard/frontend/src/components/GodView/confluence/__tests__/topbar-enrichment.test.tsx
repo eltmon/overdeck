@@ -165,14 +165,15 @@ describe('God View enriched top bar', () => {
     render(<InfraGauges />);
     for (const label of ['CPU', 'MEM', 'PSI']) expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.queryByText('SWAP')).toBeNull();
-    for (const value of ['24%', '61%', '0%']) expect(screen.getByText(value)).toBeInTheDocument();
+    for (const value of ['24%', '61%', '0.4']) expect(screen.getByText(value)).toBeInTheDocument();
     expect(screen.getByTestId('gv-psi-gauge')).toHaveAttribute('data-level', 'calm');
   });
 
   // PAN-3540: a full swap of cold pages is not pressure. The memory signal
   // follows PSI and swap in/out; swap occupancy alone can never raise it.
-  function pressureSystem(metrics: Record<string, number | null>, swapUsedPercent = 100) {
+  function pressureSystem(metrics: Record<string, number | null>, swapUsedPercent = 100, admission = 'open') {
     return {
+      admission: { state: admission },
       cpu: 24,
       memPercent: 61,
       memUsed: 8,
@@ -207,8 +208,14 @@ describe('God View enriched top bar', () => {
   it('raises the memory signal from PSI and swap in/out, not from occupancy', () => {
     expect(psiMeter(pressureSystem({ memoryPressureSomeAvg10: 6 }, 10))).toHaveAttribute('data-level', 'warning');
     expect(psiMeter(pressureSystem({ memoryPressureFullAvg10: 1.5 }, 10))).toHaveAttribute('data-level', 'critical');
-    expect(psiMeter(pressureSystem({ swapActivityBytesPerMinute: 80 * 1024 ** 2 }, 10))).toHaveAttribute('data-level', 'warning');
-    expect(psiMeter(pressureSystem({ swapActivityBytesPerMinute: 300 * 1024 ** 2 }, 10))).toHaveAttribute('data-level', 'critical');
+    expect(psiMeter(pressureSystem({ swapActivityBytesPerMinute: 80 * 1024 ** 2 }, 10, 'soft'))).toHaveAttribute('data-level', 'warning');
+    expect(psiMeter(pressureSystem({ swapActivityBytesPerMinute: 300 * 1024 ** 2 }, 10, 'blocked'))).toHaveAttribute('data-level', 'critical');
+  });
+
+  it('keeps swap traffic calm while admission is open (memory to spare), as the host evaluator does', () => {
+    const meter = psiMeter(pressureSystem({ swapActivityBytesPerMinute: 300 * 1024 ** 2 }, 100, 'open'));
+    expect(meter).toHaveAttribute('data-level', 'calm');
+    expect(meter.getAttribute('title')).toContain('swap in/out 300.0 MB/min');
   });
 
   it('reads unknown, not calm, when the host reports no pressure signal', () => {

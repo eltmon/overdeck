@@ -5,12 +5,16 @@ import { describeMemoryPressure, readMemoryPressure, type MemoryPressureLevel } 
 
 interface GaugeProps {
   label: string;
-  value: number | null; // 0-100
+  value: number | null;
   color: string;
   size?: number;
+  /** The value that fills the arc; defaults to 100 (a percentage). */
+  max?: number;
+  /** Center text; defaults to a rounded percentage. */
+  format?: (value: number) => string;
 }
 
-function Gauge({ label, value, color, size = 62 }: GaugeProps) {
+function Gauge({ label, value, color, size = 62, max = 100, format = (v) => `${Math.round(v)}%` }: GaugeProps) {
   const cx = size / 2;
   const cy = size / 2;
   const outerRadius = cx - 4;
@@ -18,8 +22,8 @@ function Gauge({ label, value, color, size = 62 }: GaugeProps) {
 
   const startAngle = -Math.PI * 0.75;
   const endAngle = Math.PI * 0.75;
-  const bounded = value == null ? 0 : Math.max(0, Math.min(100, value));
-  const valueAngle = startAngle + (bounded / 100) * (endAngle - startAngle);
+  const bounded = value == null ? 0 : Math.max(0, Math.min(max, value));
+  const valueAngle = startAngle + (bounded / max) * (endAngle - startAngle);
 
   return (
     <div className="flex flex-col items-center gap-0.5">
@@ -51,7 +55,7 @@ function Gauge({ label, value, color, size = 62 }: GaugeProps) {
             fill={color}
             fontFamily="var(--gv-font-mono)"
           >
-            {value == null ? '—' : `${Math.round(value)}%`}
+            {value == null ? '—' : format(value)}
           </text>
         </Group>
       </svg>
@@ -69,6 +73,9 @@ function formatBytes(bytes: number): string {
   const mb = bytes / (1024 ** 2);
   return `${mb.toFixed(0)} MB`;
 }
+
+/** PSI `some` avg10 that fills the arc: the 5% warning band sits at half-scale. */
+const PSI_GAUGE_MAX = 10;
 
 const PRESSURE_COLOR: Record<MemoryPressureLevel, string> = {
   calm: 'var(--gv-blue)',
@@ -94,7 +101,13 @@ export function InfraGauges() {
         <Gauge label="MEM" value={systemHealth?.memPercent ?? null} color="var(--gv-purple)" />
         {/* PAN-3540: memory distress is PSI + swap in/out, never swap occupancy. */}
         <span title={describeMemoryPressure(pressure)} data-testid="gv-psi-gauge" data-level={pressure.level}>
-          <Gauge label="PSI" value={pressure.someAvg10} color={PRESSURE_COLOR[pressure.level]} />
+          <Gauge
+            label="PSI"
+            value={pressure.someAvg10}
+            color={PRESSURE_COLOR[pressure.level]}
+            max={PSI_GAUGE_MAX}
+            format={(value) => value.toFixed(1)}
+          />
         </span>
       </div>
       <div className="flex justify-between px-1">

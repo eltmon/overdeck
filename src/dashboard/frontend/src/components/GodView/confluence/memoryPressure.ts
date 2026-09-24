@@ -34,16 +34,22 @@ export function readMemoryPressure(system: GodViewSystemHealth | null | undefine
   const fullAvg10 = metrics?.memoryPressureFullAvg10 ?? null;
   const swapActivityBytesPerMinute = metrics?.swapActivityBytesPerMinute ?? null;
   const swapUsedPercent = metrics?.swapUsedPercent ?? system?.summary?.swapUsedPercent ?? null;
+  // Swap traffic with memory to spare is cold pages moving, not distress: the
+  // host evaluator files it only once admission is soft or blocked (memory
+  // below reserve), and the meter follows the same verdict.
+  const admission = system?.admission?.state;
+  const memoryConstrained = admission === 'soft' || admission === 'blocked';
+  const swapTraffic = memoryConstrained ? swapActivityBytesPerMinute : null;
 
   let level: MemoryPressureLevel;
   if (
     (fullAvg10 != null && fullAvg10 >= PSI_FULL_CRITICAL_AVG10)
-    || (swapActivityBytesPerMinute != null && swapActivityBytesPerMinute >= SWAP_ACTIVITY_CRITICAL_BYTES_PER_MINUTE)
+    || (swapTraffic != null && swapTraffic >= SWAP_ACTIVITY_CRITICAL_BYTES_PER_MINUTE)
   ) {
     level = 'critical';
   } else if (
     (someAvg10 != null && someAvg10 >= PSI_SOME_WARNING_AVG10)
-    || (swapActivityBytesPerMinute != null && swapActivityBytesPerMinute >= SWAP_ACTIVITY_WARNING_BYTES_PER_MINUTE)
+    || (swapTraffic != null && swapTraffic >= SWAP_ACTIVITY_WARNING_BYTES_PER_MINUTE)
   ) {
     level = 'warning';
   } else if (someAvg10 == null && fullAvg10 == null && swapActivityBytesPerMinute == null) {
