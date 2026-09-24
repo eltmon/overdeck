@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:29:27.611Z · model: claude-opus-5 · open: 807_
+_Last sequenced: 2026-09-24T22:38:22.233Z · model: claude-opus-5 · open: 805_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,7 +10,6 @@ _Last sequenced: 2026-09-24T22:29:27.611Z · model: claude-opus-5 · open: 807_
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
 | 23 | PAN-4134 | S | critical | ok |  |  | All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges |
-| 25 | PAN-4171 | S | critical | ok |  |  | An aborted createWorkspace leaves the worktree on disk; the retry's existence guard then starts an agent in it with no deps or hooks |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -346,7 +345,6 @@ _Last sequenced: 2026-09-24T22:29:27.611Z · model: claude-opus-5 · open: 807_
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
-| 396 | PAN-4131 | M | medium | ok |  |  | Dead models.overrides still rewrites the operator's config.yaml for a key nothing reads; roles.review.sub.synthesis is never read |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -552,7 +550,6 @@ _Last sequenced: 2026-09-24T22:29:27.611Z · model: claude-opus-5 · open: 807_
 | 606 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
 | 607 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
 | 608 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 609 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
 | 610 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
 | 611 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
 | 612 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
@@ -691,7 +688,6 @@ _Last sequenced: 2026-09-24T22:29:27.611Z · model: claude-opus-5 · open: 807_
 | 747 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
 | 748 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
 | 749 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 750 | PAN-762 | M | low | ok |  |  | Settings: warn when model overrides target disabled providers |
 | 751 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
 | 752 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
 | 753 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
@@ -776,6 +772,8 @@ _Last sequenced: 2026-09-24T22:29:27.611Z · model: claude-opus-5 · open: 807_
 | 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 835 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
+| 836 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
 | 837 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
 | 838 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
 | 839 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
@@ -834,10 +832,6 @@ Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked eve
 ### PAN-4134 (rank 23)
 
 New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where "unknown" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two. PAN-3914 closed this pass when PR #4133 merged, so its informs edge drops and the false review.redispatched journaling it caused is gone; the synthesis-recovery gap described here is untouched, so rank, score and condition hold.
-
-### PAN-4171 (rank 25)
-
-New this run (filed 2026-09-24T21:07:04Z, in the review of #4163/PAN-3905), and it takes the rank-25 slot PAN-3977 vacated when that issue closed. Since #4163, createWorkspace returns success:false when setup aborts after the worktree exists — a failed dependency install, pre-rebase hook install or workspace package build — but the rollback in src/lib/workspace-manager/create.ts deletes the workspace row only when !worktreeCreated, so the half-built worktree stays on disk. Every caller then guards on the directory existing rather than re-calling createWorkspace (workspace-service.ts, swarm.ts, swarm-gates.ts, remote-completion.ts, spawn-planning-session.ts, where any non-.pan file counts as created), so the first pan start fails loudly and the second one starts a work agent in a worktree with no dependencies, no pre-rebase hook and no synced skills. That is worse than the stall it replaces: a stall is visible, whereas this agent runs, burns tokens and produces failing work that looks real. It sits on the paved road (pan start), which is why it ranks critical despite the unlabelled P3 signal. The fix is small and the issue states both options (delete the worktree and its branch on abort, or write an incomplete-setup marker the existence guards check and resume from), with mechanically checkable acceptance criteria and a named test, so size S, condition ok.
 
 ### PAN-3566 (rank 26)
 
@@ -1115,6 +1109,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
 
 patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
 
+### PAN-3793 (rank 114)
+
+New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1122,10 +1120,10 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:29:27.611Z",
+  "generatedAt": "2026-09-24T22:38:22.233Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 807,
+  "openCount": 805,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1241,6 +1239,19 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "dependsOn": [],
       "why": "A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers.",
       "rationale": "Triage: verify the --changed verification-loop relaunch against deacon-lite's smaller suppression surface. Kept in the critical band: an unstoppable server-owned test loop is the worst kind of runaway.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4166",
+      "rank": 31,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main",
+      "rationale": "New issue (2026-09-24), the only delta since the prior run. pushPlanArtifacts replays the whole local range through git merge-tree, so one superseded rendering of .pan/backlog/sequence.md aborts the push and origin keeps serving a stale ranked order that the Flywheel reads for pickup; the silent reset --keep refusal then adds another unpushed commit every run, so the failure compounds. Ranked 31 rather than into the vacated top slots: the acute incident was hand-repaired (main is level with origin, the identical untracked drafts removed), so the bug is latent until the next untracked-draft collision, and it ranks behind the actively-biting pipeline blockers at 19-30 while staying in the critical band because a stale sequence misdirects every Flywheel pickup. Root cause is verified in the body with a named file, a proposed fix, and three mechanical acceptance criteria.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2197,19 +2208,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3948",
-      "rank": 172,
-      "size": "XS",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Residual only: an agent idle after \"Connection lost mid-response\" is never nudged; deacon-api-recovery.ts patterns miss it",
-      "rationale": "Demoted from 118: the operator verified on 2026-09-24 that the pan tell half landed on main in 9857ddec289 (#4018) - isAlive now probes the legacy tmux session on -L overdeck when Herdr answers absent, and delivery falls through to tmux - so what is left is an XS error-pattern addition to deacon-api-recovery.ts that the operator reports is already in progress outside the pipeline, which no longer earns a top-120 slot.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2511",
       "rank": 119,
       "size": "XS",
@@ -2810,6 +2808,19 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "dependsOn": [],
       "why": "Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT",
       "rationale": "The test role's browser UAT runs against the workspace stack; without session bootstrap every mutation AC is unprovable. Likely missing trusted-origin/Traefik env in the feature stack.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3948",
+      "rank": 172,
+      "size": "XS",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Residual only: an agent idle after \"Connection lost mid-response\" is never nudged; deacon-api-recovery.ts patterns miss it",
+      "rationale": "Demoted from 118: the operator verified on 2026-09-24 that the pan tell half landed on main in 9857ddec289 (#4018) - isAlive now probes the legacy tmux session on -L overdeck when Herdr answers absent, and delivery falls through to tmux - so what is left is an XS error-pattern addition to deacon-api-recovery.ts that the operator reports is already in progress outside the pipeline, which no longer earns a top-120 slot.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4804,19 +4815,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "condition": "ok",
       "dependsOn": [],
       "why": "Strike merge door can report fetch failure after merge and land the same head twice",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4131",
-      "rank": 396,
-      "size": "M",
-      "importance": "medium",
-      "score": 57,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dead models.overrides still rewrites the operator's config.yaml for a key nothing reads; roles.review.sub.synthesis is never read",
-      "rationale": "Moved 349→396 and 60→57 because PR #4164 (PAN-4160) landed the Command Deck status-review model key, leaving only dead-code removal, the roles.review.sub.synthesis decision, and the docs/CONFIGURATION.md rewrite.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7887,18 +7885,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "planning": "auto"
     },
     {
-      "issue": "PAN-736",
-      "rank": 609,
-      "size": "M",
-      "importance": "medium",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "feat: wire per-subagent model overrides from settings to Claude Code spawn env",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3322",
       "rank": 610,
       "size": "XS",
@@ -9592,18 +9578,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "planning": "auto"
     },
     {
-      "issue": "PAN-762",
-      "rank": 750,
-      "size": "M",
-      "importance": "low",
-      "score": 17,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Settings: warn when model overrides target disabled providers",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-752",
       "rank": 751,
       "size": "M",
@@ -10632,6 +10606,32 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "planning": "skip"
     },
     {
+      "issue": "PAN-736",
+      "rank": 835,
+      "size": "M",
+      "importance": "low",
+      "score": 14,
+      "condition": "stale",
+      "dependsOn": [],
+      "why": "Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design",
+      "rationale": "Demoted 609→835, medium→low and ok→stale because #4174 (PAN-4131) merged this run and retired models.overrides, while PAN-1048 had already deleted src/lib/work-types.ts, WorkTypeRouter.getModel and Settings/WorkTypeTable.tsx — every component this issue's body names is gone on origin/main, so the underlying per-subagent routing want would have to be re-specified against roles.<role>.model before it is workable.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-762",
+      "rank": 836,
+      "size": "M",
+      "importance": "low",
+      "score": 13,
+      "condition": "stale",
+      "dependsOn": [],
+      "why": "Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about",
+      "rationale": "Demoted 750→836 and ok→stale because #4174 (PAN-4131) merged this run and made models.overrides retired and ignored (merge.ts logs one warning and drops it), so the override mechanism this issue asks Overdeck to warn about no longer exists.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-299",
       "rank": 837,
       "size": "M",
@@ -11074,32 +11074,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "dependsOn": [],
       "why": "Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content.",
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4166",
-      "rank": 31,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main",
-      "rationale": "New issue (2026-09-24), the only delta since the prior run. pushPlanArtifacts replays the whole local range through git merge-tree, so one superseded rendering of .pan/backlog/sequence.md aborts the push and origin keeps serving a stale ranked order that the Flywheel reads for pickup; the silent reset --keep refusal then adds another unpushed commit every run, so the failure compounds. Ranked 31 rather than into the vacated top slots: the acute incident was hand-repaired (main is level with origin, the identical untracked drafts removed), so the bug is latent until the next untracked-draft collision, and it ranks behind the actively-biting pipeline blockers at 19-30 while staying in the critical band because a stale sequence misdirects every Flywheel pickup. Root cause is verified in the body with a named file, a proposed fix, and three mechanical acceptance criteria.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4171",
-      "rank": 25,
-      "size": "S",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "An aborted createWorkspace leaves the worktree on disk; the retry's existence guard then starts an agent in it with no deps or hooks",
-      "rationale": "New this run (filed 2026-09-24T21:07:04Z, in the review of #4163/PAN-3905), and it takes the rank-25 slot PAN-3977 vacated when that issue closed. Since #4163, createWorkspace returns success:false when setup aborts after the worktree exists — a failed dependency install, pre-rebase hook install or workspace package build — but the rollback in src/lib/workspace-manager/create.ts deletes the workspace row only when !worktreeCreated, so the half-built worktree stays on disk. Every caller then guards on the directory existing rather than re-calling createWorkspace (workspace-service.ts, swarm.ts, swarm-gates.ts, remote-completion.ts, spawn-planning-session.ts, where any non-.pan file counts as created), so the first pan start fails loudly and the second one starts a work agent in a worktree with no dependencies, no pre-rebase hook and no synced skills. That is worse than the stall it replaces: a stall is visible, whereas this agent runs, burns tokens and produces failing work that looks real. It sits on the paved road (pan start), which is why it ranks critical despite the unlabelled P3 signal. The fix is small and the issue states both options (delete the worktree and its branch on abort, or write an incomplete-setup marker the existence guards check and resume from), with mechanically checkable acceptance criteria and a named test, so size S, condition ok.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12135,20 +12109,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "confidence": 1
     },
     {
-      "from": "PAN-4131",
-      "to": "PAN-762",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4131",
-      "to": "PAN-736",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-3939",
       "to": "PAN-4134",
       "type": "informs",
@@ -12168,13 +12128,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
-    },
-    {
-      "from": "PAN-3905",
-      "to": "PAN-4171",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     }
   ]
 }
