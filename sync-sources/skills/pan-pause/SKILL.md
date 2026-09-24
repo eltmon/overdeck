@@ -30,6 +30,8 @@ pan pause PAN-123 --reason "investigating bad loop"
 
 `pan pause <id>` sets a persistent pause gate in the agent state file. If the agent is currently running, it also stops the agent so it cannot keep working while paused.
 
+Pausing an issue (its work agent) holds the whole issue: its running review and test agents are stopped too, and the Deacon's stalled-review recovery does not relaunch reviewers for it until `pan unpause <id>`.
+
 Paused agents are skipped by auto-resume. A later `pan start <id>` refuses by default and tells the operator to run `pan unpause <id>` first; `pan start <id> --force` clears the pause gate and starts anyway.
 
 ## When to Use

@@ -341,6 +341,10 @@ Auto-resume is intentionally suppressible:
   fields in `~/.overdeck/agents/<agent-id>/state.json` and stops the agent
   if it is running. `pan unpause <id>` clears the gate without spawning.
   `pan start <id>` refuses paused agents unless `--force` is passed.
+  Pausing an issue's work agent pauses the issue (PAN-3911): the pause also
+  stops the issue's live review and test agents, and `recoverStalledReviews`
+  re-dispatches no reviewer for it until it is unpaused. A scheduler yield
+  (`yieldedByScheduler`) is not an issue pause.
 - **Operator-stop gate:** `stoppedByUser` blocks autonomous re-drive when no
   completed handoff exists and emits one durable needs-you trip. Only an
   operator-initiated stop sets the flag (PAN-3324) — `pan kill`, `pan
@@ -426,8 +430,9 @@ observe and nudge — none reconciles a stored copy of anything:
 5. `recoverStalledReviews` — the one recovery routine, and the only timer added
    by the journal work.
 
-`recoverStalledReviews` reads the journal and nothing else — no GitHub call, no
-tracker call. It acts only when an issue's **last** entry is `review.dispatched`,
+`recoverStalledReviews` reads the journal and the issue's pause gate (the work
+agent's `paused`, see "Manual pause" above) — no GitHub call, no tracker call.
+It skips a paused issue and logs the hold once per pause. Otherwise it acts only when an issue's **last** entry is `review.dispatched`,
 `review.redispatched`, or `review.requested`, is at least 15 minutes old, and no
 pane whose id starts with `agent-<issue>-review-` is live. The last-entry rule is
 load-bearing: a `verification.failed` written *after* `review.requested` means
