@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T19:16:40.169Z · model: claude-opus-5 · open: 820_
+_Last sequenced: 2026-09-24T19:28:02.399Z · model: claude-opus-5 · open: 821_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -308,6 +308,7 @@ _Last sequenced: 2026-09-24T19:16:40.169Z · model: claude-opus-5 · open: 820_
 | 346 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
 | 347 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 348 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 349 | PAN-4118 | S | medium | ok |  |  | Review menu's Full/Quick/None is parsed, validated, then dropped; every run uses roles.review.mode and the docs claim it is saved |
 | 350 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 351 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
 | 352 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
@@ -1135,10 +1136,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T19:16:40.169Z",
+  "generatedAt": "2026-09-24T19:28:02.399Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 820,
+  "openCount": 821,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11281,6 +11282,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Every runtime's isRunning asks tmux only, so on the default Herdr backend live agents read stuck, pokes never fire and crashes miscount",
       "rationale": "New since the prior pass and the direct sibling of PAN-4109 — the same tmux-only liveness blindness, one layer down in the runtimes. Herdr is the default backend, so isRunning returns false for every live agent: pokeAgentWithEscalation bails before it can unstick anything, getAgentHealth reports a working agent as stuck (feeding kill_on_stuck), and handleAgentCrash counts crashes without consulting the liveness oracle. The fix pattern is already landed in #4088/#4103/#4107 — route through isAlive in liveness.ts and require confirmed-dead before any crash action — so this is a small, well-specified change guarding the pipeline against killing healthy agents. Ranked at 10, immediately after PAN-4109.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4118",
+      "rank": 349,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review menu's Full/Quick/None is parsed, validated, then dropped; every run uses roles.review.mode and the docs claim it is saved",
+      "rationale": "New since the prior pass. A post-Cut (PAN-3917 W6) leftover: the trigger route still validates reviewMode but spawnReviewRoleForIssue never receives it, so the operator's Full/Quick/None choice silently loses to roles.review.mode while the toast and docs/ISSUE-VIEW.md both claim it took effect. Nothing wedges — the run falls back to config — so it is medium, not high. The body carries a complete fix outline (optional reviewMode on spawnReviewRoleForIssue, pass it from the route, correct the doc) with verified file paths, so it is a cheap, self-contained win. Placed in the medium 62-63 band beside comparable operator-facing correctness bugs; no renumbering.",
       "gate": "auto",
       "planning": "auto"
     }
