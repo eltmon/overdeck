@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:24:53.293Z · model: claude-opus-5 · open: 821_
+_Last sequenced: 2026-09-24T20:31:01.590Z · model: claude-opus-5 · open: 822_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -98,6 +98,7 @@ _Last sequenced: 2026-09-24T20:24:53.293Z · model: claude-opus-5 · open: 821_
 | 120 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
 | 121 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
 | 122 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
+| 123 | PAN-4160 | M | high | ok |  |  | Four sites still fall back to a literal model: fork summary, Command Deck status review, the claude CLI flag map, Cloister handoff |
 | 124 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
 | 125 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
 | 126 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
@@ -1140,10 +1141,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:24:53.293Z",
+  "generatedAt": "2026-09-24T20:31:01.590Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 821,
+  "openCount": 822,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1168,6 +1169,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed",
       "rationale": "In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4109",
+      "rank": 9,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Nine readers still filter on tmuxActive: on Herdr the health loop, emergencyStop and the memory governor's shed all see zero agents",
+      "rationale": "Filed 2026-09-24, placed at rank 9 — freed when PAN-4097 closed — so it inherits its predecessor's slot in the same Herdr-blindness wave and no existing rank moves. PRs #4088, #4103 and #4107 moved the lifecycle guards, the output route and crash detection onto the backend-aware door (isAlive in src/lib/agents/liveness.ts plus the backend inventory), but nine readers still take liveness from the tmuxActive flag on listRunningAgents(), which reports tmux session presence on the overdeck socket alone and is therefore false for every agent on Herdr, the default backend. This is critical rather than high because two of those sites are protections, not reports: memory-governor.ts shed() never pauses a Herdr agent under HARD pressure and cannot protect a live agent's stack from the merged-stack shed, and service.ts emergencyStop() kills nothing — so the OOM defences the host relies on are inert on the default backend, while service-health.ts silently skips crash detection, pokes and stuck handling for the whole fleet. The body enumerates every site with the grep that finds them, states the safety rule (an unreachable backend must never read as dead where that drives a kill, restart, pause or stack stop), keeps tmuxActive where it is part of an API shape, and asks for scripts/lint-liveness.sh to be extended so the sites cannot regress. M rather than S because it is nine modules across CLI, Cloister and the dashboard server plus a lint ratchet.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1207,6 +1221,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive",
       "rationale": "Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4134",
+      "rank": 23,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges",
+      "rationale": "New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where \"unknown\" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1259,6 +1286,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures.",
       "rationale": "New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4155",
+      "rank": 29,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Refused post-planning auto-spawns are never retried, so planned issues sit with no work agent until an operator runs pan start by hand",
+      "rationale": "New this run (filed 2026-09-24, minutes before the manifest). This is the remaining half of the post-planning auto-handoff gap that PAN-3977 opened: 3977 covers the case where stateToRole(todo) is null so no work agent is ever requested, while 4155 covers the case where the request IS made and the spawn guardrail refuses it. On a 409, or a 429/503 carrying blocked, completePlanningAutoSpawn records planning.failed stage=auto-handoff and stops; nothing retries. The refusal lands before claimAutoSpawnConsentForWorkStart, so the operator consent stays granted and the issue sits planned with no work agent indefinitely - the reactive dispatchers planning-consent release source cannot pick it up because it only fires on work-role state events and demands the ready label, which a todo issue never carries. That is a silent pipeline stall on the paved road, which is why it ranks critical despite the unlabelled P3 signal. The proposal is well-specified (record planning.autoHandoffDeferred, add a deacon-lite tick that re-POSTs /api/agents with no guardrail acknowledgement while consent is granted and the spec is promoted, give up after a bounded window with a needs-you signal) and it preserves the rule that machines never waive a health warning. It also carries a verified docs correction: PIPELINE-GATES.md claims the PAN-2500 resource governor gates every autonomous dispatch path, but no spawn path consults getCachedMemoryVerdict. Ranked at 29, immediately behind PAN-3977 at 25, because the two share completePlanningAutoSpawn and should be sequenced together.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1636,6 +1676,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin.",
       "rationale": "New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4149",
+      "rank": 70,
+      "size": "XS",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Effect ratchet splits two-line diagnostics: 68 findings carry no file, so the per-file 'yours to fix' list blames the wrong file",
+      "rationale": "New since the prior run. The gate itself trips on the total count only, so this raises no false red — but every regression it does catch points the fixer, and the verification feedback an agent consumes, at the wrong file: each unknownInEffectCatch warning spans two lines and the ratchet keeps only the indented marker line, dropping the file position. Sits beside PAN-3605, the other defect in the same script. The fix is fully specified (group tsc output into whole diagnostics, then regenerate the baseline at the same commit), so it is XS and ready to plan.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2302,6 +2355,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Workspace init container's bun install doesn't populate container-node-modules named volume",
       "rationale": "Workspace init container bun install does not populate the container-node-modules named volume.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4160",
+      "rank": 123,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Four sites still fall back to a literal model: fork summary, Command Deck status review, the claude CLI flag map, Cloister handoff",
+      "rationale": "New since the prior run, inserted at the free rank-123 slot in the high/78 band. It violates the no-hardcoded-model-fallback rule at four live call sites: a fork with no summaryModel picks its harness for Sonnet 5 then summarizes on Sonnet 4.6; Command Deck status review always runs the literal because loadSettingsApi never carries models.overrides; getClaudeModelFlag maps any unknown claude-* ID to plain sonnet, so every new model release silently downgrades; and the Cloister handoff respawns a test_failure or task_complete agent on sonnet regardless of its role model. None of these wedge the pipeline, which keeps it out of the critical band, but each silently spends the operator’s money on a model they never chose, and the fix is fully specified (two config keys in defaults.ts, a pass-through in getClaudeModelFlag, determineModel in the handoff, plus the docs/MODEL-CALLS.md rows). Sibling work is already warm: #4131 owns the dead models.overrides code this shares, and the spawn-path half is in flight as PR #4154.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3443,6 +3509,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
+      "issue": "PAN-4127",
+      "rank": 220,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "findLatestReviewRunDir scans for the retired review-<issue>-<millis> folder, so no current run ever marks a lane mid-round or done",
+      "rationale": "New since the prior pass, and a silent regression rather than a missing feature: findLatestReviewRunDir in reviewer-tree.ts still looks for directories named review-<ISSUE>-<unixMillis>, a naming scheme review-agent.ts stopped writing when runs moved to agent-<issue>-review-<head8>. It therefore returns null on every current run, which switches off two behaviours that already shipped — the PAN-915 mid-round check and the PAN-1048 lane-done check. The operator reads the reviewer tree to know where a convoy stands, so the cost is a status lie in both directions: a live reviewer working the new round renders as a stopped zombie and invites a kill, and a finished lane keeps showing as working until the synthesiser exits. The existing tests pass only because their fixtures still use the retired directory name, so the suite cannot catch it. Ranked high at 74 rather than critical because nothing wedges — dispatch, convoy and synthesis all run correctly and only the view is wrong — and placed in the score-72-to-76 band at a free rank, with no renumbering. Size S: the body carries a verified fix (read reviewRunId from the review parent state row instead of scanning, with no fallback needed since buildReviewerNodes already returns no lanes when reviewRunId is absent) plus acceptance criteria that fail before it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2874",
       "rank": 222,
       "size": "M",
@@ -3454,6 +3533,20 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "Demoted from rank 64 (critical/92) because the closure of its blocker PAN-2828 and of PAN-3898 falsified most of the premise. Defect 1 — the verification gate demanding a vBRIEF checklist strikes never have — is fixed: src/dashboard/server/routes/workspaces/merge-strike.ts:36 sets skipPlanChecklist: true for request.kind === 'strike', and verification-runner.ts:775 honours it, so the incomplete-plan-items gate no longer fires for a strike. Defect 3 — the landing loop leaving strike_landing_state: 'recovering' after a transient fetch failure — describes deacon-strike-landing.ts, which the PAN-3917 cut deleted; no stored strike landing state remains to retry. Only defect 2 may survive: feedback delivery can still strand on feedback_delivery_needs_you (src/lib/cloister/review-verdict-feedback.ts:276) when the target agent has exited, although the strike carve-out removes the failure that used to trigger it. Held above the obsolete tail rather than sent to it, because that residual needs a rescope against the current code rather than a close.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4145",
+      "rank": 228,
+      "size": "S",
+      "importance": "medium",
+      "score": 63,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "restart-fresh, restartAgent and resume relaunch fall back to literal model IDs, so harness policy checks a model pan start will not staff",
+      "rationale": "New since the prior pass; placed in the free rank slot beside its family (PAN-3022 work-spawn override, PAN-3855 stale recorded model) because it is the same spawn-path model-resolution defect, scored lower because the hardcoded literal only fires when no model is recorded.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
     },
     {
       "issue": "PAN-3527",
@@ -4878,6 +4971,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
+      "issue": "PAN-4131",
+      "rank": 349,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dead models.overrides still rewrites the user's config.yaml, and Command Deck status review silently falls back to a code default",
+      "rationale": "New since the prior run, a follow-up to the now-closed #4128. Scored 60 rather than treated as pure cleanup because two live defects ride along with the dead code: a load-time migration rewrites deprecated model IDs inside models.overrides, so Overdeck still edits the operator's own config.yaml for a key nothing reads, and command-deck.ts looks up a status-review key in data that never carries overrides, so the Command Deck status review always runs on a hardcoded code default the project's no-hardcoded-model-fallback rule forbids. Removal spans about ten files plus their tests and a docs/CONFIGURATION.md rewrite of the fallback-map sections that no longer describe src/lib, and it forces the roles.review.sub.synthesis decision: retire it alongside RETIRED_SUB_ROLES or wire it into the review parent's spawn, since synthesis currently runs on roles.review.model regardless.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2839",
       "rank": 350,
       "size": "S",
@@ -6058,6 +6164,20 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch",
       "rationale": "Triage: the archive-planning step this describes is superseded; demoted to stale.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4151",
+      "rank": 447,
+      "size": "L",
+      "importance": "medium",
+      "score": 46,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-3822"
+      ],
+      "why": "Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11197,112 +11317,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4109",
-      "rank": 9,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Nine readers still filter on tmuxActive: on Herdr the health loop, emergencyStop and the memory governor's shed all see zero agents",
-      "rationale": "Filed 2026-09-24, placed at rank 9 — freed when PAN-4097 closed — so it inherits its predecessor's slot in the same Herdr-blindness wave and no existing rank moves. PRs #4088, #4103 and #4107 moved the lifecycle guards, the output route and crash detection onto the backend-aware door (isAlive in src/lib/agents/liveness.ts plus the backend inventory), but nine readers still take liveness from the tmuxActive flag on listRunningAgents(), which reports tmux session presence on the overdeck socket alone and is therefore false for every agent on Herdr, the default backend. This is critical rather than high because two of those sites are protections, not reports: memory-governor.ts shed() never pauses a Herdr agent under HARD pressure and cannot protect a live agent's stack from the merged-stack shed, and service.ts emergencyStop() kills nothing — so the OOM defences the host relies on are inert on the default backend, while service-health.ts silently skips crash detection, pokes and stuck handling for the whole fleet. The body enumerates every site with the grep that finds them, states the safety rule (an unreachable backend must never read as dead where that drives a kill, restart, pause or stack stop), keeps tmuxActive where it is part of an API shape, and asks for scripts/lint-liveness.sh to be extended so the sites cannot regress. M rather than S because it is nine modules across CLI, Cloister and the dashboard server plus a lint ratchet.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4127",
-      "rank": 220,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "findLatestReviewRunDir scans for the retired review-<issue>-<millis> folder, so no current run ever marks a lane mid-round or done",
-      "rationale": "New since the prior pass, and a silent regression rather than a missing feature: findLatestReviewRunDir in reviewer-tree.ts still looks for directories named review-<ISSUE>-<unixMillis>, a naming scheme review-agent.ts stopped writing when runs moved to agent-<issue>-review-<head8>. It therefore returns null on every current run, which switches off two behaviours that already shipped — the PAN-915 mid-round check and the PAN-1048 lane-done check. The operator reads the reviewer tree to know where a convoy stands, so the cost is a status lie in both directions: a live reviewer working the new round renders as a stopped zombie and invites a kill, and a finished lane keeps showing as working until the synthesiser exits. The existing tests pass only because their fixtures still use the retired directory name, so the suite cannot catch it. Ranked high at 74 rather than critical because nothing wedges — dispatch, convoy and synthesis all run correctly and only the view is wrong — and placed in the score-72-to-76 band at a free rank, with no renumbering. Size S: the body carries a verified fix (read reviewRunId from the review parent state row instead of scanning, with no fallback needed since buildReviewerNodes already returns no lanes when reviewRunId is absent) plus acceptance criteria that fail before it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4131",
-      "rank": 349,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dead models.overrides still rewrites the user's config.yaml, and Command Deck status review silently falls back to a code default",
-      "rationale": "New since the prior run, a follow-up to the now-closed #4128. Scored 60 rather than treated as pure cleanup because two live defects ride along with the dead code: a load-time migration rewrites deprecated model IDs inside models.overrides, so Overdeck still edits the operator's own config.yaml for a key nothing reads, and command-deck.ts looks up a status-review key in data that never carries overrides, so the Command Deck status review always runs on a hardcoded code default the project's no-hardcoded-model-fallback rule forbids. Removal spans about ten files plus their tests and a docs/CONFIGURATION.md rewrite of the fallback-map sections that no longer describe src/lib, and it forces the roles.review.sub.synthesis decision: retire it alongside RETIRED_SUB_ROLES or wire it into the review parent's spawn, since synthesis currently runs on roles.review.model regardless.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4134",
-      "rank": 23,
-      "size": "S",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges",
-      "rationale": "New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where \"unknown\" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4145",
-      "rank": 228,
-      "size": "S",
-      "importance": "medium",
-      "score": 63,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "restart-fresh, restartAgent and resume relaunch fall back to literal model IDs, so harness policy checks a model pan start will not staff",
-      "rationale": "New since the prior pass; placed in the free rank slot beside its family (PAN-3022 work-spawn override, PAN-3855 stale recorded model) because it is the same spawn-path model-resolution defect, scored lower because the hardcoded literal only fires when no model is recorded.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": false
-    },
-    {
-      "issue": "PAN-4149",
-      "rank": 70,
-      "size": "XS",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Effect ratchet splits two-line diagnostics: 68 findings carry no file, so the per-file 'yours to fix' list blames the wrong file",
-      "rationale": "New since the prior run. The gate itself trips on the total count only, so this raises no false red — but every regression it does catch points the fixer, and the verification feedback an agent consumes, at the wrong file: each unknownInEffectCatch warning spans two lines and the ratchet keeps only the indented marker line, dropping the file position. Sits beside PAN-3605, the other defect in the same script. The fix is fully specified (group tsc output into whole diagnostics, then regenerate the baseline at the same commit), so it is XS and ready to plan.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4151",
-      "rank": 447,
-      "size": "L",
-      "importance": "medium",
-      "score": 46,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-3822"
-      ],
-      "why": "Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4155",
-      "rank": 29,
-      "size": "M",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Refused post-planning auto-spawns are never retried, so planned issues sit with no work agent until an operator runs pan start by hand",
-      "rationale": "New this run (filed 2026-09-24, minutes before the manifest). This is the remaining half of the post-planning auto-handoff gap that PAN-3977 opened: 3977 covers the case where stateToRole(todo) is null so no work agent is ever requested, while 4155 covers the case where the request IS made and the spawn guardrail refuses it. On a 409, or a 429/503 carrying blocked, completePlanningAutoSpawn records planning.failed stage=auto-handoff and stops; nothing retries. The refusal lands before claimAutoSpawnConsentForWorkStart, so the operator consent stays granted and the issue sits planned with no work agent indefinitely - the reactive dispatchers planning-consent release source cannot pick it up because it only fires on work-role state events and demands the ready label, which a todo issue never carries. That is a silent pipeline stall on the paved road, which is why it ranks critical despite the unlabelled P3 signal. The proposal is well-specified (record planning.autoHandoffDeferred, add a deacon-lite tick that re-POSTs /api/agents with no guardrail acknowledgement while consent is granted and the spec is promoted, give up after a bounded window with a needs-you signal) and it preserves the rule that machines never waive a health warning. It also carries a verified docs correction: PIPELINE-GATES.md claims the PAN-2500 resource governor gates every autonomous dispatch path, but no spawn path consults getCachedMemoryVerdict. Ranked at 29, immediately behind PAN-3977 at 25, because the two share completePlanningAutoSpawn and should be sequenced together.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12453,6 +12467,13 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4131",
+      "to": "PAN-4160",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
