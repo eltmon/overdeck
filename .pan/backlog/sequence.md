@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:14:38.105Z · model: claude-opus-5 · open: 809_
+_Last sequenced: 2026-09-24T22:22:26.087Z · model: claude-opus-5 · open: 809_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1124,7 +1124,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:14:38.105Z",
+  "generatedAt": "2026-09-24T22:22:26.087Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 809,
