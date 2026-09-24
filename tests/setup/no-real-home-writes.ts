@@ -140,6 +140,8 @@ function withGuardedPromiseFs(
     appendFile: guardedPromise(actual.appendFile as never, [0]),
     mkdir: guardedPromise(actual.mkdir as never, [0]),
     rm: guardedPromise(actual.rm as never, [0]),
+    rmdir: guardedPromise(actual.rmdir as never, [0]),
+    unlink: guardedPromise(actual.unlink as never, [0]),
     rename: guardedPromise(actual.rename as never, [0, 1]),
     cp: guardedPromise(actual.cp as never, [0, 1]),
     copyFile: guardedPromise(actual.copyFile as never, [1]),

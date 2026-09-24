@@ -1,4 +1,4 @@
-import { appendFile, copyFile, mkdir, open, rm, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, mkdir, open, rm, unlink, writeFile } from 'node:fs/promises';
 import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -39,6 +39,7 @@ describe('real OVERDECK_HOME test guard', () => {
     expect(() => unlinkSync(transcript)).toThrow('[test-guard]');
     expect(() => rmSync(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true, force: true })).toThrow('[test-guard]');
     await expect(appendFile(transcript, '{}\n')).rejects.toThrow('[test-guard]');
+    await expect(unlink(transcript)).rejects.toThrow('[test-guard]');
     await expect(rm(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true, force: true })).rejects.toThrow('[test-guard]');
   });
 
