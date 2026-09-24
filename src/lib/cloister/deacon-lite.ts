@@ -14,7 +14,7 @@
  */
 import { existsSync } from 'node:fs';
 
-import type { AgentState } from '../agents/agent-state.js';
+import { getIssuePause, type AgentState } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents.js';
 import { isAlive, isConfirmedDead, isIdle } from '../agents/liveness.js';
 import { liveAgentInventory } from '../terminal-backends/inventory.js';
@@ -188,10 +188,13 @@ const STALLED_REVIEW_MIN_AGE_MS = 15 * 60_000;
 const STALLED_REVIEW_COOLDOWN_MS = 60 * 60_000; // one re-dispatch per issue per hour
 
 const lastReviewRedispatchAt = new Map<string, number>();
+/** issueId -> pausedAt of the pause already logged, so a hold logs once, not every tick. */
+const loggedPausedSkip = new Map<string, string>();
 
 /** Test seam: clear the per-issue re-dispatch cooldown between test cases. */
 export function __resetStalledReviewCooldownForTests(): void {
   lastReviewRedispatchAt.clear();
+  loggedPausedSkip.clear();
 }
 
 /**
@@ -236,6 +239,17 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     if (!reason) continue;
     const at = Date.parse(last.at);
     if (Number.isNaN(at) || now - at < STALLED_REVIEW_MIN_AGE_MS) continue;
+
+    // An issue pause holds the whole issue, reviewers included (PAN-3911).
+    const pause = getIssuePause(issueId);
+    if (pause) {
+      const key = pause.pausedAt ?? 'paused';
+      if (loggedPausedSkip.get(issueId) !== key) {
+        loggedPausedSkip.set(issueId, key);
+        console.log(`[deacon-lite] ${issueId} is paused (${pause.agentId}${pause.pausedReason ? `: ${pause.pausedReason}` : ''}) — not re-dispatching its stalled review`);
+      }
+      continue;
+    }
 
     // Only SUB-reviewers count as "the convoy is alive". The synthesis parent's
     // id is exactly `agent-<issue>-review`, so a prefix without the trailing

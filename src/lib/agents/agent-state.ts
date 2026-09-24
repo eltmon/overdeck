@@ -551,6 +551,20 @@ export function isAgentPaused(agentId: string): boolean {
   return getAgentState(agentId)?.paused === true;
 }
 
+/**
+ * The issue-level pause gate (PAN-3911): `pan pause <issue>` pauses the
+ * issue's work agent, and that pause holds the whole issue — no dispatcher may
+ * spawn or resume a review, test or other role for it. A scheduler yield is a
+ * slot-freeing move, not an operator hold, so it does not count. Returns the
+ * work agent's pause state, or null when the issue is not paused.
+ */
+export function getIssuePause(issueId: string): { agentId: string; pausedAt?: string; pausedReason?: string } | null {
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  const state = getAgentState(agentId);
+  if (state?.paused !== true || state.yieldedByScheduler === true) return null;
+  return { agentId, pausedAt: state.pausedAt, pausedReason: state.pausedReason };
+}
+
 /** Reports whether callers should block start, resume, auto-resume, or message delivery on the troubled gate. */
 export function isAgentTroubled(agentId: string): boolean {
   return getAgentState(agentId)?.troubled === true;
