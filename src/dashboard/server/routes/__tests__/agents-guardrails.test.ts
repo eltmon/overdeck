@@ -403,7 +403,7 @@ describe('resolveSpawnGuardrailRefusal (POST /api/agents guardrail step)', () =>
   function refuse(body: unknown, health: SystemHealthSnapshot) {
     // Round-trip through JSON: the route sees the body the way fetch sent it.
     const parsed = JSON.parse(JSON.stringify(body)) as unknown;
-    return resolveSpawnGuardrailRefusal('PAN-3977', health, parseSpawnGuardrailAcknowledgement(parsed));
+    return resolveSpawnGuardrailRefusal('PAN-3977', health, parseSpawnGuardrailAcknowledgement(parsed)).refusal;
   }
 
   afterEach(async () => {

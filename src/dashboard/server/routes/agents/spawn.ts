@@ -49,6 +49,7 @@ import {
   parseSpawnGuardrailAcknowledgement,
   unacknowledgedSpawnGuardrailWarnings,
   type SpawnGuardrailAcknowledgement,
+  type SpawnGuardrailDecision,
   getIssueDataService,
   getProjectPath,
   invalidateAgentsCache,
@@ -99,15 +100,15 @@ export function spawnGuardrailResourcesHint(hint?: string): string {
 }
 
 /**
- * The guardrail step of POST /api/agents. Returns the refusal response, or
- * null when the start may proceed. Critical warnings always refuse. A warning
+ * The guardrail step of POST /api/agents. Returns the guardrail decision and
+ * the refusal response, which is null when the start may proceed. Critical warnings always refuse. A warning
  * refuses with 409 unless the request acknowledged its kind (PAN-3977).
  */
 export function resolveSpawnGuardrailRefusal(
   issueId: string,
   health: SystemHealthSnapshot,
   acknowledgement: SpawnGuardrailAcknowledgement,
-): { status: number; body: Record<string, unknown> } | null {
+): { decision: SpawnGuardrailDecision; refusal: { status: number; body: Record<string, unknown> } | null } {
   emitStartAgentPhase(issueId, 'guardrails', 'start', 'evaluating spawn guardrails');
   const spawnGuardrails = evaluateSpawnGuardrails(health);
   if (spawnGuardrails.blocked) {
@@ -116,14 +117,17 @@ export function resolveSpawnGuardrailRefusal(
       hint: spawnGuardrails.hint,
     });
     return {
-      status: spawnGuardrails.status,
-      body: {
-        success: false,
-        blocked: true,
-        skipped: true,
-        error: spawnGuardrails.error,
-        hint: spawnGuardrails.hint,
-        guardrails: spawnGuardrails,
+      decision: spawnGuardrails,
+      refusal: {
+        status: spawnGuardrails.status,
+        body: {
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: spawnGuardrails.error,
+          hint: spawnGuardrails.hint,
+          guardrails: spawnGuardrails,
+        },
       },
     };
   }
@@ -136,21 +140,24 @@ export function resolveSpawnGuardrailRefusal(
       hint: spawnGuardrails.hint,
     });
     return {
-      status: spawnGuardrails.status,
-      body: {
-        success: false,
-        blocked: false,
-        skipped: true,
-        requiresAcknowledgement: true,
-        error: `Guardrail acknowledgement required: ${unacknowledged.map((warning) => warning.message).join(' ')}`,
-        hint: spawnGuardrailResourcesHint(spawnGuardrails.hint),
-        guardrails: spawnGuardrails,
-        unacknowledgedWarnings: unacknowledged,
+      decision: spawnGuardrails,
+      refusal: {
+        status: spawnGuardrails.status,
+        body: {
+          success: false,
+          blocked: false,
+          skipped: true,
+          requiresAcknowledgement: true,
+          error: `Guardrail acknowledgement required: ${unacknowledged.map((warning) => warning.message).join(' ')}`,
+          hint: spawnGuardrailResourcesHint(spawnGuardrails.hint),
+          guardrails: spawnGuardrails,
+          unacknowledgedWarnings: unacknowledged,
+        },
       },
     };
   }
   emitStartAgentPhase(issueId, 'guardrails', 'success', 'spawn guardrails passed');
-  return null;
+  return { decision: spawnGuardrails, refusal: null };
 }
 
 // ─── Start-agent gate resolution (PAN-2499) ───────────────────────────────────
@@ -445,7 +452,7 @@ export const postAgentsRoute = HttpRouter.add(
     }
 
     const health = yield* Effect.promise(() => getSystemHealthSnapshot());
-    const guardrailRefusal = resolveSpawnGuardrailRefusal(issueId, health, guardrailAcknowledgement);
+    const { decision: spawnGuardrails, refusal: guardrailRefusal } = resolveSpawnGuardrailRefusal(issueId, health, guardrailAcknowledgement);
     if (guardrailRefusal) return jsonResponse(guardrailRefusal.body, { status: guardrailRefusal.status });
 
     let spawnModel: string;
