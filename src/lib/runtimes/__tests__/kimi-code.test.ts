@@ -17,6 +17,13 @@ vi.mock('../tmux-cli.js', () => ({
   tmuxSessionExists: tmuxMocks.tmuxSessionExists,
 }));
 
+const livenessMocks = vi.hoisted(() => ({
+  isRuntimeAgentAlive: vi.fn(async (): Promise<boolean> => false),
+}));
+vi.mock('../runtime-liveness.js', () => ({
+  isRuntimeAgentAlive: livenessMocks.isRuntimeAgentAlive,
+}));
+
 const agentStateMocks = vi.hoisted(() => ({ getAgentState: vi.fn(), saveAgentStateSync: vi.fn() }));
 vi.mock('../../agents/agent-state.js', () => ({
   getAgentState: agentStateMocks.getAgentState,
@@ -466,11 +473,12 @@ describe('KimiCodeRuntimeSync', () => {
     expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith('agent-kill-fallback');
   });
 
-  it('isRunning mirrors tmuxSessionExists (AC4)', async () => {
-    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
+  it('isRunning answers through the backend-aware liveness oracle (AC4, #4116)', async () => {
+    livenessMocks.isRuntimeAgentAlive.mockResolvedValueOnce(true);
     const runtime = new KimiCodeRuntimeSync({ overdeckHome: makeHome(), kimiHome: makeHome() });
     await expect(runtime.isRunning('agent-x')).resolves.toBe(true);
-    expect(tmuxMocks.tmuxSessionExists).toHaveBeenCalledWith('agent-x');
+    expect(livenessMocks.isRuntimeAgentAlive).toHaveBeenCalledWith('agent-x', 'kimi-code');
+    expect(tmuxMocks.tmuxSessionExists).not.toHaveBeenCalledWith('agent-x');
   });
 
   it('listSessions returns only kimi-code agents with a captured session id (AC4)', () => {

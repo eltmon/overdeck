@@ -36,6 +36,7 @@ import type { AgentState } from '../agents/agent-state.js';
 import { getAgentState, saveAgentStateSync } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents/queries.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
+import { isRuntimeAgentAlive } from './runtime-liveness.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { writePtyToken } from '../pty-token.js';
 import { generateLauncherScript } from '../launcher-generator.js';
@@ -644,7 +645,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return tmuxSessionExists(agentId);
+    return isRuntimeAgentAlive(agentId, this.name);
   }
 
   private home(): string {
