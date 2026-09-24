@@ -61,9 +61,9 @@ The Claude-backed ones spawn `claude -p` from the empty scratch cwd `${OVERDECK_
 | `summaryFork` / smart compaction | Chunked transcript summary for compaction/forks | `src/lib/conversations/smart-compaction.ts:49` | `claude-haiku-4-5-20251001` | `conversations.compaction_model` | `background:summaryFork` | Yes (Background AI) |
 | `summaryFork` / fork summary | One-shot fork summary when no model override given | `src/lib/conversations/summary-fork.ts:687` | `claude-sonnet-4-6` | `options.model` / `conv.model` | `background:summaryFork` (when JSON envelope has usage) | Yes (Background AI) |
 | `summaryFork` / handoff author | External handoff document author | `src/lib/conversations/summary-fork.ts:223` | **None — required** | `options.handoffAuthorModel` (`--author-model`), else `conversations.handoff_author_model` (PAN-3860; previously an unconfigurable literal, `claude-sonnet-4-6`). Neither set → `pan handoff` fails loudly with `HandoffAuthorModelNotConfiguredError` instead of silently picking a model | `background:summaryFork` (when JSON envelope has usage) | Yes (Background AI) |
-| `ttsSummarizer` | Narrate recent dashboard activity | `src/lib/config-yaml.ts:1112` → `src/dashboard/server/services/tts-summarizer.ts:159` | `gpt-5.4-mini` | `tts.summarizer.model` | `background:ttsSummarizer` | Yes (Background AI) |
-| Docs-corpus embeddings | Embed docs/skills/rules/PRDs for RAG | `src/lib/config-yaml.ts:1021` → `src/lib/docs/index-builder.ts:258` | `gte-small` (local, `Xenova/gte-small`) | `docs.embedding.provider` (`local`/`openai`), `docs.embedding.model` | **None** | No |
-| Conversation-search embeddings | Embed conversation JSONL chunks for Ctrl+K palette search | `src/lib/config-yaml.ts:1033` → `src/lib/conversation-search/embedding-provider.ts:51` | `text-embedding-3-small` | `conversationSearch.model` | **None** (only cost estimate UI) | Yes (enabled by default; toggle in Settings → Conversation Search) |
+| `ttsSummarizer` | Narrate recent dashboard activity | `src/lib/config-yaml/defaults.ts:209` → `src/dashboard/server/services/tts-summarizer.ts:159` | `gpt-5.4-mini` | `tts.summarizer.model` | `background:ttsSummarizer` | Yes (Background AI) |
+| Docs-corpus embeddings | Embed docs/skills/rules/PRDs for RAG | `src/lib/config-yaml/defaults.ts:115` → `src/lib/docs/index-builder.ts:258` | `gte-small` (local, `Xenova/gte-small`) | `docs.embedding.provider` (`local`/`openai`), `docs.embedding.model` | **None** | No |
+| Conversation-search embeddings | Embed conversation JSONL chunks for Ctrl+K palette search | `src/lib/config-yaml/defaults.ts:129` → `src/lib/conversation-search/embedding-provider.ts:51` | `text-embedding-3-small` | `conversationSearch.model` | **None** (only cost estimate UI) | Yes (enabled by default; toggle in Settings → Conversation Search) |
 
 ---
 
@@ -93,7 +93,7 @@ Defaults that are pricier than their job suggests, with per-1M-token cost from `
 
 5. **Handoff-author cost attribution is conditional.** `authorHandoffExternal()` goes through `runModelSummary()`, which records cost only when the `claude -p --output-format json` envelope contains `result` and usage. If the model emits the doc on stdout instead of using the Write tool, the cost may not be captured.
 
-6. **Background AI defaults are ON for most features.** `registry.ts` defaults `conversationTitles`, `titleRefinement`, `memoryExtraction`, `memoryQueryExpansion`, `conversationEnrichment`, and `summaryFork` to enabled, but the master `backgroundAi.cheapMode` default is `true` in `DEFAULT_CONFIG` (`src/lib/config-yaml.ts:1044`), so out-of-the-box behavior depends on whether cheap mode is flipped off.
+6. **Background AI defaults are ON for most features.** `registry.ts` defaults `conversationTitles`, `titleRefinement`, `memoryExtraction`, `memoryQueryExpansion`, `conversationEnrichment`, and `summaryFork` to enabled, but the master `backgroundAi.cheapMode` default is `true` in `DEFAULT_CONFIG` (`src/lib/config-yaml/defaults.ts:146`), so out-of-the-box behavior depends on whether cheap mode is flipped off.
 
 ---
 
