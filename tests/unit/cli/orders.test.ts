@@ -263,7 +263,7 @@ describe('pan orders pushes its order-book commits', () => {
     git(['push', '-q', 'origin', 'main'], other);
   }
 
-  it('pushes every write verb’s commit to origin main', async () => {
+  it('pushes every write verb commit to origin main', async () => {
     const panDir = gitFixture();
     const home = dirname(panDir);
     const deps = { panDir, now: () => new Date(at), actor: 'operator' };
