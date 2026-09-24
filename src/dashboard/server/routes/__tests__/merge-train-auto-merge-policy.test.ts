@@ -42,15 +42,17 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
       labelsByIssue[issueId] ? { open: true, labels: labelsByIssue[issueId] } : null,
   }),
 }));
+const openPrRows = [
+  { headRefName: 'feature/pan-1' },
+  { headRefName: 'feature/pan-2' },
+  { headRefName: 'feature/pan-3' },
+  { headRefName: 'feature/pan-4' },
+];
 vi.mock('../../services/derived-issue-state.js', () => ({
   getDerivedIssueState: vi.fn(),
   listReadyIssuesForProject: vi.fn(async () => []),
-  listRepoPullRequestsStaleOk: vi.fn(async () => [
-    { headRefName: 'feature/pan-1' },
-    { headRefName: 'feature/pan-2' },
-    { headRefName: 'feature/pan-3' },
-    { headRefName: 'feature/pan-4' },
-  ]),
+  listRepoPullRequests: vi.fn(async () => openPrRows),
+  listRepoPullRequestsStaleOk: vi.fn(async () => openPrRows),
   issueIdFromBranch: (branch: string) => branch.replace('feature/', '').toUpperCase(),
   loadIssueStatesForProject: vi.fn(async (_path: string, ids: string[]) =>
     new Map(ids.map((id) => [id, { issueId: id, state: 'in-review' }]))),
