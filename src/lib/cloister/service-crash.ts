@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import type { DomainEvent } from '@overdeck/contracts';
 import { CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentState, saveAgentStateSync } from '../agents.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import { setCloisterSpawnsPaused } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { exactPaneTarget, getManagedTmuxSocketName } from '../tmux.js';
@@ -140,8 +141,13 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
   // never change — so every cycle would count another "ineffective" poke until
   // tier 3 paused it with a fabricated idle-alive reason. Boot gates
   // (--no-resume) make that the normal post-reboot state for the whole fleet.
-  if (!(await runtime.isRunning(agentId))) {
-    host.pokeProgress.delete(agentId);
+  // Liveness comes from the backend-aware oracle (#4116): a Herdr agent has no
+  // tmux session. Unknown liveness (backend unreachable) is not a poke target
+  // either, and leaves the progress streak untouched — it is not a death, and
+  // a poke that cannot land must not count toward the tier-3 pause.
+  const liveness = await isAlive(agentId);
+  if (!liveness.alive) {
+    if (isConfirmedDead(liveness)) host.pokeProgress.delete(agentId);
     return;
   }
 
@@ -234,6 +240,14 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
   const agentState = getAgentState(agentId);
   if (!agentState || agentState.status === 'stopped') {
     console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
+    return;
+  }
+  // #4116: only a confirmed death is a crash. An agent the liveness oracle
+  // reads alive, or cannot read at all (backend unreachable), is left alone —
+  // no crash count, no heartbeat_dead, no mass-death pause.
+  const liveness = await isAlive(agentId);
+  if (!isConfirmedDead(liveness)) {
+    console.log(`🔔 Agent ${agentId} is not confirmed dead (${liveness.alive ? 'alive' : liveness.reason}); skipping crash handling`);
     return;
   }
   const runtimeState = getAgentRuntimeStateSync(agentId);
