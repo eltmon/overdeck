@@ -82,8 +82,8 @@ async function defaultGetConversation(name: string): Promise<LegacyConversation 
 }
 
 async function defaultSessionAlive(tmuxSession: string): Promise<boolean> {
-  const [{ Effect }, { sessionExists }] = await Promise.all([import('effect'), import('../tmux.js')]);
-  return Effect.runPromise(sessionExists(tmuxSession));
+  const { conversationSessionAlive } = await import('../overdeck/conversation-liveness.js');
+  return conversationSessionAlive(tmuxSession);
 }
 
 /** The flywheel transcript as parsed messages (lazy default for `readTranscript`). */
