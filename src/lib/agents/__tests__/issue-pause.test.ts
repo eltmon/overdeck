@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   listWorkspaces: vi.fn(),
   recoverMissingConvoyReviewers: vi.fn(),
   appendOperatorInterventionEvent: vi.fn(),
+  requestReviewThroughRoute: vi.fn(),
 }));
 
 vi.mock('../liveness.js', async (importOriginal) => ({
@@ -81,8 +82,11 @@ vi.mock('../../workspaces/resolver.js', () => ({ listWorkspaces: mocks.listWorks
 vi.mock('../../cloister/review-convoy.js', () => ({
   recoverMissingConvoyReviewers: mocks.recoverMissingConvoyReviewers,
 }));
+vi.mock('../../cloister/review-request-route.js', () => ({
+  requestReviewThroughRoute: mocks.requestReviewThroughRoute,
+}));
 
-const { getAgentState, getIssuePause, setAgentPaused, setAgentYielded, saveAgentStateSync } = await import('../agent-state.js');
+const { clearAgentPaused, getAgentState, getIssuePause, setAgentPaused, setAgentYielded, saveAgentStateSync } = await import('../agent-state.js');
 const { stopIssueSpecialistAgents } = await import('../issue-pause.js');
 const { messageAgent } = await import('../messaging.js');
 const { pauseCommand } = await import('../../../cli/commands/pause.js');
@@ -125,6 +129,22 @@ function journalReviewDispatched(minutesAgo: number): void {
   vi.useRealTimers();
 }
 
+/** The dashboard route journals `review.requested` when it accepts a request; the stub does too. */
+function acceptReviewRequests(): void {
+  mocks.requestReviewViaDashboard.mockImplementation(async (issueId: string) => {
+    appendPipelineEntry(workspace, { type: 'review.requested', issueId, source: 'pan-unpause' });
+    return { kind: 'ok', status: 202, result: { success: true, queued: true, message: 'Verification started' } };
+  });
+}
+
+/** Pause the issue while its review is in flight: the convoy stops and `review.halted` is journalled. */
+async function pauseInFlightReview(): Promise<void> {
+  seedConvoy();
+  journalReviewDispatched(30);
+  await pauseCommand(ISSUE, {});
+  expect(readPipelineJournal(workspace).at(-1)?.type).toBe('review.halted');
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   rmSync(join(testHome, 'agents'), { recursive: true, force: true });
@@ -134,7 +154,8 @@ beforeEach(() => {
   mocks.agentPaneExists.mockResolvedValue(true);
   mocks.closeAgentPaneDetailed.mockResolvedValue({ outcome: 'closed' });
   mocks.closeIssuePanes.mockResolvedValue([]);
-  mocks.requestReviewViaDashboard.mockResolvedValue({ kind: 'ok', status: 200, result: { message: 'ok' } });
+  acceptReviewRequests();
+  mocks.requestReviewThroughRoute.mockResolvedValue({ requested: true });
   mocks.resumeAgent.mockResolvedValue({ success: true });
   mocks.liveAgentInventory.mockResolvedValue({ backend: 'herdr', panes: [] });
   mocks.listWorkspaces.mockImplementation(() => [{ id: 'ws1', issueId: ISSUE, path: workspace }]);
@@ -318,13 +339,91 @@ describe('pan pause, then pan unpause (PAN-3911)', () => {
     expect(getAgentState(WORK)?.paused).toBeUndefined();
     expect(getAgentState(WORK)?.pauseStoppedAgents).toBeUndefined();
     expect(process.exitCode).toBeUndefined();
-    expect(await recoverStalledReviews(Date.now() + 2 * 60 * 60_000)).toEqual([]);
+    // The re-request ended the halt: nothing is owed and recovery stays out.
+    expect(readPipelineJournal(workspace).at(-1)?.type).toBe('review.requested');
+    expect(await recoverStalledReviews(Date.now())).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
     expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
   });
 
-  it('surfaces a review re-request the dashboard could not take', async () => {
+  it('stops nothing and re-requests nothing when the review already posted its verdict', async () => {
+    // Warm reviewers idle at their prompt after the verdict, alive.
     seedConvoy();
+    journalReviewDispatched(30);
+    appendPipelineEntry(workspace, { type: 'review.verdict', issueId: ISSUE, data: { verdict: 'CHANGES_REQUESTED' } });
+
     await pauseCommand(ISSUE, {});
+
+    expect(getAgentState(PARENT)?.status).toBe('running');
+    expect(getAgentState(LANE)?.status).toBe('running');
+    const closed = mocks.closeAgentPaneDetailed.mock.calls.map(([id]) => id);
+    expect(closed).toEqual([WORK]);
+    expect(getAgentState(WORK)?.pauseStoppedAgents).toBeUndefined();
+    expect(readPipelineJournal(workspace).at(-1)?.type).toBe('review.verdict');
+
+    await unpauseCommand(ISSUE);
+
+    expect(mocks.requestReviewViaDashboard).not.toHaveBeenCalled();
+    expect(await recoverStalledReviews(Date.now() + 2 * 60 * 60_000)).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
+  });
+
+  it('still stops a running test agent when no review is in flight', async () => {
+    seed(WORK, { role: 'work' });
+    seed(PARENT, {});
+    seed(TEST_AGENT, { role: 'test' });
+    appendPipelineEntry(workspace, { type: 'review.verdict', issueId: ISSUE, data: { verdict: 'APPROVED' } });
+
+    await pauseCommand(ISSUE, {});
+
+    expect(getAgentState(TEST_AGENT)?.status).toBe('stopped');
+    expect(getAgentState(PARENT)?.status).toBe('running');
+    expect(getAgentState(WORK)?.pauseStoppedAgents).toEqual([TEST_AGENT]);
+    expect(mocks.closeIssuePanes).toHaveBeenCalledWith(ISSUE, { roles: ['test'] });
+  });
+
+  it('reports a merged issue as nothing to re-request, not as a re-requested review', async () => {
+    await pauseInFlightReview();
+    mocks.requestReviewViaDashboard.mockResolvedValue({
+      kind: 'ok', status: 200, result: { success: false, alreadyMerged: true, message: 'PAN-3911 is already merged. Reopen the issue first.' },
+    });
+
+    await unpauseCommand(ISSUE);
+
+    const logs = vi.mocked(console.log).mock.calls.map(([line]) => String(line)).join('\n');
+    expect(logs).not.toContain('Re-requested review');
+    expect(logs).toContain('No review re-requested for PAN-3911: PAN-3911 is already merged');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('reports an already-approved head as nothing to re-request, not as a re-requested review', async () => {
+    await pauseInFlightReview();
+    mocks.requestReviewViaDashboard.mockResolvedValue({
+      kind: 'ok', status: 200, result: { success: true, alreadyPassed: true, message: 'Review already passed for PAN-3911' },
+    });
+
+    await unpauseCommand(ISSUE);
+
+    const logs = vi.mocked(console.log).mock.calls.map(([line]) => String(line)).join('\n');
+    expect(logs).not.toContain('Re-requested review');
+    expect(logs).toContain('No review re-requested for PAN-3911: Review already passed');
+  });
+
+  it('reports the re-review breaker as a failure', async () => {
+    await pauseInFlightReview();
+    mocks.requestReviewViaDashboard.mockResolvedValue({
+      kind: 'rejected', status: 429, result: { success: false, error: 'Circuit breaker triggered' },
+    });
+
+    await unpauseCommand(ISSUE);
+
+    expect(process.exitCode).toBe(1);
+    const errors = vi.mocked(console.error).mock.calls.map(([line]) => String(line)).join('\n');
+    expect(errors).toContain('Review not re-requested for PAN-3911: Circuit breaker triggered');
+  });
+
+  it('surfaces a review re-request the dashboard could not take', async () => {
+    await pauseInFlightReview();
     mocks.requestReviewViaDashboard.mockResolvedValue({ kind: 'unreachable', error: 'ECONNREFUSED' });
 
     await unpauseCommand(ISSUE);
@@ -344,6 +443,7 @@ describe('pan pause, then pan unpause (PAN-3911)', () => {
 
   it('surfaces a failed close of the work agent pane and of a reviewer instead of reporting them stopped', async () => {
     seedConvoy();
+    journalReviewDispatched(30);
     mocks.closeAgentPaneDetailed.mockImplementation(async (id: string) => (
       id === WORK || id === LANE ? { outcome: 'failed', reason: `herdr could not close ${id}` } : { outcome: 'closed' }
     ));
@@ -373,6 +473,61 @@ describe('pan pause, then pan unpause (PAN-3911)', () => {
   });
 });
 
+describe('a halted review once the pause is gone (PAN-3911)', () => {
+  it('holds while the issue is paused', async () => {
+    await pauseInFlightReview();
+
+    expect(await recoverStalledReviews(Date.now() + 2 * 60 * 60_000)).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
+  });
+
+  it('holds while the pause cannot be read', async () => {
+    await pauseInFlightReview();
+    writeFileSync(join(testHome, 'agents', WORK, 'state.json'), '');
+
+    expect(await recoverStalledReviews(Date.now())).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
+  });
+
+  it('re-requests the review when pan unpause could not reach the dashboard', async () => {
+    await pauseInFlightReview();
+    mocks.requestReviewViaDashboard.mockResolvedValue({ kind: 'unreachable', error: 'ECONNREFUSED' });
+    await unpauseCommand(ISSUE);
+    expect(readPipelineJournal(workspace).at(-1)?.type).toBe('review.halted');
+
+    const actions = await recoverStalledReviews(Date.now());
+
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith(ISSUE, expect.objectContaining({ source: 'deacon-lite' }));
+    expect(actions).toEqual([`recoverStalledReviews: re-requested the halted ${ISSUE} review`]);
+    expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+  });
+
+  it('re-requests the review when the pause was cleared without pan unpause (pan start --force, Start with clearGates)', async () => {
+    await pauseInFlightReview();
+    // Both doors clear the pause with clearAgentPaused and nothing else.
+    await Effect.runPromise(clearAgentPaused(WORK));
+
+    await recoverStalledReviews(Date.now());
+
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith(ISSUE, expect.objectContaining({ source: 'deacon-lite' }));
+  });
+
+  it('does not repeat a refused re-request within the cooldown', async () => {
+    await pauseInFlightReview();
+    await Effect.runPromise(clearAgentPaused(WORK));
+    mocks.requestReviewThroughRoute.mockResolvedValue({ requested: false, reason: 'working tree is dirty' });
+
+    expect(await recoverStalledReviews(Date.now())).toEqual([]);
+    expect(await recoverStalledReviews(Date.now() + 5 * 60_000)).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
+
+    await recoverStalledReviews(Date.now() + 61 * 60_000);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('machine pauses and the stalled-review hold', () => {
   it('a machine pause of the work agent does not hold stalled-review recovery', async () => {
     seedConvoy();
@@ -387,8 +542,10 @@ describe('machine pauses and the stalled-review hold', () => {
 });
 
 describe('messageAgent while the issue is paused', () => {
-  it('queues a message to a stopped reviewer instead of resuming it', async () => {
-    seed(WORK, { role: 'work', paused: true, pausedBy: 'operator', pausedAt: '2026-09-24T10:00:00.000Z' });
+  it('queues a message to a reviewer the pause stopped instead of resuming it', async () => {
+    seed(WORK, {
+      role: 'work', paused: true, pausedBy: 'operator', pausedAt: '2026-09-24T10:00:00.000Z', pauseStoppedAgents: [PARENT],
+    });
     seed(PARENT, { status: 'stopped' });
 
     const outcome = await messageAgent(PARENT, 'REVIEWER_FAILED security reviewer exited');
@@ -396,5 +553,35 @@ describe('messageAgent while the issue is paused', () => {
     expect(outcome).toMatchObject({ delivered: false, queuedToMail: true });
     expect(outcome.reason).toContain('PAN-3911 is paused');
     expect(mocks.resumeAgent).not.toHaveBeenCalled();
+  });
+
+  it('does not hold a stopped agent of another role, or a reviewer the pause did not stop', async () => {
+    seed(WORK, {
+      role: 'work', paused: true, pausedBy: 'operator', pausedAt: '2026-09-24T10:00:00.000Z', pauseStoppedAgents: [PARENT],
+    });
+    seed(TEST_AGENT, { role: 'test', status: 'stopped' });
+    seed(LANE, { status: 'stopped' });
+
+    const toTest = await messageAgent(TEST_AGENT, 'TEST_FAILED rerun');
+    const toLane = await messageAgent(LANE, 'REVIEWER_FAILED security reviewer exited');
+
+    expect(toTest.reason ?? '').not.toContain('is paused');
+    expect(toLane.reason ?? '').not.toContain('is paused');
+    expect(mocks.resumeAgent).toHaveBeenCalledWith(TEST_AGENT, 'TEST_FAILED rerun');
+    expect(mocks.resumeAgent).toHaveBeenCalledWith(LANE, 'REVIEWER_FAILED security reviewer exited');
+  });
+
+  it('does not strand messages when the work agent state is unreadable', async () => {
+    mkdirSync(join(testHome, 'agents', WORK), { recursive: true });
+    writeFileSync(join(testHome, 'agents', WORK, 'state.json'), '');
+    seed(TEST_AGENT, { role: 'test', status: 'stopped' });
+    seed(PARENT, { status: 'stopped' });
+
+    const toTest = await messageAgent(TEST_AGENT, 'TEST_FAILED rerun');
+    const toParent = await messageAgent(PARENT, 'REVIEWER_FAILED security reviewer exited');
+
+    expect(toTest.reason ?? '').not.toContain('is paused');
+    expect(toParent.reason ?? '').not.toContain('is paused');
+    expect(mocks.resumeAgent).toHaveBeenCalledTimes(2);
   });
 });
