@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
-import { recoverAgent, stopAgentSync, getAgentStateSync, getAgentRuntimeStateSync } from './agents.js';
+import { recoverAgent, stopAgent, getAgentStateSync, getAgentRuntimeStateSync } from './agents.js';
 import { capturePane, listSessionNames, sessionExists } from './tmux.js';
 import { getAgentEffectiveLastActivityMs } from './agents/liveness.js';
 
@@ -254,7 +254,7 @@ async function handleStuckAgentPromise(
 
   // Force kill the agent
   try {
-    stopAgentSync(agentId);
+    await Effect.runPromise(stopAgent(agentId));
   } catch {}
 
   // Record the force kill

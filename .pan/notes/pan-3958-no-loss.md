@@ -1037,7 +1037,7 @@ PRD W8 and W11 part 3. Every Shape C pair outside Oh My Pi was re-decided with i
 `capturePaneSync`/`killSessionSync`, `sessionExistsSync` → `querySessionSync`).
 
 Ratchet: C 52 → 35 (34 pairs plus the Oh My Pi runtime row). A 1 and B 4 are Oh My Pi only (#4003). Effect diagnostics
-unchanged at 250. `src/lib/tmux.ts` (1322) and `src/lib/projects.ts` (1253) gain audited file-size exceptions (PAN-4012)
+unchanged at 250. `src/lib/tmux.ts` (1324) and `src/lib/projects.ts` (1253) gain audited file-size exceptions (PAN-4012)
 for their sync-twin headers.
 
 `agents/agent-state.ts` `clearAgentPausedSync` stays (C6 with a stated reason) after the merge of #4045: its
@@ -1148,3 +1148,20 @@ None are deleted, and the diff adds and removes no `it()`/`test()` calls. Tests 
 `getLatestSessionIdSync`). Mocks follow the new shapes: sync-to-Effect mocks return `Effect.succeed`, sync-to-Promise
 mocks resolve, and factories that mocked both a deleted twin and its survivor keep only the survivor. Where a module
 still calls both twins (`concurrency.ts`), tests mock both.
+
+### #4048 review follow-ups
+
+- `tmux.ts` `sessionQueryFailure` (now exported for its test) reads the exit code from `status` (execFileSync) or a
+  numeric `code` (promisified `execFile`). The async `querySession` used to see `code: 1` with `status` unset and
+  classified every missing session as a tmux error, so `queryConfirmedSession` reported "skipped — tmux query failed".
+  `src/lib/__tests__/tmux-session-query-failure.test.ts` builds the errors from real child processes.
+- `stopAgentSync`'s async callers now await `stopAgent`, which closes a Herdr pane as well as a tmux session:
+  `cli/commands/start-fresh-session.ts` (`pan start --fresh`), `cli/commands/workspace-migrate.ts` (migrate to
+  remote) and `health.ts` `handleStuckAgentPromise`. The first two were gated on the tmux-only `sessionExistsSync`,
+  so on Herdr they skipped the stop and left the local pane and harness running (the #3966 symptom); they now gate on
+  `terminal-backends/launch.ts` `agentPaneExists` plus a legacy tmux session. `pan start --fresh`'s "still alive"
+  error no longer names tmux. `termination.ts`'s header now lists only `stopAgentSync`'s real sync callers
+  (`cli/commands/swarm.ts` dependency slots and `concurrency.ts` `emergencyBrake`).
+- `runtime.json`: `stopAgentSync`'s `saveAgentRuntimeState(id, { state: 'stopped' })` writes no file any more; it only
+  emits the `activity: stopped` heartbeat, which `stopAgent` already emits (detached). The two paths match; no change.
+

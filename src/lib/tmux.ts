@@ -10,8 +10,8 @@
  * - `listSessionNamesSync` (async: `listSessionNames`): 9 sites in cli/commands/doctor.ts, cli/commands/pause.ts,
  *   cli/commands/swarm-status.ts, cli/commands/swarm.ts.
  * - `listSessionsSync` (async: `listSessions`): src/cli/commands/resources.ts:153, src/lib/agents/queries.ts:36,
- *   src/lib/hygiene.ts:51, src/lib/runtimes/ohmypi.ts:210, src/lib/tmux.ts:645,954.
- * - `querySessionSync` (async: `querySession`): src/lib/tmux.ts:713.
+ *   src/lib/hygiene.ts:51, src/lib/runtimes/ohmypi.ts:210, src/lib/tmux.ts:645,956.
+ * - `querySessionSync` (async: `querySession`): src/lib/tmux.ts:715.
  * - `sessionExistsSync` (async: `sessionExists`): 7 sites in cli/commands/answer.ts, lib/agents/liveness.ts,
  *   lib/agents/termination.ts, lib/runtimes/claude-code.ts.
  * Each of these blocks on a child process: never call one from src/dashboard/** or src/lib/cloister/** (FR-8).
@@ -685,16 +685,18 @@ export type SessionQueryResult =
   | { status: 'missing'; detail: string }
   | { status: 'error'; detail: string };
 
-function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { status: 'exists' }> {
-  const error = cause as NodeJS.ErrnoException & { stderr?: string | Buffer; status?: number };
+/** Classify a failed `has-session`; the exit code is `status` (execFileSync) or a numeric `code` (promisified execFile). */
+export function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { status: 'exists' }> {
+  const error = cause as Omit<NodeJS.ErrnoException, 'code'> & { code?: string | number; stderr?: string | Buffer; status?: number };
+  const exitCode = typeof error.status === 'number' ? error.status : typeof error.code === 'number' ? error.code : undefined;
   const stderr = String(error.stderr ?? '').trim();
   const detail = [
-    `exit=${error.status ?? 'unknown'}`,
-    error.code ? `code=${error.code}` : '',
+    `exit=${exitCode ?? 'unknown'}`,
+    typeof error.code === 'string' ? `code=${error.code}` : '',
     stderr ? `stderr=${stderr}` : '',
     error.message ? `message=${error.message}` : '',
   ].filter(Boolean).join(' ');
-  return error.status === 1 && /can't find session:/i.test(stderr)
+  return exitCode === 1 && /can't find session:/i.test(stderr)
     ? { status: 'missing', detail }
     : { status: 'error', detail };
 }
