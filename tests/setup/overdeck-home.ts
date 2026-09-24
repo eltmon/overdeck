@@ -26,3 +26,9 @@ process.env.PLAYWRIGHT_BROWSERS_PATH ??= join(
 const testHome = join(runRoot, `home-${workerId}`);
 process.env.HOME = testHome;
 mkdirSync(testHome, { recursive: true });
+// A test that unsets OVERDECK_HOME falls back to `<temp HOME>/.overdeck`, which
+// counts as the default home and would pick the operator's shared tmux socket
+// and pin the temp HOME in its global env (PAN-1798/PAN-3671). An explicit
+// per-worker socket keeps every test off it. Tests of the socket derivation
+// unset this themselves.
+process.env.OVERDECK_TMUX_SOCKET_NAME ??= `overdeck-test-${process.pid}-${workerId}`;
