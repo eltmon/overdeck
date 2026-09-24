@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T17:26:30.637Z · model: claude-opus-5 · open: 831_
+_Last sequenced: 2026-09-24T17:30:33.555Z · model: claude-opus-5 · open: 832_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
+| 2 | PAN-4096 | S | critical | ok |  |  | Herdr restore drops the issue token: workspaceFor forks a duplicate workspace per launch and closeIssuePanes closes nothing |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
 | 6 | PAN-3926 | S | high | ok |  |  | isAliveSync is tmux-only; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled — make backend-aware before swarm re-enable |
 | 7 | PAN-3925 | S | medium | ok |  |  | /api/parked and /api/merge-train/auto-merge take 10s+ deriving state per request; batch through the issue-data cache |
@@ -843,6 +844,10 @@ _Last sequenced: 2026-09-24T17:26:30.637Z · model: claude-opus-5 · open: 831_
 
 In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.
 
+### PAN-4096 (rank 2)
+
+New this run, filed from read-only evidence on the live Herdr session while landing #4076. A restore wipes the `issue` token from 16 of 17 workspaces and from every pane but the one created after it, while the durable `label` and pane `cwd` survive. Both lookups that matter key on `tokens.issue` alone: `workspaceFor` in src/lib/terminal-backends/herdr.ts therefore misses the issue's own workspace and forks a duplicate on every launch (two live `sequencer-runner` workspaces already), and `closeIssuePanes` in src/lib/terminal-backends/launch.ts sees no pane to close, so close-out teardown and reap-issue-residue leave the root shell, the pane set and the workspace behind — four residue workspaces with deleted cwds belong to already-closed issues. Herdr is the default backend, so this corrupts workspace identity and leaks residue on every host after every restart, and it is the same pane-lookup seam PAN-3966 (merged as #4076) just hardened. Ranked immediately behind PAN-3921 with the rest of the Herdr substrate cluster: the fix is small and bounded (token-else-label fallback, re-stamp the token on re-adoption, never close a pane that names another owner).
+
 ### PAN-3923 (rank 3)
 
 In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.
@@ -1162,10 +1167,10 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T17:26:30.637Z",
+  "generatedAt": "2026-09-24T17:30:33.555Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 831,
+  "openCount": 832,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1177,6 +1182,19 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "dependsOn": [],
       "why": "Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane",
       "rationale": "In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4096",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Herdr restore drops the issue token: workspaceFor forks a duplicate workspace per launch and closeIssuePanes closes nothing",
+      "rationale": "New this run, filed from read-only evidence on the live Herdr session while landing #4076. A restore wipes the `issue` token from 16 of 17 workspaces and from every pane but the one created after it, while the durable `label` and pane `cwd` survive. Both lookups that matter key on `tokens.issue` alone: `workspaceFor` in src/lib/terminal-backends/herdr.ts therefore misses the issue's own workspace and forks a duplicate on every launch (two live `sequencer-runner` workspaces already), and `closeIssuePanes` in src/lib/terminal-backends/launch.ts sees no pane to close, so close-out teardown and reap-issue-residue leave the root shell, the pane set and the workspace behind — four residue workspaces with deleted cwds belong to already-closed issues. Herdr is the default backend, so this corrupts workspace identity and leaks residue on every host after every restart, and it is the same pane-lookup seam PAN-3966 (merged as #4076) just hardened. Ranked immediately behind PAN-3921 with the rest of the Herdr substrate cluster: the fix is small and bounded (token-else-label fallback, re-stamp the token on re-adoption, never close a pane that names another owner).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12646,6 +12664,20 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-4096",
+      "to": "PAN-3981",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4096",
+      "to": "PAN-3923",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
