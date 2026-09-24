@@ -6,7 +6,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './useNeedsTerminalAutoSwitch';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConversationTerminalView } from './ConversationTerminalView';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -30,6 +30,8 @@ import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
+import { ConversationBranchMeta } from './ConversationBranchMeta';
+import { PullRequestMenuItems } from '../CommandDeck/PullRequestMenuItems';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
@@ -858,6 +860,7 @@ export function ConversationPanel({
                           : <Sparkles size={14} />}
                         Regenerate title
                       </MenuItemButton>
+                      <PullRequestMenuItems conversation={conversation} mutations={convMutations} onClose={() => setMenuOpen(false)} />
 
                       {conversation.harness === 'claude-code' && (
                         <div className={styles.headerMenuDeliveryRow}>
@@ -966,21 +969,7 @@ export function ConversationPanel({
               <Circle size={7} style={{ fill: statusColor, color: statusColor }} />
               {statusLabel}
             </span>
-            {conversation.branch && (
-              <>
-                <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span
-                  className={styles.terminalBranchBar}
-                  title={`${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`}
-                >
-                  {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
-                  <span className={styles.terminalBranchBarMode}>
-                    {conversation.isWorktree ? 'Worktree' : 'Local'}
-                  </span>
-                  <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
-                </span>
-              </>
-            )}
+            <ConversationBranchMeta conversation={conversation} />
             <span className={styles.conversationMetaSep} aria-hidden>·</span>
             <PanOpenInPicker openInCwd={conversation.cwd} />
             {conversation.totalCost !== undefined && conversation.totalCost > 0 && (

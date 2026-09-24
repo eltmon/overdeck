@@ -228,6 +228,28 @@ describe('ConversationPanel rename flow', () => {
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
   });
 
+  it('shows the effective pull request badge beside the branch in the header (PAN-3822)', () => {
+    renderPanel({
+      ...mockConversation,
+      branch: 'feature/pan-3822',
+      pullRequestCount: 1,
+      pullRequest: {
+        host: 'github.com', repository: 'eltmon/overdeck', number: 4067,
+        url: 'https://github.com/eltmon/overdeck/pull/4067', source: 'manual',
+        linkedAt: '2026-09-24T00:00:00.000Z', dismissedAt: null, snapshot: null,
+      },
+    });
+    expect(screen.getByText('feature/pan-3822')).toBeInTheDocument();
+    const badge = screen.getByRole('link', { name: /eltmon\/overdeck #4067/ });
+    expect(badge).toHaveTextContent('#4067');
+    expect(badge).not.toHaveTextContent('+');
+  });
+
+  it('renders no pull request badge without a linked PR', () => {
+    renderPanel();
+    expect(screen.queryByRole('link', { name: /#\d+/ })).not.toBeInTheDocument();
+  });
+
   it('shows About as a visible pressed-state toggle', async () => {
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/conversations/test-conv/about') {

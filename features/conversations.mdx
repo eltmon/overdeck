@@ -340,7 +340,8 @@ and the original's context is never lost.
 ## Pull requests on conversations
 
 A conversation shows the pull request its work lives on. A badge next to the
-branch chip on the conversation row shows the PR number, colored by state: blue
+branch chip, on the conversation row and in the open conversation's header,
+shows the PR number, colored by state: blue
 for open, amber when a review needs a human, green for merged, red for closed
 without merging, and muted for drafts. A `×` marks failing checks. Hover it for
 the repository, number, state, and title; click it to open the PR. `+N` means the
@@ -357,8 +358,9 @@ are final and are not re-read.
 
 ### Linking a pull request by hand
 
-Open a conversation's actions (the row's `⋮`, a right-click on the row, or a
-right-click on its tab) and choose **Link pull request…**. Type a PR URL, a
+Open a conversation's actions (the row's `⋮`, the open conversation's header
+`⋮`, or a right-click on the row, the header, or its tab) and choose **Link pull
+request…**. Type a PR URL, a
 GitLab merge request URL, `#42`, or `owner/repo#42`, then press Enter. `#42`
 means PR 42 of the conversation's project repository. When the conversation
 shows a PR, the same menu offers **Unlink #42**.
