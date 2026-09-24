@@ -10,7 +10,6 @@ import { exec, execFile, execFileSync, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
-import { isSessionResetMarker } from '../../lib/session-history.js';
 import { attachHintLines, resolveAttach } from '../../lib/terminal-backends/attach-hint.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
@@ -695,7 +694,7 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
   }
 }
 
-import { resolveStartSpawnModel } from './start-spawn-model.js';
+import { resolvePanStartSpawnModel } from './start-spawn-model.js';
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
@@ -716,13 +715,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentState(agentId);
-  // PAN-3855: a pending `pan reset-session` discards resume continuity, so the
-  // recorded model is not reused and current tier/role routing applies.
-  const sessionReset = isSessionResetMarker(agentId);
-  const spawnModel = resolveStartSpawnModel(options.model, options.fresh, existingAgentState?.model, sessionReset);
-  if (sessionReset && !options.model && !options.fresh && existingAgentState?.model) {
-    console.log(chalk.dim(`Session was reset: not reusing recorded model ${existingAgentState.model}; tier/role routing applies (pass --model to pin).`));
-  }
+  const spawnModel = resolvePanStartSpawnModel(agentId, options.model, options.fresh, existingAgentState?.model);
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.

@@ -11,6 +11,8 @@
  * skipped tier resolution and re-stamped the record on every start
  * (PAN-3857).
  */
+import chalk from 'chalk';
+import { isSessionResetMarker } from '../../lib/session-history.js';
 
 /** PAN-2410: --fresh means fresh STAFFING, not just a fresh session. Never
  * inherit the dead agent's recorded model — with no explicit --model the
@@ -34,4 +36,21 @@ export function resolveStartSpawnModel(
   sessionReset = false,
 ): string | undefined {
   return explicitModel ?? resolveSpawnModel(undefined, fresh || sessionReset, priorAgentModel);
+}
+
+/** `pan start`'s spawn model for `agentId`. A pending `pan reset-session`
+ * (the session-reset marker, cleared when the next launch marks the agent
+ * running) drops the recorded model so current tier/role routing applies, and
+ * says so instead of silently changing staffing (PAN-3855). */
+export function resolvePanStartSpawnModel(
+  agentId: string,
+  explicitModel: string | undefined,
+  fresh: boolean | undefined,
+  priorAgentModel: string | undefined,
+): string | undefined {
+  const sessionReset = isSessionResetMarker(agentId);
+  if (sessionReset && !explicitModel && !fresh && priorAgentModel) {
+    console.log(chalk.dim(`Session was reset: not reusing recorded model ${priorAgentModel}; tier/role routing applies (pass --model to pin).`));
+  }
+  return resolveStartSpawnModel(explicitModel, fresh, priorAgentModel, sessionReset);
 }
