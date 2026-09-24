@@ -81,9 +81,7 @@ vi.mock('../../../../lib/harness-resolve.js', () => ({
   resolveHarness: vi.fn(async () => resolvedConversationHarness),
 }));
 
-vi.mock('../../../../lib/workspace-manager.js', () => ({
-  preTrustDirectorySync: vi.fn(),
-}));
+vi.mock('../../../../lib/workspace-manager.js', () => ({}));
 
 vi.mock('../../event-store.js', () => ({
   getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })),

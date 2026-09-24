@@ -800,10 +800,6 @@ export async function spawnConversationSession(
     await Effect.runPromise(killSession(tmuxSession)).catch(() => undefined);
     console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
     try {
-      const { preTrustDirectorySync } = await import('../workspace-manager.js');
-      preTrustDirectorySync(cwd);
-    } catch { /* non-fatal */ }
-    try {
       await Effect.runPromise(createSession(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
         env: {
           ...BLANKED_PROVIDER_ENV,

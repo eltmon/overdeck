@@ -930,7 +930,7 @@ the context route's own `syncContextLayers`, `overdeck/health-events.ts`, `xbrie
 and so on). `tsc` on the root and dashboard projects after deleting all 34 reported only the sites below.
 
 Ratchet: B 38 → 4 (the four left are Oh My Pi: `cost-parsers/ohmypi-parser.ts` 2, `runtimes/ohmypi-fifo.ts` 2). A and C are
-unchanged (1 and 52); C is CH-6b's. Effect diagnostics: 254 → 252.
+unchanged (1 and 52); C is CH-6b's. Effect diagnostics: 254 → 250.
 
 ### Shape B wrappers (34) → the `Sync` function
 
@@ -967,7 +967,7 @@ unchanged (1 and 52); C is CH-6b's. Effect diagnostics: 254 → 252.
 | `tracker-utils.ts` | `resolveGitHubIssue` | `resolveGitHubIssueSync` | no production caller |
 | `tts-speak.ts` | `buildTtsSpeakPayload` | `buildTtsSpeakPayloadSync` | no production caller |
 | `work-agent-lifecycle.ts` | `assertCanStartFresh` | `assertCanStartFreshSync` | no production caller |
-| `workspace-manager.ts` | `preTrustDirectory` | `preTrustDirectorySync` | three dynamic-import sites cast it to `(dir) => void` and called it, which built an Effect and never ran it; they now call `preTrustDirectorySync` (behaviour change, see below) |
+| `workspace-manager.ts` | `preTrustDirectory` | `preTrustDirectorySync` | dead call removed, behaviour unchanged: three dynamic-import sites (`agents/spawn.ts` `spawnRun` and `spawnAgent`, `overdeck/conversation-runtime.ts` conversation spawn) cast it to `(dir) => void` and called it, which built an Effect and never ran it (dead since PAN-1379, 2026-05-22). The calls are deleted; workspace creation and project registration still pre-trust through `preTrustDirectorySync` |
 | `workspace/ensure-devcontainer.ts` | `ensureDevcontainer` | `ensureDevcontainerSync` | no production caller |
 | `xbrief/lifecycle-io.ts` | `findXBriefByIssue` | `findXBriefByIssueSync` | no production caller |
 
@@ -1009,11 +1009,10 @@ doc said more than the survivor's, the detail moved to the `Sync` function (`cre
 
 ### Behaviour notes for reviewers
 
-- `preTrustDirectory`: `agents/spawn.ts` (`spawnRun`, `spawnAgent`) and `overdeck/conversation-runtime.ts`
-  (conversation spawn) have not pre-trusted their directory since PAN-1379 (2026-05-22) made the name an Effect;
-  the cast hid it. They now call `preTrustDirectorySync`, which writes `~/.claude.json` only when the directory is
-  not yet trusted or the bypass acknowledgement is missing. Workspace creation and project registration already
-  pre-trusted, so a spawn in a workspace is normally a read; a conversation in a new directory writes once.
+- `preTrustDirectory`: the three dead calls are deleted rather than revived (operator decision on #4044).
+  `preTrustDirectorySync` writes `~/.claude.json`, which every Claude Code session on the machine shares, without an
+  atomic rename, so concurrent spawns could race on it. The calls have done nothing since PAN-1379, and workspace
+  creation and project registration already pre-trust. Behaviour is unchanged.
 - `getAgentState`: a route handler whose agent-state read throws (an existing `state.json` that cannot be read) now
   answers 500 with the underlying error message instead of "read failed for agents-db:<id>: <cause>". Parse
   errors and missing files never threw (they return null), so this is only an unreadable file.
@@ -1023,6 +1022,8 @@ doc said more than the survivor's, the detail moved to the `Sync` function (`cre
 None are deleted, and the diff adds and removes no `it()`/`test()` calls. Mocks of `getAgentState` (Effect) became
 mocks of `getAgentStateSync` returning plain values (`Effect.succeed(v)` → `v`, `Effect.fail(e)` → a throwing
 implementation); where a factory mocked both names, the stale `getAgentState` entry is removed and the test's inputs
-moved to the `Sync` entry (`postmerge-cleanup-async`, `cloister/__tests__/review-agent`). `preTrustDirectory` mocks
-became `preTrustDirectorySync`. Factory entries for the 31 wrappers that had no production caller are removed as
+moved to the `Sync` entry (`postmerge-cleanup-async`, `cloister/__tests__/review-agent`). Where a `workspace-manager.js`
+mock provided only `preTrustDirectory` for a deleted call (`agent-state-role`, `conversations-switch-model`,
+`conversations-supervisor`), the factory is now empty so the module stays mocked out; where it also provided
+`preTrustDirectorySync` (registration and creation tests), the stale key is dropped. Factory entries for the 31 wrappers that had no production caller are removed as
 stale (26 files). `agents-barrel-exports.test.ts` drops `getAgentState` from the frozen list.

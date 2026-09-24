@@ -560,9 +560,7 @@ describe('AgentState role persistence', () => {
       ...((await importOriginal()) as typeof import('../harness-resolve.js')),
       resolveHarness: vi.fn(async () => 'ohmypi'),
     }));
-    vi.doMock('../workspace-manager.js', () => ({
-      preTrustDirectorySync: vi.fn(),
-    }));
+    vi.doMock('../workspace-manager.js', () => ({}));
     vi.doMock('../github-app.js', () => ({
       isGitHubAppConfigured: vi.fn(() => false),
     }));
