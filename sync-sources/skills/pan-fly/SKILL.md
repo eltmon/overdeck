@@ -7,7 +7,7 @@ triggers:
   - fly machine
   - fly deploy
   - fly ssh
-  - pan remote
+  - pan admin remote
   - pan fly
 allowed-tools:
   - Bash
@@ -20,7 +20,7 @@ Use this skill when the task involves Fly.io-backed Overdeck remote workspaces o
 
 ## What This Covers
 
-- `pan remote setup` / `pan remote status`
+- `pan admin remote setup` / `pan admin remote status`
 - Fly-backed remote workspaces created by Overdeck
 - Fly Machines lifecycle: create, inspect, start, stop, destroy
 - SSH/exec into Fly machines
@@ -43,8 +43,8 @@ Use this skill when the task involves Fly.io-backed Overdeck remote workspaces o
 ### Initial setup
 
 ```bash
-pan remote setup
-pan remote status
+pan admin remote setup
+pan admin remote status
 ```
 
 Key config lives in `~/.overdeck/config.toml` under `[remote]` and `[remote.fly]`.
@@ -65,7 +65,7 @@ Reference: `docs/fly-provider.md`
 
 ```bash
 pan workspace create --remote PAN-42
-pan remote status
+pan admin remote status
 pan workspace list
 ```
 
@@ -74,7 +74,7 @@ pan workspace list
 ```bash
 pan workspace start PAN-42
 pan workspace stop PAN-42
-pan workspace delete PAN-42
+pan workspace destroy PAN-42
 ```
 
 ## Fly CLI Patterns
@@ -162,7 +162,7 @@ If needed:
 Run:
 
 ```bash
-pan remote status
+pan admin remote status
 ```
 
 Then inspect:
