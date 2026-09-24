@@ -55,7 +55,13 @@ The frontend keeps parent and subagent transcripts in separate React Query cache
 
 ## Status derivation
 
-Metadata files do not contain runtime status. While the parent stream is live, Overdeck marks a subagent `running` when its `toolUseId` remains in the parser's `pendingToolUse` map. It marks all other entries `done`.
+Metadata files do not contain runtime status. While the parent stream is live, Overdeck derives it from the launch shape in the metadata (`requestShape`):
+
+- A foreground subagent is `running` while its `toolUseId` remains in the parser's `pendingToolUse` map, and `done` otherwise.
+- A background subagent (`requestShape: "background"`) gets its `Agent` tool result as soon as it launches, so that map cannot track it. It is `running` until the parent transcript has a `<task-notification>` whose `<tool-use-id>` equals its `toolUseId` exactly. Claude Code writes that notification as a `queue-operation` `enqueue` record when the subagent stops, and again as a `user` record when the parent takes it. Text that only quotes a notification, such as assistant text or a tool result, does not count.
+- A background subagent whose notification never arrives, for example because the parent crashed, becomes `done` once its transcript and metadata files have not changed for `BACKGROUND_SUBAGENT_IDLE_MS` (30 minutes).
+
+The notification scan reads only the parent transcript bytes appended since the previous poll. It rescans from the start when the transcript gets shorter. A subagent resumed with `SendMessage` after its notification still reads as `done`.
 
 A watcher delta triggers an immediate status refresh. The two-second metadata poll catches new subagent files. REST responses for ended conversations mark every discovered subagent `done`.
 
