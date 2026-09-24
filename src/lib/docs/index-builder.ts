@@ -9,7 +9,7 @@ import { discoverDocsCorpusSources, chunkMarkdown, type DocsChunk } from './corp
 
 export const DEFAULT_DOCS_INDEX_PATH = join(packageRoot, 'dist', 'docs-index.sqlite');
 export const DEFAULT_DOCS_INDEX_MAX_BYTES = 50 * 1024 * 1024;
-export const DOCS_INDEX_SCHEMA_VERSION = 1;
+const DOCS_INDEX_SCHEMA_VERSION = 1;
 
 export interface DocsEmbeddingInput {
   chunk: DocsChunk;
@@ -229,7 +229,7 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
   }
 }
 
-export function createDocsIndexSchema(db: SqliteDatabase): void {
+function createDocsIndexSchema(db: SqliteDatabase): void {
   db.exec(`
     CREATE TABLE docs_chunks (
       chunk_id INTEGER PRIMARY KEY,
@@ -266,7 +266,7 @@ export function createDocsIndexSchema(db: SqliteDatabase): void {
   `);
 }
 
-export function readDocsIndexMetadata(db: SqliteDatabase): DocsIndexMetadata {
+function readDocsIndexMetadata(db: SqliteDatabase): DocsIndexMetadata {
   const rows = db.prepare('SELECT key, value FROM docs_index_metadata').all() as Array<{ key: string; value: string }>;
   const metadata = Object.fromEntries(rows.map((row) => [row.key, row.value]));
   return {
@@ -304,14 +304,14 @@ export function validateDocsIndex(db: SqliteDatabase): DocsIndexMetadata {
   return metadata;
 }
 
-export function createDocsEmbeddingFunction(config: NormalizedDocsConfig['embedding']): DocsEmbeddingFunction {
+function createDocsEmbeddingFunction(config: NormalizedDocsConfig['embedding']): DocsEmbeddingFunction {
   switch (config.provider) {
     case 'local': return embedDocsWithLocalModel;
     case 'openai': return embedDocsWithOpenAI;
   }
 }
 
-export async function embedDocsWithLocalModel(input: DocsEmbeddingInput): Promise<DocsEmbeddingOutput> {
+async function embedDocsWithLocalModel(input: DocsEmbeddingInput): Promise<DocsEmbeddingOutput> {
   const modelId = input.model === 'gte-small' ? LOCAL_GTE_SMALL_MODEL_ID : input.model;
   const extractor = await getLocalEmbeddingPipeline(modelId);
   const output = await extractor(input.chunk.content, { pooling: 'mean', normalize: true });
@@ -322,7 +322,7 @@ export async function embedDocsWithLocalModel(input: DocsEmbeddingInput): Promis
   };
 }
 
-export async function embedDocsWithOpenAI(input: DocsEmbeddingInput): Promise<DocsEmbeddingOutput> {
+async function embedDocsWithOpenAI(input: DocsEmbeddingInput): Promise<DocsEmbeddingOutput> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY is required to build docs embeddings with provider openai');

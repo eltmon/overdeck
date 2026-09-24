@@ -596,7 +596,7 @@ export function recordSwarmAdvanceFailure(issueId: string, now = Date.now()): vo
   });
 }
 
-export function recordSwarmAdvanceSuccess(issueId: string): void {
+function recordSwarmAdvanceSuccess(issueId: string): void {
   issueAdvanceFailures.delete(issueId.toUpperCase());
 }
 

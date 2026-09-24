@@ -6,7 +6,7 @@ import { buildProcessTreeIndex, collectDescendantPids, type ProcessTreeIndex } f
 import type { TmuxPaneRecord } from './tmux.js';
 
 const execFileAsync = promisify(execFile);
-export const RUNTIME_CENSUS_TTL_MS = 3_000;
+const RUNTIME_CENSUS_TTL_MS = 3_000;
 
 const KEEPALIVE_FOREGROUND_COMMANDS = new Set(['sleep', 'bash', 'sh', 'dash', 'zsh', 'ash']);
 

@@ -559,7 +559,7 @@ async function runHttpHealthGate(
   }
 }
 
-// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
+// ─── Effect API ──────────────────────────────────────────────────────────────
 
 /**
  * Effect variant of {@link autoRevertMerge}. Surfaces git failure through a

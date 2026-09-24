@@ -122,7 +122,7 @@ export type Rollup = typeof Rollup.Type;
 export const Window = Schema.Literals(['day', 'week', 'month']);
 export type Window = typeof Window.Type;
 
-export const WindowSummary = Schema.Struct({
+const WindowSummary = Schema.Struct({
   project:     Schema.NullOr(Schema.String),
   window:      Window,
   totalCost:   Schema.Number,
@@ -141,7 +141,7 @@ export const IssueCost = Schema.Struct({
 });
 export type IssueCost = typeof IssueCost.Type;
 
-export const BudgetSpec = Schema.Struct({
+const BudgetSpec = Schema.Struct({
   name:           Schema.String,
   type:           Schema.Literals(['daily', 'monthly', 'project', 'issue', 'feature']),
   limit:          Schema.Number,
@@ -158,7 +158,7 @@ export const Budget = Schema.Struct({
 });
 export type Budget = typeof Budget.Type;
 
-export const BudgetStatus = Schema.Struct({
+const BudgetStatus = Schema.Struct({
   budget:      Budget,
   percentUsed: Schema.Number,
   remaining:   Schema.Number,
@@ -187,12 +187,12 @@ export type CostReconcileExtraRoot =
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 
-export class CostIngestError extends Schema.TaggedErrorClass<CostIngestError>()(
+class CostIngestError extends Schema.TaggedErrorClass<CostIngestError>()(
   'CostIngestError',
   { reason: Schema.String },
 ) {}
 
-export class BudgetNotFound extends Schema.TaggedErrorClass<BudgetNotFound>()(
+class BudgetNotFound extends Schema.TaggedErrorClass<BudgetNotFound>()(
   'BudgetNotFound',
   { id: Schema.String },
 ) {}

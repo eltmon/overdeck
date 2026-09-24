@@ -81,7 +81,7 @@ export class KimiCodeSpawnTimeout extends Error {
  * the session id the same way — mirroring codex's standalone
  * waitForCodexRollout/extractThreadIdFromRollout pair.
  */
-export async function waitForNewKimiSession(
+async function waitForNewKimiSession(
   kimiHome: string,
   workspace: string,
   existingBefore: Set<string>,
@@ -222,7 +222,7 @@ interface KimiCaptureLockOwner {
   acquiredAt: string;
 }
 
-export class KimiCaptureLockTimeoutError extends Error {
+class KimiCaptureLockTimeoutError extends Error {
   constructor(lockPath: string, waitedMs: number) {
     super(`Timed out after ${waitedMs}ms waiting for the Kimi session-capture lock at ${lockPath} — another process is still holding it.`);
     this.name = 'KimiCaptureLockTimeoutError';

@@ -2,7 +2,7 @@
  * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
  * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
  * as sync) and cannot await:
- * - `listRunningAgentsSync` (async: `listRunningAgents`): 9 sites in lib/agents/recovery.ts,
+ * - `listRunningAgentsSync` (async: `listRunningAgents`): 8 sites in lib/agents/recovery.ts,
  *   lib/cloister/concurrency.ts, lib/cloister/service.ts, lib/work-agent-conflicts.ts.
  * It blocks on a child process: never call it from src/dashboard/** or src/lib/cloister/** (FR-8).
  * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.

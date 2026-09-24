@@ -138,29 +138,3 @@ export function formatAcceptanceCriteria(criteria: AcceptanceCriterion[]): strin
 
   return lines.join('\n').trimEnd();
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Compose with `readWorkspacePlanProgram` from io.ts so AC extraction and AC
-// completion checks can participate in Effect-native pipelines without
-// blocking the event loop. extractACFromDocument and the AC-completion logic
-// itself are pure-sync — only the plan read is wrapped.
-
-/**
- * Extract all acceptance criteria from an xBRIEF plan.
- *
- * Reads the merged xBRIEF plan and returns all child items
- * where metadata.kind === 'acceptance_criterion', enriched with parent
- * task context.
- *
- * @returns Array of acceptance criteria, or empty array if no plan exists
- *          or no AC are found (legacy workspace compatibility).
- */
-export const extractAcceptanceCriteria = (
-  workspacePath: string,
-): Effect.Effect<AcceptanceCriterion[], XBriefReadError> =>
-  Effect.gen(function* () {
-    const doc = yield* readWorkspacePlan(workspacePath);
-    if (!doc) return [];
-    return extractACFromDocument(doc);
-  });

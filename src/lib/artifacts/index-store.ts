@@ -60,7 +60,7 @@ interface ArtifactRow {
 
 const SLUG_PATTERN = /^[A-Za-z0-9_-]{8}$/;
 
-export function getArtifactsDir(): string {
+function getArtifactsDir(): string {
   return join(getOverdeckHome(), 'artifacts');
 }
 
@@ -68,7 +68,7 @@ export function getArtifactIndexPath(): string {
   return join(getArtifactsDir(), 'index.sqlite');
 }
 
-export function getArtifactSnapshotDir(slug: string): string {
+function getArtifactSnapshotDir(slug: string): string {
   return join(getArtifactsDir(), 'snapshots', slug);
 }
 
@@ -86,7 +86,7 @@ export function computeArtifactPendingChanges(artifact: ArtifactMetadata, curren
     : true;
 }
 
-export function getArtifactLifecycleState(
+function getArtifactLifecycleState(
   artifact: ArtifactMetadata,
   currentHash = artifact.currentHash,
 ): ArtifactLifecycleState {

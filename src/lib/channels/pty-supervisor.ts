@@ -82,7 +82,7 @@ export function getPtySupervisorSocketPath(agentId: string): string {
   return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
 }
 
-export function getPtySupervisorLogPath(agentId: string): string {
+function getPtySupervisorLogPath(agentId: string): string {
   return join(getOverdeckHome(), 'logs', `pty-supervisor-${agentId}.log`);
 }
 

@@ -65,7 +65,7 @@ function getIssueDataService() {
   return getSharedIssueService();
 }
 
-export async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Overdeck'): Promise<string[]> {
+async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Overdeck'): Promise<string[]> {
   const githubCheck = isGitHubIssue(issueId);
   if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
     return ['No GitHub PR to close'];
@@ -105,7 +105,7 @@ export async function closeIssuePullRequest(issueId: string, reason = 'Canceled 
   }
 }
 
-export function buildLifecycleContext(id: string, issueSource: string | undefined) {
+function buildLifecycleContext(id: string, issueSource: string | undefined) {
   const issuePrefix = extractTeamPrefix(id);
   const projectPath = getProjectPath(undefined, issuePrefix ?? undefined);
   const projectConfig = issuePrefix ? findProjectByTeamSync(issuePrefix) : null;

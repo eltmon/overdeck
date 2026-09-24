@@ -18,8 +18,8 @@ import { resolveHarnessBinary } from '../../harness-binary.js';
 import { getOverdeckHome } from '../../paths.js';
 import type { CompanionOwner, CompanionTargetResolution, CompanionTerminalAdapter } from './lifecycle.js';
 
-export const OPENCODE_SESSION_ID_PATTERN = /^ses_[A-Za-z0-9]{1,120}$/;
-export const OPENCODE_SESSION_PROBE_TIMEOUT_MS = 2_000;
+const OPENCODE_SESSION_ID_PATTERN = /^ses_[A-Za-z0-9]{1,120}$/;
+const OPENCODE_SESSION_PROBE_TIMEOUT_MS = 2_000;
 
 export const OPENCODE_RESTART_REQUIRED_MESSAGE =
   'This OpenCode conversation started before Overdeck recorded its server port, so the native CLI cannot attach to it. ' +

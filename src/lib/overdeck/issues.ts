@@ -36,7 +36,7 @@ export const overdeckIssues = sqliteTable('issues', {
 export const IssueId = Schema.String.pipe(Schema.brand('IssueId'));
 export type IssueId = typeof IssueId.Type;
 
-export const Sha = Schema.String.pipe(Schema.brand('Sha'));
+const Sha = Schema.String.pipe(Schema.brand('Sha'));
 export type Sha = typeof Sha.Type;
 
 export const Stage = Schema.Literals([
@@ -54,10 +54,10 @@ export const Stage = Schema.Literals([
 ]);
 export type Stage = typeof Stage.Type;
 
-export const Outcome = Schema.Literals(['pending', 'passed', 'failed']);
+const Outcome = Schema.Literals(['pending', 'passed', 'failed']);
 export type Outcome = typeof Outcome.Type;
 
-export const TestOutcome = Schema.Literals(['pending', 'passed', 'failed', 'skipped']);
+const TestOutcome = Schema.Literals(['pending', 'passed', 'failed', 'skipped']);
 export type TestOutcome = typeof TestOutcome.Type;
 
 export const Blocker = Schema.Struct({
@@ -95,7 +95,7 @@ export class IssueNotFound extends Schema.TaggedErrorClass<IssueNotFound>()(
   { id: IssueId },
 ) {}
 
-export class IllegalTransition extends Schema.TaggedErrorClass<IllegalTransition>()(
+class IllegalTransition extends Schema.TaggedErrorClass<IllegalTransition>()(
   'IllegalTransition',
   { from: Stage, to: Stage },
 ) {}

@@ -10,16 +10,16 @@ import { Data, Effect } from 'effect';
 
 // ─── Error types ──────────────────────────────────────────────────────────────
 
-export class SpecialistCompletionTimeoutError extends Data.TaggedError('SpecialistCompletionTimeoutError')<{
+class SpecialistCompletionTimeoutError extends Data.TaggedError('SpecialistCompletionTimeoutError')<{
   readonly issueId: string;
   readonly timeoutMs: number;
 }> {}
 
-export class SpecialistSupersededError extends Data.TaggedError('SpecialistSupersededError')<{
+class SpecialistSupersededError extends Data.TaggedError('SpecialistSupersededError')<{
   readonly issueId: string;
 }> {}
 
-export class SpecialistCancelledError extends Data.TaggedError('SpecialistCancelledError')<{
+class SpecialistCancelledError extends Data.TaggedError('SpecialistCancelledError')<{
   readonly issueId: string;
   readonly reason: string;
 }> {}

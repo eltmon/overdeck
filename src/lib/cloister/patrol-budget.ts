@@ -1,8 +1,7 @@
 /**
  * PAN-3850 (W39, FR-26): per-patrol firing budgets.
  *
- * Patrols are alarms with budgets. Each patrol registered through
- * `runBudgetedPatrol` keeps a per-UTC-day tally of the actions it took,
+ * Patrols are alarms with budgets. Each budgeted patrol keeps a per-UTC-day tally of the actions it took,
  * persisted at `~/.overdeck/deacon/patrol-budget.json`. When a patrol's tally
  * exceeds its budget (default 50 actions/day, `patrolBudgets` in
  * cloister.toml), it is suspended for the rest of the UTC day and a
@@ -12,6 +11,10 @@
  * A runaway patrol used to fire unbounded recovery actions every 60s tick;
  * the budget converts "thousands of duplicate repairs" into one operator
  * signal and a silent remainder of the day.
+ *
+ * Since the PAN-3917 cut no patrol runs through a budget (`runBudgetedPatrol`
+ * was deleted in PAN-3958 CH-8 with no caller left); `pan doctor` still reads
+ * the tally file through `listPatrolBudgetRows`.
  *
  * Deviation from the PRD text: the PRD routes the needs-you through
  * `recordDeadEndNeedsYou('deacon', …)`, but that door is issue-scoped —
@@ -43,7 +46,7 @@ export interface PatrolBudgetState {
   days: Record<string, Record<string, PatrolBudgetDayEntry>>;
 }
 
-export const DEFAULT_PATROL_ACTIONS_PER_DAY = 50;
+const DEFAULT_PATROL_ACTIONS_PER_DAY = 50;
 
 /** Keep one week of history plus today so `pan doctor` can show recent days. */
 const RETAINED_DAYS = 8;
@@ -105,6 +108,8 @@ function resolveBudgets(config?: PatrolBudgetsConfig): PatrolBudgetsConfig {
 /**
  * Record `count` actions for a patrol on the given day. Returns the new tally.
  * Zero-action passes are free: they leave the tally untouched.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function recordPatrolActions(name: string, count: number, now: Date = new Date()): number {
   if (count <= 0) {
@@ -123,6 +128,8 @@ export function recordPatrolActions(name: string, count: number, now: Date = new
  * Suspend a patrol for the rest of the UTC day and emit the needs-you once
  * per day. The idempotency key makes a second suspension attempt in the same
  * day a no-op at the event store, so the operator sees exactly one alert.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export async function suspendPatrol(name: string, reason: string, now: Date = new Date()): Promise<void> {
   const state = readPatrolBudgetState();

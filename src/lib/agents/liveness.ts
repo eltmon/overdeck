@@ -183,7 +183,7 @@ export async function isAlive(agentId: string, deps: LivenessAsyncDeps = {}): Pr
 }
 
 /** Upper bound on the whole legacy tmux check (has-session, list-panes, ps). */
-export const LEGACY_TMUX_LIVENESS_TIMEOUT_MS = LEGACY_TMUX_PROBE_TIMEOUT_MS + 1_000;
+const LEGACY_TMUX_LIVENESS_TIMEOUT_MS = LEGACY_TMUX_PROBE_TIMEOUT_MS + 1_000;
 
 const INDETERMINATE: LivenessVerdict = { alive: false, reason: 'runtime-indeterminate' };
 
@@ -348,7 +348,7 @@ export function getAgentEffectiveLastActivityMs(agentId: string): number | null 
  * minutes while producing no tool calls, no transcript writes, and no hook
  * events. This signal goes stale exactly when real work stops.
  */
-export function getAgentWorkActivityMs(agentId: string): number | null {
+function getAgentWorkActivityMs(agentId: string): number | null {
   const candidates: number[] = [];
 
   const runtimeState = getAgentRuntimeStateSync(agentId);

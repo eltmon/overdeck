@@ -95,7 +95,7 @@ export function createPromiseConcurrencyLimiter(max: number) {
   });
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 /**
  * Effect-native semaphore: run at most `max` Effects concurrently, preserving

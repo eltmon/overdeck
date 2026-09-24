@@ -1853,3 +1853,434 @@ one is Oh My Pi (#4003).
   several of their tests exercise live code through them (the merge-train route tests mock
   `listEligibleCandidatesByProject`; the swarm-foreman liveness tests drive through `swarmJanitorPass`), so each needs
   the same port-or-delete review as the rows above. CH-8b handles them.
+
+## CH-8b: a comment is not a use, the exports only comments kept, and `export` pruning (#4014)
+
+PRD W10 step 4, the rest of AC-W10, and the #4051 review follow-up.
+
+### The scan no longer counts comments
+
+`.pan/notes/pan-3958-dead-exports.py` now blanks `//` and `/* */` comments in JS/TS files before it indexes words,
+so a doc or line comment that names an export no longer keeps it alive. Strings, template literals and regex literals
+still count, because config lists (`patrolBudgets.exempt`) and dynamic lookups name exports in strings. With `v` it
+also prints the `OWNFILE` rows (exported, used only in their own file) that step 4 prunes.
+
+### Exports only comments kept alive
+
+The fixed scan found 14 `DEAD` and 16 non-seam `TESTONLY` exports. That is the nine the #4051 review named and 21
+more. Each was deleted, or its tests were moved to the live entry point:
+
+- **Ported to live code.**
+  - Swarm stall tests: `deacon-swarm-stall-events.test.ts` and the polyrepo integration test now read the stall
+    signal from `classifyInFlightSlots`, which `pan swarm status`/`wait` use. They no longer go through the deleted
+    `swarmJanitorPass`, which lost its last caller in PAN-3917 W5.
+  - Merge-train and UAT-train route tests: `merge-train.test.ts` and `uat-train.test.ts` named their ready-set mock
+    `listEligibleCandidatesByProject`, but it stood in for the live `listReadyIssuesForProject`. The mock key is renamed
+    and no test is lost.
+  - UAT generation status tests: they drive the live `updateUatGenerationSync(name, { status })` instead of the
+    deleted `updateUatGenerationStatusSync`.
+  - `sacred-file-invariant.test.ts`: the idempotency check drives the live `writeObservation` instead of the
+    remodel's `MemoryFilesLive`.
+  - `foreman-swarm.test.ts`: drops one `chooseDispatchTier` assertion inside an otherwise live flow.
+- **Kept as test seams**, with the seam doc line: `readMemoryHealthSnapshot`, which observes live
+  `updateMemoryHealth`; and `recordPatrolActions`/`suspendPatrol`, which set up `listPatrolBudgetRows` for
+  `pan doctor`.
+- **Deleted with the tests of their subject.** The subjects:
+  - the swarm janitor and automatic foreman respawn (`swarmJanitorPass`, `maintainSwarmForeman`; `swarm-foreman-liveness.ts` is deleted);
+  - the dispatch-tier choosers (`assignDispatchTier`, `chooseDispatchTier`);
+  - the Flywheel sequence picker (`pickFromSequence`) and `listEligibleCandidatesByProject`;
+  - the Pi cost parser (`cost-parsers/pi-parser.ts` is deleted);
+  - `runBudgetedPatrol` and its readers;
+  - yield-victim selection;
+  - `waitForReviewerOutputs`;
+  - CodeRabbit reply helpers;
+  - `estimateFootprint`;
+  - the memory-driven work-slot math (`workResumeSlotsAvailable`, `memoryDrivenWorkSlots`), whose only caller was the respawn;
+  - the remodel's HTTP API groups and Memory Live layers;
+  - `tmux.ts` `querySession` (the Effect twin; `querySessionSync` stays and now has no twin);
+  - the git `rehydrateHeadAnchor`, `resolveProjectKeyForCwd` (its `…Async` variant stays), `getMemoryStatus`,
+    `getLatestHealthEvent`, `createSymlinks`, `buildPiCommand`, `parseAgentOutput` and `decideEscalation`.
+- **The xbrief `extractAcceptanceCriteria`** was copied into its test in #4051, but the `src` export was never deleted:
+  a same-named function in `tier-supervisor.ts` hid it from the scan. It is deleted here.
+
+Comments that named deleted code are updated. The dangling "HTTP API group" section headers in
+`overdeck/conversations.ts` and `overdeck/merge.ts` are gone.
+
+### `Effect variants (PAN-1249)` headers (AC-W2)
+
+The 20 non-Oh-My-Pi `Effect variants (PAN-1249)` section headers are retired:
+
+- Empty sections lose the header (`cost-monitor.ts`, with its unused `FsError` re-export and `void readFile`;
+  `launcher-generator.ts`; `subscription-types.ts`; `xbrief/acceptance-criteria.ts`).
+- The rest become `Effect API`.
+- Paragraphs that said the Promise or sync variants "remain canonical" and these are "additive" are rewritten to
+  describe what is there. Where a module keeps sync twins, the paragraph points at the module header that names
+  their callers.
+
+### `export` pruning (W10 step 4)
+
+348 exports used only inside their own file lose the `export` keyword. The five Oh My Pi rows are skipped (#4003).
+The four exports `scripts/build-docs-index.mjs` loads from `dist/index.js` are referenced in that script, so the scan
+never lists them. `tsc` (with `declaration: true`) is clean. Façade ratchet: C 35 → 32. The `tmux.ts` `querySession`
+row goes, and `projects-config-write.ts` drops from C 3 to C 1 because its async twins are now module-private.
+
+Removed from the `@overdeck/core` main entry (v0.61.0 release notes): `DOCS_INDEX_SCHEMA_VERSION`,
+`createDocsIndexSchema`, `readDocsIndexMetadata`, `createDocsEmbeddingFunction`, `embedDocsWithLocalModel`,
+`embedDocsWithOpenAI` (`docs/index-builder.ts`); `isAnthropicModelSync` (`settings.ts`); `hasAliasSync` (`shell.ts`).
+
+After this PR the scan reports 0 `DEAD` rows, 0 non-seam `TESTONLY` rows outside Oh My Pi (the one left is
+`OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON`), and 0 `OWNFILE` rows outside Oh My Pi.
+
+### Docs
+
+- `docs/HARNESSES.md` (a redirect stub) links the "Storage paths" section, which is the literal AC-W11 check.
+- `docs/codebase-health/REFACTOR-QUEUE.md` marks every PAN-3958 child landed and adds the AC-W8 follow-up row.
+
+### Tests
+
+In the touched test files, `it`/`test` calls go from 226 to 130. Every removed test exercised a deleted subject. The
+ports above keep the tests of live code. Six test files are deleted: two of them go with deleted modules
+(`swarm-foreman-liveness`, `pi-parser`), and the rest tested only deleted subjects in surviving modules. So this PR
+needs `pan verify waive-test-removal 4014 --reason "PAN-3958 deleted subject, see no-loss ledger"` at its head.
+
+### PRD status after CH-8b
+
+Every PRD work item is done except:
+
+- **AC-W8 residual.** The audit's `twinPairs` still lists pairs AC-W8 does not allow, all of them live:
+  - one `Promise`-kind pair: `concurrency.ts` `withConcurrencyLimit` (Effect) / `withConcurrencyLimitPromise`;
+  - eight `Async`-kind pairs with no C6 header note: `orders/io.ts` `readOrderBook`, `orders/resolver.ts` `getBook`,
+    `planning/auto-spawn-consent.ts` `readAutoSpawnOnFinalizeFlag`, `projects.ts` `listProjects`,
+    `runtimes/storage/kimi-code.ts` `findKimiWirePath` and `findLatestKimiSession`, `session-history.ts`
+    `appendSessionIdToHistory`, `xbrief/continue-state.ts` `readItemStatuses`.
+
+  The CH-6 inventory did not list them. Settling them means converting callers or adding C6 header notes. That is
+  refactoring, not dead-code removal, so it is left as a follow-up (REFACTOR-QUEUE row 21i).
+- **Oh My Pi (#4003).** Everything the epic skipped there: A 1 and B 4 in the façade baseline, five `OWNFILE` rows,
+  one `TESTONLY` row, three `Effect variants (PAN-1249)` headers, and the `AgentRuntime` names in its own tests.
+- **The optional `codex-home-v2` storage helper** (CH-7 review) was not done.
+
+### Deleted, by module
+
+All paths are relative to `src/lib/`.
+
+| Module | Deleted exports | Private code left unused, deleted with them |
+| --- | --- | --- |
+| `agents/dispatch-tier.ts` | `assignDispatchTier`, `chooseDispatchTier` | `CHEAP_DIFFICULTIES`, `HEAVY_DIFFICULTIES` |
+| `agents/tier-escalation.ts` | `decideEscalation` | `triggerReason` |
+| `cloister/coderabbit-ingestion.ts` | `postCodeRabbitReply`, `CODERABBIT_REPLY_ADDRESSED`, `CODERABBIT_REPLY_REJECTED` | — |
+| `cloister/concurrency.ts` | `workResumeSlotsAvailable`, `memoryDrivenWorkSlots` | `GIB` |
+| `cloister/deacon-swarm.ts` | `swarmJanitorPass` | — |
+| `cloister/memory-governor.ts` | `estimateFootprint`, `computeLearnedFootprintBytes` | `coldStartFootprintBytes` |
+| `cloister/merge-agent.ts` | `parseAgentOutput` | — |
+| `cloister/patrol-budget.ts` | `runBudgetedPatrol`, `isPatrolSuspended`, `isPatrolBudgetExempt`, `getPatrolBudget` | — |
+| `cloister/preemption.ts` | `selectYieldVictim` | — |
+| `cloister/review-monitor.ts` | `waitForReviewerOutputs` | — |
+| `cloister/swarm-foreman-liveness.ts` | `maintainSwarmForeman` | `defaultDeps` |
+| `cost-parsers/pi-parser.ts` | `parsePiSessionSync`, `parsePiSessionContent` | `KNOWN_TYPES`, `ParseResult`, `emptyUsage`, `isAssistantMessage`, `tsMs`, `PiSessionRoot`, `isMessage`, `PiEntry`, `PiGenericEntry`, `PiMessageEntry`, `PiUsage` |
+| `flywheel-merge-order.ts` | `listEligibleCandidatesByProject`, `pickFromSequence` | — |
+| `git-utils.ts` | `rehydrateHeadAnchor` | — |
+| `launcher-generator.ts` | `buildPiCommand` | — |
+| `memory/cli.ts` | `getMemoryStatus` | — |
+| `overdeck/conversations.ts` | `ConversationsApi` | — |
+| `overdeck/cost.ts` | `CostApi` | — |
+| `overdeck/health-events.ts` | `getLatestHealthEvent` | — |
+| `overdeck/memory.ts` | `MemorySearchLive`, `MemoryApi`, `MemoryResolverLive`, `MemoryWriterLive`, `MemoryFilesLive` | `CLAIM_EXPIRY_MS`, `buildIdentityClause`, `buildMatchQuery`, `clearFtsCacheStatement`, `makeCheckpointFromRow`, `makeIndexStatements`, `makeInsertResetMarkerStatement`, `rowToHit`, `MemoryFtsRow`, `mapCheckpointRow`, `tryParseJson`, `transcriptCheckpoints` |
+| `overdeck/merge-sync-uat.ts` | `updateUatGenerationStatusSync` | — |
+| `overdeck/merge-sync.ts` | `getAllMergeSetsFromDb`, `deleteMergeSet` | — |
+| `overdeck/merge.ts` | `MergeApi` | — |
+| `projects.ts` | `resolveProjectKeyForCwd` | — |
+| `tmux.ts` | `querySession` | — |
+| `workspace-manager/worktree-ops.ts` | `createSymlinks` | — |
+| `xbrief/acceptance-criteria.ts` | `extractAcceptanceCriteria` | — |
+
+### Now module-private (W10 step 4)
+
+All paths are relative to `src/lib/`.
+
+| Module | Now module-private |
+| --- | --- |
+| `acp/host.ts` | `OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS` |
+| `acp/providers.ts` | `ACP_PROVIDER_SUPPORT` |
+| `agents/external-paths.ts` | `externalTranscriptRoots`, `openRegularFile` |
+| `agents/external-registry.ts` | `REGISTRATION_FILE`, `externalAgentDir`, `parseRegistration`, `defaultProcReader` |
+| `agents/liveness.ts` | `LEGACY_TMUX_LIVENESS_TIMEOUT_MS`, `getAgentWorkActivityMs` |
+| `agents/monitor-transport.ts` | `MONITOR_BLOCK_MAX_BODY_CHARS`, `monitorPresencePath` |
+| `agents/recovery.ts` | `prepareRestartSessionIdentity` |
+| `agents/spawn-prep.ts` | `selectStaffingItem` |
+| `agents/staffing.ts` | `providerDefaultHarnessSync` |
+| `agents/tier-feed.ts` | `shouldSkipFeedSubject`, `renderCommitFeedDiff`, `resolveFeedApiUrl`, `composeCommitFeedMessage` |
+| `agents/tier-metrics.ts` | `tierMetricsDir` |
+| `agents/tier-supervisor.ts` | `buildSupervisorPrompt`, `extractTracedFrText` |
+| `agents/tier-table.ts` | `TIERED_EXECUTION_ISSUE_OVERRIDES` |
+| `agents/worker/ids.ts` | `WORKER_ID_CLAIM_ATTEMPTS` |
+| `artifacts/index-store.ts` | `getArtifactsDir`, `getArtifactSnapshotDir`, `getArtifactLifecycleState` |
+| `artifacts/thumbnails.ts` | `getArtifactThumbnailDir` |
+| `background-ai/cost.ts` | `BACKGROUND_COST_AGENT_ID`, `BACKGROUND_COST_ISSUE_ID` |
+| `backlog/label-ops.ts` | `addIssueLabel`, `removeIssueLabel` |
+| `backlog/pickup.ts` | `EFFORT_UNITS` |
+| `bridge-token.ts` | `getBridgeTokenPath` |
+| `channels/overdeck-bridge.ts` | `forwardPermissionRequestToDashboard` |
+| `channels/permission-payload.ts` | `CHANNEL_PERMISSION_LIMITS`, `PermissionPayloadValidationError`, `utf8ByteLength`, `normalizePermissionInputPreview` |
+| `channels/pty-supervisor.ts` | `getPtySupervisorLogPath` |
+| `checkpoint/checkpoint-manager.ts` | `deleteCheckpoint` |
+| `cliproxy.ts` | `CLIPROXY_HOST`, `getCliproxyDir`, `getCliproxyConfigPath`, `getCliproxyPidPath` |
+| `cloister/ci-default-branch-tests.ts` | `DEFAULT_BRANCH_LOOKBACK` |
+| `cloister/concurrency.ts` | `countWarmIdleAdvancingAgents` |
+| `cloister/database.ts` | `initHealthDatabase`, `getHealthDatabase`, `cleanupOldEventsSync` |
+| `cloister/deacon-swarm.ts` | `recordSwarmAdvanceSuccess` |
+| `cloister/handoff-context.ts` | `serializeHandoffContext` |
+| `cloister/memory-governor.ts` | `readGovernorRunwayThresholds`, `nextGovernorModeWithRunway` |
+| `cloister/patrol-budget.ts` | `DEFAULT_PATROL_ACTIONS_PER_DAY` |
+| `cloister/pr-facts.ts` | `summarizeStatusCheckRollup`, `isTrustedComment` |
+| `cloister/quality-gate-admission.ts` | `QUALITY_GATE_CPU_START_THRESHOLD`, `QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD`, `QUALITY_GATE_ADMISSION_POLL_MS`, `QUALITY_GATE_ADMISSION_SETTLE_MS`, `QUALITY_GATE_ADMISSION_STALE_MS`, `sampleQualityGatePressure` |
+| `cloister/review-agent.ts` | `PARENT_REVIEW_TIMEOUT_MS` |
+| `cloister/review-rounds.ts` | `listReviewRunDirs`, `reviewCycleSeries` |
+| `cloister/specialist-completion.ts` | `SpecialistCompletionTimeoutError`, `SpecialistSupersededError`, `SpecialistCancelledError` |
+| `cloister/stall-sweeper.ts` | `SWEEP_MAX_RECOMMENDATIONS_PER_SCAN`, `SWEEP_RESURFACE_TTL_MS` |
+| `cloister/swarm-slot-reconcile.ts` | `listSlotBranches` |
+| `cloister/swarm-slot-store.ts` | `SWARM_SLOT_FILENAME_SUFFIX` |
+| `cloister/sync-main-git.ts` | `GIT_OPERATION_HEADS` |
+| `cloister/test-agent-queue.ts` | `TestDispatchError` |
+| `cloister/test-skip-gate.ts` | `subjectCandidatesForTestFile` |
+| `cloister/test-skip-waiver.ts` | `TEST_SKIP_WAIVER_DECISION_PREFIX` |
+| `cloister/triggers.ts` | `checkStuckEscalation`, `checkTestFailure`, `checkTaskCompletion` |
+| `cloister/uat-candidate-name.ts` | `UAT_CODENAMES` |
+| `cloister/uat-reconciler.ts` | `MAX_CONSECUTIVE_FAILED_ASSEMBLIES`, `MIN_BATCH_FEATURES` |
+| `cloister/uat-stack.ts` | `uatStackFolderName` |
+| `cloister/uat-union-lint.ts` | `applyRenames` |
+| `cloister/verification-artifact.ts` | `VERIFICATION_RUN_RETENTION_MS`, `verificationRunArtifactPath` |
+| `cloister/verification-runner.ts` | `getSyncTargetBranch` |
+| `cloister/verification-tests-mode.ts` | `detectGitHubActionsTestJobSync` |
+| `cloister/verification-worker-supervisor.ts` | `verificationWorkerDeadline` |
+| `cloister/version-ship-git.ts` | `versionShipGitArgs`, `versionShipGitEnv` |
+| `cloister/work-agent-prompt.ts` | `extractStitchDesigns` |
+| `codex-auth.ts` | `getNativeCodexAuthPath`, `probeNativeCodexAuthSync`, `listCodexAuthBurnedAgentsSync`, `hasActiveBurnedCodexAgentsSync` |
+| `codex/app-server-client.ts` | `CODEX_HOST_OP_TIMEOUT_MS` |
+| `codex/app-server-manager.ts` | `nativePidPath` |
+| `codex/native-endpoint.ts` | `CODEX_NATIVE_SOCKET_DIR`, `CODEX_NATIVE_SOCKET_NAME` |
+| `compliance/advisory-warning.ts` | `writeComplianceWarningMarkers`, `resolveComplianceWarningMarkersFile` |
+| `config-yaml/load.ts` | `resolveConversationWatchDirs` |
+| `context-layers/assemble.ts` | `WORKSPACE_CONTEXT_V2` |
+| `conversations/embeddings/providers.ts` | `EmbedHttpError` |
+| `conversations/harness-discovery.ts` | `discoverySources` |
+| `conversations/session-fork.ts` | `findLastCompactBoundaryOffset`, `sanitizeEntryForPlainFork` |
+| `conversations/summary-fork.ts` | `HandoffValidationError`, `sanitizeHandoffDoc` |
+| `cost.ts` | `readCostsSync`, `getBudgetSync` |
+| `cv.ts` | `saveAgentCVSync` |
+| `dns.ts` | `addWsl2HostEntry`, `removeWsl2HostEntry`, `addHostsFileEntry`, `removeHostsFileEntry`, `addDnsmasqEntry`, `removeDnsmasqEntry` |
+| `docker-bridge-pool.ts` | `BRIDGE_POOL_WARNING_HEADROOM` |
+| `docs/index-builder.ts` | `DOCS_INDEX_SCHEMA_VERSION`, `createDocsIndexSchema`, `readDocsIndexMetadata`, `createDocsEmbeddingFunction`, `embedDocsWithLocalModel`, `embedDocsWithOpenAI` |
+| `env-loader.ts` | `ENV_FILE_PATH` |
+| `flywheel-merge-order.ts` | `MERGE_QUEUE_GIT_CONCURRENCY` |
+| `flywheel/actions.ts` | `FLYWHEEL_STOP_POLL_MS`, `FLYWHEEL_STOP_DEFAULT_TIMEOUT_MS` |
+| `flywheel/files.ts` | `resolveUnderPlanHome` |
+| `flywheel/substrate-stats.ts` | `SUBSTRATE_LABEL`, `DEFAULT_STATS_WINDOW_DAYS`, `listSubstrateIssuesWithGh`, `listMergedPrsFromForge` |
+| `forge.ts` | `ForgeError` |
+| `harness-binary.ts` | `HARNESS_BINARY_BY_RUNTIME` |
+| `harness-resolve.ts` | `HarnessResolutionError` |
+| `health.ts` | `HealthError`, `saveAgentHealth`, `isAgentAlive` |
+| `herdr-setup/binary.ts` | `HERDR_INSTALL_TIMEOUT_MS`, `HERDR_MANIFEST_TIMEOUT_MS`, `isInstallerManaged` |
+| `herdr-setup/integrations.ts` | `HERDR_INTEGRATION_INSTALL_TIMEOUT_MS`, `KIMI_INTEGRATION_MIN_VERSION` |
+| `herdr-setup/service.ts` | `HERDR_SERVER_WAIT_MS`, `HERDR_SERVER_POLL_MS`, `herdrServerLogPath` |
+| `herdr-setup/status.ts` | `HERDR_EXEC_TIMEOUT_MS` |
+| `hooks.ts` | `getHookSync` |
+| `installers/open-knowledge.ts` | `readOnlyOpenKnowledgeSnapshotPath` |
+| `linear-mcp-auth.ts` | `linearMcpAuthEvent`, `appendLinearMcpAuthEvent`, `appendLinearMcpAuthNotifiedEvent` |
+| `memory/cli.ts` | `MEMORY_TIMELINE_DEFAULT_LIMIT` |
+| `memory/paths.ts` | `assertUnderMemoryBase` |
+| `memory/poller.ts` | `DEFAULT_MEMORY_POLLER_INTERVAL_MS`, `DEFAULT_MEMORY_POLLER_ACTIVITY_LINE_THRESHOLD`, `DEFAULT_MEMORY_POLLER_MIN_INTERVAL_MS`, `DEFAULT_MEMORY_POLLER_MAX_MID_TURN_EXTRACTIONS` |
+| `memory/reconciliation.ts` | `reconcileTranscriptCheckpoint` |
+| `memory/settings.ts` | `DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD`, `DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS` |
+| `memory/transcript-source.ts` | `createDefaultTranscriptSourceRegistry` |
+| `memory/worker-pool.ts` | `DEFAULT_MEMORY_WORKER_QUEUE_LIMIT` |
+| `model-fallback.ts` | `applyTierAwareFallbackSync` |
+| `orders/io.ts` | `ordersDirectory` |
+| `orders/resolver.ts` | `issuePrefixForStateRoot` |
+| `overdeck/agents.ts` | `AgentFilter` |
+| `overdeck/companion-terminal/codex-adapter.ts` | `CODEX_THREAD_ID_PATTERN`, `CODEX_PREPARE_TERMINAL_TIMEOUT_MS` |
+| `overdeck/companion-terminal/lifecycle.ts` | `COMPANION_SESSION_PREFIX` |
+| `overdeck/companion-terminal/opencode-adapter.ts` | `OPENCODE_SESSION_ID_PATTERN`, `OPENCODE_SESSION_PROBE_TIMEOUT_MS` |
+| `overdeck/control-settings.ts` | `FlywheelConfig`, `FlywheelConfigPatch`, `FlywheelRuntime`, `DEACON_GLOBAL_PAUSE_KEY`, `CLOISTER_SPAWNS_PAUSED_KEY`, `FLYWHEEL_GLOBAL_PAUSE_KEY`, `FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY`, `FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY`, `MERGE_TRAIN_ENABLED_KEY`, `BOOT_RECONCILIATION_DECISION_KEY`, `BOOT_RECONCILIATION_PER_AGENT_KEY`, `BOOT_RECONCILIATION_DECIDED_AT_KEY` |
+| `overdeck/conversation-archive.ts` | `parseStringArrayColumn`, `mapArchivedConversation`, `parseOptionalNumberParam` |
+| `overdeck/conversation-delivery.ts` | `CONTROL_ACK_TIMEOUT_MS`, `parseThinkingLevel`, `CODEX_APPROVAL_TOOL_PREFIX`, `deliverCodexApprovalChoice` |
+| `overdeck/conversation-reads.ts` | `isClaudeInvocationTimeout` |
+| `overdeck/conversation-retrospective.ts` | `RETROSPECTIVE_WINDOWS`, `isRetrospectiveRequestBody`, `collectRetrospectiveProjects`, `listRecordsThroughReadDoor` |
+| `overdeck/conversation-runtime.ts` | `codexConversationSystemPromptFiles` |
+| `overdeck/conversations.ts` | `ConversationId`, `ConversationName`, `FavoriteType`, `BackingFile`, `ParsedTranscript`, `TranscriptSubject`, `ConversationNotFound`, `AlreadyArchived`, `NotArchived`, `isAgentConversationName`, `resolveLiveSessionId` |
+| `overdeck/cost-sync.ts` | `getCostSinceSync` |
+| `overdeck/cost.ts` | `WindowSummary`, `BudgetSpec`, `BudgetStatus`, `CostIngestError`, `BudgetNotFound` |
+| `overdeck/infra.ts` | `DEAD_ISSUES_FK_DROPPED_SETTING` |
+| `overdeck/issue-transitions.ts` | `closeIssuePullRequest`, `buildLifecycleContext` |
+| `overdeck/issues.ts` | `Sha`, `Outcome`, `TestOutcome`, `IllegalTransition` |
+| `overdeck/memory.ts` | `ClaimResult`, `CommitResult`, `PromptTimeInput`, `PromptTimeResult`, `ExtractDeltaInput`, `ExtractResult`, `ClaimInput`, `CommitInput`, `SummaryResult`, `RebuildResult`, `ResetMarkerInput`, `CheckpointNotFound` |
+| `overdeck/merge.ts` | `GateStatus`, `RepoMergeStatus`, `WorkspaceType`, `AutoMergeStatus`, `UatStatus`, `UatMemberRole`, `QueueView`, `AutoMerge`, `UatMember`, `UatResolution`, `AutoMergeFilter`, `UatGenerationFilter`, `MergeSetNotFound`, `NotReadyForMerge`, `MergeInProgress`, `AutoMergeNotFound`, `UatGenerationNotFound`, `UatNotPromotable`, `ForgeMergeFailed` |
+| `overdeck/observability.ts` | `ReplayEventsInput`, `ReplayGap`, `SnapshotRequired` |
+| `overdeck/planning-promotion.ts` | `removePendingPromotionMarker`, `commitWorkspacePlanArtifacts` |
+| `overdeck/terminal-issues.ts` | `TERMINAL_STAGES`, `isTerminalStage`, `listTerminalIssues` |
+| `pan-dir/legacy-pan-ignore.ts` | `LEGACY_PAN_IGNORE_PATTERNS`, `PAN_IGNORE_PROBES` |
+| `parked/resolver.ts` | `IDLE_EXEMPT_ROLES`, `hasCompletedHandoffMarker`, `normalizeParkedIssueId` |
+| `pi-codex-auth.ts` | `refreshPiCodexAuth` |
+| `pipeline-membership-gather.ts` | `classifyBranchRefLine` |
+| `platform-lifecycle.ts` | `MIN_HEALTH_TIMEOUT_MS` |
+| `projects-config-write.ts` | `atomicWriteProjectsConfig`, `withProjectsConfigWrite` |
+| `projects.ts` | `getSpecialistConfig` |
+| `provider-health.ts` | `formatProbeError` |
+| `registry/feature-registry-population.ts` | `workspaceIdFromPath`, `buildFeatureClassificationPrompt` |
+| `restart-gate-client.ts` | `RESTART_GATE_UNHEALTHY_FALLBACK_MS` |
+| `review-artifacts.ts` | `buildRichReviewArtifactBody` |
+| `runtime-census.ts` | `RUNTIME_CENSUS_TTL_MS` |
+| `runtimes/codex.ts` | `CodexSpawnTimeout`, `seedCodexAuthSymlink`, `seedCodexRulesSymlink` |
+| `runtimes/kimi-code.ts` | `waitForNewKimiSession`, `KimiCaptureLockTimeoutError` |
+| `runtimes/kimi-context-envelope.ts` | `readManagedKimiSessionId`, `buildKimiContextEnvelope` |
+| `safety/protected-paths.ts` | `RESTART_PRESERVE`, `WORKSPACE_ARTIFACTS` |
+| `session-format-converter.ts` | `extractContentText` |
+| `settings-api.ts` | `updateSettingsApi` |
+| `settings.ts` | `isAnthropicModelSync` |
+| `shell.ts` | `hasAliasSync` |
+| `smart-model-selector.ts` | `WORK_TYPE_REQUIREMENTS` |
+| `system-health/darwin.ts` | `aggregateDarwinCpuCounters` |
+| `system-health/inotify.ts` | `INOTIFY_TOP_CONSUMER_COUNT` |
+| `system-health/linux.ts` | `INOTIFY_REFRESH_MS`, `parseProcStat`, `parseVmstat`, `parseLoadAverage`, `computeSwapActivityBytesPerMinute` |
+| `system-health/sampler.ts` | `createMeasuringState`, `transitionAcceptedAssessment` |
+| `systemd.ts` | `userUnitDir`, `stopSupervisorUnit` |
+| `terminal-backends/agent-pane-io.ts` | `toHerdrKey` |
+| `terminal-backends/herdr-api.ts` | `HERDR_FIXTURE_DIR`, `DEFAULT_MAX_FRAME_BYTES` |
+| `terminal-backends/herdr.ts` | `HERDR_PROBE_TIMEOUT_MS` |
+| `terminal-backends/launch.ts` | `CONVERSATIONS_WORKSPACE` |
+| `terminal-backends/prompt-guard.ts` | `PROMPT_RING_SIZE`, `checkPromptAuthority` |
+| `tmux-dedup.ts` | `DEDUP_KEY_RE`, `dedupPayloadStateOptionName` |
+| `tmux.ts` | `getTmuxBaseArgs` |
+| `tracker-utils.ts` | `extractIssuePrefix` |
+| `traefik.ts` | `resolveTraefikRenderMode` |
+| `tts-daemon.ts` | `QWEN_TTS_START_LOCK_PATH`, `QWEN_TTS_MANUAL_STOP_PATH`, `QWEN_TTS_AUTH_TOKEN_PATH`, `QWEN_TTS_AUTH_HEADER`, `QWEN_TTS_LOG_PATH`, `resolveTtsDaemonScript`, `getTtsDaemonPython`, `getTtsDaemonAuthToken`, `waitForTtsDaemonHealth` |
+| `uat-fixtures/fixture-data.ts` | `FIXTURE_ISSUE_PREFIX`, `FIXTURE_ISSUE_NUMBER`, `FIXTURE_SOURCE_REPO`, `fixtureProjectPath`, `FIXTURE_ISSUE_CACHE_ID`, `FIXTURE_DESCRIPTION_BANNER`, `FIXTURE_CANONICAL_STATUS`, `FIXTURE_BRANCH`, `FIXTURE_AGENT_MODEL`, `FIXTURE_WORK_AGENT_ID`, `FIXTURE_XBRIEF_PLAN_ID`, `FIXTURE_XBRIEF_PLAN_UID`, `FIXTURE_ACTIVITY_IDS` |
+| `uat-fixtures/seed.ts` | `isRunningInContainer` |
+| `webhook-handlers.ts` | `FAILING_CHECK_CONCLUSIONS` |
+| `workspace-manager/worktree-ops.ts` | `mergeDirectoryWithoutOverwriteSync` |
+| `workspace/rebuild-stack.ts` | `removeStaleIssueContainers` |
+| `workspace/stack-health.ts` | `DEFAULT_STUCK_CREATED_THRESHOLD_MS` |
+| `xbrief/lifecycle.ts` | `LEGACY_VBRIEF_ROOT_DIRNAME`, `LEGACY_VBRIEF_FILENAME_SUFFIX`, `XBRIEF_FILENAME_SUFFIXES` |
+
+### Surviving `…Sync` functions with no async twin, after CH-8b (scope for #4002)
+
+Supersedes the CH-8a part 2 list. Exported `…Sync` functions in `src/lib` (tests excluded) that the audit does not pair and whose module defines no `foo`/`fooAsync`/`fooPromise` of the same base (exported or not). The number counts appearances in production files under `src`, the declaration included.
+
+| Module | `…Sync` functions (production references) |
+| --- | --- |
+| `activity-logger.ts` | `emitActivityDetailedSync` (4), `emitActivityEntrySync` (156), `emitActivityTtsSync` (32), `emitDashboardLifecycleSync` (5) |
+| `agent-input-detection.ts` | `detectAwaitingInputFromPaneSync` (5) |
+| `agents/activity.ts` | `getLatestSessionIdSync` (27), `resolveClaudeSessionRecoverySync` (2), `resolveLatestSessionIdSync` (10) |
+| `agents/agent-state-read.ts` | `getAgentStateSync` (276) |
+| `agents/agent-state.ts` | `clearAgentOperatorGatesForIssueSync` (3), `clearAgentOperatorGatesForIssuesSync` (3), `clearYieldForResumeSync` (6), `recordAgentActivitySync` (3), `setAgentYieldedSync` (2), `writeAgentStateJsonSync` (4) |
+| `agents/identity.ts` | `resolveAgentTargetSync` (16) |
+| `agents/monitor-transport.ts` | `listInboxMessagesSync` (3) |
+| `agents/runtime-command.ts` | `parseRoleMcpServersSync` (4), `roleSystemPromptInjectionSync` (8) |
+| `agents/tier-fitness-context.ts` | `buildTierFitnessContextSync` (5) |
+| `backup.ts` | `backupFileSync` (3), `cleanOldBackupsSync` (3), `createBackupSync` (3), `listBackupsSync` (6), `restoreBackupSync` (3) |
+| `bridge-token.ts` | `readBridgeTokenSync` (7), `writeBridgeTokenSync` (6) |
+| `child-env.ts` | `buildChildEnvSync` (9), `buildChildEnvWithoutTmuxSync` (13) |
+| `claude-mcp.ts` | `ensureExcalidrawMcpSync` (3), `ensurePlaywrightIsolationSync` (4), `getIsolatedPlaywrightMcpConfigSync` (3) |
+| `claude-permissions.ts` | `buildClaudeUserSettingsSync` (6), `bypassPrefixForAgentFlagSync` (1), `ensureClaudePermissionFlagSync` (3), `getClaudePermissionFlagsStringSync` (17), `getClaudePermissionFlagsSync` (6), `resolvePermissionModeSync` (5) |
+| `claude-settings-file.ts` | `atomicWriteJsonSync` (6), `backupSettingsSync` (6), `findNewestBackupSync` (3), `pruneBackupsSync` (6) |
+| `cloister/cost-monitor.ts` | `recordCostSync` (1), `resetCostTrackingSync` (1) |
+| `cloister/handoff-logger.ts` | `logHandoffEventSync` (3) |
+| `cloister/merge-agent.ts` | `autoCommitWorkspaceChangesBeforeSync` (2) |
+| `cloister/specialist-logs.ts` | `appendToRunLogSync` (1), `cleanupAllLogsSync` (5), `cleanupOldLogsSync` (8), `createRunLogSync` (1), `finalizeRunLogSync` (5), `getRunLogSync` (6), `listRunLogsSync` (7) |
+| `cloister/test-skip-waiver.ts` | `resolveActiveTestSkipWaiverSync` (3) |
+| `config-migration.ts` | `cleanupLegacyRuntimeSymlinksSync` (3), `convertToYamlConfigSync` (2), `hasLegacySettingsSync` (3), `migrateConfigSync` (5), `migrateSyncTargetsSync` (3), `needsMigrationSync` (7) |
+| `config-yaml/load.ts` | `getConversationSearchConfigSync` (18), `isTldrEnabledSync` (7), `loadConfigSync` (218) |
+| `config.ts` | `getDashboardApiUrlSync` (40), `getDashboardLoopbackApiUrlSync` (5), `getDefaultConfigSync` (5), `getDevrootPathSync` (3), `saveConfigSync` (12) |
+| `context-layers/detach.ts` | `detachManagedContextSync` (4) |
+| `context.ts` | `appendSummarySync` (3), `estimateTokensSync` (3), `getRecentHistorySync` (3), `listMaterializedSync` (3), `logHistorySync` (4), `materializeOutputSync` (2), `readMaterializedSync` (3), `searchHistorySync` (3) |
+| `conversations/correlator.ts` | `buildCorrelationMapSync` (3), `buildLocatorCorrelationMapSync` (3) |
+| `cost-parsers/codex-parser.ts` | `parseCodexSessionCostEventsSync` (3), `parseCodexSessionSync` (6) |
+| `cost-parsers/jsonl-parser.ts` | `getActiveSessionModelSync` (4), `getAllSessionFilesSync` (3), `getProjectDirsSync` (5), `getSessionFilesSync` (7), `parseClaudeSessionSync` (7) |
+| `cost-parsers/kimi-parser.ts` | `parseKimiSessionSync` (7) |
+| `cost-parsers/muse-parser.ts` | `parseMuseSessionSync` (4) |
+| `cost-parsers/ohmypi-parser.ts` | `parseOhmypiSessionCostResultSync` (3) (Oh My Pi, #4003) |
+| `cost.ts` | `calculateCostSync` (20), `checkBudgetSync` (6), `createBudgetSync` (5), `deleteBudgetSync` (5), `formatCostSync` (26), `generateReportSync` (3), `getAllBudgetsSync` (5), `getDailySummarySync` (3), `getMonthlySummarySync` (3), `getPricingSync` (33), `getWeeklySummarySync` (3), `readIssueCostsSync` (3), `readTodayCostsSync` (3), `summarizeCostsSync` (7) |
+| `costs/aggregator.ts` | `getCostsByIssueSync` (5), `getCostsForIssueSync` (7), `loadCacheSync` (6), `rebuildCacheSync` (8), `saveCacheSync` (5), `setIssueBudgetSync` (2), `syncCacheSync` (6), `updateCacheFromEventsSync` (3) |
+| `costs/attribution.ts` | `reclassifyUnknownCostEventsSync` (3) |
+| `costs/events.ts` | `appendCostEventSync` (8), `deduplicateEventsSync` (4), `forEachCostEventSync` (3), `getEventsFileSizeSync` (4), `getLastEventMetadataSync` (5), `readEventsFromByteOffsetSync` (3), `readEventsFromLineSync` (2), `readEventsSync` (11), `replaceEventsFileSync` (6), `tailEventsSync` (4) |
+| `costs/migration.ts` | `migrateAllSessionsSync` (5), `migrateIfNeededSync` (2), `needsMigrationSync` (7) |
+| `costs/retention.ts` | `getRetentionStatusSync` (2), `needsPruningSync` (2), `pruneOldEventsSync` (2) |
+| `costs/wal.ts` | `appendToWalSync` (4) |
+| `cv.ts` | `completeWorkSync` (3), `formatCVSync` (3), `getAgentCVSync` (6), `getAgentRankingsSync` (3), `readAgentCVSync` (4), `startWorkSync` (5) |
+| `deploy/active-dashboard-bundle.ts` | `readActiveDashboardBundleSync` (10) |
+| `env-loader.ts` | `loadOverdeckEnvSync` (3) |
+| `harness-policy.ts` | `canUseHarnessSync` (29), `canUseModelWithAuthSync` (4) |
+| `harness-skill-sync.ts` | `executeAgentSkillsSync` (3), `planAgentSkillsSync` (3) |
+| `hooks.ts` | `checkHookSync` (8), `clearHookSync` (5), `generateFixedPointPromptSync` (7), `initHookSync` (6), `popFromHookSync` (3), `pushToHookSync` (3), `sendMailSync` (3) |
+| `internal-token.ts` | `ensureInternalTokenSync` (21), `getInternalTokenSync` (27) |
+| `issue-id.ts` | `extractNumberSync` (21), `extractPrefixSync` (77), `normalizeIssueIdSync` (3), `parseIssueIdSync` (108), `resolveBareNumericIdSync` (15), `resolveIssueIdSync` (27) |
+| `kimi-claude-routing.ts` | `getClaudeCodeLaunchModelSync` (6) |
+| `launcher-generator.ts` | `generateLauncherScriptSync` (29) |
+| `manifest.ts` | `collectSourceFilesSync` (18), `hashFileSync` (23), `pruneStaleManifestEntriesSync` (8), `readManifestSync` (12), `writeManifestSync` (10) |
+| `memory/fts-operations.ts` | `getMemoryFtsDatabaseSync` (7), `runMemoryFtsStatementSync` (5), `runMemoryFtsTransactionSync` (5) |
+| `merge-set.ts` | `buildMergeSetForIssueSync` (4), `ensureMergeSetForIssueSync` (11), `getMergeSetSync` (17), `upsertMergeSetSync` (27), `withRepoArtifactUrlSync` (7), `withRepoStateSync` (24) |
+| `model-capabilities.ts` | `getModelCapabilitySync` (10), `getModelEffortLevelsSync` (8), `hasModelCapabilitySync` (6), `modelSupportsImagesSync` (4), `resolveModelIdSync` (28) |
+| `model-context-windows.ts` | `apiLaunchModelIdSync` (5), `isGpt56LongContextVariantSync` (2) |
+| `model-fallback.ts` | `applyFallbackSync` (4), `getAvailableModelsSync` (2), `getFallbackModelSync` (2), `getModelProviderSync` (3), `getModelsByProviderSync` (2), `isOpenRouterModelSync` (2) |
+| `model-validation.ts` | `normalizeModelOverrideSync` (17), `requireModelOverrideSync` (25), `shellQuoteModelIdSync` (17) |
+| `multi-tool-sync.ts` | `resolveAlsoSyncToolsSync` (4), `runMultiToolSyncSync` (3), `syncSkillsToToolsSync` (3) |
+| `overdeck/agents.ts` | `getIssueStageSync` (3), `listAgentIdsByPrefixSync` (6) |
+| `overdeck/control-settings.ts` | `getFlywheelActiveRunIdSync` (3), `isCloisterSpawnsPausedSync` (6), `setCloisterSpawnsPausedSync` (8) |
+| `overdeck/conversation-cost-session.ts` | `findConversationForCostSessionSync` (6) |
+| `overdeck/cost-agent-stats.ts` | `getAgentCostStatsSync` (4) |
+| `overdeck/cost-sync.ts` | `getAgentDailyCostSync` (3), `getBackgroundCostBySourceSync` (3), `getCavemanExperimentDataSync` (3), `getCostForIssueAggregateSync` (7), `getCostForIssueSync` (2), `getCostsByIssueSync` (5), `getDailyTrendsSync` (4), `getModelRollupSync` (3), `getTodayCostSync` (3), `insertCostEventSync` (5), `queryMemoryExtractionCostUsdSync` (3) |
+| `overdeck/event-reads.ts` | `readLatestAgentClaudeSessionIdEventSync` (4) |
+| `overdeck/git-activity.ts` | `appendGitOperationSync` (10), `listGitOperationsSync` (7) |
+| `overdeck/infra.ts` | `closeOverdeckDatabaseSync` (1), `dropDeadIssuesForeignKeysSync` (4), `dropPipelineStateMirrorTablesSync` (4), `getOverdeckDatabaseSync` (136), `readPipelineMirrorMarkerSync` (2) |
+| `overdeck/issue-reads.ts` | `resolveIssueProjectPathSync` (16) |
+| `overdeck/merge-sync-uat.ts` | `getUatGenerationSync` (13), `hasUncleanedTerminalUatGenerationSync` (3), `insertUatGenerationSync` (4), `listUatGenerationNamesSync` (4), `listUatGenerationsSync` (10), `listUatGenerationsWithStacksSync` (4), `markUatGenerationRepoPromotedSync` (3), `setUatGenerationStackStartedAtSync` (4), `updateUatGenerationSync` (4) |
+| `pan-dir/drafts.ts` | `checkPrdGateSync` (7) |
+| `persistent-logger.ts` | `logAgentLifecycleSync` (69), `logDeaconEventSync` (16) |
+| `pipeline-notifier.ts` | `notifyPipelineSync` (23), `setPipelineHandlerSync` (3) |
+| `platform-lifecycle.ts` | `readPlatformConfigSync` (13) |
+| `prd-draft.ts` | `getPRDDraftPathSync` (3) |
+| `prd-locations.ts` | `canonicalPrdSubdirSync` (4), `findPrdAnywhereSync` (8), `findPrdAtStatusSync` (6) |
+| `project-repos.ts` | `computeWorkspaceRepoRootsSync` (7), `forgeFromRemoteUrlSync` (3), `inferProjectForgeSync` (10), `normalizeForgeSync` (3), `resolveConfiguredReposSync` (6), `resolvePrimaryWorkspaceRepoDirSync` (7), `resolveProjectReposForIssueSync` (19), `resolveProjectReposFromResolvedIssueSync` (6), `resolveSlotWorkspaceWorktreesSync` (5), `resolveWorkspaceRepoRootsSync` (34) |
+| `projects-writer.ts` | `setProjectVersionSync` (4) |
+| `projects.ts` | `findProjectByPathSync` (62), `findProjectByTeamSync` (51), `hasProjectsSync` (4), `initializeProjectsConfigSync` (3), `registerProjectSync` (14), `saveProjectsConfigSync` (1), `unregisterProjectSync` (4) |
+| `projects/project-key.ts` | `findProjectKeyByPathSync` (3) |
+| `provider-health.ts` | `invalidateProbeCacheSync` (1) |
+| `providers.ts` | `clearCredentialFileAuthSync` (9), `getProviderEnvSync` (13), `getProviderForModelSync` (53), `setupCredentialFileAuthSync` (9) |
+| `release-set.ts` | `getReleaseSetSync` (5), `upsertReleaseSetSync` (6), `withComponentStateSync` (4) |
+| `remote/fly-api.ts` | `createFlyApiClientSync` (3) |
+| `remote/workspace-metadata.ts` | `deleteWorkspaceMetadataSync` (7), `findRemoteWorkspaceMetadataSync` (7), `listWorkspaceMetadataSync` (4), `loadWorkspaceMetadataSync` (23), `saveWorkspaceMetadataSync` (7) |
+| `resource-utils.ts` | `parseIssueIdFromTextSync` (10) |
+| `runtimes/acp.ts` | `createAcpRuntimeSync` (5) |
+| `runtimes/claude-code.ts` | `createClaudeCodeRuntimeSync` (4) |
+| `runtimes/codex.ts` | `createCodexRuntimeSync` (4) |
+| `runtimes/kimi-code.ts` | `createKimiCodeRuntimeSync` (4) |
+| `runtimes/muse.ts` | `createMuseRuntimeSync` (4) |
+| `runtimes/pi-fifo.ts` | `destroyPiFifoSync` (1), `writePiCommandSync` (4) |
+| `session-history.ts` | `readLatestIndexedSessionIdSync` (11), `readSessionIndexSync` (2), `readSessionIndexWithLegacySync` (4) |
+| `settings.ts` | `getAgentCommandSync` (6), `getAvailableModelsSync` (2), `getClaudeModelFlagSync` (2), `getDefaultSettingsSync` (3), `loadSettingsSync` (3) |
+| `shadow-state.ts` | `needsSync` (3) |
+| `shell.ts` | `addAliasSync` (3), `detectShellSync` (3), `getAliasInstructionsSync` (3), `getShellRcFileSync` (4) |
+| `skills-merge.ts` | `applyProjectTemplateOverlaySync` (3), `mergePanSkillsIntoWorkspaceSync` (3), `mergeSkillsIntoWorkspaceSync` (9) |
+| `smart-model-selector.ts` | `selectAllModelsSync` (6), `selectModelSync` (4) |
+| `smee.ts` | `isSmeeConfiguredSync` (5), `isSmeeProcessRunningSync` (8), `startSmeeProcessSync` (8), `stopSmeeProcessSync` (6) |
+| `supervisor.ts` | `getSupervisorPortSync` (9), `getSupervisorUrlSync` (3), `isSupervisorRunningSync` (4), `startSupervisorProcessSync` (10), `stopSupervisorProcessSync` (9) |
+| `sync-hooks.ts` | `planHooksSyncSync` (8), `syncHooksSync` (6) |
+| `sync-startup-gate.ts` | `isStartupSyncNeededSync` (6), `writeSyncManifestSync` (4) |
+| `sync.ts` | `executeSyncSync` (4), `migrateStalePersonalContentSync` (3), `mirrorProjectSkillsSync` (4), `planSyncSync` (4), `refreshCacheSync` (5), `removeLegacySkills070Sync` (3), `syncContextLayersSync` (5), `syncPiSettingsSync` (3), `syncStatuslineSync` (5) |
+| `tldr-daemon.ts` | `captureTldrMetricsSync` (1), `getTldrDaemonServiceSync` (47), `getTldrMetricsSync` (4), `listTldrDaemonServicesSync` (2) |
+| `tmux.ts` | `findManagedServerPidSync` (6), `querySessionSync` (3), `sanitizeManagedServerGlobalEnvSync` (2) |
+| `tracker-utils.ts` | `isGitHubIssueSync` (4), `parseGitHubReposSync` (2), `resolveGitHubIssueSync` (70), `resolveTrackerTypeSync` (18) |
+| `traefik.ts` | `cleanupStaleTlsSectionsSync` (5), `cleanupTemplateFilesSync` (3), `ensureProjectCertsSync` (7), `generateOverdeckTraefikConfigSync` (8), `generateTlsConfigSync` (8) |
+| `tts-speak.ts` | `buildTtsSpeakPayloadSync` (2) |
+| `webhook-handlers.ts` | `isTrackedRepositorySync` (11) |
+| `work-agent-lifecycle.ts` | `assertCanResumeSessionSync` (3), `assertCanStartFreshSync` (8) |
+| `workspace-config.ts` | `getDefaultWorkspaceConfigSync` (7), `replacePlaceholdersSync` (24) |
+| `workspace-manager/create.ts` | `ensurePolyrepoWorkspaceGitignoreSync` (2) |
+| `workspace-manager/migration.ts` | `copyOverdeckSettingsToWorkspaceSync` (9), `ensurePanGitignoreSync` (4), `migrateOverdeckToPanSync` (4) |
+| `workspace-manager/worktree-ops.ts` | `preTrustDirectorySync` (8), `restorePreWorktreeMetadataSync` (4), `stagePreWorktreeMetadataSync` (3) |
+| `workspace/devcontainer-renderer.ts` | `createWorkspacePlaceholdersSync` (4), `processTemplatesSync` (6), `renderDevcontainerSync` (10), `sanitizeComposeFileSync` (4) |
+| `workspace/ensure-devcontainer.ts` | `ensureDevcontainerSync` (11) |
+| `xbrief/acceptance-criteria.ts` | `getXBriefACStatusSync` (4) |
+| `xbrief/io.ts` | `findSpecByIssueSync` (9) |
+| `xbrief/lifecycle-io.ts` | `findXBriefByIssueSync` (7) |
+| `xbrief/lifecycle.ts` | `ensureXBriefDirsSync` (3) |

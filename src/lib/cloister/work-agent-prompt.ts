@@ -475,7 +475,7 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
  * Check if planning content contains Stitch design information.
  * Returns the Stitch section if found, null otherwise.
  */
-export function extractStitchDesigns(stateContent: string | null): string | null {
+function extractStitchDesigns(stateContent: string | null): string | null {
   if (!stateContent) return null;
 
   // Look for Stitch-related sections in planning content

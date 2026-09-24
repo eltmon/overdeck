@@ -13,7 +13,7 @@ const decodeIndex = Schema.decodeUnknownSync(Schema.Array(OrderBookIndexEntrySch
  * Order books, the index, and the backlog sequence live under the project's
  * plan directory: pass `getProjectPanPaths(projectRoot).panDir` (PAN-3917).
  */
-export function ordersDirectory(panDir: string): string {
+function ordersDirectory(panDir: string): string {
   return join(panDir, 'orders');
 }
 

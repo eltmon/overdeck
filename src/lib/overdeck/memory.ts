@@ -86,7 +86,7 @@ export const SearchMemoryInput = Schema.Struct({
 export type SearchMemoryInput = typeof SearchMemoryInput.Type
 
 // ClaimResult — the outcome of a byte-range lease attempt (not an error; normal control flow).
-export const ClaimResult = Schema.Union([
+const ClaimResult = Schema.Union([
   Schema.Struct({
     status: Schema.Literal('claimed'),
     fromOffset: Schema.Number,
@@ -100,7 +100,7 @@ export const ClaimResult = Schema.Union([
 ])
 export type ClaimResult = typeof ClaimResult.Type
 
-export const CommitResult = Schema.Union([
+const CommitResult = Schema.Union([
   Schema.Struct({ status: Schema.Literal('committed'), checkpoint: TranscriptCheckpoint }),
   Schema.Struct({
     status: Schema.Literal('empty'),
@@ -119,21 +119,21 @@ export const MemoryHealthSnapshot = Schema.Struct({
 })
 export type MemoryHealthSnapshot = typeof MemoryHealthSnapshot.Type
 
-export const PromptTimeInput = Schema.Struct({
+const PromptTimeInput = Schema.Struct({
   prompt: Schema.String,
   identity: MemoryIdentity,
   surface: Schema.optional(Schema.String),
 })
 export type PromptTimeInput = typeof PromptTimeInput.Type
 
-export const PromptTimeResult = Schema.Struct({
+const PromptTimeResult = Schema.Struct({
   contextChunks: Schema.Array(Schema.String),
   hitCount: Schema.Number,
   tokensBudgeted: Schema.Number,
 })
 export type PromptTimeResult = typeof PromptTimeResult.Type
 
-export const ExtractDeltaInput = Schema.Struct({
+const ExtractDeltaInput = Schema.Struct({
   identity: MemoryIdentity,
   transcriptPath: Schema.String,
   trigger: Schema.Literals(['stop-hook', 'poller', 'reconciliation', 'manual']),
@@ -141,13 +141,13 @@ export const ExtractDeltaInput = Schema.Struct({
 })
 export type ExtractDeltaInput = typeof ExtractDeltaInput.Type
 
-export const ExtractResult = Schema.Struct({
+const ExtractResult = Schema.Struct({
   extracted: Schema.Number,
   sessionId: Schema.String,
 })
 export type ExtractResult = typeof ExtractResult.Type
 
-export const ClaimInput = Schema.Struct({
+const ClaimInput = Schema.Struct({
   sessionId: Schema.String,
   expectedFromOffset: Schema.Number,
   toOffset: Schema.Number,
@@ -159,7 +159,7 @@ export const ClaimInput = Schema.Struct({
 })
 export type ClaimInput = typeof ClaimInput.Type
 
-export const CommitInput = Schema.Struct({
+const CommitInput = Schema.Struct({
   sessionId: Schema.String,
   consumedOffset: Schema.Number,
   transcriptPath: Schema.String,
@@ -169,19 +169,19 @@ export const CommitInput = Schema.Struct({
 })
 export type CommitInput = typeof CommitInput.Type
 
-export const SummaryResult = Schema.Struct({
+const SummaryResult = Schema.Struct({
   path: Schema.String,
   date: Schema.String,
 })
 export type SummaryResult = typeof SummaryResult.Type
 
-export const RebuildResult = Schema.Struct({
+const RebuildResult = Schema.Struct({
   projectId: Schema.String,
   reindexed: Schema.Number,
 })
 export type RebuildResult = typeof RebuildResult.Type
 
-export const ResetMarkerInput = Schema.Struct({
+const ResetMarkerInput = Schema.Struct({
   projectId: Schema.String,
   scope: ResetMarkerScope,
   scopeId: Schema.String,
@@ -197,7 +197,7 @@ export type ReconcileResult = typeof ReconcileResult.Type
 
 // ── Errors ───────────────────────────────────────────────────────────────────
 
-export class CheckpointNotFound extends Schema.TaggedErrorClass<CheckpointNotFound>()(
+class CheckpointNotFound extends Schema.TaggedErrorClass<CheckpointNotFound>()(
   'CheckpointNotFound',
   { sessionId: Schema.String },
 ) {}

@@ -63,7 +63,7 @@ export function tokensFromLaunchMetadata(
 }
 
 /** How many recent message ids are remembered per target. */
-export const PROMPT_RING_SIZE = 64;
+const PROMPT_RING_SIZE = 64;
 
 /** How long a remembered id suppresses a repeat. */
 export const PROMPT_DEDUPE_WINDOW_MS = 10 * 60 * 1000;
@@ -141,7 +141,7 @@ function sameIssue(a: string | undefined, b: string | undefined): boolean {
  * everyone but an operator — a human at a conversation always keeps the ability
  * to steer, and an agent never gains one it could not be granted.
  */
-export function checkPromptAuthority(
+function checkPromptAuthority(
   targetTokens: Partial<PaneTokens>,
   sender: PromptSender,
   tokensAvailable = true,

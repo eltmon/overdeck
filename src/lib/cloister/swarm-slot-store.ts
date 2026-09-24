@@ -81,7 +81,7 @@ export interface SwarmSlotState {
   supersededAttempts?: SwarmSupersededAttempt[];
 }
 
-export const SWARM_SLOT_FILENAME_SUFFIX = '.slots.json';
+const SWARM_SLOT_FILENAME_SUFFIX = '.slots.json';
 
 /**
  * `<planHome>/.pan/continues/<ISSUE>.slots.json` — beside the issue's continue

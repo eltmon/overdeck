@@ -14,7 +14,7 @@ const COMPLETE_STATUS = 'complete';
  * or null when it cannot be determined. `panDir` is `<planHome>/.pan`, which
  * lives inside a registered checkout, so path containment is the match.
  */
-export function issuePrefixForStateRoot(panDir: string): string | null {
+function issuePrefixForStateRoot(panDir: string): string | null {
   try {
     const byPath = findProjectByPathSync(panDir);
     return byPath?.issue_prefix ? byPath.issue_prefix.toUpperCase() : null;

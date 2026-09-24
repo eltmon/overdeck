@@ -305,7 +305,7 @@ export function stagePreWorktreeMetadataSync(workspacePath: string): string | nu
   return stagedPath;
 }
 
-export function mergeDirectoryWithoutOverwriteSync(source: string, target: string): void {
+function mergeDirectoryWithoutOverwriteSync(source: string, target: string): void {
   if (!existsSync(source)) return;
   mkdirSync(target, { recursive: true });
 

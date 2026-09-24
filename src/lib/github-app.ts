@@ -855,7 +855,7 @@ export function getAppStatus(): {
   return { configured: false, mode: 'fallback' };
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 const apiCatch = (operation: string) => (cause: unknown) =>
   new GitHubApiError({

@@ -80,7 +80,7 @@ export function parseGitHubReposSync(): GitHubRepoConfig[] {
  * Uses unified parser to support standard, Rally, and custom formats.
  * @deprecated Use extractPrefix from issue-id.ts for unified parsing
  */
-export function extractIssuePrefix(issueId: string): string {
+function extractIssuePrefix(issueId: string): string {
   return extractPrefixSync(issueId) ?? issueId.split('-')[0].toUpperCase();
 }
 

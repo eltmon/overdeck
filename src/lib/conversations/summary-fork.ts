@@ -69,7 +69,7 @@ export class HandoffStallError extends Error {
   }
 }
 
-export class HandoffValidationError extends Error {
+class HandoffValidationError extends Error {
   constructor(
     public readonly docPath: string,
     public readonly reason: string,
@@ -84,7 +84,7 @@ export class HandoffValidationError extends Error {
  * helpfully wrapped its Markdown output in a fence. Returns the inner
  * content if a fence was detected, otherwise returns the trimmed input.
  */
-export function sanitizeHandoffDoc(text: string): string {
+function sanitizeHandoffDoc(text: string): string {
   const trimmed = text.trim();
   const fenceMatch = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/);
   return fenceMatch?.[1]?.trim() ?? trimmed;

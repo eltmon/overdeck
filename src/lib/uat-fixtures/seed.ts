@@ -45,7 +45,7 @@ export interface SeedReport {
  * src/dashboard/server/identity.ts:86-89 uses, rather than an
  * environment variable a host process could set by hand.
  */
-export function isRunningInContainer(): boolean {
+function isRunningInContainer(): boolean {
   return existsSync('/.dockerenv') || existsSync('/run/.containerenv');
 }
 

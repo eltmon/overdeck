@@ -30,7 +30,7 @@ export interface CodexHostClientOptions {
   readonly timeoutMs?: number;
 }
 
-export const CODEX_HOST_OP_TIMEOUT_MS = 10_000;
+const CODEX_HOST_OP_TIMEOUT_MS = 10_000;
 
 async function readToken(path: string): Promise<string | undefined> {
   try {

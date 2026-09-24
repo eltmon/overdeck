@@ -4,7 +4,7 @@
  * Replaces direct `getDatabase()` calls in:
  *   src/lib/database/health-events-db.ts
  *
- * Live consumers (service.ts): writeHealthEvent, getLatestHealthEvent.
+ * Live consumers (service.ts): writeHealthEvent.
  * Pattern follows src/lib/overdeck/review-status-sync.ts.
  *
  * NOTE: overdeck stores timestamps as INTEGER milliseconds.

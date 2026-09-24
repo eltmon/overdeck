@@ -218,7 +218,7 @@ function classifyFetchError(err: unknown, provider: ProviderConfig): ProbeResult
 /**
  * User-facing error message for a failed probe, suitable for dashboard display.
  */
-export function formatProbeError(provider: ProviderConfig, model: string, result: ProbeResult & { ok: false }): string {
+function formatProbeError(provider: ProviderConfig, model: string, result: ProbeResult & { ok: false }): string {
   const prefix = `${provider.displayName} (${model})`;
 
   switch (result.kind) {

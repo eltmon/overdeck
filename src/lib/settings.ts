@@ -258,7 +258,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
  * Check if a model ID is an Anthropic model
  * Anthropic models can be run directly with `claude` CLI
  */
-export function isAnthropicModelSync(modelId: ModelId | string): boolean {
+function isAnthropicModelSync(modelId: ModelId | string): boolean {
   return modelId.startsWith('claude-');
 }
 

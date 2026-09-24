@@ -276,7 +276,7 @@ export class TranscriptSourceRegistry {
   }
 }
 
-export function createDefaultTranscriptSourceRegistry(): TranscriptSourceRegistry {
+function createDefaultTranscriptSourceRegistry(): TranscriptSourceRegistry {
   const registry = new TranscriptSourceRegistry();
   registry.register(new ClaudeCodeTranscriptSource());
   registry.register(new PiTranscriptSource());

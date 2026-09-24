@@ -1,7 +1,7 @@
 import { exec, type ChildProcess, type ExecException } from 'child_process';
 import { cleanupStaleLocks } from '../git-utils.js';
 
-export const GIT_OPERATION_HEADS = [
+const GIT_OPERATION_HEADS = [
   'MERGE_HEAD',
   'REBASE_HEAD',
   'CHERRY_PICK_HEAD',

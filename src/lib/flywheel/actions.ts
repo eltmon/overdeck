@@ -34,8 +34,8 @@ export const FLYWHEEL_REPORT_REQUEST =
 export const FLYWHEEL_STOP_REQUEST =
   'Stop the loop: write .pan/flywheel/report.md, commit it, print flywheel-tick: … phase=stopping, then end.';
 
-export const FLYWHEEL_STOP_POLL_MS = 5_000;
-export const FLYWHEEL_STOP_DEFAULT_TIMEOUT_MS = 120_000;
+const FLYWHEEL_STOP_POLL_MS = 5_000;
+const FLYWHEEL_STOP_DEFAULT_TIMEOUT_MS = 120_000;
 
 export interface FlywheelStartOptions {
   model?: string;

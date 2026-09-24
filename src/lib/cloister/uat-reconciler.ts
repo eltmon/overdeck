@@ -50,9 +50,9 @@ export const FAILED_RETRY_BACKOFF_MS = 10 * 60 * 1000;
  * it bypasses the backoff — that is the operator's retry lever once the
  * underlying cause is fixed.
  */
-export const MAX_CONSECUTIVE_FAILED_ASSEMBLIES = 3;
+const MAX_CONSECUTIVE_FAILED_ASSEMBLIES = 3;
 /** PAN-3965: the smallest ready set worth a batch; one feature merges directly. */
-export const MIN_BATCH_FEATURES = 2;
+const MIN_BATCH_FEATURES = 2;
 
 export interface UatReconcilerDeps {
   /** Gate: flywheel.merge_train_enabled. */

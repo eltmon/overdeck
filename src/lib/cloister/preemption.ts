@@ -48,8 +48,8 @@ export interface YieldOutcome {
 }
 
 /**
- * A running work agent considered for yielding. Carries the precomputed
- * eligibility signals so `selectYieldVictim` is pure and unit-testable.
+ * A running work agent considered for yielding, with its precomputed
+ * eligibility signals.
  */
 export interface YieldCandidate {
   id: string;

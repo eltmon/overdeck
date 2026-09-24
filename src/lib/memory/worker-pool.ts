@@ -10,7 +10,7 @@ import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type 
 import { getMemoryWorkerConcurrency } from './settings.js';
 
 export const DEFAULT_MEMORY_WORKER_CONCURRENCY = 4;
-export const DEFAULT_MEMORY_WORKER_QUEUE_LIMIT = 500;
+const DEFAULT_MEMORY_WORKER_QUEUE_LIMIT = 500;
 
 export interface MemoryExtractionJob extends ExtractObservationInput {
   jobId?: string;

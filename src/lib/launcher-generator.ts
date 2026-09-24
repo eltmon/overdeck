@@ -913,9 +913,6 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   ];
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure-sync launcher emission — additive Effect.sync wrappers.
-
 /** Persistent native TUI, verified against Muse Code 1.0.2. */
 function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {
   const model = config.museModel ?? config.model;

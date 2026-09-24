@@ -253,7 +253,7 @@ const postBacklogGateRoute = HttpRouter.add(
       writeSequenceMd(projectRoot, doc, { operatorEdit: true });
 
       // Mirror the hard veto to the `vetoed` GitHub label so it's visible + queryable
-      // and honored by pickFromSequence; clear it when the gate is relaxed.
+      // and honored by the Flywheel's pickup; clear it when the gate is relaxed.
       if (gate === 'vetoed') await applyIssueVetoedLabel(issueId);
       else await removeIssueVetoedLabel(issueId);
 

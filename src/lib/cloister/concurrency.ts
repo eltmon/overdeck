@@ -132,7 +132,7 @@ export function countRunningSwarmSlotsForIssue(
  * reviewer that finished (or a reviewer that was never busy) frees its slot
  * without anything needing to have written a verdict down first.
  */
-export function countWarmIdleAdvancingAgents(
+function countWarmIdleAdvancingAgents(
   agents: ReturnType<typeof listRunningAgentsSync> = listRunningAgentsSync(),
 ): number {
   const advancingRows = agents.filter(a => a.role && ADVANCING_ROLES.has(a.role) && a.issueId);

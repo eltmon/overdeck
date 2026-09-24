@@ -22,7 +22,7 @@ import { getAgentDir } from './agent-state.js';
 /** Presence heartbeat cadence for a running monitor. */
 export const MONITOR_HEARTBEAT_INTERVAL_MS = 15_000;
 /** Monitor stdout blocks truncate here; `pan inbox` re-reads full bodies. */
-export const MONITOR_BLOCK_MAX_BODY_CHARS = 4_000;
+const MONITOR_BLOCK_MAX_BODY_CHARS = 4_000;
 
 export interface MonitorPresence {
   pid: number;
@@ -36,7 +36,7 @@ export interface ParsedMailMessage {
   body: string;
 }
 
-export function monitorPresencePath(agentId: string): string {
+function monitorPresencePath(agentId: string): string {
   return join(getAgentDir(agentId), 'monitor.json');
 }
 

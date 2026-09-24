@@ -13,7 +13,7 @@ import { resolveProjectForIssue } from '../overdeck/issue-projects.js';
 import { readContinueState } from '../xbrief/continue-state.js';
 
 /** Decision id prefix the waiver is recorded under on the continue file. */
-export const TEST_SKIP_WAIVER_DECISION_PREFIX = 'D-test-removal-waived:';
+const TEST_SKIP_WAIVER_DECISION_PREFIX = 'D-test-removal-waived:';
 
 export interface TestSkipWaiver {
   /** Head anchor the waiver was granted against (`snapshotWorkspaceHeadsPromise` format). */

@@ -216,7 +216,7 @@ export function recordCodexRolloutSession(agentId: string, threadId: string, rol
 
 const SPAWN_READY_TIMEOUT_MS = 60_000
 
-export class CodexSpawnTimeout extends Error {
+class CodexSpawnTimeout extends Error {
   readonly code = 'CODEX_SPAWN_TIMEOUT' as const
   constructor(agentId: string) {
     super(`Codex agent ${agentId} did not start within ${SPAWN_READY_TIMEOUT_MS}ms`)
@@ -395,7 +395,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
  * Exported for unit testing over temp dirs. Privacy: a symlink's permissions
  * follow its target (the global file is 0600), so no chmod is needed here.
  */
-export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: string): void {
+function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: string): void {
   if (!existsSync(globalAuthPath)) return
 
   // If the home path is already a symlink pointing at the global file, we're done.
@@ -434,7 +434,7 @@ export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: strin
  * authorize out-of-sandbox execution, so Overdeck must never silently discard
  * or redirect a rule directory it did not create.
  */
-export function seedCodexRulesSymlink(homeRulesPath: string, globalRulesPath: string): void {
+function seedCodexRulesSymlink(homeRulesPath: string, globalRulesPath: string): void {
   if (!existsSync(globalRulesPath)) return
 
   try {

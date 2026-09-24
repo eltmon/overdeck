@@ -40,7 +40,7 @@ export class CliproxyError extends Data.TaggedError('CliproxyError')<{
   readonly cause?: unknown;
 }> {}
 
-export const CLIPROXY_HOST = '127.0.0.1';
+const CLIPROXY_HOST = '127.0.0.1';
 export const CLIPROXY_PORT = 8317;
 export const CLIPROXY_AUTH_TOKEN = 'overdeck-local-cliproxy-key';
 export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
@@ -53,7 +53,7 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 // hour, and cold-started all caching on proxy restart.
 const CLIPROXY_RELEASE_VERSION = 'v7.2.113';
 
-export function getCliproxyDir(): string {
+function getCliproxyDir(): string {
   return join(OVERDECK_HOME, 'cliproxy');
 }
 
@@ -65,7 +65,7 @@ export function extractedBinaryName(platform: NodeJS.Platform = process.platform
   return platform === 'win32' ? 'cli-proxy-api.exe' : 'cli-proxy-api';
 }
 
-export function getCliproxyConfigPath(): string {
+function getCliproxyConfigPath(): string {
   return join(getCliproxyDir(), 'config.yaml');
 }
 
@@ -73,7 +73,7 @@ export function getCliproxyAuthDir(): string {
   return join(getCliproxyDir(), 'auth');
 }
 
-export function getCliproxyPidPath(): string {
+function getCliproxyPidPath(): string {
   return join(getCliproxyDir(), 'cliproxy.pid');
 }
 

@@ -15,7 +15,7 @@ import { getOverdeckHome } from '../../paths.js';
 export const WORKER_ID_RE = /^agent-[a-z0-9_-]+-worker-\d+$/;
 
 /** How many ids `allocateWorkerId` tries before giving up. */
-export const WORKER_ID_CLAIM_ATTEMPTS = 20;
+const WORKER_ID_CLAIM_ATTEMPTS = 20;
 
 export function agentsRoot(): string {
   return join(getOverdeckHome(), 'agents');

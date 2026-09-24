@@ -38,7 +38,7 @@ export async function reserveForkSession(cwd: string): Promise<ReservedForkSessi
  * Find the byte offset of the last `compact_boundary` entry in a JSONL file.
  * Returns 0 if no boundary is found.
  */
-export async function findLastCompactBoundaryOffset(jsonlPath: string): Promise<number> {
+async function findLastCompactBoundaryOffset(jsonlPath: string): Promise<number> {
   const content = await readFile(jsonlPath, 'utf-8');
   const lines = content.split('\n');
   let offset = 0;
@@ -68,7 +68,7 @@ type JsonlEntry = {
   [key: string]: unknown;
 };
 
-export function sanitizeEntryForPlainFork(entry: JsonlEntry): JsonlEntry {
+function sanitizeEntryForPlainFork(entry: JsonlEntry): JsonlEntry {
   if (entry.type !== 'assistant' || !entry.message || !Array.isArray(entry.message.content)) {
     return entry;
   }

@@ -11,13 +11,13 @@ C 1 src/lib/agents/termination.ts
 C 1 src/lib/config.ts
 C 1 src/lib/prd-locations.ts
 C 1 src/lib/projects-config-lock.ts
+C 1 src/lib/projects-config-write.ts
 C 1 src/lib/runtimes/ohmypi.ts
 C 1 src/lib/runtimes/storage/muse.ts
 C 1 src/lib/ui-theme.ts
 C 1 src/lib/work-agent-lifecycle.ts
 C 2 src/lib/agents/agent-state.ts
 C 2 src/lib/cloister/config.ts
-C 3 src/lib/projects-config-write.ts
 C 4 src/lib/projects.ts
 C 4 src/lib/xbrief/io.ts
-C 8 src/lib/tmux.ts
+C 7 src/lib/tmux.ts

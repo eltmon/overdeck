@@ -91,7 +91,7 @@ export const Agent = Schema.Struct({
 });
 export type Agent = typeof Agent.Type;
 
-export const AgentFilter = Schema.Struct({
+const AgentFilter = Schema.Struct({
   issueId: Schema.optional(IssueId),
   role: Schema.optional(Role),
   status: Schema.optional(Status),

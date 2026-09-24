@@ -76,7 +76,7 @@ export function insertCostEventSync(event: CostEvent): boolean {
 
 // ── Records-layer helpers ─────────────────────────────────────────────────────
 
-export function getCostSinceSync(startTs: Date): number {
+function getCostSinceSync(startTs: Date): number {
   const db = getOverdeckDatabaseSync();
   const row = db
     .prepare(

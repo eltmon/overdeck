@@ -25,7 +25,7 @@ export interface FlywheelFilePayload {
 }
 
 /** Resolve `relativePath` under `planHome`; throws when it escapes. */
-export function resolveUnderPlanHome(planHome: string, relativePath: string): string {
+function resolveUnderPlanHome(planHome: string, relativePath: string): string {
   const root = resolve(planHome);
   const absolute = resolve(root, relativePath);
   const rel = relative(root, absolute);

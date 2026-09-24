@@ -24,25 +24,25 @@ export type UatName = typeof UatName.Type;
 export const MergeSetStatus = Schema.Literals([
   'draft', 'reviewing', 'ready', 'merging', 'merged', 'failed',
 ]);
-export const GateStatus = Schema.Literals([
+const GateStatus = Schema.Literals([
   'pending', 'running', 'passed', 'failed', 'blocked', 'skipped',
 ]);
 export type GateStatus = typeof GateStatus.Type;
 export const RebaseStatus = Schema.Literals([
   'pending', 'requested', 'running', 'passed', 'failed', 'blocked', 'skipped',
 ]);
-export const RepoMergeStatus = Schema.Literals([
+const RepoMergeStatus = Schema.Literals([
   'pending', 'ready', 'merging', 'merged', 'failed', 'blocked', 'skipped',
 ]);
-export const WorkspaceType = Schema.Literals(['monorepo', 'polyrepo']);
-export const AutoMergeStatus = Schema.Literals([
+const WorkspaceType = Schema.Literals(['monorepo', 'polyrepo']);
+const AutoMergeStatus = Schema.Literals([
   'pending', 'merging', 'blocked', 'failed', 'merged', 'cancelled',
 ]);
-export const UatStatus = Schema.Literals([
+const UatStatus = Schema.Literals([
   'assembling', 'ready', 'superseded', 'invalidated', 'promoted', 'failed',
 ]);
 export type UatStatus = typeof UatStatus.Type;
-export const UatMemberRole = Schema.Literals(['member', 'held_out']);
+const UatMemberRole = Schema.Literals(['member', 'held_out']);
 
 // ── Entities ──────────────────────────────────────────────────────────────────
 
@@ -76,7 +76,7 @@ export const MergeSet = Schema.Struct({
 });
 export type MergeSet = typeof MergeSet.Type;
 
-export const QueueView = Schema.Struct({
+const QueueView = Schema.Struct({
   projectKey:  ProjectKey,
   current:     Schema.NullOr(IssueId),
   queue:       Schema.Array(IssueId),
@@ -84,7 +84,7 @@ export const QueueView = Schema.Struct({
 });
 export type QueueView = typeof QueueView.Type;
 
-export const AutoMerge = Schema.Struct({
+const AutoMerge = Schema.Struct({
   id:               Schema.Number,
   issueId:          IssueId,
   prUrl:            Schema.String,
@@ -101,7 +101,7 @@ export const AutoMerge = Schema.Struct({
 });
 export type AutoMerge = typeof AutoMerge.Type;
 
-export const UatMember = Schema.Struct({
+const UatMember = Schema.Struct({
   issueId:    IssueId,
   role:       UatMemberRole,
   title:      Schema.NullOr(Schema.String),
@@ -113,7 +113,7 @@ export const UatMember = Schema.Struct({
   reason:     Schema.NullOr(Schema.String),
 });
 
-export const UatResolution = Schema.Struct({
+const UatResolution = Schema.Struct({
   id:        Schema.Number,
   issueIds:  Schema.Array(IssueId),
   files:     Schema.Array(Schema.String),
@@ -136,13 +136,13 @@ export const UatGeneration = Schema.Struct({
 });
 export type UatGeneration = typeof UatGeneration.Type;
 
-export const AutoMergeFilter = Schema.Struct({
+const AutoMergeFilter = Schema.Struct({
   active:   Schema.optional(Schema.Boolean),
   problems: Schema.optional(Schema.Boolean),
 });
 export type AutoMergeFilter = typeof AutoMergeFilter.Type;
 
-export const UatGenerationFilter = Schema.Struct({
+const UatGenerationFilter = Schema.Struct({
   projectRoot: Schema.optional(Schema.String),
   statuses:    Schema.optional(Schema.Array(UatStatus)),
 });
@@ -150,11 +150,11 @@ export type UatGenerationFilter = typeof UatGenerationFilter.Type;
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 
-export class MergeSetNotFound extends Schema.TaggedErrorClass<MergeSetNotFound>()(
+class MergeSetNotFound extends Schema.TaggedErrorClass<MergeSetNotFound>()(
   'MergeSetNotFound', { issueId: IssueId },
 ) {}
 
-export class NotReadyForMerge extends Schema.TaggedErrorClass<NotReadyForMerge>()(
+class NotReadyForMerge extends Schema.TaggedErrorClass<NotReadyForMerge>()(
   'NotReadyForMerge', {
     issueId:    IssueId,
     repoReview: GateStatus,
@@ -162,23 +162,23 @@ export class NotReadyForMerge extends Schema.TaggedErrorClass<NotReadyForMerge>(
   },
 ) {}
 
-export class MergeInProgress extends Schema.TaggedErrorClass<MergeInProgress>()(
+class MergeInProgress extends Schema.TaggedErrorClass<MergeInProgress>()(
   'MergeInProgress', { issueId: IssueId },
 ) {}
 
-export class AutoMergeNotFound extends Schema.TaggedErrorClass<AutoMergeNotFound>()(
+class AutoMergeNotFound extends Schema.TaggedErrorClass<AutoMergeNotFound>()(
   'AutoMergeNotFound', { issueId: IssueId },
 ) {}
 
-export class UatGenerationNotFound extends Schema.TaggedErrorClass<UatGenerationNotFound>()(
+class UatGenerationNotFound extends Schema.TaggedErrorClass<UatGenerationNotFound>()(
   'UatGenerationNotFound', { name: UatName },
 ) {}
 
-export class UatNotPromotable extends Schema.TaggedErrorClass<UatNotPromotable>()(
+class UatNotPromotable extends Schema.TaggedErrorClass<UatNotPromotable>()(
   'UatNotPromotable', { name: UatName, status: UatStatus },
 ) {}
 
-export class ForgeMergeFailed extends Schema.TaggedErrorClass<ForgeMergeFailed>()(
+class ForgeMergeFailed extends Schema.TaggedErrorClass<ForgeMergeFailed>()(
   'ForgeMergeFailed', {
     issueId: IssueId,
     repoKey: RepoKey,
@@ -236,11 +236,6 @@ export class MergeWriter extends Context.Service<MergeWriter, {
   readonly promoteUat:    (name: UatName) =>
     Effect.Effect<UatGeneration, UatGenerationNotFound | UatNotPromotable>;
 }>()('overdeck/MergeWriter') {}
-
-// ── MergeApi — HttpApiGroup ───────────────────────────────────────────────────
-// query: (not urlParams:) for GET params per Effect v4. Schema.Union([...]) array form.
-// HttpApiEndpoint['delete'] for reserved word. PAN-1696: merge-train endpoints are under
-// /merge-train/* (per-project concern); auto-merge + merge-blockers stay /flywheel/*.
 
 // ── Sync helpers for merge-queue (used by synchronous call sites) ────────────
 

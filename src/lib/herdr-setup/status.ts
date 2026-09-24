@@ -15,7 +15,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 /** Default subprocess timeout for quick `herdr` calls. */
-export const HERDR_EXEC_TIMEOUT_MS = 10_000;
+const HERDR_EXEC_TIMEOUT_MS = 10_000;
 
 export interface HerdrExecOptions {
   readonly timeoutMs?: number;

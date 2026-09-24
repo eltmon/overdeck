@@ -31,7 +31,7 @@ import type { PendingAskUserQuestionSnapshot, PendingInputKind } from '../agent-
 import { getOverdeckHome } from '../paths.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
 
-export const CONTROL_ACK_TIMEOUT_MS = 10_000;
+const CONTROL_ACK_TIMEOUT_MS = 10_000;
 
 export interface ConversationControlAck {
   id: string
@@ -268,7 +268,7 @@ export function isPiControlChannelHarness(harness: RuntimeName | 'pi'): boolean 
   return harness === 'ohmypi' || harness === 'pi';
 }
 
-export function parseThinkingLevel(value: unknown): ThinkingLevel | null {
+function parseThinkingLevel(value: unknown): ThinkingLevel | null {
   return typeof value === 'string' && (THINKING_LEVELS as readonly string[]).includes(value)
     ? value as ThinkingLevel
     : null;
@@ -439,7 +439,7 @@ export async function handleConversationDeliveryMethod(
   return jsonResponse({ ok: true, deliveryMethod });
 }
 
-export const CODEX_APPROVAL_TOOL_PREFIX = 'codex-approval:';
+const CODEX_APPROVAL_TOOL_PREFIX = 'codex-approval:';
 
 export async function codexConversationPendingInput(
   conv: Conversation,
@@ -494,7 +494,7 @@ export async function codexConversationPendingInput(
   }
 }
 
-export async function deliverCodexApprovalChoice(tmuxSession: string, optionNumber: number): Promise<void> {
+async function deliverCodexApprovalChoice(tmuxSession: string, optionNumber: number): Promise<void> {
   for (let i = 1; i < optionNumber; i += 1) {
     await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Down', 'codex-approval'));
     await new Promise((r) => setTimeout(r, 60));

@@ -69,7 +69,7 @@ export function initHookSync(agentId: string): void {
 /**
  * Get the hook for an agent
  */
-export function getHookSync(agentId: string): Hook | null {
+function getHookSync(agentId: string): Hook | null {
   const hookFile = getHookFile(agentId);
   if (!existsSync(hookFile)) {
     return null;

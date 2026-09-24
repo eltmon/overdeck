@@ -30,7 +30,7 @@ export interface DiscoverySource {
 
 type AgentStateHarness = DiscoveredHarness | string;
 
-export const discoverySources: DiscoverySource[] = [
+const discoverySources: DiscoverySource[] = [
   {
     harness: 'claude-code',
     roots: () => [claudeProjectsRoot()],

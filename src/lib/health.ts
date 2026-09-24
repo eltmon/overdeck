@@ -16,7 +16,7 @@ import { listSessionNames, sessionExists } from './tmux.js';
 import { getAgentEffectiveLastActivityMs } from './agents/liveness.js';
 
 /** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
-export class HealthError extends Data.TaggedError('HealthError')<{
+class HealthError extends Data.TaggedError('HealthError')<{
   readonly agentId: string;
   readonly operation: string;
   readonly message: string;
@@ -82,14 +82,14 @@ export function getAgentHealth(agentId: string): AgentHealth {
 /**
  * Save health record for an agent
  */
-export function saveAgentHealth(health: AgentHealth): void {
+function saveAgentHealth(health: AgentHealth): void {
   const dir = join(AGENTS_DIR, health.agentId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(getHealthFile(health.agentId), JSON.stringify(health, null, 2));
 }
 
 /** Tmux session liveness probe for an agent; never rejects. */
-export async function isAgentAlive(agentId: string): Promise<boolean> {
+async function isAgentAlive(agentId: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(agentId));
 }
 
@@ -413,7 +413,7 @@ export function formatHealthStatus(health: AgentHealth): string {
   return lines.join('\n');
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 const healthCatch = (agentId: string, operation: string) => (cause: unknown) =>
   new HealthError({

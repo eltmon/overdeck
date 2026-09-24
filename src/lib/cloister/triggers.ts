@@ -51,7 +51,7 @@ export interface TriggerDetection {
  * @param config - Cloister configuration
  * @returns Trigger detection result
  */
-export function checkStuckEscalation(
+function checkStuckEscalation(
   health: AgentHealth,
   currentModel: string,
   config?: CloisterConfig
@@ -139,7 +139,7 @@ export function checkStuckEscalation(
  * @param config - Cloister configuration
  * @returns Trigger detection result
  */
-export function checkTestFailure(
+function checkTestFailure(
   workspace: string,
   currentModel: string,
   config?: CloisterConfig
@@ -230,7 +230,7 @@ function detectTestFailure(workspace: string): {
  * Detect whether an issue's tasks are complete. Never rejects: failures
  * return a "not triggered" detection.
  */
-export async function checkTaskCompletion(
+async function checkTaskCompletion(
   issueId: string,
   config?: CloisterConfig,
   workspace?: string,

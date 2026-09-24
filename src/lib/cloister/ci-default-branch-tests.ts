@@ -13,7 +13,7 @@ import { execFile } from 'node:child_process';
 import { isCiTestCheckName } from './verification-tests-mode.js';
 
 /** How many default-branch commits to walk back for a finished test run. */
-export const DEFAULT_BRANCH_LOOKBACK = 10;
+const DEFAULT_BRANCH_LOOKBACK = 10;
 
 /** Conclusions that are no verdict on the code: skip that commit. */
 const INDECISIVE_CONCLUSIONS = new Set(['cancelled', 'stale', 'startup_failure', 'action_required']);

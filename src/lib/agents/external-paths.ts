@@ -27,7 +27,7 @@ import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
 export type PathCheck = { ok: true; path: string } | { ok: false; error: string };
 
 /** The directories a registered transcript may live under. */
-export function externalTranscriptRoots(): string[] {
+function externalTranscriptRoots(): string[] {
   return [
     claudeProjectsRoot(),
     codexSessionsRoot(codexHomeDir()),
@@ -75,7 +75,7 @@ export function checkTranscriptPath(path: string): Promise<PathCheck> {
  * opening a FIFO return at once, and the descriptor is refused unless it is a
  * regular file. Null when the path cannot be opened or is not a regular file.
  */
-export async function openRegularFile(path: string): Promise<FileHandle | null> {
+async function openRegularFile(path: string): Promise<FileHandle | null> {
   let handle: FileHandle;
   try {
     handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);

@@ -109,3 +109,4 @@ for k, v in byfile.most_common(25): print('  ', v, k)
 if len(sys.argv) > 1:
     for r in dead_unused: print('DEAD', *r)
     for r in to_unused: print('TESTONLY', *r)
+    for r in dead_selfonly: print('OWNFILE', *r)

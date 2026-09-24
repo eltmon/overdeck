@@ -182,8 +182,8 @@ or un-parks an issue.
 `snapshotWorkspaceHeadsPromise()` is the producer for review `HeadAnchor` values:
 a monorepo anchor is one full SHA, while a polyrepo anchor is a space-separated
 set of `repoKey@sha` tokens. `parseCompositeSnapshot()` is the shared parser for
-inspection; persisted strings regain the `HeadAnchor` brand only through
-`rehydrateHeadAnchor()` at the storage boundary.
+inspection. Persisted strings do not regain the `HeadAnchor` brand: the
+rehydrate helper had no caller and was removed in PAN-3958 CH-8.
 
 This keeps review evidence tied to the actual code repositories rather than the
 polyrepo wrapper repository. A composite/bare shape mismatch is indeterminate,

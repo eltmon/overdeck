@@ -51,7 +51,7 @@ export interface HysteresisResult<TMetrics> {
   transition: AcceptedHealthTransition | null;
 }
 
-export function createMeasuringState<TMetrics>(
+function createMeasuringState<TMetrics>(
   metrics: TMetrics,
   observedAt: string,
 ): HysteresisState<TMetrics> {
@@ -107,7 +107,7 @@ function accept<TMetrics>(
  * and reasons move with their state only when that complete assessment is
  * accepted, so readers never observe a new state paired with old evidence.
  */
-export function transitionAcceptedAssessment<TMetrics>(
+function transitionAcceptedAssessment<TMetrics>(
   previous: HysteresisState<TMetrics>,
   raw: RawHealthAssessment<TMetrics>,
 ): HysteresisResult<TMetrics> {

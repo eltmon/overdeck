@@ -186,11 +186,11 @@ export async function recordFeatureRegistryLifecycle(input: FeatureRegistryLifec
   }
 }
 
-export function workspaceIdFromPath(workspacePath?: string | null): string | undefined {
+function workspaceIdFromPath(workspacePath?: string | null): string | undefined {
   return workspacePath ? basename(workspacePath) : undefined;
 }
 
-export function buildFeatureClassificationPrompt(input: Pick<IssueFeatureClassificationInput, 'issueId' | 'title' | 'body'>): string {
+function buildFeatureClassificationPrompt(input: Pick<IssueFeatureClassificationInput, 'issueId' | 'title' | 'body'>): string {
   return [
     'Classify this Overdeck tracker issue into low-cardinality product feature names for a knowledge registry.',
     'Prefer stable product areas or user-visible capabilities over implementation details, branch names, or one-off bug wording.',

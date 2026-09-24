@@ -31,7 +31,7 @@ export type TraefikRenderMode = 'production' | 'dev';
  * unchanged for the common case while letting dev workflows opt in by exporting
  * the env var before invoking any code path that regenerates Traefik config.
  */
-export function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikRenderMode {
+function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikRenderMode {
   if (explicit) return explicit;
   const env = process.env['OVERDECK_DEV'];
   if (env && env !== '0' && env.toLowerCase() !== 'false') return 'dev';

@@ -123,7 +123,7 @@ export function readGovernorWatchReserveBytes(): number {
   return loadConfigSync().config.resources.governorWatchReserveGb * GIB;
 }
 
-export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
+function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
   const resources = loadConfigSync().config.resources;
   return {
     swapSoftFreePercent: resources.governorSwapSoftFreePercent,
@@ -162,7 +162,7 @@ export function nextGovernorMode(
   return 'holding';
 }
 
-export function nextGovernorModeWithRunway(
+function nextGovernorModeWithRunway(
   availableBytes: number,
   reserves: GovernorReserves,
   runway: GovernorRunway,

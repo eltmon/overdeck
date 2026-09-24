@@ -41,7 +41,7 @@ export interface SkillRequirement {
  * Work type to skill mapping
  * Defines what skills each work type needs
  */
-export const WORK_TYPE_REQUIREMENTS: Record<string, SkillRequirement[]> = {
+const WORK_TYPE_REQUIREMENTS: Record<string, SkillRequirement[]> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ISSUE AGENT PHASES
   // ═══════════════════════════════════════════════════════════════════════════

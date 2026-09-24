@@ -160,7 +160,7 @@ export const changedFilesVsMain = (branch: string, cwd: string, base = 'main') =
     );
   });
 
-export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
+const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 
 export interface ComputeMergeQueueOptions {
   getPrUrl?: (item: { issueId: string; pr?: number }) => string | undefined;

@@ -71,7 +71,7 @@ export async function probeAgentPane(agentId: string, backend?: TerminalBackend)
  * validates every key before writing any byte, so an unknown name fails the
  * whole call without typing anything.
  */
-export function toHerdrKey(tmuxKey: string): string {
+function toHerdrKey(tmuxKey: string): string {
   switch (tmuxKey) {
     case 'Enter': return 'enter';
     case 'Escape': return 'esc';

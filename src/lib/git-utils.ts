@@ -385,8 +385,8 @@ export function formatAnchorShort(anchor: string): string {
  * the ref lookup and fall back to their conservative full-rerun path.
  *
  * Its branded return value is the only legitimate source for reviewedAtCommit,
- * lastVerifiedCommit, and roleRunHead. Persisted values regain that brand only
- * through rehydrateHeadAnchor at an explicitly documented storage boundary.
+ * lastVerifiedCommit, and roleRunHead. Persisted values never regain that brand
+ * (the rehydrate helper had no caller and was removed in PAN-3958 CH-8).
  */
 export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
   // Dynamic import: project-repos → projects sits above this low-level module

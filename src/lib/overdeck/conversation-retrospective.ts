@@ -22,7 +22,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-export const RETROSPECTIVE_WINDOWS = {
+const RETROSPECTIVE_WINDOWS = {
   '24h': { label: 'last 24 hours', ms: 24 * 60 * 60 * 1000 },
   '7d': { label: 'last 7 days', ms: 7 * 24 * 60 * 60 * 1000 },
 } as const;
@@ -47,7 +47,7 @@ export function isRetrospectiveWindow(value: unknown): value is RetrospectiveWin
   );
 }
 
-export function isRetrospectiveRequestBody(value: unknown): value is Record<string, unknown> {
+function isRetrospectiveRequestBody(value: unknown): value is Record<string, unknown> {
   // Reject non-object bodies (null, arrays, primitives) before the window
   // lookup. The route's readJsonBody defaults malformed JSON to `{}`, but a
   // caller that POSTs `null` or `"constructor"` would otherwise reach
@@ -103,7 +103,7 @@ export async function loadRetrospectiveTemplate(
   return readFile(path, 'utf-8');
 }
 
-export async function collectRetrospectiveProjects(): Promise<RetrospectiveProjectLine[]> {
+async function collectRetrospectiveProjects(): Promise<RetrospectiveProjectLine[]> {
   const projects = await listProjectsAsync();
   return projects.map(({ key, config }) => ({
     key,
@@ -453,7 +453,7 @@ function applyRenderedByteBudget(blocks: string[]): string {
  * A project with no `github_repo` is reported as unreadable rather than quiet:
  * a retrospective that claims silence it never verified is worse than a gap.
  */
-export async function listRecordsThroughReadDoor(
+async function listRecordsThroughReadDoor(
   project: RetrospectiveProjectLine,
 ): Promise<RetrospectiveRecordListing> {
   const repo = project.githubRepo;

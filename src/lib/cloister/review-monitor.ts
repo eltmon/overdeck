@@ -7,9 +7,9 @@
  *   2. Detect stalls (reviewer session died or hasn't written in N minutes)
  *   3. Receive all output paths when every reviewer has settled
  *
- * waitForReviewerOutputs() implements that contract. Synthesis calls it
- * after firing all four spawnRun calls, then reads the resolved output files
- * to synthesize findings.
+ * The poll loop that implemented that contract (waitForReviewerOutputs) had no
+ * caller and was removed in PAN-3958 CH-8; the path and stall helpers below
+ * remain.
  */
 
 import { existsSync } from 'fs';
@@ -157,7 +157,7 @@ interface ReviewerState {
 
 /**
  * Compute the expected output path for a convoy reviewer.
- * Synthesis writes findings here; waitForReviewerOutputs polls it.
+ * Synthesis writes findings here.
  */
 export function reviewerOutputPath(
   workspace: string,

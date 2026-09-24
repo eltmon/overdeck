@@ -675,7 +675,7 @@ export function clearCredentialFileAuthSync(workspacePath: string): void {
   } catch { /* non-fatal */ }
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 /**
  * Map a Overdeck provider to the Pi harness's provider name for that

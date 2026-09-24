@@ -140,7 +140,7 @@ export async function spawnTierSupervisor(
   });
 }
 
-export function buildSupervisorPrompt(
+function buildSupervisorPrompt(
   issueId: string,
   subscribe: TieredExecutionSubscription,
 ): string {
@@ -255,7 +255,7 @@ export function extractAcceptanceCriteria(item: XBriefItem): string[] {
  * indented continuation lines, up to the next bullet or heading. Returns
  * undefined when no trace resolves to a requirement in the document.
  */
-export function extractTracedFrText(prdMarkdown: string, traces: readonly string[]): string | undefined {
+function extractTracedFrText(prdMarkdown: string, traces: readonly string[]): string | undefined {
   if (traces.length === 0) return undefined;
   const lines = prdMarkdown.split('\n');
   const sections: string[] = [];

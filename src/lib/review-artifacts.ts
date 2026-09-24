@@ -30,7 +30,7 @@ export interface ReviewArtifactCreationResult {
 }
 
 /** Build the markdown body of an issue's review artifact (PR description). */
-export async function buildRichReviewArtifactBody(issueId: string, workspacePath: string): Promise<string> {
+async function buildRichReviewArtifactBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
   // Non-closing reference on purpose: a closing keyword ("Closes #N") hands

@@ -72,7 +72,7 @@ const execAsync = promisify(exec);
 // PAN-2584: liveness budget for the review PARENT (discovery + convoy + synthesis).
 // Sub-reviewers get their own 20-minute deadlines in review-convoy.ts; the parent
 // needs headroom for all three phases. Enforced by checkStalledReviewParents.
-export const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
+const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 // Review now runs against the committed diff only. The dirty-worktree gate
 // at pan done time (and the same gate added to /api/review/:id/request)
 // guarantees the worktree is clean before specialists see the diff.
@@ -732,7 +732,7 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
   return { killed, failed };
 }
 
-// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
+// ─── Effect API ──────────────────────────────────────────────────────────────
 
 // PAN-2695: dispatch has multiple legitimate callers (request route, deacon
 // reconcile, dispatch reconcile) that can fire near-simultaneously. An

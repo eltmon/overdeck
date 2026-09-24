@@ -189,7 +189,7 @@ function normalize(value: string | null | undefined): string {
 }
 
 /** Aggregate GitHub's `statusCheckRollup` into one verdict. */
-export function summarizeStatusCheckRollup(
+function summarizeStatusCheckRollup(
   rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
 ): ChecksVerdict {
   const items = rollup ?? [];
@@ -277,7 +277,7 @@ function normalizeLogin(login: string): string {
  * as `OWNER`, `MEMBER` or `COLLABORATOR`, or from the identity Overdeck posts
  * verdicts as. Everything else is ignored — a pass, a failure, an approval.
  */
-export function isTrustedComment(comment: PrComment | undefined, trusted: TrustedAuthors): boolean {
+function isTrustedComment(comment: PrComment | undefined, trusted: TrustedAuthors): boolean {
   if (!comment) return false;
   if (TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))) return true;
   const login = comment.author?.login;

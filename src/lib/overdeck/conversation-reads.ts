@@ -716,7 +716,7 @@ export async function handleConversationMove(
 const retitleInFlight = new Set<string>();
 const EXPLICIT_RETITLE_TIMEOUT_MS = 90_000;
 
-export function isClaudeInvocationTimeout(error: unknown): boolean {
+function isClaudeInvocationTimeout(error: unknown): boolean {
   return error instanceof Error && /claude invocation timed out after \d+ms/.test(error.message);
 }
 

@@ -10,8 +10,8 @@
  */
 import { join } from 'node:path';
 
-export const CODEX_NATIVE_SOCKET_DIR = 'codex-native';
-export const CODEX_NATIVE_SOCKET_NAME = 'app.sock';
+const CODEX_NATIVE_SOCKET_DIR = 'codex-native';
+const CODEX_NATIVE_SOCKET_NAME = 'app.sock';
 export const CODEX_NATIVE_ENDPOINT_FILE = 'codex-native-endpoint';
 
 export function codexNativeSocketPath(agentDir: string): string {
