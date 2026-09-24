@@ -49,6 +49,12 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
+- The Command Deck project list (`command-deck-projects`), project registry
+  (`registered-projects`) and conversation list (`conversations`) still load over
+  REST. `lib/queryRecovery.ts` (PAN-3527) retries any failure of them with
+  backoff (1s, 2s, 4s, 8s, 16s) and, when EventRouter re-bootstraps after a
+  `/ws/rpc` reconnect, cancels in-flight fetches and refetches them, so a failed
+  or hung fetch during a dashboard restart does not leave the sidebar empty.
 
 **Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
 starts a discuss-first conversation through `POST /api/conversations` and opens
