@@ -311,6 +311,12 @@ In `src/lib/cloister/service-crash.ts`:
 - `pokeAgentWithEscalation` asks `isAlive` itself. It pokes only a confirmed-alive agent. When the
   backend does not answer (`runtime-indeterminate`), it neither pokes nor changes the no-progress
   streak.
+- `progressFingerprint`, which judges whether a poke did anything, reads the pane with
+  `readAgentPaneText` (#4121). It combines the workspace HEAD, the pane tail, and the runtime
+  heartbeat (the transcript mtime for claude-code). When the pane read throws or returns no text, the
+  fingerprint is unknown, and the poke is skipped without changing the streak. A fingerprint that
+  moved since the last poke counts as progress, so that agent is not poked either. Only an unchanged
+  fingerprint counts toward the tier-3 `idle-alive` pause.
 - `handleAgentCrash` counts a crash and emits `agent.heartbeat_dead` only when `isConfirmedDead`
   holds.
 
@@ -328,6 +334,36 @@ alias with the same value, true for a live pane on either backend. The same pair
 read-model `AgentSnapshot`, the `agent.status_changed` payload and the work-agent lifecycle
 object. The shared reducer fills whichever name an event omits, so stored events that carry only
 `hasLiveTmuxSession` still set `hasLivePane`. Readers use `hasLivePane`.
+
+**No reader filters on `tmuxActive`** (#4109). `listRunningAgents()` still returns the flag, but it
+is tmux session presence only, so it is `false` for every Herdr agent. The former readers now read
+the selected backend's live inventory (`listLiveAgentIds` / `listLiveAgentPanes` in
+`src/lib/terminal-backends/inventory.ts`) or await `isAlive`, and `scripts/lint-liveness.sh` bans
+`.tmuxActive` reads in them. What each does when the inventory is unreadable (`null`) depends on
+whether it acts:
+
+- **Does not act on unknown:** the memory governor pauses only agents the inventory lists, and
+  none when it is unreadable. The Cloister health loop skips a round whose inventory is
+  unreadable and keeps its previous running set. An agent missing from a readable inventory is a
+  crash only when `isConfirmedDead(await isAlive(id))` holds; otherwise it is re-checked next round.
+  `POST /api/agents/restart-all` answers 503 and restarts nothing, and the
+  restart-with-current-config list is empty.
+- **Treats unknown as live:** the governor still sheds merged stacks, but any agent for the issue
+  that the inventory lists or that has a `running` row protects its stack. `pan workspace update`
+  (`findLiveAgentInWorkspace`, via `isAlive`) refuses to run under a probe that did not answer.
+  `pan show --health ping|check` (`lib/health.ts`) reports an unanswered probe as a `warning` that
+  neither increments nor resets the force-kill counter. Cloister `emergencyStop` stops every agent
+  the inventory lists plus every `running` row, through `stopAgent` (which closes Herdr panes), and
+  reports a stop whose pane is not confirmed gone as `unconfirmedAgents`, apart from `killedAgents`.
+
+The tmux adapter's inventory reports a failed ps/pgrep probe (`runtime-indeterminate`) as
+`unknown`, never `exited`, so a live agent does not drop out of a readable inventory.
+- **Displays and read-only feeds fall back to the `running` rows** (`isListedOrRunning`): the
+  Cloister agent-health lists, the memory transcript sources and the boot telemetry count. The
+  all-output feed discovers nothing and still captures explicit subscriptions; it reads panes
+  through `captureLiveAgentPaneText`. `GET /api/health/agents` combines the inventory with the tmux
+  census and answers unavailable when the inventory is unreadable; its snapshots carry
+  `hasLivePane`, with `tmuxActive` kept as a deprecated alias.
 
 **Known gaps on Herdr** (readers, not spawners): the Claude resume-summary gate crossing
 (`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the

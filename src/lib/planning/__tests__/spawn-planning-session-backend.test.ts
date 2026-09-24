@@ -187,3 +187,20 @@ describe('spawnPlanningSession launches through the host backend (PAN-3960)', ()
     expect(mocks.tmuxSetOption).not.toHaveBeenCalled();
   });
 });
+
+describe('spawnPlanningSession pre-trusts the workspace (PAN-3905)', () => {
+  it('writes the Claude Code trust entry for an existing workspace before launch', async () => {
+    mocks.host = 'herdr';
+    // HOME is the temp dir, so this is the only ~/.claude.json the helper can
+    // touch. It must exist: the helper leaves a missing file alone.
+    const claudeJsonPath = join(tempHome, '.claude.json');
+    writeFileSync(claudeJsonPath, JSON.stringify({ projects: {} }));
+
+    const result = await spawnPlanner('planning-pan-3905-trust');
+
+    expect(result).toEqual({ success: true });
+    expect(herdr.starts).toHaveLength(1);
+    const data = JSON.parse(readFileSync(claudeJsonPath, 'utf-8'));
+    expect(data.projects[workspace]).toMatchObject({ hasTrustDialogAccepted: true });
+  });
+});

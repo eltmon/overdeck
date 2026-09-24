@@ -6,8 +6,10 @@ import { getCloisterEventStore, type CloisterEventStore } from './event-store-pr
 import { loadCloisterConfigSync } from './config.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
-import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgentsSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
+import { getGlobalRegistry } from '../runtimes/index.js';
+import { listRunningAgents, stopAgent, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
+import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
 import {
   isCloisterSpawnsPaused,
   setCloisterSpawnsPaused,
@@ -154,7 +156,7 @@ export type CloisterEvent =
   | { type: 'session_rotated'; specialistName: string; result: SessionRotationResult }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
   | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
-  | { type: 'emergency_stop'; killedAgents: string[] }
+  | { type: 'emergency_stop'; killedAgents: string[]; unconfirmedAgents: string[] }
   | { type: 'error'; error: Error };
 
 /**
@@ -461,7 +463,7 @@ export class CloisterService {
    *
    * This is the nuclear option. Use with caution.
    */
-  emergencyStop(): string[] {
+  async emergencyStop(): Promise<{ killedAgents: string[]; unconfirmedAgents: string[] }> {
     console.log('🚨 EMERGENCY STOP - Killing all agents');
 
     // Freeze auto-resume FIRST, before killing — otherwise the deacon patrol or a
@@ -477,30 +479,49 @@ export class CloisterService {
       console.error('  ✗ Failed to set global pause flags:', error);
     }
 
-    const runningAgents = listRunningAgentsSync();
-    const killedAgents: string[] = [];
+    // Halt the health loop BEFORE stopping anything, so no health tick runs
+    // mid-stop and reports the panes being closed as crashes (#4114 re-check).
+    this.stop();
 
-    for (const agent of runningAgents) {
-      if (agent.tmuxActive) {
-        try {
-          const runtime = getRuntimeForAgent(agent.id);
-          if (runtime) {
-            runtime.killAgent(agent.id); // killAgent already resets runtime.json to idle
-            killedAgents.push(agent.id);
-            console.log(`  ✓ Killed ${agent.id}`);
-          }
-        } catch (error) {
-          console.error(`  ✗ Failed to kill ${agent.id}:`, error);
-        }
+    // Emergency stop stops EVERYTHING (#4109 review): every registered agent the
+    // selected backend's inventory lists PLUS every `running` row, deduplicated.
+    // The inventory alone would miss legacy tmux agents on a Herdr host and any
+    // agent whose probe failed; the rows alone would miss a live agent whose
+    // state says stopped. The tmux-only `tmuxActive` flag is not consulted.
+    // Stops go through the terminal backend, so they close Herdr panes too
+    // (the claude-code runtime's own killAgent is tmux-only).
+    const [agents, liveIds] = await Promise.all([
+      Effect.runPromise(listRunningAgents()),
+      listLiveAgentIds(),
+    ]);
+    const targets = agents.filter((agent) => agent.status === 'running' || liveIds?.has(agent.id) === true);
+    const killedAgents: string[] = [];
+    const unconfirmedAgents: string[] = [];
+
+    for (const agent of targets) {
+      try {
+        await Effect.runPromise(stopAgent(agent.id));
+      } catch (error) {
+        console.error(`  ✗ Failed to kill ${agent.id}:`, error);
+        continue;
+      }
+      // stopAgent writes stopped state even when the pane close fails (PAN-3966),
+      // so confirm the harness is gone before calling it killed.
+      const verdict = await isAlive(agent.id).catch(
+        (): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }),
+      );
+      if (isConfirmedDead(verdict)) {
+        killedAgents.push(agent.id);
+        console.log(`  ✓ Killed ${agent.id}`);
+      } else {
+        unconfirmedAgents.push(agent.id);
+        console.warn(`  ⚠ Stop attempted for ${agent.id}, but its pane is still ${verdict.alive ? 'live' : 'unconfirmed'}`);
       }
     }
 
-    this.emit({ type: 'emergency_stop', killedAgents });
+    this.emit({ type: 'emergency_stop', killedAgents, unconfirmedAgents });
 
-    // Stop monitoring after emergency stop
-    this.stop();
-
-    return killedAgents;
+    return { killedAgents, unconfirmedAgents };
   }
 
   /**
@@ -539,9 +560,9 @@ export class CloisterService {
     return pokeAgentWithHost(this.crashHost(), agentId);
   }
 
-  /** PAN-2452: fingerprint of observable progress — workspace HEAD + pane tail.
-   * Unchanged fingerprint across pokes = the poke did nothing. */
-  private async progressFingerprint(agentId: string): Promise<string> {
+  /** PAN-2452: fingerprint of observable progress — workspace HEAD, pane tail,
+   * heartbeat. Unchanged across pokes = the poke did nothing; null = unknown (#4121). */
+  private async progressFingerprint(agentId: string): Promise<string | null> {
     return progressFingerprintWithHost(this.crashHost(), agentId);
   }
 

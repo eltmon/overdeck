@@ -108,7 +108,7 @@ pan admin specialists wake review-agent --task "review PAN-655"
 - `failed` — sends structured feedback to the work-agent, blocks the pipeline
 - `skipped` — not applicable (e.g., docs-only change)
 
-Review can also run in **convoy mode** — multiple reviewers in parallel, each with a focused lens (security, performance, requirements). See [Review Convoys](/features/convoys).
+Review can also run as a **convoy**: set `roles.review.mode: full` and four reviewers (correctness, security, performance, requirements) run in parallel before a review parent writes the synthesis. See [Review modes](/cli/review-commands#review-modes).
 
 ## Test Agent
 

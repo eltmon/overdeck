@@ -1,7 +1,8 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-export type AcpTranscriptRole = "user" | "assistant" | "tool" | "system";
+/** `thought` carries ACP `agent_thought_chunk` reasoning, kept apart from assistant text. */
+export type AcpTranscriptRole = "user" | "assistant" | "thought" | "tool" | "system";
 export type AcpTranscriptStopReason =
   | "end_turn"
   | "max_tokens"
@@ -27,8 +28,12 @@ export interface AcpTranscriptEntry {
   readonly toolCalls?: ReadonlyArray<AcpTranscriptToolCallState>;
   readonly source?: "orchestrator" | "agent" | "watchdog";
   readonly promptId?: string;
-  /** Durable lifecycle record for queued, failed, and completed prompts. */
-  readonly event?: "prompt_queued" | "prompt_failed" | "turn_completed";
+  /**
+   * Durable lifecycle record for queued, failed, and completed prompts.
+   * `prompt_stalled` (PAN-3890) is informational: the turn is still in flight,
+   * so it does not settle the prompt.
+   */
+  readonly event?: "prompt_queued" | "prompt_failed" | "prompt_stalled" | "turn_completed";
   readonly stopReason?: AcpTranscriptStopReason;
 }
 

@@ -43,6 +43,14 @@ import { ACP_TRANSCRIPT_FILE } from "../runtimes/storage/acp.js";
 const FILE_MODE = 0o600;
 const OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS = 60_000;
 export const OPENCODE_PERMISSION_WATCHDOG_STALE_MS = 180_000;
+/** How often an in-flight turn is checked for a stall (PAN-3890). */
+export const ACP_TURN_STALL_CHECK_INTERVAL_MS = 30_000;
+/**
+ * Default turn inactivity timeout: a turn with no runtime event for this long
+ * gets a `prompt_stalled` record. Override with OVERDECK_ACP_TURN_STALL_MS
+ * (milliseconds; 0 disables the inactivity check).
+ */
+export const DEFAULT_ACP_TURN_STALL_TIMEOUT_MS = 600_000;
 type JsonRecord = Record<string, unknown>;
 
 export type AcpHostRuntime = Pick<
@@ -73,6 +81,8 @@ export interface AcpHostOptions {
   readonly disposeRuntime?: () => Promise<void>;
   readonly openCodePort?: number;
   readonly fetch?: typeof fetch;
+  /** Turn inactivity timeout in ms; 0 disables it. Defaults to DEFAULT_ACP_TURN_STALL_TIMEOUT_MS. */
+  readonly turnStallTimeoutMs?: number;
 }
 
 interface HostOpResult {
@@ -94,6 +104,10 @@ export class AcpHost {
   private lastRuntimeEventAt = 0;
   private permissionWatchdogRunning = false;
   private permissionWatchdog: ReturnType<typeof setInterval> | undefined;
+  private stallWatchdog: ReturnType<typeof setInterval> | undefined;
+  private stallCheckRunning = false;
+  private activePromptId: string | undefined;
+  private stallReportedFor: string | undefined;
 
   constructor(private readonly options: AcpHostOptions) {
     this.overdeckHome =
@@ -198,6 +212,7 @@ export class AcpHost {
       clearInterval(this.permissionWatchdog);
       this.permissionWatchdog = undefined;
     }
+    this.stopStallWatchdog();
     await Effect.runPromise(this.options.runtime.cancel).catch(() => undefined);
     if (this.eventFiber) {
       await Effect.runPromise(Fiber.interrupt(this.eventFiber));
@@ -277,6 +292,7 @@ export class AcpHost {
           : content;
         this.lastRuntimeEventAt = Date.now();
         this.permissionWatchdog = this.startPermissionWatchdog();
+        this.startStallWatchdog(promptId);
         const promptResult = await Effect.runPromise(
           this.options.runtime.prompt({ prompt: [{ type: "text", text: promptContent }] }),
         );
@@ -308,6 +324,7 @@ export class AcpHost {
           clearInterval(this.permissionWatchdog);
           this.permissionWatchdog = undefined;
         }
+        this.stopStallWatchdog();
       }
     });
     this.promptQueue = promptOperation.then(
@@ -433,6 +450,15 @@ export class AcpHost {
       });
       return;
     }
+    if (event._tag === "ThoughtDelta") {
+      await this.transcript.append({
+        role: "thought",
+        content: event.text,
+        sessionId: this.sessionId,
+        source: "agent",
+      });
+      return;
+    }
     if (event._tag === "ToolCallUpdated") {
       await this.transcript.append({
         role: "tool",
@@ -469,6 +495,88 @@ export class AcpHost {
         this.writePaneLine(`[warning] OpenCode permission watchdog failed: ${errorMessage(error)}`);
       });
     }, OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS);
+  }
+
+  /**
+   * PAN-3890: a turn whose session/prompt never returns (e.g. OpenCode retrying
+   * a provider 429 internally) writes nothing to the transcript. Detect it and
+   * record one `prompt_stalled` entry per prompt, carrying the provider's retry
+   * message when OpenCode exposes one. The turn is not cancelled.
+   */
+  private startStallWatchdog(promptId: string): void {
+    this.stopStallWatchdog();
+    this.activePromptId = promptId;
+    this.stallWatchdog = setInterval(() => {
+      void this.checkTurnStall(promptId).catch((error) => {
+        this.writePaneLine(`[warning] ACP stall check failed: ${errorMessage(error)}`);
+      });
+    }, ACP_TURN_STALL_CHECK_INTERVAL_MS);
+  }
+
+  private stopStallWatchdog(): void {
+    if (this.stallWatchdog) {
+      clearInterval(this.stallWatchdog);
+      this.stallWatchdog = undefined;
+    }
+    this.activePromptId = undefined;
+  }
+
+  private async checkTurnStall(promptId: string): Promise<void> {
+    if (this.stallCheckRunning || this.stallReportedFor === promptId) return;
+    const silentMs = Date.now() - this.lastRuntimeEventAt;
+    if (silentMs < ACP_TURN_STALL_CHECK_INTERVAL_MS) return;
+    this.stallCheckRunning = true;
+    try {
+      const retry = await this.readOpenCodeRetryStatus();
+      const timeoutMs = this.options.turnStallTimeoutMs ?? DEFAULT_ACP_TURN_STALL_TIMEOUT_MS;
+      const inactive = timeoutMs > 0 && silentMs >= timeoutMs;
+      if (!retry && !inactive) return;
+      if (this.activePromptId !== promptId || this.stallReportedFor === promptId) return;
+      this.stallReportedFor = promptId;
+      const content = retry
+        ? `${this.options.provider} is retrying the turn (attempt ${retry.attempt}): ${retry.message}`
+        : `No activity from ${this.options.provider} for ${Math.round(silentMs / 60_000)} min; the turn may be stuck.`;
+      this.writePaneLine(`[error] ${content}`);
+      await this.transcript.append({
+        role: "system",
+        content,
+        sessionId: this.sessionId,
+        source: "watchdog",
+        promptId,
+        event: "prompt_stalled",
+      });
+    } finally {
+      this.stallCheckRunning = false;
+    }
+  }
+
+  /** Reads OpenCode's GET /session/status and returns its retry state, if any. */
+  private async readOpenCodeRetryStatus(): Promise<{ attempt: number; message: string } | undefined> {
+    if (
+      (this.options.provider !== "opencode" && this.options.provider !== "opencode-go")
+      || this.options.openCodePort === undefined
+    ) {
+      return undefined;
+    }
+    const fetchImpl = this.options.fetch ?? globalThis.fetch;
+    let payload: JsonRecord;
+    try {
+      const response = await fetchImpl(`http://127.0.0.1:${this.options.openCodePort}/session/status`);
+      if (!response.ok) throw new Error(`GET /session/status returned HTTP ${response.status}`);
+      payload = asRecord(await response.json());
+    } catch (error) {
+      this.writePaneLine(`[warning] OpenCode session status check failed: ${errorMessage(error)}`);
+      return undefined;
+    }
+    // Prefer this session's status; a task subagent retries under its own session id.
+    const own = this.sessionId ? asRecord(payload[this.sessionId]) : {};
+    const retry = [own, ...Object.values(payload).map(asRecord)]
+      .find((status) => status.type === "retry" && typeof status.message === "string");
+    if (!retry) return undefined;
+    return {
+      attempt: typeof retry.attempt === "number" ? retry.attempt : 0,
+      message: String(retry.message),
+    };
   }
 
   private async resolvePendingOpenCodePermissions(): Promise<void> {
@@ -656,6 +764,12 @@ function isAuthenticationFailure(error: unknown): boolean {
   return /authenticat|credential|login required/i.test(detail);
 }
 
+export function parseTurnStallTimeoutMs(value: string | undefined): number {
+  if (value === undefined || value.trim() === "") return DEFAULT_ACP_TURN_STALL_TIMEOUT_MS;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : DEFAULT_ACP_TURN_STALL_TIMEOUT_MS;
+}
+
 interface AcpHostArgs {
   readonly agentId: string;
   readonly provider: string;
@@ -768,6 +882,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       stdout: process.stdout,
       disposeRuntime: closeScope,
       openCodePort,
+      turnStallTimeoutMs: parseTurnStallTimeoutMs(process.env.OVERDECK_ACP_TURN_STALL_MS),
     });
     await host.start();
     const stop = () => {

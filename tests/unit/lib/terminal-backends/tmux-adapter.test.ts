@@ -120,6 +120,17 @@ describe('tmux adapter — states', () => {
     expect(await Effect.runPromise(backend.list())).toMatchObject([{ state: 'exited' }]);
   });
 
+  it('#4109: a failed runtime probe is unknown, not exited, so the inventory keeps the agent', async () => {
+    sessions = [{ name: 'agent-pan-3917', created: new Date(), attached: false, windows: 1 }];
+    const backend = new TmuxBackend();
+
+    aliveVerdict = { alive: false, reason: 'runtime-indeterminate' };
+    expect(await Effect.runPromise(backend.list())).toMatchObject([{ state: 'unknown' }]);
+
+    aliveVerdict = { alive: false, reason: 'runtime-missing' };
+    expect(await Effect.runPromise(backend.list())).toMatchObject([{ state: 'exited' }]);
+  });
+
   it('maps Overdeck roles onto the pane-token roles', () => {
     expect(toPaneRole('work')).toBe('work');
     expect(toPaneRole('review')).toBe('review');

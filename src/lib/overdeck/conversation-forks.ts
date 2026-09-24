@@ -8,6 +8,7 @@ import { Effect } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
+import { loadConfigSync } from '../config-yaml.js';
 import { parseIssueId } from '../issue-id.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { resolveProjectKeyForCwdAsync } from '../projects.js';
@@ -817,7 +818,9 @@ export async function handleConversationSummaryFork(
     const newName = `${timestamp}-${suffix}`;
     const newTmux = `conv-${newName}`;
     const launchModel = model || conv.model;
-    const effectiveSummaryModel = summaryModel || 'claude-sonnet-5';
+    // PAN-4160: same source generateSummaryForFork falls back to, so the
+    // summary harness is chosen for the model that actually runs.
+    const effectiveSummaryModel = summaryModel || loadConfigSync().config.conversations.forkSummaryModel;
     const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
     const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
     const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined

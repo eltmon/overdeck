@@ -63,13 +63,12 @@ Not every project or run will emphasize every sub-role equally, but the spawned 
 
 Some names you will see in settings or `.claude/agents/` are not lifecycle roles.
 
-Examples:
-- `review:security`
-- `review:requirements`
-- `subagent:explore`
-- `cli:interactive`
-
-These are real and important, but they are better understood as **role-internal helpers or routed contexts** than as the primary Overdeck roles a newcomer should picture first.
+Removed: work-type IDs such as `review:security`, `review:requirements`,
+`subagent:explore` and `cli:interactive` were routing keys for the old
+work-type router, deleted in PAN-1048. Nothing routes on them any more, and
+`review:*` keys in `models.overrides` do nothing. The review lanes are now
+sub-roles of the `review` role (`roles.review.sub.<lane>`); see
+[CONFIGURATION.md](CONFIGURATION.md#review-mode-and-reviewer-models).
 
 ## Where model selection fits
 

@@ -14,6 +14,8 @@ const world = vi.hoisted(() => ({
   answers: {} as Record<string, string>,
   sendMessage: vi.fn(async () => undefined),
   agentState: null as Record<string, unknown> | null,
+  pane: (async () => 'working…') as (id: string, lines: number) => Promise<string>,
+  heartbeatMs: null as number | null,
 }));
 
 vi.mock('../../../../src/lib/terminal-backends/select.js', async (importOriginal) => ({
@@ -38,7 +40,18 @@ vi.mock('../../../../src/lib/agents/tmux-session-query.js', async (importOrigina
 
 vi.mock('../../../../src/lib/runtimes/index.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getRuntimeForAgent: () => ({ name: 'claude-code', sendMessage: world.sendMessage }),
+  getRuntimeForAgent: () => ({
+    name: 'claude-code',
+    sendMessage: world.sendMessage,
+    getHeartbeat: () => (world.heartbeatMs === null ? null : { timestamp: new Date(world.heartbeatMs) }),
+  }),
+}));
+
+// #4121: the fake terminal backend's pane reader. The fingerprint must read
+// the pane here, never through tmux.
+vi.mock('../../../../src/lib/terminal-backends/agent-pane-io.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  readAgentPaneText: (id: string, lines: number) => world.pane(id, lines),
 }));
 
 vi.mock('../../../../src/lib/agents.js', async (importOriginal) => ({
@@ -47,7 +60,7 @@ vi.mock('../../../../src/lib/agents.js', async (importOriginal) => ({
   getAgentRuntimeStateSync: () => null,
 }));
 
-import { handleAgentCrash, pokeAgentWithEscalation, type CrashEvent, type CrashHost } from '../../../../src/lib/cloister/service-crash.js';
+import { handleAgentCrash, pokeAgentWithEscalation, progressFingerprint, type CrashEvent, type CrashHost } from '../../../../src/lib/cloister/service-crash.js';
 
 const AGENT = 'agent-pan-4116';
 
@@ -76,6 +89,8 @@ function makeHost(): CrashHost & { events: CrashEvent[]; appended: unknown[] } {
 beforeEach(() => {
   world.answers = {};
   world.sendMessage.mockClear();
+  world.pane = async () => 'working…';
+  world.heartbeatMs = null;
   world.agentState = { id: AGENT, issueId: 'PAN-4116', role: 'work', status: 'running', sessionId: 'sess-4116', workspace: '/tmp/ws' };
 });
 
@@ -104,6 +119,84 @@ describe('pokeAgentWithEscalation', () => {
     await pokeAgentWithEscalation(host, AGENT);
     expect(world.sendMessage).not.toHaveBeenCalled();
     expect(host.pokeProgress.has(AGENT)).toBe(false);
+  });
+});
+
+describe('progress fingerprint on a Herdr host (#4121)', () => {
+  /** A host whose fingerprint is the real one, reading the fake backend. */
+  function makeFingerprintHost(): ReturnType<typeof makeHost> {
+    const host = makeHost();
+    host.progressFingerprint = (id) => progressFingerprint(host, id);
+    return host;
+  }
+
+  beforeEach(() => {
+    world.answers[AGENT] = 'alive';
+    // No workspace: HEAD never moves, as for an agent that hasn't committed.
+    world.agentState = { ...world.agentState, workspace: undefined };
+  });
+
+  it('does not poke an agent whose pane moved since the last poke, with no new commits', async () => {
+    const host = makeFingerprintHost();
+    let screen = 'step 1';
+    world.pane = async () => screen;
+
+    await pokeAgentWithEscalation(host, AGENT);
+    expect(world.sendMessage).toHaveBeenCalledTimes(1);
+
+    for (const next of ['step 2', 'step 3', 'step 4', 'step 5', 'step 6']) {
+      screen = next;
+      await pokeAgentWithEscalation(host, AGENT);
+    }
+    expect(world.sendMessage).toHaveBeenCalledTimes(1);
+    expect(host.pokeProgress.get(AGENT)?.ineffective).toBe(0);
+    expect(host.events.filter((e) => e.type === 'agent_stuck')).toEqual([]);
+  });
+
+  it('treats transcript growth as progress when the pane is static', async () => {
+    const host = makeFingerprintHost();
+    world.heartbeatMs = 1_000;
+    await pokeAgentWithEscalation(host, AGENT);
+    world.heartbeatMs = 2_000;
+    await pokeAgentWithEscalation(host, AGENT);
+    expect(world.sendMessage).toHaveBeenCalledTimes(1);
+    expect(host.pokeProgress.get(AGENT)?.ineffective).toBe(0);
+  });
+
+  it('still counts an unchanged pane as an ineffective poke', async () => {
+    const host = makeFingerprintHost();
+    await pokeAgentWithEscalation(host, AGENT);
+    await pokeAgentWithEscalation(host, AGENT);
+    expect(world.sendMessage).toHaveBeenCalledTimes(2);
+    expect(host.pokeProgress.get(AGENT)?.ineffective).toBe(1);
+  });
+
+  it.each([
+    ['fails', async () => { throw new Error('herdr holds no pane'); }],
+    ['returns nothing', async () => ''],
+    ['returns only whitespace', async () => '\n  \n'],
+  ])('neither pokes nor counts when the pane read %s', async (_label, read) => {
+    const host = makeFingerprintHost();
+    await pokeAgentWithEscalation(host, AGENT);
+    const baseline = host.pokeProgress.get(AGENT);
+    expect(baseline?.ineffective).toBe(0);
+    world.sendMessage.mockClear();
+
+    world.pane = read as (id: string, lines: number) => Promise<string>;
+    for (let i = 0; i < 6; i++) await pokeAgentWithEscalation(host, AGENT);
+    expect(world.sendMessage).not.toHaveBeenCalled();
+    expect(host.pokeProgress.get(AGENT)).toEqual(baseline);
+    expect(host.events.filter((e) => e.type === 'agent_stuck')).toEqual([]);
+  });
+
+  it('answers null for an unreadable pane and a string for a readable one', async () => {
+    const host = makeHost();
+    world.pane = async () => { throw new Error('socket did not answer'); };
+    expect(await progressFingerprint(host, AGENT)).toBeNull();
+    world.pane = async () => '';
+    expect(await progressFingerprint(host, AGENT)).toBeNull();
+    world.pane = async () => 'working…';
+    expect(await progressFingerprint(host, AGENT)).toEqual(expect.any(String));
   });
 });
 

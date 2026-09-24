@@ -92,12 +92,13 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
   'POST',
   '/api/cloister/emergency-stop',
   httpHandler(Effect.gen(function* () {
-    const killedAgents = yield* Effect.try({
+    const { killedAgents, unconfirmedAgents } = yield* Effect.tryPromise({
       try: () => getCloisterService().emergencyStop(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     const ts = new Date().toISOString();
-    for (const agentId of killedAgents) {
+    // Both lists had their state written stopped; unconfirmed ones may still hold a live pane.
+    for (const agentId of [...killedAgents, ...unconfirmedAgents]) {
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction. Cloister already stopped the agents,
       // so re-upsert the latest row to make the event atomic.
@@ -110,7 +111,7 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
         });
       }
     }
-    return jsonResponse({ success: true, message: 'Emergency stop executed', killedAgents });
+    return jsonResponse({ success: true, message: 'Emergency stop executed', killedAgents, unconfirmedAgents });
   })),
 );
 
