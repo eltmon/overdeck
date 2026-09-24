@@ -1,0 +1,281 @@
+---
+title: Workers
+description: Delegate a brief to a registered, issue-linked agent with pan worker run and get its report back
+---
+
+# Workers
+
+A **worker** is a separate agent that one agent or conversation starts for a
+single brief. `pan worker run` starts it for an issue, waits, and prints its
+report. The worker is a real Overdeck agent with the role `worker`:
+
+- It has its own `~/.overdeck/agents/<id>/state.json`, transcript, cost, and
+  model routing (`roles.worker.model` in `config.yaml`; the default is the
+  same workhorse as `work`).
+- It runs in a persistent pane on the host's terminal backend (Herdr by
+  default, tmux when `terminal.backend: tmux`). It is never a one-shot
+  `claude -p` or `codex exec` run.
+- It appears in the [Agents Directory](/reference/agents-directory) under the
+  agent or conversation that started it and under its issue, and in the
+  issue's session tree as **Worker &lt;n&gt;**.
+- `pan tell`, `pan kill`, and the other lifecycle verbs work on it.
+
+A worker never runs the issue's lifecycle: it does not run `pan done`,
+`pan review`, or `pan task done`, and it does not push unless the brief says
+to. Pipeline patrols that act on the `work` role never act on it.
+
+`--issue` is required. Issue-less workers are not supported yet.
+
+## Commands
+
+```bash
+pan worker run --issue <id> (--prompt <text> | --brief <file>)
+               [--model <m>] [--harness <h>] [--read-only] [--cwd <path>]
+               [--parent <id>] [--name <label>]
+               [--detach] [--timeout <seconds>] [--stop-after-report]
+pan worker wait <worker-id> [--after <seq>] [--timeout <seconds>]
+pan worker report <worker-id> (--file <path> | --stdin) [--status done|blocked|failed]
+pan worker list [--issue <id>] [--parent <id>] [--json]
+```
+
+| Command | What it does |
+| --- | --- |
+| `run` | Starts a worker and waits for its first report. `--detach` prints only the worker id and returns once the pane exists. `--stop-after-report` stops the worker after its first report (its worktree stays; see below). |
+| `wait` | Waits for a report. With no `--after` it returns the newest report the worker has written, whenever it was written. With `--after <seq>` it returns the next report after `<seq>`. |
+| `report` | Records a report. The worker runs this itself; its brief ends with the exact command. An agent can record a report only for itself (`OVERDECK_AGENT_ID` must be the worker's id); a shell with no agent id counts as the operator. |
+| `list` | Lists workers with their issue, parent, live state (`running`, `stopped`, `unknown`), and newest report. |
+
+Worker ids are `agent-<issue>-worker-<n>`, for example `agent-pan-123-worker-2`.
+
+## Exit codes
+
+`run` and `wait` print the report body on stdout and every status line on
+stderr.
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Report with status `done`. |
+| `4` | Report with status `blocked` or `failed`. The body is still printed. |
+| `2` | The worker exited, or sat idle for 10 minutes, without a report. Its last assistant message is printed, prefixed `[no report — last assistant message]`. When the dashboard cannot be reached, the transcript path is printed instead. |
+| `3` | Timeout. The worker is still running; the hint names the exact `pan worker wait` to run next. |
+| `1` | Usage or spawn error. |
+
+A report's status line names its sequence number and the next wait, for
+example `worker agent-pan-123-worker-1 report 2: done; next: pan worker wait agent-pan-123-worker-1 --after 2`.
+
+The wait polls every two seconds and never messages the worker. A worker
+that was never seen alive is not called dead during its first minute, while
+the harness is still starting.
+
+## The report contract
+
+The worker writes its report as Markdown to a file and runs
+`pan worker report <id> --file <path>`. The command writes
+`~/.overdeck/agents/<id>/reports/<seq>.json`:
+
+```json
+{ "seq": 1, "at": "2026-09-23T12:00:00.000Z", "status": "done", "body": "<markdown>" }
+```
+
+`seq` is 1-based and zero-padded to four digits in the file name. Each report
+is written to a temporary file and renamed into place, so a reader never sees
+half a report. Overdeck never rewrites or deletes reports. The body limit is
+1 MiB.
+
+Reporting does not signal the pipeline. The directory derives a worker's
+**done** state from its newest report: an idle worker whose newest report was
+written in the turn that just ended is **done**.
+
+## Working directory and read-only mode
+
+| Flags | Where the worker runs |
+| --- | --- |
+| none | Its own git worktree at `<workspace>/.swarm/worker-<n>/`, on branch `<feature-branch>-worker-<n>`. |
+| `--read-only` | The issue workspace, behind a git guard in read-only mode. |
+| `--cwd <path>` | That directory. It must be inside the issue workspace, symlinks resolved; anything else is refused. |
+
+`--read-only` puts a `git` shim first on the worker's `PATH`. The shim
+prevents accidental git writes to the issue's repository: the primary
+checkout, every worktree of it (the issue workspace included), and their
+subdirectories, however the call reaches them (`cd ..`, `-C`, `--git-dir`,
+`GIT_DIR`, `--work-tree`). Inside that repository it lets only reads through:
+
+- `status`, `diff`, `log`, `show`, `rev-parse`, `rev-list`, `ls-files`,
+  `ls-tree`, `blame`, `cat-file`, `merge-base`, `describe`, `grep`,
+  `shortlog`, `for-each-ref`, `show-ref`;
+- `config` only when its first argument is `--get`, `--get-all`,
+  `--get-regexp`, `--list`/`-l` (or `get`/`list`), and every later option is
+  a read option such as `--show-origin` or `--global`;
+- `remote` bare or `-v`, `remote show [-n]` and `remote get-url [--push|--all]`;
+- `branch --show-current`, `branch --list`/`-l` with patterns, a bare `branch`
+  listing, and exactly the listing options `-a`, `-r`, `-v`, `-vv`,
+  `--contains`, `--merged`, `--no-merged`, `--points-at`, `--sort=` and
+  `--format=`.
+
+Options are matched as exact tokens: git accepts unique prefixes of long
+options, so an abbreviation such as `--unset` or `--set-upstream-t=` is refused.
+Everything else is refused there, including `fetch`, which writes refs.
+
+The shim is not a sandbox. Calling git by its absolute path (`/usr/bin/git`)
+bypasses it, so does setting `OVERDECK_PAN_GIT_OP=1` (the switch Overdeck's
+own `pan` git operations use), and it does not restrict file writes or network
+access at all.
+It is there to stop a reviewing worker from changing the branch by mistake,
+not to contain a worker that tries to.
+
+## Parent and `pan tell`
+
+The parent is `--parent`, else `$OVERDECK_AGENT_ID`, else
+`$OVERDECK_CONVERSATION`. Every conversation launcher exports
+`OVERDECK_CONVERSATION`. When an agent (a caller whose stdin is not a
+terminal) has none of these, `run` fails and asks for `--parent`. An
+interactive operator shell may start a worker without a parent.
+
+The parent is recorded in `state.json` (`parentId`) and stamped on the pane as
+the `parent` token. The prompt guard lets a worker pane accept messages from:
+
+- the issue's `work` agent,
+- its parent,
+- an operator conversation.
+
+Everyone else is refused. A worker stays running after it reports; to give it
+more work, run `pan tell <worker-id> "<message>"` and then
+`pan worker wait <worker-id> --after <n>`, where `<n>` is the last report you
+read. Without `--after` you would get report `<n>` again.
+
+## Waiting from each harness
+
+- **Claude Code:** run `pan worker run …` with the Bash tool's
+  `run_in_background: true`. The foreground limit is 10 minutes; a background
+  command notifies the conversation when it exits, and its stdout is the
+  report.
+- **Codex and other harnesses:** run `pan worker run … --detach`, then wait
+  in a loop until the exit code is not `3`. A timed-out wait loses nothing:
+  a report written between two waits is returned by the next one.
+
+  ```bash
+  id=$(pan worker run --issue PAN-123 --brief brief.md --detach)
+  pan worker wait "$id" --timeout 540              # repeat while the exit code is 3
+  # after reading report 1, wait for the next one:
+  pan worker wait "$id" --after 1 --timeout 540
+  ```
+
+## When the worktree goes away
+
+Stopping a worker (`pan kill`, or `--stop-after-report`) keeps its
+`.swarm/worker-<n>` worktree and its `<feature-branch>-worker-<n>` branch: the
+parent may still need the work.
+
+When the issue is torn down (close-out, close, approve) the worker worktrees
+are removed only if the workspace itself is deleted (`git worktree remove
+--force`, then `git worktree prune`); a kept workspace keeps them, uncommitted
+changes included. The closed-issue residue reaper removes them with the
+workspace.
+
+A worker branch exists only on this machine, so every cleanup path deletes it
+only when its tip is already in the default branch (`main`, `origin/main`, or
+whatever `origin/HEAD` names) or in the feature branch while that still
+exists. Any other worker branch is kept, and the cleanup logs its name and its
+unmerged commit count. A branch still checked out in a kept worktree is kept.
+
+`.swarm/` is in the repository's `.gitignore`, so `git add -A` in a workspace
+never commits an embedded worktree.
+
+## Where the files are
+
+| Path | Contents |
+| --- | --- |
+| `~/.overdeck/agents/<id>/state.json` | The agent state: role `worker`, `parentId`, `startedBy: pan-worker`. |
+| `~/.overdeck/agents/<id>/worker.json` | Write-once launch facts: issue, parent, read-only, cwd, branch, name, start time. |
+| `~/.overdeck/agents/<id>/reports/<seq>.json` | The reports. |
+
+## Externally spawned agents
+
+An **external agent** is one another tool launched: Overdeck did not start it,
+has no pane for it, and cannot steer it. Overdeck can record it so the
+[Agents Directory](/reference/agents-directory) shows it under the agent or
+conversation that spawned it and under its issue, with its transcript when the
+harness writes one Overdeck can read (Claude Code, Codex, Pi, ACP, Kimi Code,
+Muse).
+
+| Overdeck can | Overdeck cannot |
+| --- | --- |
+| List it, with its parent, issue, harness and model | `pan tell` it or type into it |
+| Show whether it is working, done or stopped | Stop, pause, restart or resume it |
+| Show its transcript on the agent transcript route | Attribute its cost to the ledger |
+
+### Registering one: `pan worker register`
+
+```bash
+pan worker register --source my-tool --external-id run-7 --harness codex \
+  --model gpt-5.5 --cwd . --issue PAN-123 --parent "$OVERDECK_CONVERSATION" \
+  --label "nightly audit" --pid 4242 \
+  --transcript ~/.codex/sessions/2026/09/23/rollout-2026-09-23T10-00-00-<thread>.jsonl
+```
+
+- Required: `--source` (`[a-z0-9-]`, up to 32 characters; `codex-plugin` is
+  reserved for the adapter below), `--external-id`, and `--harness`.
+- Optional: `--model`, `--cwd`, `--issue`, `--parent` (an agent id, a
+  conversation's tmux session, or `claude-session:<uuid>`), `--label`, `--pid`,
+  `--transcript`, `--session-id`, and `--json` (prints `{ "id", "created" }`).
+- The id is `ext-<source>-<external-id>` (a short hash is added when the
+  external id is not already a lowercase slug). Registering the same source and
+  external id again prints the existing id and writes no new registration; if
+  the first attempt never linked its transcript, the repeat links it.
+- `--transcript` must be a regular file under `~/.claude/projects`, the Codex
+  sessions directory (`$CODEX_HOME/sessions`, default `~/.codex/sessions`) or
+  `~/.overdeck/agents`, after following symlinks. Anything else (another
+  directory, a symlink out of those roots, a FIFO, a directory) is refused with
+  a message that names the allowed directories. The same check runs again
+  before every read, so a transcript replaced later is simply not shown.
+
+Scripts that do not have the CLI can call the same core over HTTP:
+`POST /api/workers/register` with those fields as JSON (`source`,
+`externalId`, `harness`, `model`, `cwd`, `issue`, `parent`, `label`, `pid`,
+`transcript`, `sessionId`) and the `x-overdeck-internal-token` header. The
+answer is `200 { "id", "created" }`, or `400 { "error" }` for a bad field or
+a transcript path outside the allowed directories.
+
+### Codex-plugin jobs are registered automatically
+
+The Codex plugin for Claude Code (`codex:codex-rescue` and friends) runs its
+jobs as detached `codex` processes. The dashboard reads the plugin's job
+records (`~/.claude/plugins/data/codex-openai-codex/state/*/jobs/*.json`) every
+15 seconds and registers each job the first time it sees it. It records the
+parent then, because the plugin deletes its job records when the parent Claude
+session ends:
+
+- **Parent:** the conversation running that Claude session, else the agent
+  whose session index names it, else `claude-session:<uuid>` (shown as
+  **Claude session** and the first eight characters).
+- **Issue:** read from a `workspaces/feature-<issue>` working directory.
+- **Transcript:** the Codex rollout of the job's thread, linked once the
+  thread id appears in the job record or its log.
+
+The adapter only reads the plugin's files; it never writes under
+`~/.claude/plugins`. It runs in the primary dashboard only. It will be retired
+when plugins can call the registration door themselves (PAN-3940).
+
+### How its state is worked out
+
+Nothing about an external agent's state is stored. Each directory read derives
+it:
+
+- **working** — the recorded process is alive. The pid's start time is
+  recorded with it, so a reused pid does not count.
+- **done** — otherwise, the transcript's last turn finished.
+- **working** — a registration with no pid whose transcript changed in the last
+  two minutes.
+- **stopped** — anything else.
+
+### Where the files are
+
+| Path | Contents |
+| --- | --- |
+| `~/.overdeck/agents/ext-<source>-<slug>/registration.json` | Write-once facts: source, external id, harness, model, cwd, issue, parent, label, pid and its start time, registration time. Never rewritten. |
+| `~/.overdeck/agents/ext-<source>-<slug>/sessions.json` | The append-only session index; its `path` points at the transcript. |
+
+`pan sync`'s agent-directory cleanup keeps `ext-*` directories, as it keeps
+conversation directories.
+
+See also: [Harnesses — Use Overdeck workers instead of harness plugins](/configuration/harnesses#use-overdeck-workers-instead-of-harness-plugins).

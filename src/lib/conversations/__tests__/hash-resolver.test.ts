@@ -3,7 +3,7 @@ import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { HashResolver, extractHashFromJsonlPath } from '../hash-resolver.js';
-import { encodeClaudeProjectDir } from '../../paths.js';
+import { encodeClaudeProjectDir } from '../../runtimes/storage/claude-code.js';
 
 let tmpRoot: string;
 

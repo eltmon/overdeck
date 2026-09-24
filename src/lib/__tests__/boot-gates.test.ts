@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyBootGateEnv,
   DEACON_GATE_SOURCE_ENV,
+  isPeerDashboardProcess,
   RESUME_GATE_SOURCE_ENV,
   resolveBootGates,
 } from '../boot-gates.js';
@@ -71,5 +72,25 @@ describe('boot gate env resolution', () => {
     expect(resolveBootGates({}, { OVERDECK_RESUME: '1' }).resume).toEqual({ enabled: true, source: 'env' });
     const env = applyBootGateEnv({ OVERDECK_RESUME: '1' });
     expect(env.OVERDECK_NO_RESUME).toBeUndefined();
+  });
+});
+
+// fix10: one answer to "is this a peer dashboard", read from the raw env —
+// a hand-run `node dist/dashboard/server.js` never passes through
+// applyBootGateEnv, so it is never normalized to '1'.
+describe('isPeerDashboardProcess', () => {
+  it('is false with no OVERDECK_DISABLE_DEACON', () => {
+    expect(isPeerDashboardProcess({})).toBe(false);
+  });
+
+  it('accepts every truthy spelling, not just "1"', () => {
+    for (const value of ['1', 'true', 'TRUE', ' yes ']) {
+      expect(isPeerDashboardProcess({ OVERDECK_DISABLE_DEACON: value })).toBe(true);
+    }
+  });
+
+  it('is false for a falsy value', () => {
+    expect(isPeerDashboardProcess({ OVERDECK_DISABLE_DEACON: '0' })).toBe(false);
+    expect(isPeerDashboardProcess({ OVERDECK_DISABLE_DEACON: '' })).toBe(false);
   });
 });

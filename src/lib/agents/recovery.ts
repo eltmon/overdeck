@@ -1,36 +1,34 @@
+import { resolveMuseSessionPathSync, museSessionId } from '../runtimes/storage/muse.js';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { readdir as readdirAsync } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { getLatestSessionIdSync } from './activity.js';
+import { getLatestSessionId } from './activity.js';
 import { sendGracefulRestartWarning } from '../graceful-restart.js';
-import { checkHookSync, generateFixedPointPromptSync } from '../hooks.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { checkHook, generateFixedPointPrompt } from '../hooks.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
-import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
+import { logAgentLifecycle } from '../persistent-logger.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { normalizeHarness } from '../overdeck/conversations.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import {
-  createSession,
-  createSessionSync,
-  killSessionSync,
-  listPaneValues,
-  sendKeys,
-  sessionExists,
-  sessionExistsSync,
-} from '../tmux.js';
+  agentPaneExists,
+  closeAgentPane,
+  launchAgentPane,
+} from '../terminal-backends/launch.js';
+import { toPaneRole } from '../terminal-backends/prompt-guard.js';
+import type { AgentPaneRef } from '../terminal-backends/types.js';
 import {
   decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
-  getAgentStateSync,
+  getAgentState,
   markAgentRunning,
   saveAgentStateSync,
   type AgentState,
@@ -38,6 +36,7 @@ import {
 } from './agent-state.js';
 import { deliverAgentMessage, deliverInitialPromptWithRetry, resilientDeliveryMethod } from './delivery.js';
 import { clearReadySignal, normalizeAgentId } from './identity.js';
+import { isAlive } from './liveness.js';
 import {
   detectPendingOperatorDecision,
   type PendingOperatorDecision,
@@ -49,7 +48,6 @@ import {
   claudeSystemPromptFiles,
   getCodexLauncherFields,
   getRoleRuntimeBaseCommand,
-  hasAgentRuntimeInSubtree,
   waitForPromptReady,
   writeLauncherScriptAtomic,
   writeOhmypiAgentPrompt,
@@ -57,6 +55,8 @@ import {
 import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './spawn-prep.js';
 import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
+import { createFreshSessionIdentity } from '../session-history.js';
+import { kimiHomeDefault } from '../runtimes/storage/kimi-code.js';
 
 export type RecoverAgentResult =
   | { action: 'respawned'; state: AgentState }
@@ -79,19 +79,77 @@ export interface RestartAgentResult {
 
 export interface RestartAgentDeps {
   detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
-  getAgentStateSync?: typeof getAgentStateSync;
-  logAgentLifecycleSync?: typeof logAgentLifecycleSync;
+  getAgentStateSync?: typeof getAgentState;
+  logAgentLifecycleSync?: typeof logAgentLifecycle;
   assertWorkspaceStackHealthyForSpawn?: typeof assertWorkspaceStackHealthyForSpawn;
   resolveHarness?: typeof resolveHarness;
   prepareHarnessLaunch?: typeof prepareHarnessLaunch;
   sessionExists?: (agentId: string) => Promise<boolean>;
   sendGracefulRestartWarning?: typeof sendGracefulRestartWarning;
   stopAgent?: (agentId: string) => Promise<unknown>;
+  allocateSessionIdentity?: typeof createFreshSessionIdentity;
+}
+
+function prepareRestartSessionIdentity(
+  agentId: string,
+  harness: RuntimeName,
+  state: AgentState,
+  allocate: typeof createFreshSessionIdentity = createFreshSessionIdentity,
+): string | undefined {
+  const sessionId = allocate(agentId, harness, state.model);
+  if (sessionId) state.sessionId = sessionId;
+  else delete state.sessionId;
+  return sessionId;
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
-  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') return undefined;
-  return getLatestSessionIdSync(agentId) ?? undefined;
+  if (harness === 'muse') {
+    const path = resolveMuseSessionPathSync(agentId);
+    return path ? museSessionId(path) : undefined;
+  }
+  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') return undefined;
+  const state = getAgentState(agentId);
+  const resolutionState = state
+    ? { ...state, harness }
+    : { id: agentId, harness } as AgentState;
+  return getLatestSessionId(agentId, { getAgentState: () => resolutionState }) ?? undefined;
+}
+
+/**
+ * Relaunch an agent's pane through the terminal backend the host selects NOW
+ * (PAN-3960) — never the one its previous pane used, so a restart or recovery
+ * on a Herdr host lands on Herdr and one on a tmux-only host lands on tmux.
+ * Stamps the same four tokens `spawn.ts` does and records the pane on the
+ * state so a failure after this point is still addressable.
+ */
+async function relaunchAgentPane(input: {
+  agentId: string;
+  state: AgentState;
+  role: string | undefined;
+  harness: RuntimeName;
+  model: string;
+  launcherScript: string;
+  env: Record<string, string>;
+}): Promise<AgentPaneRef> {
+  const issueId = input.state.issueId
+    || input.agentId.replace(/^(agent|planning)-/, '').toUpperCase();
+  const pane = await launchAgentPane({
+    issueId,
+    cwd: input.state.workspace,
+    agentId: input.agentId,
+    argv: ['bash', input.launcherScript],
+    env: input.env,
+    tokens: {
+      issue: issueId,
+      role: toPaneRole(input.role),
+      harness: input.harness,
+      model: input.model,
+    },
+  });
+  input.state.backend = pane.backend;
+  input.state.paneId = pane.paneId;
+  saveAgentStateSync(input.state);
+  return pane;
 }
 
 export async function restartAgent(
@@ -101,16 +159,18 @@ export async function restartAgent(
 ): Promise<RestartAgentResult> {
   const normalizedId = normalizeAgentId(agentId);
   const { graceful = true, model: rawNewModel, harness: newHarness, message, force = false } = opts;
-  const newModel = normalizeModelOverrideSync(rawNewModel);
-  const readAgentState = deps.getAgentStateSync ?? getAgentStateSync;
+  const newModel = normalizeModelOverride(rawNewModel);
+  const readAgentState = deps.getAgentStateSync ?? getAgentState;
   const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
-  const logLifecycle = deps.logAgentLifecycleSync ?? logAgentLifecycleSync;
+  const logLifecycle = deps.logAgentLifecycleSync ?? logAgentLifecycle;
   const assertWorkspaceHealthy = deps.assertWorkspaceStackHealthyForSpawn
     ?? assertWorkspaceStackHealthyForSpawn;
   const resolveRestartHarness = deps.resolveHarness ?? resolveHarness;
   const prepareRestartHarness = deps.prepareHarnessLaunch ?? prepareHarnessLaunch;
-  const restartSessionExists = deps.sessionExists
-    ?? ((id: string) => Effect.runPromise(sessionExists(id)));
+  // Backend-aware (PAN-3960): a live tmux session or a live Herdr agent.
+  // A liveness read: an unavailable backend (PAN-3956) is "no session" here, and
+  // the launch below reports the TerminalBackendUnavailableError as a failure.
+  const restartSessionExists = deps.sessionExists ?? ((id: string) => agentPaneExists(id).catch(() => false));
   const sendRestartWarning = deps.sendGracefulRestartWarning ?? sendGracefulRestartWarning;
   const stopRestartAgent = deps.stopAgent
     ?? ((id: string) => Effect.runPromise(stopAgent(id)));
@@ -163,7 +223,7 @@ export async function restartAgent(
     return { success: false, error: reason };
   }
 
-  const effectiveModel = newModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
+  const effectiveModel = newModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
   const effectiveHarness = await resolveRestartHarness({
     explicit: newHarness ?? agentState.harness,
     role: agentState.role,
@@ -174,7 +234,7 @@ export async function restartAgent(
   if (graceful && await restartSessionExists(normalizedId)) {
     const warningPendingDecision = await checkPendingDecision();
     if (warningPendingDecision) return warningPendingDecision;
-    await sendRestartWarning(normalizedId, agentState.harness, agentState.workspace);
+    await sendRestartWarning(normalizedId, agentState.harness, agentState.workspace, deliverAgentMessage);
   }
 
   const stopPendingDecision = await checkPendingDecision();
@@ -186,7 +246,20 @@ export async function restartAgent(
   }
   agentState.harness = effectiveHarness;
   agentState.status = 'starting';
-  saveAgentStateSync(agentState);
+  let freshSessionId: string | undefined;
+  try {
+    freshSessionId = prepareRestartSessionIdentity(
+      normalizedId,
+      effectiveHarness,
+      agentState,
+      deps.allocateSessionIdentity ?? createFreshSessionIdentity,
+    );
+    saveAgentStateSync(agentState);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logLifecycle(normalizedId, `restartAgent ABORTED before launch: session index write failed: ${msg}`);
+    return { success: false, error: `Failed to restart agent: session index write failed: ${msg}` };
+  }
 
   try {
     clearReadySignal(normalizedId);
@@ -204,15 +277,15 @@ export async function restartAgent(
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
       extraEnvExports: [harnessLaunch.pathExport],
+      sessionId: freshSessionId,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    const claudeCmd = `bash ${launcherScript}`;
 
     // PAN-1837: restartAgent always kills and fresh-launches (no resumeSessionId
     // above), so a kimi-code relaunch always starts a brand-new Kimi session —
-    // snapshot the bucket before the tmux session exists so the capture below
+    // snapshot the bucket before the pane exists so the capture below
     // can diff against it (mirrors spawnAgent's fresh-launch capture in
     // spawn.ts).
     //
@@ -220,7 +293,7 @@ export async function restartAgent(
     // fresh launch, so a failed/timed-out capture leaves NO pointer
     // (findKimiWirePath's safe newest-session-by-mtime fallback) rather than a
     // WRONG pointer still pinned to the pre-restart transcript. Review cycle 6:
-    // snapshot, createSession, and capture/persist all run inside
+    // snapshot, the pane launch, and capture/persist all run inside
     // withKimiSessionCaptureLock — merely awaiting the capture (the cycle-5
     // fix) is not enough on its own, since it only proves *some* new same-cwd
     // directory appeared, not that it's THIS relaunch's. Only the per-
@@ -232,14 +305,20 @@ export async function restartAgent(
       if (effectiveHarness === 'kimi-code') {
         try { unlinkSync(join(getAgentDir(normalizedId), 'kimi-session-id')); } catch { /* absent or already cleared */ }
         try {
-          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), agentState.workspace)));
+          const { kimiSessionsRoot } = await import('../runtimes/storage/kimi-code.js');
+          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(kimiHomeDefault(), agentState.workspace)));
         } catch {
           kimiExistingSessionsBefore = new Set();
         }
       }
 
-      await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
+      await relaunchAgentPane({
+        agentId: normalizedId,
+        state: agentState,
+        role: agentState.role,
+        harness: effectiveHarness,
+        model: effectiveModel,
+        launcherScript,
         env: {
           ...BLANKED_PROVIDER_ENV,
           TERM: 'xterm-256color',
@@ -250,12 +329,12 @@ export async function restartAgent(
           GIT_SEQUENCE_EDITOR: 'false',
           ...providerEnv,
         },
-      }));
+      });
 
       if (kimiExistingSessionsBefore) {
-        const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
         const sessionId = await waitForNewKimiSessionAsync(
-          join(homedir(), '.kimi-code'),
+          kimiHomeDefault(),
           agentState.workspace,
           kimiExistingSessionsBefore,
         );
@@ -264,17 +343,16 @@ export async function restartAgent(
             `kimi-code session capture timed out after fresh relaunch for ${normalizedId} — no new session directory appeared under the workspace bucket`,
           );
         }
-        writeKimiSessionId(normalizedId, sessionId);
+        recordKimiSessionCapture(normalizedId, sessionId, agentState.workspace);
       }
     };
 
     if (effectiveHarness === 'kimi-code') {
       const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
-      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), agentState.workspace, launchAndCaptureKimiSession);
+      await withKimiSessionCaptureLock(kimiHomeDefault(), agentState.workspace, launchAndCaptureKimiSession);
     } else {
       await launchAndCaptureKimiSession();
     }
-
     // PAN-2974 (root cause B): the fallback continue-prompt is phase-aware —
     // a handed-off agent (completed marker) gets a passive restore, not a
     // "pick up where you left off" that re-drives the pipeline.
@@ -290,26 +368,23 @@ export async function restartAgent(
         console.error(`[restartAgent] ohmypi prompt delivery failed for ${normalizedId}: ${msg}`);
       }
     } else {
-      const ready = await waitForPromptReady(normalizedId, effectiveHarness, 30);
+      const timeout = getHarnessBehavior(effectiveHarness).readyTimeoutSeconds;
+      const ready = await waitForPromptReady(normalizedId, effectiveHarness, timeout);
       if (!ready) {
-        throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within 30s for ${normalizedId}`);
+        throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within ${timeout}s for ${normalizedId}`);
       }
       await new Promise(r => setTimeout(r, 500));
-      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code') {
-        // PAN-1837: kimi-code's deliveryKind is pty-supervisor, same as codex/acp —
-        // it must not fall through to the legacy sync sendKeys() branch below,
-        // which bypasses the supervisor cascade entirely.
-        const delivery = await deliverAgentMessage(
-          normalizedId,
-          prompt,
-          'restartAgent:continue-prompt',
-          effectiveHarness === 'codex' ? resilientDeliveryMethod(agentState.deliveryMethod) : undefined,
-        );
-        if (!delivery.ok) {
-          throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} continue prompt delivery failed`);
-        }
-      } else {
-        await Effect.runPromise(sendKeys(normalizedId, prompt));
+      // PAN-1837: kimi-code's deliveryKind is pty-supervisor, same as codex/acp.
+      // PAN-3960: claude-code goes through the same backend-aware delivery —
+      // a direct tmux paste cannot reach a Herdr pane.
+      const delivery = await deliverAgentMessage(
+        normalizedId,
+        prompt,
+        'restartAgent:continue-prompt',
+        effectiveHarness === 'codex' ? resilientDeliveryMethod(agentState.deliveryMethod) : undefined,
+      );
+      if (!delivery.ok) {
+        throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} continue prompt delivery failed`);
       }
     }
 
@@ -331,19 +406,6 @@ export async function restartAgent(
   }
 }
 
-/**
- * Check whether a tmux session has an active agent runtime.
- * A session may exist with only a bare bash shell after Claude exits.
- */
-async function hasAgentRuntimeInSession(sessionName: string, harness: RuntimeName): Promise<boolean> {
-  try {
-    const panePids = await Effect.runPromise(listPaneValues(sessionName, '#{pane_pid}'));
-    if (panePids.length === 0) return false;
-    return hasAgentRuntimeInSubtree(panePids[0]!, harness);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Detect crashed agents (state shows running but tmux session is gone)
@@ -363,11 +425,11 @@ export async function recoverAgent(
   opts: { modelOverride?: string; force?: boolean } = {},
 ): Promise<RecoverAgentResult | null> {
   const normalizedId = normalizeAgentId(agentId);
-  logAgentLifecycleSync(normalizedId, 'recoverAgent called');
-  const state = getAgentStateSync(normalizedId);
+  logAgentLifecycle(normalizedId, 'recoverAgent called');
+  const state = getAgentState(normalizedId);
 
   if (!state) {
-    logAgentLifecycleSync(normalizedId, 'recoverAgent BLOCKED: no state.json');
+    logAgentLifecycle(normalizedId, 'recoverAgent BLOCKED: no state.json');
     return null;
   }
 
@@ -375,25 +437,25 @@ export async function recoverAgent(
   if (!state.id) state.id = normalizedId;
   const gateDecision = decideResumeGate(getAgentResumeGateBlockReason(state), 'operator-start');
   if (gateDecision.decision === 'block') {
-    logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateDecision.reason}. Clear the gate before recovering.`);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateDecision.reason}. Clear the gate before recovering.`);
     return null;
   }
   if (!opts.force) {
     const pendingDecision = await detectPendingOperatorDecision(normalizedId);
     if (pendingDecision) {
-      logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: pending operator decision (${pendingDecision.reason})`);
+      logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: pending operator decision (${pendingDecision.reason})`);
       return null;
     }
   }
-  const modelOverride = normalizeModelOverrideSync(opts.modelOverride);
+  const modelOverride = normalizeModelOverride(opts.modelOverride);
   if (modelOverride) {
     state.model = modelOverride;
-    logAgentLifecycleSync(normalizedId, `recoverAgent: model overridden → ${modelOverride}`);
+    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${modelOverride}`);
   }
   if (!state.workspace || !state.model) {
     const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
     console.error(reason);
-    logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: ${reason}`);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: ${reason}`);
     return null;
   }
 
@@ -408,20 +470,28 @@ export async function recoverAgent(
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: ${reason}`);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: ${reason}`);
     return null;
   }
 
-  // Check if already running — session may exist with only a bare shell
-  // after Claude exited (zombie session). Kill it and recover.
-  if (sessionExistsSync(normalizedId)) {
-    const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
-    if (await hasAgentRuntimeInSession(normalizedId, recoveryHarness)) {
-      logAgentLifecycleSync(normalizedId, 'recoverAgent NO_ACTION: live harness runtime is already running');
-      return { action: 'already-running', state };
-    }
-    console.log(`[agents] ${normalizedId} tmux session is a zombie (no ${recoveryHarness} runtime) — killing and recovering`);
-    try { killSessionSync(normalizedId); } catch { /* ignore */ }
+  // Check if already running. A pane may still exist with only a bare shell
+  // after the harness exited (a zombie). liveness.ts is the one oracle and is
+  // backend-aware (PAN-3960): alive → nothing to do; a confirmed death → close
+  // whatever pane or session is left and recover. A probe that could not answer
+  // (`runtime-indeterminate`) is never a death, so nothing is reaped on it. On
+  // a Herdr host a live same-name tmux session (an agent from before the
+  // switch) answers alive, so it is never reaped (review of #3992, M3).
+  const liveness = await isAlive(normalizedId);
+  if (liveness.alive) {
+    logAgentLifecycle(normalizedId, 'recoverAgent NO_ACTION: live harness runtime is already running');
+    return { action: 'already-running', state };
+  }
+  if (liveness.reason === 'runtime-indeterminate') {
+    logAgentLifecycle(normalizedId, 'recoverAgent NO_ACTION: liveness probe was indeterminate — not reaping a possibly-live agent');
+    return { action: 'already-running', state };
+  }
+  if (await closeAgentPane(normalizedId)) {
+    console.log(`[agents] ${normalizedId} pane was a zombie (${liveness.reason}) — closed it and recovering`);
   }
 
   // Update crash count in health file
@@ -439,16 +509,17 @@ export async function recoverAgent(
   const recoveryPrompt = generateRecoveryPrompt(state);
 
   // Get provider env for the agent's model (reads latest API key from settings)
-  const providerEnv = state.model ? await getProviderEnvForModel(state.model) : {};
+  const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
+  const providerEnv = state.model ? await getProviderEnvForModel(state.model, recoveryHarness) : {};
 
   // For credential-file providers, ensure apiKeyHelper is configured.
   // For all other providers, clear stale apiKeyHelper from previous runs.
   if (state.model) {
-    const provider = getProviderForModelSync(state.model as ModelId);
+    const provider = getProviderForModel(state.model as ModelId);
     if (provider.authType === 'credential-file') {
-      setupCredentialFileAuthSync(provider, state.workspace);
+      setupCredentialFileAuth(provider, state.workspace);
     } else {
-      clearCredentialFileAuthSync(state.workspace);
+      clearCredentialFileAuth(state.workspace);
     }
   }
 
@@ -456,7 +527,6 @@ export async function recoverAgent(
   // the saved AgentState (or the session-id heuristic for legacy planning-* IDs)
   // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
   // resurrected as work agents.
-  const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
   const harnessLaunch = await prepareHarnessLaunch(recoveryHarness);
   const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
   saveAgentStateSync(state);
@@ -479,7 +549,13 @@ export async function recoverAgent(
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+    await relaunchAgentPane({
+      agentId: normalizedId,
+      state,
+      role: recoveryRole,
+      harness: 'ohmypi',
+      model: state.model,
+      launcherScript,
       env: {
         ...BLANKED_PROVIDER_ENV,
         OVERDECK_AGENT_ID: normalizedId,
@@ -488,7 +564,7 @@ export async function recoverAgent(
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...piProviderEnv,
       },
-    }));
+    });
     try {
       await writeOhmypiAgentPrompt(normalizedId, recoveryPrompt);
     } catch (err) {
@@ -497,11 +573,11 @@ export async function recoverAgent(
     }
     markAgentRunning(state);
     saveAgentStateSync(state);
-    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (ohmypi)`);
+    logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (ohmypi)`);
     return { action: 'respawned', state };
   }
 
-  if (recoveryHarness === 'acp') {
+  if (recoveryHarness === 'acp' || recoveryHarness === 'opencode' || recoveryHarness === 'muse') {
     const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
     const { launcherContent, providerEnv: acpProviderEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
@@ -510,13 +586,21 @@ export async function recoverAgent(
       role: recoveryRole,
       isPlanning: recoveryRole === 'plan',
       ...(resumeSessionId ? { spawnMode: 'resume' as const, resumeSessionId } : {}),
-      harness: 'acp',
+      harness: recoveryHarness,
+      useSupervisor: recoverySupervisorLaunch.useSupervisor,
+      supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
       harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+    await relaunchAgentPane({
+      agentId: normalizedId,
+      state,
+      role: recoveryRole,
+      harness: recoveryHarness,
+      model: state.model,
+      launcherScript,
       env: {
         ...BLANKED_PROVIDER_ENV,
         OVERDECK_AGENT_ID: normalizedId,
@@ -525,26 +609,30 @@ export async function recoverAgent(
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...acpProviderEnv,
       },
-    }));
+    });
+    if (recoveryHarness === 'muse' && !await waitForPromptReady(normalizedId, recoveryHarness, getHarnessBehavior(recoveryHarness).readyTimeoutSeconds)) {
+      await Effect.runPromise(stopAgent(normalizedId));
+      throw new Error(`Muse recovery readiness timed out for ${normalizedId}`);
+    }
     const delivery = await deliverInitialPromptWithRetry(
       normalizedId,
       recoveryPrompt,
-      'recoverAgent:acp-recovery-prompt',
+      `recoverAgent:${recoveryHarness}-recovery-prompt`,
     );
     if (!delivery.ok) {
       await Effect.runPromise(stopAgent(normalizedId));
       throw new Error(
-        `ACP recovery prompt delivery failed for ${normalizedId}: ${delivery.failure ?? 'unknown failure'}`,
+        `${getHarnessBehavior(recoveryHarness).displayName} recovery prompt delivery failed for ${normalizedId}: ${delivery.failure ?? 'unknown failure'}`,
       );
     }
     markAgentRunning(state);
     saveAgentStateSync(state);
-    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (acp)`);
+    logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (${recoveryHarness})`);
     return { action: 'respawned', state };
   }
 
   if (recoveryHarness === 'kimi-code') {
-    // PAN-1837: kimi-code has no launcher-writable session.id — its resume id
+    // PAN-1837: kimi-code has no launcher-writable session index — its resume id
     // comes from resolveRecoveryResumeSessionId (kimi-session-newest source)
     // and buildAgentLaunchConfig threads kimiCodeLauncherFields (model/yolo)
     // that buildKimiCodeCommand() requires; the generic default branch below
@@ -564,28 +652,34 @@ export async function recoverAgent(
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
 
-    // PAN-1837 review fix: snapshot, createSession, and capture/persist all run
+    // PAN-1837 review fix: snapshot, the pane launch, and capture/persist all run
     // inside withKimiSessionCaptureLock (review cycle 6) — a fire-and-forget or
     // merely-awaited capture outside the per-workDirKey mutex only proves *some*
     // new same-cwd directory appeared, not that it's THIS recovery's, so a
     // concurrent same-cwd Kimi launch (a work agent, a restart, or a
     // conversation) could otherwise claim this session or vice versa. When
     // there is no captured session id to resume, this recovery is a fresh
-    // Kimi launch — snapshot the workspace's session bucket BEFORE the tmux
-    // session exists so the capture below can diff against it and persist the
+    // Kimi launch — snapshot the workspace's session bucket BEFORE the pane
+    // exists so the capture below can diff against it and persist the
     // new session id for the NEXT recovery.
     const launchAndCaptureKimiSession = async (): Promise<void> => {
       let kimiExistingSessionsBefore: Set<string> | undefined;
       if (!resumeSessionId) {
         try {
-          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), state.workspace)));
+          const { kimiSessionsRoot } = await import('../runtimes/storage/kimi-code.js');
+          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(kimiHomeDefault(), state.workspace)));
         } catch {
           kimiExistingSessionsBefore = new Set();
         }
       }
 
-      await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+      await relaunchAgentPane({
+        agentId: normalizedId,
+        state,
+        role: recoveryRole,
+        harness: 'kimi-code',
+        model: state.model,
+        launcherScript,
         env: {
           ...BLANKED_PROVIDER_ENV,
           OVERDECK_AGENT_ID: normalizedId,
@@ -594,17 +688,17 @@ export async function recoverAgent(
           CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
           ...kimiProviderEnv,
         },
-      }));
+      });
 
       if (kimiExistingSessionsBefore) {
-        const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
         const sessionId = await waitForNewKimiSessionAsync(
-          join(homedir(), '.kimi-code'),
+          kimiHomeDefault(),
           state.workspace,
           kimiExistingSessionsBefore,
         );
         if (sessionId) {
-          writeKimiSessionId(normalizedId, sessionId);
+          recordKimiSessionCapture(normalizedId, sessionId, state.workspace);
         } else {
           // PAN-1837 review fix: fail closed like restartAgent/spawnAgent — a
           // missing capture would otherwise leave a running, unowned Kimi
@@ -621,7 +715,7 @@ export async function recoverAgent(
 
     const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
     try {
-      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), state.workspace, launchAndCaptureKimiSession);
+      await withKimiSessionCaptureLock(kimiHomeDefault(), state.workspace, launchAndCaptureKimiSession);
     } catch (err) {
       await Effect.runPromise(stopAgent(normalizedId)).catch(() => undefined);
       throw err;
@@ -640,19 +734,19 @@ export async function recoverAgent(
     }
     markAgentRunning(state);
     saveAgentStateSync(state);
-    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (kimi-code)`);
+    logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (kimi-code)`);
     return { action: 'respawned', state };
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
     ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole)
     : {};
-  const recoveryLauncherContent = generateLauncherScriptSync({
+  const recoveryLauncherContent = generateLauncherScript({
     role: recoveryRole,
     workingDir: state.workspace,
     changeDir: false,
     setTerminalEnv: true,
-    providerExports: (await getProviderExportsForModel(state.model)).trimEnd(),
+    providerExports: (await getProviderExportsForModel(state.model, recoveryHarness)).trimEnd(),
     extraEnvExports: [harnessLaunch.pathExport],
     baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
     appendSystemPromptFiles: await claudeSystemPromptFiles(state.workspace, recoveryHarness),
@@ -664,7 +758,13 @@ export async function recoverAgent(
   });
   const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
   await writeLauncherScriptAtomic(launcherScript, recoveryLauncherContent);
-  createSessionSync(normalizedId, state.workspace, `bash ${launcherScript}`, {
+  await relaunchAgentPane({
+    agentId: normalizedId,
+    state,
+    role: recoveryRole,
+    harness: recoveryHarness,
+    model: state.model,
+    launcherScript,
     env: {
       ...BLANKED_PROVIDER_ENV,
       OVERDECK_AGENT_ID: normalizedId,
@@ -672,10 +772,8 @@ export async function recoverAgent(
       OVERDECK_SESSION_TYPE: state.role ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work'),
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       ...providerEnv
-    }
+    },
   });
-
-  saveAgentStateSync(state);
   if (recoveryHarness === 'codex') {
     const delivery = await deliverInitialPromptWithRetry(normalizedId, recoveryPrompt, 'recoverAgent:recovery-prompt', state.deliveryMethod);
     if (!delivery.ok) {
@@ -686,7 +784,7 @@ export async function recoverAgent(
   markAgentRunning(state);
   saveAgentStateSync(state);
 
-  logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount}`);
+  logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount}`);
   return { action: 'respawned', state };
 }
 
@@ -716,9 +814,9 @@ function generateRecoveryPrompt(state: AgentState): string {
   ];
 
   // Add FPP work if available
-  const { hasWork } = checkHookSync(state.id);
+  const { hasWork } = checkHook(state.id);
   if (hasWork) {
-    const fixedPointPrompt = generateFixedPointPromptSync(state.id);
+    const fixedPointPrompt = generateFixedPointPrompt(state.id);
     if (fixedPointPrompt) {
       lines.push('---');
       lines.push('');

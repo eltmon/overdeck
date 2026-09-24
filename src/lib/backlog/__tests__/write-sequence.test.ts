@@ -3,11 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-vi.mock('../../pan-dir/auto-commit.js', () => ({ queueAutoCommit: vi.fn() }));
-vi.mock('../../review-status.js', () => ({ getReviewStatusSync: vi.fn().mockReturnValue(null) }));
-
 import { writeSequenceMd, parseSequenceMd } from '../sequence-io.js';
-import { getReviewStatusSync } from '../../review-status.js';
 import type { SequenceDoc } from '../types.js';
 
 const SAMPLE_DOC: SequenceDoc = {
@@ -30,7 +26,6 @@ describe('writeSequenceMd + parseSequenceMd round-trip', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'sequence-test-'));
-    vi.mocked(getReviewStatusSync).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -92,14 +87,6 @@ describe('writeSequenceMd + parseSequenceMd round-trip', () => {
     expect(md).toContain('Full paragraph for top-tier.');
   });
 
-  it('calls queueAutoCommit with the expected subject', async () => {
-    const { queueAutoCommit } = await import('../../pan-dir/auto-commit.js');
-    writeSequenceMd(tmpDir, SAMPLE_DOC);
-    expect(queueAutoCommit).toHaveBeenCalledWith(
-      expect.objectContaining({ subject: 'chore(state): update backlog sequence (overdeck)' })
-    );
-  });
-
   it('footprint for 522 nodes stays under 65k tokens (characters proxy)', () => {
     const bigDoc: SequenceDoc = {
       ...SAMPLE_DOC,
@@ -130,7 +117,6 @@ describe('writeSequenceMd – merge-preservation (FR-13, FR-15, FR-16, FR-17)', 
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'sequence-merge-test-'));
-    vi.mocked(getReviewStatusSync).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -261,7 +247,6 @@ describe('writeSequenceMd – operatorEdit mode resets gate/planning (FR-15/FR-1
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'sequence-reset-test-'));
-    vi.mocked(getReviewStatusSync).mockReturnValue(null);
   });
 
   afterEach(() => {

@@ -6,9 +6,9 @@ import { loadConfigSync as loadYamlConfig } from '../../../../lib/config-yaml.js
 import { listProjectsSync } from '../../../../lib/projects.js';
 import type { IssueDataService } from '../../services/issue-data-service.js';
 import {
-  getLinearApiKey as getLinearApiKeyShared,
-  getGitHubConfig as getGitHubConfigShared,
-  getRallyConfig as getRallyConfigShared,
+  getLinearApiKey,
+  getGitHubConfig,
+  getRallyConfig,
 } from '../../services/tracker-config.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { readJsonBody } from './shared.js';
@@ -91,9 +91,9 @@ const getTrackerStatusRoute = HttpRouter.add(
         const hasConfigKey = !!(((yamlConfig as { trackerKeys?: Record<string, string | undefined> }).trackerKeys || {}) as Record<string, string | undefined>)[trackerType];
 
         let hasEnvFileKey = false;
-        if (trackerType === 'linear') hasEnvFileKey = !!getLinearApiKeyShared();
-        else if (trackerType === 'github') hasEnvFileKey = !!getGitHubConfigShared();
-        else if (trackerType === 'rally') hasEnvFileKey = !!getRallyConfigShared();
+        if (trackerType === 'linear') hasEnvFileKey = !!getLinearApiKey();
+        else if (trackerType === 'github') hasEnvFileKey = !!getGitHubConfig();
+        else if (trackerType === 'rally') hasEnvFileKey = !!getRallyConfig();
 
         configured.push({
           type: trackerType,

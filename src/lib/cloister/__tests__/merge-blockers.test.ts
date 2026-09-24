@@ -1,50 +1,109 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
-const mockGetAll = vi.fn();
-vi.mock('../../overdeck/review-status-sync.js', () => ({
-  getAllReviewStatusesFromDb: () => mockGetAll(),
-}));
+import { blockerReasonsFor, getMergeBlockersPayload } from '../merge-blockers.js';
+import { emptyPrFacts, type PrFacts } from '../pr-facts.js';
 
-import { getMergeBlockersPayload } from '../merge-blockers.js';
+function facts(overrides: Partial<PrFacts>): PrFacts {
+  return {
+    ...emptyPrFacts('PAN-1'),
+    forge: 'github',
+    exists: true,
+    open: true,
+    url: 'https://github.com/o/r/pull/1',
+    number: 1,
+    approved: true,
+    reviewDecision: 'APPROVED',
+    mergeable: true,
+    checks: 'green',
+    headSha: 'abcdef1234',
+    ...overrides,
+  };
+}
 
-describe('getMergeBlockersPayload (PAN-1620, sandbox-safe — reads SQLite, no HTTP)', () => {
-  beforeEach(() => vi.clearAllMocks());
+function signals(issueId: string, hasOpenPr = true) {
+  return {
+    issueId,
+    issueOpen: true,
+    hasOpenPr,
+    hasMergedPr: false,
+    hasConventionBranch: true,
+    branchUnmerged: true,
+    hasMergedBranchWork: false,
+    phaseLabel: 'in-review',
+    hasXbriefSpec: true,
+    explicitlyReady: false,
+    hasTerminalCloseOut: false,
+  };
+}
 
-  it('returns only passed, unmerged PRs whose blockers are merge-gate reasons', () => {
-    mockGetAll.mockReturnValue({
-      'PAN-1': { reviewStatus: 'passed', mergeStatus: 'pending', prUrl: 'u1', blockerReasons: [{ type: 'merge_conflict', summary: 'conflict' }] },
-      'PAN-2': { reviewStatus: 'passed', mergeStatus: 'merged', blockerReasons: [{ type: 'failing_checks', summary: 'x' }] }, // merged → excluded
-      'PAN-3': { reviewStatus: 'pending', blockerReasons: [{ type: 'merge_conflict', summary: 'x' }] }, // not passed → excluded
-      'PAN-4': { reviewStatus: 'passed', mergeStatus: 'pending', blockerReasons: [{ type: 'reviewer_unresponsive', summary: 'x' }] }, // unlisted reason → excluded
-      'PAN-5': { reviewStatus: 'passed', mergeStatus: 'pending', blockerReasons: [] }, // no reasons → excluded
-      'PAN-6': { reviewStatus: 'passed', mergeStatus: 'failed', prUrl: 'u6', blockerReasons: [{ type: 'unmerged_sibling_repo', summary: 'api has 2 unmerged commits' }] },
-    });
-    expect(getMergeBlockersPayload()).toEqual([
-      { issueId: 'PAN-1', prUrl: 'u1', reasons: [{ type: 'merge_conflict', summary: 'conflict' }] },
-      { issueId: 'PAN-6', prUrl: 'u6', reasons: [{ type: 'unmerged_sibling_repo', summary: 'api has 2 unmerged commits' }] },
+const project = { key: 'p', config: { name: 'p', path: '/tmp/p' } } as never;
+
+describe('blockerReasonsFor (PAN-3917: forge-native blockers, no stored row)', () => {
+  it('reports nothing for an approved, green, mergeable PR', () => {
+    expect(blockerReasonsFor(facts({}))).toEqual([]);
+  });
+
+  it('reports a merge conflict when the forge says the branch conflicts', () => {
+    expect(blockerReasonsFor(facts({ mergeable: false, mergeableState: 'conflicting' }))).toEqual([
+      { type: 'merge_conflict', summary: 'the branch conflicts with the base branch' },
     ]);
   });
 
-  it('keeps only the native reasons when a PR mixes native + non-native blockers', () => {
-    mockGetAll.mockReturnValue({
-      'PAN-9': {
-        reviewStatus: 'passed',
-        mergeStatus: 'pending',
-        prUrl: 'u9',
-        blockerReasons: [
-          { type: 'failing_checks', summary: 'CI red' },
-          { type: 'reviewer_unresponsive', summary: 'ignore me' },
-          { type: 'not_mergeable', summary: 'dirty' },
-        ],
+  it('reports not_mergeable for a non-conflict unmergeable state', () => {
+    expect(blockerReasonsFor(facts({ mergeable: false, mergeableState: 'blocked' }))).toEqual([
+      { type: 'not_mergeable', summary: 'the forge reports the PR is not mergeable (blocked)' },
+    ]);
+  });
+
+  it('reports failing checks from the check rollup', () => {
+    expect(blockerReasonsFor(facts({ checks: 'red' }))).toEqual([
+      { type: 'failing_checks', summary: 'CI checks are failing on abcdef12' },
+    ]);
+  });
+
+  it('reports both when the PR is red and unmergeable', () => {
+    const reasons = blockerReasonsFor(facts({ checks: 'red', mergeable: false, mergeableState: 'conflicting' }));
+    expect(reasons.map((r) => r.type)).toEqual(['merge_conflict', 'failing_checks']);
+  });
+
+  it('reports nothing once the PR is merged', () => {
+    expect(blockerReasonsFor(facts({ merged: true, open: false, checks: 'red' }))).toEqual([]);
+  });
+});
+
+describe('getMergeBlockersPayload', () => {
+  const deps = (factsById: Record<string, PrFacts>, ids: string[]) => ({
+    listProjects: async () => [project],
+    gather: async () => [{ project: project.config, signals: ids.map((id) => signals(id)) }] as never,
+    getFacts: async (issueId: string) => factsById[issueId] ?? emptyPrFacts(issueId),
+  });
+
+  it('returns only approved PRs the forge is blocking', async () => {
+    const payload = await getMergeBlockersPayload(deps({
+      'PAN-1': facts({ issueId: 'PAN-1', mergeable: false, mergeableState: 'conflicting' }),
+      'PAN-2': facts({ issueId: 'PAN-2' }),
+      'PAN-3': facts({ issueId: 'PAN-3', approved: false, reviewDecision: 'REVIEW_REQUIRED', checks: 'red' }),
+    }, ['PAN-1', 'PAN-2', 'PAN-3']));
+
+    expect(payload).toEqual([
+      {
+        issueId: 'PAN-1',
+        prUrl: 'https://github.com/o/r/pull/1',
+        reasons: [{ type: 'merge_conflict', summary: 'the branch conflicts with the base branch' }],
       },
-    });
-    expect(getMergeBlockersPayload()).toEqual([
-      { issueId: 'PAN-9', prUrl: 'u9', reasons: [{ type: 'failing_checks', summary: 'CI red' }, { type: 'not_mergeable', summary: 'dirty' }] },
     ]);
   });
 
-  it('returns empty when nothing is blocked', () => {
-    mockGetAll.mockReturnValue({});
-    expect(getMergeBlockersPayload()).toEqual([]);
+  it('returns empty when nothing is blocked', async () => {
+    expect(await getMergeBlockersPayload(deps({ 'PAN-2': facts({ issueId: 'PAN-2' }) }, ['PAN-2']))).toEqual([]);
+  });
+
+  it('skips issues with no open PR', async () => {
+    const payload = await getMergeBlockersPayload({
+      listProjects: async () => [project],
+      gather: async () => [{ project: project.config, signals: [signals('PAN-7', false)] }] as never,
+      getFacts: async () => { throw new Error('should not look up a PR-less issue'); },
+    });
+    expect(payload).toEqual([]);
   });
 });

@@ -17,10 +17,10 @@ vi.mock('../../lib/refresh-dashboard-state', () => ({ refreshDashboardState: (..
 
 const action = (key: string, enabled: boolean) => ({ action: { key }, enabled, isPending: false, invoke: vi.fn() });
 
-function setState({ start = false, resume = false, troubled = false, paused = false, agentId = 'agent-pan-2499' } = {}) {
+function setState({ start = false, resume = false, paused = false, agentId = 'agent-pan-2499' } = {}) {
   useIssueActions.mockReturnValue({
     all: [action('startAgent', start), action('resumeSession', resume)],
-    agent: agentId ? { id: agentId, troubled, paused } : undefined,
+    agent: agentId ? { id: agentId, paused } : undefined,
     issue: { project: { id: 'overdeck' } },
   });
 }
@@ -63,11 +63,9 @@ describe('StartAgentCta', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it.each([
-    ['troubled'],
-    ['paused'],
-  ] as const)('opens the shared recovery dialog for the %s gate instead of an inline confirm', async (kind) => {
-    setState({ start: true, [kind]: true });
+  it('opens the shared recovery dialog for the paused gate instead of an inline confirm', async () => {
+    const kind = 'paused';
+    setState({ start: true, paused: true });
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
     renderCta();
     fireEvent.click(screen.getByRole('button', { name: 'Start work agent' }));

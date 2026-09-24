@@ -21,9 +21,9 @@ vi.mock('../../projects.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../projects.js')>();
   return {
     ...actual,
-    findProjectByPathSync: (workspacePath: string) => projectRegistry.entries.find(({ config }) => (
+    findProjectByPath: (workspacePath: string) => projectRegistry.entries.find(({ config }) => (
       workspacePath === config.path || workspacePath.startsWith(`${config.path}/`)
-    ))?.config ?? actual.findProjectByPathSync(workspacePath),
+    ))?.config ?? actual.findProjectByPath(workspacePath),
     listProjectsSync: () => projectRegistry.entries.length > 0
       ? projectRegistry.entries
       : actual.listProjectsSync(),
@@ -176,50 +176,29 @@ describe('writeAutoStartXBrief', () => {
     });
   });
 
-  it('writes migrated project specs to the state worktree where findPlanSync resolves them', async () => {
+  it('writes a registered project spec into <planHome>/.pan/specs where findPlanSync resolves it', async () => {
     await withTempDir(async (root) => {
       const previousOverdeckHome = process.env['OVERDECK_HOME'];
       process.env['OVERDECK_HOME'] = root;
       try {
         const projectRoot = join(root, 'project');
         const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1072');
-        const projectKey = 'registered-project';
-        const stateRoot = join(root, 'state', projectKey);
-        const stateOrigin = join(root, 'state-origin.git');
         projectRegistry.entries = [{
-          key: projectKey,
+          key: 'registered-project',
           config: { name: 'Registered project', path: projectRoot },
         }];
         await mkdir(projectRoot, { recursive: true });
-        await initializeGitRepo(stateRoot, 'overdeck-state');
-        git(root, ['init', '--bare', '--quiet', stateOrigin]);
-        await writeFile(join(stateRoot, 'migration-complete.json'), JSON.stringify({
-          version: 1,
-          sourceMainSha: 'a'.repeat(40),
-          stateBranchSha: 'b'.repeat(40),
-          completedAt: '2026-07-28T00:00:00.000Z',
-        }));
-        git(stateRoot, ['add', 'migration-complete.json']);
-        git(stateRoot, ['commit', '--quiet', '-m', 'mark migrated']);
-        git(stateRoot, ['remote', 'add', 'origin', stateOrigin]);
-        git(stateRoot, ['push', '--quiet', '-u', 'origin', 'overdeck-state']);
 
         const result = await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspacePath, {
           issueId: 'PAN-1072',
-          title: 'Auto start migrated work agents',
-          body: '- [ ] Start from a migrated project',
+          title: 'Auto start work agents',
+          body: '- [ ] Start from a registered project',
         }));
 
-        expect(result.projectSpecPath).toBe(join(stateRoot, 'specs', result.canonicalFilename));
+        // PAN-3917: the plan home is the project checkout itself — no state
+        // worktree, no migration marker, nothing under ~/.overdeck/state.
+        expect(result.projectSpecPath).toBe(join(projectRoot, '.pan', 'specs', result.canonicalFilename));
         expect(findPlanSync(workspacePath)).toBe(result.projectSpecPath);
-        expect(git(stateRoot, ['status', '--porcelain'])).toBe('');
-        const remoteSpec = git(root, [
-          '--git-dir',
-          stateOrigin,
-          'show',
-          `refs/heads/overdeck-state:specs/${result.canonicalFilename}`,
-        ]);
-        expect(JSON.parse(remoteSpec).plan.id).toBe('pan-1072');
       } finally {
         if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
         else process.env['OVERDECK_HOME'] = previousOverdeckHome;

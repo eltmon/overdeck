@@ -25,7 +25,7 @@ describe('runPreflightChecks', () => {
       Effect.succeed([]),
     );
 
-    await Effect.runPromise(runPreflightChecks('/workspace', 'PAN-1501', 'waived reason'));
+    await runPreflightChecks('/workspace', 'PAN-1501', 'waived reason');
     expect(runTestRequirementCheck).toHaveBeenCalledWith('/workspace', 'PAN-1501', 'waived reason');
   });
 
@@ -34,7 +34,7 @@ describe('runPreflightChecks', () => {
       Effect.succeed(['  Test gate failure']),
     );
 
-    const failures = await Effect.runPromise(runPreflightChecks('/workspace', 'PAN-1501'));
+    const failures = await runPreflightChecks('/workspace', 'PAN-1501');
     expect(failures).toContain('  Test gate failure');
   });
 });
@@ -56,7 +56,7 @@ describe('open-tasks check follows .tasks/redirect (PAN-2195)', () => {
       writeFileSync(join(ws, '.tasks', 'redirect'), '../../.tasks');
       writeFileSync(join(ws, '.tasks', 'issues.jsonl'), makeTask('open'));
 
-      const failures = await Effect.runPromise(runPreflightChecks(ws, 'PAN-9999'));
+      const failures = await runPreflightChecks(ws, 'PAN-9999');
       expect(failures.some((f) => f.includes('Open tasks'))).toBe(false);
     } finally {
       rmSync(base, { recursive: true, force: true });
@@ -71,7 +71,7 @@ describe('open-tasks check follows .tasks/redirect (PAN-2195)', () => {
       mkdirSync(join(ws, '.tasks'), { recursive: true });
       writeFileSync(join(ws, '.tasks', 'issues.jsonl'), makeTask('open'));
 
-      const failures = await Effect.runPromise(runPreflightChecks(ws, 'PAN-9999'));
+      const failures = await runPreflightChecks(ws, 'PAN-9999');
       expect(failures.some((f) => f.includes('Open tasks'))).toBe(false);
     } finally {
       rmSync(base, { recursive: true, force: true });

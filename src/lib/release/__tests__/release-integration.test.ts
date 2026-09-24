@@ -4,38 +4,24 @@ import { runRelease } from '../release-engine.js';
 const mocks = vi.hoisted(() => ({
   mergeSet: null as any,
   project: null as any,
-  reviewUpdates: [] as Array<{ issueId: string; update: any }>,
   persistedSets: [] as any[],
 }));
 
 vi.mock('../../merge-set.js', () => ({
-  getMergeSetSync: vi.fn(() => mocks.mergeSet),
+  getMergeSet: vi.fn(() => mocks.mergeSet),
 }));
 
 vi.mock('../../projects.js', () => ({
   getProjectSync: vi.fn(() => mocks.project),
-  findProjectByPathSync: vi.fn(() => mocks.project),
+  findProjectByPath: vi.fn(() => mocks.project),
 }));
 
-vi.mock('../../review-status.js', () => ({
-  setReviewStatusSync: vi.fn((issueId: string, update: any) => {
-    mocks.reviewUpdates.push({ issueId, update });
-    return {
-      issueId,
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      updatedAt: new Date().toISOString(),
-      readyForMerge: false,
-      ...update,
-    };
-  }),
-}));
 
 vi.mock('../../release-set.js', () => ({
-  upsertReleaseSetSync: vi.fn((releaseSet: any) => {
+  upsertReleaseSet: vi.fn((releaseSet: any) => {
     mocks.persistedSets.push(structuredClone(releaseSet));
   }),
-  withComponentStateSync: vi.fn((releaseSet: any, componentKey: string, patch: any) => ({
+  withComponentState: vi.fn((releaseSet: any, componentKey: string, patch: any) => ({
     ...releaseSet,
     updatedAt: new Date().toISOString(),
     components: releaseSet.components.map((component: any) =>
@@ -66,7 +52,6 @@ describe('runRelease integration with fake timers', () => {
   beforeEach(() => {
     mocks.mergeSet = null;
     mocks.project = null;
-    mocks.reviewUpdates = [];
     mocks.persistedSets = [];
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -127,10 +112,7 @@ describe('runRelease integration with fake timers', () => {
       'npm run smoke:frontend',
       'npm run smoke:worker',
     ]);
-    expect(mocks.reviewUpdates.at(-1)).toMatchObject({
-      issueId: 'PAN-399',
-      update: { releaseStatus: 'passed' },
-    });
+    expect(result?.status).toBe('passed');
   });
 
   it('polls health with fake timers until the endpoint succeeds', async () => {
@@ -198,7 +180,7 @@ describe('runRelease integration with fake timers', () => {
       ['worker', 'skipped'],
     ]);
     expect(commands).toEqual(['npm run smoke:api', 'npm run smoke:frontend']);
-    expect(mocks.reviewUpdates.at(-1)?.update.releaseStatus).toBe('partial');
+    expect(result?.status).toBe('partial');
   });
 
   it('runs rollback and marks rolled_back when configured rollback succeeds', async () => {
@@ -229,7 +211,7 @@ describe('runRelease integration with fake timers', () => {
       status: 'rolled_back',
       rollbackStatus: 'rolled_back',
     });
-    expect(mocks.reviewUpdates.at(-1)?.update.releaseStatus).toBe('rolled_back');
+    expect(result?.status).toBe('rolled_back');
   });
 
   it('marks manual components blocked and the release partial instead of passed', async () => {
@@ -251,13 +233,7 @@ describe('runRelease integration with fake timers', () => {
       ['api', 'passed'],
       ['worker', 'blocked'],
     ]);
-    expect(mocks.reviewUpdates.at(-1)).toMatchObject({
-      issueId: 'PAN-399',
-      update: {
-        releaseStatus: 'partial',
-        releaseNotes: 'Release awaiting manual step(s): worker.',
-      },
-    });
+    expect(result?.status).toBe('partial');
   });
 
   it('blocks auto dependents when their manual dependency has not passed', async () => {
@@ -290,13 +266,7 @@ describe('runRelease integration with fake timers', () => {
     expect(result?.components.find((c) => c.componentKey === 'frontend')?.notes).toContain(
       'Blocked: dependencies not passed: worker.',
     );
-    expect(mocks.reviewUpdates.at(-1)).toMatchObject({
-      issueId: 'PAN-399',
-      update: {
-        releaseStatus: 'partial',
-        releaseNotes: 'Release awaiting manual step(s): worker, frontend.',
-      },
-    });
+    expect(result?.status).toBe('partial');
   });
 
   it('skips cleanly and returns null when the project has no release config', async () => {
@@ -307,10 +277,6 @@ describe('runRelease integration with fake timers', () => {
 
     expect(result).toBeNull();
     expect(runCommand).not.toHaveBeenCalled();
-    expect(mocks.reviewUpdates.at(-1)).toMatchObject({
-      issueId: 'PAN-399',
-      update: { releaseStatus: 'skipped', releaseNotes: 'No release config found for project.' },
-    });
   });
 
   it('runs verification commands in the project root by default', async () => {

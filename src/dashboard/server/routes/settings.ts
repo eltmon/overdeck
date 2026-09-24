@@ -1,3 +1,4 @@
+import { getAvailableModelsWithOpenCodeApi } from '../../../lib/settings-model-catalog.js';
 import { jsonResponse } from "../http-helpers.js";
 /**
  * Settings route module — Effect HttpRouter.Layer (PAN-428 B15)
@@ -23,7 +24,6 @@ import {
   saveSettingsApi,
   saveDesignLanguage,
   validateSettingsApi,
-  getAvailableModelsApi,
   getOptimalDefaultsApi,
   getMiniMaxDefaultsApi,
   saveOpenRouterFavorites,
@@ -32,10 +32,11 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { setUiTheme } from '../../../lib/ui-theme.js';
-import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
+import { getCodexAuthPath, getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
+import { FsError } from '../../../lib/errors.js';
 import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { getDashScopeUpstreamBaseUrl } from '../../../lib/openai-compatible-proxy.js';
-import { OpenRouterService } from '../services/openrouter-service.js';
+import { OpenRouterService, includeOpenRouterFavorites } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
 import { buildHarnessPolicyDecisions, parseHarnessPolicyModels } from '../../../lib/harness-policy-decisions.js';
@@ -47,13 +48,10 @@ import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
 import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
-import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
-import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
-import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
-import { getConversationSearchHealth, recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
+import { getConversationSearchConfig } from '../../../lib/config-yaml.js';
+import { getConversationSearchStatus } from '../services/conversation-search-status.js';
+import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
-import { getLegacyHome } from '../../../lib/paths.js';
-import { previewLegacyConversations, importLegacyConversations } from '../../../lib/overdeck/legacy-import.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -178,8 +176,8 @@ const getSettingsRoute = HttpRouter.add(
 const getAvailableModelsRoute = HttpRouter.add(
   'GET',
   '/api/settings/available-models',
-  httpHandler(Effect.try({
-    try: () => jsonResponse(getAvailableModelsApi()),
+  httpHandler(Effect.tryPromise({
+    try: async () => jsonResponse(await getAvailableModelsWithOpenCodeApi()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -223,7 +221,10 @@ const getOpenAIAuthRoute = HttpRouter.add(
   'GET',
   '/api/settings/openai-auth',
   httpHandler(Effect.gen(function* () {
-    const status = yield* getOpenAIAuthStatus();
+    const status = yield* Effect.tryPromise({
+      try: () => getOpenAIAuthStatus(),
+      catch: (cause) => new FsError({ path: getCodexAuthPath(), operation: 'getOpenAIAuthStatus', cause }),
+    });
     return jsonResponse(status);
   })),
 );
@@ -745,53 +746,9 @@ const getConversationSearchStatusRoute = HttpRouter.add(
   'GET',
   '/api/settings/conversation-search/status',
   httpHandler(Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => {
-        const config = getConversationSearchConfigSync();
-        // Runtime embed failures (exhausted credits, quota, network) are recorded
-        // by the search service and watcher; surface them in every shape (PAN-3771).
-        const health = getConversationSearchHealth();
-        if (!config.enabled) {
-          return jsonResponse({
-            enabled: false,
-            available: false,
-            unavailableReason: 'conversationSearch is disabled',
-            dbPath: config.dbPath,
-            chunkCount: 0,
-            indexedFileCount: 0,
-            lastIndexedAt: null,
-            health,
-          });
-        }
-
-        const provider = createConversationEmbeddingProvider({ config });
-        if (!provider.enabled) {
-          return jsonResponse({
-            enabled: config.enabled,
-            available: false,
-            unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable',
-            dbPath: config.dbPath,
-            chunkCount: 0,
-            indexedFileCount: 0,
-            lastIndexedAt: null,
-            health,
-          });
-        }
-
-        const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
-        try {
-          const stats = db.getStats();
-          return jsonResponse({
-            enabled: config.enabled,
-            available: db.available && provider.enabled,
-            unavailableReason: db.unavailableReason,
-            dbPath: config.dbPath,
-            ...stats,
-            health,
-          });
-        } finally {
-          db.close();
-        }
+    return yield* Effect.tryPromise({
+      try: async () => {
+        return jsonResponse(await getConversationSearchStatus());
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
@@ -807,7 +764,7 @@ const getConversationSearchReindexEstimateRoute = HttpRouter.add(
       try: async () => {
         // Optional ?model= lets the UI price a *prospective* model switch before saving it.
         const modelOverride = new URL(request.url, 'http://localhost').searchParams.get('model')?.trim();
-        const baseConfig = getConversationSearchConfigSync();
+        const baseConfig = getConversationSearchConfig();
         const config = modelOverride ? { ...baseConfig, model: modelOverride } : baseConfig;
         const estimate = await estimateFullReindexConversationSearchCost({ config });
         const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
@@ -910,7 +867,7 @@ const putSettingsRoute = HttpRouter.add(
         if (!validation.valid) {
           return jsonResponse({ error: validation.errors.join('; ') }, { status: 400 });
         }
-        await Effect.runPromise(saveSettingsApi(newSettings));
+        await saveSettingsApi(newSettings);
         await refreshTtsRuntimeConfig();
         await syncTtsPlaybackWithConfig();
         await syncConversationSearchWatcher();
@@ -971,7 +928,7 @@ const putDesignLanguageRoute = HttpRouter.add(
       if (theme !== 'ledger' && theme !== 'broadsheet') {
         return jsonResponse({ error: "theme must be 'ledger' or 'broadsheet'" }, { status: 400 });
       }
-      await Effect.runPromise(saveDesignLanguage(theme));
+      await saveDesignLanguage(theme);
       return jsonResponse({ success: true });
     });
   })),
@@ -986,7 +943,7 @@ const getOpenRouterModelsRoute = HttpRouter.add(
     const orService = yield* OpenRouterService;
     const models = yield* orService.fetchModels();
     const favorites = getOpenRouterFavorites();
-    return jsonResponse({ models, favorites });
+    return jsonResponse({ models: includeOpenRouterFavorites(models, favorites), favorites });
   })),
 );
 
@@ -1006,7 +963,7 @@ const putOpenRouterFavoritesRoute = HttpRouter.add(
     const modelIds = favorites.filter((f): f is string => typeof f === 'string');
     return yield* Effect.promise(async () => {
       try {
-        await Effect.runPromise(saveOpenRouterFavorites(modelIds));
+        await saveOpenRouterFavorites(modelIds);
         return jsonResponse({ success: true, favorites: modelIds });
       } catch (err) {
         throw new Error(err instanceof Error ? err.message : String(err));
@@ -1030,7 +987,7 @@ const putOpenRouterApiKeyRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
-        const settings = await Effect.runPromise(updateProviderApiKey('openrouter', apiKey?.trim() || undefined));
+        const settings = await updateProviderApiKey('openrouter', apiKey?.trim() || undefined);
         return jsonResponse({
           success: true,
           apiKey: settings.api_keys.openrouter,
@@ -1118,46 +1075,6 @@ const getProviderEnvConflictsRoute = HttpRouter.add(
 );
 
 
-const getLegacyImportPreviewRoute = HttpRouter.add(
-  'GET',
-  '/api/settings/legacy-import/conversations',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    return yield* Effect.try({
-      try: () => {
-        const urlPath = new URL(request.url, 'http://localhost').searchParams.get('path');
-        const defaultPath = join(getLegacyHome(), 'panopticon.db');
-        const resolvedPath = urlPath?.trim() || defaultPath;
-        const preview = previewLegacyConversations(resolvedPath);
-        if (!preview.found) {
-          return jsonResponse({ found: false, defaultPath, message: `No legacy database found at ${resolvedPath}` });
-        }
-        return jsonResponse({ found: true, path: resolvedPath, conversations: preview.rows });
-      },
-      catch: (err) => jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 500 }),
-    });
-  })),
-);
-
-const postLegacyImportRoute = HttpRouter.add(
-  'POST',
-  '/api/settings/legacy-import/conversations',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnsafeDashboardMutationRequest(request);
-    if (authError) return authError;
-    const body = yield* readJsonBody;
-    return yield* Effect.try({
-      try: () => {
-        const { path, names } = body as { path: string; names: string[] };
-        const result = importLegacyConversations(path, names);
-        return jsonResponse(result);
-      },
-      catch: (err) => jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 500 }),
-    });
-  })),
-);
-
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const settingsRouteLayer = Layer.mergeAll(
@@ -1182,8 +1099,6 @@ export const settingsRouteLayer = Layer.mergeAll(
   postOpenRouterTestKeyRoute,
   getHarnessPolicyRoute,
   getProviderEnvConflictsRoute,
-  getLegacyImportPreviewRoute,
-  postLegacyImportRoute,
 );
 
 export default settingsRouteLayer;

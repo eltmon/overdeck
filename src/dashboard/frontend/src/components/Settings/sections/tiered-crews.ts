@@ -1,4 +1,8 @@
 import { MODELS_BY_PROVIDER, type ModelDef } from '../modelCatalog';
+import { checkTierFitness, type TierFitnessWarning } from '../../../../../../lib/agents/tier-fitness.js';
+import { capabilityClassOf } from '../../../../../../lib/model-capability-class.js';
+import { CONFIGURABLE_PROVIDER_SET } from '../../../../../../lib/configurable-providers.js';
+import { MODEL_CAPABILITY_CLASSES } from '../../../../../../lib/model-capability-class.js';
 import type {
   Harness,
   ModelId,
@@ -202,6 +206,29 @@ function yamlLines(value: unknown, indent: number): string[] {
     });
   }
   return [`${prefix}${yamlScalar(value)}`];
+}
+
+
+/** PAN-3842: fitness warnings for the current (unsaved) draft. Frontend
+ * context: catalog = MODELS_BY_PROVIDER, provider = catalog group key,
+ * enabled providers = settings.models.providers. */
+export function tierFitnessWarnings(
+  config: TieredExecutionConfig,
+  settings: Pick<SettingsConfig, 'models'>,
+  catalog = MODELS_BY_PROVIDER,
+): TierFitnessWarning[] {
+  // PAN-3842 F-4: MODELS_BY_PROVIDER has no groq/cerebras/mistral groups, so
+  // models the server knows — mistral-large-latest, llama-3.3-70b-versatile —
+  // were reported "not in the model catalog" by Settings alone. Union in the
+  // shared class table, whose completeness against the real catalog is
+  // enforced by the FR-1 test, so both surfaces agree on what exists.
+  const knownModelIds = new Set([
+    ...Object.values(catalog).flatMap((provider) => provider.models.map((model) => model.id as string)),
+    ...Object.keys(MODEL_CAPABILITY_CLASSES),
+  ]);
+  const providerOf = (model: string) => Object.entries(catalog).find(([, provider]) => provider.models.some((candidate) => candidate.id === model))?.[0];
+  const enabledProviders = new Set(Object.entries(settings.models.providers).filter(([, on]) => on).map(([name]) => name));
+  return checkTierFitness(config, { knownModelIds, classOf: capabilityClassOf, providerOf, enabledProviders, configurableProviders: CONFIGURABLE_PROVIDER_SET });
 }
 
 export function renderYamlPreview(config: TieredExecutionConfig): string {

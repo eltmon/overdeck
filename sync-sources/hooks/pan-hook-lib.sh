@@ -116,6 +116,27 @@ pan_release_singleflight_lock() {
   return 0
 }
 
+# Append one structured JSON line. O_APPEND plus a single write keeps concurrent
+# writers from interleaving; readers resolve duplicate session ids.
+pan_append_session_index() {
+  local agent_dir="$1" session_id="$2" observed_at="$3" source="$4" harness="${5:-}" model="${6:-}" path="${7:-}"
+  [ -n "$session_id" ] && command -v jq >/dev/null 2>&1 || return 1
+  mkdir -p "$agent_dir" 2>/dev/null || return 1
+  if [ -f "$agent_dir/state.json" ]; then
+    [ -n "$harness" ] || harness=$(jq -r '.harness // ""' "$agent_dir/state.json" 2>/dev/null || true)
+    [ -n "$model" ] || model=$(jq -r '.model // ""' "$agent_dir/state.json" 2>/dev/null || true)
+  fi
+  [ -n "$harness" ] || harness="unknown"
+  [ -n "$model" ] || model="unknown"
+  local line byte_count
+  line=$(jq -cn --arg sid "$session_id" --arg at "$observed_at" --arg source "$source" \
+    --arg harness "$harness" --arg model "$model" --arg path "$path" \
+    '{sessionId: $sid, at: $at, source: $source, harness: $harness, model: $model} + (if $path == "" then {} else {path: $path} end)') || return 1
+  byte_count=$(printf '%s' "$line" | LC_ALL=C wc -c) || return 1
+  [ "$byte_count" -le 4095 ] || return 1
+  printf '%s\n' "$line" >> "$agent_dir/sessions.json"
+}
+
 # Run a command with a hard deadline while preserving its stdin, stdout, and
 # ordinary exit code. GNU timeout is preferred when installed; stock macOS uses
 # the pure-bash watchdog fallback. Expiry is always reported as 124.

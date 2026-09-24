@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js';
-import { insertCostEventSync } from '../../../src/lib/overdeck/cost-sync.js';
+import { insertCostEvent } from '../../../src/lib/overdeck/cost-sync.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 import {
   extractWithProviderPolicy,
@@ -31,14 +30,12 @@ let odb: OverdeckTestDb;
 
 beforeEach(async () => {
   originalHome = process.env.OVERDECK_HOME;
-  resetDatabase();
   // setupOverdeckTestDb creates a fresh OVERDECK_HOME with overdeck.db.
   odb = setupOverdeckTestDb();
   tempDir = odb.home;
 });
 
 afterEach(async () => {
-  closeDatabase();
   teardownOverdeckTestDb(odb);
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
@@ -79,7 +76,7 @@ describe('memory extraction provider policy', () => {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
 
-    insertCostEventSync({
+    insertCostEvent({
       ts: today.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,
@@ -96,7 +93,7 @@ describe('memory extraction provider policy', () => {
       requestId: 'memory-extraction-today',
       sessionId: identity.sessionId,
     });
-    insertCostEventSync({
+    insertCostEvent({
       ts: yesterday.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,
@@ -113,7 +110,7 @@ describe('memory extraction provider policy', () => {
       requestId: 'memory-extraction-yesterday',
       sessionId: identity.sessionId,
     });
-    insertCostEventSync({
+    insertCostEvent({
       ts: today.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,

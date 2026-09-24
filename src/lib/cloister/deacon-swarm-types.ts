@@ -1,10 +1,9 @@
 import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 import type { SpawnRunOptions } from '../agents/spawn-prep.js';
 import type { SlotMergeResult } from '../agents/slot-merge.js';
-import type { SlotReconcileResult } from '../agents/slot-reconcile.js';
-import type { PanIssueSwarmSlotCompletion } from '../pan-dir/record.js';
+import type { SlotReconcileResult } from './swarm-slot-reconcile.js';
+import type { SwarmSlotCompletion } from './swarm-slot-store.js';
 import type { findSpecByIssue } from '../pan-dir/specs.js';
-import type { ReviewStatus } from '../review-status.js';
 import type { resolveAutomaticSwarmPolicy } from '../swarm-policy.js';
 import type { PersistedTaskOperation } from '../xbrief/dag.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
@@ -16,8 +15,6 @@ import type {
   writeSwarmCompletionObservation,
   writeSwarmForemanTakeover,
 } from './deacon-swarm-record.js';
-import type { ensureSwarmForeman } from './swarm-foreman.js';
-import type { SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
 
 export interface ArchivedBlockedSlot {
   archivedBranch: string;
@@ -71,16 +68,21 @@ export interface CoordinateSwarmSlotsDeps {
   clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => Promise<void>;
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   registeredSlotCapacityAvailable: (issueId: string, selectedCount: number) => boolean;
-  tryReserveSwarmSlot: () => boolean;
+  /** PAN-3917: the running count comes from the backend inventory, so this is async. */
+  tryReserveSwarmSlot: () => Promise<boolean>;
   releaseSwarmSlot: () => void;
   spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
-  /** Per-issue hold: deaconIgnored (operator) suppresses all swarm coordination (PAN-2214);
-   *  system-set `stuck` is logged but no longer halts coordination (PAN-2469). */
-  getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored' | 'stuckReason'> | null;
-  /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
-  readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
-  /** Durable per-slot completion marker written by `pan done`. */
-  readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => PanIssueSwarmSlotCompletion | undefined;
+  /**
+   * Per-issue swarm hold (PAN-3917): the swarm's own ledger entry, set by
+   * `pan swarm hold`, is the only per-issue halt. The old system-set `stuck`
+   * and operator `deaconIgnored` flags lived on the review-status row and are
+   * gone with it.
+   */
+  getIssueHold?: (issueId: string, workspacePath: string) => { reason: string } | null;
+  /** Item id → status from the issue's continue file — the one home for item progress. */
+  readItemStatuses?: (workspacePath: string, issueId: string) => Promise<Record<string, string>>;
+  /** Per-slot completion marker written by `pan done`. */
+  readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => SwarmSlotCompletion | undefined;
   /** Delete a stale durable marker that does not belong to the active item. */
   clearSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;
   /** Re-evaluated immediately before every slot spawn. */
@@ -92,11 +94,6 @@ export interface CoordinateSwarmSlotsDeps {
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
   listReleasedSlotIndexes?: (issueId: string, workspacePath: string) => number[];
   recordForemanTakeover?: typeof writeSwarmForemanTakeover;
-  ensureSwarmForeman?: typeof ensureSwarmForeman;
-  workResumeSlotsAvailable?: SwarmForemanLivenessDeps['workResumeSlotsAvailable'];
-  writeSwarmHold?: SwarmForemanLivenessDeps['writeSwarmHold'];
-  emitActivityEntry?: SwarmForemanLivenessDeps['emitActivityEntry'];
-  sendStallEvent?: (agentId: string, message: string) => Promise<unknown>;
   resolveAutomaticSwarmPolicy?: typeof resolveAutomaticSwarmPolicy;
   getReleasedSlotBranch?: (issueId: string, workspacePath: string, slotIndex: number) => string | undefined;
   clearReleasedSlot?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;

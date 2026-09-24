@@ -1,7 +1,6 @@
 import { readdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
+import { claudeProjectsRoot, encodeClaudeProjectDir } from '../../../../lib/runtimes/storage/claude-code.js';
 
 /**
  * Encode a filesystem path to the Claude Code project directory name.
@@ -14,7 +13,7 @@ function encodeCwdToProjectDir(cwd: string): string {
 
 /** Returns ~/.claude/projects/<encoded-cwd>/ */
 function claudeProjectDir(cwd: string): string {
-  return join(homedir(), '.claude', 'projects', encodeCwdToProjectDir(cwd));
+  return join(claudeProjectsRoot(), encodeCwdToProjectDir(cwd));
 }
 
 /**

@@ -1,8 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { Effect } from 'effect';
-import { FsError } from './errors.js';
 
 import { getOverdeckHome } from './paths.js';
 
@@ -12,11 +10,11 @@ function bridgeTokensDir(): string {
   return join(getOverdeckHome(), 'bridge-tokens');
 }
 
-export function getBridgeTokenPath(agentId: string): string {
+function getBridgeTokenPath(agentId: string): string {
   return join(bridgeTokensDir(), `${agentId}.token`);
 }
 
-export function readBridgeTokenSync(agentId: string): string | null {
+export function readBridgeToken(agentId: string): string | null {
   const path = getBridgeTokenPath(agentId);
   if (!existsSync(path)) return null;
   try {
@@ -27,7 +25,7 @@ export function readBridgeTokenSync(agentId: string): string | null {
   }
 }
 
-export function writeBridgeTokenSync(agentId: string): string {
+export function writeBridgeToken(agentId: string): string {
   const dir = bridgeTokensDir();
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -42,27 +40,3 @@ export function writeBridgeTokenSync(agentId: string): string {
   }
   return token;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Read the bridge token for an agent. Returns `null` if no token exists.
- * Effect-native variant — never fails (errors are swallowed to null like the Promise version).
- */
-export const readBridgeToken = (agentId: string): Effect.Effect<string | null> =>
-  Effect.sync(() => readBridgeTokenSync(agentId));
-
-/**
- * Generate and persist a new bridge token. Returns the new token.
- * Effect-native variant — fails with FsError if the write cannot be persisted.
- */
-export const writeBridgeToken = (agentId: string): Effect.Effect<string, FsError> =>
-  Effect.try({
-    try: () => writeBridgeTokenSync(agentId),
-    catch: (cause) =>
-      new FsError({
-        path: getBridgeTokenPath(agentId),
-        operation: 'writeBridgeToken',
-        cause,
-      }),
-  });

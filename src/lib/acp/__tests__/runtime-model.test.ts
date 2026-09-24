@@ -10,7 +10,6 @@ import {
   extractModelConfigId,
   findSessionConfigOption,
   mergeToolCallState,
-  parsePermissionRequest,
   parseSessionModeState,
   parseSessionUpdateEvent,
   sessionUpdateIsReplay,
@@ -422,42 +421,4 @@ describe("AcpRuntimeModel", () => {
     ]);
   });
 
-  it("keeps permission request parsing compatible with loose extension payloads", () => {
-    const request = parsePermissionRequest({
-      sessionId: "session-1",
-      options: [
-        {
-          optionId: "allow-once",
-          name: "Allow once",
-          kind: "allow_once",
-        },
-      ],
-      toolCall: {
-        toolCallId: "tool-1",
-        title: "`cat package.json`",
-        kind: "execute",
-        status: "pending",
-        content: [
-          {
-            type: "content",
-            content: {
-              type: "text",
-              text: "Not in allowlist",
-            },
-          },
-        ],
-      },
-    });
-
-    expect(request).toMatchObject({
-      kind: "execute",
-      detail: "cat package.json",
-      toolCall: {
-        toolCallId: "tool-1",
-        kind: "execute",
-        status: "pending",
-        command: "cat package.json",
-      },
-    });
-  });
 });

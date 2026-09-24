@@ -1,7 +1,7 @@
 /**
  * xBRIEF Lifecycle Foundation
  *
- * Canonical xBRIEF documents live in `specs/` on `overdeck-state`, with
+ * Canonical xBRIEF documents live in the plan home's `.pan/specs/`, with
  * lifecycle represented by `plan.status`. The `./vbrief/` directory helpers
  * below remain only for legacy lifecycle compatibility:
  *
@@ -16,20 +16,17 @@
  */
 
 import { mkdirSync } from 'fs';
-import { mkdir } from 'fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
-import { FsError } from '../errors.js';
 
-export const LEGACY_VBRIEF_ROOT_DIRNAME = 'vbrief';
+const LEGACY_VBRIEF_ROOT_DIRNAME = 'vbrief';
 
 export const LEGACY_VBRIEF_LIFECYCLE_DIRS = ['proposed', 'active', 'completed', 'cancelled'] as const;
 
 export type XBriefLifecycleDir = typeof LEGACY_VBRIEF_LIFECYCLE_DIRS[number];
 
 export const XBRIEF_FILENAME_SUFFIX = '.xbrief.json';
-export const LEGACY_VBRIEF_FILENAME_SUFFIX = '.vbrief.json';
-export const XBRIEF_FILENAME_SUFFIXES = [XBRIEF_FILENAME_SUFFIX, LEGACY_VBRIEF_FILENAME_SUFFIX] as const;
+const LEGACY_VBRIEF_FILENAME_SUFFIX = '.vbrief.json';
+const XBRIEF_FILENAME_SUFFIXES = [XBRIEF_FILENAME_SUFFIX, LEGACY_VBRIEF_FILENAME_SUFFIX] as const;
 
 const FILENAME_STEM_RE = /^(\d{4}-\d{2}-\d{2})-([A-Za-z][A-Za-z0-9]*-\d+)-([a-z0-9-]+)$/;
 
@@ -125,20 +122,12 @@ export function resolveXBriefDir(projectRoot: string, lifecycleDir: XBriefLifecy
 }
 
 /**
- * Resolve the absolute path to a project's xBRIEF root directory (without a
- * lifecycle subdirectory). Pure path math.
- */
-export function resolveXBriefRoot(projectRoot: string, legacyRootDirname?: string): string {
-  return join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME);
-}
-
-/**
  * Ensure the xBRIEF lifecycle directories exist under the given project root.
  * Returns the absolute path to the xBRIEF root. Idempotent.
  *
  * @param legacyRootDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function ensureXBriefDirsSync(projectRoot: string, legacyRootDirname?: string): string {
+export function ensureXBriefDirs(projectRoot: string, legacyRootDirname?: string): string {
   const root = join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME);
   mkdirSync(root, { recursive: true });
   for (const dir of LEGACY_VBRIEF_LIFECYCLE_DIRS) {
@@ -146,30 +135,3 @@ export function ensureXBriefDirsSync(projectRoot: string, legacyRootDirname?: st
   }
   return root;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect variant of `ensureXBriefDirs`. Uses fs/promises so dashboard server
- * routes can create the xBRIEF lifecycle directories without blocking the
- * Node.js event loop. Idempotent.
- */
-export const ensureXBriefDirs = (
-  projectRoot: string,
-  legacyRootDirname?: string,
-): Effect.Effect<string, FsError> =>
-  Effect.gen(function* () {
-    const root = join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME);
-    yield* Effect.tryPromise({
-      try: () => mkdir(root, { recursive: true }),
-      catch: (cause) => new FsError({ path: root, operation: 'mkdir', cause }),
-    });
-    for (const dir of LEGACY_VBRIEF_LIFECYCLE_DIRS) {
-      const lifecycleDir = join(root, dir);
-      yield* Effect.tryPromise({
-        try: () => mkdir(lifecycleDir, { recursive: true }),
-        catch: (cause) => new FsError({ path: lifecycleDir, operation: 'mkdir', cause }),
-      });
-    }
-    return root;
-  });

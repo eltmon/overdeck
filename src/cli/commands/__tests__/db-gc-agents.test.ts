@@ -1,27 +1,33 @@
-import { mkdirSync, rmSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../../../lib/overdeck/infra.js';
-import {
-  listAllAgentsSync,
-  removeAgentRecordSync,
-} from '../../../lib/overdeck/agents.js';
+import { listAgentStatesSync } from '../../../lib/agents/agent-state.js';
 import { registerDbCommands } from '../db.js';
 
+// paths.ts resolves AGENTS_DIR once at module load, so the home has to be
+// pointed at a scratch directory before the subject's imports are evaluated.
+const testHome = vi.hoisted(() => {
+  const { mkdtempSync } = require('node:fs') as typeof import('node:fs');
+  const { tmpdir } = require('node:os') as typeof import('node:os');
+  const { join: joinPath } = require('node:path') as typeof import('node:path');
+  const home = mkdtempSync(joinPath(tmpdir(), 'gc-agents-'));
+  process.env.OVERDECK_HOME = home;
+  return home;
+});
+
+/**
+ * PAN-3917: gc-agents used to enumerate overdeck.db rows. The table is dropped,
+ * so the candidates are the agent state directories themselves.
+ */
 describe('pan admin db gc-agents', () => {
-  const originalOverdeckHome = process.env.OVERDECK_HOME;
-  let testHome: string;
   let logs: string[];
 
   beforeEach(() => {
-    testHome = join(tmpdir(), `gc-agents-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(testHome, { recursive: true });
-    process.env.OVERDECK_HOME = testHome;
-    closeOverdeckDatabaseSync();
+    rmSync(join(testHome, 'agents'), { recursive: true, force: true });
+    mkdirSync(join(testHome, 'agents'), { recursive: true });
     logs = [];
     vi.spyOn(console, 'log').mockImplementation((message?: unknown) => {
       logs.push(String(message ?? ''));
@@ -30,13 +36,7 @@ describe('pan admin db gc-agents', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    closeOverdeckDatabaseSync();
-    if (originalOverdeckHome === undefined) {
-      delete process.env.OVERDECK_HOME;
-    } else {
-      process.env.OVERDECK_HOME = originalOverdeckHome;
-    }
-    rmSync(testHome, { recursive: true, force: true });
+    rmSync(join(testHome, 'agents'), { recursive: true, force: true });
   });
 
   async function runGcAgents(args: string[] = []): Promise<void> {
@@ -49,20 +49,12 @@ describe('pan admin db gc-agents', () => {
         if (!options.dryRun) {
           for (const agent of removable) {
             rmSync(join(testHome, 'agents', agent.id), { recursive: true, force: true });
-            removeAgentRecordSync(agent.id);
           }
         }
         return { removed: removable.map((agent) => agent.id), preserved: [] };
       }),
     });
     await program.parseAsync(['node', 'test', 'db', 'gc-agents', ...args]);
-  }
-
-  function seedIssue(id: string, stage: string): void {
-    getOverdeckDatabaseSync().prepare(`
-      INSERT INTO issues (id, stage, updated_at)
-      VALUES (?, ?, ?)
-    `).run(id, stage, Date.now());
   }
 
   function seedAgent(
@@ -72,28 +64,23 @@ describe('pan admin db gc-agents', () => {
     status: string,
     flags: { paused?: boolean; troubled?: boolean } = {},
   ): void {
-    mkdirSync(join(testHome, 'agents', id), { recursive: true });
-    getOverdeckDatabaseSync().prepare(`
-      INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, paused, troubled, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    const dir = join(testHome, 'agents', id);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'state.json'), JSON.stringify({
       id,
       issueId,
       role,
       status,
-      `/workspaces/${id}`,
-      'claude-code',
-      'claude',
-      flags.paused ? 1 : 0,
-      flags.troubled ? 1 : 0,
-      Date.now(),
-    );
+      workspace: `/workspaces/${id}`,
+      harness: 'claude-code',
+      model: 'claude',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      paused: flags.paused ?? false,
+      troubled: flags.troubled ?? false,
+    }));
   }
 
   function seedFixture(): void {
-    seedIssue('PAN-TERM', 'closed');
-    seedIssue('PAN-CANCELLED', 'cancelled');
-    seedIssue('PAN-OPEN', 'working');
     seedAgent('agent-terminal-1', 'PAN-TERM', 'work', 'stopped');
     seedAgent('agent-terminal-2', 'PAN-CANCELLED', 'work', 'stopped');
     seedAgent('agent-paused-terminal', 'PAN-TERM', 'work', 'stopped', { paused: true });
@@ -103,22 +90,23 @@ describe('pan admin db gc-agents', () => {
     seedAgent('agent-review-terminal', 'PAN-TERM', 'review', 'stopped');
   }
 
-  it('reports candidates without deleting rows or state dirs in dry-run mode', async () => {
+  it('reports candidates without deleting state dirs in dry-run mode', async () => {
     seedFixture();
 
     await runGcAgents(['--dry-run']);
 
-    // PAN-2543 D10/FR-11: every *stopped* row on a terminal issue prunes,
+    // PAN-2543 D10/FR-11: every *stopped* agent on a terminal issue prunes,
     // regardless of role or paused/troubled flags (those gate resume, not GC —
-    // a terminal issue never resumes). Only live/non-stopped rows and rows on
+    // a terminal issue never resumes). Only live agents and agents on
     // non-terminal issues survive.
     expect(logs.join('\n')).toContain('Would reap 5 agent(s) after live terminality checks.');
-    expect(logs.join('\n')).toContain('agent-terminal-1');
-    expect(logs.join('\n')).toContain('agent-terminal-2');
-    expect(logs.join('\n')).toContain('agent-paused-terminal');
-    expect(logs.join('\n')).toContain('agent-troubled-terminal');
-    expect(logs.join('\n')).toContain('agent-review-terminal');
-    expect(listAllAgentsSync().map((agent) => agent.id).sort()).toEqual([
+    for (const id of [
+      'agent-terminal-1', 'agent-terminal-2', 'agent-paused-terminal',
+      'agent-troubled-terminal', 'agent-review-terminal',
+    ]) {
+      expect(logs.join('\n')).toContain(id);
+    }
+    expect(listAgentStatesSync().map((agent) => agent.id).sort()).toEqual([
       'agent-open',
       'agent-paused-terminal',
       'agent-review-terminal',
@@ -131,21 +119,22 @@ describe('pan admin db gc-agents', () => {
     expect(existsSync(join(testHome, 'agents', 'agent-terminal-2'))).toBe(true);
   });
 
-  it('reaps every stopped row on terminal issues and preserves live/non-terminal rows', async () => {
+  it('reaps every stopped agent on terminal issues and preserves live/non-terminal ones', async () => {
     seedFixture();
 
     await runGcAgents();
 
     expect(logs.join('\n')).toContain('Reaped 5 agent(s); preserved 0 agent(s).');
-    expect(listAllAgentsSync().map((agent) => agent.id).sort()).toEqual([
+    expect(listAgentStatesSync().map((agent) => agent.id).sort()).toEqual([
       'agent-open',
       'agent-running-terminal',
     ]);
-    expect(existsSync(join(testHome, 'agents', 'agent-terminal-1'))).toBe(false);
-    expect(existsSync(join(testHome, 'agents', 'agent-terminal-2'))).toBe(false);
-    expect(existsSync(join(testHome, 'agents', 'agent-paused-terminal'))).toBe(false);
-    expect(existsSync(join(testHome, 'agents', 'agent-troubled-terminal'))).toBe(false);
-    expect(existsSync(join(testHome, 'agents', 'agent-review-terminal'))).toBe(false);
+    for (const id of [
+      'agent-terminal-1', 'agent-terminal-2', 'agent-paused-terminal',
+      'agent-troubled-terminal', 'agent-review-terminal',
+    ]) {
+      expect(existsSync(join(testHome, 'agents', id))).toBe(false);
+    }
     expect(existsSync(join(testHome, 'agents', 'agent-running-terminal'))).toBe(true);
     expect(existsSync(join(testHome, 'agents', 'agent-open'))).toBe(true);
   });

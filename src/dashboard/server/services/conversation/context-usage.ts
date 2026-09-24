@@ -1,6 +1,6 @@
 import { open, stat } from 'node:fs/promises';
 import type { ContextUsage } from '@overdeck/contracts';
-import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../../lib/model-capabilities.js';
+import { MODEL_CAPABILITIES, resolveModelId } from '../../../../lib/model-capabilities.js';
 import { findLastCompactBoundary } from './compact-boundary.js';
 import type { JsonlEntry, LatestAssistantUsage, ParseResult } from './types.js';
 
@@ -33,7 +33,7 @@ function resolveContextCapability(model: string | null): ModelCapability | null 
   const normalizedModel = model?.trim();
   if (!normalizedModel) return null;
 
-  const resolvedModel = resolveModelIdSync(normalizedModel);
+  const resolvedModel = resolveModelId(normalizedModel);
   return Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
     ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
     : null;

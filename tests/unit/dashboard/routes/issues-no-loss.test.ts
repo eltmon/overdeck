@@ -12,7 +12,6 @@ const MEMBERSHIP_ROUTE_FILE = join(WORKSPACE_ROOT, 'src', 'dashboard', 'server',
 
 const EXPECTED_ISSUES_ROUTES = [
   'GET /api/issues',
-  'GET /api/issues/:id/analyze',
   'POST /api/issues/:issueId/close',
   'POST /api/issues/:id/start-planning',
   'POST /api/issues/:id/abort-planning',
@@ -30,11 +29,8 @@ const EXPECTED_ISSUES_ROUTES = [
   'POST /api/issues/bulk-close-out',
   'GET /api/issues/:id/prd',
   'GET /api/issues/:id/tasks',
-  'POST /api/issues/:id/tasks/:itemId/inspect',
   'GET /api/issues/:id/verification',
-  'POST /api/issues/:id/reset-to-planned',
   'GET /api/issues/:id/planning-state',
-  'GET /api/issues/:id/ship-log',
   'POST /api/issues/:id/generate-tasks',
   'GET /api/issues/:id/pr',
   'GET /api/issues/:id/pr/diff',
@@ -42,7 +38,6 @@ const EXPECTED_ISSUES_ROUTES = [
   'GET /api/issues/:id/check-runs',
   'GET /api/issues/:id/discussions',
   'GET /api/issues/:id/costs',
-  'GET /api/issues/:id/ship-log',
   'GET /api/issues/resource-allocated',
   'GET /api/issues/:id/resource-details',
 ] as const;
@@ -71,7 +66,9 @@ function enumerateIssuesRoutes(): Set<string> {
 }
 
 describe('PAN-2148 issues route no-loss audit', () => {
-  it('keeps all 35 issues + pipeline-membership method/path registrations', () => {
+  // PAN-3859 deleted GET /api/issues/:id/analyze (dead Linear-era surface) —
+  // the locked surface is now 34 routes.
+  it('keeps all 31 issues + pipeline-membership method/path registrations', () => {
     const liveRoutes = enumerateIssuesRoutes();
     const allExpected = [...EXPECTED_ISSUES_ROUTES, ...EXPECTED_MEMBERSHIP_ROUTES];
     const expectedRoutes = new Set<string>(allExpected);
@@ -91,6 +88,6 @@ describe('PAN-2148 issues route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(35);
+    expect(liveRoutes.size).toBe(31);
   });
 });

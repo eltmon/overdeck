@@ -6,10 +6,12 @@
  * conversation (model chosen here), where the AI discusses the idea and
  * files the issue only when the operator says it's ready. The issue then
  * lands in "Just filed" on My work, one click from planning.
+ * The description owns a full row; project, model, and action wrap below it.
+ * Failed launches retain the draft and show the server error for retry.
  */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ModelPicker } from '../chat/ModelPicker';
+import { ModelPicker, type Harness } from '../chat/ModelPicker';
 import { ensureDefaultConversationModel, getDefaultConversationModel } from '../chat/defaultConversationModel';
 import { fetchProjects } from '../CommandDeck/projectsData';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
@@ -50,8 +52,9 @@ export function seedDiscussPrompt(description: string): string {
 
 export function TalkItThrough() {
   const [text, setText] = useState('');
-  const [model, setModel] = useState(() => getDefaultConversationModel() || 'claude-opus-4-6');
-  const [harness, setHarness] = useState<'claude-code' | 'codex'>('claude-code');
+  const [model, setModel] = useState(getDefaultConversationModel);
+  // Until the picker resolves its settings, let the server use provider routing.
+  const [harness, setHarness] = useState<Harness>();
   const projectsQuery = useQuery({ queryKey: ['projects'], queryFn: fetchProjects, staleTime: 60_000 });
   const projects = projectsQuery.data ?? [];
   const [projectKey, setProjectKey] = useState<string | undefined>(undefined);
@@ -89,22 +92,24 @@ export function TalkItThrough() {
 
   const submit = () => {
     const description = text.trim();
-    if (description) spawn.mutate(description);
+    if (description && model && !spawn.isPending) spawn.mutate(description);
   };
 
   return (
-    <div className="mt-4 flex items-center gap-2.5">
+    <div className="mt-4 flex flex-wrap items-center gap-2.5">
       <input
         value={text}
+        disabled={spawn.isPending}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
         placeholder={SIMPLE_STRINGS.home.composerPlaceholder}
-        className="h-11 flex-1 rounded-2xl border border-input bg-card px-4 text-sm text-foreground outline-none focus:border-ring"
+        className="h-11 w-full min-w-0 rounded-2xl border border-input bg-card px-4 text-sm text-foreground outline-none focus:border-ring"
         data-testid="talk-it-through-input"
       />
       {projects.length > 0 && (
         <select
           value={effectiveProjectKey}
+          disabled={spawn.isPending}
           onChange={(e) => setProjectKey(e.target.value)}
           aria-label="Project for this conversation"
           data-testid="talk-it-through-project"
@@ -115,10 +120,16 @@ export function TalkItThrough() {
           ))}
         </select>
       )}
-      <ModelPicker value={model} onChange={(id) => setModel(id)} harness={harness} onHarnessChange={(h) => setHarness(h as typeof harness)} />
-      <PrimaryButton disabled={!text.trim() || spawn.isPending} onClick={submit}>
-        {spawn.isPending ? 'Starting…' : SIMPLE_STRINGS.home.composerButton}
-      </PrimaryButton>
+      <div className="min-w-0 max-w-full">
+        <ModelPicker value={model} onChange={setModel} harness={harness} onHarnessChange={setHarness} followProviderDefault disabled={spawn.isPending} />
+      </div>
+      <div className="shrink-0 whitespace-nowrap">
+        <PrimaryButton disabled={!text.trim() || !model || spawn.isPending} onClick={submit}>
+          {spawn.isPending ? 'Starting…' : SIMPLE_STRINGS.home.composerButton}
+        </PrimaryButton>
+      </div>
+      {!model && <p className="w-full text-sm text-muted-foreground">Choose a model to start the conversation.</p>}
+      {spawn.isError && <p role="alert" className="w-full text-sm text-destructive">{spawn.error.message}</p>}
     </div>
   );
 }

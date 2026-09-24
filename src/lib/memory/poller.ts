@@ -1,6 +1,5 @@
 import { open, stat } from 'fs/promises';
 import type { MemoryIdentity } from '@overdeck/contracts';
-import { Effect } from 'effect';
 import { getTranscriptCheckpoint } from './checkpoint-client.js';
 import type { TranscriptCheckpoint } from './checkpoints.js';
 import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type ExtractFromTranscriptDeltaResult } from './pipeline.js';
@@ -8,10 +7,10 @@ import { areMemoryObservationsEnabled } from './settings.js';
 import { getActiveTranscriptEntries, type TranscriptEntry } from './transcript-source.js';
 import { enqueueMemoryPipelineJob } from './worker-pool.js';
 
-export const DEFAULT_MEMORY_POLLER_INTERVAL_MS = 2_000;
-export const DEFAULT_MEMORY_POLLER_ACTIVITY_LINE_THRESHOLD = 20;
-export const DEFAULT_MEMORY_POLLER_MIN_INTERVAL_MS = 60_000;
-export const DEFAULT_MEMORY_POLLER_MAX_MID_TURN_EXTRACTIONS = 3;
+const DEFAULT_MEMORY_POLLER_INTERVAL_MS = 2_000;
+const DEFAULT_MEMORY_POLLER_ACTIVITY_LINE_THRESHOLD = 20;
+const DEFAULT_MEMORY_POLLER_MIN_INTERVAL_MS = 60_000;
+const DEFAULT_MEMORY_POLLER_MAX_MID_TURN_EXTRACTIONS = 3;
 export const MAX_MEMORY_POLLER_SAMPLE_BYTES = 64 * 1024;
 
 export interface RegisteredTranscript {
@@ -75,7 +74,7 @@ export class TranscriptPoller {
     this.getActiveEntries = options.getActiveTranscriptEntries ?? getActiveTranscriptEntries;
     this.statTranscript = options.statTranscript ?? stat;
     this.readTranscriptSlice = options.readTranscriptSlice ?? readTranscriptSlice;
-    this.getCheckpoint = options.getTranscriptCheckpoint ?? ((sessionId) => Effect.runPromise(getTranscriptCheckpoint(sessionId)));
+    this.getCheckpoint = options.getTranscriptCheckpoint ?? ((sessionId) => getTranscriptCheckpoint(sessionId));
     this.enqueueDelta = options.enqueueTranscriptDelta ?? options.extractFromTranscriptDelta ?? ((input) => { enqueueMemoryPipelineJob(input); });
     this.areObservationsEnabled = options.areObservationsEnabled ?? areMemoryObservationsEnabled;
   }
@@ -227,10 +226,6 @@ function isSuccessfulExtractionResult(result: unknown): boolean {
 
 const defaultTranscriptPoller = new TranscriptPoller();
 
-export function getTranscriptPoller(): TranscriptPoller {
-  return defaultTranscriptPoller;
-}
-
 export function startTranscriptPoller(): void {
   defaultTranscriptPoller.start();
 }
@@ -245,10 +240,6 @@ export async function syncTranscriptPollerRegistry(): Promise<void> {
 
 export function registerTranscriptForPolling(entry: TranscriptEntry): void {
   defaultTranscriptPoller.register(entry);
-}
-
-export function unregisterTranscriptForPolling(sessionId: string): void {
-  defaultTranscriptPoller.unregister(sessionId);
 }
 
 async function readTranscriptSlice(path: string, fromOffset: number, toOffset: number): Promise<string> {

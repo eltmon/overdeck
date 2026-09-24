@@ -30,19 +30,15 @@
  *    flood the feed at once;
  *  - this module holds no door to any mutation — there is nothing to force.
  */
-import { emitActivityEntrySync, type ActivityLevel } from '../activity-logger.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
+import { emitActivityEntry, type ActivityLevel } from '../activity-logger.js';
 import {
   PARKED_ORBIT_SEVERITY,
   resolveParkedPopulation,
   type ParkedOrbit,
   type ParkedRow,
 } from '../parked/resolver.js';
-import { sessionExistsSync } from '../tmux.js';
 import { getCloisterEventStore } from './event-store-provider.js';
-import { readMemoizedArtifactVerdict, type SynthesisArtifactVerdict } from './synthesis-verdict.js';
 import {
-  clearSweeperRowState,
   readSweeperRowState,
   readSweeperSignature,
   writeSweeperRowState,
@@ -55,9 +51,9 @@ import {
 /** Max recommendations per park episode; beyond this the row is escalate-only. */
 export const SWEEP_MAX_RECOMMENDATIONS_PER_ROW = 8;
 /** Max recommendations per patrol scan — a full graveyard surfaces over cycles, never in one burst. */
-export const SWEEP_MAX_RECOMMENDATIONS_PER_SCAN = 4;
+const SWEEP_MAX_RECOMMENDATIONS_PER_SCAN = 4;
 /** Operator-gated / exhausted rows re-surface to the operator this often (and stay hands-off otherwise). */
-export const SWEEP_RESURFACE_TTL_MS = 24 * 60 * 60_000;
+const SWEEP_RESURFACE_TTL_MS = 24 * 60 * 60_000;
 
 const ORBIT_COOLDOWN_MS: Record<string, number> = {
   'zombie-session': 15 * 60_000,
@@ -78,8 +74,8 @@ const NO_ACTION_TRAILER = 'Observability-only: no action taken.';
 export interface StallSweeperDeps {
   now?: number;
   resolveRows?: () => Promise<ParkedRow[]>;
-  readArtifact?: (issueId: string) => SynthesisArtifactVerdict | null;
-  isAgentLive?: (agentId: string) => boolean;
+  /** Required: the tmux-only default this had was wrong on Herdr hosts, and every caller passes one (PAN-3958 CH-8). */
+  isAgentLive: (agentId: string) => boolean | Promise<boolean>;
   emitActivity?: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
 }
@@ -106,7 +102,7 @@ function defaultEmitEvent(type: string, payload: Record<string, unknown>): void 
 function defaultEmitActivity(entry: { level: ActivityLevel; issueId?: string; message: string }): void {
   // Source is cloister — the sweeper is cloister machinery; the 🧹 message
   // prefix carries the sweeper identity in the feed.
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'cloister',
     level: entry.level,
     ...(entry.issueId ? { issueId: entry.issueId } : {}),
@@ -147,17 +143,10 @@ function recordEscalation(issueId: string, orbit: ParkedOrbit, state: StallSweep
 
 // ─── The patrol ───────────────────────────────────────────────────────────────
 
-export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promise<string[]> {
+export async function runStallSweeperPatrol(deps: StallSweeperDeps): Promise<string[]> {
   const now = deps.now ?? Date.now();
   const resolveRows = deps.resolveRows ?? resolveParkedPopulation;
-  const readArtifact = deps.readArtifact ?? ((issueId: string) => {
-    const review = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
-    return readMemoizedArtifactVerdict(issueId, {
-      runId: review?.reviewRunId,
-      workspacePath: review?.workspace,
-    });
-  });
-  const isAgentLive = deps.isAgentLive ?? sessionExistsSync;
+  const isAgentLive = deps.isAgentLive;
   const emitActivity = deps.emitActivity ?? defaultEmitActivity;
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
 
@@ -188,7 +177,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
     const state = readSweeperRowState(issueId, orbit);
 
     // Operator-owned rows: never act, re-surface on TTL.
-    if (orbit === 'operator-gate' || orbit === 'deacon-ignored' || orbit === 'needs-you' || orbit === 'circuit-breaker') {
+    if (orbit === 'operator-gate') {
       if (dueForResurface(state, now)) {
         recordEscalation(issueId, orbit, state, now);
         emitEvent('sweep.escalated', { issueId, orbit, reason: row.parkReason });
@@ -210,7 +199,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
     }
     if (recommendationBudget <= 0) continue;
 
-    const reported = reportRow(row, state, now, { readArtifact, isAgentLive, emitActivity, emitEvent }, outcome);
+    const reported = await reportRow(row, state, now, { isAgentLive, emitActivity, emitEvent }, outcome);
     if (reported) {
       recordRecommendation(issueId, orbit, state, now);
       recommendationBudget--;
@@ -223,8 +212,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
 // ─── Per-orbit recommendations ────────────────────────────────────────────────
 
 interface ReportDeps {
-  readArtifact: (issueId: string) => SynthesisArtifactVerdict | null;
-  isAgentLive: (agentId: string) => boolean;
+  isAgentLive: (agentId: string) => boolean | Promise<boolean>;
   emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent: (type: string, payload: Record<string, unknown>) => void;
 }
@@ -241,13 +229,13 @@ interface ReportDeps {
  * recommendation says so, so the flywheel's substrate intake files why it
  * keeps parking instead of the symptom being swept forever.
  */
-function reportRow(
+async function reportRow(
   row: ParkedRow,
   state: StallSweeperRowState | null,
   now: number,
   reporting: ReportDeps,
   outcome: ScanOutcome,
-): boolean {
+): Promise<boolean> {
   const { issueId, orbit } = row;
   const recurrence = state?.recommendationCount ?? 0;
   const substrateNote = recurrence >= 1
@@ -262,60 +250,16 @@ function reportRow(
   switch (orbit) {
     case 'zombie-session': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
-      const live = reporting.isAgentLive(agentId);
+      const live = await reporting.isAgentLive(agentId);
       recommend(`reap zombie session ${agentId} via the existing door (pan close ${issueId} owns merged/closed teardown; the reaper is the backstop)`, { agentId, sessionCurrentlyLive: live });
       return true;
     }
 
-    case 'merge-failed': {
-      recommend(`reset ${issueId}'s merge for re-evaluation via pan review resync ${issueId}`);
-      return true;
-    }
-
-    case 'uat-failed': {
-      // Reaching this orbit means the relay's feedback-target resurrection ladder failed.
-      const notes = typeof row.details?.uatNotes === 'string' ? row.details.uatNotes : 'UAT failed — see the UAT panel for details';
-      recommend(`start a work agent for ${issueId} via pan start ${issueId} — the UAT-failure relay found no live target for its feedback`, { uatNotes: notes.slice(0, 400) });
-      return true;
-    }
-
-    case 'stuck-flag': {
-      const reason = typeof row.details?.stuckReason === 'string' ? row.details.stuckReason : '';
-
-      // PAN-3511: evidence from the active review run prevents a recommendation
-      // from re-driving work over a review that has already finished. The
-      // sweeper remains observability-only and cannot promote that evidence into
-      // a terminal review status.
-      const artifact = reporting.readArtifact(issueId);
-      if (artifact?.verdict === 'passed') {
-        recommend(
-          `preserve ${issueId}'s passed review evidence from run ${artifact.runId} and await pan admin specialists done review; do not re-dispatch or resume rework`,
-          { artifactVerdict: artifact.verdict, artifactRunId: artifact.runId, artifactHead: artifact.headSha },
-        );
-        return true;
-      }
-      if (reason === 'review_infrastructure_failure') {
-        recommend(`clear ${issueId}'s infra-failure stuck flag and re-dispatch the review via pan unstick ${issueId} && pan review restart ${issueId}`);
-        return true;
-      }
-      if (reason === 'feedback_delivery_needs_you' || reason === 'verification_stuck') {
-        recommend(
-          artifact?.notes
-            ? `resume ${issueId} rework via pan resume agent-${issueId.toLowerCase()} using the blocker from review run ${artifact.runId}`
-            : `resume ${issueId} rework from the pending feedback via pan resume agent-${issueId.toLowerCase()} (feedback is in .pan/feedback)`,
-          artifact?.notes ? { artifactVerdict: artifact.verdict, artifactRunId: artifact.runId, reviewNotes: artifact.notes.slice(0, 400) } : {},
-        );
-        return true;
-      }
-      // Unknown / dead-end stuck flavors are operator-owned — re-surface on TTL.
-      if (dueForResurface(state, now)) {
-        recordEscalation(issueId, orbit, state, now);
-        reporting.emitEvent('sweep.escalated', { issueId, orbit, reason: row.parkReason });
-        reporting.emitActivity({ level: 'warn', issueId, message: `🧹 sweeper re-surface: ${issueId} remains stuck (${reason || 'unknown'}) — ${row.parkReason}` });
-        outcome.escalations.push(`${issueId} (stuck:${reason || 'unknown'}) re-surfaced`);
-      }
-      return false;
-    }
+    // PAN-3917: the merge-failed, uat-failed, and stuck-flag orbits are gone
+    // with the stored flags that defined them. A failed merge is a PR the forge
+    // still refuses; a failed UAT is a check run; a stuck flag was a row. The
+    // resolver no longer produces those rows, so the sweeper has nothing to say
+    // about them.
 
     case 'idle-running': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
@@ -326,20 +270,12 @@ function reportRow(
         previouslyRecommended
           ? `stop or resume ${agentId} via pan kill ${agentId} / pan resume ${agentId} — still idle ${Math.round(lastActivity / 60)}h after a prior recommendation`
           : `nudge ${agentId} via pan tell ${agentId} — idle ${Math.round(lastActivity / 60)}h with no pipeline stage owning its next move`,
-        { agentId, idleMinutes: lastActivity, live: reporting.isAgentLive(agentId) },
+        { agentId, idleMinutes: lastActivity, live: await reporting.isAgentLive(agentId) },
       );
       return true;
     }
 
     default:
       return false;
-  }
-}
-
-/** Forget episode state for rows that left the population (called by tests + future reconcilers). */
-export function forgetResolvedSweeperRows(currentRows: readonly ParkedRow[]): void {
-  const live = new Set(currentRows.map((row) => `${row.issueId}:${row.orbit}`));
-  for (const row of currentRows) {
-    if (!live.has(`${row.issueId}:${row.orbit}`)) clearSweeperRowState(row.issueId, row.orbit);
   }
 }

@@ -288,9 +288,18 @@ function ToolUseExpanded({
   // Fallback: pretty-printed JSON. Replaces the previous behavior of stuffing
   // JSON.stringify(input) into a one-line `detail` string with no formatting.
   return (
-    <pre className={styles.workLogResult}>
-      <code>{JSON.stringify(input, null, 2)}</code>
-    </pre>
+    <div className={styles.workLogResult}>
+      {subagentByToolUseId?.has(entry.id) && onOpenSubagent && (
+        <button
+          type="button"
+          className="mb-2 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+          onClick={() => onOpenSubagent(entry.id)}
+        >
+          Open subagent transcript
+        </button>
+      )}
+      <pre><code>{JSON.stringify(input, null, 2)}</code></pre>
+    </div>
   );
 }
 

@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Eye,
 } from 'lucide-react';
-import { GraceCountdown } from '../components/GraceCountdown';
 
 interface RunLogEntry {
   runId: string;
@@ -29,15 +28,6 @@ interface RunLogEntry {
   };
   fileSize: number;
   createdAt: Date;
-}
-
-interface GracePeriodState {
-  active: boolean;
-  startedAt: string;
-  duration: number;
-  paused: boolean;
-  pausedAt?: string;
-  remainingTime?: number;
 }
 
 async function fetchRunLogs(project: string, type: string): Promise<RunLogEntry[]> {
@@ -61,13 +51,6 @@ async function regenerateContextDigest(project: string, type: string): Promise<s
   if (!res.ok) throw new Error('Failed to regenerate context digest');
   const data = await res.json();
   return data.digest;
-}
-
-async function fetchGracePeriod(project: string, type: string): Promise<GracePeriodState | null> {
-  const res = await fetch(`/api/specialists/${project}/${type}/grace`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error('Failed to fetch grace period');
-  return res.json();
 }
 
 const STATUS_ICONS = {
@@ -115,13 +98,6 @@ export function SpecialistDetail() {
     queryKey: ['context-digest', project, type],
     queryFn: () => fetchContextDigest(project!, type!),
     enabled: !!project && !!type,
-  });
-
-  const { data: gracePeriod } = useQuery({
-    queryKey: ['grace-period', project, type],
-    queryFn: () => fetchGracePeriod(project!, type!),
-    enabled: !!project && !!type,
-    refetchInterval: 30000,
   });
 
   const regenerateMutation = useMutation({
@@ -175,13 +151,6 @@ export function SpecialistDetail() {
           </div>
         </div>
       </div>
-
-      {/* Grace period countdown */}
-      {gracePeriod && gracePeriod.active && (
-        <div className="mb-6">
-          <GraceCountdown project={project} type={type} gracePeriod={gracePeriod} />
-        </div>
-      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">

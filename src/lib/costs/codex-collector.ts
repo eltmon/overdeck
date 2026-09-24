@@ -1,10 +1,11 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
+import { parseCodexSessionCostEvents, parseCodexSession } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import type { IssueId } from '../overdeck/issues.js';
 import { lookupSkipVerdict, type SkipVerdict } from './skip-cache.js';
+import { codexAgentSessionsDir } from '../runtimes/storage/codex.js';
 
 export type SkipVerdictEntry = { path: string; mtimeMs: number; size: number; verdict: SkipVerdict };
 
@@ -60,7 +61,7 @@ export async function collectCodexCostEvents(opts: {
   const agentsDir = join(getOverdeckHome(), 'agents');
   const names = existsSync(agentsDir)
     ? readdirSync(agentsDir, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name) : [];
-  const roots = names.map(agentName => ({ root: join(agentsDir, agentName, 'codex-home', 'sessions'),
+  const roots = names.map(agentName => ({ root: codexAgentSessionsDir(join(agentsDir, agentName)),
     agentName, issueId: issueIdFromAgentName(agentName), inferIssueFromCwd: false }));
   for (const root of opts.extraRoots ?? []) roots.push({ root, agentName: 'codex-global', issueId: null, inferIssueFromCwd: true });
   for (const extra of opts.extraRootSpecs ?? []) if (extra.kind === 'codex-global') {
@@ -88,7 +89,7 @@ export async function collectCodexCostEvents(opts: {
     const stat = statSync(file);
     if (lookupSkipVerdict(file, stat.mtimeMs, stat.size)) { cacheSkipped++; continue; }
     let parsed;
-    try { parsed = parseCodexSessionCostEventsSync(file); }
+    try { parsed = parseCodexSessionCostEvents(file); }
     catch (cause) { errors.push(`${file}: ${cause instanceof Error ? cause.message : String(cause)}`); continue; }
     if (parsed.length === 0) {
       skipped.push({ file, reason: 'no-usage' });
@@ -98,7 +99,7 @@ export async function collectCodexCostEvents(opts: {
     }
     const unknown = parsed.some(event => event.model === 'unknown');
     if (unknown) skipped.push({ file, reason: 'unknown-model' });
-    const session = root.inferIssueFromCwd ? parseCodexSessionSync(file) : null;
+    const session = root.inferIssueFromCwd ? parseCodexSession(file) : null;
     const issueId = root.inferIssueFromCwd ? inferIssueFromPath(session?.cwd) ?? 'UNKNOWN' as IssueId : root.issueId;
     for (const usage of parsed) {
       events.push({ ts: new Date(usage.timestamp), issueId, agentId: root.agentName,

@@ -33,6 +33,17 @@ describe('provisionOhmypiProviderForModel', () => {
     expect(ids).toContain('qwen3.7-max');
   });
 
+  it('provisions new Gemini models absent from the installed bundled catalog', () => {
+    provisionOhmypiProviderForModel('gemini-3.8-flash', agentDir);
+    const google = readRegistry().providers.google;
+    expect(google.apiKey).toBe('GEMINI_API_KEY');
+    expect(google.api).toBe('google-generative-ai');
+    expect(google.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'gemini-3.8-flash', contextWindow: 1048576, maxTokens: 65536 }),
+      expect.objectContaining({ id: 'gemini-3.5-flash-lite', contextWindow: 1048576, maxTokens: 65536 }),
+    ]));
+  });
+
   it('accepts a provider-qualified id (conversations pre-qualify models)', () => {
     provisionOhmypiProviderForModel('dashscope/qwen3.8-max', agentDir);
     expect(readRegistry().providers.dashscope).toBeDefined();

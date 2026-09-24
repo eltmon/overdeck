@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { getPricingSync } from '../../cost.js';
+import { getPricing } from '../../cost.js';
 import { calculateExtractionCost, type ExtractionUsage } from '../providers/types.js';
 
 describe('memory extraction pricing', () => {
@@ -42,7 +42,7 @@ describe('memory extraction pricing', () => {
 });
 
 function expectedCost(provider: 'anthropic' | 'openai', model: string, usage: ExtractionUsage): number {
-  const pricing = getPricingSync(provider, model);
+  const pricing = getPricing(provider, model);
   if (!pricing) throw new Error(`Missing pricing for ${provider}/${model}`);
   return (
     (usage.input / 1_000) * pricing.inputPer1k +

@@ -12,9 +12,9 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  const { closeOverdeckDatabaseSync } = await import('../../../../src/lib/overdeck/infra.js');
+  const { closeOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
   const { resetDiscoveredSessionsSchemaBootstrap } = await import('../../../../src/lib/overdeck/discovered-sessions.js');
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   resetDiscoveredSessionsSchemaBootstrap();
   delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
@@ -22,8 +22,8 @@ afterEach(async () => {
 
 describe('discovered session conversation refs', () => {
   async function conversationUuid(name: string): Promise<string> {
-    const { getOverdeckDatabaseSync } = await import('../../../../src/lib/overdeck/infra.js');
-    const row = getOverdeckDatabaseSync()
+    const { getOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
+    const row = getOverdeckDatabase()
       .prepare(`SELECT id FROM conversations WHERE name = ?`)
       .get(name) as { id: string } | undefined;
     if (!row) throw new Error(`Missing seeded conversation ${name}`);

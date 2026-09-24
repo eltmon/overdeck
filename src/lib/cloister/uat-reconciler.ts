@@ -14,6 +14,11 @@
  *   3. If no live generation matches the current desired set, assemble the
  *      next generation in the background. Single-flight per project; a failed
  *      assembly for the SAME desired signature backs off before retrying.
+ *      PAN-3965: never for a single ready feature unless the project holds
+ *      merges for UAT — a one-member batch is byte-identical to the PR branch
+ *      and its CI run a duplicate, so that feature merges directly. A
+ *      UAT-held project still gets the one-member batch: it is the UAT stack
+ *      the operator tests on.
  *   4. Trim/reap the chain (cleanup hook).
  *
  * Pure orchestration with injected deps — interval wiring and real data
@@ -35,6 +40,19 @@ import type { UatGeneration } from '../overdeck/merge-sync.js';
 export const STUCK_ASSEMBLING_MS = 60 * 60 * 1000;
 /** Minimum age before re-attempting an assembly that failed for the same input. */
 export const FAILED_RETRY_BACKOFF_MS = 10 * 60 * 1000;
+/**
+ * After this many CONSECUTIVE failed assemblies (newest-first tail of the
+ * chain, regardless of input signature), stop re-assembling and surface instead
+ * of burning a worktree per attempt forever. PAN-3963: a store-write failure
+ * killed three generations in a row today; the 10-minute backoff alone only
+ * spaces the failures out. Any newer non-failed row (a live or invalidated
+ * generation) breaks the streak, and `force` bypasses the cutoff the same way
+ * it bypasses the backoff — that is the operator's retry lever once the
+ * underlying cause is fixed.
+ */
+const MAX_CONSECUTIVE_FAILED_ASSEMBLIES = 3;
+/** PAN-3965: the smallest ready set worth a batch; one feature merges directly. */
+const MIN_BATCH_FEATURES = 2;
 
 export interface UatReconcilerDeps {
   /** Gate: flywheel.merge_train_enabled. */
@@ -72,12 +90,24 @@ export interface UatReconcilerDeps {
   teardownStack(generation: UatGeneration): Promise<void>;
   /** Chain trim/reap (cleanupUatGenerations wiring). */
   cleanup(): Promise<void>;
+  /**
+   * PAN-3965: true when the lone ready feature is held for UAT: its issue's
+   * `auto-merge` / `hold-for-uat` label, else the project's
+   * `auto_merge_default`, else the global `flywheel.require_uat_before_merge`
+   * (review of #3993: the per-issue tier counts, as auto-merge eligibility's
+   * does). A held feature keeps a one-member batch — it is the UAT stack.
+   * Omitted = not held.
+   */
+  holdsForUat?(feature: ReadyFeature): boolean | Promise<boolean>;
   now?: () => number;
   log?: (msg: string) => void;
 }
 
 export interface ReconcileResult {
-  action: 'disabled' | 'no-queue' | 'idle' | 'assembled' | 'assembly-failed' | 'backoff' | 'in-flight';
+  action:
+    | 'disabled' | 'no-queue' | 'idle' | 'assembled' | 'assembly-failed' | 'assembly-blocked' | 'backoff' | 'in-flight'
+    /** PAN-3965: exactly one feature is ready — it merges directly, no batch. */
+    | 'single-feature';
   invalidated: string[];
   generation?: UatGeneration;
 }
@@ -245,6 +275,40 @@ export async function reconcileUatGenerations(
       if (live.some((gen) => liveSignatureMatches(gen, readySet, headShas, mainSha))) {
         await deps.cleanup().catch(() => {});
         return { action: 'idle', invalidated };
+      }
+    }
+    // PAN-3965: a batch exists to union-test 2+ features. One ready feature
+    // merges directly (Merge button / `gh pr merge`); force does not override
+    // this — a one-member batch would only duplicate the PR's own CI run. A
+    // batch assembled earlier is left alone (the stale checks above own it).
+    // A feature held for UAT (its label, else the project, else global) keeps
+    // the one-member batch: it is the UAT stack the operator tests on.
+    if (readySet.length < MIN_BATCH_FEATURES && !((await deps.holdsForUat?.(readySet[0]!)) ?? false)) {
+      log(`[uat-reconciler] 1 feature ready (${readySet[0]!.issueId}) — merges directly; batches assemble when ${MIN_BATCH_FEATURES}+ are ready`);
+      await deps.cleanup().catch(() => {});
+      return { action: 'single-feature', invalidated };
+    }
+    if (!options.force) {
+      // Consecutive-failure cutoff (PAN-3963): the backoff spaces retries out,
+      // but a deterministic failure (a bad FK, a broken dep) still burns one
+      // worktree per window forever. A trailing streak of failed rows means
+      // every recent attempt died; stop and surface until the operator forces
+      // a rebuild after fixing the cause. The streak is signature-independent
+      // on purpose — a failure before the first member row is recorded leaves
+      // a row whose signature can never match `desired`.
+      const chain = deps.store.listChain(projectRoot);
+      let failedStreak = 0;
+      for (const gen of chain) {
+        if (gen.status === 'failed') failedStreak += 1;
+        else break;
+      }
+      if (failedStreak >= MAX_CONSECUTIVE_FAILED_ASSEMBLIES) {
+        const names = chain.slice(0, failedStreak).map((gen) => gen.name).join(', ');
+        log(
+          `[uat-reconciler] BLOCKED — ${failedStreak} consecutive assemblies failed (${names}); `
+          + 'not re-assembling. Fix the logged cause, then force a rebuild from the Merge train page',
+        );
+        return { action: 'assembly-blocked', invalidated };
       }
       const failed = deps.store.listChain(projectRoot, ['failed']);
       const recentFailure = failed.find((gen) =>

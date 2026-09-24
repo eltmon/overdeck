@@ -10,10 +10,17 @@ import {
 } from '../../src/lib/agents.js';
 import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../src/lib/agent-runtime-mirror.js';
-import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../src/lib/work-agent-lifecycle.js';
-import * as paths from '../../src/lib/paths.js';
-import * as reviewStatus from '../../src/lib/review-status.js';
+import { assertCanStartFresh, getWorkAgentLifecycleStateSync } from '../../src/lib/work-agent-lifecycle.js';
+import * as claudeStorage from '../../src/lib/runtimes/storage/claude-code.js';
 import * as tmux from '../../src/lib/tmux.js';
+import * as liveness from '../../src/lib/agents/liveness.js';
+
+// PAN-3849: "live agent" is the liveness oracle's verdict — mock the oracle
+// at its boundary for fixtures that mean "the agent is genuinely alive".
+function spyLiveAgent() {
+  const spy = vi.spyOn(liveness, 'isAliveSync').mockReturnValue({ alive: true, paneAlive: true });
+  return { restore: () => spy.mockRestore() };
+}
 
 describe('work-agent-lifecycle', () => {
   const testAgentIds: string[] = [];
@@ -59,7 +66,7 @@ describe('work-agent-lifecycle', () => {
     saveSessionId(agentId, 'session-123');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const transcriptExistsSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.canResumeSession).toBe(true);
@@ -68,8 +75,8 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.recommendedAction).toBe('resume');
     expect(lifecycle.reason).toContain(`pan reset-session ${agentId}`);
     expect(lifecycle.reason).not.toContain('--fresh');
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/resumable Claude session/);
-    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
+    expect(() => assertCanStartFresh(agentId)).toThrow(/resumable Claude session/);
+    expect(() => assertCanStartFresh(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
@@ -100,16 +107,16 @@ describe('work-agent-lifecycle', () => {
     writeFileSync(join(getAgentDir(agentId), 'completed'), '');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const transcriptExistsSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.handedOff).toBe(true);
-    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.canResumeSession).toBe(true);
     expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(true);
     expect(lifecycle.canStartFresh).toBe(false);
-    expect(lifecycle.recommendedAction).toBe('none');
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/nothing to resume/);
-    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
+    expect(lifecycle.recommendedAction).toBe('resume');
+    expect(() => assertCanStartFresh(agentId)).toThrow(/handed off/);
+    expect(() => assertCanStartFresh(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
@@ -166,7 +173,7 @@ describe('work-agent-lifecycle', () => {
     });
     saveSessionId(agentId, 'session-running');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
+    const liveSpies = spyLiveAgent();
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.hasLiveTmuxSession).toBe(true);
@@ -176,7 +183,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.canResumeSession).toBe(false);
     expect(lifecycle.recommendedAction).toBe('none');
 
-    sessionExistsSpy.mockRestore();
+    liveSpies.restore();
   });
 
   // Regression: PAN-1014 — running agent with idle runtime incorrectly showed
@@ -210,7 +217,7 @@ describe('work-agent-lifecycle', () => {
     }));
     saveSessionId(agentId, 'session-stuck');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
+    const liveSpies = spyLiveAgent();
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // The session IS alive and the agent IS running — isRunning must stay true.
@@ -223,7 +230,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.recommendedAction).toBe('resume');
     expect(lifecycle.reason).toContain('runtime is idle');
 
-    sessionExistsSpy.mockRestore();
+    liveSpies.restore();
     Effect.runSync(setAgentRuntimeMirror({}));
   });
 
@@ -264,7 +271,7 @@ describe('work-agent-lifecycle', () => {
     }));
     saveSessionId(agentId, 'session-suspended');
 
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
+    const liveSpies = spyLiveAgent();
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.isRunning).toBe(true);
@@ -272,7 +279,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.canResumeSession).toBe(false);
     expect(lifecycle.recommendedAction).toBe('resume');
 
-    sessionExistsSpy.mockRestore();
+    liveSpies.restore();
     Effect.runSync(setAgentRuntimeMirror({}));
   });
 
@@ -290,8 +297,8 @@ describe('work-agent-lifecycle', () => {
     sessionExistsSpy.mockRestore();
   });
 
-  it('treats placeholder agents with missing live session as orphaned and fresh-startable', () => {
-    const agentId = getUniqueAgentId('placeholder-orphan');
+  it('PAN-3849: a starting agent with no live session is fresh-startable (no placeholder concept)', () => {
+    const agentId = getUniqueAgentId('starting-no-session');
     const workspace = join('/tmp', agentId);
     mkdirSync(workspace, { recursive: true });
 
@@ -309,8 +316,11 @@ describe('work-agent-lifecycle', () => {
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
-    expect(lifecycle.isPlaceholder).toBe(true);
-    expect(lifecycle.isOrphaned).toBe(true);
+    // No placeholder classification anymore: a 'starting' row with a workspace
+    // and no live session is simply not orphaned and offers a fresh start.
+    expect(lifecycle.hasAgentState).toBe(true);
+    expect(lifecycle.hasLiveTmuxSession).toBe(false);
+    expect(lifecycle.isOrphaned).toBe(false);
     expect(lifecycle.canStartFresh).toBe(true);
     expect(lifecycle.canResumeSession).toBe(false);
     expect(lifecycle.recommendedAction).toBe('start');
@@ -374,77 +384,21 @@ describe('work-agent-lifecycle', () => {
     return agentId;
   }
 
-  it('reopens the resume doors for a handed-off agent that owes rework (PAN-3555)', () => {
-    const agentId = setUpHandedOffAgentOwingRework('handoff-rework');
-
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
-    const reviewSpy = vi.spyOn(reviewStatus, 'getReviewStatusSync').mockReturnValue({
-      issueId: 'PAN-3555',
-      verificationStatus: 'failed',
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-    } as ReturnType<typeof reviewStatus.getReviewStatusSync>);
-
-    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
-
-    expect(lifecycle.handedOff).toBe(true);
-    expect(lifecycle.owesRework).toBe(true);
-    expect(lifecycle.canResumeSession).toBe(true);
-    // A plain start preserves the owed-rework session; --fresh is explicit.
-    expect(lifecycle.canStartFresh).toBe(false);
-    expect(lifecycle.recommendedAction).toBe('resume');
-    expect(lifecycle.reason).toContain('owes it rework');
-    expect(lifecycle.reason).toContain(`pan resume ${agentId}`);
-
-    reviewSpy.mockRestore();
-    transcriptExistsSpy.mockRestore();
-    sessionExistsSpy.mockRestore();
-  });
-
-  it('refuses a silent fresh start over a resumable owed-rework session; explicit --fresh still passes (PAN-3555)', () => {
-    const agentId = setUpHandedOffAgentOwingRework('handoff-silent-fresh');
-
-    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
-    const reviewSpy = vi.spyOn(reviewStatus, 'getReviewStatusSync').mockReturnValue({
-      issueId: 'PAN-3555',
-      verificationStatus: 'passed',
-      reviewStatus: 'blocked',
-      testStatus: 'pending',
-    } as ReturnType<typeof reviewStatus.getReviewStatusSync>);
-
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/owes it rework.*pan resume|PAN-3555/);
-    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
-
-    reviewSpy.mockRestore();
-    transcriptExistsSpy.mockRestore();
-    sessionExistsSpy.mockRestore();
-  });
-
-  it('keeps the handed-off nothing-to-resume posture when no rework is owed (PAN-3334)', () => {
+  it('keeps a handed-off agent warm-resumable without asking the forge (supersedes PAN-3334)', () => {
     const agentId = setUpHandedOffAgentOwingRework('handoff-resting');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
-    const reviewSpy = vi.spyOn(reviewStatus, 'getReviewStatusSync').mockReturnValue({
-      issueId: 'PAN-3555',
-      verificationStatus: 'passed',
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-    } as ReturnType<typeof reviewStatus.getReviewStatusSync>);
+    const transcriptExistsSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
 
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.handedOff).toBe(true);
-    expect(lifecycle.owesRework).toBe(false);
-    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.canResumeSession).toBe(true);
     expect(lifecycle.canStartFresh).toBe(false);
-    expect(lifecycle.recommendedAction).toBe('none');
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/nothing to resume/);
-    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
+    expect(lifecycle.recommendedAction).toBe('resume');
+    expect(() => assertCanStartFresh(agentId)).toThrow(/handed off/);
+    expect(() => assertCanStartFresh(agentId, { explicitFresh: true })).not.toThrow();
 
-    reviewSpy.mockRestore();
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
   });

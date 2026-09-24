@@ -27,20 +27,20 @@ beforeEach(() => {
   queryMocks.activityQuery.data.sections = [
     { type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 1 },
   ]
-  Object.assign(queryMocks.reviewStatusQuery.data, {
-    reviewStatus: 'blocked',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    verificationStatus: 'passed',
-    reviewNotes: 'Security blocker',
-    readyForMerge: false,
-    stuck: false,
-    stuckReason: undefined,
-  })
   queryMocks.prQuery.data.pr = { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661', additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
   queryMocks.issueCostsQuery.data.totalCost = 1.23
   queryMocks.workspaceQuery.data = null
-  useDashboardStore.setState({ agentsById: {}, reviewStatusByIssueId: {} })
+  useDashboardStore.setState({
+    agentsById: {},
+    backendPanesById: {},
+    derivedIssueStateByIssueId: {
+      'PAN-1661': {
+        issueId: 'PAN-1661',
+        state: 'changes-requested',
+        pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'changes-requested', checks: 'green', mergeable: true },
+      },
+    },
+  } as Parameters<typeof useDashboardStore.setState>[0])
   Object.assign(queryMocks.issueCheckRunsQuery.data.pr!, {
     number: 1661,
     url: 'https://github.com/eltmon/overdeck/pull/1661',
@@ -140,34 +140,19 @@ const queryMocks = vi.hoisted(() => {
       pr: { number: number; url: string; additions: number; deletions: number; changedFiles: number; isDraft: boolean; state: string; mergeCommit?: { oid?: string } | string | null } | null
     }
   } = { data: { pr: { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661', additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
-  const reviewStatusQuery = {
-    data: {
-      issueId: 'PAN-1661',
-      reviewStatus: 'blocked',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      verificationStatus: 'passed',
-      reviewNotes: 'Security blocker',
-      readyForMerge: false,
-      updatedAt: '2026-06-07T00:00:00Z',
-    },
-  }
   const issueCostsQuery = { data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }
   const workspaceQuery = { data: null, isLoading: false }
-  const shipLogQuery = { data: null, isLoading: false }
   const issueActionState = { hasPlan: true, hasTasks: true }
   const exactAgentActions = {
     tell: { mutate: vi.fn(), isPending: false },
     answer: { mutate: vi.fn(), isPending: false },
     recover: { mutate: vi.fn(), isPending: false },
     unpause: { mutate: vi.fn(), isPending: false },
-    untroubled: { mutate: vi.fn(), isPending: false },
-    unstick: { mutate: vi.fn(), isPending: false },
     merge: { mutate: vi.fn(), isPending: false },
     startWork: { mutate: vi.fn(), isPending: false },
     startPlanning: { mutate: vi.fn(), isPending: false },
   }
-  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery, shipLogQuery, issueActionState, exactAgentActions }
+  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, issueCostsQuery, workspaceQuery, issueActionState, exactAgentActions }
 })
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
@@ -175,10 +160,8 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useIssueCheckRunsQuery: () => queryMocks.issueCheckRunsQuery,
   usePlanningQuery: () => queryMocks.planningQuery,
   usePrQuery: () => queryMocks.prQuery,
-  useReviewStatusQuery: () => queryMocks.reviewStatusQuery,
   useIssueCostsQuery: () => queryMocks.issueCostsQuery,
   useWorkspaceQuery: () => queryMocks.workspaceQuery,
-  useShipLogQuery: () => queryMocks.shipLogQuery,
 }))
 
 vi.mock('../../../lib/useSharedTick', () => ({
@@ -229,7 +212,6 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
 }))
 
 vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div> }))
-vi.mock('../../ReviewPolicyControl', () => ({ ReviewPolicyControl: () => <div>Review policy</div> }))
 vi.mock('../../issue-view/StartAgentCta', () => ({
   StartAgentCta: ({ issueId, density }: { issueId: string; density: string }) => (
     <div data-testid="start-agent-cta" data-issue-id={issueId} data-density={density}>Start work agent · Overrides · model · harness</div>
@@ -259,7 +241,6 @@ vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({
   SessionPanel: ({ session }: { session: { sessionId: string } }) => <div data-testid="session-panel">{session.sessionId}</div>,
 }))
 vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>Review card</div> }))
-vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
 vi.mock('./AgentsLane', () => ({
   AgentsLane: ({ sessions, onSelectSession }: {
@@ -376,7 +357,7 @@ describe('IssueMissionControl', () => {
     const { container } = renderMissionControl();
     // A known session makes Session the default: route chrome + the ONE
     // IssueDetail at page density.
-    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'ReviewPolicyControl', 'Session tab']) {
+    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'Session tab']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
     expect(container.querySelectorAll('[data-section="Pipeline Band"]')).toHaveLength(1);
@@ -427,7 +408,7 @@ describe('IssueMissionControl', () => {
       'href',
       'https://github.com/eltmon/overdeck/issues/1661',
     )
-    expect(narrative).toHaveTextContent('The reviewer found problems')
+    expect(narrative).toHaveTextContent('The reviewer asked for changes')
     expect(narrative).toHaveAttribute('data-section', 'StatusNarrative')
   })
 
@@ -512,20 +493,6 @@ describe('IssueMissionControl', () => {
     })
   })
 
-  it('clears review-stuck state through the issue unstick action', () => {
-    Object.assign(queryMocks.reviewStatusQuery.data, {
-      stuck: true,
-      stuckReason: 'Review is not converging',
-    })
-    renderMissionControl()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Clear stuck gate' }))
-
-    expect(queryMocks.exactAgentActions.unstick.mutate).toHaveBeenCalledWith({
-      issueId: 'PAN-1661',
-    })
-    expect(queryMocks.exactAgentActions.recover.mutate).not.toHaveBeenCalled()
-  })
 
   it('lifts the detail tabs between the header and body without wrapping', () => {
     const { container } = renderMissionControl()
@@ -628,7 +595,7 @@ describe('IssueMissionControl', () => {
     ['code', 'changes', 'checks'],
     ['files', 'changes', 'files'],
     ['artifacts', 'changes', 'artifacts'],
-    ['timeline', 'activity', 'history'],
+    ['timeline', 'activity', 'feed'],
     ['costs', 'overview', undefined],
     ['ship', 'overview', undefined],
   ] as const)('maps the legacy %s deep link to %s/%s', (legacyTab, expectedTab, expectedSubView) => {
@@ -712,29 +679,22 @@ describe('IssueMissionControl', () => {
     if (!expectedBadge) expect(changes.textContent).toBe('Changes')
   })
 
-  it('renders Feed and Status history inside Activity without leaving the cockpit tab', () => {
+  it('renders the activity feed inside Activity without leaving the cockpit tab', () => {
     const { container } = renderMissionControl()
     const cockpitTabs = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
     fireEvent.click(within(cockpitTabs).getByRole('button', { name: 'Activity' }))
 
-    const activityViews = screen.getByRole('tablist', { name: 'Activity views' })
     expect(screen.getByText('Activity tab')).toBeInTheDocument()
     expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'feed')
-
-    fireEvent.click(within(activityViews).getByRole('tab', { name: 'Status history' }))
-    expect(screen.getAllByText('Status history')).toHaveLength(2)
-    expect(screen.queryByText('Activity tab')).toBeNull()
-    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'history')
     expect(within(cockpitTabs).getByRole('button', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('keeps the legacy Timeline deep link on Activity status history', () => {
+  it('keeps the legacy Timeline deep link on the Activity feed', () => {
     window.history.replaceState(null, '', '/?tab=timeline')
     const { container } = renderMissionControl()
 
     expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'activity')
-    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'history')
-    expect(screen.getAllByText('Status history')).toHaveLength(2)
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'feed')
   })
 
   it('renders the six-card awareness rail and routes its cost and activity links', () => {
@@ -827,46 +787,14 @@ describe('IssueMissionControl', () => {
     expect(resetBody?.className).toContain('spineCollapsed')
   })
 
-  it('keeps the stale-review warning visible and actionable in the collapsed spine', () => {
-    queryMocks.activityQuery.data.sections.push({
-      type: 'reviewer',
-      sessionId: 'reviewer-pan-1661',
-      model: 'claude-sonnet-5',
-      status: 'completed',
-      startedAt: '2026-06-07T00:01:00Z',
-      duration: 1,
-    })
-    const { container } = renderMissionControl()
-
-    // Lane starts collapsed (#2962): the compact warning shows first.
-    const compactWarning = screen.getByRole('button', {
-      name: 'Stale review state: 1 leftover review agent. Expand agent spine for details and reset.',
-    })
-    expect(compactWarning).toBeVisible()
-    expect(screen.queryByRole('button', { name: 'Complete review reset' })).toBeNull()
-
-    fireEvent.click(compactWarning)
-
-    // Expanded: the full warning + reset action.
-    expect(container.querySelector('[data-section="Stale-review warning"]')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Complete review reset' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse agent spine' }))
-
-    expect(screen.queryByRole('button', { name: 'Complete review reset' })).toBeNull()
-    expect(screen.getByRole('button', {
-      name: 'Stale review state: 1 leftover review agent. Expand agent spine for details and reset.',
-    })).toBeVisible()
-  })
-
   it('renders the status narrative in place of the chip and gate rows (PAN-2398, C-VOCAB)', () => {
     renderMissionControl()
 
     // ONE status representation in the header: the plain-language narrative.
     // The shared phase rail lives inside IssueDetail (its own tests cover it).
     expect(screen.getByTestId('status-narrative')).toBeTruthy()
-    // the fixture's review is blocked — the narrative says so in plain words
-    expect(screen.getByText('The reviewer found problems')).toBeTruthy()
+    // the fixture's PR has changes requested — the narrative says so in plain words
+    expect(screen.getByText('The reviewer asked for changes')).toBeTruthy()
     // the old jargon rows are gone
     expect(screen.queryByTestId('cockpit-pipeline-progress')).toBeNull()
     expect(screen.queryByTestId('cockpit-gates')).toBeNull()
@@ -882,17 +810,13 @@ describe('IssueMissionControl', () => {
     expect(screen.getAllByText('Issues').length).toBeGreaterThan(0)
   })
 
-  it('derives pipeline state and Ship progress from the same preferred review snapshot', () => {
+  it('derives pipeline state and Ship progress from the derived issue state', () => {
     useDashboardStore.setState({
-      reviewStatusByIssueId: {
+      derivedIssueStateByIssueId: {
         'PAN-1661': {
           issueId: 'PAN-1661',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          mergeStatus: 'merging',
-          verificationStatus: 'passed',
-          readyForMerge: false,
-          updatedAt: '2026-06-07T00:02:00Z',
+          state: 'ready',
+          pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0])
@@ -923,7 +847,7 @@ describe('IssueMissionControl', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
     const overview = screen.getByTestId('overview-live')
-    expect(within(overview).getByTestId('status-narrative')).toHaveTextContent('The reviewer found problems')
+    expect(within(overview).getByTestId('status-narrative')).toHaveTextContent('The reviewer asked for changes')
     const specialist = within(overview).getByText('review.security').closest('button')
     expect(specialist).toHaveAttribute('data-specialist', 'agent-pan-1661-review-security')
     expect(specialist).toBeDisabled()
@@ -932,14 +856,12 @@ describe('IssueMissionControl', () => {
     expect(within(overview).getByText('Pickup gate')).toBeInTheDocument()
   })
 
-  it('renders the done Overview with an emerald badge, truthful merge metadata, and review summary', () => {
-    Object.assign(queryMocks.reviewStatusQuery.data, {
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      mergeStatus: 'merged',
-      reviewNotes: 'Security, correctness, and performance approved.',
-      readyForMerge: false,
-    })
+  it('renders the done Overview with an emerald badge and truthful merge metadata', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1661': { issueId: 'PAN-1661', state: 'merged', pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'approved', checks: 'green', mergeable: true } },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0])
     Object.assign(queryMocks.prQuery.data.pr!, { mergeCommit: { oid: 'mergeabc123' } })
     renderMissionControl()
 
@@ -947,21 +869,17 @@ describe('IssueMissionControl', () => {
     const done = screen.getByTestId('overview-done')
     expect(within(done).getByText('Done')).toHaveClass('text-success-foreground')
     expect(within(done).getByText('mergeabc123')).toHaveClass('font-mono')
-    expect(within(done).getByText('Security, correctness, and performance approved.')).toBeInTheDocument()
   })
 
   it('renders a teaching pre-work Overview with the configurable StartAgentCta', () => {
     queryMocks.activityQuery.data.sections = []
     queryMocks.issueActionState.hasPlan = false
     queryMocks.issueActionState.hasTasks = false
-    Object.assign(queryMocks.reviewStatusQuery.data, {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      verificationStatus: 'pending',
-      reviewNotes: undefined,
-      readyForMerge: false,
-    })
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-1661': { issueId: 'PAN-1661', state: 'backlog' },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0])
     renderMissionControl()
 
     const empty = screen.getByTestId('overview-pre-work')
@@ -985,7 +903,7 @@ describe('IssueMissionControl', () => {
     const conversation = container.querySelector('[data-section="Session tab"]')
     expect(conversation).toBeInTheDocument()
     expect(conversation?.previousElementSibling).toHaveTextContent('Current state')
-    expect(container.querySelector('[data-section="Awareness rail"]')).toHaveTextContent('Review blocked — awaiting the work agent')
+    expect(container.querySelector('[data-section="Awareness rail"]')).toHaveTextContent('Changes requested — awaiting the work agent')
     expect(conversation).toHaveTextContent('Launcher')
     expect(conversation).toHaveTextContent('Agent dock')
     expect(conversation).toHaveTextContent('Action dock')
@@ -1017,7 +935,7 @@ describe('IssueMissionControl', () => {
     expect(screen.getByRole('button', { name: 'Session' }).getAttribute('aria-selected')).toBe('false')
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
-    expect(screen.getByText('Review blocked — awaiting the work agent')).toBeTruthy()
+    expect(screen.getByText('Changes requested — awaiting the work agent')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
 

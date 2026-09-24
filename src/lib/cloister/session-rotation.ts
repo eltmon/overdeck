@@ -13,7 +13,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { OVERDECK_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
-import { getAgentStateSync } from '../agents.js';
+import { getAgentState } from '../agents.js';
 import type { SpecialistAgentName } from './specialists.js';
 import { getTmuxSessionName } from './specialists.js';
 import { killSession } from '../tmux.js';
@@ -84,7 +84,13 @@ export function needsSessionRotation(agentId: string): boolean {
 
   const totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
   return totalTokens >= SESSION_ROTATION_THRESHOLD;
-}async function buildMergeAgentMemoryPromise(
+}
+
+/**
+ * Build the merge-agent memory file from recent merge history. Git errors are
+ * swallowed and yield a fallback string, so this never rejects.
+ */
+export async function buildMergeAgentMemory(
   workingDir: string,
   tiers: MemoryTiers = DEFAULT_MEMORY_TIERS
 ): Promise<string> {
@@ -179,7 +185,13 @@ export function needsSessionRotation(agentId: string): boolean {
   }
 
   return memory;
-}async function rotateSpecialistSessionPromise(
+}
+
+/**
+ * Rotate a specialist's session: build its memory, kill the session, and spawn
+ * a fresh one. Never rejects: failures return `{ success: false, error }`.
+ */
+export async function rotateSpecialistSession(
   specialistName: SpecialistAgentName,
   workingDir?: string
 ): Promise<SessionRotationResult> {
@@ -194,7 +206,7 @@ export function needsSessionRotation(agentId: string): boolean {
     };
   }
 
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!agentState?.sessionId) {
     return {
       success: false,
@@ -211,7 +223,7 @@ export function needsSessionRotation(agentId: string): boolean {
     let memoryFile: string | undefined;
 
     if (specialistName === 'merge-agent' && workingDir) {
-      memoryContent = await Effect.runPromise(buildMergeAgentMemory(workingDir));
+      memoryContent = await buildMergeAgentMemory(workingDir);
       memoryFile = join(OVERDECK_HOME, `merge-agent-memory-${Date.now()}.md`);
       writeFileSync(memoryFile, memoryContent);
       console.log(`Built memory file: ${memoryFile}`);
@@ -254,7 +266,10 @@ export function needsSessionRotation(agentId: string): boolean {
       error: error instanceof Error ? error.message : String(error),
     };
   }
-}async function checkAndRotateIfNeededPromise(
+}
+
+/** Rotate a specialist's session when it needs it; resolves to `null` otherwise. */
+export async function checkAndRotateIfNeeded(
   specialistName: SpecialistAgentName,
   workingDir?: string
 ): Promise<SessionRotationResult | null> {
@@ -265,41 +280,5 @@ export function needsSessionRotation(agentId: string): boolean {
   }
 
   console.log(`🔔 Session rotation needed for ${specialistName}`);
-  return (await Effect.runPromise(rotateSpecialistSession(specialistName, workingDir)));
-}
-
-// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
-
-/**
- * Effect-typed variant of {@link buildMergeAgentMemory}. The underlying
- * function swallows git errors and returns a fallback string, so this Effect
- * never fails.
- */
-export function buildMergeAgentMemory(
-  workingDir: string,
-  tiers: MemoryTiers = DEFAULT_MEMORY_TIERS,
-): Effect.Effect<string> {
-  return Effect.promise(() => buildMergeAgentMemoryPromise(workingDir, tiers));
-}
-
-/**
- * Effect-typed variant of {@link rotateSpecialistSession}. Never fails — the
- * Promise version returns `{ success: false, error }` instead of throwing.
- */
-export function rotateSpecialistSession(
-  specialistName: SpecialistAgentName,
-  workingDir?: string,
-): Effect.Effect<SessionRotationResult> {
-  return Effect.promise(() => rotateSpecialistSessionPromise(specialistName, workingDir));
-}
-
-/**
- * Effect-typed variant of {@link checkAndRotateIfNeeded}. Resolves to `null`
- * when no rotation was needed (mirrors the Promise contract).
- */
-export function checkAndRotateIfNeeded(
-  specialistName: SpecialistAgentName,
-  workingDir?: string,
-): Effect.Effect<SessionRotationResult | null> {
-  return Effect.promise(() => checkAndRotateIfNeededPromise(specialistName, workingDir));
+  return rotateSpecialistSession(specialistName, workingDir);
 }

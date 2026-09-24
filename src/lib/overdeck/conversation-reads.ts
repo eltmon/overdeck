@@ -1,18 +1,24 @@
+/**
+ * Read operations for registered conversations. Agent-backed issue sessions
+ * use `/api/agents/:id/conversation`; this module never scans agent state or
+ * global transcript directories to make a missing conversation row succeed.
+ */
+import { isMuseSessionPath, resolveMuseSessionPath } from '../runtimes/storage/muse.js';
+import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
 import { existsSync } from 'node:fs';
-import { access, readdir, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { access, stat } from 'node:fs/promises';
+import { basename } from 'node:path';
 
 import { Effect } from 'effect';
 
 import { withConcurrencyLimit } from '../concurrency.js';
-import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
+import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
 import { capturePane, listSessionNames } from '../tmux.js';
 import { paneShowsClaudeBootBlockingScreen } from '../cloister/modal-detector.js';
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
 import {
   CONVERSATION_TITLE_MODEL,
@@ -47,20 +53,23 @@ import { resolveConversationMessageLocator } from '../../dashboard/server/servic
 import { isPiSessionFile, parsePiConversationMessages } from '../../dashboard/server/services/pi-conversation-parser.js';
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../../dashboard/server/services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../dashboard/server/services/codex-conversation-parser.js';
+import { parseAcpConversationMessages } from '../../dashboard/server/services/acp-conversation-parser.js';
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
+import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashboard/server/services/conversation/codex-subagents.js';
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
 import {
   readLauncherPinnedSessionId,
-  resolveAgentHarness,
-  resolveClaudeSessionId,
+  resolveAcpTranscriptPath,
   resolveCodexRolloutPath,
   resolveKimiWirePath,
   resolvePiSessionPath,
-} from '../../dashboard/server/routes/jsonl-resolver.js';
+} from '../agents/transcript-resolver.js';
 import { parseKimiConversationMessages } from '../../dashboard/server/services/kimi-conversation-parser.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
-import { findClaudeSessionFileById, findSubagentTranscriptById } from './claude-session-file-search.js';
+import { findClaudeSessionFileById } from './claude-session-file-search.js';
+import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
+import { isKimiWirePath } from '../runtimes/storage/kimi-code.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -80,43 +89,8 @@ function result(body: unknown, status?: number): ConversationReadResult {
   return status === undefined ? { body } : { body, status };
 }
 
-const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
-
-/**
- * A bare Claude Code session UUID, as used to name `<session-id>.jsonl`.
- *
- * Conversation search indexes every transcript under ~/.claude/projects/, but
- * only a minority of them are dashboard conversations — the rest are work-agent
- * and plain terminal sessions that have no conversations-table row. A palette
- * hit on one of those arrives here as a raw session id, so the read paths fall
- * back to resolving the transcript by id and serving it read-only rather than
- * 404ing a session the operator can plainly see in search results.
- *
- * Narrower than SAFE_SESSION_ID_PATTERN on purpose: the by-id fallback sweeps
- * every project dir on a miss, so only the exact shape Claude generates is
- * allowed to trigger it.
- */
-const CLAUDE_SESSION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/**
- * A Claude Code subagent transcript id, as used to name
- * `<session-dir>/subagents/agent-<id>.jsonl`. The search indexer recurses into
- * subagents dirs, so those transcripts appear in palette results with the bare
- * agent id as their sessionId; clicking one arrives here. Like the UUID shape,
- * only this exact shape may trigger the by-id sweep — and the 10-hex floor
- * keeps Overdeck's own short `agent-<digits>` work-agent names out of it
- * (those resolve through resolveSpecialistSessionFile above, or nowhere).
- */
-const SUBAGENT_TRANSCRIPT_ID_PATTERN = /^agent-[0-9a-f]{10,20}$/i;
-
-/** The transcript of an indexed-but-unregistered Claude session, or null. */
-async function resolveUnregisteredClaudeSessionFile(name: string): Promise<string | null> {
-  if (CLAUDE_SESSION_UUID_PATTERN.test(name)) return findClaudeSessionFileById(name);
-  if (SUBAGENT_TRANSCRIPT_ID_PATTERN.test(name)) return findSubagentTranscriptById(name);
-  return null;
-}
-
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
+  if (conv.harness === 'muse') return resolveMuseSessionPath(conv.tmuxSession);
   // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
   // conversations use sessions/. The shared resolver checks both and skips sidecars.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
@@ -129,6 +103,14 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
     const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
     if (codexPath) return codexPath;
     // Fall through if codex path not found — same stale-harness recovery.
+  }
+  // OpenCode conversations persist the normalized ACP transcript in the
+  // agent directory. Conversation-list activity enrichment reads this path
+  // to surface active tools and stalled turns.
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'acp-jsonl') {
+    const acpPath = await resolveAcpTranscriptPath(conv.tmuxSession);
+    if (acpPath) return acpPath;
+    // Fall through if the harness is stale from an earlier ACP run.
   }
   // Native kimi-code conversations write wire.jsonl under Kimi's own
   // ~/.kimi-code/sessions/<workDirKey>/<sessionId>/agents/main/ tree.
@@ -193,7 +175,7 @@ export function conversationTranscriptMissing(
 }
 
 const captureVisiblePane = (sessionName: string): Promise<string> =>
-  Effect.runPromise(capturePane(sessionName, 0));
+  capturePane(sessionName, 0);
 
 /**
  * An alive claude-code session with no transcript file yet may be parked on a
@@ -235,9 +217,13 @@ function isCodexSessionFile(sessionFile: string): boolean {
   return sessionFile.includes('/codex-home/sessions/') || /\/rollout-[^/]+\.jsonl$/.test(sessionFile);
 }
 
+function isAcpSessionFile(sessionFile: string): boolean {
+  return basename(sessionFile) === ACP_TRANSCRIPT_FILE;
+}
+
 /** Native Kimi Code CLI's own wire.jsonl, under .../agents/main/wire.jsonl. */
 function isKimiWireSessionFile(sessionFile: string): boolean {
-  return sessionFile.endsWith('/agents/main/wire.jsonl');
+  return isKimiWirePath(sessionFile);
 }
 
 export async function getCachedMessages(
@@ -255,8 +241,12 @@ export async function getCachedMessages(
 
   if (isCodexSessionFile(sessionFile)) {
     parsed = await parseCodexConversationMessages(sessionFile);
+  } else if (isAcpSessionFile(sessionFile)) {
+    parsed = await parseAcpConversationMessages(sessionFile);
   } else if (isOhmypiSessionFile(sessionFile)) {
     parsed = await parseOhmypiConversationMessages(sessionFile);
+  } else if (isMuseSessionPath(sessionFile)) {
+    parsed = await parseMuseConversationMessages(sessionFile);
   } else if (isKimiWireSessionFile(sessionFile)) {
     parsed = await parseKimiConversationMessages(sessionFile);
   } else if (isPiSessionFile(sessionFile)) {
@@ -332,7 +322,7 @@ export async function getCachedMessages(
 // ─── Pending input helpers ───────────────────────────────────────────────────
 
 export function askUserQuestionSnapshotFromScan(
-  scan: Awaited<ReturnType<typeof scanPendingInputsPromise>>,
+  scan: Awaited<ReturnType<typeof scanPendingInputs>>,
 ): PendingAskUserQuestionSnapshot | undefined {
   if (scan.askUserQuestions.length === 0) return undefined;
   const first = scan.askUserQuestions[0];
@@ -357,8 +347,8 @@ export async function getConversationsPendingInputFeed(
     const alive = conversations.filter(
       (conv) => !conv.forkStatus && liveSessionNames.has(conv.tmuxSession),
     );
-    const rows = await Effect.runPromise(withConcurrencyLimit(
-      alive.map((conv) => Effect.promise(async () => {
+    const rows = await withConcurrencyLimit(
+      alive.map((conv) => async () => {
         const convSf = await deps.resolveSessionFile(conv);
         let pending: PendingAskUserQuestionSnapshot | undefined;
         // PAN-1520 (FR-2) — pending ExitPlanMode plan payload, so the plan
@@ -372,7 +362,7 @@ export async function getConversationsPendingInputFeed(
             // non-fatal — askedAt falls back to now for the codex path
           }
           try {
-            const scan = await scanPendingInputsPromise(convSf);
+            const scan = await scanPendingInputs(convSf);
             pending = askUserQuestionSnapshotFromScan(scan);
             pendingPlan = scan.pendingProposedPlan;
           } catch {
@@ -406,9 +396,9 @@ export async function getConversationsPendingInputFeed(
           ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
           ...(paneChoice ? { pendingPaneChoice: paneChoice } : {}),
         };
-      })),
+      }),
       8,
-    ));
+    );
     return result(rows.filter((row) => row !== null));
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -443,7 +433,7 @@ export async function getConversationRead(
     let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
     if (sessionAlive && convSf && existsSync(convSf)) {
       try {
-        const scan = await scanPendingInputsPromise(convSf);
+        const scan = await scanPendingInputs(convSf);
         const kinds: PendingInputKind[] = [];
         if (scan.askUserQuestions.length > 0) {
           kinds.push('askUserQuestion');
@@ -495,104 +485,6 @@ export async function getConversationRead(
   }
 }
 
-const SPECIALIST_SESSION_CACHE_TTL_MS = 5_000;
-const SPECIALIST_SESSION_CACHE_MAX = 100;
-const specialistSessionFileCache = new Map<string, { path: string; timestamp: number }>();
-
-function getSpecialistSessionCache(name: string): string | undefined {
-  const entry = specialistSessionFileCache.get(name);
-  if (!entry) return undefined;
-  if (Date.now() - entry.timestamp > SPECIALIST_SESSION_CACHE_TTL_MS) {
-    specialistSessionFileCache.delete(name);
-    return undefined;
-  }
-  return entry.path;
-}
-
-function setSpecialistSessionCache(name: string, sessionFile: string): void {
-  specialistSessionFileCache.set(name, { path: sessionFile, timestamp: Date.now() });
-  if (specialistSessionFileCache.size > SPECIALIST_SESSION_CACHE_MAX) {
-    const firstKey = specialistSessionFileCache.keys().next().value;
-    if (firstKey !== undefined) specialistSessionFileCache.delete(firstKey);
-  }
-}
-
-async function resolveSpecialistSessionFile(name: string): Promise<string | null> {
-  const cached = getSpecialistSessionCache(name);
-  if (cached) return cached;
-  if (!/^(specialist-|agent-|planning-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(name)) return null;
-
-  try {
-    const agentHarness = await resolveAgentHarness(name);
-    if (
-      agentHarness !== 'claude-code' &&
-      agentHarness !== 'codex' &&
-      agentHarness !== 'ohmypi' &&
-      agentHarness !== 'pi' &&
-      agentHarness !== 'kimi-code'
-    ) {
-      return null;
-    }
-    const agentBehavior = getHarnessBehavior(agentHarness);
-    if (agentBehavior.transcriptKind === 'codex-rollout-jsonl') {
-      const rollout = await resolveCodexRolloutPath(name);
-      if (rollout) {
-        setSpecialistSessionCache(name, rollout);
-        return rollout;
-      }
-    } else if (agentBehavior.transcriptKind === 'ohmypi-jsonl') {
-      const piSession = await resolvePiSessionPath(name);
-      if (piSession) {
-        setSpecialistSessionCache(name, piSession);
-        return piSession;
-      }
-    } else if (agentBehavior.transcriptKind === 'kimi-wire-jsonl') {
-      const wirePath = await resolveKimiWirePath(name);
-      if (wirePath) {
-        setSpecialistSessionCache(name, wirePath);
-        return wirePath;
-      }
-    }
-  } catch {
-    // fall through to Claude lookup
-  }
-
-  try {
-    const claudeSessionId = await resolveClaudeSessionId(name);
-    if (claudeSessionId && SAFE_SESSION_ID_PATTERN.test(claudeSessionId)) {
-      const claudeProjects = join(homedir(), '.claude', 'projects');
-      const dirs = await readdir(claudeProjects);
-      const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-      const candidates = dirs
-        .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-        .map((dir) => join(claudeProjects, dir, `${claudeSessionId}.jsonl`));
-      const STAT_BATCH_SIZE = 50;
-      let found: string | null = null;
-      for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
-        const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-        const checks = await Promise.all(
-          batch.map(async (candidate) => {
-            try {
-              await stat(candidate);
-              return candidate;
-            } catch {
-              return null;
-            }
-          }),
-        );
-        found = checks.find((c): c is string => c !== null) ?? null;
-      }
-      if (found) {
-        setSpecialistSessionCache(name, found);
-        return found;
-      }
-    }
-  } catch {
-    // session resolution failed
-  }
-  return null;
-}
-
 export async function getConversationMessagesRead(
   name: string,
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile' | 'shouldReportUnresolvedLiveSession'>,
@@ -600,12 +492,8 @@ export async function getConversationMessagesRead(
 ): Promise<ConversationReadResult> {
   try {
     const conv = getConversationByName(name);
-    let sessionFile: string | null | undefined = conv ? await deps.resolveSessionFile(conv) : undefined;
-    if (!conv) {
-      sessionFile = await resolveSpecialistSessionFile(name)
-        ?? await resolveUnregisteredClaudeSessionFile(name);
-      if (!sessionFile) return result({ error: 'Conversation not found' }, 404);
-    }
+    if (!conv) return result({ error: 'Conversation not found', lookedUp: name }, 404);
+    let sessionFile: string | null = await deps.resolveSessionFile(conv);
 
     if (!sessionFile) {
       if (deps.shouldReportUnresolvedLiveSession(conv)) {
@@ -624,7 +512,9 @@ export async function getConversationMessagesRead(
 
     const parentSessionFile = sessionFile;
     if (agentId !== undefined) {
-      sessionFile = subagentTranscriptPath(parentSessionFile, agentId);
+      sessionFile = isCodexSessionFile(parentSessionFile)
+        ? await resolveCodexSubagentTranscript(parentSessionFile, agentId)
+        : subagentTranscriptPath(parentSessionFile, agentId);
       if (!sessionFile) return result({ error: 'Invalid subagent id' }, 400);
     }
 
@@ -643,7 +533,9 @@ export async function getConversationMessagesRead(
         }
       }
       const subagents = agentId === undefined
-        ? (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
+        ? isCodexSessionFile(parentSessionFile)
+          ? await listCodexSubagents(parentSessionFile, parsed.workLog)
+          : (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
         : undefined;
 
       return result({
@@ -677,10 +569,8 @@ export async function getConversationMessageLocator(
 ): Promise<ConversationReadResult> {
   try {
     const conv = getConversationByName(name) ?? getConversationByClaudeSessionId(name);
-    const sessionFile = conv
-      ? await deps.resolveSessionFile(conv)
-      : await resolveUnregisteredClaudeSessionFile(name);
-    if (!conv && !sessionFile) return result({ error: 'Conversation not found' }, 404);
+    if (!conv) return result({ error: 'Conversation not found', lookedUp: name }, 404);
+    const sessionFile = await deps.resolveSessionFile(conv);
     if (!sessionFile) return result({ error: 'Conversation transcript not found' }, 404);
 
     const locator = await resolveConversationMessageLocator(sessionFile, byteOffset);
@@ -826,7 +716,7 @@ export async function handleConversationMove(
 const retitleInFlight = new Set<string>();
 const EXPLICIT_RETITLE_TIMEOUT_MS = 90_000;
 
-export function isClaudeInvocationTimeout(error: unknown): boolean {
+function isClaudeInvocationTimeout(error: unknown): boolean {
   return error instanceof Error && /claude invocation timed out after \d+ms/.test(error.message);
 }
 

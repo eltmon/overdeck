@@ -4,7 +4,7 @@
  * This module is the ONE place that classifies a backlog issue's pipeline state and
  * decides what is auto-pickable / unblock-eligible, plus the wave / lane / cohort
  * computations the Forecast UI (PAN-2005) and the Run lifecycle consume. The Flywheel
- * (`pickFromSequence`) and the dashboard must import from here rather than reimplement
+ * and the dashboard must import from here rather than reimplement
  * the rules, so the operator-facing forecast can never disagree with what actually runs.
  *
  * Pure: no I/O. All environment facts (labels, planned-ness, in-pipeline) are injected
@@ -115,19 +115,8 @@ export function isAutoPickable(
   return s.ready && s.planned && released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline && !s.epic;
 }
 
-/**
- * Pipeline-unblock override (FR-6): a blocks-main issue may be picked / struck even
- * when not Ready/Released and even with auto-pickup off — EXCEPT `vetoed` (the one
- * hard stop), an open `objection` (PAN-2059), and `epic` containers, which halt even
- * blocks-main pickup until the operator overrides or parks. An epic is never directly
- * worked, so it is not a valid unblock target either — strike a child instead.
- */
-export function isUnblockEligible(s: PipelineState): boolean {
-  return s.blocksMain && !s.vetoed && !s.objection && !s.inPipeline && !s.epic;
-}
-
 /** Effort → relative duration units for the lane forecast. */
-export const EFFORT_UNITS: Record<string, number> = { XS: 1, S: 2, M: 3, L: 5, XL: 8 };
+const EFFORT_UNITS: Record<string, number> = { XS: 1, S: 2, M: 3, L: 5, XL: 8 };
 export function effortOf(size: string): number {
   return EFFORT_UNITS[size] ?? EFFORT_UNITS['M']!;
 }
@@ -223,24 +212,6 @@ export function computeCohort(
     ids.add(item.issue);
   }
   return [...ids];
-}
-
-/**
- * Pipeline-unblock targets (FR-6): the blocks-main issues the Flywheel may strike
- * even when auto-pickup is off — in rank order, capped, never `vetoed`, never
- * already in-flight. `vetoed` is the absolute stop that overrides the unblock path.
- */
-export function selectUnblockTargets(
-  nodes: readonly SequenceNode[],
-  lk: ClassifyLookups,
-  opts: { cap?: number } = {},
-): ForecastNode[] {
-  const cap = Math.max(1, opts.cap ?? 2);
-  return nodes
-    .map((n) => ({ issue: n.issue, rank: n.rank, size: n.size, state: classifyIssue(n, lk) }))
-    .filter((n) => isUnblockEligible(n.state))
-    .sort((a, b) => a.rank - b.rank)
-    .slice(0, cap);
 }
 
 /**

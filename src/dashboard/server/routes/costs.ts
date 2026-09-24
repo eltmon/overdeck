@@ -1,3 +1,4 @@
+import { getCostsByIssueSnapshot } from '../services/dashboard-poll-snapshots.js';
 import { jsonResponse } from "../http-helpers.js";
 /**
  * Costs route module — Effect HttpRouter.Layer (PAN-428 B10)
@@ -20,23 +21,22 @@ import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
-  readEventsSync,
-  tailEventsSync,
-  migrateAllSessionsSync,
-  rebuildCacheSync,
-  deduplicateEventsSync,
+  readEvents,
+  tailEvents,
+  migrateAllSessions,
+  rebuildCache,
+  deduplicateEvents,
 } from '../../../lib/costs/index.js';
 import {
   reconcile as reconcileClaudeTranscripts,
   type ReconcileResult as ClaudeReconcileResult,
 } from '../../../lib/costs/reconciler.js';
 import {
-  getCostsByIssueSync,
-  getCostForIssueAggregateSync,
+  getCostForIssueAggregate,
   getDailyTrendsSync,
-  getModelRollupSync,
-  getCavemanExperimentDataSync,
-  getBackgroundCostBySourceSync,
+  getModelRollup,
+  getCavemanExperimentData,
+  getBackgroundCostBySource,
 } from '../../../lib/overdeck/cost-sync.js';
 import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
 import { httpHandler } from './http-handler.js';
@@ -79,9 +79,9 @@ const getCostsSummaryRoute = HttpRouter.add(
             ? entries.filter((e) => typeof e.issueId === 'string' && e.issueId.toUpperCase().startsWith(`${projectPrefix}-`))
             : entries;
 
-        const todayEntries = scope(readEventsSync({ startDate: today }));
-        const weekEntries = scope(readEventsSync({ startDate: weekAgo }));
-        const monthEntries = scope(readEventsSync({ startDate: monthAgo }));
+        const todayEntries = scope(readEvents({ startDate: today }));
+        const weekEntries = scope(readEvents({ startDate: weekAgo }));
+        const monthEntries = scope(readEvents({ startDate: monthAgo }));
 
         const summarize = (entries: Entry[]) => ({
           totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),
@@ -113,39 +113,9 @@ const getCostsSummaryRoute = HttpRouter.add(
 const getCostsByIssueRoute = HttpRouter.add(
   'GET',
   '/api/costs/by-issue',
-  httpHandler(Effect.try({
-    try: () => {
-      const dbIssues = getCostsByIssueSync();
-
-      const issues = Object.entries(dbIssues).map(([issueId, data]) => {
-        const d = data as {
-          totalCost: number; inputTokens: number; outputTokens: number;
-          cacheReadTokens: number; cacheWriteTokens: number; models: Record<string, { cost: number; tokens: number }>;
-          stages?: Record<string, { cost: number; tokens: number }>; budgetWarning?: boolean; lastUpdated?: string;
-        };
-        return {
-          issueId,
-          totalCost: d.totalCost,
-          tokenCount: d.inputTokens + d.outputTokens + d.cacheReadTokens + d.cacheWriteTokens,
-          inputTokens: d.inputTokens,
-          outputTokens: d.outputTokens,
-          cacheReadTokens: d.cacheReadTokens,
-          cacheWriteTokens: d.cacheWriteTokens,
-          models: d.models,
-          byModel: Object.fromEntries(
-            Object.entries(d.models).map(([model, stats]) => [model, { cost: stats.cost, tokens: stats.tokens }])
-          ),
-          byStage: Object.fromEntries(
-            Object.entries(d.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
-          ),
-          budgetWarning: d.budgetWarning,
-          lastUpdated: d.lastUpdated,
-        };
-      });
-
-      issues.sort((a, b) => b.totalCost - a.totalCost);
-
-      return jsonResponse({ status: 'live', eventCount: issues.length, issues });
+  httpHandler(Effect.tryPromise({
+    try: async () => {
+      return jsonResponse(await getCostsByIssueSnapshot());
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
@@ -159,8 +129,8 @@ const postCostsRebuildRoute = HttpRouter.add(
   httpHandler(Effect.try({
     try: () => {
       console.log('Manual cost cache rebuild requested...');
-      const migrationStats = migrateAllSessionsSync();
-      const cache = rebuildCacheSync();
+      const migrationStats = migrateAllSessions();
+      const cache = rebuildCache();
       return jsonResponse({
         success: true,
         message: 'Cost cache rebuilt successfully',
@@ -188,7 +158,7 @@ const postCostsDeduplicateRoute = HttpRouter.add(
   '/api/costs/deduplicate',
   httpHandler(Effect.try({
     try: () => {
-      const removed = deduplicateEventsSync();
+      const removed = deduplicateEvents();
       return jsonResponse({
         success: true,
         message: `Deduplication complete: ${removed} duplicate event${removed !== 1 ? 's' : ''} removed`,
@@ -216,7 +186,7 @@ const getCostsStreamRoute = HttpRouter.add(
 
     return yield* Effect.try({
       try: () => {
-        const events = since ? readEventsSync({ startDate: since, limit }) : tailEventsSync(limit);
+        const events = since ? readEvents({ startDate: since, limit }) : tailEvents(limit);
 
         const byIssue: Record<string, unknown[]> = {};
         for (const event of events) {
@@ -271,7 +241,7 @@ const getCostsByModelRoute = HttpRouter.add(
     const issueId = urlOpt.value.searchParams.get('issueId') ?? undefined;
 
     return yield* Effect.try({
-      try: () => jsonResponse({ models: getModelRollupSync(issueId), issueId: issueId ?? null }),
+      try: () => jsonResponse({ models: getModelRollup(issueId), issueId: issueId ?? null }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
   })),
@@ -288,7 +258,7 @@ const getCostsIssueRoute = HttpRouter.add(
 
     return yield* Effect.try({
       try: () => {
-        const data = getCostForIssueAggregateSync(id);
+        const data = getCostForIssueAggregate(id);
         if (!data) {
           return jsonResponse({ issueId: id.toUpperCase(), totalCost: 0, models: {}, stages: {} });
         }
@@ -326,7 +296,7 @@ const postCostsSyncWalRoute = HttpRouter.add(
   '/api/costs/sync-wal',
   httpHandler(Effect.gen(function* () {
     const result = yield* Effect.tryPromise({
-      try: () => Effect.runPromise(syncWalFromAllProjects()),
+      try: () => syncWalFromAllProjects(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse({ success: true, ...result });
@@ -345,7 +315,7 @@ const runOverdeckCostReconcileSource: ReconcileSourceRunner = (source) =>
   );
 
 const runClaudeTranscriptReconcile: ClaudeReconcileRunner = () =>
-  Effect.runPromise(reconcileClaudeTranscripts());
+  reconcileClaudeTranscripts();
 
 export async function runCostReconcileSources(
   runSource: ReconcileSourceRunner = runOverdeckCostReconcileSource,
@@ -402,7 +372,7 @@ const getCostsExperimentsRoute = HttpRouter.add(
   'GET',
   '/api/costs/experiments',
   httpHandler(Effect.try({
-    try: () => jsonResponse({ experiments: getCavemanExperimentDataSync() }),
+    try: () => jsonResponse({ experiments: getCavemanExperimentData() }),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -419,7 +389,7 @@ const getCostsBackgroundRoute = HttpRouter.add(
       const url = new URL(request.url, 'http://localhost');
       const hoursParam = Number(url.searchParams.get('hours'));
       const hours = Number.isFinite(hoursParam) && hoursParam > 0 ? hoursParam : 24;
-      return jsonResponse({ hours, bySource: getBackgroundCostBySourceSync(hours) });
+      return jsonResponse({ hours, bySource: getBackgroundCostBySource(hours) });
     }),
   ),
 );

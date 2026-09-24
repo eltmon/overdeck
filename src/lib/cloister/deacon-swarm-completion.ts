@@ -1,9 +1,9 @@
+import { WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/types.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { messageAgent } from '../agents/messaging.js';
-import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
-import { isStatePlaneOnlyStatus } from '../state-plane.js';
-import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
+import type { ReconciledSlotItem } from './swarm-slot-reconcile.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
 import { loadCloisterConfigSync, type SwarmInferCompletionMode } from './config.js';
 import type { ClassifiedSwarmSlot, ClassifyInFlightSlotsOptions, CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
 import {
@@ -158,7 +158,7 @@ export async function defaultGetSlotBranchAheadCount(
   const slotWorkspace = branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)
     ? `${workspacePath}-slot-${branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)![1]}`
     : workspacePath;
-  const roots = resolveWorkspaceRepoRootsSync(issueId, slotWorkspace);
+  const roots = resolveWorkspaceRepoRoots(issueId, slotWorkspace);
   let total = 0;
   for (const root of roots) {
     if (root.degradedPolyrepo) return 0;
@@ -174,17 +174,40 @@ export async function defaultGetSlotBranchAheadCount(
 
 export async function defaultIsSlotWorktreeClean(slotWorkspacePath: string): Promise<boolean> {
   const match = /feature-([a-z]+-\d+)-slot-\d+$/.exec(slotWorkspacePath);
-  const roots = match ? resolveWorkspaceRepoRootsSync(match[1].toUpperCase(), slotWorkspacePath) : [];
+  const roots = match ? resolveWorkspaceRepoRoots(match[1].toUpperCase(), slotWorkspacePath) : [];
   if (roots.some(root => root.degradedPolyrepo)) return false;
   const statuses = roots.length > 0
     ? await Promise.all(roots.map(root => execAsync('git status --porcelain', { cwd: root.dir }).then(result => result.stdout)))
     : [(await execAsync('git status --porcelain', { cwd: slotWorkspacePath })).stdout];
-  // PAN-2372 WI-6 / FR-9: treat state-plane-only dirt (.pan/continue.json, .pan/records/...,
-  // the workspace record door) as clean. The swarm writes durable state to those paths on the
-  // permanent plane, so their presence must not block a slot from being inferred complete.
-  // isStatePlaneOnlyStatus already returns true for empty porcelain (vacuous every()), so one
-  // shared classifier covers both cases — no local path list here. See docs/STATE-PLANE-COMMIT-POLICY.md.
-  return statuses.every(isStatePlaneOnlyStatus);
+  // PAN-2372 WI-6 / FR-9, re-pointed by PAN-3917: the only dirt that does not
+  // block a slot from being inferred complete is the workspace runtime
+  // directory, which is machine-local and gitignored. The old exemption also
+  // covered `.pan/` writes made by the record door on the state plane; `.pan/`
+  // is tracked plan content in the repo now, so a change there is real work and
+  // must block, exactly like any other uncommitted file.
+  return statuses.every(isRuntimeOnlyPorcelain);
+}
+
+/** Every changed path in `git status --porcelain` output. */
+function porcelainPaths(porcelain: string): string[] {
+  return porcelain
+    .split('\n')
+    .map(line => line.replace(/\s+$/, ''))
+    .filter(Boolean)
+    .map(line => {
+      // Porcelain v1 is two status columns plus a space, then the path. Never
+      // trim the leading columns away first: ' M src/foo.ts' would lose its
+      // first characters.
+      const path = line.slice(3).trim();
+      const renamed = path.split(' -> ');
+      return (renamed[1] ?? renamed[0] ?? '').replace(/^"|"$/g, '');
+    })
+    .filter(Boolean);
+}
+
+/** True when nothing but the gitignored workspace runtime directory changed. */
+function isRuntimeOnlyPorcelain(porcelain: string): boolean {
+  return porcelainPaths(porcelain).every(path => path === WORKSPACE_RUNTIME_DIRNAME || path.startsWith(`${WORKSPACE_RUNTIME_DIRNAME}/`));
 }
 
 export async function defaultSendCompletionNudge(agentId: string, issueId: string): Promise<void> {

@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const roots = vi.hoisted(() => ({ value: [] as Array<{ repoKey: string; dir: string; sourceBranch: string; targetBranch: string; isPolyrepo: boolean }> }));
-vi.mock('../../project-repos.js', () => ({ resolveWorkspaceRepoRootsSync: () => roots.value }));
+vi.mock('../../project-repos.js', () => ({ resolveWorkspaceRepoRoots: () => roots.value }));
 
 import { ensureRegisteredSlotWorktree } from '../registered-slot-spawn.js';
 

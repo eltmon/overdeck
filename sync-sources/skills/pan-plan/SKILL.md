@@ -73,7 +73,7 @@ The legacy `--auto-start` flag on `pan plan <id>` is deprecated and kept only th
 
 ## Finalizing (`pan plan finalize`)
 
-Run this from inside the planning workspace after the planning agent has produced a complete `.pan/spec.vbrief.json`.
+Run this from inside the planning workspace after the planning agent has produced a complete `.overdeck/spec.vbrief.json`.
 
 ```bash
 pan plan finalize
@@ -81,10 +81,10 @@ pan plan finalize
 
 What it does:
 
-1. Reads `.pan/spec.vbrief.json` from the current workspace (walks up if needed).
+1. Reads `.overdeck/spec.vbrief.json` from the current workspace (walks up if needed).
 2. Validates the tasks already stored in `plan.items[]`, including their declared dependencies.
 3. Flips the spec's `plan.status` from `draft` to `proposed`.
-4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/`, commit it on main, push, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
+4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `.pan/specs/` in the project repo (or the configured plan-home repo for polyrepo projects), commit and push the feature branch, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
 5. Returns a summary of finalized xBRIEF tasks and promotion status, or JSON with `--json`.
 
 Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs xBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
@@ -101,7 +101,7 @@ Finalize and complete-planning refuse to promote a plan unless a **PRD draft** o
 pan plan done PAN-1071
 ```
 
-This promotes the workspace xBRIEF to `<projectRoot>/.pan/specs/`, syncs xBRIEF tasks, and transitions the tracker state to Planned. It is subject to the same PRD-first gate as `finalize`; pass `--no-prd` only for a genuinely trivial issue.
+This promotes the workspace xBRIEF to `.pan/specs/` in the project repo, syncs xBRIEF tasks, and transitions the tracker state to Planned. It is subject to the same PRD-first gate as `finalize`; pass `--no-prd` only for a genuinely trivial issue.
 
 ## Related commands
 
@@ -113,4 +113,3 @@ This promotes the workspace xBRIEF to `<projectRoot>/.pan/specs/`, syncs xBRIEF 
 
 - `roles/plan.md` — planning role prompt.
 - `docs/XBRIEF.md` — xBRIEF schema, artifact locations, lifecycle states.
-- `docs/SKILLS-CONVENTION.md` — skill/CLI naming convention.

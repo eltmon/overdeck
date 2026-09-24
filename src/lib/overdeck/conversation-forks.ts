@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { parseIssueIdSync } from '../issue-id.js';
+import { parseIssueId } from '../issue-id.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { resolveProjectKeyForCwdAsync } from '../projects.js';
 import { issueIdFromBranch } from '../webhook-handlers.js';
@@ -49,6 +49,7 @@ import {
   copySessionFromCompactBoundary,
   generateFallbackSummary,
   generateSummaryForFork,
+  HandoffAuthorModelNotConfiguredError,
   handoffFailureReason,
   handoffPreconditionFallbackReason,
   logHandoffFallback,
@@ -59,18 +60,18 @@ import {
   type SummaryForkMode,
 } from '../conversations/summary-fork.js';
 import { UnknownModelError } from '../providers.js';
-import { sessionFilePath } from '../paths.js';
+import { claudeProjectsRoot, sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
 import { activeComposerRegion } from '../pane-composer.js';
-import { capturePaneText, capturePaneViewport, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
+import { capturePane, capturePaneViewport, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
 import {
   readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
   resolveKimiWirePath,
   resolvePiSessionPath,
-} from '../../dashboard/server/routes/jsonl-resolver.js';
+} from '../agents/transcript-resolver.js';
 import * as self from './conversation-forks.js';
 
 // Canonical model-id shape (allows the `[1m]` suffix) — see model-validation.ts (PAN-2979).
@@ -89,7 +90,7 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
     }
   }
   try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const claudeProjects = claudeProjectsRoot();
     const dirs = await readdir(claudeProjects);
     const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
     const candidates = dirs
@@ -380,7 +381,7 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
       const composer = activeComposerRegion(viewport);
       if (composer !== null) return normalizePaneVerification(composer).includes(verify);
     }
-    return normalizePaneVerification(await capturePaneText(conv.tmuxSession, 40)).includes(verify);
+    return normalizePaneVerification(await capturePane(conv.tmuxSession, 40)).includes(verify);
   };
 
   for (let nudge = 1; nudge <= 2; nudge++) {
@@ -436,7 +437,7 @@ export async function runForkPipeline(
     if (!reusableSession) {
       const forkSessionFile = resolvePlainForkTargetSessionFile(conv);
       if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
-      await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
+      await copySessionFromCompactBoundary(parentSessionFile, forkSessionFile);
     }
     updateForkStatus(convName, 'spawning');
     await ensureForkSessionReady(conv, sessionId, true, true);
@@ -451,7 +452,7 @@ export async function runForkPipeline(
   const buildSummary = async (): Promise<string> => {
     if (localSummaryOnly) {
       try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined));
+        return await generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined);
       } catch (error) {
         console.warn(
           `[fork-pipeline] Heuristic fallback summary failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -476,7 +477,7 @@ export async function runForkPipeline(
         `[fork-pipeline] LLM summary failed, falling back to heuristic: ${error instanceof Error ? error.message : String(error)}`,
       );
       try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined));
+        return await generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined);
       } catch (heuristicError) {
         console.warn(
           `[fork-pipeline] Heuristic fallback also failed: ${heuristicError instanceof Error ? heuristicError.message : String(heuristicError)}`,
@@ -502,6 +503,11 @@ export async function runForkPipeline(
         summary = handoff.docText;
         handoffDocPath = handoff.docPath;
       } catch (error) {
+        // PAN-3860: a missing handoff-author-model config is an operator
+        // error, not a transient authoring failure — never silently degrade
+        // to a plain summary fork over it; let it fail the whole pipeline
+        // (handleForkPipelineFailure marks forkStatus='failed' + ends the row).
+        if (error instanceof HandoffAuthorModelNotConfiguredError) throw error;
         forkFallbackReason = handoffFailureReason(error);
         effectiveForkMode = 'summary';
         logHandoffFallback(parentConv, forkFallbackReason);
@@ -583,6 +589,7 @@ export function registerInFlightForkPipeline(pipeline: Promise<void>): Promise<v
   return tracked;
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function getInFlightForkPipelineCount(): number {
   return inFlightForkPipelines.size;
 }
@@ -610,12 +617,20 @@ export async function recoverStuckForks(): Promise<number> {
   for (const fork of forks) {
     try {
       if (!fork.forkRequest) {
+        // PAN-3860: an in-memory fork pipeline cannot survive a dashboard
+        // restart. Every give-up branch below must end the row alongside
+        // marking forkStatus='failed' — otherwise the conversation-lifecycle
+        // sweeper's forkStatus-based skip (added for PAN-3860) treats it as
+        // still in flight and the row never gets its normal tmux-liveness
+        // pass, leaving status='active' with no live session indefinitely.
         updateForkStatus(fork.name, 'failed', 'Dashboard restarted during fork before recovery metadata was persisted');
+        markConversationEnded(fork.name);
         continue;
       }
       const request = parsePersistedForkRequest(fork.forkRequest);
       if (!request) {
         updateForkStatus(fork.name, 'failed', 'Persisted fork request is invalid');
+        markConversationEnded(fork.name);
         continue;
       }
       const tmuxAlive = await forkSessionExists(fork.tmuxSession);
@@ -629,12 +644,14 @@ export async function recoverStuckForks(): Promise<number> {
       }
       if (fork.forkRetryCount >= 2) {
         updateForkStatus(fork.name, 'failed', 'Fork recovery retry limit reached');
+        markConversationEnded(fork.name);
         continue;
       }
       incrementForkRetryCount(fork.name);
       const parentConv = getConversationByName(request.parentConversationName);
       if (!parentConv) {
         updateForkStatus(fork.name, 'failed', `Parent conversation ${request.parentConversationName} not found`);
+        markConversationEnded(fork.name);
         continue;
       }
       await registerInFlightForkPipeline(runForkPipeline(
@@ -657,6 +674,7 @@ export async function recoverStuckForks(): Promise<number> {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[fork-recovery] Failed to recover ${fork.name}:`, error);
       updateForkStatus(fork.name, 'failed', message);
+      markConversationEnded(fork.name);
     }
   }
   return recovered;
@@ -728,7 +746,7 @@ export async function handleConversationSummaryFork(
     const requestedIssueId = body['issueId'];
     let explicitIssueId: string | undefined;
     if (requestedIssueId !== undefined) {
-      if (typeof requestedIssueId !== 'string' || !parseIssueIdSync(requestedIssueId.trim())) {
+      if (typeof requestedIssueId !== 'string' || !parseIssueId(requestedIssueId.trim())) {
         return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
       }
       explicitIssueId = requestedIssueId.trim();
@@ -793,7 +811,7 @@ export async function handleConversationSummaryFork(
       explicitIssueId === undefined && conv.issueId == null
         ? await detectIssueIdFromBranch(effectiveCwd)
         : undefined;
-    const { sessionId } = await Effect.runPromise(reserveSummaryForkSession(effectiveCwd));
+    const { sessionId } = await reserveSummaryForkSession(effectiveCwd);
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const suffix = randomUUID().slice(0, 4);
     const newName = `${timestamp}-${suffix}`;

@@ -143,20 +143,6 @@ export function mergeTldrConfig(result: NormalizedTldrConfig, config: YamlConfig
   }
 }
 
-export function getDefaultRtkConfig(): NormalizedRtkConfig {
-  return {
-    enabled: DEFAULT_CONFIG.rtk.enabled,
-  };
-}
-
-export function mergeRtkConfigs(...configs: (YamlConfig | null)[]): NormalizedRtkConfig {
-  const result = getDefaultRtkConfig();
-  for (const config of configs) {
-    mergeRtkConfig(result, config);
-  }
-  return result;
-}
-
 export function cloneDocsConfig(config: NormalizedDocsConfig): NormalizedDocsConfig {
   return {
     enabled: config.enabled,
@@ -229,14 +215,6 @@ export function mergeDocsConfig(result: NormalizedDocsConfig, config: YamlConfig
 
 export function getDefaultDocsConfig(): NormalizedDocsConfig {
   return cloneDocsConfig(DEFAULT_CONFIG.docs);
-}
-
-export function mergeDocsConfigs(...configs: (YamlConfig | null)[]): NormalizedDocsConfig {
-  const result = getDefaultDocsConfig();
-  for (const config of configs) {
-    mergeDocsConfig(result, config);
-  }
-  return result;
 }
 
 export function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | null): void {

@@ -13,7 +13,7 @@ import {
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
-import { writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
+import { writeSwarmFailedMergeBlock } from '../../../../src/lib/cloister/deacon-swarm-record.js';
 
 function makeDoc(items: XBriefDocument['plan']['items']): XBriefDocument {
   return {
@@ -349,38 +349,22 @@ describe('pan swarm command', () => {
 
   it('recover reads a failed slot persisted by Deacon instead of a CLI-local map', async () => {
     resetSwarmLoopSafetyForTests();
-    const workspace = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-recover-'));
+    // swarmSlotStatePath resolves the plan home from <workspace>/../.., so the
+    // fixture has to sit at <root>/workspaces/feature-pan-2203.
+    const projectRoot = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-recover-'));
+    const workspace = join(projectRoot, 'workspaces', 'feature-pan-2203');
+    mkdirSync(workspace, { recursive: true });
     try {
       const doc = makeDoc([
         makeEligibleItem('wi-1', 'src/a.ts'),
         makeEligibleItem('wi-2', 'src/b.ts'),
       ]);
-      writeIssueRecordForWorkspaceSync(workspace, 'PAN-2203', {
+      await writeSwarmFailedMergeBlock(workspace, 'PAN-2203', {
         issueId: 'PAN-2203',
-        schemaVersion: 2,
-        feedback: [],
-        swarm: {
-          failedMergeBlock: {
-            issueId: 'PAN-2203',
-            itemId: 'wi-1',
-            slotIndex: 1,
-            branch: 'feature/pan-2203-slot-1',
-            note: 'persisted by Deacon',
-          },
-        },
-        pipeline: {
-          issueId: 'PAN-2203',
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          mergeStatus: 'pending',
-          readyForMerge: false,
-          updatedAt: '2026-07-01T00:00:00.000Z',
-        },
-        closeOut: {
-          usage: { byStage: {}, totals: {} },
-          merges: [],
-          ranOn: 'test',
-        },
+        itemId: 'wi-1',
+        slotIndex: 1,
+        branch: 'feature/pan-2203-slot-1',
+        note: 'persisted by Deacon',
       });
       const deps = {
         ...makeDeps(doc),
@@ -393,7 +377,7 @@ describe('pan swarm command', () => {
       expect(result.ok).toBe(true);
       expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith('PAN-2203', workspace, 1, doc, 'retry');
     } finally {
-      rmSync(workspace, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
       resetSwarmLoopSafetyForTests();
     }
   });
@@ -586,13 +570,13 @@ describe('pan swarm stop (PAN-2214)', () => {
 describe('pan swarm status (PAN-2214)', () => {
   function makeStatusDeps(options: {
     doc?: XBriefDocument;
-    hold?: { deaconIgnored?: boolean; deaconIgnoredReason?: string; stuck?: boolean; stuckReason?: string } | null;
+    hold?: { reason: string; setBy: string; at: string } | null;
     reconciled?: Record<string, unknown>;
     classified?: Array<Record<string, unknown>>;
     getFailedMergeBlocks?: () => Array<Record<string, unknown>>;
     sessionNames?: string[];
     liveSlotCount?: number;
-    statusOverrides?: Record<string, string>;
+    itemStatuses?: Record<string, string>;
   } = {}): SwarmStatusCommandDeps {
     const doc = options.doc ?? makeDoc([
       makeEligibleItem('wi-1', 'src/a.ts'),
@@ -618,10 +602,9 @@ describe('pan swarm status (PAN-2214)', () => {
       })) as unknown as SwarmStatusCommandDeps['reconcileSlotState'],
       classifyInFlightSlots: vi.fn(async () => (options.classified ?? []) as never),
       getFailedMergeBlocks: vi.fn(() => (options.getFailedMergeBlocks ? options.getFailedMergeBlocks() : [])),
-      getReviewStatusSync: vi.fn(() => options.hold ?? null) as unknown as SwarmStatusCommandDeps['getReviewStatusSync'],
-      readSwarmHold: vi.fn(() => undefined),
+      readSwarmHold: vi.fn(() => options.hold ?? undefined),
       readSwarmInterventions: vi.fn(() => ({})),
-      readStatusOverrides: vi.fn(() => options.statusOverrides),
+      readItemStatuses: vi.fn(async () => options.itemStatuses ?? {}),
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       getConcurrencyLimits: vi.fn(() => ({
         maxWorkAgents: 4,
@@ -663,17 +646,14 @@ describe('pan swarm status (PAN-2214)', () => {
     expect(output).toContain('Capacity: 1 of 3 swarm slots in use');
   });
 
-  it('prints the hold reason and the resume command when a hold is active', async () => {
+  it('prints the hold reason when a hold is active', async () => {
     const deps = makeStatusDeps({
-      hold: { deaconIgnored: true, deaconIgnoredReason: 'operator freeze' },
+      hold: { reason: 'operator freeze', setBy: 'operator', at: '2026-08-13T00:00:00Z' },
     });
 
     await swarmStatusCommand('PAN-2203', deps);
 
-    const output = loggedText(deps);
-    expect(output).toContain('Hold: deacon-ignored');
-    expect(output).toContain('pan swarm resume PAN-2203');
-    expect(output).toContain('Reason: operator freeze');
+    expect(loggedText(deps)).toContain('Hold: frozen — operator freeze');
   });
 
   it('prints foreman ownership and Deacon backstop duties when no hold is set', async () => {
@@ -688,7 +668,7 @@ describe('pan swarm status (PAN-2214)', () => {
   });
 
   it('applies durable status overrides before reconciling slots', async () => {
-    const deps = makeStatusDeps({ statusOverrides: { 'wi-1': 'completed' } });
+    const deps = makeStatusDeps({ itemStatuses: { 'wi-1': 'completed' } });
 
     await swarmStatusCommand('PAN-2203', deps);
 
@@ -752,9 +732,8 @@ describe('pan swarm status (PAN-2214)', () => {
       'findSpecByIssue',
       'getConcurrencyLimits',
       'getFailedMergeBlocks',
-      'getReviewStatusSync',
       'listSessionNamesSync',
-      'readStatusOverrides',
+      'readItemStatuses',
       'readSwarmHold',
       'readSwarmInterventions',
       'reconcileSlotState',

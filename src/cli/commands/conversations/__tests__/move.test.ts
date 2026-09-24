@@ -20,7 +20,7 @@ vi.mock('chalk', () => {
 
 vi.mock('../../../../lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../../lib/config.js')>()),
-  getDashboardApiUrlSync: vi.fn(() => 'http://dashboard.test'),
+  getDashboardApiUrl: vi.fn(() => 'http://dashboard.test'),
 }));
 
 // PAN-1577: isolate project resolution from real projects.yaml I/O. Only

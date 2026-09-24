@@ -5,11 +5,14 @@
  * per-project pipeline concern, but its only HTTP surface used to live under
  * `/api/flywheel/*` and answered for the Overdeck repo alone. These routes
  * answer for EVERY tracked project and require no active flywheel run: the
- * ready set comes from the review-status records via
- * `listEligibleCandidatesByProject`, not from a run's `activePipeline`.
+ * ready set is derived from the forge — approvals, checks, and mergeability.
  *
- * The legacy `/api/flywheel/*` merge-train routes stay in place until the
- * frontend migrates — removing them is the remove-legacy-routes item.
+ * PAN-3917 W6: the flywheel routes are gone, and the merge-train config and
+ * auto-merge surface that lived under `/api/flywheel/*` moved here, under
+ * `/api/merge-train/config` and `/api/merge-train/auto-merge/*`. Scheduling an
+ * auto-merge no longer consults a flywheel run or a review-status record: it
+ * gates on the derived issue state, which is approvals plus green checks plus
+ * forge mergeability (FR-9, D3).
  */
 
 import { Effect, Layer } from 'effect';
@@ -18,14 +21,43 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { resolve } from 'node:path';
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
-import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { getProjectSync, listProjectsSync, type ProjectConfig } from '../../../lib/projects.js';
-import {
-  computeMergeQueueFromCandidates,
-  listEligibleCandidatesByProject,
-  type MergeQueueItem,
-} from '../../../lib/flywheel-merge-order.js';
+import { hasDashboardInternalToken, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { getProjectSync, listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
+import type { MergeQueueItem } from '../../../lib/flywheel-merge-order.js';
 import { gatherMergeEligibility, isMergeEligible } from '../../../lib/cloister/merge-eligibility.js';
+import { emitActivityTts } from '../../../lib/activity-logger.js';
+import { parseArtifactRef } from '../../../lib/forge.js';
+import { validateOrigin } from './origin-validation.js';
+import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
+import { autoMergeFromLabels, isAutoMergeEligible, issueHoldsForUat, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import {
+  getProjectAutoMergeDefault,
+  projectHoldsForUat,
+  shouldHoldForUat,
+  type ProjectAutoMergeDefault,
+} from '../../../lib/cloister/auto-merge-policy.js';
+import { getMergeBlockersPayload } from '../../../lib/cloister/merge-blockers.js';
+import {
+  isFlywheelAutoPickupBacklog,
+  isFlywheelRequireUatBeforeMerge,
+  isMergeTrainEnabled,
+  setFlywheelAutoPickupBacklog,
+  setFlywheelRequireUatBeforeMerge,
+  setMergeTrainEnabled,
+} from '../../../lib/overdeck/control-settings.js';
+import {
+  cancelPending,
+  countActionableAutoMerges,
+  getActionableAutoMerge,
+  listActiveAutoMerges,
+  listProblemAutoMerges,
+  scheduleAutoMergeWithResult,
+  type PendingAutoMerge,
+  type ScheduleAutoMergeInput,
+  type ScheduleAutoMergeResult,
+} from '../../../lib/overdeck/merge-sync.js';
+import { getDerivedIssueState, listReadyIssuesForProject, type IssueStateLoaderDeps } from '../services/derived-issue-state.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import type { PipelineMembership } from '../../../lib/pipeline-membership.js';
 
 const readUnknownJsonBody = Effect.gen(function* () {
@@ -49,6 +81,13 @@ export interface MergeTrainQueueEntry {
   projectName: string;
   /** Effective per-project flag: the project override, else the global setting. */
   enabled: boolean;
+  /**
+   * PAN-3965: one ready feature still gets a batch (its UAT stack). With
+   * exactly one feature queued this is that feature's own hold (its label,
+   * then the project, then global); otherwise the project-level hold.
+   * False = one ready feature merges directly.
+   */
+  holdsForUat: boolean;
   queue: MergeQueueItem[];
 }
 
@@ -70,16 +109,29 @@ async function queueEntryForProject(
   config: ProjectConfig,
   enabled: boolean,
 ): Promise<MergeTrainQueueEntry> {
-  const base = { projectKey: key, projectName: config.name, enabled };
+  const globalRequireUat = isFlywheelRequireUatBeforeMerge();
+  const holdsForUat = projectHoldsForUat(config, globalRequireUat);
+  const base = { projectKey: key, projectName: config.name, enabled, holdsForUat };
   if (!enabled) return { ...base, queue: [] };
 
   const projectPath = resolve(config.path);
-  const candidates = await listEligibleCandidatesByProject(projectPath);
+  // PAN-3917 FR-9: the ready set is the forge's — approvals, green checks, and
+  // mergeability — not a scan of review-status records.
+  const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return { ...base, queue: [] };
 
+  // Imported here so the conflict-ordering module's git work is only loaded
+  // when a queue is actually computed.
+  const { computeMergeQueueFromCandidates } = await import('../../../lib/flywheel-merge-order.js');
   const queue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
   );
+  // Review of #4017: a lone ready feature's hold is its own (label, then
+  // project, then global), the same one the reconciler applies — the page must
+  // not say "merges directly" for a feature that gets a UAT batch.
+  if (queue.length === 1) {
+    return { ...base, holdsForUat: await issueHoldsForUat(queue[0]!.issueId, config, globalRequireUat), queue };
+  }
   return { ...base, queue };
 }
 
@@ -102,7 +154,7 @@ export async function getMergeTrainQueuesPayload(): Promise<MergeTrainQueueEntry
     if (!entry) return [];
     const reason = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
     console.warn(`[merge-train] queue for project ${entry.key} failed: ${reason}`);
-    return [{ projectKey: entry.key, projectName: entry.config.name, enabled: true, queue: [] }];
+    return [{ projectKey: entry.key, projectName: entry.config.name, enabled: true, holdsForUat: projectHoldsForUat(entry.config, isFlywheelRequireUatBeforeMerge()), queue: [] }];
   });
 }
 
@@ -134,8 +186,9 @@ export interface MergeTrainMergeNextDeps {
 }
 
 async function defaultOrderedIssueIdsForProject(projectPath: string): Promise<string[]> {
-  const candidates = await listEligibleCandidatesByProject(projectPath);
+  const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return [];
+  const { computeMergeQueueFromCandidates } = await import('../../../lib/flywheel-merge-order.js');
   const queue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
   );
@@ -236,11 +289,11 @@ export async function postMergeTrainGenerationShipPayload(
   name: string,
   version: string,
 ): Promise<{ status: number; body: unknown }> {
-  const { getUatGenerationSync } = await import('../../../lib/overdeck/merge-sync.js');
-  const generation = getUatGenerationSync(name);
+  const { getUatGeneration } = await import('../../../lib/overdeck/merge-sync.js');
+  const generation = getUatGeneration(name);
   if (!generation) return { status: 404, body: { error: `No UAT generation named ${name}` } };
 
-  const { shipPromotedBatch, ShipPromotedBatchError } = await import('../../../lib/cloister/ship-record.js');
+  const { shipPromotedBatch, ShipPromotedBatchError } = await import('../services/generation-ship.js');
   try {
     return {
       status: 200,
@@ -383,6 +436,349 @@ const postMergeTrainMergeNextRoute = HttpRouter.add(
   })),
 );
 
+
+// ─── Moved from /api/flywheel/* (PAN-3917 W6, D3) ────────────────────────────
+//
+// `config` and the auto-merge surface belong to the merge train, not to a
+// flywheel run. The flywheel is a loop skill now (D12), so these gate on the
+// derived issue state instead of a run id or a review-status record.
+
+function requireTrustedOrigin(request: HttpServerRequest.HttpServerRequest) {
+  if (hasDashboardInternalToken(request)) return null;
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+  return rejectUnsafeDashboardMutationRequest(request);
+}
+
+export interface MergeTrainConfigBody {
+  auto_pickup_backlog: boolean;
+  require_uat_before_merge: boolean;
+  merge_train_enabled: boolean;
+}
+
+export function getMergeTrainConfigPayload(): MergeTrainConfigBody {
+  return {
+    auto_pickup_backlog: isFlywheelAutoPickupBacklog(),
+    require_uat_before_merge: isFlywheelRequireUatBeforeMerge(),
+    merge_train_enabled: isMergeTrainEnabled(),
+  };
+}
+
+export async function postMergeTrainConfigPayload(payload: unknown): Promise<{ status: number; body: unknown }> {
+  if (!isJsonObject(payload)) {
+    return { status: 400, body: { error: 'Request body must be a JSON object' } };
+  }
+  for (const key of ['auto_pickup_backlog', 'require_uat_before_merge', 'merge_train_enabled'] as const) {
+    if (payload[key] !== undefined && typeof payload[key] !== 'boolean') {
+      return { status: 400, body: { error: `${key} must be a boolean` } };
+    }
+  }
+  if (payload['auto_pickup_backlog'] !== undefined) setFlywheelAutoPickupBacklog(payload['auto_pickup_backlog'] as boolean);
+  if (payload['require_uat_before_merge'] !== undefined) setFlywheelRequireUatBeforeMerge(payload['require_uat_before_merge'] as boolean);
+  if (payload['merge_train_enabled'] !== undefined) setMergeTrainEnabled(payload['merge_train_enabled'] as boolean);
+  return { status: 200, body: getMergeTrainConfigPayload() };
+}
+
+export interface AutoMergeScheduleDeps {
+  now?: () => Date;
+  isRequireUatBeforeMerge?: () => boolean;
+  isMergeTrainEnabled?: () => boolean;
+  isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  derivedState?: (issueId: string, deps?: IssueStateLoaderDeps) => ReturnType<typeof getDerivedIssueState>;
+  resolveProject?: (issueId: string) => ResolvedProject | null;
+  schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
+  announce?: (issueId: string, entry: PendingAutoMerge) => void;
+  getProjectAutoMergeDefault?: (issueId: string) => ProjectAutoMergeDefault;
+  /** The issue's tracker labels; defaults to the dashboard's cached tracker row. */
+  getIssueLabels?: (issueId: string) => readonly string[];
+}
+
+/**
+ * PAN-3932: the issue's `auto-merge` / `hold-for-uat` labels from the cached
+ * tracker row. The auto-merge policy map is polled across every in-flight
+ * issue, so it reads the cache rather than asking the forge per issue.
+ */
+function cachedIssueLabels(issueId: string): readonly string[] {
+  try {
+    return getSharedIssueService().getTrackerIssue(issueId)?.labels ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export interface AutoMergeCancelDeps {
+  now?: () => Date;
+  getPending?: (issueId: string) => PendingAutoMerge | null;
+  cancel?: (id: number, cancelledBy: string) => boolean;
+  countRemaining?: (issueId: string) => number;
+  announce?: (issueId: string) => void;
+}
+
+function announceAutoMergeScheduled(issueId: string, _entry: PendingAutoMerge): void {
+  emitActivityTts({
+    utterance: `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
+    priority: 1,
+    issueId,
+    source: 'dashboard',
+    eventType: 'auto-merge-scheduled',
+  });
+}
+
+function announceAutoMergeCancelled(issueId: string): void {
+  emitActivityTts({
+    utterance: `auto-merge cancelled for ${issueId}`,
+    priority: 1,
+    issueId,
+    source: 'dashboard',
+    eventType: 'auto-merge-cancelled',
+  });
+}
+
+/**
+ * Schedule an auto-merge. The gate is the forge: the issue must derive to
+ * `ready`, which is approved plus green checks plus `mergeable` (FR-9).
+ */
+export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoMergeScheduleDeps = {}) {
+  if (!isJsonObject(payload)) {
+    return { status: 400, body: { error: 'Request body must be a JSON object' } };
+  }
+  const rawIssueId = payload['issueId'];
+  if (typeof rawIssueId !== 'string' || rawIssueId.trim().length === 0) {
+    return { status: 400, body: { error: 'issueId must be a non-empty string' } };
+  }
+  const issueId = rawIssueId.trim().toUpperCase();
+
+  // PAN-1691/1695 tiers: the issue's `auto-merge` / `hold-for-uat` label
+  // (PAN-3932), then the project default, then global.
+  const labels = (deps.getIssueLabels ?? cachedIssueLabels)(issueId);
+  const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
+  const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();
+  if (shouldHoldForUat(autoMergeFromLabels(labels), projectDefault, globalRequireUat)) {
+    return { status: 412, body: { error: 'UAT is still required before merge' } };
+  }
+  if (!(deps.isMergeTrainEnabled ?? isMergeTrainEnabled)()) {
+    return { status: 412, body: { error: 'Merge train is disabled' } };
+  }
+
+  const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(issueId);
+  if (!eligibility.eligible) {
+    return { status: 422, body: { error: eligibility.reason } };
+  }
+
+  const derived = await (deps.derivedState ?? getDerivedIssueState)(issueId);
+  if (derived.state !== 'ready') {
+    return { status: 422, body: { error: `${issueId} is ${derived.state}, not ready to merge` } };
+  }
+  const pr = derived.pr;
+  if (!pr || !pr.url) {
+    return { status: 422, body: { error: `No pull request for ${issueId}` } };
+  }
+  const artifactRef = parseArtifactRef(pr.url);
+  if (artifactRef === null) {
+    return { status: 422, body: { error: `Pull request URL for ${issueId} is not a recognized forge artifact` } };
+  }
+
+  const project = (deps.resolveProject ?? resolveProjectFromIssueSync)(issueId);
+  if (!project) return { status: 422, body: { error: `Unknown project for issue ${issueId}` } };
+
+  const scheduledAt = (deps.now ?? (() => new Date()))();
+  const scheduledMergeAt = new Date(scheduledAt.getTime() + AUTO_MERGE_COOLDOWN_MS);
+  const result = (deps.schedule ?? scheduleAutoMergeWithResult)({
+    issueId,
+    prUrl: pr.url,
+    prNumber: artifactRef.number,
+    projectKey: project.projectKey,
+    forge: artifactRef.forge,
+    scheduledMergeAt: scheduledMergeAt.toISOString(),
+    scheduledAt: scheduledAt.toISOString(),
+  });
+  if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
+  return { status: 200, body: result.entry };
+}
+
+const AUTO_MERGE_POLL_LIMIT = 100;
+
+export function getPendingAutoMergePayload(): PendingAutoMerge[] {
+  return listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT);
+}
+
+export function getAutoMergeProblemPayload(): PendingAutoMerge[] {
+  return listProblemAutoMerges(AUTO_MERGE_POLL_LIMIT);
+}
+
+export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCancelDeps = {}) {
+  const issueId = issueIdParam.trim().toUpperCase();
+  if (!issueId) return { status: 400, body: { error: 'issueId must be a non-empty string' } };
+
+  const entry = (deps.getPending ?? getActionableAutoMerge)(issueId);
+  if (!entry) return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
+  if (entry.status === 'merging') {
+    return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
+  }
+
+  const cancelledAt = (deps.now ?? (() => new Date()))().toISOString();
+  const cancelled = (deps.cancel ?? cancelPending)(entry.id, 'operator');
+  if (!cancelled) {
+    const raced = (deps.getPending ?? getActionableAutoMerge)(issueId);
+    if (raced?.status === 'merging') {
+      return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
+    }
+    return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
+  }
+
+  (deps.announce ?? announceAutoMergeCancelled)(issueId);
+  return {
+    status: 200,
+    body: {
+      ...entry,
+      status: 'cancelled' as const,
+      cancelledAt,
+      cancelledBy: 'operator',
+      remainingActionable: (deps.countRemaining ?? countActionableAutoMerges)(issueId),
+    },
+  };
+}
+
+/**
+ * The effective auto-merge routing key per in-flight issue (PAN-3917, D3).
+ *
+ * There is no per-issue routing key record any more. The answer is derived:
+ * the issue's own `auto-merge` / `hold-for-uat` tracker label (PAN-3932),
+ * then its project default, then the global `require_uat_before_merge`.
+ * `autoMerge: true` means the train may ship it when green; `false` means
+ * hold for UAT.
+ */
+export async function getAutoMergePolicyPayload(): Promise<{
+  issues: Array<{ issueId: string; autoMerge: boolean }>;
+}> {
+  const globalRequireUat = isFlywheelRequireUatBeforeMerge();
+  const { loadIssueStatesForProject } = await import('../services/derived-issue-state.js');
+  const IN_FLIGHT = new Set(['working', 'in-review', 'changes-requested', 'ready']);
+
+  const issues: Array<{ issueId: string; autoMerge: boolean }> = [];
+  for (const { config } of listProjectsSync()) {
+    const projectPath = resolve(config.path);
+    let states;
+    try {
+      states = await loadIssueStatesForProject(projectPath, await listCandidateIssueIds(projectPath));
+    } catch (error) {
+      console.warn(`[merge-train] auto-merge policy for ${config.name} failed: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
+    for (const [issueId, derived] of states) {
+      if (!IN_FLIGHT.has(derived.state)) continue;
+      const held = shouldHoldForUat(
+        autoMergeFromLabels(cachedIssueLabels(issueId)),
+        getProjectAutoMergeDefault(issueId),
+        globalRequireUat,
+      );
+      issues.push({ issueId, autoMerge: !held });
+    }
+  }
+  return { issues };
+}
+
+/** Issue ids with an open PR in the project — the only ones the train can route. */
+async function listCandidateIssueIds(projectPath: string): Promise<string[]> {
+  const { listRepoPullRequests, issueIdFromBranch } = await import('../services/derived-issue-state.js');
+  const rows = await listRepoPullRequests(projectPath);
+  return rows.flatMap((row) => {
+    const issueId = issueIdFromBranch(row.headRefName);
+    return issueId ? [issueId] : [];
+  });
+}
+
+const getAutoMergePolicyRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/auto-merge',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(yield* Effect.promise(() => getAutoMergePolicyPayload()));
+  })),
+);
+
+/** Whether an autonomous merge can actually be performed (GitHub App or gh CLI). */
+const getMergeBackendRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/merge-backend',
+  httpHandler(Effect.gen(function* () {
+    const { getMergeBackendStatus } = yield* Effect.promise(() => import('../../../lib/github-app.js'));
+    return jsonResponse(yield* Effect.promise(() => getMergeBackendStatus()));
+  })),
+);
+
+const getMergeTrainConfigRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/config',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getMergeTrainConfigPayload());
+  })),
+);
+
+const postMergeTrainConfigRoute = HttpRouter.add(
+  'POST',
+  '/api/merge-train/config',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+    const result = yield* Effect.promise(() => postMergeTrainConfigPayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const getPendingAutoMergeRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/auto-merge/pending',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getPendingAutoMergePayload());
+  })),
+);
+
+const getAutoMergeProblemsRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/auto-merge/problems',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getAutoMergeProblemPayload());
+  })),
+);
+
+const postAutoMergeScheduleRoute = HttpRouter.add(
+  'POST',
+  '/api/merge-train/auto-merge/schedule',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+    const result = yield* Effect.promise(() => postAutoMergeSchedulePayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const deleteAutoMergeRoute = HttpRouter.add(
+  'DELETE',
+  '/api/merge-train/auto-merge/:id',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+    const params = yield* HttpRouter.params;
+    const result = deleteAutoMergePayload(params['id'] ?? '');
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const getMergeBlockersRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/merge-blockers',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getMergeBlockersPayload());
+  })),
+);
+
 export const mergeTrainRouteLayer = Layer.mergeAll(
   getMergeTrainQueuesRoute,
   getMergeTrainGenerationsRoute,
@@ -391,6 +787,15 @@ export const mergeTrainRouteLayer = Layer.mergeAll(
   postMergeTrainGenerationShipRoute,
   postMergeTrainAssembleRoute,
   postMergeTrainMergeNextRoute,
+  getMergeTrainConfigRoute,
+  postMergeTrainConfigRoute,
+  getAutoMergePolicyRoute,
+  getMergeBackendRoute,
+  getPendingAutoMergeRoute,
+  getAutoMergeProblemsRoute,
+  postAutoMergeScheduleRoute,
+  deleteAutoMergeRoute,
+  getMergeBlockersRoute,
 );
 
 export default mergeTrainRouteLayer;

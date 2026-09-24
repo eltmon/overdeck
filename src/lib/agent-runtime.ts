@@ -18,7 +18,7 @@ import type {
   ChannelReplyKind,
   WaitingReason,
 } from '@overdeck/contracts'
-import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js'
+import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js'
 
 // Use 127.0.0.1 explicitly: when /etc/hosts resolves `localhost` to ::1
 // (IPv6 first), Node's undici-based fetch() connects to [::1]:3011 and
@@ -91,7 +91,7 @@ export const emitAgentEvent = (
     // classified finished slots as still running, forever. The bash hooks
     // attach this same header; the lib emitter must too.
     const token = yield* Effect.try({
-      try: (): string => ensureInternalTokenSync(),
+      try: (): string => ensureInternalToken(),
       catch: (cause) => new AgentRuntimeFetchError({ url, cause }),
     }).pipe(Effect.orElseSucceed((): string | null => null))
     if (!token) return false
@@ -116,43 +116,3 @@ export const emitActivity = (
   activity: Activity,
   tool?: string,
 ): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'activity', activity, tool })
-
-export const emitWaitingStart = (
-  agentId: string,
-  reason: WaitingReason,
-  message?: string,
-): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'waiting_start', reason, message })
-
-export const emitWaitingClear = (
-  agentId: string,
-  clearedBy: 'user_response' | 'timeout' | 'stopped' | 'tool_resumed' = 'user_response',
-): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'waiting_clear', clearedBy })
-
-export const emitModelSet = (
-  agentId: string,
-  model: string,
-  claudeSessionId?: string,
-  sessionOrigin?: { sessionModel?: string; sessionHarness?: string },
-): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'model_set', model, claudeSessionId, ...sessionOrigin })
-
-export const emitMessageReceived = (
-  agentId: string,
-  direction: 'to_agent' | 'from_agent',
-  source: 'user' | 'cloister' | 'specialist' | 'automated',
-): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'message_received', direction, source })
-
-export const emitChannelReply = (
-  agentId: string,
-  reply: { kind: ChannelReplyKind; summary: string; artifactRefs?: ChannelReplyArtifactRef[] },
-): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'channel_reply', reply })
-
-export const emitResolution = (
-  agentId: string,
-  resolution: AgentResolution,
-  resolutionCount: number,
-): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'resolution_set', resolution, resolutionCount })
-
-export const emitContextSaturationChanged = (
-  agentId: string,
-  contextSaturatedAt?: string,
-): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'context_saturation_changed', contextSaturatedAt })

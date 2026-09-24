@@ -8,10 +8,8 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import { loadProjectsConfigSync, getIssuePrefix } from './projects.js';
-import { extractPrefixSync, extractNumberSync, parseIssueIdSync } from './issue-id.js';
-import { ConfigError } from './errors.js';
+import { extractPrefix, extractNumber, parseIssueId } from './issue-id.js';
 
 export interface GitHubRepoConfig {
   owner: string;
@@ -38,7 +36,7 @@ export type IssueResolution = GitHubIssueResolution | NonGitHubResolution;
  * Priority: GITHUB_REPOS env var first, then auto-derive from projects.yaml.
  * Format for env var: "owner/repo:PREFIX,owner2/repo2:PREFIX2"
  */
-export function parseGitHubReposSync(): GitHubRepoConfig[] {
+export function parseGitHubRepos(): GitHubRepoConfig[] {
   const repos: GitHubRepoConfig[] = [];
 
   // 1. Check GITHUB_REPOS env var
@@ -82,8 +80,8 @@ export function parseGitHubReposSync(): GitHubRepoConfig[] {
  * Uses unified parser to support standard, Rally, and custom formats.
  * @deprecated Use extractPrefix from issue-id.ts for unified parsing
  */
-export function extractIssuePrefix(issueId: string): string {
-  return extractPrefixSync(issueId) ?? issueId.split('-')[0].toUpperCase();
+function extractIssuePrefix(issueId: string): string {
+  return extractPrefix(issueId) ?? issueId.split('-')[0].toUpperCase();
 }
 
 /**
@@ -92,13 +90,13 @@ export function extractIssuePrefix(issueId: string): string {
  * Checks the issue prefix against all prefixes configured in GITHUB_REPOS.
  * Returns the matching repo config with parsed issue number, or { isGitHub: false }.
  */
-export function resolveGitHubIssueSync(issueId: string): IssueResolution {
+export function resolveGitHubIssue(issueId: string): IssueResolution {
   const prefix = extractIssuePrefix(issueId);
-  const repos = parseGitHubReposSync();
+  const repos = parseGitHubRepos();
 
   for (const repoConfig of repos) {
     if (repoConfig.prefix === prefix) {
-      const number = extractNumberSync(issueId);
+      const number = extractNumber(issueId);
       if (number !== null) {
         return { isGitHub: true, ...repoConfig, number };
       }
@@ -111,8 +109,8 @@ export function resolveGitHubIssueSync(issueId: string): IssueResolution {
 /**
  * Check if an issue ID belongs to a GitHub-tracked project.
  */
-export function isGitHubIssueSync(issueId: string): boolean {
-  return resolveGitHubIssueSync(issueId).isGitHub;
+export function isGitHubIssue(issueId: string): boolean {
+  return resolveGitHubIssue(issueId).isGitHub;
 }
 
 export type TrackerTypeResolution = 'github' | 'rally' | 'linear' | 'gitlab';
@@ -125,14 +123,14 @@ export type TrackerTypeResolution = 'github' | 'rally' | 'linear' | 'gitlab';
  * 2. Rally — prefix matches a project with rally_project or tracker: 'rally'
  * 3. Linear — fallback (matches linear_team or unknown prefix)
  */
-export function resolveTrackerTypeSync(issueId: string): TrackerTypeResolution {
+export function resolveTrackerType(issueId: string): TrackerTypeResolution {
   // Check GitHub first (existing logic)
-  if (resolveGitHubIssueSync(issueId).isGitHub) {
+  if (resolveGitHubIssue(issueId).isGitHub) {
     return 'github';
   }
 
   // Check if the issue prefix matches a project with explicit tracker type
-  const parsed = parseIssueIdSync(issueId);
+  const parsed = parseIssueId(issueId);
   if (!parsed) {
     return 'linear'; // default for unparseable IDs
   }
@@ -172,47 +170,3 @@ export function resolveTrackerTypeSync(issueId: string): TrackerTypeResolution {
   // Default to Linear for unknown prefixes
   return 'linear';
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Parse configured GitHub repo entries from env + projects.yaml. Wraps the
- * sync implementation so callers in Effect graphs can stay Effect-native.
- */
-export const parseGitHubRepos = (): Effect.Effect<readonly GitHubRepoConfig[], ConfigError> =>
-  Effect.try({
-    try: () => parseGitHubReposSync(),
-    catch: (cause) =>
-      new ConfigError({ message: 'parseGitHubRepos failed', cause }),
-  });
-
-/** Resolve an issue ID to a GitHub repo, or signal it's not a GitHub issue. */
-export const resolveGitHubIssue = (
-  issueId: string,
-): Effect.Effect<IssueResolution, ConfigError> =>
-  Effect.try({
-    try: () => resolveGitHubIssueSync(issueId),
-    catch: (cause) =>
-      new ConfigError({ message: `resolveGitHubIssue(${issueId}) failed`, cause }),
-  });
-
-/** True if the issue prefix matches a configured github_repo project. */
-export const isGitHubIssue = (issueId: string): Effect.Effect<boolean, ConfigError> =>
-  Effect.try({
-    try: () => isGitHubIssueSync(issueId),
-    catch: (cause) =>
-      new ConfigError({ message: `isGitHubIssue(${issueId}) failed`, cause }),
-  });
-
-/**
- * Resolve the tracker type for an issue ID via projects.yaml.
- * Falls back to 'linear' for unknown prefixes.
- */
-export const resolveTrackerType = (
-  issueId: string,
-): Effect.Effect<TrackerTypeResolution, ConfigError> =>
-  Effect.try({
-    try: () => resolveTrackerTypeSync(issueId),
-    catch: (cause) =>
-      new ConfigError({ message: `resolveTrackerType(${issueId}) failed`, cause }),
-  });

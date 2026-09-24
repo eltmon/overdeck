@@ -2,9 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { Effect } from 'effect';
 
-import { findDraftPrd, findDraftPrdSync, findPrdAnywhereSync } from '../prd-locations.js';
+import { findDraftPrd, findDraftPrdSync, findPrdAnywhere } from '../prd-locations.js';
 import { getDraftsDir } from '../pan-dir/index.js';
 
 let projectRoot: string;
@@ -52,7 +51,7 @@ describe('findDraftPrd', () => {
     const lower = join(draftsDir, 'pan-2858.md');
     writeFileSync(lower, 'prd\n', 'utf-8');
 
-    await expect(Effect.runPromise(findDraftPrd(projectRoot, 'PAN-2858'))).resolves.toEqual({
+    await expect(findDraftPrd(projectRoot, 'PAN-2858')).resolves.toEqual({
       path: lower,
       format: 'pan-draft',
       status: 'draft',
@@ -60,18 +59,18 @@ describe('findDraftPrd', () => {
   });
 
   it('returns null asynchronously when no draft exists', async () => {
-    await expect(Effect.runPromise(findDraftPrd(projectRoot, 'PAN-2858'))).resolves.toBeNull();
+    await expect(findDraftPrd(projectRoot, 'PAN-2858')).resolves.toBeNull();
   });
 });
 
-describe('findPrdAnywhereSync', () => {
+describe('findPrdAnywhere', () => {
   it('falls through to the canonical draft when no legacy status PRD exists', () => {
     const draftsDir = getDraftsDir(projectRoot);
     mkdirSync(draftsDir, { recursive: true });
     const lower = join(draftsDir, 'pan-2858.md');
     writeFileSync(lower, 'prd\n', 'utf-8');
 
-    const loc = findPrdAnywhereSync(projectRoot, 'PAN-2858');
+    const loc = findPrdAnywhere(projectRoot, 'PAN-2858');
     expect(loc?.format).toBe('pan-draft');
     expect(loc?.path).toBe(lower);
   });

@@ -4,7 +4,7 @@ import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
-import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { resolveIssueProjectPath } from './issue-reads.js';
 
 export function buildChildStoriesFromRally(
   children: readonly { ref: string; title: string; status: string; description: string }[],
@@ -20,7 +20,7 @@ export function buildChildStoriesFromRally(
 export function generateTasksForIssue(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
-    const projectPath = resolveIssueProjectPathSync(id);
+    const projectPath = resolveIssueProjectPath(id);
 
     if (!projectPath) {
       return jsonResponse({ success: false, error: `Could not resolve project path for ${id}` }, { status: 404 });

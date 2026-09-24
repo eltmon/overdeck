@@ -24,6 +24,8 @@
  * live ephemeral state.
  */
 import type { ComposerCommandResult } from '@overdeck/contracts';
+import { sendConversationMessage, sendFailureDetails, type SendFailureDetails } from './composerSend';
+import { reconcileComposerEchoes, type SendIdentity } from './composerEchoes';
 import { create } from 'zustand';
 import type { ChatMessage, FailedMessage } from '../components/chat/chat-types';
 import {
@@ -63,7 +65,8 @@ interface ComposerSlice {
   /** Server message count captured when the optimistic message was added, so the
    *  view can tell when the real message has arrived and drop the optimistic copy. */
   optimisticBaseCount: number;
-  /** Messages whose send POST failed — retryable from the timeline. */
+  consumedEchoIds: string[];
+  /** Rejected or unconfirmed sends, with recovery actions in the timeline. */
   failed: FailedMessage[];
   /** Structured results from dashboard-intercepted `/pan` commands. */
   commandResults: ChatMessage[];
@@ -83,6 +86,7 @@ function emptySlice(): ComposerSlice {
     attachments: [],
     optimistic: [],
     optimisticBaseCount: 0,
+    consumedEchoIds: [],
     failed: [],
     commandResults: [],
   };
@@ -100,152 +104,8 @@ function isEmptySlice(s: ComposerSlice): boolean {
 
 // ─── Message send (shared by the composer and the retry outbox) ─────────────────
 
-export function isComposerCommandResult(value: unknown): value is ComposerCommandResult {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Record<string, unknown>;
-  switch (candidate.kind) {
-    case 'captured':
-      return (
-        (candidate.status === 'completed' || candidate.status === 'failed') &&
-        typeof candidate.command === 'string' &&
-        typeof candidate.output === 'string' &&
-        typeof candidate.truncated === 'boolean'
-      );
-    case 'activity':
-      return (
-        candidate.status === 'accepted' &&
-        typeof candidate.command === 'string' &&
-        typeof candidate.activityId === 'string' &&
-        typeof candidate.message === 'string'
-      );
-    case 'ui':
-      return (
-        candidate.status === 'requires_ui' &&
-        (candidate.action === 'handoff' || candidate.action === 'fork') &&
-        candidate.args !== null &&
-        typeof candidate.args === 'object'
-      );
-    case 'confirmation':
-      return (
-        candidate.status === 'confirmation_required' &&
-        typeof candidate.nonce === 'string' &&
-        typeof candidate.consequence === 'string' &&
-        (candidate.typedText === undefined || typeof candidate.typedText === 'string')
-      );
-    case 'terminal-only':
-      return candidate.status === 'rejected' && typeof candidate.message === 'string';
-    default:
-      return false;
-  }
-}
-
-export interface ComposerCommandConfirmation {
-  nonce: string;
-  typedText?: string;
-}
-
-/**
- * Structured send failure. `status` is the HTTP status when the server
- * answered at all (undefined for network-level failures). `reason` is the
- * server-supplied error text when present. `retryable` is false for
- * deterministic rejections — a 4xx other than 408/429 will fail an identical
- * retry every time, so the outbox must not offer Retry for it (PAN-3117).
- */
-export class MessageSendError extends Error {
-  readonly status?: number;
-  readonly reason?: string;
-  readonly retryable: boolean;
-  constructor(message: string, opts: { status?: number; reason?: string }) {
-    super(message);
-    this.name = 'MessageSendError';
-    this.status = opts.status;
-    this.reason = opts.reason;
-    this.retryable = opts.status === undefined
-      || opts.status >= 500
-      || opts.status === 408
-      || opts.status === 429;
-  }
-}
-
-export interface SendFailureDetails {
-  error?: string;
-  retryable?: boolean;
-}
-
-/** Extract the display reason + retryability the outbox preserves from any send failure. */
-export function sendFailureDetails(err: unknown): SendFailureDetails {
-  if (err instanceof MessageSendError) {
-    return { error: err.reason ?? err.message, retryable: err.retryable };
-  }
-  return { error: err instanceof Error ? err.message : String(err), retryable: true };
-}
-
-/**
- * POST a message to a conversation (or agent) session. The single source of
- * truth for the send endpoint + payload, used by both the composer's first send
- * (ComposerFooter.handleSubmit), confirmation resubmissions, and the failed-
- * message retry below. Structured command results are returned even when their
- * HTTP status is non-2xx (for example terminal-only rejection), while ordinary
- * transport failures still throw so callers can preserve the text in the retry
- * outbox.
- */
-export async function sendConversationMessage(
-  conversationName: string,
-  message: string,
-  agentId?: string,
-  deliverAs?: 'steer' | 'follow_up',
-  confirmation?: ComposerCommandConfirmation,
-): Promise<ComposerCommandResult | null> {
-  const endpoint = agentId
-    ? `/api/agents/${encodeURIComponent(agentId)}/message`
-    : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
-  const payload = {
-    message,
-    ...(deliverAs && !agentId ? { deliverAs } : {}),
-    ...(confirmation ? {
-      confirmationNonce: confirmation.nonce,
-      ...(confirmation.typedText !== undefined
-        ? { confirmationText: confirmation.typedText }
-        : {}),
-    } : {}),
-  };
-  let res: Response;
-  try {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  } catch (err) {
-    // Network-level failure (server unreachable, connection reset): no status,
-    // always retryable.
-    throw new MessageSendError(
-      `Failed to send message: ${err instanceof Error ? err.message : String(err)}`,
-      {},
-    );
-  }
-  const body = await res.text().catch(() => '');
-  let responseBody: unknown = null;
-  if (body) {
-    try {
-      responseBody = JSON.parse(body);
-    } catch {
-      responseBody = null;
-    }
-  }
-  if (isComposerCommandResult(responseBody)) return responseBody;
-  if (!res.ok) {
-    const error = responseBody && typeof responseBody === 'object' &&
-      'error' in responseBody && typeof responseBody.error === 'string'
-      ? responseBody.error
-      : body;
-    throw new MessageSendError(
-      `Failed to send message (${res.status})${error ? `: ${error}` : ''}`,
-      { status: res.status, reason: error || undefined },
-    );
-  }
-  return null;
-}
+export { isComposerCommandResult, MessageSendError, sendConversationMessage, sendFailureDetails } from './composerSend';
+export type { ComposerCommandConfirmation, SendFailureDetails } from './composerSend';
 
 // ─── Attachment API + upload pump (module-level, survives component unmount) ────
 
@@ -373,8 +233,10 @@ interface ComposerStore {
    *  but does NOT delete the server uploads — the sent message references them. */
   consumeAttachments(conversationName: string): void;
 
-  addOptimistic(conversationName: string, text: string, serverBaseCount: number): void;
-  acknowledgeOptimistic(conversationName: string, text: string): void;
+  addOptimistic(conversationName: string, text: string, serverBaseCount: number, identity?: SendIdentity): void;
+  acknowledgeOptimistic(conversationName: string, text: string, clientMessageId?: string): void;
+  reconcileEchoes(conversationName: string, messages: ChatMessage[]): void;
+  markDeliveryUnknown(conversationName: string, id: string): void;
   clearOptimistic(conversationName: string): void;
 
   /** A send POST failed: preserve it in the retry outbox with its original lane. */
@@ -405,6 +267,7 @@ interface ComposerStore {
     text: string,
     serverBaseCount: number,
     agentId?: string,
+    serverMessageIds?: string[],
   ): Promise<ComposerCommandResult | null>;
 }
 
@@ -513,7 +376,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     }));
   },
 
-  addOptimistic: (conversationName, text, serverBaseCount) =>
+  addOptimistic: (conversationName, text, serverBaseCount, identity) =>
     set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
         ...s,
@@ -524,25 +387,28 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
         optimistic: [
           ...s.optimistic,
           {
-            id: `optimistic-${Date.now()}-${s.optimistic.length}`,
+            id: `optimistic-${identity?.clientMessageId ?? crypto.randomUUID()}`,
+            ...identity,
+            echoBaselineIds: identity?.echoBaselineIds,
+            deliveryState: 'pending',
             role: 'user',
             text,
-            createdAt: new Date().toISOString(),
+            createdAt: identity?.createdAt ?? new Date().toISOString(),
           },
         ],
       })),
     })),
 
-  acknowledgeOptimistic: (conversationName, text) =>
+  acknowledgeOptimistic: (conversationName, text, clientMessageId) =>
     set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => {
         let acknowledged = false;
         return {
           ...s,
           optimistic: s.optimistic.map((message) => {
-            if (acknowledged || message.acknowledged || message.text !== text) return message;
+            if (acknowledged || message.acknowledged || (clientMessageId ? message.clientMessageId !== clientMessageId : message.text !== text)) return message;
             acknowledged = true;
-            return { ...message, acknowledged: true };
+            return { ...message, acknowledged: true, deliveryState: 'accepted' as const };
           }),
         };
       }),
@@ -555,24 +421,42 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       ),
     })),
 
+  reconcileEchoes: (conversationName, messages) => {
+    const slice = get().byConversation[conversationName];
+    if (!slice) return;
+    const next = reconcileComposerEchoes(slice, messages);
+    if (next === slice) return;
+    set((state) => ({ byConversation: mutateSlice(state.byConversation, conversationName, () => next) }));
+  },
+
+  markDeliveryUnknown: (conversationName, id) => set((state) => ({
+    byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+      ...s,
+      optimistic: s.optimistic.map((message) => message.id === id && !message.acknowledged
+        ? { ...message, deliveryState: 'unknown' } : message),
+    })),
+  })),
+
   failSend: (conversationName, text, kind = 'prompt', details) =>
     set((state) => ({
-      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
-        ...s,
-        optimistic: kind === 'prompt' ? [] : s.optimistic,
-        optimisticBaseCount: kind === 'prompt' ? 0 : s.optimisticBaseCount,
-        failed: [
-          ...s.failed,
-          {
-            id: `failed-${Date.now()}`,
-            text,
-            kind,
-            createdAt: new Date().toISOString(),
-            ...(details?.error !== undefined ? { error: details.error } : {}),
-            ...(details?.retryable !== undefined ? { retryable: details.retryable } : {}),
-          },
-        ],
-      })),
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => {
+        const pending = kind === 'prompt' ? s.optimistic.find((message) => details?.clientMessageId
+          ? message.clientMessageId === details.clientMessageId : message.text === text) : undefined;
+        // An echo may settle the send before the HTTP request finishes.
+        if (kind === 'prompt' && details?.clientMessageId && !pending) return s;
+        return {
+          ...s,
+          optimistic: s.optimistic.filter((message) => message !== pending),
+          failed: [...s.failed, {
+            ...pending,
+            id: `failed-${crypto.randomUUID()}`,
+            clientMessageId: details?.clientMessageId ?? pending?.clientMessageId ?? crypto.randomUUID(),
+            text, kind,
+            createdAt: pending?.createdAt ?? new Date().toISOString(),
+            ...details,
+          }],
+        };
+      }),
     })),
 
   removeFailed: (conversationName, id) =>
@@ -619,26 +503,29 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       })),
     })),
 
-  retryFailed: async (conversationName, failedId, text, serverBaseCount, agentId) => {
+  retryFailed: async (conversationName, failedId, text, serverBaseCount, agentId, serverMessageIds) => {
     const { addOptimistic, addCommandResult, removeFailed, failSend } = get();
     const failed = get().byConversation[conversationName]?.failed.find(
       candidate => candidate.id === failedId,
     );
-    const kind = failed?.kind ?? 'prompt';
+    if (!failed || failed.retryable === false || text !== failed.text) return null;
+    const kind = failed.kind;
+    const clientMessageId = failed.clientMessageId ?? crypto.randomUUID();
     if (kind === 'prompt') {
       // Preserve the ordinary prompt path byte-for-byte: move the text onto a
       // recoverable optimistic surface before clearing the outbox and POSTing.
-      addOptimistic(conversationName, text, serverBaseCount);
+      addOptimistic(conversationName, text, serverBaseCount, { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds, createdAt: failed.createdAt });
     }
     removeFailed(conversationName, failedId);
     try {
-      const result = await sendConversationMessage(conversationName, text, agentId);
+      const result = await sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined, { clientMessageId, retry: true });
+      if (kind === 'prompt') get().acknowledgeOptimistic(conversationName, text, clientMessageId);
       if (kind === 'command' && result && result.kind !== 'ui') {
         addCommandResult(conversationName, text, result);
       }
       return result;
     } catch (err) {
-      failSend(conversationName, text, kind, sendFailureDetails(err));
+      failSend(conversationName, text, kind, { ...sendFailureDetails(err), clientMessageId, deliverAs: failed.deliverAs });
       return null;
     }
   },

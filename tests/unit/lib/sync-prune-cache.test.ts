@@ -66,7 +66,7 @@ function readManifest(): {
   return JSON.parse(readFileSync(dirs.cacheManifest, 'utf-8'));
 }
 
-describe('refreshCacheSync stale cache pruning', () => {
+describe('refreshCache stale cache pruning', () => {
   beforeAll(() => {
     dirs.base = mkdtempSync(join(tmpdir(), 'overdeck-sync-prune-cache-'));
     dirs.claude = join(dirs.base, 'home', '.claude');
@@ -102,8 +102,8 @@ describe('refreshCacheSync stale cache pruning', () => {
       },
     });
 
-    const { refreshCacheSync } = await import('../../../src/lib/sync.js');
-    const result = refreshCacheSync();
+    const { refreshCache } = await import('../../../src/lib/sync.js');
+    const result = refreshCache();
 
     expect(result.pruned).toEqual(['skills/beads/SKILL.md', 'rules/beads.md']);
     expect(result.keptModified).toEqual([]);
@@ -128,8 +128,8 @@ describe('refreshCacheSync stale cache pruning', () => {
       },
     });
 
-    const { refreshCacheSync } = await import('../../../src/lib/sync.js');
-    const result = refreshCacheSync();
+    const { refreshCache } = await import('../../../src/lib/sync.js');
+    const result = refreshCache();
     const manifest = readManifest();
 
     expect(result.pruned).toEqual([]);
@@ -150,8 +150,8 @@ describe('refreshCacheSync stale cache pruning', () => {
     mkdirSync(join(dirs.syncSources, 'dev-skills', 'empty-dev-skill'), { recursive: true });
     dirs.devMode = true;
 
-    const { refreshCacheSync } = await import('../../../src/lib/sync.js');
-    const result = refreshCacheSync();
+    const { refreshCache } = await import('../../../src/lib/sync.js');
+    const result = refreshCache();
 
     expect(result.skills).toEqual({ copied: 0, total: 0 });
     expect(existsSync(join(dirs.skills, 'empty-skill'))).toBe(false);
@@ -167,9 +167,9 @@ describe('refreshCacheSync stale cache pruning', () => {
       },
     });
 
-    const { refreshCacheSync } = await import('../../../src/lib/sync.js');
-    const first = refreshCacheSync();
-    const second = refreshCacheSync();
+    const { refreshCache } = await import('../../../src/lib/sync.js');
+    const first = refreshCache();
+    const second = refreshCache();
 
     expect(first.pruned).toEqual(['rules/removed.md']);
     expect(second.pruned).toEqual([]);

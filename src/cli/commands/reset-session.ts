@@ -2,11 +2,11 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { existsSync } from 'fs';
-import { getAgentStateSync, getAgentDir, getLatestSessionIdSync } from '../../lib/agents.js';
+import { getAgentState, getAgentDir, getLatestSessionId } from '../../lib/agents.js';
 import { clearAgentSessionPointers } from '../../lib/agents/session-pointers.js';
-import { listAgentIdsByPrefixSync } from '../../lib/overdeck/agents.js';
+import { listAgentIdsByPrefix } from '../../lib/overdeck/agents.js';
 import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
-import { resolveIssueIdSync } from '../../lib/issue-id.js';
+import { resolveIssueId } from '../../lib/issue-id.js';
 
 export function registerResetSessionCommand(program: Command): void {
   program.command('reset-session <id>')
@@ -24,8 +24,8 @@ async function resetAgentSessions(agentIds: string[]): Promise<void> {
   }
 
   for (const agentId of targets) {
-    const state = getAgentStateSync(agentId);
-    const previousSessionId = getLatestSessionIdSync(agentId);
+    const state = getAgentState(agentId);
+    const previousSessionId = getLatestSessionId(agentId);
     const hasAgentDir = existsSync(getAgentDir(agentId));
     if (!state && !previousSessionId && !hasAgentDir) {
       console.log(chalk.yellow(`Agent ${agentId} has no saved session to reset.`));
@@ -53,9 +53,9 @@ export async function resetSessionCommand(id: string): Promise<void> {
   // id keeps targeting the work agent.
   const agentId = id.startsWith('agent-')
     ? id
-    : `agent-${resolveIssueIdSync(id).toLowerCase()}`;
+    : `agent-${resolveIssueId(id).toLowerCase()}`;
 
-  if (!getAgentStateSync(agentId) && !existsSync(getAgentDir(agentId))) {
+  if (!getAgentState(agentId) && !existsSync(getAgentDir(agentId))) {
     console.log(chalk.red(`Agent ${agentId} not found.`));
     return exitCli(1);
     return;
@@ -65,9 +65,9 @@ export async function resetSessionCommand(id: string): Promise<void> {
 }
 
 export async function resetReviewSessionsCommand(id: string): Promise<void> {
-  const issueId = resolveIssueIdSync(id);
+  const issueId = resolveIssueId(id);
   const prefix = `agent-${issueId.toLowerCase()}-review`;
-  const reviewAgentIds = listAgentIdsByPrefixSync(prefix);
+  const reviewAgentIds = listAgentIdsByPrefix(prefix);
 
   if (reviewAgentIds.length === 0) {
     console.log(chalk.yellow(`No saved review sessions found for ${issueId}.`));

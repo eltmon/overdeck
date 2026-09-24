@@ -6,9 +6,12 @@
  * Pure reducer functions are shared with the server read model via @overdeck/contracts.
  */
 
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import type {
   AgentSnapshot,
+  BackendPane,
+  DerivedIssueState,
   ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
@@ -19,7 +22,6 @@ import type {
   ResetMarker,
   ResourceStats,
   RestartGateSnapshot,
-  ReviewStatusSnapshot,
 } from '@overdeck/contracts'
 import {
   type ReadModelState,
@@ -301,10 +303,36 @@ export const selectAgentsByRole =
   (s: DashboardState): AgentSnapshot[] =>
     Object.values(s.agentsById).filter((a) => a.role === role)
 
-export const selectReviewStatus =
+export const selectDerivedIssueState =
   (issueId: string) =>
-  (s: DashboardState): ReviewStatusSnapshot | undefined =>
-    s.reviewStatusByIssueId[issueId]
+  (s: DashboardState): DerivedIssueState | undefined =>
+    s.derivedIssueStateByIssueId[issueId]
+
+/** React hook form of `selectDerivedIssueState` — the issue read model. */
+export function useDerivedIssueState(issueId: string | null | undefined): DerivedIssueState | undefined {
+  return useDashboardStore((s) => (issueId ? s.derivedIssueStateByIssueId[issueId] : undefined))
+}
+
+/** React hook form of `selectBackendPanes` — the issue's rows in the issue tree. */
+export function useBackendPanes(issueId: string | null | undefined): BackendPane[] {
+  const byId = useDashboardStore((s) => s.backendPanesById)
+  return useMemo(
+    () => (issueId
+      ? Object.values(byId).filter((pane) => pane.issue?.toUpperCase() === issueId.toUpperCase())
+      : EMPTY_PANES),
+    [byId, issueId],
+  )
+}
+
+const EMPTY_PANES: BackendPane[] = []
+
+/** Every backend pane whose `issue` metadata token names this issue. */
+export const selectBackendPanes =
+  (issueId: string) =>
+  (s: DashboardState): BackendPane[] =>
+    Object.values(s.backendPanesById).filter(
+      (pane) => pane.issue?.toUpperCase() === issueId.toUpperCase(),
+    )
 
 export const selectMemoryObservations =
   (issueId: string) =>
@@ -560,56 +588,39 @@ export const selectPendingInputSubjects = deriveMemo<
 )
 
 /**
- * Issues currently awaiting a human merge click — `readyForMerge: true`
- * and not already merged. Sorted oldest-ready first (FIFO) so issues
- * don't age in the queue.
+ * Issues the forge says are mergeable now — approved, checks green, `mergeable`
+ * true (FR-9). Sorted by issue id so the queue reads stably.
  */
-export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
-  'reviewStatusByIssueId',
-  (rsMap) =>
-    Object.values(rsMap)
-      .filter(
-        (rs): rs is ReviewStatusSnapshot =>
-          rs?.readyForMerge === true &&
-          rs.mergeStatus !== 'merged' &&
-          (rs.blockerReasons?.length ?? 0) === 0,
-      )
-      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'derivedIssueStateByIssueId', DerivedIssueState[]>(
+  'derivedIssueStateByIssueId',
+  (byId) =>
+    Object.values(byId)
+      .filter((issue) => issue.state === 'ready')
+      .sort((a, b) => a.issueId.localeCompare(b.issueId)),
 )
 
 /**
- * Issues blocked from merge by GitHub-native blockers.
- * Shows issues with blockerReasons that haven't been merged yet.
+ * Issues with an open PR the forge will not merge — red checks or a conflict.
  */
-export const selectBlockedFromMerge = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
-  'reviewStatusByIssueId',
-  (rsMap) =>
-    Object.values(rsMap)
-      .filter(
-        (rs): rs is ReviewStatusSnapshot =>
-          (rs?.blockerReasons?.length ?? 0) > 0 &&
-          rs.mergeStatus !== 'merged' &&
-          rs.reviewStatus === 'passed' &&
-          (rs.testStatus === 'passed' || rs.testStatus === 'skipped'),
-      )
-      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+export const selectBlockedFromMerge = memoizeArraySelector<DashboardState, 'derivedIssueStateByIssueId', DerivedIssueState[]>(
+  'derivedIssueStateByIssueId',
+  (byId) =>
+    Object.values(byId)
+      .filter((issue) => !!issue.pr && issue.state !== 'merged' && issue.state !== 'closed'
+        && (issue.pr.checks === 'red' || issue.pr.mergeable === false))
+      .sort((a, b) => a.issueId.localeCompare(b.issueId)),
 )
 
 /**
- * Open merge requests — PR/MR exists but not yet readyForMerge.
- * Shown on the Awaiting Merge page so the user can approve/review early.
+ * Open pull requests that are not yet ready to merge — shown on the Awaiting
+ * Merge page so the operator can review early.
  */
-export const selectOpenMergeRequests = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
-  'reviewStatusByIssueId',
-  (rsMap) =>
-    Object.values(rsMap)
-      .filter(
-        (rs): rs is ReviewStatusSnapshot =>
-          !!rs?.prUrl &&
-          rs.readyForMerge !== true &&
-          rs.mergeStatus !== 'merged',
-      )
-      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+export const selectOpenMergeRequests = memoizeArraySelector<DashboardState, 'derivedIssueStateByIssueId', DerivedIssueState[]>(
+  'derivedIssueStateByIssueId',
+  (byId) =>
+    Object.values(byId)
+      .filter((issue) => !!issue.pr && issue.state !== 'ready' && issue.state !== 'merged' && issue.state !== 'closed')
+      .sort((a, b) => a.issueId.localeCompare(b.issueId)),
 )
 
 const EMPTY_STRING_ARRAY: string[] = []

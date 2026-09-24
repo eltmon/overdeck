@@ -1,5 +1,5 @@
 import { provisionClaudeHooks } from '../claude-hooks-provision.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
+import { logAgentLifecycle } from '../persistent-logger.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
 /**
@@ -16,14 +16,14 @@ export async function ensureLifecycleHooksBeforeLaunch(
   const result = await provisionClaudeHooks();
   if (!result.ok) {
     const reason = result.reason ?? 'unknown provisioning failure';
-    logAgentLifecycleSync(agentId, `hook provisioning: failed harness=${harness} reason=${reason}`);
+    logAgentLifecycle(agentId, `hook provisioning: failed harness=${harness} reason=${reason}`);
     throw new Error(
       `Claude Code lifecycle hooks are unavailable: ${reason}. `
         + 'Run `pan up` to install host prerequisites, then `pan sync` and retry.',
     );
   }
 
-  logAgentLifecycleSync(
+  logAgentLifecycle(
     agentId,
     `hook provisioning: ready harness=${harness} changed=${result.changed} `
       + `binariesSynced=${result.binariesSynced} registered=${result.registered.length} pruned=${result.pruned.length}`,

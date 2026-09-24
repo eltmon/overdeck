@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -28,30 +27,6 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
   const actual = await vi.importActual<typeof import('../../src/lib/config-yaml.js')>('../../src/lib/config-yaml.js');
   return {
     ...actual,
-    loadConfig: vi.fn(() => ({
-      config: {
-        preset: 'balanced',
-        enabledProviders: new Set(['anthropic', 'openai']),
-        apiKeys: {
-          openai: 'sk-test-123',
-        },
-        overrides: {},
-        geminiThinkingLevel: 3,
-        tmux: {
-          configMode: 'managed',
-        },
-        ui: { openInEditorCommand: null, theme: 'broadsheet' },
-        conversations: {
-          compactionModel: 'claude-haiku-4-5',
-          manualCompactMode: 'claude-code',
-          richCompaction: false,
-        },
-        defaultConversationModel: 'claude-sonnet-4-6',
-        trackerKeys: {},
-        tts: makeTtsConfig(),
-      },
-      migration: null,
-    })),
     loadConfigSync: vi.fn(() => ({
       config: {
         preset: 'balanced',
@@ -113,7 +88,7 @@ const validTieredExecution = {
   supervisor: { model: 'claude-opus-4-8', harness: 'claude-code' as const, subscribe: 'flagged' as const },
   by_kind: {},
   feed: { callouts: 'off' as const, exclude: [], exclude_subjects: [], max_diff_bytes: null },
-  escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+  escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
   compaction_reroute: 'off' as const,
   replay_threshold: 0.5,
 };
@@ -217,7 +192,7 @@ describe('settings-api', () => {
             by_kind: {},
             byKind: {},
             feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
-            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
             compaction_reroute: 'off',
             replay_threshold: 0.5,
             difficultyToTier: {
@@ -461,11 +436,11 @@ describe('settings-api', () => {
       const models = getAvailableModelsApi();
 
       const openaiIds = models.openai.map(m => m.id);
-      expect(openaiIds).toContain('gpt-5.5');
-      expect(openaiIds).toContain('gpt-5.4');
-      expect(openaiIds).toContain('gpt-5.4-mini');
-      expect(openaiIds).toContain('gpt-5.3-codex');
-      expect(openaiIds).toContain('gpt-5.2');
+      expect(openaiIds).not.toContain('gpt-5.5');
+      expect(openaiIds).not.toContain('gpt-5.4');
+      expect(openaiIds).not.toContain('gpt-5.4-mini');
+      expect(openaiIds).not.toContain('gpt-5.3-codex');
+      expect(openaiIds).not.toContain('gpt-5.2');
     });
   });
 
@@ -561,7 +536,7 @@ describe('settings-api', () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, kimi-code, or empty string');
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or empty string');
     });
   });
 
@@ -586,7 +561,7 @@ describe('settings-api', () => {
         },
         api_keys: {},
       };
-      await Effect.runPromise(saveSettingsApi(settings));
+      await saveSettingsApi(settings);
       const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
       const yamlContent = callArgs[1] as string;
       expect(yamlContent).toContain('default_conversation_model: gpt-5.4');
@@ -616,7 +591,7 @@ describe('settings-api', () => {
         api_keys: {},
       };
 
-      await Effect.runPromise(saveSettingsApi(settings));
+      await saveSettingsApi(settings);
 
       const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
       const yamlContent = callArgs[1] as string;
@@ -674,7 +649,7 @@ describe('settings-api', () => {
       };
 
       // Should not throw
-      await Effect.runPromise(saveSettingsApi(settings));
+      await saveSettingsApi(settings);
 
       // Verify writeFile was called
       expect(writeFile).toHaveBeenCalled();
@@ -719,7 +694,7 @@ describe('settings-api', () => {
           max_concurrent_agents: 7,
         },
       };
-      await Effect.runPromise(saveSettingsApi(settings));
+      await saveSettingsApi(settings);
       const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
       const yamlContent = callArgs[1] as string;
       expect(yamlContent).toContain('remote:');
@@ -753,7 +728,7 @@ describe('settings-api', () => {
           features: { conversationTitles: true },
         },
       };
-      await Effect.runPromise(saveSettingsApi(settings));
+      await saveSettingsApi(settings);
       const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
       const yamlContent = callArgs[1] as string;
       expect(yamlContent).toContain('background_ai:');
@@ -788,7 +763,7 @@ models:
         tiered_execution: validTieredExecution,
       };
 
-      await Effect.runPromise(saveSettingsApi(settings));
+      await saveSettingsApi(settings);
 
       const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
       const yamlContent = String(callArgs[1]);
@@ -828,7 +803,7 @@ models:
         },
       };
 
-      await expect(Effect.runPromise(saveSettingsApi(settings))).rejects.toMatchObject({
+      await expect(saveSettingsApi(settings)).rejects.toMatchObject({
         message: "tiered_execution difficulty 'trivial' is not mapped to any tier",
       });
       expect(writeFile).not.toHaveBeenCalled();
@@ -928,7 +903,7 @@ describe('OpenRouter favorites', () => {
         migration: null,
       });
 
-      await Effect.runPromise(saveOpenRouterFavorites(['openai/gpt-4o', 'openai/o3']));
+      await saveOpenRouterFavorites(['openai/gpt-4o', 'openai/o3']);
 
       const { writeFile } = await import('fs/promises');
       expect(vi.mocked(writeFile)).toHaveBeenCalled();
@@ -943,7 +918,7 @@ describe('OpenRouter favorites', () => {
         migration: null,
       });
 
-      await Effect.runPromise(saveOpenRouterFavorites([]));
+      await saveOpenRouterFavorites([]);
 
       const { writeFile } = await import('fs/promises');
       const [, writtenContent] = vi.mocked(writeFile).mock.calls.at(-1)!;

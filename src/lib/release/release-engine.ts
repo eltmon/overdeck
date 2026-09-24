@@ -1,15 +1,14 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { getMergeSetSync } from '../merge-set.js';
-import { findProjectByPathSync, getProjectSync, type ReleaseComponentConfig } from '../projects.js';
-import { setReviewStatusSync } from '../review-status.js';
+import { getMergeSet } from '../merge-set.js';
+import { findProjectByPath, getProjectSync, type ReleaseComponentConfig } from '../projects.js';
 import {
   type ReleaseCheckStatus,
   type ReleaseComponentState,
   type ReleaseSet,
   type ReleaseSetStatus,
-  upsertReleaseSetSync,
-  withComponentStateSync,
+  upsertReleaseSet,
+  withComponentState,
 } from '../release-set.js';
 import { resolveReleasePlan, type ReleaseComponentPlanEntry } from './release-plan.js';
 
@@ -40,26 +39,19 @@ export async function runRelease(
   projectPath: string,
   options: ReleaseEngineOptions = {},
 ): Promise<ReleaseSet | null> {
-  const mergeSet = getMergeSetSync(issueId);
+  const mergeSet = getMergeSet(issueId);
   if (!mergeSet) {
     throw new Error(`Cannot run release for ${issueId}: merge set not found`);
   }
 
-  const project = getProjectSync(mergeSet.projectKey) ?? findProjectByPathSync(projectPath);
-  if (!project?.release) {
-    setReviewStatusSync(issueId, {
-      releaseStatus: 'skipped',
-      releaseNotes: 'No release config found for project.',
-    });
-    return null;
-  }
+  const project = getProjectSync(mergeSet.projectKey) ?? findProjectByPath(projectPath);
+  if (!project?.release) return null;
 
   const now = options.now ?? (() => new Date());
   options.commandCwd = options.commandCwd ?? projectPath;
   const plan = resolveReleasePlan(project.release);
   let releaseSet = buildReleaseSet(issueId, mergeSet, plan, now().toISOString());
-  upsertReleaseSetSync(releaseSet);
-  setReviewStatusSync(issueId, { releaseStatus: 'releasing' });
+  upsertReleaseSet(releaseSet);
 
   let failure: ComponentFailure | null = null;
   for (const entry of plan) {
@@ -109,12 +101,8 @@ export async function runRelease(
 
   if (failure) {
     releaseSet = haltRemainingComponents(releaseSet, failure.componentKey);
-    const releaseStatus = finalFailureStatus(releaseSet, failure.rollbackRan);
-    releaseSet = persistReleaseSetStatus(releaseSet, releaseStatus);
-    setReviewStatusSync(issueId, {
-      releaseStatus,
-      releaseNotes: `Release halted at ${failure.componentKey}.`,
-    });
+    const finalStatus = finalFailureStatus(releaseSet, failure.rollbackRan);
+    releaseSet = persistReleaseSetStatus(releaseSet, finalStatus);
     return releaseSet;
   }
 
@@ -122,23 +110,17 @@ export async function runRelease(
     (component) => component.status === 'blocked',
   );
   if (blockedComponents.length > 0) {
-    const blockedKeys = blockedComponents.map((component) => component.componentKey).join(', ');
     releaseSet = persistReleaseSetStatus(releaseSet, 'partial');
-    setReviewStatusSync(issueId, {
-      releaseStatus: 'partial',
-      releaseNotes: `Release awaiting manual step(s): ${blockedKeys}.`,
-    });
     return releaseSet;
   }
 
   releaseSet = persistReleaseSetStatus(releaseSet, 'passed');
-  setReviewStatusSync(issueId, { releaseStatus: 'passed' });
   return releaseSet;
 }
 
 function buildReleaseSet(
   issueId: string,
-  mergeSet: NonNullable<ReturnType<typeof getMergeSetSync>>,
+  mergeSet: NonNullable<ReturnType<typeof getMergeSet>>,
   plan: ReleaseComponentPlanEntry[],
   timestamp: string,
 ): ReleaseSet {
@@ -283,8 +265,8 @@ function persistComponentPatch(
   componentKey: string,
   patch: Partial<ReleaseComponentState>,
 ): ReleaseSet {
-  const updated = withComponentStateSync(releaseSet, componentKey, patch);
-  upsertReleaseSetSync(updated);
+  const updated = withComponentState(releaseSet, componentKey, patch);
+  upsertReleaseSet(updated);
   return updated;
 }
 
@@ -294,7 +276,7 @@ function persistReleaseSetStatus(releaseSet: ReleaseSet, status: ReleaseSetStatu
     status,
     updatedAt: new Date().toISOString(),
   };
-  upsertReleaseSetSync(updated);
+  upsertReleaseSet(updated);
   return updated;
 }
 
@@ -305,12 +287,12 @@ function haltRemainingComponents(releaseSet: ReleaseSet, failedComponentKey: str
   let updated = releaseSet;
   for (const component of releaseSet.components) {
     if (component.releaseOrder <= failed.releaseOrder || component.status !== 'pending') continue;
-    updated = withComponentStateSync(updated, component.componentKey, {
+    updated = withComponentState(updated, component.componentKey, {
       status: 'skipped',
       notes: 'Release halted before this component ran.',
     });
   }
-  upsertReleaseSetSync(updated);
+  upsertReleaseSet(updated);
   return updated;
 }
 

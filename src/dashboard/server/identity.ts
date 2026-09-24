@@ -4,6 +4,7 @@ import { relative, resolve, sep } from 'node:path';
 
 import { parse as parseToml } from '@iarna/toml';
 
+import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { CONFIG_FILE } from '../../lib/paths.js';
 import { getBuildInfo, type BuildInfo } from '../../lib/deploy/build-info.js';
 
@@ -18,7 +19,7 @@ export interface DashboardIdentity extends BuildInfo {
 export function getDashboardIdentity(): DashboardIdentity {
   return {
     repoRoot: resolve(cwd()),
-    mode: process.env.OVERDECK_DISABLE_DEACON === '1' ? 'peer' : 'primary',
+    mode: isPeerDashboardProcess() ? 'peer' : 'primary',
     pid: process.pid,
     ...getBuildInfo(),
   };

@@ -1,12 +1,12 @@
 # xBRIEF Plan Format & Lifecycle
 
-Overdeck uses [xBRIEF](https://github.com/deftai/xBRIEF) for machine-readable work plans. Canonical specs, continues, drafts, and issue records live on `overdeck-state`; workspaces keep only runtime state under `.overdeck/`.
+Overdeck uses [xBRIEF](https://github.com/deftai/xBRIEF) for machine-readable work plans. Canonical specs, continues, and drafts live under `.pan/` in the project repo (or the configured plan-home repo for polyrepo projects), committed on the feature branch; workspaces keep only runtime state under `.overdeck/`.
 
 ## Task state and concurrency
 
-The xBRIEF checklist is the task source of truth. Durable runtime state lives in the issue record's `tasks` block: each item can carry a claim owner, claim timestamp, and completion state, while `readWorkspacePlan()` overlays those states onto the checked-in plan.
+The xBRIEF checklist is the task source of truth. Completion state lives in `.pan/continues/<issue-lowercase>.xbrief.json`, plus the `Item: <item-id>` trailer on the commit that finished it — nothing is duplicated into a separate pipeline record.
 
-Agents use the smallest loop: `pan task next`, `pan task claim <item-id>`, implement and push the change, then `pan task done <item-id>`. Every mutation goes through the task write door, which holds the shared filesystem lock and applies a sequence check before updating the record. Two agents may race to claim an item; exactly one claim succeeds, and the loser rereads the plan and selects the next dispatchable item. Stale claims are surfaced by patrol rather than silently reassigned.
+Agents use the smallest loop: `pan task next`, `pan task claim <item-id>`, implement and push the change, then `pan task done <item-id>`. `pan task done` verifies the pushed commit carries the `Item:` trailer before recording completion in the continue file. Two agents may race to claim an item; exactly one claim succeeds, and the loser rereads the plan and selects the next dispatchable item.
 
 ## xBRIEF v0.8
 
@@ -30,22 +30,13 @@ The item status enum includes `failed` in addition to `draft`, `proposed`, `appr
 
 ## Migration from vBRIEF
 
-The v0.7 rename changed the public name and canonical write format. Overdeck keeps these legacy read surfaces permanently so old plans and in-flight workspaces continue to load:
+The v0.7 rename changed the public name and canonical write format. Overdeck keeps these legacy read surfaces permanently so old plans continue to load:
 
 - Documents with the legacy `vBRIEFInfo` envelope remain readable; current writers emit `xBRIEFInfo`.
 - Files ending in `*.vbrief.json` remain readable; current canonical spec and continue writers use `*.xbrief.json`.
-- `PAN_SPEC_FILENAME` remains the workspace-only `spec.vbrief.json` compatibility filename, readable under `.pan/` and `.overdeck/` during migration. It is not the canonical state filename.
-- The root `vbrief/{proposed,active,completed,cancelled}/` lifecycle directories remain read-only fallbacks. New writes target `specs/` on `overdeck-state`.
+- `PAN_SPEC_FILENAME` remains the workspace-only `spec.vbrief.json` compatibility filename, readable under `.pan/` and `.overdeck/`.
 
-Migrate each project's existing state files only after this code has merged, the release has been deployed, and the running dashboard uses that deployed build. The deployed readers must accept both extensions before any state filename changes.
-
-```bash
-pan admin state migrate-xbrief <project> --dry-run
-pan admin state migrate-xbrief <project>
-pan admin state migrate-xbrief <project> --dry-run
-```
-
-The first command prints every envelope rewrite and filename change without mutating state. The second rewrites legacy spec envelopes, renames spec and continue files, and creates one reversible commit on `overdeck-state` through the state write door. The final dry run must report `0 file(s) to migrate`. Run this sequence once per configured project; do not run it from a feature branch before deployment and do not edit the state worktree manually.
+Every project's plan artifacts (drafts, specs, continues, orders, notes, backlog sequence) were migrated once, for open issues, from the old `overdeck-state` worktree into `.pan/` in the project repo (closed-issue artifacts stayed on the archived branch, tagged `state-final`). That migration is done; there is no ongoing migration tooling.
 
 ---
 
@@ -53,33 +44,32 @@ The first command prints every envelope rewrite and filename change without muta
 
 ### Directory Structure
 
-#### Canonical state (`overdeck-state`)
+#### Canonical plan state (`.pan/`)
 
-On disk, each migrated project's state worktree is `${OVERDECK_HOME}/state/<project>/`:
+`.pan/` lives in the project repo (or the configured plan-home repo for polyrepo projects), committed on the feature branch by the agent that writes it:
 
 ```
-specs/
-  2026-05-01-PAN-950-feature-x.xbrief.json
-  2026-05-03-PAN-960-feature-y.xbrief.json
-continues/
-  pan-950.xbrief.json
-  pan-960.xbrief.json
-drafts/
-  pan-970.md
-records/
-  pan-950.json
-  pan-960.json
-migration-complete.json
+.pan/
+  specs/
+    2026-05-01-PAN-950-feature-x.xbrief.json
+    2026-05-03-PAN-960-feature-y.xbrief.json
+  continues/
+    pan-950.xbrief.json
+    pan-960.xbrief.json
+  drafts/
+    pan-970.md
+  orders/
+  notes/
+  backlog/sequence.md
 ```
 
-The canonical spec is immutable after planning except for lifecycle status changes and explicit re-planning through the write door. The issue record carries mutable task claims, completion overlays, pipeline verdicts, close-out data, and the owner lease.
+The canonical spec is immutable after planning except for lifecycle status changes and explicit re-planning. Task claims and completion state live in the matching `continues/<issue>.xbrief.json` file, keyed by commit trailers — never in a separate pipeline record.
 
 #### Workspace runtime state
 
 ```
 .overdeck/
-  continue.json             ← session state (statusOverrides live in the project-side per-issue record)
-  pending-promotion.json    ← finalized plan awaiting server-side promotion recovery
+  continue.json             ← session state (decisions, hazards, git state)
   sessions.jsonl            ← append-only session history
   feedback/
     001-review-changes-requested.md
@@ -87,23 +77,21 @@ The canonical spec is immutable after planning except for lifecycle status chang
   context.md                ← feature context for story agents
 ```
 
-Workspace runtime files are local and gitignored. Readers merge the canonical spec with `statusOverrides` from the project-side per-issue record (`continues/<issue-lowercase>.xbrief.json`) so agents and the dashboard see current item status without mutating the spec; legacy workspace-side overrides are backfilled one-way into that record.
-
-See [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) for the permanent, runtime, and liveness planes.
+Workspace runtime files are local and gitignored.
 
 ### PRD → Spec Lifecycle
 
 PRDs and xBRIEFs are distinct artifacts that flow through the same pipeline:
 
-1. **PRD drafted** — a human writes a markdown PRD to `drafts/` on `overdeck-state`, or a planning agent authors a workspace-local draft. `pan plan finalize` enforces the PRD's existence (PRD-first gate, PAN-2234) and complete-planning promotes a workspace-authored draft to `drafts/` on `overdeck-state` through the draft write door (`promoteWorkspacePrdDraft()`), never overwriting an existing canonical draft
-2. **Planning completes** — the planning agent converts the PRD into a machine-readable workspace xBRIEF, stamps it `status: "proposed"` with `plan.metadata.promotionIntent`, and normally calls `complete-planning` to promote it into `specs/` on `overdeck-state`. If the dashboard cannot complete promotion, `pan plan finalize` leaves `.overdeck/pending-promotion.json`; the Deacon retries through the same endpoint on its next eligible patrol and removes the marker after convergence. Explicit `--no-promote` stamps `promotionIntent: "manual"`, so markerless recovery preserves the operator approval gate. The manual fallback is `pan plan done <issue-id>`.
-3. **Work starts** — `pan start` performs one `transitionXBriefOnMain(..., "active", "running")` call that sets the spec's top-level `status` to `"active"` and `plan.status` to `"running"`, then commits and pushes that transition through the state write door before returning. Before first promotion, the fallback updates only the gitignored workspace draft. Work agents read the canonical spec via `findPlan()` and track item progress in the project-side record's `statusOverrides` (written via `writeStatusOverrideSync`)
-4. **Active plan repair** — if an item's declared scope and verification are mechanically incompatible, stop its running work session and return the issue to planning. Preserve stable item IDs, repair the ownership or verification in the planning draft, and re-finalize it. Planning quality-lints the replacement and `writeSpecDocument()` rewrites the same canonical filename through the state write door; matching status overrides continue to apply. Work, task, and inspection surfaces never edit the canonical document directly.
-5. **Work completes** — after merge, `status` is updated to `"completed"` on `overdeck-state`
+1. **PRD drafted** — a human writes a markdown PRD to `.pan/drafts/<issue>.md`, or a planning agent authors a workspace-local draft that gets promoted there. `pan plan finalize` enforces the PRD's existence (PRD-first gate, PAN-2234), never overwriting an existing canonical draft.
+2. **Planning completes** — the planning agent converts the PRD into a machine-readable workspace xBRIEF, stamps it `status: "proposed"`, and `complete-planning` promotes it into `.pan/specs/` on the feature branch. Explicit `--no-promote` leaves the spec at `status: "proposed"` for a human to promote later with `pan plan done <issue-id>`.
+3. **Work starts** — `pan start` sets the spec's top-level `status` to `"active"` and `plan.status` to `"running"`, then commits and pushes that transition on the feature branch before returning. Work agents read the canonical spec via `findPlan()` and track item progress in `.pan/continues/<issue>.xbrief.json`.
+4. **Active plan repair** — if an item's declared scope and verification are mechanically incompatible, stop its running work session and return the issue to planning. Preserve stable item IDs, repair the ownership or verification in the planning draft, and re-finalize it. Planning quality-lints the replacement and rewrites the same canonical filename; matching continue-file state continues to apply.
+5. **Work completes** — after merge, `status` is updated to `"completed"` in the spec.
 
 ### Status Transitions (field-based)
 
-Status is a JSON field inside the xBRIEF — files never move between directories. All transitions are commits on `overdeck-state` through the state write door.
+Status is a JSON field inside the xBRIEF — files never move between directories. All transitions are commits on the feature branch.
 
 ```
 draft ──► proposed ──► active ──► completed
@@ -113,11 +101,11 @@ draft ──► proposed ──► active ──► completed
 
 | Transition | Trigger | What happens |
 |-----------|---------|--------------|
-| (new) → draft | `pan plan` starts | PRD written to `drafts/` on `overdeck-state` |
-| draft → proposed | Planning completes | xBRIEF created in `specs/` on `overdeck-state` with `status: "proposed"` |
-| proposed → active | `pan start` | Status field updated to `"active"` on `overdeck-state`; agents read through `findPlan()` |
-| active → completed | PR merges | Status field updated to `"completed"` on `overdeck-state` |
-| active → cancelled | Issue closed | Status field updated to `"cancelled"` on `overdeck-state` |
+| (new) → draft | `pan plan` starts | PRD written to `.pan/drafts/` |
+| draft → proposed | Planning completes | xBRIEF created in `.pan/specs/` with `status: "proposed"` |
+| proposed → active | `pan start` | Status field updated to `"active"`; agents read through `findPlan()` |
+| active → completed | PR merges | Status field updated to `"completed"` |
+| active → cancelled | Issue closed | Status field updated to `"cancelled"` |
 
 ### Issue-Keyed Filenames
 
@@ -137,27 +125,25 @@ If `slugify()` receives an empty or all-special-character title, it returns `'pl
 
 ### Workspace Spec (PAN-1124: single-spec-on-main)
 
-There is no workspace-local copy of the spec during work execution. Work agents read the canonical spec directly from `specs/` on `overdeck-state` via `findPlan()`. Item/subItem status updates are tracked in the project-side per-issue record's `statusOverrides` flat map (`writeStatusOverrideSync` in `src/lib/pan-dir/record.ts`). `readWorkspacePlan()` returns a merged view (canonical spec + overlay) so callers see a complete document with up-to-date statuses. Planning may write a workspace draft; finalization validates that draft, replaces the canonical document through `writeSpecDocument()`, and leaves the draft non-canonical.
+There is no workspace-local copy of the spec during work execution. Work agents read the canonical spec directly from `.pan/specs/` via `findPlan()`. Item/subItem status updates are tracked in `.pan/continues/<issue>.xbrief.json`. `readWorkspacePlan()` returns a merged view (canonical spec + continue-file overlay) so callers see a complete document with up-to-date statuses. Planning may write a workspace draft; finalization validates that draft, replaces the canonical document, and leaves the draft non-canonical.
 
 ### Concurrency Model
 
 | Resource | Writer | Readers | Contention |
 |----------|--------|---------|------------|
-| `specs/<file>` on `overdeck-state` | Planning and lifecycle writers only | Dashboard, agents (via `findPlan()`) | None — structure is immutable during work; explicit re-planning may replace the document at the same canonical filename |
+| `.pan/specs/<file>` | Planning and lifecycle writers only | Dashboard, agents (via `findPlan()`) | None — structure is immutable during work; explicit re-planning may replace the document at the same canonical filename |
+| `.pan/continues/<issue>.xbrief.json` | `pan task claim`/`pan task done` | Dashboard, agents | Serialized per issue |
 | `.overdeck/continue.json` in a workspace | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
 | `.overdeck/sessions.jsonl` in a workspace | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
 | `.overdeck/feedback/*.md` in a workspace | Pipeline only | Agent (injected into prompt) | None — single writer |
-| Task state (issue record `tasks` block) | Each agent via `pan task` | Pipeline, dashboard | Serialized by the shared task-state lock |
 
-For N parallel agents on N different issues, each has its own feature branch and workspace. Task mutations use the shared task-state lock but update different issue records.
+For N parallel agents on N different issues, each has its own feature branch, workspace, and continue file.
 
 ---
 
-## Continue State — Structured Session History
+## Workspace Continue State
 
-The continue file is the machine-readable operational state for in-progress work. It lives on the feature branch at `.overdeck/continue.json`.
-
-### Schema
+The workspace continue file is local, gitignored operational context for in-progress work. It lives at `.overdeck/continue.json` and carries `decisions[]`, `hazards[]`, and `gitState` — context that isn't in the xBRIEF narrative but that the work agent, and review/test agents, need. It is not permanent state and is never committed; permanent completion state is `.pan/continues/<issue>.xbrief.json` plus commit trailers (see [Task state and concurrency](#task-state-and-concurrency)).
 
 ```json
 {
@@ -183,45 +169,9 @@ The continue file is the machine-readable operational state for in-progress work
       "summary": "Circular ESM imports between health-filtering and cloister/config",
       "mitigation": "Bundle with tsdown to resolve at build time"
     }
-  ],
-  "resumePoint": {
-    "description": "Implement the WebSocket reconnection logic in ws-rpc.ts",
-    "taskId": "ws-reconnect",
-    "filesToRead": ["src/dashboard/server/ws-rpc.ts"]
-  },
-  "tasksMapping": {
-    "ws-reconnect": ["task-42"],
-    "ws-reconnect.ac1": ["task-42"]
-  },
-  "agentModel": "claude-opus-4-6",
-  "sessionHistory": [
-    { "timestamp": "2026-04-28T12:00:00Z", "reason": "planning", "agentModel": "claude-opus-4-7" },
-    { "timestamp": "2026-04-28T14:00:00Z", "reason": "start", "agentModel": "claude-opus-4-6" },
-    { "timestamp": "2026-04-28T18:00:00Z", "reason": "end" },
-    { "timestamp": "2026-04-29T10:00:00Z", "reason": "resume", "agentModel": "claude-opus-4-6" }
   ]
 }
 ```
-
-### Session Reasons
-
-| Reason | When |
-|--------|------|
-| `planning` | Initial write during planning phase |
-| `start` | Agent session begins |
-| `end` | Agent signals done (`pan work done`) |
-| `resume` | Agent resumes after restart |
-| `crash-recovery` | Deacon recovers a stuck agent |
-| `feedback` | Specialist sends feedback |
-| `manual` | User manually updates |
-
-### Functions
-
-| Function | Module | Description |
-|----------|--------|-------------|
-| `writeContinueState()` | `continue-state.ts` | Atomic write via temp-file + rename |
-| `readContinueState()` | `continue-state.ts` | Read + validate, returns null if missing |
-| `appendSessionEntry()` | `continue-state.ts` | Append to sessionHistory, creates fresh state if missing |
 
 ---
 
@@ -242,13 +192,13 @@ Every xBRIEF has exactly two top-level keys per the xBRIEF spec:
     "title": "Dashboard skeleton loading states",
     "status": "approved",
     "uid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "author": "agent:claude-opus-4-6",
+    "author": "agent:example-model",
     "sequence": 3,
     "created": "2026-04-04T12:00:00Z",
     "updated": "2026-04-04T18:30:00Z",
     "references": [
       { "uri": "https://github.com/eltmon/overdeck/issues/436", "label": "PAN-436", "type": "issue" },
-      { "uri": "${OVERDECK_HOME}/state/<project>/drafts/PAN-436.md", "label": "PAN-436 PRD draft (drafts/PAN-436.md on overdeck-state)", "type": "prd" }
+      { "uri": ".pan/drafts/PAN-436.md", "label": "PAN-436 PRD draft", "type": "prd" }
     ],
     "tags": ["frontend", "ux"],
     "narratives": {
@@ -267,14 +217,15 @@ Every xBRIEF has exactly two top-level keys per the xBRIEF spec:
           "difficulty": "simple",
           "kind": "frontend",
           "issueLabel": "pan-436",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
           "files_scope": ["src/dashboard/frontend/src/components/BootstrapGate.tsx"],
           "files_scope_confidence": "high",
           "verify_commands": ["npm --prefix src/dashboard/frontend test"],
           "expected_outputs": ["BootstrapGate tests pass"],
           "readiness": "ready",
-          "traces": ["FR-1"]
+          "traces": ["FR-1"],
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
         },
         "narrative": {
           "Action": "Component that checks selectIsBootstrapped and renders fallback or children"
@@ -322,7 +273,7 @@ Every xBRIEF has exactly two top-level keys per the xBRIEF spec:
 | `plan.items` | YES | Array of work items |
 | `plan.edges` | NO | Dependency edges between items |
 | `plan.uid` | NO | UUID v4, generated once at creation — stable identifier for the plan |
-| `plan.author` | NO | Who created the plan, e.g. `"agent:claude-opus-4-6"` |
+| `plan.author` | NO | Who created the plan, e.g. `"agent:<model-slug>"` |
 | `plan.sequence` | NO | Monotonically incrementing write counter (starts at 1, auto-incremented by io.ts) |
 | `plan.references` | NO | External links — see [References](#references) |
 | `plan.created` | NO | ISO 8601 timestamp — when the plan was first created |
@@ -330,9 +281,6 @@ Every xBRIEF has exactly two top-level keys per the xBRIEF spec:
 | `plan.tags` | NO | Tags for categorization |
 | `plan.narratives` | NO | Problem/Proposal/NonGoals/Constraint/Risk narratives |
 | `plan.narratives.NonGoals` | NO | Explicitly out-of-scope behaviors, one per line prefixed `- `, or `"none"` if genuinely nothing. Review enforces these as must-not constraints. |
-| `plan.pipeline` | NO | Runtime-derived durable verdict block; lives in the per-issue permanent record, not the spec |
-| `plan.closeOut` | NO | Close-out aggregate; lives in the per-issue permanent record, not the spec |
-| `plan.owner` | NO | Owner-URI lease; lives in the per-issue permanent record, not the spec |
 
 #### `plan.status` Enum
 
@@ -397,15 +345,15 @@ The xBRIEF spec supports arbitrary `metadata` on items and child items. Overdeck
 | `metadata.difficulty` | items | `trivial`, `simple`, `medium`, `complex`, `expert` — used for model routing |
 | `metadata.kind` | items | Routing category: `docs`, `api`, `backend`, `frontend`, `infra`, `test`, `refactor`, `design`, or `spike` |
 | `metadata.issueLabel` | items | Issue ID for task filtering (e.g., `"pan-436"`) |
-| `metadata.requiresInspection` | items | Boolean decision for whether a task must pass the work.inspect gate before downstream work proceeds |
-| `metadata.inspectionDepth` | items | `"fast"` or `"deep"` review depth when `requiresInspection` is true |
-| `metadata.foundationFor` | items | Downstream task IDs that depend on this inspection-gated item |
 | `metadata.files_scope` | items | Concrete files or narrow globs the item may modify |
 | `metadata.files_scope_confidence` | items | `high`, `medium`, or `low` confidence in `files_scope` |
 | `metadata.verify_commands` | items | Commands that verify the committed item |
 | `metadata.expected_outputs` | items | Observable evidence expected from those commands |
 | `metadata.readiness` | items | Static parallel-safety classification: `ready` can run in its own slot once DAG blockers complete; `sequential` must remain serialized after prerequisites; `needs_refinement` must be split or clarified. Edges control dispatch order. |
 | `metadata.traces` | items | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) satisfied by this item |
+| `metadata.requiresInspection` | items | Boolean: does this item's risk warrant a standing tier-supervisor watching its commits (PAN-3917 dropped the blocking `pan inspect` CLI gate; this is now a subscription signal, not a completion blocker). Required on every item — `quality-lint.ts` rejects a plan missing it. |
+| `metadata.inspectionDepth` | items | `"fast"` or `"deep"` — how closely the supervisor should read commits when `requiresInspection` is true |
+| `metadata.foundationFor` | items | `string[]` of downstream item IDs that build on this one; required and non-empty when `requiresInspection` is true (`quality-lint.ts` flags `requiresInspection: true` with no `foundationFor` entries) |
 | `metadata.kind` | child items | `"acceptance_criterion"` — marks a child item as an AC for the verification gate |
 | `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |
 
@@ -415,7 +363,7 @@ These extensions are NOT part of the xBRIEF core spec. We've opened a feature re
 
 ## `pan scope` Commands
 
-Manual lifecycle transition overrides for xBRIEFs. All commands resolve the project from the issue ID and update the status field in `specs/` on `overdeck-state`.
+Manual lifecycle transition overrides for xBRIEFs. All commands resolve the project from the issue ID and update the status field in `.pan/specs/`.
 
 | Command | Effect |
 |---------|--------|
@@ -448,13 +396,13 @@ Manual lifecycle transition overrides for xBRIEFs. All commands resolve the proj
 
 ## How Overdeck Uses xBRIEF
 
-1. **PRD authored** — a human or planning agent writes a PRD to `drafts/` on `overdeck-state`.
+1. **PRD authored** — a human or planning agent writes a PRD to `.pan/drafts/`.
 2. **Planning agent** converts the PRD into an xBRIEF spec during the discovery session and finalizes it through the canonical state writer.
-3. **`complete-planning`** writes the xBRIEF to `specs/` on `overdeck-state` with an issue-keyed `.xbrief.json` filename and sets `plan.status` to `proposed`.
-4. **`pan start`** updates `plan.status` to `active` on `overdeck-state`. Work agents read the spec through `findPlan()`.
-5. **Work agent** works through tasks in DAG dependency order (`pan task next <issue>`). Item/subItem status updates are written through the task state door. `readWorkspacePlan()` returns a merged view with current statuses.
+3. **`complete-planning`** writes the xBRIEF to `.pan/specs/` with an issue-keyed `.xbrief.json` filename and sets `plan.status` to `proposed`.
+4. **`pan start`** updates `plan.status` to `active`. Work agents read the spec through `findPlan()`.
+5. **Work agent** works through tasks in DAG dependency order (`pan task next <issue>`). Item/subItem status updates are written to `.pan/continues/<issue>.xbrief.json`. `readWorkspacePlan()` returns a merged view with current statuses.
 6. **Verification gate** checks all child items with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
-7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `specs/` on `overdeck-state`.
+7. **Merge** updates `plan.status` to `completed` in the spec.
 8. **Dashboard** renders the plan via the Directive Flow (DAG visualization) and xBRIEF viewer (List/DAG/Raw JSON tabs).
 
 ### Dashboard viewer
@@ -469,34 +417,13 @@ The dashboard exposes the same xBRIEF through three entry points:
 
 ### Plan Resolution (PAN-1124: single-spec-on-main)
 
-`findPlan(workspacePath)` in `src/lib/xbrief/io.ts` resolves the canonical spec on `overdeck-state` first via `findSpecByIssue(projectRoot, issueId)`. It derives the issue ID from the workspace directory name (`feature-<id>`) and the project root (two levels up), then falls back to the workspace compatibility copy documented in [Migration from vBRIEF](#migration-from-vbrief).
+`findPlan(workspacePath)` in `src/lib/xbrief/io.ts` resolves the canonical spec in `.pan/specs/` first via `findSpecByIssue(projectRoot, issueId)`. It derives the issue ID from the workspace directory name (`feature-<id>`) and the project root (two levels up), then falls back to the workspace compatibility copy documented in [Migration from vBRIEF](#migration-from-vbrief).
 
-`readWorkspacePlan(workspacePath)` returns a merged view: canonical `overdeck-state` spec + `statusOverrides` from the project-side per-issue record (`readIssueRecord`). This is transparent to all callers.
+`readWorkspacePlan(workspacePath)` returns a merged view: canonical `.pan/specs/` spec + item status from `.pan/continues/<issue>.xbrief.json`. This is transparent to all callers.
 
 `findXBriefByIssue(projectRoot, issueId)` in `lifecycle-io.ts` remains the canonical read-only lifecycle lookup for cross-issue queries.
 
-Canonical continue files live at `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.xbrief.json`. Workspace-side continue state lives at `<workspace>/.overdeck/continue.json` and includes `statusOverrides` for item/subItem status tracking. See [Migration from vBRIEF](#migration-from-vbrief) for the permanent legacy read surfaces.
-
-### Per-issue permanent record (PAN-1908)
-
-In addition to the xBRIEF spec and continue file, every in-flight issue has a durable record at `records/<issue-lowercase>.json` on `overdeck-state` (on disk: `${OVERDECK_HOME}/state/<project>/records/<issue-lowercase>.json`). This record is committed through the state write door on durable transitions.
-
-It contains:
-
-| Field | Source | Writable by |
-|-------|--------|-------------|
-| `issueId` | issue id | read-only |
-| `schemaVersion` | record format version | read-only |
-| `decisions` | continue file | work agent / planning agent |
-| `hazards` | continue file | work agent / planning agent |
-| `feedback` | continue file | work agent / planning agent |
-| `pipeline` | durable `review_status` columns | review-status upsert path |
-| `closeOut` | cost events + merge set | close-out flow |
-| `owner` | URI lease | spawn/claim/close-out flow |
-
-The `pipeline` block carries the durable verdicts (`reviewStatus`, `testStatus`, `inspectStatus`, `mergeStatus`, `readyForMerge`, `prUrl`/`prNumber`/`prHeadSha`, `reviewedAtCommit`, `lastVerifiedCommit`, `autoMerge`, `deaconIgnored`, etc.). The `closeOut` block carries `usage.byStage[stage][provider/model] = {input, output, cacheRead, cacheWrite}`, `usage.totals`, `costAtCloseOut`, `merges[]` (URL strings), `ranOn`, and `closedAt`.
-
-The infra repo and subpath are declared per project in `projects.yaml` under `pan_records: { repo, path }`. See [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md).
+Canonical continue files live at `.pan/continues/<issue-lowercase>.xbrief.json` in the project repo (or the configured plan-home repo for polyrepo projects), resolved via `pan_records.repo` in `projects.yaml` when set, else the project root. Workspace-side continue state at `<workspace>/.overdeck/continue.json` is separate, local session context (decisions, hazards, git state) — see [Workspace Continue State](#workspace-continue-state).
 
 ---
 

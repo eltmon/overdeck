@@ -15,10 +15,6 @@ import {
   type PersistedAgentHealthState,
   type ResolvedPersistedAgentHealthState,
 } from '../../lib/agents/health.js';
-import {
-  classifyAdvancingSessionLifecycle,
-  readReviewStatusMap,
-} from '../../lib/cloister/review-status-source.js';
 import { capturePane, sessionExists } from '../../lib/tmux.js';
 
 /**
@@ -31,7 +27,7 @@ export const checkAgentHealth = (agentId: string) =>
       return { alive: false };
     }
 
-    const stdout = yield* capturePane(agentId, 5);
+    const stdout = yield* Effect.promise(() => capturePane(agentId, 5));
 
     return { alive: true, lastOutput: stdout.trim() };
   }).pipe(Effect.catch(() => Effect.succeed({ alive: false })));
@@ -67,22 +63,6 @@ function runtimeHealthState(
         contextSaturatedAt: runtime.contextSaturatedAt,
       };
   }
-}
-
-function reviewLifecycle(
-  state: PersistedAgentHealthState,
-  tmuxActive: boolean,
-): SpecialistLifecycle {
-  const role = state.role;
-  if (role !== 'review' && role !== 'test' && role !== 'ship') return 'unknown';
-  if (!state.issueId) return 'unknown';
-  const statuses = readReviewStatusMap();
-  if (!statuses) return 'unknown';
-  return classifyAdvancingSessionLifecycle(
-    role,
-    statuses[state.issueId.toUpperCase()],
-    tmuxActive,
-  );
 }
 
 async function resolvePersistedState(
@@ -134,9 +114,10 @@ export const determineHealthStatus = (
   Effect.gen(function* () {
     const persisted = yield* Effect.promise(() => resolvePersistedState(stateFile));
     const runtime = yield* getRuntimeSnapshot(agentId);
-    const lifecycle = persisted.status === 'available'
-      ? reviewLifecycle(persisted.value, liveSessions.has(agentId))
-      : 'unknown';
+    // PAN-3917: a specialist session has no warm-vs-orphaned distinction any
+    // more. The terminal backend says whether the pane is live; there is no
+    // status row to compare it against.
+    const lifecycle: SpecialistLifecycle = 'unknown';
     const snapshot = classifyAgentHealth({
       agentId,
       persisted,

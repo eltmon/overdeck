@@ -23,25 +23,18 @@
  * `listSessions()`.
  */
 
-import { Effect } from 'effect';
+
+import { getPrFacts, type PrFacts } from './pr-facts.js';
 
 import {
-  clearYieldForResumeSync,
+  clearYieldForResume,
   listAgentStates,
-  listRunningAgentsSync,
   resumeAgent,
-  setAgentYieldedSync,
-  stopAgent,
   type AgentState,
 } from '../agents.js';
-import { getReviewStatusSync } from '../review-status.js';
-import { listSessions } from '../tmux.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { logDeaconEventSync } from '../persistent-logger.js';
-import { loadCloisterConfigSync } from './config.js';
-import { isAgentIdleForNudge } from './agent-idle.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { logDeaconEvent } from '../persistent-logger.js';
 import { assessMemoryPressure } from './memory-governor.js';
-import { tryReserveAdvancingSlot } from './concurrency.js';
 
 /** RSS settle window after a resume before the next memory re-assessment (mirrors deacon-auto-resume). */
 const RSS_SETTLE_MS = 2000;
@@ -55,20 +48,20 @@ export interface YieldOutcome {
 }
 
 /**
- * A running work agent considered for yielding. Carries the precomputed
- * eligibility signals so `selectYieldVictim` is pure and unit-testable.
+ * A running work agent considered for yielding, with its precomputed
+ * eligibility signals.
  */
 export interface YieldCandidate {
   id: string;
   issueId: string;
-  /** `isAgentIdleForNudge` — only idle agents may be yielded (never preempt active work). */
+  /** `isIdle` — only idle agents may be yielded (never preempt active work). */
   idle: boolean;
   /** An operator is attached to the tmux session — never yield out from under a human. */
   attached: boolean;
   /** Already paused (operator pause or a prior yield) — not a fresh victim. */
   paused: boolean;
   /**
-   * The agent's own issue is blocked on the pipeline (reviewStatus pending or
+   * The agent's own issue is blocked on the pipeline (review pending or
    * reviewing) — it is waiting anyway, so prefer it as a victim (FR-2a).
    */
   reviewBlocked: boolean;
@@ -78,155 +71,10 @@ export interface YieldCandidate {
   lastYieldResumeMs: number | null;
 }
 
-/**
- * FR-2 predicate + ordering, pure. Returns the best victim or null.
- *
- * Excludes any agent that is not idle, is operator-attached, is already paused,
- * or is inside its post-resume re-yield cooldown. Among the eligible, prefers
- * (a) an agent blocked on its own review, then (b) the longest-idle
- * (`lastActivity` ascending).
- */
-export function selectYieldVictim(
-  candidates: readonly YieldCandidate[],
-  nowMs: number,
-  cooldownSecs: number,
-): YieldCandidate | null {
-  const cooldownMs = cooldownSecs * 1000;
-  const eligible = candidates.filter((c) => {
-    if (!c.idle) return false;
-    if (c.attached) return false;
-    if (c.paused) return false;
-    if (c.lastYieldResumeMs !== null && nowMs - c.lastYieldResumeMs < cooldownMs) return false;
-    return true;
-  });
-  if (eligible.length === 0) return null;
-
-  const ordered = [...eligible].sort((a, b) => {
-    // (a) prefer pipeline-blocked agents
-    if (a.reviewBlocked !== b.reviewBlocked) return a.reviewBlocked ? -1 : 1;
-    // (b) then longest-idle first (oldest lastActivity)
-    return (a.lastActivityMs ?? 0) - (b.lastActivityMs ?? 0);
-  });
-  return ordered[0];
-}
-
-function reviewBlockedFor(issueId: string): boolean {
-  const status = getReviewStatusSync(issueId)?.reviewStatus;
-  // PAN-2507 (FR-2a): the enum has no `in_progress`; the faithful "waiting on
-  // its own review" states are `pending` (queued) and `reviewing` (running).
-  return status === 'pending' || status === 'reviewing';
-}
-
 function parseMs(iso: string | undefined): number | null {
   if (!iso) return null;
   const ms = Date.parse(iso);
   return Number.isFinite(ms) ? ms : null;
-}
-
-async function buildCandidates(): Promise<YieldCandidate[]> {
-  const sessions = await Effect.runPromise(listSessions());
-  const attached = new Set(sessions.filter((s) => s.attached).map((s) => s.name));
-
-  return listRunningAgentsSync()
-    .filter((s) => s.role === 'work' && s.status === 'running')
-    .map((s) => ({
-      id: s.id,
-      issueId: s.issueId,
-      idle: isAgentIdleForNudge(s.id),
-      attached: attached.has(s.id),
-      paused: s.paused === true,
-      reviewBlocked: reviewBlockedFor(s.issueId),
-      lastActivityMs: parseMs(s.lastActivity),
-      lastYieldResumeMs: parseMs(s.lastYieldResumeAt),
-    }));
-}
-
-function countYielded(): number {
-  return listAgentStates().filter((s: AgentState) => s.yieldedByScheduler === true).length;
-}
-
-/**
- * FR-1 flow: try to yield an idle work agent to free capacity for an advancing
- * dispatch of `role` for `issueId`. Pauses the victim with scheduler attribution
- * and stops its session (async). The caller re-attempts its reservation after a
- * true outcome; on FR-6c (retry still fails) the caller is responsible for
- * resuming the victim immediately — see the wire-site pattern.
- *
- * No-op (returns `{ yielded: false }`) when preemption is disabled, the
- * `max_yielded` cap is reached, or no eligible victim exists.
- */
-export async function yieldWorkAgentFor(role: AdvancingRole, issueId: string): Promise<YieldOutcome> {
-  const concurrency = loadCloisterConfigSync().concurrency;
-  if (concurrency?.preemption !== true) return { yielded: false, reason: 'preemption disabled' };
-
-  const maxYielded = concurrency.max_yielded ?? 3;
-  const cooldownSecs = concurrency.yield_cooldown_secs ?? 600;
-
-  const alreadyYielded = countYielded();
-  if (alreadyYielded >= maxYielded) {
-    return { yielded: false, reason: `max_yielded reached (${alreadyYielded}/${maxYielded})` };
-  }
-
-  const nowMs = Date.now();
-  const candidates = await buildCandidates();
-  const victim = selectYieldVictim(candidates, nowMs, cooldownSecs);
-  if (!victim) return { yielded: false, reason: 'no eligible idle work agent to yield' };
-
-  const reason = `yield: making room for ${role} of ${issueId}`;
-  if (!setAgentYieldedSync(victim.id, reason)) {
-    return { yielded: false, reason: `victim ${victim.id} state vanished before yield` };
-  }
-  await Effect.runPromise(stopAgent(victim.id));
-
-  const idleMinutes = victim.lastActivityMs !== null ? Math.round((nowMs - victim.lastActivityMs) / 60000) : null;
-  const idleDesc = idleMinutes !== null ? ` (idle ${idleMinutes}m)` : '';
-  const message = `Yielded ${victim.id}${idleDesc} to run ${role} for ${issueId}`;
-  logDeaconEventSync(`[preemption] ${message}`);
-  emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId });
-
-  return { yielded: true, victimId: victim.id, reason: message };
-}
-
-/**
- * Dispatch-site entry point: a blocked advancing dispatch of `role` for
- * `issueId` tries to yield an idle work agent and re-confirm capacity. Returns
- * true iff, after the yield, `tryReserveAdvancingSlot()` succeeds — i.e. a slot
- * is now reserved for the caller to dispatch. On failure it resumes the victim
- * immediately (FR-6c) and returns false, so the caller defers exactly as before.
- *
- * Two capacity paths after a yield:
- *  - count-gated: `stopAgent` already awaited `killSession`, so the freed slot
- *    is visible to `countRunningAgents()` on the immediate retry;
- *  - memory-gated: let the freed RSS settle, refresh the cached memory verdict
- *    (`assessMemoryPressure` publishes it), then retry once.
- */
-export async function tryYieldForAdvancingDispatch(role: AdvancingRole, issueId: string): Promise<boolean> {
-  const outcome = await yieldWorkAgentFor(role, issueId);
-  if (!outcome.yielded) return false;
-
-  // Count-gated: the killed session already dropped the running count.
-  if (tryReserveAdvancingSlot()) return true;
-
-  // Memory-gated: settle freed RSS, refresh the cached verdict, retry once.
-  await new Promise((r) => setTimeout(r, RSS_SETTLE_MS));
-  await assessMemoryPressure();
-  if (tryReserveAdvancingSlot()) return true;
-
-  // FR-6c: the yield freed no usable capacity — put the victim back immediately.
-  if (outcome.victimId) await resumeYieldedVictim(outcome.victimId);
-  return false;
-}
-
-/**
- * Immediately resume a victim after a failed reservation retry (FR-6c): the
- * yield freed capacity but the advancing dispatch still could not reserve it, so
- * put the work agent back rather than leaving it stranded.
- */
-export async function resumeYieldedVictim(agentId: string): Promise<void> {
-  clearYieldForResumeSync(agentId);
-  const result = await resumeAgent(agentId);
-  const suffix = result.success ? 'resumed' : `resume failed: ${result.error ?? 'unknown'}`;
-  logDeaconEventSync(`[preemption] Yield retry still blocked — ${agentId} ${suffix}`);
 }
 
 /**
@@ -252,8 +100,9 @@ export async function resumeYieldedAgents(maxToResume: number): Promise<string[]
 
     const memVerdict = await assessMemoryPressure();
     if (memVerdict.band !== 'ok') {
-      logDeaconEventSync(
-        `[preemption] resumeYieldedAgents: memory gate (${memVerdict.band}); deferring remaining yielded agents`,
+      logDeaconEvent(
+        `[preemption] resumeYieldedAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}`
+        + `${memVerdict.loadPerCore == null ? '' : `, load/core=${memVerdict.loadPerCore.toFixed(2)}`}; deferring remaining yielded agents`,
       );
       break;
     }
@@ -263,18 +112,48 @@ export async function resumeYieldedAgents(maxToResume: number): Promise<string[]
       await new Promise((r) => setTimeout(r, RSS_SETTLE_MS));
     }
 
-    clearYieldForResumeSync(agent.id);
+    clearYieldForResume(agent.id);
     const result = await resumeAgent(agent.id);
     if (result.success) {
       resumed.push(agent.id);
       const message = `Resumed yielded ${agent.id} for ${agent.issueId} — capacity returned`;
-      logDeaconEventSync(`[preemption] ${message}`);
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: agent.issueId });
+      logDeaconEvent(`[preemption] ${message}`);
+      emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: agent.issueId });
     } else {
       // The pause is already cleared, so the normal auto-resume path will retry
       // this agent on a later patrol like any other stopped work agent.
-      logDeaconEventSync(`[preemption] resumeYieldedAgents: resume failed for ${agent.id}: ${result.error ?? 'unknown'}`);
+      logDeaconEvent(`[preemption] resumeYieldedAgents: resume failed for ${agent.id}: ${result.error ?? 'unknown'}`);
     }
   }
   return resumed;
+}
+
+/**
+ * Is this idle agent waiting on the pipeline rather than stalled? (PAN-2581,
+ * re-pointed by PAN-3917.)
+ *
+ * The health check's poke loop must never ask "are you stuck?" of an agent
+ * that is legitimately waiting: a work agent that has opened its PR and is
+ * waiting on review, or a review/test agent between phases. A poke there spends
+ * tokens re-explaining the wait, and the idle-alive pause that follows it
+ * manufactures the paused-delivery-target deadlock PAN-2461 exists to undo.
+ *
+ * This used to read the issue's review row — `reviewing`, `passed`, or
+ * `pending` with a `reviewRequestedAt` stamp, plus the owed-rework states. The
+ * pull request says the same thing without a row: a work/review/test agent
+ * whose issue has a PR at all is inside the pipeline, and the pipeline, not a
+ * poke, is what moves it. Roles outside work/review/test keep their ordinary
+ * idleness semantics.
+ */
+export async function shouldSkipIdlePokeForAgent(
+  agent: Pick<AgentState, 'id' | 'issueId' | 'role'> | null,
+  readFacts: (issueId: string) => Promise<PrFacts> = getPrFacts,
+): Promise<boolean> {
+  if (!agent) return false;
+  if (agent.role !== 'work' && agent.role !== 'review' && agent.role !== 'test') return false;
+  const issueId = (agent.issueId
+    || agent.id.replace(/^agent-/, '').replace(/-(review|test|ship)(-.*)?$/, '').replace(/-slot-\d+$/, '')
+  ).toUpperCase();
+  const facts = await readFacts(issueId).catch(() => null);
+  return facts?.exists === true && !facts.merged;
 }

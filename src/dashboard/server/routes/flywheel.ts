@@ -1,530 +1,176 @@
-import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { Effect, Layer, Option, Schema } from 'effect';
-import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
+/**
+ * `/api/flywheel/*` (PAN-3964 FR-7) — the Flywheel page's HTTP surface.
+ *
+ * Every GET is a derived read: the status comes from `deriveFlywheelStatus()`
+ * (the same function `pan flywheel status` prints), the state and report are
+ * the loop's own `.pan/flywheel/*.md` files, and the stats are computed from
+ * the tracker and the forge. Every POST is a thin wrapper over the same
+ * `src/lib/flywheel/actions.ts` functions the CLI verbs call. There is no
+ * `POST /api/flywheel/status`: the loop reports through its transcript's tick
+ * markers, not through an endpoint (D3).
+ */
+
+import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+
+import {
+  abortFlywheel,
+  pauseFlywheel,
+  requestFlywheelReport,
+  resumeFlywheel,
+  startFlywheel,
+  stopFlywheel,
+  type FlywheelStartOptions,
+} from '../../../lib/flywheel/actions.js';
+import { deriveFlywheelStatus, readFlywheelRun, resolveFlywheelProjectRoot } from '../../../lib/flywheel/derive-status.js';
+import {
+  FlywheelAlreadyRunning,
+  FlywheelNotRunning,
+  FlywheelOrphanSession,
+  FlywheelPausedExists,
+} from '../../../lib/flywheel/errors.js';
+import { readFlywheelReportFile, readFlywheelStateFile } from '../../../lib/flywheel/files.js';
+import { computeSubstrateStats } from '../../../lib/flywheel/substrate-stats.js';
 import { jsonResponse } from '../http-helpers.js';
-import { FlywheelRunId, FlywheelStats, FlywheelStatus, type FlywheelStats as FlywheelStatsPayload } from '@overdeck/contracts';
-import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { hasDashboardInternalToken, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
-import { getSubstrateBugWeightsRoute } from './flywheel-substrate-bug-weights.js';
 import { validateOrigin } from './origin-validation.js';
-import {
-  getFlywheelRunDetail,
-  isFlywheelRunId,
-  listFlywheelRuns,
-  resolveLiveFlywheelRunId,
-  writeLatestFlywheelStatus,
-  type FlywheelRunListOptions,
-  type FlywheelRunStateOptions,
-} from '../services/flywheel-run-state.js';
-import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { sessionExists } from '../../../lib/tmux.js';
-import { runDashboardDbJob } from '../services/dashboard-db-task.js';
-import {
-  abortFlywheelRunForDashboard,
-  openFlywheelRunReportForDashboard,
-  pauseFlywheelRunForDashboard,
-  readCurrentFlywheelStatusForDashboard,
-  resumeFlywheelRunForDashboard,
-  startFlywheelRunForDashboard,
-} from '../services/flywheel-actions.js';
-import { readFlywheelState } from '../services/flywheel-state.js';
-import { computeFlywheelStats, parseFlywheelStatsWindow } from '../services/flywheel-telemetry.js';
-import { derivePipelineRunStatsInputs } from '../services/pipeline-run-metrics.js';
-import {
-  isFlywheelAutoPickupBacklog,
-  isFlywheelGloballyPaused,
-  isFlywheelRequireUatBeforeMerge,
-  setFlywheelAutoPickupBacklog,
-  setFlywheelRequireUatBeforeMerge,
-  isMergeTrainEnabled,
-  setMergeTrainEnabled,
-} from '../../../lib/overdeck/control-settings.js';
-import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
-import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
-import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
-import { parseArtifactRef } from '../../../lib/forge.js';
-import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
-import { getMergeBlockersPayload } from '../../../lib/cloister/merge-blockers.js';
-import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
-import {
-  cancelPending,
-  countActionableAutoMerges,
-  getActionableAutoMerge,
-  listActiveAutoMerges,
-  listProblemAutoMerges,
-  scheduleAutoMergeWithResult,
-  type PendingAutoMerge,
-  type ScheduleAutoMergeInput,
-  type ScheduleAutoMergeResult,
-} from '../../../lib/overdeck/merge-sync.js';
-import { getMergeBackendRoute } from './flywheel-merge-backend.js';
-const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
-const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
-const AUTO_MERGE_POLL_LIMIT = 100;
 
-interface BriefRequestBody {
-  content?: unknown;
-  path?: unknown;
-}
-
-interface StartRequestBody {
-  brief?: unknown;
-}
-
-interface FlywheelConfigRequestBody {
-  auto_pickup_backlog?: unknown;
-  require_uat_before_merge?: unknown;
-  merge_train_enabled?: unknown;
-}
-
-interface FlywheelConfigResponseBody {
-  auto_pickup_backlog: boolean;
-  require_uat_before_merge: boolean;
-  merge_train_enabled: boolean;
-}
-
-interface AutoMergeScheduleRequestBody {
-  issueId?: unknown;
-}
-
-interface ReportOpenRequestBody {
-  runId?: unknown;
-}
-
-interface FlywheelStatusResponse {
+export interface RouteResult {
   status: number;
-  body: { ok: true; runId: string } | { error: string; details: string[] };
+  body: unknown;
 }
-
-interface FlywheelStatsResponse {
-  status: number;
-  body: FlywheelStatsPayload | { error: string; details?: string[] };
-}
-
-const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
-const decodeFlywheelStats = Schema.decodeUnknownSync(FlywheelStats);
-const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunId);
 
 function requireTrustedOrigin(request: HttpServerRequest.HttpServerRequest) {
   if (hasDashboardInternalToken(request)) return null;
   const originCheck = validateOrigin(request);
-  return originCheck.ok ? null : jsonResponse({ error: originCheck.error }, { status: 403 });
-}
-
-function isInsideRoot(projectRoot: string, candidate: string): boolean {
-  const relativePath = relative(projectRoot, candidate);
-  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
-}
-
-function parseRunIdParam(runId: string): { ok: true; runId: string } | { ok: false; error: string } {
-  try {
-    return { ok: true, runId: decodeFlywheelRunId(runId) };
-  } catch {
-    return { ok: false, error: 'Flywheel run id must match RUN-<number>' };
-  }
-}
-
-function parseRunsLimit(value: string | null): number | undefined {
-  if (value === null) return undefined;
-  const limit = Number(value);
-  return Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : undefined;
-}
-
-export function resolveFlywheelBriefPath(projectRoot: string): { ok: true; path: string } | { ok: false; error: string } {
-  const root = resolve(projectRoot);
-  const resolvedPath = resolve(root, DEFAULT_BRIEF_PATH);
-  const normalizedRoot = root.endsWith(sep) ? root : `${root}${sep}`;
-  const displayPath = relative(root, resolvedPath);
-  return { ok: true, path: resolvedPath.startsWith(normalizedRoot) ? displayPath : resolvedPath };
-}
-
-function resolveBriefAbsolutePath(projectRoot: string): { ok: true; absolutePath: string; displayPath: string } | { ok: false; error: string } {
-  const resolved = resolveFlywheelBriefPath(projectRoot);
-  if (!resolved.ok) return resolved;
-  return {
-    ok: true,
-    absolutePath: resolve(projectRoot, resolved.path),
-    displayPath: resolved.path,
-  };
-}
-
-async function assertExistingPathInsideRoot(projectRoot: string, candidate: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const [realRoot, realCandidate] = await Promise.all([realpath(projectRoot), realpath(candidate)]);
-  return isInsideRoot(realRoot, realCandidate)
-    ? { ok: true }
-    : { ok: false, error: 'Brief path must stay inside the project root' };
-}
-
-async function assertWritePathInsideRoot(projectRoot: string, candidate: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const realRoot = await realpath(projectRoot);
-  const realParent = await realpath(dirname(candidate));
-  if (!isInsideRoot(realRoot, realParent)) return { ok: false, error: 'Brief path must stay inside the project root' };
-
-  try {
-    const info = await lstat(candidate);
-    if (info.isSymbolicLink()) {
-      const realCandidate = await realpath(candidate);
-      if (!isInsideRoot(realRoot, realCandidate)) return { ok: false, error: 'Brief path must stay inside the project root' };
-    }
-  } catch (error) {
-    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-    if (code !== 'ENOENT') throw error;
-  }
-
-  return { ok: true };
+  if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+  return rejectUnsafeDashboardMutationRequest(request);
 }
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
   try {
-    return { ok: true as const, body: text ? (JSON.parse(text) as BriefRequestBody) : {} };
+    const parsed = text ? (JSON.parse(text) as unknown) : {};
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? { ok: true as const, body: parsed as Record<string, unknown> }
+      : { ok: false as const, error: 'Request body must be a JSON object' };
   } catch {
     return { ok: false as const, error: 'Request body must be valid JSON' };
   }
 });
 
-const readUnknownJsonBody = Effect.gen(function* () {
-  const request = yield* HttpServerRequest.HttpServerRequest;
-  const text = yield* request.text;
-  try {
-    return { ok: true as const, body: text ? (JSON.parse(text) as unknown) : {} };
-  } catch {
-    return { ok: false as const, error: 'Request body must be valid JSON' };
+/** Typed flywheel errors → 409/404; anything else → 500 with its message. */
+export function flywheelErrorResult(error: unknown): RouteResult {
+  if (error instanceof FlywheelAlreadyRunning || error instanceof FlywheelPausedExists || error instanceof FlywheelOrphanSession) {
+    return { status: 409, body: { error: error.message, code: error._tag } };
   }
-});
+  if (error instanceof FlywheelNotRunning) return { status: 404, body: { error: error.message, code: error._tag } };
+  const message = error instanceof Error ? error.message : String(error);
+  console.error('[flywheel] action failed:', message);
+  return { status: 500, body: { error: message || 'Internal server error' } };
+}
 
-export async function postFlywheelStatusPayload(payload: unknown, options: FlywheelRunStateOptions = {}): Promise<FlywheelStatusResponse> {
+async function guarded(action: () => Promise<unknown>): Promise<RouteResult> {
   try {
-    const status = decodeFlywheelStatus(payload);
-    await writeLatestFlywheelStatus(status, options);
-    return { status: 200, body: { ok: true, runId: status.runId } };
+    return { status: 200, body: (await action()) ?? { success: true } };
   } catch (error) {
-    return {
-      status: 400,
-      body: {
-        error: 'Invalid FlywheelStatus payload',
-        details: [error instanceof Error ? error.message : String(error)],
-      },
-    };
+    return flywheelErrorResult(error);
   }
 }
 
-export async function getFlywheelRunsPayload(options: FlywheelRunListOptions = {}) {
-  return listFlywheelRuns(options);
+// ─── payloads (exported for tests) ───────────────────────────────────────────
+
+export function getFlywheelStatusPayload(): Promise<RouteResult> {
+  return guarded(() => deriveFlywheelStatus());
 }
 
-export async function getFlywheelRunPayload(runId: string, options: FlywheelRunStateOptions = {}) {
-  if (!isFlywheelRunId(runId)) return null;
-  return getFlywheelRunDetail(runId, options);
+export function getFlywheelStatePayload(): Promise<RouteResult> {
+  return guarded(async () => readFlywheelStateFile((await resolveFlywheelProjectRoot()).planHome));
 }
 
-export function getFlywheelConfigPayload(): FlywheelConfigResponseBody {
-  return {
-    auto_pickup_backlog: isFlywheelAutoPickupBacklog(),
-    require_uat_before_merge: isFlywheelRequireUatBeforeMerge(),
-    merge_train_enabled: isMergeTrainEnabled(),
-  };
+export function getFlywheelReportPayload(): Promise<RouteResult> {
+  return guarded(async () => readFlywheelReportFile((await resolveFlywheelProjectRoot()).planHome));
 }
 
-export async function postFlywheelConfigPayload(payload: unknown) {
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-    return { status: 400, body: { error: 'Request body must be a JSON object' } };
+export async function getFlywheelStatsPayload(windowParam: string | null): Promise<RouteResult> {
+  const windowDays = windowParam === null || windowParam === '' ? undefined : Number(windowParam);
+  if (windowDays !== undefined && (!Number.isInteger(windowDays) || windowDays <= 0 || windowDays > 365)) {
+    return { status: 400, body: { error: 'window must be a whole number of days between 1 and 365' } };
   }
-
-  const body = payload as FlywheelConfigRequestBody;
-  if (body.auto_pickup_backlog !== undefined && typeof body.auto_pickup_backlog !== 'boolean') {
-    return { status: 400, body: { error: 'auto_pickup_backlog must be a boolean' } };
-  }
-  if (body.require_uat_before_merge !== undefined && typeof body.require_uat_before_merge !== 'boolean') {
-    return { status: 400, body: { error: 'require_uat_before_merge must be a boolean' } };
-  }
-  if (body.merge_train_enabled !== undefined && typeof body.merge_train_enabled !== 'boolean') {
-    return { status: 400, body: { error: 'merge_train_enabled must be a boolean' } };
-  }
-
-  if (body.auto_pickup_backlog !== undefined) setFlywheelAutoPickupBacklog(body.auto_pickup_backlog);
-  if (body.require_uat_before_merge !== undefined) setFlywheelRequireUatBeforeMerge(body.require_uat_before_merge);
-  if (body.merge_train_enabled !== undefined) setMergeTrainEnabled(body.merge_train_enabled);
-
-  return { status: 200, body: getFlywheelConfigPayload() };
+  return guarded(async () => computeSubstrateStats({
+    projectPath: (await resolveFlywheelProjectRoot()).projectRoot,
+    ...(windowDays !== undefined ? { windowDays } : {}),
+  }));
 }
 
-interface AutoMergeScheduleDeps {
-  now?: () => Date;
-  isRequireUatBeforeMerge?: () => boolean;
-  isFlywheelPaused?: () => boolean;
-  resolveLiveRunId?: () => Promise<string | null>;
-  isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
-  getReviewStatus?: (issueId: string) => ReviewStatus | null;
-  resolveProject?: (issueId: string) => ResolvedProject | null;
-  schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
-  announce?: (issueId: string, entry: PendingAutoMerge) => void;
-  getProjectAutoMergeDefault?: (issueId: string) => ProjectAutoMergeDefault;
+export function parseStartBody(body: Record<string, unknown>): { ok: true; options: FlywheelStartOptions } | { ok: false; error: string } {
+  const options: FlywheelStartOptions = {};
+  for (const key of ['model', 'harness', 'orders'] as const) {
+    const value = body[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'string' || !value.trim()) return { ok: false, error: `${key} must be a non-empty string` };
+    options[key] = value.trim();
+  }
+  if (body['fresh'] !== undefined) {
+    if (typeof body['fresh'] !== 'boolean') return { ok: false, error: 'fresh must be a boolean' };
+    options.fresh = body['fresh'];
+  }
+  return { ok: true, options };
 }
 
-interface AutoMergeCancelDeps {
-  now?: () => Date;
-  getPending?: (issueId: string) => PendingAutoMerge | null;
-  cancel?: (id: number, cancelledBy: string) => boolean;
-  countRemaining?: (issueId: string) => number;
-  announce?: (issueId: string) => void;
+export async function postFlywheelStartPayload(body: Record<string, unknown>): Promise<RouteResult> {
+  const parsed = parseStartBody(body);
+  if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
+  return guarded(() => startFlywheel(parsed.options));
 }
 
-function announceAutoMergeScheduled(issueId: string, entry: PendingAutoMerge): void {
-  emitActivityTtsSync({
-    utterance: `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
-    priority: 1,
-    issueId,
-    source: 'dashboard',
-    eventType: 'auto-merge-scheduled',
+/**
+ * Graceful stop waits up to two minutes for the loop's report. The route
+ * checks the flywheel is running, starts the stop, and answers 202; the page
+ * sees the run flip to `paused` on its next status poll.
+ */
+export async function postFlywheelStopPayload(body: Record<string, unknown>): Promise<RouteResult> {
+  const timeoutMs = body['timeoutMs'];
+  if (timeoutMs !== undefined && (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs < 0)) {
+    return { status: 400, body: { error: 'timeoutMs must be a non-negative number' } };
+  }
+  const { run } = await readFlywheelRun();
+  if (run !== 'running') return flywheelErrorResult(new FlywheelNotRunning());
+  void stopFlywheel(typeof timeoutMs === 'number' ? { timeoutMs } : {}).catch((error: unknown) => {
+    console.error('[flywheel] stop failed:', error instanceof Error ? error.message : String(error));
   });
+  return { status: 202, body: { stopping: true } };
 }
 
-function announceAutoMergeCancelled(issueId: string): void {
-  emitActivityTtsSync({
-    utterance: `auto-merge cancelled for ${issueId}`,
-    priority: 1,
-    issueId,
-    source: 'dashboard',
-    eventType: 'auto-merge-cancelled',
-  });
+// ─── routes ──────────────────────────────────────────────────────────────────
+
+function respond(result: RouteResult) {
+  return jsonResponse(result.body, { status: result.status });
 }
 
-export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoMergeScheduleDeps = {}) {
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-    return { status: 400, body: { error: 'Request body must be a JSON object' } };
-  }
-
-  const body = payload as AutoMergeScheduleRequestBody;
-  if (typeof body.issueId !== 'string' || body.issueId.trim().length === 0) {
-    return { status: 400, body: { error: 'issueId must be a non-empty string' } };
-  }
-  const issueId = body.issueId.trim().toUpperCase();
-
-  const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
-
-  // PAN-1691/1695: resolve the hold-for-UAT decision across three tiers —
-  // per-issue autoMerge (true=auto / false=hold) → per-project default →
-  // global require-UAT. Auto is the only state that overrides a hold default.
-  const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
-  const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();
-  if (shouldHoldForUat(reviewStatus?.autoMerge, projectDefault, globalRequireUat)) {
-    return { status: 412, body: { error: 'UAT is still required before merge' } };
-  }
-  if ((deps.isFlywheelPaused ?? isFlywheelGloballyPaused)()) {
-    return { status: 423, body: { error: 'Flywheel is paused' } };
-  }
-  if (!await (deps.resolveLiveRunId ?? resolveLiveFlywheelRunId)()) {
-    return { status: 412, body: { error: 'Flywheel is not running' } };
-  }
-
-  const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(issueId);
-  if (!eligibility.eligible) {
-    return { status: 422, body: { error: eligibility.reason } };
-  }
-
-  if (!reviewStatus?.prUrl) {
-    return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
-  }
-  const artifactRef = parseArtifactRef(reviewStatus.prUrl);
-  if (artifactRef === null) {
-    return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
-  }
-
-  const project = (deps.resolveProject ?? resolveProjectFromIssueSync)(issueId);
-  if (!project) return { status: 422, body: { error: `Unknown project for issue ${issueId}` } };
-
-  const scheduledAt = (deps.now ?? (() => new Date()))();
-  const scheduledMergeAt = new Date(scheduledAt.getTime() + AUTO_MERGE_COOLDOWN_MS);
-  const result = (deps.schedule ?? scheduleAutoMergeWithResult)({
-    issueId,
-    prUrl: reviewStatus.prUrl,
-    prNumber: artifactRef.number,
-    projectKey: project.projectKey,
-    forge: artifactRef.forge,
-    scheduledMergeAt: scheduledMergeAt.toISOString(),
-    scheduledAt: scheduledAt.toISOString(),
-  });
-  if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
-  return { status: 200, body: result.entry };
-}
-export function getPendingAutoMergePayload(): PendingAutoMerge[] {
-  return listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT);
-}
-
-export function getAutoMergeProblemPayload(): PendingAutoMerge[] {
-  return listProblemAutoMerges(AUTO_MERGE_POLL_LIMIT);
-}
-
-export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCancelDeps = {}) {
-  const issueId = issueIdParam.trim().toUpperCase();
-  if (!issueId) return { status: 400, body: { error: 'issueId must be a non-empty string' } };
-
-  const entry = (deps.getPending ?? getActionableAutoMerge)(issueId);
-  if (!entry) return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
-  if (entry.status === 'merging') {
-    return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
-  }
-
-  const cancelledAt = (deps.now ?? (() => new Date()))().toISOString();
-  const cancelled = (deps.cancel ?? cancelPending)(entry.id, 'operator');
-  if (!cancelled) {
-    const raced = (deps.getPending ?? getActionableAutoMerge)(issueId);
-    if (raced?.status === 'merging') {
-      return { status: 409, body: { error: `Auto-merge cooldown has expired for ${issueId}; merge is in progress` } };
-    }
-    return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
-  }
-
-  (deps.announce ?? announceAutoMergeCancelled)(issueId);
-  return {
-    status: 200,
-    body: {
-      ...entry,
-      status: 'cancelled' as const,
-      cancelledAt,
-      cancelledBy: 'operator',
-      remainingActionable: (deps.countRemaining ?? countActionableAutoMerges)(issueId),
-    },
-  };
-}
-
-export async function getFlywheelCurrentPayload() {
-  return readCurrentFlywheelStatusForDashboard();
-}
-
-export async function getFlywheelConversationPayload() {
-  const conversation = await runDashboardDbJob<{ tmuxSession: string } | null>('getConversationByName', FLYWHEEL_CONVERSATION_NAME);
-  if (!conversation) return null;
-  const sessionAlive = await Effect.runPromise(sessionExists(conversation.tmuxSession));
-  return { ...conversation, sessionAlive };
-}
-
-export async function postFlywheelReportPayload() {
-  const { flywheelReportCommand } = await import('../../../cli/commands/flywheel.js');
-  await flywheelReportCommand({ cwd: process.cwd() });
-  return { status: 200, body: { ok: true } };
-}
-
-interface FlywheelActionDeps {
-  start?: typeof startFlywheelRunForDashboard;
-  pause?: typeof pauseFlywheelRunForDashboard;
-  resume?: typeof resumeFlywheelRunForDashboard;
-  abort?: typeof abortFlywheelRunForDashboard;
-  openReport?: typeof openFlywheelRunReportForDashboard;
-}
-
-interface FlywheelStatsDeps {
-  compute?: typeof computeFlywheelStats;
-  deriveInputs?: typeof derivePipelineRunStatsInputs;
-  now?: () => Date;
-}
-
-export async function getFlywheelStatsPayload(window: string | null | undefined, deps: FlywheelStatsDeps = {}): Promise<FlywheelStatsResponse> {
-  const selectedWindow = window ?? '30d';
-  try {
-    const generatedAt = (deps.now ?? (() => new Date()))();
-    const parsedWindow = parseFlywheelStatsWindow(selectedWindow);
-    const since = new Date(generatedAt.getTime() - parsedWindow.ms).toISOString();
-    const until = generatedAt.toISOString();
-    const stats = deps.compute
-      ? await deps.compute(selectedWindow)
-      : await computeFlywheelStats(selectedWindow, {
-          generatedAt,
-          ...await (deps.deriveInputs ?? derivePipelineRunStatsInputs)(since, until),
-        });
-    return { status: 200, body: decodeFlywheelStats(stats) };
-  } catch (error) {
-    return {
-      status: 400,
-      body: {
-        error: 'Invalid Flywheel stats window or payload',
-        details: [error instanceof Error ? error.message : String(error)],
-      },
-    };
-  }
-}
-
-export async function postFlywheelStartPayload(payload: unknown, deps: FlywheelActionDeps = {}) {
-  const body = (payload ?? {}) as StartRequestBody;
-  if (body.brief !== undefined && typeof body.brief !== 'string') {
-    return { status: 400, body: { error: 'brief must be a string when provided' } };
-  }
-  const result = await (deps.start ?? startFlywheelRunForDashboard)({ cwd: process.cwd(), brief: body.brief });
-  return { status: 200, body: { ok: true, runId: result.runId } };
-}
-
-export async function postFlywheelPausePayload(deps: FlywheelActionDeps = {}) {
-  const result = await (deps.pause ?? pauseFlywheelRunForDashboard)();
-  return { status: 200, body: { ok: true, changed: result.changed } };
-}
-
-export async function postFlywheelResumePayload(deps: FlywheelActionDeps = {}) {
-  const result = await (deps.resume ?? resumeFlywheelRunForDashboard)();
-  return { status: 200, body: { ok: true, changed: result.changed } };
-}
-
-export async function postFlywheelAbortPayload(deps: FlywheelActionDeps = {}) {
-  const result = await (deps.abort ?? abortFlywheelRunForDashboard)();
-  return { status: 200, body: { ok: true, aborted: result.aborted } };
-}
-
-export async function postFlywheelReportOpenPayload(payload: unknown, deps: FlywheelActionDeps = {}) {
-  const body = (payload ?? {}) as ReportOpenRequestBody;
-  if (body.runId !== undefined && typeof body.runId !== 'string') {
-    return { status: 400, body: { error: 'runId must be a string when provided' } };
-  }
-  if (typeof body.runId === 'string') {
-    const parsed = parseRunIdParam(body.runId);
-    if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
-  }
-  const result = await (deps.openReport ?? openFlywheelRunReportForDashboard)({ runId: body.runId });
-  return { status: 200, body: { ok: true, runId: result.runId, path: result.path } };
-}
-
-const getFlywheelRunsRoute = HttpRouter.add(
+const getFlywheelStatusRoute = HttpRouter.add(
   'GET',
-  '/api/flywheel/runs',
+  '/api/flywheel/status',
   httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const limit = HttpServerRequest.toURL(request).pipe(Option.match({
-      onNone: () => undefined,
-      onSome: (url) => parseRunsLimit(url.searchParams.get('limit')),
-    }));
-    return yield* Effect.promise(async () => jsonResponse(await getFlywheelRunsPayload({ limit })));
+    return respond(yield* Effect.promise(() => getFlywheelStatusPayload()));
   })),
 );
 
-const getFlywheelRunRoute = HttpRouter.add(
+const getFlywheelStateRoute = HttpRouter.add(
   'GET',
-  '/api/flywheel/runs/:id',
+  '/api/flywheel/state',
   httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const runId = params['id'] ?? '';
-    const parsed = parseRunIdParam(runId);
-    if (!parsed.ok) return jsonResponse({ error: parsed.error, runId }, { status: 400 });
-    const run = yield* Effect.promise(() => getFlywheelRunPayload(parsed.runId));
-    if (!run) return jsonResponse({ error: 'Flywheel run not found', runId: parsed.runId }, { status: 404 });
-    return jsonResponse(run);
+    return respond(yield* Effect.promise(() => getFlywheelStatePayload()));
   })),
 );
 
-const getFlywheelConversationRoute = HttpRouter.add(
+const getFlywheelReportRoute = HttpRouter.add(
   'GET',
-  '/api/flywheel/conversation',
+  '/api/flywheel/report',
   httpHandler(Effect.gen(function* () {
-    return yield* Effect.promise(async () => jsonResponse(await getFlywheelConversationPayload()));
-  })),
-);
-
-const getFlywheelCurrentRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/current',
-  httpHandler(Effect.gen(function* () {
-    return yield* Effect.promise(async () => jsonResponse(await getFlywheelCurrentPayload()));
+    return respond(yield* Effect.promise(() => getFlywheelReportPayload()));
   })),
 );
 
@@ -533,328 +179,69 @@ const getFlywheelStatsRoute = HttpRouter.add(
   '/api/flywheel/stats',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const window = HttpServerRequest.toURL(request).pipe(Option.match({
-      onNone: () => undefined,
-      onSome: (url) => url.searchParams.get('window'),
-    }));
-    const result = yield* Effect.promise(() => getFlywheelStatsPayload(window));
-    return jsonResponse(result.body, { status: result.status });
+    const windowParam = new URL(request.url, 'http://localhost').searchParams.get('window');
+    return respond(yield* Effect.promise(() => getFlywheelStatsPayload(windowParam)));
   })),
 );
 
-const getFlywheelConfigRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/config',
-  httpHandler(Effect.gen(function* () {
-    return jsonResponse(getFlywheelConfigPayload());
-  })),
-);
-
-const postFlywheelConfigRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/config',
-  httpHandler(Effect.gen(function* () {
+function mutation(run: (body: Record<string, unknown>) => Promise<RouteResult>) {
+  return httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = requireTrustedOrigin(request);
     if (originError) return originError;
-
-    const parsed = yield* readUnknownJsonBody;
+    const parsed = yield* readJsonBody;
     if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
-
-    const result = yield* Effect.promise(() => postFlywheelConfigPayload(parsed.body));
-    return jsonResponse(result.body, { status: result.status });
-  })),
-);
-
-const getPendingAutoMergeRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/auto-merge/pending',
-  httpHandler(Effect.gen(function* () {
-    return jsonResponse(getPendingAutoMergePayload());
-  })),
-);
-
-const getAutoMergeProblemsRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/auto-merge/problems',
-  httpHandler(Effect.gen(function* () {
-    return jsonResponse(getAutoMergeProblemPayload());
-  })),
-);
-
-// getMergeBlockersPayload (PAN-1620) moved to src/lib/cloister/merge-blockers.ts so the
-// dashboard route and the sandbox-safe `pan flywheel merge-blockers` CLI share one source.
-
-const getMergeBlockersRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/merge-blockers',
-  httpHandler(Effect.gen(function* () {
-    return jsonResponse(getMergeBlockersPayload());
-  })),
-);
-
-const postAutoMergeScheduleRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/auto-merge/schedule',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-
-    const parsed = yield* readUnknownJsonBody;
-    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
-
-    const result = yield* Effect.promise(() => postAutoMergeSchedulePayload(parsed.body));
-    return jsonResponse(result.body, { status: result.status });
-  })),
-);
-
-const deleteAutoMergeRoute = HttpRouter.add(
-  'DELETE',
-  '/api/flywheel/auto-merge/:id',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-
-    const params = yield* HttpRouter.params;
-    const result = deleteAutoMergePayload(params['id'] ?? '');
-    return jsonResponse(result.body, { status: result.status });
-  })),
-);
-
-const postFlywheelStatusRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/status',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-
-    const parsed = yield* readUnknownJsonBody;
-    if (!parsed.ok) return jsonResponse({ error: parsed.error, details: [] }, { status: 400 });
-
-    const result = yield* Effect.promise(() => postFlywheelStatusPayload(parsed.body));
-    return jsonResponse(result.body, { status: result.status });
-  })),
-);
+    return respond(yield* Effect.promise(() => run(parsed.body)));
+  }));
+}
 
 const postFlywheelStartRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/start',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-
-    const parsed = yield* readUnknownJsonBody;
-    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
-
-    try {
-      const result = yield* Effect.promise(() => postFlywheelStartPayload(parsed.body));
-      return jsonResponse(result.body, { status: result.status });
-    } catch (error) {
-      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
-    }
-  })),
+  mutation((body) => postFlywheelStartPayload(body)),
 );
 
 const postFlywheelPauseRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/pause',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-
-    try {
-      const result = yield* Effect.promise(() => postFlywheelPausePayload());
-      return jsonResponse(result.body, { status: result.status });
-    } catch (error) {
-      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
-    }
-  })),
+  mutation(() => guarded(() => pauseFlywheel())),
 );
 
 const postFlywheelResumeRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/resume',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
+  mutation(() => guarded(() => resumeFlywheel())),
+);
 
-    try {
-      const result = yield* Effect.promise(() => postFlywheelResumePayload());
-      return jsonResponse(result.body, { status: result.status });
-    } catch (error) {
-      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
-    }
-  })),
+const postFlywheelStopRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/stop',
+  mutation((body) => postFlywheelStopPayload(body)),
 );
 
 const postFlywheelAbortRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/abort',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-
-    try {
-      const result = yield* Effect.promise(() => postFlywheelAbortPayload());
-      return jsonResponse(result.body, { status: result.status });
-    } catch (error) {
-      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
-    }
-  })),
+  mutation(() => guarded(() => abortFlywheel())),
 );
 
 const postFlywheelReportRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/report',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-
-    try {
-      const result = yield* Effect.promise(() => postFlywheelReportPayload());
-      return jsonResponse(result.body, { status: result.status });
-    } catch (error) {
-      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
-    }
-  })),
-);
-
-const postFlywheelReportOpenRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/report/open',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-
-    const parsed = yield* readUnknownJsonBody;
-    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
-
-    try {
-      const result = yield* Effect.promise(() => postFlywheelReportOpenPayload(parsed.body));
-      return jsonResponse(result.body, { status: result.status });
-    } catch (error) {
-      return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
-    }
-  })),
-);
-
-const getFlywheelBriefRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/brief',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnauthorizedDashboardRequest(request);
-    if (authError) return authError;
-    const hasPathOverride = HttpServerRequest.toURL(request).pipe(Option.match({
-      onNone: () => false,
-      onSome: (url) => url.searchParams.has('path'),
-    }));
-    if (hasPathOverride) return jsonResponse({ error: 'Flywheel brief path is server-controlled' }, { status: 400 });
-    const resolved = resolveBriefAbsolutePath(process.cwd());
-    if (!resolved.ok) return jsonResponse({ error: resolved.error }, { status: 400 });
-
-    return yield* Effect.promise(async () => {
-      try {
-        const containment = await assertExistingPathInsideRoot(process.cwd(), resolved.absolutePath);
-        if (!containment.ok) return jsonResponse({ error: containment.error }, { status: 400 });
-        const content = await readFile(resolved.absolutePath, 'utf8');
-        return jsonResponse({ path: resolved.displayPath, content });
-      } catch (error) {
-        const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-        if (code === 'ENOENT') {
-          return jsonResponse({ error: 'Flywheel brief not found', path: resolved.displayPath }, { status: 404 });
-        }
-        throw error;
-      }
-    });
-  })),
-);
-
-const postFlywheelBriefRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/brief',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnauthorizedDashboardRequest(request);
-    if (authError) return authError;
-
-    const parsed = yield* readJsonBody;
-    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
-    const body = parsed.body;
-    if (typeof body.content !== 'string') {
-      return jsonResponse({ error: 'content must be a string' }, { status: 400 });
-    }
-    if (body.path !== undefined) {
-      return jsonResponse({ error: 'Flywheel brief path is server-controlled' }, { status: 400 });
-    }
-
-    const bodyContent: string = body.content;
-
-    const resolved = resolveBriefAbsolutePath(process.cwd());
-    if (!resolved.ok) return jsonResponse({ error: resolved.error }, { status: 400 });
-
-    return yield* Effect.promise(async () => {
-      await mkdir(dirname(resolved.absolutePath), { recursive: true });
-      const containment = await assertWritePathInsideRoot(process.cwd(), resolved.absolutePath);
-      if (!containment.ok) return jsonResponse({ error: containment.error }, { status: 400 });
-      await writeFile(resolved.absolutePath, bodyContent, 'utf8');
-      return jsonResponse({ ok: true, path: resolved.displayPath });
-    });
-  })),
-);
-
-const getUatCandidateRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/uat-candidate',
-  httpHandler(Effect.gen(function* () {
-    const { getUatCandidatePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
-    const payload = yield* Effect.promise(() => getUatCandidatePayload());
-    return jsonResponse(payload);
-  })),
-);
-
-const getFlywheelStateRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/state',
-  httpHandler(Effect.gen(function* () {
-    return yield* Effect.promise(async () => jsonResponse(await readFlywheelState()));
-  })),
+  mutation(() => guarded(() => requestFlywheelReport())),
 );
 
 export const flywheelRouteLayer = Layer.mergeAll(
-  getFlywheelRunsRoute,
-  getFlywheelRunRoute,
-  getFlywheelConversationRoute,
-  getFlywheelCurrentRoute,
-  getFlywheelStatsRoute,
-  getSubstrateBugWeightsRoute,
-  getFlywheelConfigRoute,
-  postFlywheelConfigRoute,
-  getPendingAutoMergeRoute,
-  getAutoMergeProblemsRoute,
-  getMergeBlockersRoute,
-  getMergeBackendRoute,
-  postAutoMergeScheduleRoute,
-  deleteAutoMergeRoute,
-  getUatCandidateRoute,
+  getFlywheelStatusRoute,
   getFlywheelStateRoute,
-  postFlywheelStatusRoute,
+  getFlywheelReportRoute,
+  getFlywheelStatsRoute,
   postFlywheelStartRoute,
   postFlywheelPauseRoute,
   postFlywheelResumeRoute,
+  postFlywheelStopRoute,
   postFlywheelAbortRoute,
   postFlywheelReportRoute,
-  postFlywheelReportOpenRoute,
-  getFlywheelBriefRoute,
-  postFlywheelBriefRoute,
 );
+
 export default flywheelRouteLayer;

@@ -16,7 +16,6 @@ import {
   fixtureNormalizedIssue,
   fixtureProjectConfig,
   fixtureReviewAgentId,
-  fixtureReviewStatus,
   fixtureXBriefDoc,
 } from '../../../../src/lib/uat-fixtures/fixture-data.js';
 import { readPlanSync } from '../../../../src/lib/xbrief/io.js';
@@ -106,7 +105,6 @@ describe('fixture builders — no real-tracker leakage (AC-4)', () => {
       fixtureNormalizedIssue(),
       fixtureProjectConfig(),
       fixtureAgentStates(),
-      fixtureReviewStatus(),
       fixtureActivityEntries(),
       fixtureXBriefDoc(),
       fixtureContinueJson(),

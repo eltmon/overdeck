@@ -2,15 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ActivitySection } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import type { DerivedIssueState } from '../../../types'
 
 const queryMocks = vi.hoisted(() => ({
   activityQuery: { data: { sections: [] as ActivitySection[] } },
-  reviewStatusQuery: { data: null },
+  derivedIssue: null as DerivedIssueState | null,
 }))
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useActivityQuery: () => queryMocks.activityQuery,
-  useReviewStatusQuery: () => queryMocks.reviewStatusQuery,
+}))
+
+vi.mock('../../../lib/store', () => ({
+  useDerivedIssueState: () => queryMocks.derivedIssue ?? undefined,
 }))
 
 import { HappenedFeed } from './HappenedFeed'
@@ -31,7 +35,7 @@ function renderHappenedFeed() {
 describe('HappenedFeed', () => {
   beforeEach(() => {
     queryMocks.activityQuery.data = { sections: [] }
-    queryMocks.reviewStatusQuery.data = null
+    queryMocks.derivedIssue = null
     global.fetch = vi.fn(async (url) => {
       if (String(url).startsWith('/api/workspaces/')) {
         return Response.json({})

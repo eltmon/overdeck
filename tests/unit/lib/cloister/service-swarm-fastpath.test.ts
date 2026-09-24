@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const deaconMock = vi.hoisted(() => ({
@@ -36,10 +35,10 @@ describe('service swarm fast-path', () => {
   });
 
   it('delivers one stopped-slot event to the owning foreman', async () => {
-    await Effect.runPromise(handleCloisterDomainEvent({
+    await handleCloisterDomainEvent({
       type: 'agent.stopped',
       payload: { agentId: 'agent-pan-2203-slot-2' },
-    }));
+    });
 
     expect(messagingMock.messageAgent).toHaveBeenCalledTimes(1);
     expect(messagingMock.messageAgent).toHaveBeenCalledWith(
@@ -50,10 +49,10 @@ describe('service swarm fast-path', () => {
   });
 
   it('does not route non-slot stopped agents to swarm coordination', async () => {
-    await Effect.runPromise(handleCloisterDomainEvent({
+    await handleCloisterDomainEvent({
       type: 'agent.stopped',
       payload: { agentId: 'agent-pan-2203' },
-    }));
+    });
 
     expect(messagingMock.messageAgent).not.toHaveBeenCalled();
   });

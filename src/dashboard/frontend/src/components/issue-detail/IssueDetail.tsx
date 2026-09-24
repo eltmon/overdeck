@@ -26,7 +26,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import type { Agent } from '../../types';
-import type { ReviewStatusSnapshot } from '@overdeck/contracts';
+import type { DerivedIssueState } from '../../types';
 import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from '../drawer/DrawerAgentSession';
@@ -67,7 +67,7 @@ export interface IssueDetailProps {
   issueId: string;
   density: IssueDetailDensity;
   agents: Agent[];
-  reviewStatus?: ReviewStatusSnapshot | undefined;
+  derived?: DerivedIssueState | undefined;
   /** Controlled tab (the drawer's store owns it). */
   tab: string;
   onSelectTab: (tab: IssueDetailTabId) => void;
@@ -285,7 +285,7 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
   );
 }
 
-export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSelectTab, tasksBadge, conversationHeight = 420, showTabs = true, className }: IssueDetailProps) {
+export function IssueDetail({ issueId, density, agents, derived, tab, onSelectTab, tasksBadge, conversationHeight = 420, showTabs = true, className }: IssueDetailProps) {
   // Selected agent for the Conversation/Terminal panes. Owned here so the
   // choice survives a Conversation ⇄ Terminal switch; falls back to the
   // default pick whenever the selection is cleared or no longer matches.
@@ -308,7 +308,7 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
     <IssueDetailShell
       issueId={issueId}
       agents={agents}
-      reviewStatus={reviewStatus}
+      derived={derived}
       activeAgentId={tab === 'conversation' || tab === 'session' ? effectiveAgentId : null}
       onOpenAgentConversation={openAgentConversation}
     />

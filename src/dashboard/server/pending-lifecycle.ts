@@ -10,16 +10,54 @@
  * the "restarting" banner.
  */
 
-import { readFile, unlink } from 'fs/promises';
+import { readFile, rename, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { emitDashboardLifecycleSync } from '../../lib/activity-logger.js';
-import {
-  claimPendingLifecycleFile,
-  settlePendingLifecycleClaim,
-  type PendingLifecycleClaim,
-} from '../../lib/cloister/pending-lifecycle-claim.js';
+import { emitDashboardLifecycle } from '../../lib/activity-logger.js';
+
+/**
+ * An exclusive claim on the pending file (PAN-3917).
+ *
+ * The rename IS the claim: whichever process renames the file first owns the
+ * handoff, and a loser sees ENOENT. deacon-lite runs no post-merge lifecycle,
+ * so the dashboard is the only claimant, but the rename keeps two dashboards
+ * from doubling the run.
+ */
+interface PendingLifecycleClaim {
+  readonly raw: string;
+  readonly claimedPath: string;
+  discard(): Promise<void>;
+}
+
+async function claimPendingLifecycleFile(pendingFile: string): Promise<PendingLifecycleClaim | null> {
+  const claimedPath = `${pendingFile}.claimed`;
+  try {
+    await rename(pendingFile, claimedPath);
+  } catch {
+    return null;
+  }
+  const raw = await readFile(claimedPath, 'utf-8');
+  return {
+    raw,
+    claimedPath,
+    discard: async () => { await unlink(claimedPath).catch(() => undefined); },
+  };
+}
+
+async function settlePendingLifecycleClaim(
+  claim: PendingLifecycleClaim,
+  issueId: string,
+  succeeded: boolean,
+): Promise<void> {
+  if (succeeded) {
+    await unlink(claim.claimedPath).catch(() => undefined);
+    return;
+  }
+  // A failed run keeps the evidence on disk under the claimed name so an
+  // operator can see what the handoff was; it is never re-run automatically.
+  console.warn(`[overdeck] Pending lifecycle for ${issueId} failed — evidence kept at ${claim.claimedPath}`);
+}
 
 export const PENDING_FILE = join(homedir(), '.overdeck', 'pending-post-merge.json');
 export const RESTART_MARKER = join(homedir(), '.overdeck', 'dashboard-restarting.json');
@@ -50,8 +88,9 @@ interface RestartMarker {
  */
 async function defaultLifecycleRunner(pending: PendingLifecycleData): Promise<void> {
   const { postMergeLifecycle, notifyTldrDaemon } = await import('../../lib/cloister/merge-agent.js');
-  // skipDeploy: we ARE the fresh rebuilt process — skip step 0 to avoid infinite rebuild loop
-  await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
+  // PAN-3917 (D1): the post-merge deploy step is gone, so there is no rebuild
+  // loop left for this fresh process to opt out of.
+  await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch);
   if (pending.sourceBranch) {
     await notifyTldrDaemon(pending.projectPath, pending.sourceBranch);
   }
@@ -71,7 +110,7 @@ async function runClaimedPendingLifecycle(
     }
     await runner(pending);
     succeeded = true;
-    emitDashboardLifecycleSync('completed', {
+    emitDashboardLifecycle('completed', {
       reason: pending.reason ?? 'post-merge',
       issueId: pending.issueId,
       durationMs: Date.now() - startTime,
@@ -79,7 +118,7 @@ async function runClaimedPendingLifecycle(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[overdeck] Post-merge lifecycle failed for ${pending.issueId}: ${message}`);
-    emitDashboardLifecycleSync('failed', {
+    emitDashboardLifecycle('failed', {
       reason: pending.reason ?? 'post-merge',
       issueId: pending.issueId,
       error: message,
@@ -128,7 +167,7 @@ export async function processPendingLifecycle(options?: {
       const age = now - (marker.timestamp ?? 0);
 
       if (age <= staleThresholdMs) {
-        emitDashboardLifecycleSync('started', {
+        emitDashboardLifecycle('started', {
           reason: marker.reason ?? 'post-merge',
           issueId: marker.issueId,
           trigger: marker.trigger ?? 'deploy-script',

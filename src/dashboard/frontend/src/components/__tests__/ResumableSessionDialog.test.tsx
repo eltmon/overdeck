@@ -1,5 +1,5 @@
 /**
- * Start-block recovery dialog: 409s (resumable session, troubled gate,
+ * Start-block recovery dialog: 409s (resumable session,
  * paused gate) become working buttons, not CLI-text alerts.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -32,11 +32,6 @@ describe('recoveryFromBody', () => {
   it('extracts a resumable recovery from a lifecycle body', () => {
     expect(recoveryFromBody({ error: '…resumable Claude session…', lifecycle: { agentId: 'agent-x', canResumeSession: true } }))
       .toEqual({ kind: 'resumable', agentId: 'agent-x' });
-  });
-
-  it('extracts a troubled recovery with the failure count', () => {
-    expect(recoveryFromBody({ success: false, error: 'Agent agent-pan-2876 is troubled (3 failures).', agentId: 'agent-pan-2876', troubled: true }))
-      .toEqual({ kind: 'troubled', agentId: 'agent-pan-2876', detail: '3 failures' });
   });
 
   it('extracts a paused recovery with the reason', () => {
@@ -118,22 +113,6 @@ describe('ResumableSessionDialog', () => {
     await waitFor(() => {
       const calls = fetchCalls();
       expect(calls.some((c) => c.url === '/api/agents/agent-pan-2876/reset-session' && c.method === 'POST')).toBe(true);
-      expect(calls.some((c) => c.url === '/api/agents' && c.method === 'POST' && c.body === JSON.stringify({ issueId: 'PAN-2876' }))).toBe(true);
-    });
-  });
-
-  it('Troubled recovery clears the gate then starts the issue', async () => {
-    useResumeRecovery.getState().openRecovery({ kind: 'troubled', agentId: 'agent-pan-2876', issueId: 'PAN-2876', detail: '3 failures' });
-    renderDialog();
-    expect(screen.getByTestId('resumable-session-dialog')).toHaveAttribute('data-kind', 'troubled');
-    expect(screen.getByRole('button', { name: /Clear gate & start/ })).toBeInTheDocument();
-    expect(screen.queryByTestId('recovery-start-fresh')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('recovery-primary'));
-
-    await waitFor(() => {
-      const calls = fetchCalls();
-      expect(calls.some((c) => c.url === '/api/agents/agent-pan-2876/untroubled' && c.method === 'POST')).toBe(true);
       expect(calls.some((c) => c.url === '/api/agents' && c.method === 'POST' && c.body === JSON.stringify({ issueId: 'PAN-2876' }))).toBe(true);
     });
   });
@@ -238,7 +217,7 @@ describe('ResumableSessionDialog', () => {
     renderDialog();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByTestId('resumable-session-dialog')).not.toBeInTheDocument();
-    expect(fetchCalls().some((c) => c.url.includes('/resume') || c.url.includes('/reset-session') || c.url.includes('/untroubled'))).toBe(false);
+    expect(fetchCalls().some((c) => c.url.includes('/resume') || c.url.includes('/reset-session'))).toBe(false);
   });
 
   it('never traps the operator: Cancel works while a start is in flight', async () => {

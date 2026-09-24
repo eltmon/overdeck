@@ -18,8 +18,6 @@ const agentMocks = vi.hoisted(() => ({
   saveAgentRuntimeState: vi.fn(),
   restartAgent: vi.fn(),
   messageAgent: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
-  clearAgentTroubledSync: vi.fn(),
   clearAgentPaused: vi.fn(),
   clearAgentTroubled: vi.fn(),
 }));
@@ -36,12 +34,12 @@ const lifecycleMocks = vi.hoisted(() => ({
 const projectMocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   extractTeamPrefix: vi.fn(),
-  findProjectByTeamSync: vi.fn(),
+  findProjectByTeam: vi.fn(),
 }));
 
 const trackerMocks = vi.hoisted(() => ({
-  resolveGitHubIssueSync: vi.fn(),
-  resolveTrackerTypeSync: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
+  resolveTrackerType: vi.fn(),
 }));
 
 const operatorInterventionMocks = vi.hoisted(() => ({
@@ -121,8 +119,6 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
     saveAgentRuntimeState: agentMocks.saveAgentRuntimeState,
     restartAgent: agentMocks.restartAgent,
     messageAgent: agentMocks.messageAgent,
-    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
-    clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
     clearAgentPaused: agentMocks.clearAgentPaused,
     clearAgentTroubled: agentMocks.clearAgentTroubled,
   };
@@ -138,6 +134,12 @@ vi.mock('../../../../lib/tmux.js', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/lifecycle/index.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
+  listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   resetToTodo: lifecycleMocks.resetToTodo,
   cancelIssueWorkflow: vi.fn(),
   closeOut: vi.fn(),
@@ -149,7 +151,7 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
     ...actual,
     resolveProjectFromIssueSync: projectMocks.resolveProjectFromIssueSync,
     extractTeamPrefix: projectMocks.extractTeamPrefix,
-    findProjectByTeamSync: projectMocks.findProjectByTeamSync,
+    findProjectByTeam: projectMocks.findProjectByTeam,
   };
 });
 
@@ -157,8 +159,8 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/tracker-utils.js')>();
   return {
     ...actual,
-    resolveGitHubIssueSync: trackerMocks.resolveGitHubIssueSync,
-    resolveTrackerTypeSync: trackerMocks.resolveTrackerTypeSync,
+    resolveGitHubIssue: trackerMocks.resolveGitHubIssue,
+    resolveTrackerType: trackerMocks.resolveTrackerType,
   };
 });
 
@@ -170,13 +172,6 @@ vi.mock('../../services/agent-projection.js', () => ({
   saveAgentStateAndEmitEventProgram: vi.fn(() => Effect.void),
 }));
 
-vi.mock('../../review-status.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../review-status.js')>();
-  return {
-    ...actual,
-    clearReviewStatus: vi.fn(),
-  };
-});
 
 vi.mock('../../../../lib/cloister/merge-agent.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/cloister/merge-agent.js')>();
@@ -314,14 +309,12 @@ describe('operator.intervention dashboard routes', () => {
     vi.clearAllMocks();
     fsMocks.appendFile.mockResolvedValue(undefined);
     fsMocks.mkdir.mockResolvedValue(undefined);
-    agentMocks.getAgentState.mockReturnValue(Effect.succeed(agentState));
+    agentMocks.getAgentState.mockReturnValue(agentState);
     agentMocks.setAgentPaused.mockReturnValue(Effect.succeed({ ...agentState, paused: true, status: 'stopped' }));
     agentMocks.saveAgentState.mockReturnValue(Effect.succeed(undefined));
     agentMocks.saveAgentRuntimeState.mockResolvedValue(undefined);
     agentMocks.restartAgent.mockResolvedValue({ success: true });
     agentMocks.messageAgent.mockResolvedValue(undefined);
-    agentMocks.clearAgentPausedSync.mockReturnValue(true);
-    agentMocks.clearAgentTroubledSync.mockReturnValue(true);
     agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed({ ...agentState, paused: false }));
     agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed({ ...agentState, troubled: false, consecutiveFailures: 0 }));
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
@@ -329,9 +322,9 @@ describe('operator.intervention dashboard routes', () => {
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
     projectMocks.extractTeamPrefix.mockReturnValue('PAN');
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project', projectName: 'overdeck' });
-    projectMocks.findProjectByTeamSync.mockReturnValue({ name: 'overdeck', workspace: {} });
-    trackerMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
-    trackerMocks.resolveTrackerTypeSync.mockReturnValue('github');
+    projectMocks.findProjectByTeam.mockReturnValue({ name: 'overdeck', workspace: {} });
+    trackerMocks.resolveGitHubIssue.mockReturnValue({ isGitHub: false });
+    trackerMocks.resolveTrackerType.mockReturnValue('github');
     issueServiceMock.getIssueSource.mockReturnValue('github');
     issueServiceMock.patchIssue.mockReturnValue(undefined);
     issueServiceMock.invalidateTracker.mockResolvedValue(undefined);
@@ -376,7 +369,7 @@ describe('operator.intervention dashboard routes', () => {
   });
 
   it('does not emit an intervention when the agent request fails', async () => {
-    agentMocks.getAgentState.mockReturnValue(Effect.succeed(null));
+    agentMocks.getAgentState.mockReturnValue(null);
 
     const { response, appendedEvents } = await requestAgents('/api/agents/agent-pan-missing/pause', {
       body: JSON.stringify({ reason: 'operator' }),
@@ -415,9 +408,7 @@ describe('operator.intervention dashboard routes', () => {
   // event — and must refuse (not silently no-op) when clearGates is absent.
 
   it('preserves the troubled gate when post-gate spawn validation fails', async () => {
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, troubled: true, consecutiveFailures: 2 }),
-    );
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, troubled: true, consecutiveFailures: 2 });
 
     const { appendedEvents } = await requestAgents('/api/agents', {
       body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
@@ -429,23 +420,19 @@ describe('operator.intervention dashboard routes', () => {
   });
 
   it('preserves the paused gate when post-gate spawn validation fails', async () => {
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
-    );
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pausedReason: 'operator' });
 
     const { appendedEvents } = await requestAgents('/api/agents', {
       body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
     });
 
-    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
-    expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentTroubled).not.toHaveBeenCalled();
     expect(appendedEvents).not.toContainEqual(expect.objectContaining({ type: 'operator.intervention' }));
   });
 
   it('refuses a gated spawn without clearGates and clears nothing (AC3)', async () => {
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
-    );
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pausedReason: 'operator' });
 
     const { response } = await requestAgents('/api/agents', {
       body: JSON.stringify({ issueId: 'PAN-1' }),
@@ -455,17 +442,15 @@ describe('operator.intervention dashboard routes', () => {
       response.status,
       response.status === 409 ? '' : await responseBodyForDiagnostics(response),
     ).toBe(409);
-    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
-    expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentTroubled).not.toHaveBeenCalled();
   });
 
   it('does not accept clearGates when the canonical mutation authorization rejects the request', async () => {
     dashboardAuthMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(
       jsonResponse({ error: 'Invalid CSRF token' }, { status: 403 }),
     );
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
-    );
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pausedReason: 'operator' });
 
     const { response } = await requestAgents('/api/agents', {
       headers: { origin: 'http://localhost' },

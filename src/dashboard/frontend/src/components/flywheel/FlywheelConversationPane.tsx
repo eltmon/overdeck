@@ -1,443 +1,194 @@
+/**
+ * The flywheel conversation column (PAN-3964 FR-13). Embeds the ordinary
+ * conversation panel for `conv-flywheel` (with a Terminal toggle) and the
+ * run controls. Which controls show is decided by the derived run state from
+ * `GET /api/flywheel/status`; every control POSTs to the route that wraps the
+ * same action the CLI verb calls.
+ */
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, FileText, Loader2, Maximize2, MoreHorizontal, Pause, Plus, RotateCcw, Settings, StopCircle } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { FileText, Loader2, Maximize2, Pause, Play, RotateCcw, Square, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import type { FlywheelStatus } from '@overdeck/contracts';
+
+import {
+  FLYWHEEL_CONVERSATION_NAME,
+  FLYWHEEL_CONVERSATION_QUERY_KEY,
+  useFlywheelAction,
+  useFlywheelStatus,
+  type FlywheelAction,
+} from '../../lib/flywheelApi';
 import { ConversationPanel } from '../chat/ConversationPanel';
-import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { useConfirm } from '../DialogProvider';
 import { ViewToggle } from '../shared/ViewToggle';
+import { XTerminal } from '../XTerminal';
 
-const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
-
-interface FlywheelRunSummary {
-  id: string;
-  startedAt: string;
-  status: 'running' | 'paused' | 'complete' | 'aborted';
-}
-
-interface FlywheelRunDetail extends FlywheelRunSummary {
-  latest: FlywheelStatus | null;
-  /** PAN-1696: the scope this run was actually started or resumed with. */
-  scope?: 'pan-only' | 'all-tracked-projects';
-  paths: {
-    latest: string;
-    report?: string;
-    openedPr?: string;
-  };
-}
+export const FLYWHEEL_POPOUT_PATH = '/popout/flywheel-conversation';
 
 interface FlywheelRoleConfig {
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+  harness?: string;
   model?: string;
-  effort?: 'low' | 'medium' | 'high';
+  effort?: string;
   maxAgents?: number;
-  scope?: 'pan-only' | 'all-tracked-projects';
+  scope?: string;
 }
 
-interface SettingsResponse {
-  roles?: Record<string, FlywheelRoleConfig | undefined>;
-}
-
-interface FlywheelConversationPaneProps {
-  onOpenSettings?: () => void;
-}
-
-const DEFAULT_FLYWHEEL_CONFIG: Required<FlywheelRoleConfig> = {
-  harness: 'claude-code',
-  model: 'claude-opus-4-8',
-  effort: 'high',
-  maxAgents: 8,
-  scope: 'pan-only',
-};
-
-async function fetchJson<T>(path: string): Promise<T> {
-  const res = await fetch(path);
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
-  return res.json() as Promise<T>;
-}
-
-async function fetchFlywheelConversation(): Promise<Conversation | null> {
-  const res = await fetch('/api/flywheel/conversation');
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+async function fetchConversation(): Promise<Conversation | null> {
+  const res = await fetch(`/api/conversations/${FLYWHEEL_CONVERSATION_NAME}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GET /api/conversations/${FLYWHEEL_CONVERSATION_NAME} → ${res.status}`);
   return res.json() as Promise<Conversation>;
 }
 
-async function postFlywheelAction<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const message = typeof payload?.error === 'string' ? payload.error : `Request failed (${res.status})`;
-    throw new Error(message);
-  }
-  return payload as T;
+async function fetchRoleConfig(): Promise<FlywheelRoleConfig> {
+  const res = await fetch('/api/settings');
+  if (!res.ok) throw new Error(`GET /api/settings → ${res.status}`);
+  const settings = (await res.json()) as { roles?: Record<string, FlywheelRoleConfig | undefined> };
+  return settings.roles?.['flywheel'] ?? {};
 }
 
-function formatPercent(value: number | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : '—';
-}
+const ACTION_TOAST: Record<FlywheelAction, string> = {
+  start: 'Flywheel started',
+  pause: 'Flywheel paused',
+  resume: 'Flywheel resumed',
+  stop: 'Asked the loop to write its report; it pauses when done',
+  abort: 'Flywheel aborted',
+  report: 'Asked the loop to write .pan/flywheel/report.md',
+};
 
-function formatScope(value: string): string {
-  if (value === 'pan-only') return 'PAN only';
-  if (value === 'all-tracked-projects') return 'All tracked projects';
-  return value;
-}
+const BUTTON = 'inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50';
+const PRIMARY_BUTTON = 'inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/15 disabled:opacity-50';
+const DESTRUCTIVE_BUTTON = 'inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50';
 
-/**
- * PAN-1696: which scope to SHOW. Scope is baked into the orchestrator prompt when
- * a run starts or resumes, so a settings change does not reach a live run. While
- * a run exists we show the run's own persisted scope; with no run there is
- * nothing running under an old value, so the configured one is the honest answer.
- */
-export function resolveDisplayedScope(
-  run: { status: FlywheelRunSummary['status']; scope?: string; latest?: { scope?: string } | null } | null,
-  configuredScope: string,
-): { displayed: string; source: 'run' | 'configured'; mismatchedConfigured?: string } {
-  const live = run?.status === 'running' || run?.status === 'paused';
-  const runScope = run?.scope ?? run?.latest?.scope;
-  if (!live || !runScope) return { displayed: configuredScope, source: 'configured' };
+function useRunAction(action: FlywheelAction) {
+  const mutation = useFlywheelAction(action);
   return {
-    displayed: runScope,
-    source: 'run',
-    ...(runScope !== configuredScope ? { mismatchedConfigured: configuredScope } : {}),
+    pending: mutation.isPending,
+    run: (body?: unknown) => mutation.mutate(body, {
+      onSuccess: () => toast.success(ACTION_TOAST[action]),
+      onError: (error: Error) => toast.error(`Flywheel ${action} failed: ${error.message}`),
+    }),
   };
 }
 
-export function resolveFlywheelConfig(settings: SettingsResponse | undefined): Required<FlywheelRoleConfig> {
-  return {
-    ...DEFAULT_FLYWHEEL_CONFIG,
-    ...(settings?.roles?.['flywheel'] ?? {}),
-  };
-}
-
-export function findFlywheelConversation(conversations: Conversation[]): Conversation | null {
-  return conversations.find((conversation) => (
-    conversation.name === FLYWHEEL_CONVERSATION_NAME || conversation.tmuxSession === FLYWHEEL_CONVERSATION_NAME
-  )) ?? null;
-}
-
-type FlywheelPaneViewMode = 'conversation' | 'terminal';
-
-export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversationPaneProps) {
-  const [viewMode, setViewMode] = useState<FlywheelPaneViewMode>('conversation');
-  const [moreOpen, setMoreOpen] = useState(false);
-  const isPopoutWindow = typeof window !== 'undefined' && window.location.pathname === '/popout/flywheel-conversation';
+export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: () => void }) {
+  const [viewMode, setViewMode] = useState<'conversation' | 'terminal'>('conversation');
+  const isPopout = typeof window !== 'undefined' && window.location.pathname === FLYWHEEL_POPOUT_PATH;
   const queryClient = useQueryClient();
-  const runsQuery = useQuery({
-    queryKey: ['flywheel-runs'],
-    queryFn: () => fetchJson<FlywheelRunSummary[]>('/api/flywheel/runs?limit=10'),
-    refetchInterval: 5000,
-  });
-  const latestRun = runsQuery.data?.[0] ?? null;
-  const runDetailQuery = useQuery({
-    queryKey: ['flywheel-run-detail', latestRun?.id],
-    queryFn: () => fetchJson<FlywheelRunDetail>(`/api/flywheel/runs/${encodeURIComponent(latestRun!.id)}`),
-    enabled: !!latestRun?.id,
-    refetchInterval: latestRun?.status === 'running' ? 5000 : false,
-  });
-  const conversationQuery = useQuery({
-    queryKey: ['conversation', FLYWHEEL_CONVERSATION_NAME],
-    queryFn: fetchFlywheelConversation,
-    refetchInterval: 5000,
-  });
-  const settingsQuery = useQuery({
-    queryKey: ['settings'],
-    queryFn: () => fetchJson<SettingsResponse>('/api/settings'),
-    staleTime: 30000,
-  });
-  const run = runDetailQuery.data ?? null;
-  const activeRun = run?.status === 'running' ? run : null;
-  const status = (run?.status === 'running' || run?.status === 'paused') ? run.latest : null;
-  const conversation = conversationQuery.data ?? null;
-  const config = resolveFlywheelConfig(settingsQuery.data);
-  const scopeDisplay = resolveDisplayedScope(run, config.scope);
-  const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
-    ? 'running'
-    : run?.status === 'paused'
-      ? 'paused'
-      : 'none';
   const confirm = useConfirm();
+  const statusQuery = useFlywheelStatus();
+  const conversationQuery = useQuery({ queryKey: FLYWHEEL_CONVERSATION_QUERY_KEY, queryFn: fetchConversation, refetchInterval: 5_000 });
+  const configQuery = useQuery({ queryKey: ['settings', 'roles', 'flywheel'], queryFn: fetchRoleConfig, staleTime: 30_000 });
 
-  const refreshFlywheel = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['flywheel-runs'] }),
-      queryClient.invalidateQueries({ queryKey: ['flywheel-run-detail'] }),
-      queryClient.invalidateQueries({ queryKey: ['conversation', FLYWHEEL_CONVERSATION_NAME] }),
-    ]);
+  const start = useRunAction('start');
+  const pause = useRunAction('pause');
+  const resume = useRunAction('resume');
+  const report = useRunAction('report');
+  const stop = useRunAction('stop');
+  const abort = useRunAction('abort');
+  const busy = start.pending || pause.pending || resume.pending || report.pending || stop.pending || abort.pending;
+
+  const run = statusQuery.data?.run;
+  const conversation = conversationQuery.data ?? null;
+  const config = configQuery.data ?? {};
+
+  const handleStop = async () => {
+    const ok = await confirm({
+      title: 'Stop the flywheel',
+      message: 'The loop writes .pan/flywheel/report.md and commits it, then the conversation pauses. Continue?',
+      confirmLabel: 'Stop with report',
+    });
+    if (ok) stop.run();
   };
-
-  const startMutation = useMutation({
-    mutationFn: () => postFlywheelAction('/api/flywheel/start'),
-    onSuccess: async () => {
-      toast.success('Flywheel started');
-      await refreshFlywheel();
-    },
-    onError: (error: Error) => toast.error(`Failed to start Flywheel: ${error.message}`),
-  });
-  const pauseMutation = useMutation({
-    mutationFn: () => postFlywheelAction('/api/flywheel/pause'),
-    onSuccess: async () => {
-      toast.success('Flywheel paused');
-      await refreshFlywheel();
-    },
-    onError: (error: Error) => toast.error(`Failed to pause Flywheel: ${error.message}`),
-  });
-  const resumeMutation = useMutation({
-    mutationFn: () => postFlywheelAction('/api/flywheel/resume'),
-    onSuccess: async () => {
-      toast.success('Flywheel resumed');
-      await refreshFlywheel();
-    },
-    onError: (error: Error) => toast.error(`Failed to resume Flywheel: ${error.message}`),
-  });
-  const newRunMutation = useMutation({
-    mutationFn: async () => {
-      if (runState === 'paused') {
-        await postFlywheelAction('/api/flywheel/report');
-      }
-      return postFlywheelAction('/api/flywheel/start');
-    },
-    onSuccess: async () => {
-      toast.success('Flywheel started');
-      await refreshFlywheel();
-    },
-    onError: (error: Error) => toast.error(`Failed to start Flywheel: ${error.message}`),
-  });
-  const openReportMutation = useMutation({
-    mutationFn: () => postFlywheelAction('/api/flywheel/report/open', { runId: run?.id }),
-    onError: (error: Error) => toast.error(`Failed to open run report: ${error.message}`),
-  });
-  const reportMutation = useMutation({
-    mutationFn: () => postFlywheelAction('/api/flywheel/report'),
-    onSuccess: async () => {
-      toast.success('Flywheel run reported');
-      await refreshFlywheel();
-    },
-    onError: (error: Error) => toast.error(`Failed to report Flywheel run: ${error.message}`),
-  });
-  const abortMutation = useMutation({
-    mutationFn: () => postFlywheelAction('/api/flywheel/abort'),
-    onSuccess: async () => {
-      toast.success('Flywheel run aborted');
-      await refreshFlywheel();
-    },
-    onError: (error: Error) => toast.error(`Failed to abort Flywheel: ${error.message}`),
-  });
 
   const handleAbort = async () => {
     const ok = await confirm({
-      title: 'Abort Flywheel Run',
-      message: `${run?.id ?? 'The active run'} will be discarded without a report. Continue?`,
-      confirmLabel: 'Abort Run',
+      title: 'Abort the flywheel',
+      message: 'The conversation stops now, without a report. Its transcript is kept. Continue?',
+      confirmLabel: 'Abort',
       variant: 'destructive',
     });
-    if (!ok) return;
-    abortMutation.mutate();
+    if (ok) abort.run();
   };
 
-  const handleReport = async () => {
+  const handleStartFresh = async () => {
     const ok = await confirm({
-      title: 'Finalize Run Report',
-      message: `Write the report for ${run?.id ?? 'the active run'} and close it out. The orchestrator session must be paused or stopped first; if it is alive, this will fail.`,
-      confirmLabel: 'Write Report',
-      variant: 'default',
+      title: 'Start a fresh flywheel',
+      message: 'The paused flywheel conversation is replaced by a new one. The old transcript stays on disk. Continue?',
+      confirmLabel: 'Start fresh',
+      variant: 'destructive',
     });
-    if (!ok) return;
-    reportMutation.mutate();
+    if (ok) start.run({ fresh: true });
   };
-
-  const handleNewRun = async () => {
-    if (runState === 'paused') {
-      const ok = await confirm({
-        title: 'Start New Run',
-        message: `${run?.id ?? 'The current run'} is paused. Reporting it will close the run and start a fresh one. Continue?`,
-        confirmLabel: 'Report & Start New',
-        variant: 'destructive',
-      });
-      if (!ok) return;
-    } else if (runState === 'running') {
-      const ok = await confirm({
-        title: 'Start New Run',
-        message: `${run?.id ?? 'The current run'} is RUNNING. Starting a new run will abort the active orchestrator session and discard its in-flight work. Continue?`,
-        confirmLabel: 'Abort & Start New',
-        variant: 'destructive',
-      });
-      if (!ok) return;
-    }
-    newRunMutation.mutate();
-  };
-
-  const actionPending = startMutation.isPending || pauseMutation.isPending || resumeMutation.isPending || newRunMutation.isPending || openReportMutation.isPending || abortMutation.isPending || reportMutation.isPending;
-  const topBarLoading = runsQuery.isLoading || runDetailQuery.isLoading;
 
   return (
-    <section className="flex h-full min-h-0 flex-col border-l border-border bg-background" aria-label="Flywheel conversation pane">
-      <header className="border-b border-border bg-card/60 px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-              <span>{activeRun?.id ?? (run ? `${run.id} (${run.status})` : 'No active run')}</span>
-              {topBarLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-            </div>
-            <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span>Model: {status?.orchestrator.model ?? config.model}</span>
-              <span>Effort: {status?.orchestrator.effort ?? config.effort}</span>
-              <span>Context: {formatPercent(status?.orchestrator.ctxPercent)}</span>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ViewToggle
-              ariaLabel="Flywheel pane view"
-              value={viewMode}
-              onChange={setViewMode}
-              options={[
-                { id: 'conversation', label: 'Conversation' },
-                {
-                  id: 'terminal',
-                  label: 'Terminal',
-                  disabled: !conversation,
-                  disabledReason: conversation
-                    ? 'Attach to flywheel-orchestrator tmux session'
-                    : 'No flywheel-orchestrator session yet',
-                },
-              ]}
-            />
-            {/* v3 control bar (PAN-1694): Pause/Resume primary, secondary actions under
-                ⋯ More, Abort red + isolated. PAN-RUN-11 guard preserved — no action is
-                state-gated-away: Pause/Resume/Abort are always visible, and New Run /
-                Write Report / Open Run Report / Pop out / Configure are always reachable
-                one click into the More menu. Each keeps its disabled-by-legality logic. */}
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 disabled:opacity-50"
-              onClick={() => pauseMutation.mutate()}
-              disabled={actionPending || runState !== 'running'}
-              title={runState !== 'running' ? 'No active run to pause' : 'Pause the orchestrator'}
-            >
-              <Pause className="h-3.5 w-3.5" />
-              Pause
+    <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Flywheel conversation pane">
+      <header className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+        <ViewToggle
+          ariaLabel="Flywheel pane view"
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { id: 'conversation', label: 'Conversation' },
+            {
+              id: 'terminal',
+              label: 'Terminal',
+              disabled: !conversation,
+              disabledReason: conversation ? `Attach to ${FLYWHEEL_CONVERSATION_NAME}` : 'No flywheel conversation yet',
+            },
+          ]}
+        />
+        {(statusQuery.isLoading || busy) && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-label="Working" />}
+        <div className="ml-auto flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Flywheel controls">
+          {run === 'idle' && (
+            <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => start.run()}>
+              <Play className="h-3.5 w-3.5" />Start
             </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={() => resumeMutation.mutate()}
-              disabled={actionPending || runState !== 'paused'}
-              title={runState !== 'paused' ? 'Run is not paused' : 'Resume the orchestrator'}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Resume
-            </button>
-            <div className="relative">
-              <button
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={moreOpen}
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
-                onClick={() => setMoreOpen((o) => !o)}
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-                More
+          )}
+          {run === 'paused' && (
+            <>
+              {/* The embedded panel's "Resume flywheel" is this view's one primary CTA. */}
+              <button type="button" className={BUTTON} disabled={busy} onClick={() => resume.run()}>
+                <RotateCcw className="h-3.5 w-3.5" />Resume
               </button>
-              {moreOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" aria-hidden="true" onClick={() => setMoreOpen(false)} />
-                  <div role="menu" aria-label="More flywheel actions" className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-card p-1 shadow-lg">
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                      onClick={() => { setMoreOpen(false); void handleNewRun(); }}
-                      disabled={actionPending}
-                      title={runState === 'running'
-                        ? 'Abort the active run and start a new one'
-                        : runState === 'paused'
-                          ? 'Report the paused run and start a new one'
-                          : 'Start a new Flywheel run'}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      New Run
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                      onClick={() => { setMoreOpen(false); void handleReport(); }}
-                      disabled={actionPending || runState === 'none'}
-                      title={runState === 'none'
-                        ? 'No active run to report'
-                        : 'Finalize the run report and close out (orchestrator must be paused/stopped)'}
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      Write Report
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                      onClick={() => { setMoreOpen(false); openReportMutation.mutate(); }}
-                      disabled={actionPending || !run?.paths.report}
-                      title={run?.paths.report ?? 'No run report yet'}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Open Run Report
-                    </button>
-                    {!isPopoutWindow && (
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent"
-                        onClick={() => {
-                          setMoreOpen(false);
-                          window.open(
-                            '/popout/flywheel-conversation',
-                            'flywheel-conversation-popout',
-                            'width=1100,height=750,menubar=no,toolbar=no,location=no,status=no',
-                          );
-                        }}
-                        title="Open this view in a separate window"
-                      >
-                        <Maximize2 className="h-3.5 w-3.5" />
-                        Pop out
-                      </button>
-                    )}
-                    <a
-                      href="/settings#roles"
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent"
-                      onClick={(event) => {
-                        setMoreOpen(false);
-                        if (onOpenSettings) {
-                          event.preventDefault();
-                          onOpenSettings();
-                        }
-                      }}
-                    >
-                      <Settings className="h-3.5 w-3.5" />
-                      Configure
-                    </a>
-                  </div>
-                </>
-              )}
-            </div>
+              <button type="button" className={BUTTON} disabled={busy} onClick={() => void handleStartFresh()}>
+                <Play className="h-3.5 w-3.5" />Start fresh
+              </button>
+            </>
+          )}
+          {run === 'running' && (
+            <>
+              <button type="button" className={BUTTON} disabled={busy} onClick={() => pause.run()}>
+                <Pause className="h-3.5 w-3.5" />Pause
+              </button>
+              <button type="button" className={BUTTON} disabled={busy} onClick={() => report.run()}>
+                <FileText className="h-3.5 w-3.5" />Report
+              </button>
+              <button type="button" className={BUTTON} disabled={busy} onClick={() => void handleStop()}>
+                <Square className="h-3.5 w-3.5" />Stop
+              </button>
+              <button type="button" className={DESTRUCTIVE_BUTTON} disabled={busy} onClick={() => void handleAbort()}>
+                <StopCircle className="h-3.5 w-3.5" />Abort
+              </button>
+            </>
+          )}
+          {!isPopout && (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-destructive/50 bg-destructive/5 px-2.5 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/15 disabled:opacity-50"
-              onClick={handleAbort}
-              disabled={actionPending || runState === 'none'}
-              title={runState === 'none' ? 'No active run to abort' : 'Discard this run without writing a report'}
+              className={BUTTON}
+              title="Open this pane in its own window"
+              onClick={() => window.open(FLYWHEEL_POPOUT_PATH, 'flywheel-conversation-popout', 'width=1100,height=750,menubar=no,toolbar=no,location=no,status=no')}
             >
-              <StopCircle className="h-3.5 w-3.5" />
-              Abort
+              <Maximize2 className="h-3.5 w-3.5" />Pop out
             </button>
-          </div>
+          )}
         </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
         {conversationQuery.isLoading ? (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading flywheel conversation…
+            <Loader2 className="h-4 w-4 animate-spin" />Loading flywheel conversation…
           </div>
         ) : conversation ? (
           viewMode === 'terminal' ? (
@@ -446,70 +197,45 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
             <ConversationPanel
               conversation={conversation}
               embedded
-              onEmbeddedResume={!conversation.sessionAlive ? () => startMutation.mutate() : undefined}
-              embeddedResumeLabel={startMutation.isPending ? 'Starting…' : 'Start New Run'}
-              onSendFailed={() => void queryClient.invalidateQueries({ queryKey: ['conversation', FLYWHEEL_CONVERSATION_NAME] })}
+              onEmbeddedResume={run === 'paused' ? () => resume.run() : undefined}
+              embeddedResumeLabel={resume.pending ? 'Resuming…' : 'Resume flywheel'}
+              onSendFailed={() => void queryClient.invalidateQueries({ queryKey: FLYWHEEL_CONVERSATION_QUERY_KEY })}
             />
           )
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-            <p className="text-sm font-medium text-foreground">No flywheel-orchestrator session yet.</p>
+            <p className="text-sm font-medium text-foreground">No flywheel conversation yet — Start to create it</p>
             <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-              Start a run to create the singleton conversation. Once it exists, this pane reuses the standard conversation transcript and composer, and the Terminal toggle attaches to the orchestrator&apos;s tmux session.
+              Start opens <span className="font-mono">{FLYWHEEL_CONVERSATION_NAME}</span> running /pan-flywheel. This pane then shows its transcript and composer; the Terminal toggle attaches to its session.
             </p>
           </div>
         )}
       </div>
 
-      <footer className="border-t border-border bg-card/60 p-4 space-y-3">
+      <footer className="border-t border-border px-4 py-2.5">
         <button
           type="button"
-          // Without an explicit label this button's accessible name is the whole
-          // config dump, so every word inside it (e.g. "resume" in the scope
-          // apply-timing note) collides with toolbar button queries and with
-          // what a screen reader announces for the card.
           aria-label="Open Flywheel run config in Settings"
-          className="w-full rounded-lg border border-border bg-background p-3 text-left hover:bg-accent/60"
+          className="w-full text-left"
           onClick={onOpenSettings}
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Run config</span>
-            <span className="text-xs font-medium text-primary">Settings → Roles → Flywheel</span>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Run config</span>
+            <span className="text-[11px] text-primary">Settings → Roles → Flywheel</span>
           </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-            <div>
-              <dt className="text-muted-foreground">Harness</dt>
-              <dd className="font-medium text-foreground">{config.harness}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Model</dt>
-              <dd className="font-medium text-foreground">{config.model}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Effort</dt>
-              <dd className="font-medium text-foreground">{config.effort}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Max agents</dt>
-              <dd className="font-medium text-foreground">{config.maxAgents}</dd>
-            </div>
-            <div className="col-span-2">
-              <dt className="text-muted-foreground">
-                Scope{scopeDisplay.source === 'run' ? ' (this run)' : ''}
-              </dt>
-              <dd className="font-medium text-foreground" data-testid="flywheel-scope-value">
-                {formatScope(scopeDisplay.displayed)}
-              </dd>
-              {scopeDisplay.mismatchedConfigured && (
-                <dd className="mt-0.5 text-[11px] leading-snug text-amber-400" data-testid="flywheel-scope-mismatch">
-                  Settings are now set to {formatScope(scopeDisplay.mismatchedConfigured)}. This run keeps
-                  running under {formatScope(scopeDisplay.displayed)} until it is restarted or resumed.
-                </dd>
-              )}
-              <dd className="mt-0.5 text-[11px] leading-snug text-muted-foreground" data-testid="flywheel-scope-note">
-                Scope changes apply at the next run start or resume.
-              </dd>
-            </div>
+          <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs" data-testid="flywheel-run-config">
+            {([
+              ['Harness', config.harness],
+              ['Model', config.model],
+              ['Effort', config.effort],
+              ['Max agents', config.maxAgents],
+              ['Scope', config.scope],
+            ] as const).map(([label, value]) => (
+              <div key={label} className="flex gap-1.5">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="font-mono text-foreground">{value ?? 'default'}</dd>
+              </div>
+            ))}
           </dl>
         </button>
       </footer>

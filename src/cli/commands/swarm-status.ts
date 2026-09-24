@@ -3,18 +3,18 @@ import chalk from 'chalk';
 import { Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
-import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
-import { applyStatusOverrides } from '../../lib/xbrief/io.js';
+import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
+import { readItemStatusesAsync } from '../../lib/xbrief/continue-state.js';
+import { applyItemStatuses } from '../../lib/xbrief/io.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import {
   classifyInFlightSlots,
   getFailedMergeBlocks,
   type ClassifiedSwarmSlot,
 } from '../../lib/cloister/deacon-swarm.js';
-import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
+import { reconcileSlotState } from '../../lib/cloister/swarm-slot-reconcile.js';
 import { readSwarmHold, readSwarmInterventions } from '../../lib/cloister/deacon-swarm-record.js';
 import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
-import { getReviewStatusSync } from '../../lib/review-status.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 
 type ConsoleLike = Pick<typeof console, 'log' | 'error'>;
@@ -33,10 +33,9 @@ export interface SwarmStatusCommandDeps {
     workspacePath: string,
   ) => Promise<ClassifiedSwarmSlot[]>;
   getFailedMergeBlocks: typeof getFailedMergeBlocks;
-  getReviewStatusSync: typeof getReviewStatusSync;
   readSwarmHold: typeof readSwarmHold;
   readSwarmInterventions: typeof readSwarmInterventions;
-  readStatusOverrides: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
+  readItemStatuses: (workspacePath: string, issueId: string) => Promise<Record<string, string>>;
   listSessionNamesSync: () => string[];
   getConcurrencyLimits: typeof getConcurrencyLimits;
   countRunningSwarmSlotsForIssue: (issueId: string) => number;
@@ -82,11 +81,9 @@ const defaultStatusDeps: SwarmStatusCommandDeps = {
   reconcileSlotState,
   classifyInFlightSlots: (slots, workspacePath) => classifyInFlightSlots(slots, undefined, { workspacePath }),
   getFailedMergeBlocks,
-  getReviewStatusSync,
   readSwarmHold,
   readSwarmInterventions,
-  readStatusOverrides: (workspacePath, issueId) =>
-    readIssueRecordForWorkspaceSync(workspacePath, issueId)?.statusOverrides,
+  readItemStatuses: (workspacePath, issueId) => readItemStatusesAsync(resolvePlanHome(workspacePath), issueId),
   listSessionNamesSync,
   getConcurrencyLimits,
   countRunningSwarmSlotsForIssue,
@@ -109,9 +106,9 @@ export async function deriveSwarmStatus(
   const loaded = await loadSwarmPlan(issue, deps);
   if (!loaded) return null;
   const workspacePath = join(loaded.project.projectPath, 'workspaces', `feature-${issueLower}`);
-  const overrides = deps.readStatusOverrides(workspacePath, issue);
-  const effectiveDoc = overrides && Object.keys(overrides).length > 0
-    ? applyStatusOverrides(loaded.doc, overrides)
+  const itemStatuses = await deps.readItemStatuses(workspacePath, issue);
+  const effectiveDoc = Object.keys(itemStatuses).length > 0
+    ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;
   const reconciled = await deps.reconcileSlotState(issue, workspacePath, effectiveDoc);
   const classified = await deps.classifyInFlightSlots(reconciled.inFlight, workspacePath);
@@ -174,7 +171,7 @@ export async function swarmStatusCommand(
     deps.console.log(JSON.stringify(snapshot));
     return { ok: true, snapshot };
   }
-  printHumanStatus(snapshot, safeGetReviewStatus(snapshot.issueId, deps), deps.console);
+  printHumanStatus(snapshot, deps.console);
   return { ok: true, snapshot };
 }
 
@@ -242,17 +239,11 @@ function diffSnapshots(before: SwarmStatusSnapshot, after: SwarmStatusSnapshot):
 
 function printHumanStatus(
   snapshot: SwarmStatusSnapshot,
-  reviewHold: ReturnType<typeof getReviewStatusSync>,
   output: ConsoleLike,
 ): void {
   output.log(chalk.bold(`Swarm status for ${snapshot.issueId}`));
   output.log(`Foreman: ${snapshot.foreman.agentId} (${snapshot.foreman.alive ? 'session alive' : 'session dead'})`);
   if (snapshot.hold) output.log(`Hold: frozen — ${snapshot.hold.reason}`);
-  else if (reviewHold?.deaconIgnored) {
-    const reason = reviewHold.deaconIgnoredReason ? ` Reason: ${reviewHold.deaconIgnoredReason}.` : '';
-    output.log(`Hold: deacon-ignored — run \`pan swarm resume ${snapshot.issueId}\` to lift it.${reason}`);
-  }
-  else if (reviewHold?.stuck) output.log(`Hold: stuck — ${reviewHold.stuckReason ?? 'no reason recorded'}`);
   else output.log(
     'Hold: none — the foreman may run gated dispatch, merge, and recovery actions. '
     + 'Deacon patrols provide janitor, liveness, and event-delivery backstops.',
@@ -300,9 +291,3 @@ function safeListSessionNames(deps: Pick<SwarmStatusCommandDeps, 'listSessionNam
   try { return deps.listSessionNamesSync(); } catch { return []; }
 }
 
-function safeGetReviewStatus(
-  issueId: string,
-  deps: Pick<SwarmStatusCommandDeps, 'getReviewStatusSync'>,
-): ReturnType<typeof getReviewStatusSync> {
-  try { return deps.getReviewStatusSync(issueId); } catch { return null; }
-}

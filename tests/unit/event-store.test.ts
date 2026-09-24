@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
-import { createEventStore, type DbAdapter, trimReviewStatusHistoryPayloads } from '../../src/dashboard/server/event-store.js';
+import { createEventStore, type DbAdapter } from '../../src/dashboard/server/event-store.js';
 
 let db: SqliteDatabase;
 
@@ -163,320 +163,31 @@ describe('workspaceId stamping resolver injection (PAN-1990 review fix, non-bloc
   });
 });
 
-describe('trimReviewStatusHistoryPayloads (PAN-3253)', () => {
-  function insertReviewEvent(historyLength: number, issueId = 'MIN-901'): number {
-    const history = Array.from({ length: historyLength }, (_, i) => ({
-      type: 'review',
-      status: i % 2 === 0 ? 'pending' : 'passed',
-      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
-      notes: 'Approved unchanged review: frontend has no PR diff, padding padding padding',
-    }));
-    const payload = JSON.stringify({ issueId, status: { issueId, reviewStatus: 'passed', history } });
-    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run(
-      'review.status_changed', Date.now(), payload,
-    );
-    return payload.length;
-  }
-
-  it('trims oversized payload history to the bounded tail and reports saved space', async () => {
-    const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
-    const originalLength = insertReviewEvent(500);
-
-    const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
-
-    expect(result.trimmed).toBe(1);
-    expect(result.savedChars).toBeGreaterThan(0);
-    const row = db.prepare("SELECT payload FROM events WHERE type = 'review.status_changed'").get() as { payload: string };
-    expect(row.payload.length).toBeLessThan(originalLength);
-    const parsed = JSON.parse(row.payload);
-    expect(parsed.status.history).toHaveLength(20);
-    // Keeps the most recent tail, not the head
-    expect(parsed.status.history[19].timestamp).toBe(new Date(1_753_000_000_000 + 499 * 1000).toISOString());
-    expect(parsed.issueId).toBe('MIN-901');
-  });
-
-  it('trim converges to a no-op on second run (boot-trim-notes.ac2)', async () => {
-    const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
-    // Create a large payload with long notes to exceed 16KB threshold
-    const longNote = 'x'.repeat(1000);
-    const largeHistory = Array.from({ length: 30 }, (_, i) => ({
-      type: 'review',
-      status: i % 2 === 0 ? 'pending' : 'passed',
-      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
-      notes: longNote,
-    }));
-    const payload = JSON.stringify({ issueId: 'MIN-905', status: { issueId: 'MIN-905', reviewStatus: 'passed', history: largeHistory } });
-    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run(
-      'review.status_changed', Date.now(), payload,
-    );
-
-    // First trim
-    const result1 = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
-    expect(result1.trimmed).toBe(1);
-    expect(result1.savedChars).toBeGreaterThan(0);
-
-    // Second trim on already-trimmed row should be a no-op
-    const result2 = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
-    expect(result2.trimmed).toBe(0);
-    expect(result2.savedChars).toBe(0);
-
-    // Payload should remain identical after second run
-    const row = db.prepare("SELECT payload FROM events WHERE type = 'review.status_changed'").get() as { payload: string };
-    const parsed = JSON.parse(row.payload);
-    expect(parsed.status.history).toHaveLength(20);
-    // All notes should still be <= 500 chars
-    for (const entry of parsed.status.history) {
-      if (entry.notes) {
-        expect(entry.notes.length).toBeLessThanOrEqual(500);
-      }
-    }
-  });
-
-  it('payload size is bounded regardless of how many transitions occurred', async () => {
-    const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
-    insertReviewEvent(500, 'MIN-901');
-    insertReviewEvent(2140, 'MIN-891');
-
-    trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
-
-    const rows = db.prepare("SELECT payload FROM events WHERE type = 'review.status_changed'").all() as Array<{ payload: string }>;
-    const sizes = rows.map((r) => r.payload.length);
-    // Both trimmed payloads carry the same bounded 20-entry tail, so their
-    // sizes are equal — independent of the 500 vs 2140 original transitions.
-    expect(sizes[0]).toBe(sizes[1]);
-  });
-
-  it('leaves small payloads and other event types untouched', async () => {
-    const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
-    const small = JSON.stringify({ issueId: 'PAN-1', status: { reviewStatus: 'passed', history: [] } });
-    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run('review.status_changed', Date.now(), small);
-    const other = JSON.stringify({ agentId: 'a1', big: 'x'.repeat(20_000) });
-    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run('agent.activity_changed', Date.now(), other);
-
-    const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
-
-    expect(result.trimmed).toBe(0);
-    const rows = db.prepare('SELECT payload FROM events ORDER BY sequence').all() as Array<{ payload: string }>;
-    expect(rows[0]!.payload).toBe(small);
-    expect(rows[1]!.payload).toBe(other);
-  });
-});
-
-describe('append() bounding of review.status_changed (PAN-3253 append-door-bound)', () => {
-  it('bounds oversized review.status_changed at append door (FR-1)', () => {
+describe('startup purge of orphaned review-status events (PAN-3917)', () => {
+  it('purgeType removes review.status_changed and pipeline.status_changed rows, leaving others', () => {
     const store = createEventStore(db as unknown as DbAdapter);
 
-    const longNote = 'x'.repeat(1000);
-    const largeHistory = Array.from({ length: 30 }, (_, i) => ({
-      type: 'review',
-      status: i % 2 === 0 ? 'pending' : 'passed',
-      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
-      notes: longNote,
-    }));
-
-    const seq = store.append({
-      type: 'review.status_changed',
-      timestamp: new Date().toISOString(),
-      payload: {
-        status: {
-          history: largeHistory,
-          issueId: 'PAN-3260',
-          reviewStatus: 'passed',
-        },
-      },
-    } as any);
-
-    const rows = db.prepare('SELECT payload FROM events WHERE sequence = ?').all([seq]) as Array<{ payload: string }>;
-    expect(rows).toHaveLength(1);
-
-    const parsed = JSON.parse(rows[0]!.payload) as {
-      status?: { history?: Array<{ notes?: string }> };
-    };
-    expect(parsed.status?.history).toHaveLength(20);
-    for (const entry of parsed.status?.history || []) {
-      if (entry.notes) {
-        expect(entry.notes.length).toBeLessThanOrEqual(500);
-      }
-    }
-  });
-
-  it('preserves large non-review payloads byte-identically at append door', () => {
-    const store = createEventStore(db as unknown as DbAdapter);
-
-    const largePayload = { big: 'x'.repeat(100_000), nested: { data: 'y'.repeat(50_000) } };
-
-    const seq = store.append({
-      type: 'agent.activity_changed',
-      timestamp: new Date().toISOString(),
-      payload: largePayload,
-    } as any);
-
-    const rows = db.prepare('SELECT payload FROM events WHERE sequence = ?').all([seq]) as Array<{ payload: string }>;
-    expect(rows).toHaveLength(1);
-
-    const parsed = JSON.parse(rows[0]!.payload);
-    expect(JSON.stringify(parsed)).toBe(JSON.stringify(largePayload));
-  });
-
-  it('handles unparseable review.status_changed payloads gracefully at append door', () => {
-    const store = createEventStore(db as unknown as DbAdapter);
-
-    const event = {
-      type: 'review.status_changed',
-      timestamp: new Date().toISOString(),
-      payload: { some: 'data', status: { issueId: 'PAN-1' } },
-    } as any;
-
-    expect(() => {
-      store.append(event);
-    }).not.toThrow();
-
-    const rows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
-    expect(rows.length).toBeGreaterThan(0);
-  });
-
-  it('bounds oversized review.status_changed at appendAsync door (FR-1)', async () => {
-    const store = createEventStore(db as unknown as DbAdapter);
-
-    const longNote = 'x'.repeat(1000);
-    const largeHistory = Array.from({ length: 30 }, (_, i) => ({
-      type: 'review',
-      status: i % 2 === 0 ? 'pending' : 'passed',
-      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
-      notes: longNote,
-    }));
-
-    await store.appendAsync({
-      type: 'review.status_changed',
-      timestamp: new Date().toISOString(),
-      payload: {
-        status: {
-          history: largeHistory,
-          issueId: 'PAN-3261',
-          reviewStatus: 'passed',
-        },
-      },
-    } as any);
-
-    const rows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
-    const mostRecent = rows[rows.length - 1]!;
-
-    const parsed = JSON.parse(mostRecent.payload) as {
-      status?: { history?: Array<{ notes?: string }> };
-    };
-    expect(parsed.status?.history).toHaveLength(20);
-    for (const entry of parsed.status?.history || []) {
-      if (entry.notes) {
-        expect(entry.notes.length).toBeLessThanOrEqual(500);
-      }
-    }
-  });
-
-
-  it('preserves raw notes in status_history table while bounding event payload (FR-2)', () => {
-    const store = createEventStore(db as unknown as DbAdapter);
-
-    // Create a status update with notes that exceed the truncation limit
-    const longNote = 'x'.repeat(600); // Exceeds 500-char limit
-    const history = [
-      {
-        type: 'review',
-        status: 'passed',
-        timestamp: new Date().toISOString(),
-        notes: longNote,
-      },
-    ];
-
-    // Append an event with long notes
     store.append({
       type: 'review.status_changed',
       timestamp: new Date().toISOString(),
-      payload: {
-        status: {
-          history,
-          issueId: 'PAN-3264',
-          reviewStatus: 'passed',
-        },
-      },
+      payload: { issueId: 'PAN-1', status: { reviewStatus: 'passed' } },
     } as any);
-
-    // Verify event payload has truncated notes
-    const eventRows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
-    const mostRecent = eventRows[eventRows.length - 1]!;
-    const eventParsed = JSON.parse(mostRecent.payload) as {
-      status?: { history?: Array<{ notes?: string }> };
-    };
-    // Event payload should have truncated notes
-    if (eventParsed.status?.history?.[0]?.notes) {
-      expect(eventParsed.status.history[0].notes.length).toBeLessThanOrEqual(500);
-    }
-  });
-
-  it('handles malformed stored JSON gracefully during boot trim (PAN-3253 append-door-bound.ac3)', () => {
-    // Malformed JSON is reachable through boot-trim, not through typed append()
-    // This test inserts malformed review.status_changed directly into the database
-    // Make it exceed 16 KiB so trimReviewStatusHistoryPayloads selects and processes it
-    // and verifies trimReviewStatusHistoryPayloads() preserves it byte-identically
-
-    // Create payload > 16 KiB (16384 chars) that is malformed JSON
-    // This ensures it exceeds OVERSIZED_REVIEW_PAYLOAD_CHARS threshold
-    const malformedPayload = '{"status": {"history": [{"notes": "' + 'x'.repeat(20000) + '}'; // Malformed, >16KiB
-
-    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)')
-      .run('review.status_changed', Date.now(), malformedPayload);
-
-    // Store the original bytes for comparison
-    const original = db.prepare('SELECT payload FROM events WHERE type = ?')
-      .get('review.status_changed') as { payload: string };
-    const originalBytes = original.payload;
-
-    // trimReviewStatusHistoryPayloads should handle this gracefully
-    // The row should be selected (> 16 KiB), passed to boundReviewStatusPayload for parsing,
-    // catch the JSON error, and preserve the row byte-identically
-    const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
-    expect(result.trimmed).toBe(0); // No rows were successfully trimmed (malformed prevented changes)
-
-    // The malformed row should survive byte-identically
-    const afterTrim = db.prepare('SELECT payload FROM events WHERE type = ?')
-      .get('review.status_changed') as { payload: string };
-    expect(afterTrim.payload).toBe(originalBytes); // Byte-identical preservation
-  });
-
-
-  it('appendAsync bounding produces bounded payload in persisted data', async () => {
-    const store = createEventStore(db as unknown as DbAdapter);
-
-    const longNote = 'x'.repeat(1000);
-    const largeHistory = Array.from({ length: 40 }, (_, i) => ({
-      type: 'review',
-      status: i % 2 === 0 ? 'pending' : 'passed',
-      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
-      notes: longNote,
-    }));
-
-    // Append via async path
-    await store.appendAsync({
-      type: 'review.status_changed',
+    store.append({
+      type: 'pipeline.status_changed',
       timestamp: new Date().toISOString(),
-      payload: {
-        status: {
-          history: largeHistory,
-          issueId: 'PAN-3265',
-          reviewStatus: 'passed',
-        },
-      },
+      payload: { issueId: 'PAN-1', stage: 'merged' },
     } as any);
+    store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: { agentId: 'a1' } } as any);
 
-    // Verify bounded in persisted data
-    const persisted = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
-    const parsed = JSON.parse(persisted[persisted.length - 1]!.payload) as { status?: { history?: any[] } };
-    expect(parsed.status?.history).toHaveLength(20);
+    // initEventStore() runs this same purge unconditionally at boot: pipeline
+    // state is derived, never stored, so any review.status_changed or
+    // pipeline.status_changed row left behind by an older build is orphaned
+    // and safe to delete outright.
+    const purged = store.purgeType('review.status_changed') + store.purgeType('pipeline.status_changed');
+    expect(purged).toBe(2);
 
-    // Verify notes are truncated
-    for (const entry of parsed.status?.history || []) {
-      if (entry.notes) {
-        expect(entry.notes.length).toBeLessThanOrEqual(500);
-      }
-    }
+    const remaining = store.readFrom(0);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]!.type).toBe('agent.started');
   });
 });

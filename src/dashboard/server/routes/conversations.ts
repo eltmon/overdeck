@@ -1,6 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
-import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
 import { mkdir, writeFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
@@ -10,6 +10,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
 import * as self from './conversations.js';
+import { withConversationMessageReceipt } from '../services/conversation-message-receipts.js';
 import {
   backfillConversationModels,
   conversationRuntimeRootPids,
@@ -126,7 +127,7 @@ import {
   setOption,
   exactPaneTarget,
   listSessionNames,
-  findManagedServerPidSync,
+  findManagedServerPid,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
@@ -136,7 +137,7 @@ import {
   getProviderEnvForModel,
   getProviderAuthMode,
 } from '../../../lib/agents.js';
-import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
+import { writeBridgeToken } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../../../lib/config-yaml.js';
 import {
   writeConversationControlCommand,
@@ -144,21 +145,21 @@ import {
   type ThinkingLevel,
 } from '../../../lib/runtimes/conversation-control.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
-import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { canUseHarness } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
-import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
+import { getProviderForModel, piProviderForModel } from '../../../lib/providers.js';
 import { getOhmypiCodexAuthStatus } from '../../../lib/ohmypi-codex-auth.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
-import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
+import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import { workspaceContextFile, piGlobalContextFile } from '../../../lib/context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import {
   compactConversationNative,
   shouldInterceptManualCompact,
 } from '../services/conversation-compaction.js';
-import { encodeClaudeProjectDir, packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../../../lib/paths.js';
+import { packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../../../lib/paths.js';
 import {
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,
@@ -178,7 +179,7 @@ function getHeader(
   if (Array.isArray(value)) return value[0];
   return value;
 }
-const conversationReadDependencies = {
+export const conversationReadDependencies = {
   resolveSessionFile,
   tmuxSessionExists,
   listSessionNames: () => Effect.runPromise(listSessionNames()),
@@ -594,21 +595,20 @@ const postConversationMessageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        return await handleConversationMessage(name, body, conversationMessageDependencies);
+        return await withConversationMessageReceipt(name, body, () =>
+          handleConversationMessage(name, body, conversationMessageDependencies));
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        // Log the full stack (falls back to message) so a 500's cause is
-        // diagnosable after the fact, not just the bare message (PAN-1552).
+        // Include the stack so failures are diagnosable after the fact (PAN-1552).
         console.error('[conversations] send message failed:', error instanceof Error ? (error.stack ?? msg) : msg);
-        // MessageDeliveryFailed includes a pane snapshot for debugging
         if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
           return jsonResponse({
-            error: 'Message delivery failed — text did not reach the terminal',
-            deliveryFailed: true,
+            error: 'Delivery could not be confirmed. Check the conversation before sending again.',
+            deliveryUnknown: true,
             details: msg,
           }, { status: 504 });
         }
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: 'Delivery could not be confirmed', deliveryUnknown: true }, { status: 500 });
       }
     });
   }),

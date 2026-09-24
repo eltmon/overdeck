@@ -1,12 +1,10 @@
-import { Issue, Agent, LinearProject, STATUS_LABELS } from '../../types';
-import type { ReviewStatusSnapshot } from '@overdeck/contracts';
+import { Issue, Agent, DerivedIssueState, LinearProject, STATUS_LABELS } from '../../types';
 
 export const COLUMN_COLORS: Record<string, string> = {
   backlog: 'border-border',
   todo: 'border-border',
   in_progress: 'border-primary',
   in_review: 'border-warning',
-  verifying_on_main: 'border-info',
   done: 'border-success',
 };
 
@@ -15,7 +13,6 @@ export const COLUMN_TITLES: Record<string, string> = {
   todo: 'Backlog',
   in_progress: 'Work',
   in_review: 'Review',
-  verifying_on_main: 'Ship',
   done: 'Done',
 };
 
@@ -70,17 +67,13 @@ export function avatarGradient(name: string): string {
   return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
 }
 
-export function applyReviewStateToIssue(
-  issue: Issue,
-  reviewStatus?: Pick<ReviewStatusSnapshot, 'mergeStatus' | 'readyForMerge'>,
-): Issue {
-  const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
-  if (!isMerged) {
-    return {
-      ...issue,
-      mergeStatus: reviewStatus?.mergeStatus ?? issue.mergeStatus,
-    };
-  }
+/**
+ * PAN-3917: a merged PR moves the card to Done. The derived state is the only
+ * signal — the board never carries its own copy of a merge status.
+ */
+export function applyDerivedStateToIssue(issue: Issue, derived?: DerivedIssueState): Issue {
+  const isMerged = derived?.state === 'merged' || issue.labels?.some((l) => l.toLowerCase() === 'merged');
+  if (!isMerged) return issue;
 
   const labels = new Set(issue.labels || []);
   labels.delete('in-review');
@@ -89,79 +82,56 @@ export function applyReviewStateToIssue(
   labels.delete('Review Ready');
   labels.add('merged');
 
-  // PAN-1190: keep verifying_on_main visible after merge until close-out completes.
-  const canonicalState = issue.targetCanonicalState ?? issue.state ?? STATUS_LABELS[issue.status];
-  if (canonicalState === 'verifying_on_main') {
-    return {
-      ...issue,
-      mergeStatus: 'merged',
-      labels: Array.from(labels),
-      targetCanonicalState: 'verifying_on_main',
-    };
-  }
-
   return {
     ...issue,
     status: 'Done',
-    mergeStatus: 'merged',
     labels: Array.from(labels),
     targetCanonicalState: 'done',
   };
 }
 
-export function shouldShowReviewReadyBadge(
-  issue: Issue,
-  reviewStatus?: Pick<ReviewStatusSnapshot, 'readyForMerge' | 'mergeStatus'>,
-): boolean {
+export function shouldShowReviewReadyBadge(issue: Issue, derived?: DerivedIssueState): boolean {
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
-  const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
-  const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
-  if (isTerminal) return false;
+  const isMerged = derived?.state === 'merged' || issue.labels?.some((l) => l.toLowerCase() === 'merged');
+  if (isMerged || canonical === 'done' || canonical === 'canceled') return false;
 
-  if (reviewStatus) {
-    return reviewStatus.readyForMerge === true;
-  }
+  if (derived) return derived.state === 'ready';
 
   return issue.labels?.some(
     (label) => typeof label === 'string' && label.toLowerCase() === 'review ready'
   ) ?? false;
 }
 
+/**
+ * What the card asks for next, read from the forge and the attention signal —
+ * never from a stored pipeline step.
+ */
 export function getPipelineCallToAction(
-  reviewStatus?: Pick<ReviewStatusSnapshot, 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes'>,
+  derived?: DerivedIssueState,
 ): { label: string; detail: string; title: string } | null {
-  if (!reviewStatus) return null;
+  if (!derived) return null;
 
-  if (reviewStatus.verificationStatus === 'failed') {
-    const detail = reviewStatus.verificationNotes || 'Verification failed.';
+  if (derived.state === 'changes-requested') {
     return {
-      label: 'Next: Review & Test',
-      detail,
-      title: 'Verification failed — rerun Review & Test to send the failure back through the pipeline.',
+      label: 'Next: address review',
+      detail: 'The reviewer requested changes.',
+      title: 'The PR has a CHANGES_REQUESTED review — push a fix, then re-request review.',
     };
   }
 
-  if (reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked') {
+  if (derived.pr?.checks === 'red') {
     return {
-      label: 'Next: Review & Test',
-      detail: 'Review did not pass.',
-      title: 'Review did not pass — rerun Review & Test after addressing the issue.',
+      label: 'Next: fix checks',
+      detail: 'CI checks are failing.',
+      title: 'The PR has failing checks — fix them before the merge gate will open.',
     };
   }
 
-  if (reviewStatus.testStatus === 'failed' || reviewStatus.testStatus === 'dispatch_failed') {
+  if (derived.pr && derived.pr.mergeable === false) {
     return {
-      label: 'Next: Review & Test',
-      detail: 'Tests failed.',
-      title: 'Tests failed — rerun Review & Test to continue the pipeline.',
-    };
-  }
-
-  if (reviewStatus.mergeStatus === 'failed') {
-    return {
-      label: 'Next: Re-Review',
-      detail: 'Merge did not complete.',
-      title: 'Merge failed after a prior pass — rerun the pipeline before merging again.',
+      label: 'Next: rebase',
+      detail: 'The branch cannot merge cleanly.',
+      title: 'The forge cannot merge this branch — rebase it onto main.',
     };
   }
 
@@ -190,7 +160,6 @@ export function groupByStatus(issues: Issue[], showClosedOut: boolean = false): 
     todo: [],
     in_progress: [],
     in_review: [],
-    verifying_on_main: [],
     done: [],
     canceled: [],
   };

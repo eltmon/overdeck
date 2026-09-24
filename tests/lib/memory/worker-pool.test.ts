@@ -2,9 +2,8 @@ import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MemoryObservation } from '@overdeck/contracts';
 import { readMemoryHealthSnapshot, updateMemoryHealth, type MemoryHealthChangedPayload } from '../../../src/lib/memory/health.js';
-import { MemoryExtractionWorkerPool, MemoryPipelineWorkerPool, type MemoryExtractionJobResult, type MemoryPipelineJobResult } from '../../../src/lib/memory/worker-pool.js';
+import { MemoryPipelineWorkerPool, type MemoryPipelineJobResult } from '../../../src/lib/memory/worker-pool.js';
 
 const identity = {
   projectId: 'overdeck',
@@ -32,16 +31,6 @@ afterEach(async () => {
   tempDir = null;
 });
 
-function job(overrides: Partial<Parameters<MemoryExtractionWorkerPool['enqueue']>[0]> = {}) {
-  return {
-    compressedText: 'U: implement worker\nA: done',
-    identity,
-    gitBranch: 'feature/pan-1052',
-    sourceTranscriptOffset: 42,
-    ...overrides,
-  };
-}
-
 function pipelineJob(overrides: Partial<Parameters<MemoryPipelineWorkerPool['enqueue']>[0]> = {}) {
   return {
     sessionId: 'session-1',
@@ -68,94 +57,8 @@ function extracted(data: unknown) {
   };
 }
 
-function validPayload(index = 1) {
-  return {
-    narrative: `Worker wrote observation ${index}.`,
-    summary: `Observation ${index} written.`,
-    actionStatus: `Worker ${index}`,
-    tags: ['handoff'],
-    files: ['src/lib/memory/worker-pool.ts'],
-  };
-}
-
 describe('memory extraction worker pool', () => {
-  it('runs queued extraction jobs with bounded concurrency', async () => {
-    let active = 0;
-    let maxActive = 0;
-    const releases: Array<() => void> = [];
-    const results: MemoryExtractionJobResult[] = [];
-    const pool = new MemoryExtractionWorkerPool({
-      loadConcurrency: () => 2,
-      writeObservation: vi.fn(async (observation: MemoryObservation) => ({ jsonlPath: `${observation.id}.jsonl`, markdownPath: `${observation.id}.md` })),
-      updateHealth: vi.fn(async () => undefined),
-      onResult: (result) => results.push(result),
-    });
 
-    for (let index = 0; index < 4; index++) {
-      pool.enqueue(job({
-        jobId: `job-${index}`,
-        extract: async () => {
-          active += 1;
-          maxActive = Math.max(maxActive, active);
-          await new Promise<void>((resolve) => releases.push(resolve));
-          active -= 1;
-          return extracted(validPayload(index));
-        },
-      }));
-    }
-
-    await vi.waitFor(() => expect(releases).toHaveLength(2));
-    expect(maxActive).toBe(2);
-
-    releases.splice(0).forEach((release) => release());
-    await vi.waitFor(() => expect(releases).toHaveLength(2));
-    releases.splice(0).forEach((release) => release());
-    await pool.waitForIdle();
-
-    expect(results.map((result) => result.status)).toEqual(['written', 'written', 'written', 'written']);
-    expect(maxActive).toBe(2);
-  });
-
-  it('drops oldest queued extraction jobs when the queue limit is reached', async () => {
-    const releases: Array<() => void> = [];
-    const results: MemoryExtractionJobResult[] = [];
-    const pool = new MemoryExtractionWorkerPool({
-      loadConcurrency: () => 1,
-      queueLimit: 2,
-      writeObservation: vi.fn(async (observation: MemoryObservation) => ({ jsonlPath: `${observation.id}.jsonl`, markdownPath: `${observation.id}.md` })),
-      updateHealth: vi.fn(async () => undefined),
-      onResult: (result) => results.push(result),
-    });
-
-    pool.enqueue(job({
-      jobId: 'job-0',
-      extract: async () => {
-        await new Promise<void>((resolve) => releases.push(resolve));
-        return extracted(validPayload(0));
-      },
-    }));
-    await vi.waitFor(() => expect(releases).toHaveLength(1));
-
-    for (let index = 1; index < 4; index++) {
-      pool.enqueue(job({
-        jobId: `job-${index}`,
-        extract: async () => {
-          await new Promise<void>((resolve) => releases.push(resolve));
-          return extracted(validPayload(index));
-        },
-      }));
-    }
-    expect(pool.droppedCount()).toBe(1);
-
-    releases.splice(0).forEach((release) => release());
-    await vi.waitFor(() => expect(releases).toHaveLength(1));
-    releases.splice(0).forEach((release) => release());
-    await vi.waitFor(() => expect(releases).toHaveLength(1));
-    releases.splice(0).forEach((release) => release());
-    await pool.waitForIdle();
-
-    expect(results.map((result) => result.jobId)).toEqual(['job-0', 'job-2', 'job-3']);
-  });
 
   it('runs transcript-delta pipeline jobs with bounded concurrency', async () => {
     let active = 0;
@@ -224,47 +127,7 @@ describe('memory extraction worker pool', () => {
     expect(ranges[2]).toEqual({ fromOffset: 0, toOffset: 300, transcriptPath: '/tmp/trusted-session-1.jsonl' });
   });
 
-  it('writes observations and records one healthy extraction per successful job', async () => {
-    const updateHealth = vi.fn(async () => undefined);
-    const write = vi.fn(async (observation: MemoryObservation) => ({
-      jsonlPath: `${observation.id}.jsonl`,
-      markdownPath: `${observation.id}.md`,
-    }));
-    const results: MemoryExtractionJobResult[] = [];
-    const pool = new MemoryExtractionWorkerPool({
-      loadConcurrency: () => 4,
-      writeObservation: write,
-      updateHealth,
-      onResult: (result) => results.push(result),
-    });
 
-    pool.enqueue(job({ extract: async () => extracted(validPayload()) }));
-    await pool.waitForIdle();
-
-    expect(write).toHaveBeenCalledOnce();
-    expect(updateHealth).toHaveBeenCalledWith(identity, { status: 'healthy', success: true });
-    expect(results[0]?.status).toBe('written');
-  });
-
-  it('records malformed extraction failures without throwing to callers', async () => {
-    const updateHealth = vi.fn(async () => undefined);
-    const results: MemoryExtractionJobResult[] = [];
-    const pool = new MemoryExtractionWorkerPool({
-      updateHealth,
-      onResult: (result) => results.push(result),
-    });
-
-    const id = pool.enqueue(job({ extract: async () => extracted({ summary: 'missing required fields' }) }));
-    expect(id).toBeTruthy();
-    await pool.waitForIdle();
-
-    expect(updateHealth).toHaveBeenCalledWith(identity, {
-      status: 'failing',
-      reason: 'malformed-response',
-      success: false,
-    });
-    expect(results).toEqual([{ jobId: id, status: 'dropped', reason: 'malformed-response' }]);
-  });
 
   it('updates health.json counts and emits events only on status transitions', async () => {
     const emitted: Array<{ payload: MemoryHealthChangedPayload; timestamp: string }> = [];

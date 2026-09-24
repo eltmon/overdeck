@@ -7,7 +7,7 @@ vi.mock('../../../../../src/lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../src/lib/agents.js')>();
   return {
     ...actual,
-    getLatestSessionIdSync: (agentId: string) => mockGetLatestSessionIdSync(agentId),
+    getLatestSessionId: (agentId: string) => mockGetLatestSessionIdSync(agentId),
   };
 });
 

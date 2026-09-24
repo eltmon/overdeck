@@ -77,12 +77,10 @@ async function captureInterestedAgent(
         const { getRemoteAgentOutput } = await import('../../../lib/remote/remote-agents.js')
         stdout = await getRemoteAgentOutput(agentId, remoteState.vmName, 50)
       } else {
-        stdout = await Effect.runPromise(capturePane(agentId, 50))
+        stdout = await capturePane(agentId, 50)
       }
     } catch {
-      stdout = await Effect.runPromise(
-        capturePane(agentId, 50).pipe(Effect.catch(() => Effect.succeed(''))),
-      )
+      stdout = await capturePane(agentId, 50).catch(() => '')
     }
 
     if (!hasAgentInterest(state, agentId)) return
@@ -127,13 +125,10 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
     }
 
     if (interestedIds.size === 0) return
-    await Effect.runPromise(withConcurrencyLimit(
-      [...interestedIds].map((agentId) => Effect.tryPromise({
-        try: () => captureInterestedAgent(state, agentId),
-        catch: (cause) => cause,
-      })),
+    await withConcurrencyLimit(
+      [...interestedIds].map((agentId) => () => captureInterestedAgent(state, agentId)),
       4,
-    ))
+    )
   } finally {
     state.polling = false
   }

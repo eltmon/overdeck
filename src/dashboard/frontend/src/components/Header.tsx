@@ -7,8 +7,8 @@ export type Tab =
   | 'kanban'
   | 'command-deck'
   | 'agents'
-  | 'flywheel'
   | 'orders'
+  | 'flywheel'
   | 'backlog'
   | 'resources'
   | 'knowledge'
@@ -25,4 +25,5 @@ export type Tab =
   | 'sessions'
   | 'awaiting-merge'
   | 'workspace-new'
-  | 'workspace';
+  | 'workspace'
+  | 'project-new';

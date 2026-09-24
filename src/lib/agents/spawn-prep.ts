@@ -1,34 +1,38 @@
+import { materializeMuseContext } from '../runtimes/muse-context.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { loadConfigSync } from '../config.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
-import { getFlywheelActiveRunIdSync } from '../overdeck/control-settings.js';
+import { getFlywheelActiveRunId } from '../overdeck/control-settings.js';
 import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
-import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByPath, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
-import { resolveCanonicalReviewStatus } from '../cloister/review-status-source.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
-import type { ModelId, ComplexityLevel } from '../settings.js';
-import { requireModelOverrideSync } from '../model-validation.js';
+import { getPrFacts } from '../cloister/pr-facts.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
+import type { ModelId } from '../settings.js';
+import { requireModelOverride } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { readWorkspacePlanSync } from '../xbrief/io.js';
-import { getDispatchableItems } from '../xbrief/dag.js';
+import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
+import type { XBriefDocument, XBriefDifficulty, XBriefItem, XBriefItemStatus } from '../xbrief/types.js';
 import { type Role } from './agent-state.js';
-import type { TierAssignment } from './dispatch-tier.js';
 import { normalizeFlywheelRunId } from './provenance.js';
-import { clearStaleClosedOutBeforeSpawn } from './reopen-guard.js';
 import { resolveStaffing } from './staffing.js';
-import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from './tier-table.js';
+import { applyEffectiveDifficulty } from './tier-escalation.js';
+import { checkStaffingFitness } from './tier-fitness.js';
+import { buildTierFitnessContext } from './tier-fitness-context.js';
+import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
 import {
   buildCavemanExports,
+  determineModel,
   getProviderEnvForModel,
   getProviderExportsForModel,
 } from './provider-env.js';
@@ -41,7 +45,7 @@ import {
   getOhmypiLauncherFields,
   inferMemoryProjectId,
   roleAgentDefinitionPath,
-  roleSystemPromptInjectionSync,
+  roleSystemPromptInjection,
 } from './runtime-command.js';
 
 export type FlywheelSpawnEnv = {
@@ -50,7 +54,7 @@ export type FlywheelSpawnEnv = {
 };
 
 export function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
-  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunIdSync());
+  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunId());
   return runId
     ? { OVERDECK_FLYWHEEL_RUN_ID: runId, OVERDECK_FLYWHEEL_AGENT_ROLE: role }
     : {};
@@ -82,11 +86,12 @@ export interface SpawnOptions {
   prompt?: string;
   /**
    * Spawn role. Defaults to 'work'. The 'strike' role is the bypass path that
-   * skips plan/review/test/ship and lands directly on main — see roles/strike.md.
+   * skips plan/review/test/ship and ends with a PR the operator merges — see
+   * roles/strike.md.
    * Strike sessions are named `strike-<issue-id>` instead of `agent-<issue-id>`.
    */
   role?: 'work' | 'strike' | 'knowledge';
-  difficulty?: ComplexityLevel;
+  difficulty?: XBriefDifficulty;
   agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
 
   // Work type system (PAN-118)
@@ -156,6 +161,10 @@ export interface SpawnRunOptions {
   slotBranch?: string;
   /** Optional per-spawn cap for registered work-agent slots. Defaults to the work-agent governor cap. */
   maxRegisteredSlots?: number;
+  /** PAN-3920: agent or conversation that spawned this run (workers); stamped as the `parent` pane token. */
+  parentId?: string;
+  /** PAN-3920: `read-only` blocks git writes inside the run's workspace. */
+  gitGuardMode?: 'default' | 'read-only';
 }
 
 export interface RegisteredSlotSpawn {
@@ -164,24 +173,6 @@ export interface RegisteredSlotSpawn {
   workspace: string;
   slotIndex: number;
   slotItemId: string;
-}
-
-/**
- * Thread a tiered-execution tier assignment into spawn options (PAN-1791).
- * When the assignment resolved a tier, its model+harness replace the parent
- * defaults so the dispatched bead runs on the tier its difficulty selected.
- * With no assignment (tiering disabled), the options pass through unchanged.
- */
-export function applyTierAssignment<T extends Pick<SpawnRunOptions, 'model' | 'harness'>>(
-  options: T,
-  assignment?: TierAssignment,
-): T {
-  if (!assignment?.model) return options;
-  return {
-    ...options,
-    model: assignment.model,
-    harness: assignment.harness ?? options.harness,
-  };
 }
 
 export function resolveRegisteredSlotSpawn(
@@ -216,17 +207,28 @@ export interface SlotTierSpawnParams {
   model?: string;
   harness?: RuntimeName;
   tierName?: string;
+  /** The slot item's xBRIEF difficulty, when the plan item declares one. */
+  difficulty?: XBriefDifficulty;
+  /** Single-work path only: deduplicated difficulties across the plan's pending items. */
+  planDifficulties?: XBriefDifficulty[];
+  /** Single-work path only: pending items that carry a difficulty, as id/difficulty pairs. */
+  planItems?: Array<{ id: string; difficulty?: XBriefDifficulty }>;
   /** PAN-2397: true when staffing came from the implicit roles.work tier.
    * Implicit staffing intentionally omits `harness` so the spawn keeps its
    * historical harness handling (provider-default derived from the model). */
   implicit?: boolean;
+  /** PAN-3842: when the caller passed an explicit per-spawn model override,
+   * the helpers still surface plan difficulty info but leave `model` and
+   * `harness` unset so override precedence is preserved. This field echoes
+   * the override for clarity in tests and logs. */
+  explicitOverride?: string;
 }
 
 /**
  * Tiered-execution model resolution for a registered slot spawn (PAN-1791,
  * fixing PAN-1196's "difficulty captured and ignored"). When tiered execution
- * is enabled for the plan, resolve the slot item's tier through
- * assignDispatchTier and return its (model, harness) as spawn params so the
+ * is enabled for the plan, resolve the slot item's tier through the
+ * resolution chain and return its (model, harness) as spawn params so the
  * dispatched bead runs on the tier its difficulty selected.
  *
  * Returns {} — leaving the existing model resolution untouched — when:
@@ -243,11 +245,29 @@ export function resolveSlotTierSpawnParams(
   explicitModel?: string,
   spawnKey?: string,
 ): SlotTierSpawnParams {
-  // An explicit per-spawn model override outranks all staffing (same
-  // precedence as determineModel).
-  if (explicitModel) return {};
   const doc = readWorkspacePlanSync(baseWorkspace);
-  if (!doc) return {};
+  if (!doc) {
+    // PAN-3842 (review): under an explicit --model a missing plan never
+    // aborts the spawn — return the override marker and let the caller
+    // proceed (FR-7 / NonGoal 1).
+    if (explicitModel) return { explicitOverride: explicitModel };
+    return {};
+  }
+
+  // PAN-3842 (review): override path short-circuits BEFORE the missing-item
+  // throw so a slot/plan desync under an explicit --model never aborts the
+  // spawn (FR-7 / NonGoal 1).
+  if (explicitModel) {
+    const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
+    return {
+      // PAN-3858: warn against the promoted difficulty, not the authored one.
+      difficulty: item
+        ? (applyEffectiveDifficulty(item, readTierOverrides(baseWorkspace)).metadata?.difficulty as XBriefDifficulty | undefined)
+        : undefined,
+      explicitOverride: explicitModel,
+    };
+  }
+
   const planMetadata = doc?.plan?.metadata;
 
   // Extract issueId from workspace path: feature-<issueId>
@@ -277,62 +297,265 @@ export function resolveSlotTierSpawnParams(
   // PAN-2397 (Always Tiered): staffing ALWAYS resolves — explicit tier table
   // when enabled, else the implicit roles.work tier (same resolveModel +
   // spawnKey as determineModel, so distributions stay deterministic).
-  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config, issueId: issueId ?? undefined });
+  // PAN-3858: recorded promotions must reach staffing.
+  const tierOverrides = readTierOverrides(baseWorkspace);
+  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config, issueId: issueId ?? undefined, tierOverrides });
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
+    // PAN-3858: staffing routed this item by its effective (promoted)
+    // difficulty, so the fitness warning must judge the model against the
+    // same difficulty.
+    difficulty: applyEffectiveDifficulty(item, tierOverrides).metadata?.difficulty as XBriefDifficulty | undefined,
+  };
+}
+
+/** Difficulty ordering for single-work staffing (PAN-3857 D4). */
+const DIFFICULTY_RANK: Readonly<Record<XBriefDifficulty, number>> = {
+  trivial: 0,
+  simple: 1,
+  medium: 2,
+  complex: 3,
+  expert: 4,
+};
+
+/** Statuses getDispatchableItems excludes. The single-work staffing candidate
+ * set is the same item set — but ALL of it, not the first dispatchable item. */
+const SINGLE_WORK_NON_CANDIDATE_STATUSES = new Set<XBriefItemStatus>(['completed', 'cancelled', 'running', 'blocked']);
+
+/**
+ * Effective dispatch difficulty of a plan item (PAN-3857 D4). by_kind routes
+ * first — exactly as resolveTier applies it — so a `design` item counts as
+ * the highest difficulty that maps to the tier its kind names; otherwise the
+ * item's own metadata.difficulty.
+ */
+function effectiveItemDifficulty(
+  item: Pick<XBriefItem, 'metadata'>,
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+): XBriefDifficulty | undefined {
+  const kind = item.metadata?.kind;
+  const kindTierName = kind ? tiered?.byKind?.[kind] : undefined;
+  if (kindTierName && tiered) {
+    let best: XBriefDifficulty | undefined;
+    for (const [difficulty, tierName] of Object.entries(tiered.difficultyToTier)) {
+      if (tierName !== kindTierName) continue;
+      const candidate = difficulty as XBriefDifficulty;
+      if (best === undefined || DIFFICULTY_RANK[candidate] > DIFFICULTY_RANK[best]) best = candidate;
+    }
+    if (best !== undefined) return best;
+  }
+  return item.metadata?.difficulty;
+}
+
+/**
+ * The item the single work agent is staffed for (PAN-3857 D4): the hardest
+ * remaining item in the plan. The agent executes the whole plan, so keying on
+ * the first dispatchable item misrouted every plan whose hard items come
+ * later. Ties break to the earliest item in plan order; items with no
+ * resolvable difficulty sort below every ranked item. Recorded tier
+ * promotions (PAN-3858) raise an item's effective difficulty before ranking.
+ */
+function selectStaffingItem(
+  doc: XBriefDocument,
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+  tierOverrides?: TierOverridesMap,
+): XBriefItem | undefined {
+  return selectHardestItem(
+    doc.plan.items.filter((item) => !SINGLE_WORK_NON_CANDIDATE_STATUSES.has(item.status)),
+    tiered,
+    tierOverrides,
+  );
+}
+
+function selectHardestItem(
+  items: readonly XBriefItem[],
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+  tierOverrides?: TierOverridesMap,
+): XBriefItem | undefined {
+  let best: XBriefItem | undefined;
+  let bestRank = -1;
+  for (const item of items) {
+    const effectiveItem = tierOverrides ? applyEffectiveDifficulty(item, tierOverrides) : item;
+    const difficulty = effectiveItemDifficulty(effectiveItem, tiered);
+    const rank = difficulty === undefined ? -1 : DIFFICULTY_RANK[difficulty];
+    if (best === undefined || rank > bestRank) {
+      best = item;
+      bestRank = rank;
+    }
+  }
+  return best;
+}
+
+/**
+ * Statuses excluded from the single-work fitness sweep (PAN-3842). Deliberately
+ * NARROWER than SINGLE_WORK_NON_CANDIDATE_STATUSES: that set picks the one item
+ * staffing keys on, while this set answers "what will this agent actually
+ * touch". A blocked item unblocks and gets worked by the same agent, so its
+ * difficulty still belongs in the warning.
+ */
+const FITNESS_DONE_STATUSES: ReadonlySet<XBriefItemStatus> = new Set<XBriefItemStatus>(['completed', 'cancelled']);
+
+/**
+ * Pending-item difficulties for the single-work fitness warning (PAN-3842).
+ * Recorded tier promotions (PAN-3858) are applied first, so an item escalated
+ * to `expert` is warned about at `expert` — staffing already routes it that
+ * way, and reading the raw metadata here would silently under-warn on exactly
+ * the items the escalation path just raised.
+ */
+function collectPlanFitnessItems(
+  doc: XBriefDocument,
+  tierOverrides: TierOverridesMap,
+): { planDifficulties: XBriefDifficulty[]; planItems: Array<{ id: string; difficulty?: XBriefDifficulty }> } {
+  const planItems = doc.plan.items
+    .filter((candidate) => !FITNESS_DONE_STATUSES.has(candidate.status))
+    .map((candidate) => ({
+      id: candidate.id,
+      difficulty: applyEffectiveDifficulty(candidate, tierOverrides).metadata?.difficulty as XBriefDifficulty | undefined,
+    }))
+    .filter((candidate): candidate is { id: string; difficulty: XBriefDifficulty } => Boolean(candidate.difficulty));
+  return {
+    planDifficulties: [...new Set(planItems.map((candidate) => candidate.difficulty))],
+    planItems,
   };
 }
 
 /**
+ * PAN-3842: build the fitness-check payload for a slot spawn. Centralizes
+ * the model reassignment + harness fallback so the fitness check always
+ * sees the FINAL selected model, and tests can drive the production
+ * ordering through this exported helper.
+ */
+export function resolveSlotSpawnFitness(
+  role: Role,
+  spawnKey: string,
+  tierParams: SlotTierSpawnParams,
+  optionsModel: string | undefined,
+  optionsHarness: RuntimeName | undefined,
+  slotItemId: string,
+): {
+  staffing: { tierName: string; model?: string; harness?: RuntimeName };
+  difficulties: XBriefDifficulty[];
+  items: Array<{ id: string; difficulty?: XBriefDifficulty }>;
+} {
+  // Reassign to the FINAL model — the same step spawn.ts performs after
+  // resolveSlotTierSpawnParams so the agent genuinely spawns the staffed
+  // model, not the pre-reassignment parent default.
+  const finalModel = tierParams.model
+    ? determineModel({ model: tierParams.model, role, spawnKey })
+    : optionsModel;
+  const finalHarness: RuntimeName | undefined = tierParams.model
+    ? (tierParams.harness ?? optionsHarness)
+    : optionsHarness;
+
+  return {
+    staffing: {
+      tierName: tierParams.tierName ?? 'default',
+      model: finalModel,
+      harness: finalHarness,
+    },
+    difficulties: tierParams.difficulty ? [tierParams.difficulty] : [],
+    items: [{ id: slotItemId, difficulty: tierParams.difficulty }],
+  };
+}
+
+/**
+ * PAN-3842: one `[spawn] tier fitness:` console.warn line per fitness warning
+ * for the staffed (model, harness) at spawn time. Never throws — a fitness
+ * check failure must not prevent a spawn.
+ */
+export function logTierFitnessAtSpawn(
+  label: string,
+  staffing: { tierName: string; model?: string; harness?: RuntimeName },
+  difficulties: XBriefDifficulty[],
+  items: Array<{ id: string; difficulty?: XBriefDifficulty }>,
+  log: (line: string) => void = console.warn,
+): void {
+  if (!staffing.model || difficulties.length === 0) return;
+  try {
+    const ctx = buildTierFitnessContext(loadYamlConfig().config);
+    const warnings = checkStaffingFitness(
+      { tierName: staffing.tierName, model: staffing.model, harness: staffing.harness, path: `tier '${staffing.tierName}'` },
+      difficulties,
+      ctx,
+    );
+    for (const w of warnings) {
+      // List only the items whose difficulty the warning names; fall back to
+      // every item so the line never reads "(items: )".
+      const offending = items.filter((i) => i.difficulty !== undefined && w.difficulties.includes(i.difficulty));
+      const ids = (offending.length > 0 ? offending : items).map((i) => i.id);
+      log(`[spawn] tier fitness: ${label} — ${w.message} (items: ${ids.join(', ')}) — PAN-3842`);
+    }
+  } catch (error) {
+    log(`[spawn] tier fitness check skipped: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
  * Tiered-execution model resolution for the single work-agent path.
- * Auto-start and non-swarm issues still run one foreground work agent, but
- * the first dispatchable xBRIEF item is the same scheduling unit the agent is
- * about to execute. If tiered execution is enabled for the issue, route that
- * agent through the item's resolved tier; otherwise leave role-default model
- * resolution untouched.
+ * Auto-start and non-swarm issues still run one foreground work agent, and
+ * that agent executes the whole plan — so it is staffed for the plan's
+ * hardest remaining item (PAN-3857 D4). If tiered execution is enabled for
+ * the issue, route the agent through that item's resolved tier; otherwise
+ * leave role-default model resolution untouched.
  */
 export function resolveSingleWorkTierSpawnParams(
   workspace: string,
   explicitModel?: string,
   spawnKey?: string,
 ): SlotTierSpawnParams {
-  if (explicitModel) return {};
-
   const doc = readWorkspacePlanSync(workspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
 
-  const item = getDispatchableItems(doc, new Set())[0];
-  if (!item) return {};
+  // PAN-3842: an override skips tier selection entirely, so it must also skip
+  // staffing. Difficulty still comes off doc.plan.items so the caller warns
+  // against the FINAL model; model and harness stay unset so options.model wins.
+  if (explicitModel) {
+    return {
+      ...collectPlanFitnessItems(doc, readTierOverrides(workspace)),
+      explicitOverride: explicitModel,
+    };
+  }
 
   // Extract issueId from workspace path: feature-<issueId>
   const workspaceName = basename(workspace);
   const issueIdMatch = workspaceName.match(/^feature-(.+)$/i);
   const issueId = issueIdMatch ? issueIdMatch[1].toUpperCase() : null;
 
-  // PAN-2397 (Always Tiered): the single-work path staffs through the same
-  // resolver as slots — explicit table when enabled, implicit roles.work
-  // tier otherwise. Use issue-aware resolver to honor record override (PAN-2383).
   const config = loadYamlConfig().config;
   const tiered = config.tieredExecution;
   const effectiveTieredEnabled = issueId
     ? resolveTieredExecutionEnabledForIssue(tiered, issueId, planMetadata)
     : resolveTieredExecutionEnabled(tiered, planMetadata);
 
+  // PAN-3858: recorded promotions must reach staffing — they raise an item's
+  // effective difficulty both when picking the staffing item and when
+  // resolving its tier.
+  const tierOverrides = readTierOverrides(workspace);
+  const item = selectStaffingItem(doc, tiered, tierOverrides);
+  if (!item) return {};
+
+  // PAN-2397 (Always Tiered): the single-work path staffs through the same
+  // resolver as slots — explicit table when enabled, implicit roles.work
+  // tier otherwise. Use issue-aware resolver to honor record override (PAN-2383).
   const staffing = resolveStaffing(item, {
     planMetadata,
     spawnKey,
     issueId: issueId ?? undefined,
+    tierOverrides,
     config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
   });
+  // PAN-3842: the single agent works the WHOLE plan, so its fitness check runs
+  // against every pending item's difficulty (FR-6), not just the one item that
+  // selected the tier.
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
+    ...collectPlanFitnessItems(doc, tierOverrides),
   };
 }
 
@@ -365,7 +588,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
 
   // Resolve the project from workspacePath — its configured tracker is authoritative.
   // Every issue MUST belong to a registered project with a tracker configured.
-  const projectConfig = workspacePath ? findProjectByPathSync(workspacePath) : null;
+  const projectConfig = workspacePath ? findProjectByPath(workspacePath) : null;
   if (!projectConfig) {
     throw new Error(`Cannot transition ${issueId}: no project config found for workspace ${workspacePath || '(none)'}. Register the project in projects.yaml.`);
   }
@@ -465,7 +688,7 @@ export async function buildAgentLaunchConfig(opts: {
   /** Inline prompt to embed in launch commands that still support prompt arguments. */
   promptInline?: string;
 }): Promise<AgentLaunchConfig> {
-  const model = requireModelOverrideSync(opts.model);
+  const model = requireModelOverride(opts.model);
 
   // Substrate guard: inject permission deny rules for Overdeck infrastructure
   // paths (.claude/agents/, .claude/hooks/, ~/.overdeck/, JSONL session dirs)
@@ -484,11 +707,11 @@ export async function buildAgentLaunchConfig(opts: {
   const providerEnv = isAcp ? {} : await getProviderEnvForModel(model, opts.harness);
 
   if (!isAcp) {
-    const provider = getProviderForModelSync(model as ModelId);
+    const provider = getProviderForModel(model as ModelId);
     if (provider.authType === 'credential-file') {
-      setupCredentialFileAuthSync(provider, opts.workspace);
+      setupCredentialFileAuth(provider, opts.workspace);
     } else {
-      clearCredentialFileAuthSync(opts.workspace);
+      clearCredentialFileAuth(opts.workspace);
     }
   }
 
@@ -501,18 +724,25 @@ export async function buildAgentLaunchConfig(opts: {
 
   // PAN-1055: ohmypi harness needs --session-dir + fifo redirect threaded into
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
-  // and they're spread into generateLauncherScript() below.
+  // and they're spread into generateLauncherScriptSync() below.
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
   const piLauncherFields = behavior.usesRpcFifo
-    ? await getOhmypiLauncherFields(opts.agentId, model)
+    ? await getOhmypiLauncherFields(opts.agentId, model, opts.effort)
     : {};
   const codexLauncherFields = behavior.usesCodexHome
-    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort)
     : {};
-  // PAN-1837: kimi-code needs kimiCodeModel/kimiCodeYolo threaded into the
-  // launcher — buildKimiCodeCommand() throws without kimiCodeModel set.
+  const museSavedSession = opts.harness === 'muse' && opts.spawnMode === 'resume'
+    ? await resolveMuseSessionPath(opts.agentId) : null;
+  const museLauncherFields = opts.harness === 'muse' ? {
+    harness: 'muse' as const,
+    museModel: model,
+    museEffort: opts.effort,
+    museContextFile: await materializeMuseContext(opts.agentId, opts.workspace, roleAgentDefinitionPath(launchRole)),
+    museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
+  } : {};
   const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
-    ? getKimiCodeLauncherFields(model)
+    ? getKimiCodeLauncherFields(model, opts.effort)
     : {};
   if (isAcp && !opts.harnessBinaryPath) {
     throw new Error('ACP launch requires the executable path resolved by preflight');
@@ -524,6 +754,7 @@ export async function buildAgentLaunchConfig(opts: {
         opts.workspace,
         opts.harnessBinaryPath!,
         launchRole,
+        opts.effort,
       )
     : {};
 
@@ -546,7 +777,7 @@ export async function buildAgentLaunchConfig(opts: {
     // --dangerously-skip-permissions on resume too.
     // Use the shared helper so the only string literal for DSP lives in
     // claude-permissions.ts (see scripts/lint-permissions.sh allowlist).
-    const launcherContent = generateLauncherScriptSync({
+    const launcherContent = generateLauncherScript({
       role: launchRole,
       spawnMode: 'resume',
       workingDir: opts.workspace,
@@ -560,7 +791,7 @@ export async function buildAgentLaunchConfig(opts: {
       // which short-circuits to the omp/codex form.
       baseCommand: behavior.launchCommandKind !== 'claude-code'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
-        : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
+        : `claude ${getClaudePermissionFlagsString()}${roleSystemPromptInjection(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
       // PAN-3189: the git guard is emitted for launchers that carry an agent
       // id. Work/strike/review agents — the ones the stash/rebase rules exist
@@ -578,6 +809,7 @@ export async function buildAgentLaunchConfig(opts: {
       ...codexLauncherFields,
       ...acpLauncherFields,
       ...kimiCodeLauncherFields,
+      ...museLauncherFields,
     });
     return { launcherContent, providerEnv };
   }
@@ -597,7 +829,7 @@ export async function buildAgentLaunchConfig(opts: {
   // definitions). The launcher generator's Pi branch then layers --session-dir
   // and the fifo redirect on top.
   const agentDefinition = roleAgentDefinitionPath(launchRole);
-  const launcherContent = generateLauncherScriptSync({
+  const launcherContent = generateLauncherScript({
     role: launchRole,
     workingDir: opts.workspace,
     changeDir: false,
@@ -617,6 +849,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...codexLauncherFields,
     ...acpLauncherFields,
     ...kimiCodeLauncherFields,
+    ...museLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
@@ -709,7 +942,11 @@ export async function prepareWorkspaceForAgentSpawn(
   allowHost = false,
   workspacePath?: string,
 ): Promise<void> {
-  await clearStaleClosedOutBeforeSpawn(issueId);
+  // PAN-3917: the stale-closedOut-record clear this used to run
+  // (reopen-guard.ts's clearStaleClosedOutBeforeSpawn) read/wrote
+  // record.pipeline.closedOut, which no longer exists — status is derived
+  // live from git/tracker/PR state, not a stored record, so there is
+  // nothing stale to clear before a respawn.
   await assertWorkspaceStackHealthyForSpawn(issueId, role, allowHost, workspacePath);
 }
 
@@ -719,7 +956,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
   allowHost = false,
   workspacePath?: string,
 ): Promise<void> {
-  if (role === 'plan' || role === 'knowledge') return;
+  if (role === 'plan' || role === 'knowledge' || role === 'worker') return;
 
   // PAN-1872: guard against an undefined issueId so workspace health checks do
   // not crash with `Cannot read properties of undefined (reading 'toUpperCase')`
@@ -790,7 +1027,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     if (!record.hostFallbackNoticed) {
       record.hostFallbackNoticed = true;
       spawnStackRebuildState.set(normalizedIssue, record);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: role,
         level: 'warn',
         issueId: normalizedIssue,
@@ -800,13 +1037,12 @@ export async function assertWorkspaceStackHealthyForSpawn(
     }
   };
 
-  // A blocked or failed review means the work agent is explicitly being
+  // A review that requested changes means the work agent is explicitly being
   // restarted to repair known-broken code. Rebuilding its container stack would
   // compile the same broken branch and can only delay that repair, so work from
-  // the host instead.
-  const reviewStatus = role === 'work' ? resolveCanonicalReviewStatus(normalizedIssue).status?.reviewStatus : undefined;
-  if (reviewStatus === 'blocked' || reviewStatus === 'failed') {
-    fallbackToHost(`review is ${reviewStatus}; rework must repair the branch before its stack can build`);
+  // the host instead. PAN-3917: the verdict is the PR's, not a stored row.
+  if (role === 'work' && (await getPrFacts(normalizedIssue)).changesRequested) {
+    fallbackToHost('the pull request has changes requested; rework must repair the branch before its stack can build');
     return;
   }
 
@@ -814,7 +1050,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     if (!record.escalated) {
       record.escalated = true;
       spawnStackRebuildState.set(normalizedIssue, record);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: role,
         level: 'error',
         issueId: normalizedIssue,

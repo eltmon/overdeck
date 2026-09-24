@@ -1,9 +1,7 @@
+import { Effect } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  workResumeSlotsAvailable,
-  canDispatchAdvancing,
-  tryReserveAdvancingSlot,
   tryReserveSwarmSlot,
   resetPatrolDispatchBudget,
   type ConcurrencyLimits,
@@ -12,24 +10,6 @@ import {
 
 const LIMITS: ConcurrencyLimits = { maxWorkAgents: 6, reservedAdvancingSlots: 3, reservedSwarmSlots: 3, totalCeiling: 9, exemptOperatorStarted: true };
 
-describe('concurrency governor — pure math', () => {
-  it('reports free work slots below the cap', () => {
-    const counts: RunningCounts = { work: 2, advancing: 1, swarm: 0, total: 3 };
-    expect(workResumeSlotsAvailable(counts, LIMITS)).toBe(4);
-  });
-
-  it('reports zero slots at the cap (never negative)', () => {
-    expect(workResumeSlotsAvailable({ work: 6, advancing: 0, swarm: 0, total: 6 }, LIMITS)).toBe(0);
-    // Over the cap (e.g. forced starts) → still 0, never negative; deacon resumes nothing.
-    expect(workResumeSlotsAvailable({ work: 9, advancing: 0, swarm: 0, total: 9 }, LIMITS)).toBe(0);
-  });
-
-  it('allows advancing dispatch until the total ceiling, using reserved headroom', () => {
-    // Work at its cap but total below ceiling → advancing roles can still claim slots.
-    expect(canDispatchAdvancing({ work: 6, advancing: 2, swarm: 0, total: 8 }, LIMITS)).toBe(true);
-    expect(canDispatchAdvancing({ work: 6, advancing: 3, swarm: 0, total: 9 }, LIMITS)).toBe(false);
-  });
-});
 
 describe('concurrency governor — swarm reserve (PAN-2212)', () => {
   it('lets the swarm dispatch its reserve even when work+advancing fill the ceiling', () => {
@@ -53,6 +33,17 @@ describe('concurrency governor — swarm reserve (PAN-2212)', () => {
   });
 });
 
+/**
+ * PAN-3917 FR-3: the ceiling's liveness evidence is the SELECTED terminal
+ * backend's inventory, so tests state which agents the backend hosts. `null`
+ * is an unreadable inventory.
+ */
+function mockLiveAgents(agentIds: string[] | null) {
+  vi.doMock('../../../src/lib/terminal-backends/inventory.js', () => ({
+    listLiveAgentIds: async () => (agentIds === null ? null : new Set(agentIds)),
+  }));
+}
+
 describe('concurrency governor — config + counting', () => {
   afterEach(() => {
     vi.resetModules();
@@ -60,6 +51,7 @@ describe('concurrency governor — config + counting', () => {
     vi.doUnmock('../../../src/lib/agents.js');
     vi.doUnmock('../../../src/lib/overdeck/agents.js');
     vi.doUnmock('../../../src/lib/cloister/swarm-slot-lifecycle.js');
+    vi.doUnmock('../../../src/lib/terminal-backends/inventory.js');
   });
 
   it('falls back to safe defaults when config omits/garbles concurrency', async () => {
@@ -74,85 +66,76 @@ describe('concurrency governor — config + counting', () => {
     expect(limits.exemptOperatorStarted).toBe(true); // defaults to true
   });
 
-  it('counts status=running agents from the agents table, grouped into work vs advancing', async () => {
+  it('counts backend-live running agents, grouped into work vs advancing', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [],
+      listRunningAgents: () => Effect.succeed([
+        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
+        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running' },
+        { id: 'agent-pan-3-ship', role: 'ship', issueId: 'PAN-3', status: 'running' },
+        { id: 'planning-pan-4', role: 'plan', issueId: 'PAN-4', status: 'running' },
+        // PAN-3917: a crashed agent's state file still says `running` — nothing
+        // rewrites it. Only the backend inventory can retire it from the ceiling.
+        { id: 'agent-pan-5', role: 'work', issueId: 'PAN-5', status: 'running' },
+      ]),
     }));
-    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
-      countAgentsByStatus: (status: string) => {
-        if (status !== 'running') return {};
-        return {
-          work: 1,
-          review: 1,
-          ship: 1,
-          plan: 1, // neither work nor advancing
-        };
-      },
-    }));
+    mockLiveAgents(['agent-pan-1', 'agent-pan-2-review', 'agent-pan-3-ship', 'planning-pan-4']);
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
-    expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, swarm: 0, total: 3 });
+    expect(await countRunningAgents()).toEqual({ work: 1, advancing: 2, swarm: 0, total: 3 });
+  });
+
+  it('counts every running state file when the backend inventory cannot be read', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgents: () => Effect.succeed([
+        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
+        { id: 'agent-pan-5', role: 'work', issueId: 'PAN-5', status: 'running' },
+      ]),
+    }));
+    mockLiveAgents(null);
+    const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
+    // Indeterminate evidence holds work back rather than admitting more.
+    expect(await countRunningAgents()).toEqual({ work: 2, advancing: 0, swarm: 0, total: 2 });
   });
 
   it('excludes terminal swarm slots from both the swarm reserve and regular work count', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [
-        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-2-slot-1', role: 'work', issueId: 'PAN-2', status: 'running', tmuxActive: true },
-      ],
-    }));
-    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
-      countAgentsByStatus: (status: string) => (status === 'running' ? { work: 2 } : {}),
+      listRunningAgents: () => Effect.succeed([
+        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
+        { id: 'agent-pan-2-slot-1', role: 'work', issueId: 'PAN-2', status: 'running' },
+      ]),
     }));
     vi.doMock('../../../src/lib/cloister/swarm-slot-lifecycle.js', () => ({
       isTerminalSwarmSlotAgent: (agent: { id: string }) => agent.id === 'agent-pan-2-slot-1',
     }));
+    mockLiveAgents(['agent-pan-1', 'agent-pan-2-slot-1']);
 
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
 
-    expect(countRunningAgents()).toEqual({ work: 1, advancing: 0, swarm: 0, total: 1 });
+    expect(await countRunningAgents()).toEqual({ work: 1, advancing: 0, swarm: 0, total: 1 });
   });
 
-  it('excludes warm-idle advancing sessions (terminal verdict) from the ceiling (PAN-2579)', async () => {
+  it('excludes warm-idle advancing sessions from the ceiling (PAN-2579, PAN-3917)', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [
-        { id: 'agent-pan-1-review', role: 'review', issueId: 'PAN-1', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-3-test', role: 'test', issueId: 'PAN-3', status: 'running', tmuxActive: true },
-      ],
+      listRunningAgents: () => Effect.succeed([
+        { id: 'agent-pan-9', role: 'work', issueId: 'PAN-9', status: 'running' },
+        { id: 'agent-pan-1-review', role: 'review', issueId: 'PAN-1', status: 'running' },
+        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running' },
+        { id: 'agent-pan-3-test', role: 'test', issueId: 'PAN-3', status: 'running' },
+      ]),
     }));
-    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
-      countAgentsByStatus: (status: string) => (status === 'running' ? { work: 1, review: 2, test: 1 } : {}),
-    }));
-    const { registerReviewStatusMapReader } = await import('../../../src/lib/cloister/review-status-source.js');
-    registerReviewStatusMapReader(() => ({
-      'PAN-1': { reviewStatus: 'blocked' },   // warm-idle: verdict recorded, session kept for re-review
-      'PAN-2': { reviewStatus: 'reviewing' }, // actively reviewing — counts
-      'PAN-3': { testStatus: 'passed' },      // warm-idle test session
+    mockLiveAgents(['agent-pan-9', 'agent-pan-1-review', 'agent-pan-2-review', 'agent-pan-3-test']);
+    // PAN-3917: warm-idle is the pane's own liveness, not a stored verdict.
+    vi.doMock('../../../src/lib/agents/liveness.js', () => ({
+      isIdle: (agentId: string) => agentId !== 'agent-pan-2-review',
     }));
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
     // 3 advancing rows − 2 warm-idle = 1 counted; warm sessions are free capacity.
-    expect(countRunningAgents()).toEqual({ work: 1, advancing: 1, swarm: 0, total: 2 });
+    expect(await countRunningAgents()).toEqual({ work: 1, advancing: 1, swarm: 0, total: 2 });
   });
 
-  it('reserves advancing slots up to the ceiling per patrol, then resets', () => {
-    // PAN-2000: inject counts + limits directly instead of vi.doMock'ing config.js
-    // and agents.js. The mock-based form flaked under the parallel run when the
-    // doMock intermittently didn't apply (the real config/running-count leaked in),
-    // mirroring the deterministic dependency-injection pattern the "pure math"
-    // tests above already use. ceiling = max_work_agents (1) + reserved (1) = 2.
-    const counts: RunningCounts = { work: 0, advancing: 0, swarm: 0, total: 0 }; // 0 running
-    const limits: ConcurrencyLimits = { maxWorkAgents: 1, reservedAdvancingSlots: 1, reservedSwarmSlots: 3, totalCeiling: 2, exemptOperatorStarted: true };
-
-    resetPatrolDispatchBudget();
-    expect(tryReserveAdvancingSlot(counts, limits)).toBe(true);  // 0 running + 0 reserved < 2
-    expect(tryReserveAdvancingSlot(counts, limits)).toBe(true);  // 0 + 1 < 2
-    expect(tryReserveAdvancingSlot(counts, limits)).toBe(false); // 0 + 2 >= 2 → defer
-    resetPatrolDispatchBudget();
-    expect(tryReserveAdvancingSlot(counts, limits)).toBe(true);  // budget cleared for the next patrol
-  });
 
   it('emergency brake stops excess work agents idle-first without claiming an operator stop', async () => {
     vi.resetModules();
@@ -173,7 +156,7 @@ describe('concurrency governor — config + counting', () => {
         { id: 'agent-d', role: 'work', tmuxActive: true, lastActivity: '2026-01-04T00:00:00Z' }, // idle
       ],
       stopAgentSync: (id: string, cause?: string) => { stopCalls.push([id, cause]); },
-      getAgentStateSync: (id: string) => states[id],
+      getAgentState: (id: string) => states[id],
       saveAgentStateSync: () => {},
       getAgentRuntimeStateSync: (id: string) => ({ state: idle.has(id) ? 'idle' : 'active' }),
     }));
@@ -199,7 +182,7 @@ describe('concurrency governor — config + counting', () => {
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [{ id: 'agent-a', role: 'work', tmuxActive: true }],
       stopAgentSync: () => { throw new Error('should not stop anything'); },
-      getAgentStateSync: () => null,
+      getAgentState: () => null,
       saveAgentStateSync: () => {},
       getAgentRuntimeStateSync: () => null,
     }));
@@ -224,7 +207,7 @@ describe('concurrency governor — config + counting', () => {
         { id: 'agent-op-c', role: 'work', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' },
       ],
       stopAgentSync: (id: string) => { states[id].stoppedByUser = true; },
-      getAgentStateSync: (id: string) => states[id],
+      getAgentState: (id: string) => states[id],
       saveAgentStateSync: (s: { id: string }) => { states[s.id] = states[s.id]; },
       getAgentRuntimeStateSync: (id: string) => ({ state: 'active' }),
     }));

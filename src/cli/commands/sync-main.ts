@@ -9,9 +9,9 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { resolve, sep } from 'node:path';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 
-const DASHBOARD_URL = getDashboardApiUrlSync();
+const DASHBOARD_URL = getDashboardApiUrl();
 
 interface SyncMainRepoResponse {
   repoKey: string;

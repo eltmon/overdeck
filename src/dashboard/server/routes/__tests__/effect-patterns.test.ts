@@ -128,16 +128,9 @@ describe('EventStoreServiceLive + ReadModelServiceLive end-to-end', () => {
   }, 30000);
 });
 
-describe('Effect helper composition', () => {
-  it('wraps the promise-based workspace head snapshot in Effect.promise', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/dashboard/server/routes/workspaces.ts'), 'utf8');
-
-    expect(source).not.toContain('getWorkspaceGitInfo(localPath)');
-    expect(source).toContain(
-      'yield* Effect.promise(() => snapshotWorkspaceHeadsPromise(issueId, localPath))',
-    );
-  });
-});
+// PAN-3917: the workspace head snapshot was taken to anchor a review verdict
+// on the review-status record. The record and that write path are gone, so
+// there is no such call in the workspaces route to assert the shape of.
 
 describe('EventStoreService.append via yield*', () => {
   it('appends events via yield* without runSync', async () => {

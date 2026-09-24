@@ -35,14 +35,3 @@ export function readFeedbackAgentStates(): FeedbackAgentState[] | null {
     return null;
   }
 }
-
-export function readActiveReviewArtifactContext(
-  issueId: string,
-): ActiveReviewArtifactContext | null {
-  if (!activeReviewArtifactContextReader) return null;
-  try {
-    return activeReviewArtifactContextReader(issueId);
-  } catch {
-    return null;
-  }
-}

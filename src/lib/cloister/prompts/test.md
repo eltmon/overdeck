@@ -1,6 +1,6 @@
 ---
 name: test
-description: Test-agent prompt — run all suites, compare vs baseline on main, smoke test containers, report via API.
+description: Test-agent prompt — run all suites, compare vs baseline on main, smoke test containers, write the verdict artifact and signal it through the CLI.
 requires:
   - ISSUE_ID
   - BRANCH
@@ -10,7 +10,6 @@ requires:
   - BASELINE_COMMANDS
   - TEST_CONFIG_SUMMARY
   - TIMEOUT_MS
-  - API_URL
   - FEATURE_NAME
   - DOCKER_PS_FORMAT
 optional:
@@ -61,7 +60,7 @@ sessions and will not exist in your toolset (PAN-3534).
 2. If ALL pass, skip baseline and report PASS
 3. If failures, run baseline on main and compare
 4. Only fail for NEW regressions (not pre-existing)
-5. Update status via API when done
+5. Write the verdict artifact, then signal it through the CLI
 
 ## CRITICAL: Context Management — Output Redirection
 
@@ -88,7 +87,7 @@ grep "EXIT_CODE" /tmp/test-feature.txt
 
 ## Step 2: Check Results
 
-- If ALL exit codes are 0 → skip baseline, go to "Update Status"
+- If ALL exit codes are 0 → skip baseline, go to "Record the Verdict"
 - If any failures → continue to Step 3
 
 ## Step 3: Baseline Comparison (ONLY if failures found)
@@ -114,27 +113,40 @@ Tests that fail on BOTH = pre-existing (don't block). Tests that fail ONLY on fe
 **Pass criteria:** Feature branch introduces ZERO new test failures vs main.
 **Fail criteria:** Feature branch introduces NEW failures not present on main.
 
-## REQUIRED: Update Status via API
+## REQUIRED: Record the Verdict
 
-You MUST execute the appropriate curl command and verify it succeeds. Do NOT just describe it — actually RUN it with Bash.
+Two steps, in this order. The artifact first, the signal second — if the signal
+is interrupted, the artifact is what the pipeline recovers the verdict from.
 
-**If NO new regressions (tests PASS):**
+**Step A — write `{{WORKSPACE}}/.pan/test/result.json`** (create `.pan/test/` if needed).
+`status` is the automated-gate result and nothing else. Add `uatStatus`/`uatNotes`
+only when browser UAT was required; omit both otherwise. Both fields accept only
+`"passed"` or `"failed"`.
+
 ```bash
-curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
-  -H "Content-Type: application/json" \
-  -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any, and which suites were tested]"}' | jq .
+mkdir -p {{WORKSPACE}}/.pan/test
+cat > {{WORKSPACE}}/.pan/test/result.json <<'JSON'
+{"status":"passed","notes":"[suites run, plus any pre-existing failures]"}
+JSON
 ```
 
-**If NEW regressions found (tests FAIL):**
+**Step B — signal it through the local CLI.** Never an unauthenticated HTTP
+request: the CLI is the trusted door, and it posts the verdict to the pull
+request for you.
+
 ```bash
-curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \
-  -H "Content-Type: application/json" \
-  -d '{"testStatus":"failed","testNotes":"[describe NEW failures only — specify which suite/repo]"}' | jq .
+# no new regressions
+pan admin specialists done test {{ISSUE_ID}} --status passed --notes "[suites run, pre-existing failures if any]"
+
+# NEW regressions only (pre-existing failures never fail the branch)
+pan admin specialists done test {{ISSUE_ID}} --status failed --notes "[NEW failures only — name the suite/repo]"
 ```
+
+Make exactly ONE signal attempt. If it fails, the artifact from Step A is the
+durable verdict and the pipeline recovers from it — do NOT retry in a loop.
+Report the failure in your summary and stop.
 
 Then use `pan tell {{ISSUE_ID}} "..."` to notify the issue agent of NEW failures only.
-
-**VERIFICATION:** After running curl, confirm you see valid JSON output with the updated status. If you get an error or empty response, the update FAILED — report this.
 
 **NEVER run test commands without redirecting to a file.** This is not optional.
 
@@ -170,4 +182,5 @@ You are a specialist agent, not the work agent. You do NOT have permission to cl
 - **NEVER** run `gh issue close` — that is only for humans or the merge-agent
 - **NEVER** say "Merged to main" — humans click the Merge button
 - **NEVER** hand off to merge-agent — the human decides when to merge
-- **ONLY** call the `/api/review/{{ISSUE_ID}}/status` endpoint
+- **ONLY** record your verdict the two ways above: the `.pan/test/result.json`
+  artifact and `pan admin specialists done test {{ISSUE_ID}}`

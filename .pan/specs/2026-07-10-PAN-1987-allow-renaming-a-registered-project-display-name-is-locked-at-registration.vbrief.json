@@ -1,0 +1,484 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-10T18:09:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1987: Allow renaming a registered project (display name is locked at registration)",
+    "updated": "2026-07-10T18:17:23.738Z"
+  },
+  "plan": {
+    "id": "pan-1987",
+    "title": "Allow renaming a registered project (display name is locked at registration)",
+    "status": "proposed",
+    "uid": "c5c76937-d318-4816-8ac3-c79971e6a68f",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-10T18:09:51Z",
+    "updated": "2026-07-10T18:17:23.738Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1987",
+        "label": "PAN-1987",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "projects-registry",
+      "cli",
+      "dashboard",
+      "command-deck"
+    ],
+    "narratives": {
+      "Problem": "A project's display name in ~/.overdeck/projects.yaml is fixed at registration and there is no rename affordance in the CLI, API, or dashboard. The only path today is hand-editing projects.yaml (both risky and undiscoverable). Concrete case: the repo at ~/Projects/overdeck still displays as 'panopticon-cli'. The issue comment additionally asks for an in-place pencil edit on the project page and tree rows, with uniqueness validation, keeping the registration key stable.",
+      "Proposal": "Add a single write-door helper renameProjectSync(key, newName) in src/lib/projects.ts (modeled on setProjectAutoMergeDefaultSync at line 272) that validates and rewrites only the display `name` field. Expose it through three surfaces that all call the helper: (1) POST /api/projects/:projectKey/rename in src/dashboard/server/routes/projects.ts following the postProjectAutoMergeDefaultRoute pattern with rejectUnsafeDashboardMutationRequest; (2) `pan project rename <key> <newName>` in src/cli/commands/project.ts registered via registerProjectCommands, with the pan-projects wrapper skill updated in the same commit (lint-enforced); (3) inline pencil edits in the dashboard — project-page hero (HeroBillboard in ProjectOverview.tsx) and Command Deck tree row (ProjectNode.tsx context menu), both following the ConversationRow inline-rename pattern, invalidating the command-deck-projects / registered-projects / session-trees react-query keys on success. Uniqueness is validated case-insensitively against every other project's key AND name because the Command Deck uses display name as project identity (fetchProjectSessionTree matches key OR name at routes/projects.ts:496). Document the command and the name-vs-key distinction in configuration/projects.mdx.",
+      "NonGoals": "- Re-keying: the registration key is immutable; no 'explicitly-warned re-key' flow is added (the issue comment's stated default is to keep the key stable)\n- No renaming of the project directory on disk or the `path` field\n- No redirect/alias layer for stale /command-deck/<oldName> URLs in already-open tabs (they recover on re-navigation)\n- No comment-preserving YAML editing — saveProjectsConfigSync's existing stringify behavior is kept\n- No rename affordance in the Sidebar rail or kanban filter bar beyond what query invalidation refreshes automatically\n- No changes to Linear/GitHub tracker mappings, issue_prefix, or project resolution from issue IDs"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Rename is display-name-only; the registration key stays immutable and re-key is a NonGoal.",
+        "rationale": "The issue comment lists 'keep the registration key stable (or offer a separate, explicitly-warned re-key)' — the first option is the stated default and the smallest acceptable scope."
+      },
+      {
+        "summary": "Uniqueness is enforced case-insensitively against every OTHER project's key AND name.",
+        "rationale": "The dashboard uses display name as project identity and the server resolves projects by key-or-name (routes/projects.ts:496); a name equal to another project's key would misroute the session tree."
+      },
+      {
+        "summary": "The rename endpoint's :projectKey param accepts the registration key or the current display name.",
+        "rationale": "Matches existing fetchProjectSessionTree resolution semantics and lets ProjectNode (which only holds the display name) call the endpoint without a name-to-key mapping step."
+      },
+      {
+        "summary": "Renaming a project to its own current name succeeds as an idempotent no-op.",
+        "rationale": "Inline editors commonly commit unchanged text; failing that case would surface spurious errors in the UI."
+      },
+      {
+        "summary": "Stale /command-deck/<oldName> URLs in other open tabs after a rename are accepted without a redirect layer.",
+        "rationale": "The renaming tab refreshes via query invalidation; a cross-tab redirect layer is disproportionate for a rename affordance and touches routing this issue doesn't otherwise need."
+      }
+    ],
+    "items": [
+      {
+        "id": "lib-rename-project",
+        "title": "Add renameProjectSync write-door helper with validation to src/lib/projects.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T18:09:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1987",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects.ts",
+            "tests/unit/lib/projects-rename.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects-rename.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/projects-rename.test.ts passes with cases for success, unknown key, empty name, name/key collision (case-insensitive), and same-name no-op",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/projects.ts, next to setProjectAutoMergeDefaultSync (line 272), add `export function renameProjectSync(key: string, newName: string): void`. Behavior: load config via loadProjectsConfigSync; if config.projects[key] is missing, throw Error(`Unknown project: ${key}`); trim newName and throw Error('Project name must not be empty') if the trimmed value is empty; if the trimmed name equals the project's own current name, return without writing (idempotent no-op); otherwise compare the trimmed name case-insensitively against every OTHER project's key and `name` field and throw Error(`Project name '${name}' conflicts with existing project '<otherKey>'`) on collision; then set config.projects[key].name to the trimmed value and persist via registerProjectSync(key, updatedConfig) exactly as setProjectAutoMergeDefaultSync does (copy config, mutate copy, write). Do NOT write projects.yaml through any other path. Add tests/unit/lib/projects-rename.test.ts modeled on tests/unit/lib/project-registration.test.ts (same OVERDECK_HOME temp-dir isolation approach used by neighboring tests): cover rename persists new name and preserves all other fields (path, issue_prefix, workspace config), unknown key throws, empty/whitespace name throws, collision with another project's name throws, collision with another project's KEY throws (case-insensitive both ways), and same-name rename succeeds without error."
+        },
+        "items": [
+          {
+            "id": "lib-rename-project.ac1",
+            "title": "Given a registered project, when renameProjectSync(key, newName) runs, then projects.yaml persists the new `name` and preserves every other field of the entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-rename-project.ac2",
+            "title": "renameProjectSync throws on an unknown key and on an empty or whitespace-only new name, leaving projects.yaml unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-rename-project.ac3",
+            "title": "renameProjectSync rejects a new name that case-insensitively equals another project's `name` OR registration key, and the test suite covers the name-equals-other-key case explicitly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-rename-project.ac4",
+            "title": "Renaming a project to its own current name returns successfully without modifying the file (idempotent no-op)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-rename-route",
+        "title": "Add POST /api/projects/:projectKey/rename route to the dashboard server",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T18:09:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-1987",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ui-rename-project-page",
+            "ui-rename-tree-row"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/projects.ts",
+            "src/dashboard/server/routes/__tests__/projects-rename.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/projects-rename.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "projects-rename.test.ts passes covering 200/404/400/409 responses",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/projects.ts, add `postProjectRenameRoute` as HttpRouter.add('POST', '/api/projects/:projectKey/rename', ...) modeled directly on postProjectAutoMergeDefaultRoute (line 629): httpHandler(Effect.gen(...)), read params, read body via the existing readProjectJsonBody helper (line 608). First call rejectUnsafeDashboardMutationRequest(request) and return its error if set (same as postProjectsRoute, line 664). Resolve the project by matching params.projectKey against listProjectsSync() entries key-first then config.name — the same two-way match fetchProjectSessionTree uses at lines 494-497 — and return 404 {error:'Project not found'} when no match. Validate body.name is a string; call renameProjectSync(resolvedKey, name) inside a try/catch mapping its errors: empty-name error to 400, conflict error to 409, and return their message in {error}. On success return jsonResponse({key: resolvedKey, name: trimmedName}). Add the new route to projectsRouteLayer (line 816). The route performs no filesystem writes itself (single write door, NFR-2) and uses no execSync (NFR-1 — renameProjectSync is sync fs like all its neighbors in this module, which is the established pattern). Add src/dashboard/server/routes/__tests__/projects-rename.test.ts modeled on a neighboring route test, covering: 200 with {key,name} on success (by key and by display name), 404 unknown project, 400 empty name, 409 duplicate name."
+        },
+        "items": [
+          {
+            "id": "api-rename-route.ac1",
+            "title": "POST /api/projects/:projectKey/rename with a valid unique name returns 200 {key, name} and persists the new display name, whether :projectKey is the registration key or the current display name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-rename-route.ac2",
+            "title": "The route returns 404 for an unknown project, 400 for an empty/non-string name, and 409 when the name collides with another project's name or key, each with an {error} message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-rename-route.ac3",
+            "title": "The route rejects unsafe dashboard mutation requests via rejectUnsafeDashboardMutationRequest before performing any work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-rename-route.ac4",
+            "title": "The route mutates projects.yaml only through renameProjectSync — the diff contains no direct writeFile/stringifyYaml calls in the route module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-rename-command",
+        "title": "Add `pan project rename <key> <newName>` CLI command and update the pan-projects skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T18:09:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1987",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/project.ts",
+            "src/cli/index.ts",
+            "sync-sources/skills/pan-projects/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint (including scripts/lint-skills.sh) passes with the skill documenting the rename subcommand"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/project.ts, add `export async function projectRenameCommand(key: string, newName: string): Promise<void>` following the style of projectRemoveCommand (line 235): call renameProjectSync(key, newName) in a try/catch; on success print chalk.green confirmation showing old name → new name (read the old name via getProjectSync before renaming); on error print chalk.red with the error message and set process.exitCode = 1. In src/cli/index.ts inside registerProjectCommands (lines 1315-1342), register `command.command('rename <key> <newName>').description('Rename a project\\'s display name (the registration key stays unchanged)').action(projectRenameCommand)` and add projectRenameCommand to the import at line 97 — this makes the subcommand available under both `pan project` and `pan projects` automatically. Update sync-sources/skills/pan-projects/SKILL.md in the same commit: add a '### Rename a Project' section with the command example and a sentence stating the registration key is immutable while the display name is the human-facing label; scripts/lint-skills.sh (part of npm run lint) fails if the skill and CLI drift."
+        },
+        "items": [
+          {
+            "id": "cli-rename-command.ac1",
+            "title": "`pan project rename <key> <newName>` renames the project and prints a confirmation showing the old and new display names; `pan projects rename` behaves identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-rename-command.ac2",
+            "title": "On unknown key, empty name, or duplicate name the command prints the error and exits with a non-zero exit code without modifying projects.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-rename-command.ac3",
+            "title": "sync-sources/skills/pan-projects/SKILL.md documents the rename subcommand in the same commit and `npm run lint` (which runs scripts/lint-skills.sh) passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-rename-project-page",
+        "title": "Inline pencil rename on the project page hero (ProjectOverview HeroBillboard)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T18:09:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1987",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ProjectOverview.test.tsx passes including new rename-interaction cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx, extend HeroBillboard (lines 618-626) so the project name h2 renders a small pencil icon button (match the icon sizing/idiom used by row action buttons elsewhere in CommandDeck; follow the pan-style-guide color-restraint rules — no decorative color). Clicking the pencil replaces the h2 text with an inline input pre-filled with the current name, using the ConversationRow.tsx inline-rename pattern (lines 139-163): select the text on open, Enter commits, Escape cancels, blur commits once (committingRef guard). Commit POSTs /api/projects/<projectKey ?? projectName>/rename with JSON body {name} — prefer the projectKey prop (already threaded to ProjectOverview, lines 289-298) and fall back to projectName when projectKey is absent, which the endpoint accepts by design. On success, invalidate react-query keys ['command-deck-projects'], ['registered-projects'], and all session-trees keys via queryClient.invalidateQueries({queryKey: ['session-trees']}) so the tree, sidebar, and hero all refresh without a page reload. On a non-OK response, keep the editor open, keep the draft text, and render the server {error} message inline next to the input (small red text is signal color, allowed). Add interaction tests to ProjectOverview.test.tsx: pencil opens editor, Enter fires the POST with the typed name, Escape closes without a request, 409 response shows the error and keeps the draft."
+        },
+        "items": [
+          {
+            "id": "ui-rename-project-page.ac1",
+            "title": "The project page hero renders a pencil control next to the project name; clicking it opens an inline input pre-filled with the current name with the text selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-rename-project-page.ac2",
+            "title": "Enter commits and sends POST /api/projects/<key-or-name>/rename with the typed name; Escape cancels the edit without sending a request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-rename-project-page.ac3",
+            "title": "When a rename succeeds, the component invalidates the command-deck-projects, registered-projects, and session-trees queries so the tree and hero show the new name without a page reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-rename-project-page.ac4",
+            "title": "A 409/400 response renders the server error message inline, preserves the draft text, and keeps the editor open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-rename-tree-row",
+        "title": "Rename project from the Command Deck tree row (ProjectNode context menu + inline edit)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T18:09:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1987",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ProjectNode.test.tsx passes including new rename-interaction cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx, add a 'Rename project' item to the existing project context menu (next to 'Copy project name', lines 169-173). Selecting it switches the projectName span (line 228) to an inline input using the same ConversationRow pattern as the project-page bead (select on open, Enter commits, Escape cancels, committingRef blur guard). Commit POSTs /api/projects/<name>/rename with body {name: newValue} — ProjectNode only holds the display name and the endpoint resolves display names by design (D4). On success invalidate ['command-deck-projects'], ['registered-projects'], and ['session-trees'] query prefixes via useQueryClient. On error, keep the editor open with the draft and show the server error inline (or as the row's title attribute if inline space is impractical — pick one and test it). Keep click-propagation stopped so entering edit mode does not toggle the node expansion (the row's onClick at line ~200 selects/expands). Add tests to ProjectNode.test.tsx: menu item present, selecting it swaps in the input, Enter fires the POST, Escape restores the span without a request."
+        },
+        "items": [
+          {
+            "id": "ui-rename-tree-row.ac1",
+            "title": "The project row's context menu contains 'Rename project'; selecting it replaces the name span with an inline input pre-filled with the current name, without toggling node expansion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-rename-tree-row.ac2",
+            "title": "Enter commits and sends POST /api/projects/<displayName>/rename; Escape restores the plain name span without sending a request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-rename-tree-row.ac3",
+            "title": "A successful rename invalidates the command-deck-projects, registered-projects, and session-trees queries so the row re-renders under the new name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-rename-tree-row.ac4",
+            "title": "An error response preserves the open editor and draft text, and shows the server error message to the user",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-project-rename",
+        "title": "Document project rename and the display-name vs registration-key distinction",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-10T18:09:51Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-1987",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan project rename' configuration/projects.mdx"
+          ],
+          "expected_outputs": [
+            "configuration/projects.mdx contains a rename section documenting `pan project rename <key> <newName>` and stating the registration key is immutable"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "Docs-only bead: one file, one section; two ACs cover the command reference and the concept explanation."
+        },
+        "narrative": {
+          "Action": "In configuration/projects.mdx (the Mintlify page that documents `pan project add/list/remove` at lines 39-45), add a 'Rename a project' subsection alongside the existing command examples: show `pan project rename <key> <newName>`, mention the dashboard inline pencil (project page and tree row), and add one short paragraph explaining the distinction this feature formalizes — the registration key (stable identifier, derived from the name at registration, immutable) versus the display name (human-facing label, renameable, must be unique across projects). No other doc files change: the pan-projects skill is updated in the cli-rename-command bead, and docs/ developer docs do not describe the projects registry surface."
+        },
+        "items": [
+          {
+            "id": "docs-project-rename.ac1",
+            "title": "configuration/projects.mdx contains a rename section with a `pan project rename <key> <newName>` example, alongside the existing add/list/remove examples",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-project-rename.ac2",
+            "title": "The page contains an explanation that the registration key is immutable while the display name is the renameable human-facing label with cross-project uniqueness, and covers the dashboard pencil affordances",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lib-rename-project",
+        "to": "api-rename-route",
+        "type": "blocks"
+      },
+      {
+        "from": "lib-rename-project",
+        "to": "cli-rename-command",
+        "type": "blocks"
+      },
+      {
+        "from": "api-rename-route",
+        "to": "ui-rename-project-page",
+        "type": "blocks"
+      },
+      {
+        "from": "api-rename-route",
+        "to": "ui-rename-tree-row",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-rename-command",
+        "to": "docs-project-rename",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-10-PAN-1987-allow-renaming-a-registered-project-display-name-is-locked-at-registration.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

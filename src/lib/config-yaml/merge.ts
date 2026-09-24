@@ -1,9 +1,10 @@
 import type { AuthMode, SubscriptionPlan } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelProvider } from '../model-fallback.js';
-import { resolveModelIdSync } from '../model-capabilities.js';
+import { resolveModelId } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
+import { isTerminalBackendName } from '@overdeck/contracts';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
@@ -51,8 +52,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, or kimi-code`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse`);
   }
 }
 
@@ -123,6 +124,19 @@ function warnInvalidClaudePermissionMode(raw: unknown, effective: string): void 
   );
 }
 
+// An unrecognized `terminal.backend` is ignored, once per distinct bad value,
+// so a typo falls back to auto-selection instead of stranding every spawn.
+const warnedInvalidTerminalBackends = new Set<string>();
+function warnInvalidTerminalBackend(raw: unknown): void {
+  const shown = typeof raw === 'string' ? raw : JSON.stringify(raw);
+  if (warnedInvalidTerminalBackends.has(String(shown))) return;
+  warnedInvalidTerminalBackends.add(String(shown));
+  console.error(
+    `[config] terminal.backend "${shown}" is not a valid value — valid values are 'herdr' and 'tmux'. ` +
+    `Ignoring it and auto-selecting the backend.`,
+  );
+}
+
 export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
@@ -130,6 +144,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     context: { rules: { ...DEFAULT_CONFIG.context.rules } },
     tmux: {
       ...DEFAULT_CONFIG.tmux,
+    },
+    terminal: {
+      ...DEFAULT_CONFIG.terminal,
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
@@ -213,6 +230,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorPsiFullShedAvg10: DEFAULT_CONFIG.resources.governorPsiFullShedAvg10,
       governorPsiCalmReadmitAvg10: DEFAULT_CONFIG.resources.governorPsiCalmReadmitAvg10,
       governorPsiCalmWindowMs: DEFAULT_CONFIG.resources.governorPsiCalmWindowMs,
+      governorCpuSoftLoadPerCore: DEFAULT_CONFIG.resources.governorCpuSoftLoadPerCore,
+      governorCpuRecoveryLoadPerCore: DEFAULT_CONFIG.resources.governorCpuRecoveryLoadPerCore,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -286,6 +305,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         if (openai.plan) result.providerPlan.openai = openai.plan;
       } else if (providers.openai !== undefined) {
         explicitlyDisabled.add('openai');
+      }
+
+      // Muse Code owns credentials; enabling Meta only exposes its model choices.
+      const meta = normalizeProviderConfig(providers.meta, undefined);
+      applyProviderHarness(result, 'meta', meta.harness);
+      if (meta.enabled) result.enabledProviders.add('meta');
+      else if (providers.meta !== undefined) {
+        explicitlyDisabled.add('meta');
+        result.enabledProviders.delete('meta');
       }
 
       // Google
@@ -387,14 +415,34 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
+    for (const provider of ['opencode', 'opencode-go'] as const) {
+      const raw = config.models?.providers?.[provider];
+      if (raw === undefined) continue;
+      const normalized = normalizeProviderConfig(raw);
+      applyProviderHarness(result, provider, normalized.harness);
+      if (normalized.enabled) result.enabledProviders.add(provider);
+      else explicitlyDisabled.add(provider);
+    }
+
     // Merge tmux configuration
     if (config.tmux?.config_mode) {
       result.tmux.configMode = config.tmux.config_mode;
     }
 
+    // Merge terminal backend selection (PAN-3917 D10). An unknown value is
+    // ignored with a warning rather than throwing: config load must not throw,
+    // and auto-selection is a safe fallback.
+    if (config.terminal?.backend !== undefined) {
+      if (isTerminalBackendName(config.terminal.backend)) {
+        result.terminal.backend = config.terminal.backend;
+      } else {
+        warnInvalidTerminalBackend(config.terminal.backend);
+      }
+    }
+
     // Merge conversation configuration
     if (config.conversations?.compaction_model) {
-      result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
+      result.conversations.compactionModel = resolveModelId(config.conversations.compaction_model);
     }
     if (config.conversations?.manual_compact_mode) {
       result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
@@ -403,7 +451,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       result.conversations.richCompaction = config.conversations.rich_compaction;
     }
     if (config.conversations?.title_model) {
-      result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
+      result.conversations.titleModel = resolveModelId(config.conversations.title_model);
+    }
+    if (config.conversations?.handoff_author_model) {
+      result.conversations.handoffAuthorModel = resolveModelId(config.conversations.handoff_author_model);
     }
     if (config.conversations?.watch_dirs) {
       result.conversations.watchDirs = config.conversations.watch_dirs;
@@ -641,7 +692,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.ttsSummarizer.enabled = s.enabled;
       }
       if (s.model) {
-        result.ttsSummarizer.model = resolveModelIdSync(s.model) as ModelId;
+        result.ttsSummarizer.model = resolveModelId(s.model) as ModelId;
       }
       if (s.batch_window_seconds !== undefined) {
         result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
@@ -720,6 +771,20 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ) {
         result.resources.governorPsiCalmWindowMs = config.resources.governor_psi_calm_window_ms;
       }
+      if (
+        typeof config.resources.governor_cpu_soft_load_per_core === 'number'
+        && Number.isFinite(config.resources.governor_cpu_soft_load_per_core)
+        && config.resources.governor_cpu_soft_load_per_core > 0
+      ) {
+        result.resources.governorCpuSoftLoadPerCore = config.resources.governor_cpu_soft_load_per_core;
+      }
+      if (
+        typeof config.resources.governor_cpu_recovery_load_per_core === 'number'
+        && Number.isFinite(config.resources.governor_cpu_recovery_load_per_core)
+        && config.resources.governor_cpu_recovery_load_per_core >= 0
+      ) {
+        result.resources.governorCpuRecoveryLoadPerCore = config.resources.governor_cpu_recovery_load_per_core;
+      }
       // PAN-2500: RECOVERY must exceed SOFT or hysteresis can never re-admit.
       // Normalize rather than throw — a misconfigured reserve shouldn't crash config load.
       if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) {
@@ -733,6 +798,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.resources.governorSwapRecoveryFreePercent = Math.min(
           result.resources.governorSwapSoftFreePercent + 10,
           100,
+        );
+      }
+      if (result.resources.governorCpuRecoveryLoadPerCore >= result.resources.governorCpuSoftLoadPerCore) {
+        throw new Error(
+          'config.yaml: resources.governor_cpu_recovery_load_per_core must be lower than '
+          + 'resources.governor_cpu_soft_load_per_core — lower CPU load is healthier',
         );
       }
     }

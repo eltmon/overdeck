@@ -10,8 +10,8 @@ import { tmpdir } from 'os';
 // never surfaced — the conversation appeared as a silently stopped agent.
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../infra.js');
+  closeOverdeckDatabase();
 }
 
 let TEST_HOME: string;

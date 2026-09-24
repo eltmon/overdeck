@@ -88,9 +88,11 @@ echo "Tmux: ${TMUX_SESSION:-NONE}"
 COMPLETED=$(ls ~/.overdeck/agents/agent-$ISSUE_LOWER/completed 2>/dev/null)
 echo "Completed: ${COMPLETED:-NO}"
 
-# 6. Review/test/merge status?
-REVIEW_STATUS=$(curl -s http://localhost:3011/api/review/$ISSUE_ID/status 2>/dev/null)
-echo "Review status: $REVIEW_STATUS"
+# 6. Where is it? PAN-3917: there is no stored review/test/merge row — the
+# derived state is computed from the tracker, the branch, and the pull request.
+REVIEW_STATE=$(pan show "$ISSUE_ID" --json 2>/dev/null)
+echo "Derived state: $REVIEW_STATE"
+(cd "$WS_PATH" && gh pr view --json state,reviewDecision,mergeable,statusCheckRollup) 2>/dev/null || true
 
 # 6b. Branch-portable xBRIEF pipeline mirror (corroborating, not authoritative)
 PIPELINE_MIRROR=""
@@ -106,7 +108,11 @@ echo "Specialists: $SPECIALISTS"
 
 ### Phase Decision Matrix
 
-Based on the checks above, determine the current phase. Treat `REVIEW_STATUS` and other live SQLite-backed API status as authoritative; use the branch-portable xBRIEF `plan.metadata.pipeline` mirror as a corroborating signal when API status is missing, stale, or ambiguous. If the mirror disagrees with the API, log a bug and prefer the API.
+Based on the checks above, determine the current phase. The forge is
+authoritative: the PR's `reviewDecision`, its checks, and whether it merged are
+the review/test/merge state (PAN-3917 — there is no status row to read). Use the
+branch-portable xBRIEF mirror only as a corroborating signal; if it disagrees
+with the forge, log a bug and prefer the forge.
 
 | Condition | Current Phase | Jump To |
 |-----------|--------------|---------|
@@ -114,15 +120,15 @@ Based on the checks above, determine the current phase. Treat `REVIEW_STATUS` an
 | Workspace exists, agent active + tmux running | Agent working | Phase 2 |
 | Workspace exists, agent active, no tmux | Agent crashed/stuck | Phase 2 (recovery) |
 | Workspace exists, agent stopped, no completion | Agent gave up or crashed | Phase 1 (resume) |
-| Completion marker exists, reviewStatus = "pending" or "reviewing" | Awaiting review | Phase 4 |
-| reviewStatus = "failed", work agent has feedback | Feedback loop | Phase 5 |
-| reviewStatus = "passed", testStatus = "pending" or "testing" | Awaiting tests | Phase 6 |
-| reviewStatus = "passed", testStatus = "passed" | Merge ready | Phase 7 |
-| reviewStatus = "passed", testStatus = "failed" | Test failed | Phase 5 (test feedback) |
-| mergeStatus = "merged" | Done | Report success |
+| PR open, `reviewDecision` is `REVIEW_REQUIRED` or null | Awaiting review | Phase 4 |
+| PR `reviewDecision` is `CHANGES_REQUESTED` | Feedback loop | Phase 5 |
+| PR approved, checks still pending | Awaiting tests | Phase 6 |
+| PR approved, checks green, forge says mergeable | Merge ready | Phase 7 |
+| PR approved, checks red | Test failed | Phase 5 (test feedback) |
+| PR merged | Done | Report success |
 
 **Print which phase you're entering and why**, e.g.:
-> "Issue PAN-129 is in Phase 4 (review pending) — reviewStatus is 'reviewing', skipping to monitor review agent."
+> "Issue PAN-129 is in Phase 4 (awaiting review) — the PR's reviewDecision is REVIEW_REQUIRED, skipping to monitor review agent."
 
 ## Supervision Workflow
 
@@ -210,13 +216,14 @@ The agent should eventually run `pan done PAN-{ID}`. Watch for:
 # Check if completed marker exists
 ls -la ~/.overdeck/agents/agent-pan-{ID}/completed 2>/dev/null
 
-# Check review status (set by `pan done`)
-curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
+# What the forge says about the PR `pan done` opened
+pan show PAN-{ID} --json | jq .
 ```
 
 **Expected state after completion:**
 - `completed` file exists in agent state dir
-- Review status: `{ reviewStatus: "reviewing" | "pending", testStatus: "pending" }`
+- A pull request exists, is open, and is not yet approved (`reviewDecision`
+  `REVIEW_REQUIRED` or null)
 - GitHub issue has "In Review" label or status
 
 **Common failures at this stage:**
@@ -226,8 +233,8 @@ curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
 
 **If review not triggered:**
 ```bash
-# Manually trigger review
-curl -s -X POST http://localhost:3011/api/review/PAN-{ID}/trigger
+# Re-request review through the CLI (the trusted door)
+pan review request PAN-{ID} -m "re-requesting review"
 ```
 
 ### Phase 4: Monitor Review Agent
@@ -241,13 +248,13 @@ curl -s http://localhost:3011/api/specialists | jq '.[] | select(.name == "revie
 # Watch review agent output
 tmux -L overdeck capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
 
-# Check review status progression
-curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{reviewStatus, reviewNotes}'
+# Check review progression on the PR itself
+(cd "$WS_PATH" && gh pr view --json reviewDecision,reviews) | jq '{reviewDecision, latest: (.reviews | last)}'
 ```
 
 **Expected outcomes:**
-- `reviewStatus: "passed"` → proceeds to test
-- `reviewStatus: "failed"` with `reviewNotes` → feedback sent to work agent
+- `reviewDecision: "APPROVED"` → proceeds to test
+- `reviewDecision: "CHANGES_REQUESTED"` → feedback sent to work agent
 
 **Common failures:**
 - Review agent not waking up (Cloister not running, specialist not initialized)
@@ -260,9 +267,8 @@ curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{reviewStatus, re
 # Wake it manually
 curl -s -X POST http://localhost:3011/api/specialists/review-agent/wake
 
-# Or reset and re-trigger
-curl -s -X POST http://localhost:3011/api/specialists/review-agent/reset
-curl -s -X POST http://localhost:3011/api/review/PAN-{ID}/trigger
+# Or restart the review cycle through the CLI
+pan review restart PAN-{ID}
 ```
 
 ### Phase 5: Monitor Feedback Loop (if review failed)
@@ -273,8 +279,8 @@ If review returned feedback, the work agent should receive it and fix issues:
 # Check if work agent received feedback
 tmux -L overdeck capture-pane -t agent-pan-{ID} -p -S -50 2>/dev/null | tail -20
 
-# Check auto-requeue count (circuit breaker: max 3)
-curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '.autoRequeueCount'
+# How many review rounds this branch has been through (convergence signal)
+ls "$WS_PATH/.pan/review" 2>/dev/null | wc -l
 ```
 
 The work agent should:
@@ -292,14 +298,15 @@ The work agent should:
 After review passes, test-agent should run:
 
 ```bash
-# Check test status
-curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{testStatus, testNotes}'
+# The test verdict: the artifact the test role writes, then the PR comment
+cat "$WS_PATH/.pan/test/result.json" 2>/dev/null | jq .
+(cd "$WS_PATH" && gh pr view --json statusCheckRollup) | jq '.statusCheckRollup'
 
 # Watch test agent
 tmux -L overdeck capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
 ```
 
-**Expected:** `testStatus: "passed"` → ready for merge
+**Expected:** `{"status":"passed"}` in the artifact and green checks on the PR
 
 **Common failures:**
 - Test agent not triggered after review passes
@@ -311,18 +318,13 @@ tmux -L overdeck capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
 After tests pass:
 
 ```bash
-# Final status check
-curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
+# Final check — the forge's own account of the PR
+(cd "$WS_PATH" && gh pr view --json reviewDecision,mergeable,statusCheckRollup) | jq .
 ```
 
-**Expected final state:**
-```json
-{
-  "reviewStatus": "passed",
-  "testStatus": "passed",
-  "readyForMerge": true
-}
-```
+**Expected final state:** the PR is approved, its checks are green, and the
+forge reports it mergeable. That conjunction IS merge readiness (PAN-3917 FR-9);
+nothing stores it.
 
 At this point, the user clicks **MERGE** in the dashboard.
 
@@ -360,9 +362,6 @@ Be thorough. All of these are findings worth logging:
 | `/api/agents` | GET | List all agents |
 | `/api/agents/:id/output` | GET | Agent terminal output |
 | `/api/agents/:id/activity` | GET | Agent activity log |
-| `/api/review/:id/status` | GET | Review/test/merge status |
-| `/api/review/:id/trigger` | POST | Trigger review |
-| `/api/review/:id/request` | POST | Re-request review |
 | `/api/issues/:id/approve` | POST | Approve & merge |
 | `/api/specialists` | GET | List specialists |
 | `/api/specialists/:name/wake` | POST | Wake specialist |

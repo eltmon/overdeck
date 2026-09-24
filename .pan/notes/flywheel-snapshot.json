@@ -1,0 +1,44 @@
+{
+  "runId": "RUN-20",
+  "startedAt": "2026-06-27T06:23:43Z",
+  "elapsedMs": 8700000,
+  "orchestrator": { "harness": "ohmypi", "model": "glm-5.2", "effort": "high", "ctxPercent": 70 },
+  "headline": { "bugsFixed": 0, "swarmItemsMerged": 0, "swarmItemsTotal": 0, "prsMerged": 0, "awaitingUat": 6 },
+  "activePipeline": [
+    { "issueId": "PAN-2081", "title": "Epic-aware backlog sequencer", "verb": "shipping", "status": "passed", "pr": 2096, "mergeOrder": 1 },
+    { "issueId": "PAN-2088", "title": "pi/ohmypi extension API control surface", "verb": "testing", "status": "failed", "progressPercent": 80, "agentId": "agent-pan-2088" },
+    { "issueId": "PAN-2054", "title": "Close-out terminality fix", "verb": "shipping", "status": "passed", "pr": 2092, "mergeOrder": 2 },
+    { "issueId": "MIN-831", "title": "Mind Your Now feature (Linear)", "verb": "shipping", "status": "passed", "pr": 68 },
+    { "issueId": "MIN-846", "title": "Mind Your Now feature (Linear)", "verb": "shipping", "status": "passed" },
+    { "issueId": "PAN-2094", "title": "ohmypi readiness source fix (landed, DEPLOY pending)", "verb": "blocked", "status": "merged" },
+    { "issueId": "PAN-2095", "title": "pan reload builds stale primary source (deploy bug)", "verb": "blocked", "status": "blocked" },
+    { "issueId": "PAN-2086", "title": "Startup speedup (ohmypi orphan, blocked on deploy)", "verb": "blocked", "status": "blocked" },
+    { "issueId": "PAN-1718", "title": "Duplicate pan reload writes (ohmypi orphan, blocked on deploy)", "verb": "blocked", "status": "blocked" }
+  ],
+  "substrateBugs": [
+    { "issueId": "PAN-2094", "title": "ohmypi writeOhmypiAgentPrompt honors 120s (source merged)", "status": "fixed", "commitSha": "0973c8c8d" },
+    { "issueId": "PAN-2093", "title": "ohmypi spawn orphan on 30s ready window (source merged)", "status": "workaround", "commitSha": "73ad6fd99" },
+    { "issueId": "PAN-2095", "title": "pan reload builds stale primary source — fixes don't deploy", "status": "filed" },
+    { "issueId": "PAN-1817", "title": "Linear API quota exhausted by polling", "status": "fixed", "commitSha": "92a82ed9a" }
+  ],
+  "agents": [
+    { "id": "agent-pan-2088", "label": "PAN-2088 work (codex)", "status": "running", "issueId": "PAN-2088", "role": "work", "model": "gpt-5.5", "currentAction": "fixing VERIFICATION (test) gate failure; following rebase-and-submit (19m+)" },
+    { "id": "agent-pan-2054", "label": "PAN-2054 work", "status": "idle", "issueId": "PAN-2054", "role": "work", "model": "gpt-5.5", "currentAction": "done; PR #2092 ready" },
+    { "id": "agent-pan-2086", "label": "PAN-2086 work (ohmypi, ORPHANED)", "status": "error", "issueId": "PAN-2086", "role": "work", "model": "kimi-k2.7-code", "currentAction": "orphaned; blocked until deploy (PAN-2095)" },
+    { "id": "agent-pan-1718", "label": "PAN-1718 work (ohmypi, ORPHANED)", "status": "error", "issueId": "PAN-1718", "role": "work", "model": "kimi-k2.7-code", "currentAction": "orphaned; blocked until deploy (PAN-2095)" }
+  ],
+  "parked": [{ "issueId": "PAN-1762", "title": "Swarm v2", "reason": "Operator-held at proposed; starts only on operator instruction (RUN-22 directive)" }],
+  "suggestions": [
+    { "action": "merge", "issueId": "PAN-2081", "priority": "urgent", "rationale": "PR #2096 review=passed test=passed. require_uat_before_merge=true → operator merge." },
+    { "action": "merge", "issueId": "PAN-2054", "priority": "urgent", "rationale": "PR #2092 CLEAN/MERGEABLE, all checks SUCCESS (close-out-terminality fix). Operator merge." },
+    { "action": "merge", "issueId": "MIN-831", "priority": "high", "rationale": "review=passed, test=passed (Linear/MYN). Operator UAT/merge." },
+    { "action": "merge", "issueId": "MIN-846", "priority": "high", "rationale": "review=passed, test=passed (Linear/MYN). Operator UAT/merge." },
+    { "action": "investigate", "issueId": "PAN-2095", "priority": "high", "rationale": "Deploy bug: pan reload builds divergent primary source → ohmypi 120s fix not live → ohmypi spawns still orphan. Operator bootstrap: git fetch && git merge origin/main --no-edit && pan reload. Until then PAN-2086/PAN-1718 orphaned." }
+  ],
+  "system": { "mainHead": "0973c8c8d", "ramUsedMb": 24238, "ramTotalMb": 64126, "swapUsedMb": 0, "swapTotalMb": 8191, "agentsActive": 11, "agentsCap": 20 },
+  "openQuestions": [
+    "RUN-20 progress this segment: closed out 4 verifying-on-main tail items (PAN-1847, 1994, 1793, 1722 — all verify-merged confirmed). PAN-2088 autonomously fixing a test-gate failure (active). Remaining forward motion is operator-gated: 4 merges (require_uat_before_merge=true) + deploy (PAN-2095) to unblock ohmypi and the 2 orphaned work agents."
+  ],
+  "ticks": 9,
+  "lastTickAt": "2026-06-27T08:40:00Z"
+}

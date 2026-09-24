@@ -1,10 +1,8 @@
-import type { AgentStatus } from '@overdeck/contracts';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
-import { classifyDashboardAgent } from '../lib/agent-classifier';
-import { Agent, type StartAgentResponse } from '../types';
+import { Agent, type BackendPane, type DerivedIssueStateName, type StartAgentResponse } from '../types';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
 import { recoveryFromBody, useResumeRecovery } from '../lib/resumeRecovery';
 import { AgentPillPopoverRow, describeAgentStop, relativeTime } from './AgentPillPopoverRow';
@@ -15,35 +13,22 @@ interface RestartResult {
   error?: string;
 }
 
-// A stopped plan/review/test/ship agent whose issue has reached one of these
-// statuses has finished its stage — the pipeline already moved past it, the
-// record just never got marked completed. Counting it produces a phantom
-// "stopped" entry (e.g. a planning agent for an issue that's now In Review, or
-// a review agent for an issue already merged-and-verifying). Work agents are
-// intentionally not re-classified here; conversation agents never reach this
-// path (PIPELINE_ROLES excludes them).
-const SPECIALIST_ROLES = new Set(['plan', 'review', 'test', 'ship']);
-const ISSUE_ADVANCED_STATUSES = new Set([
-  'in_review',
-  'verifying_on_main',
-  'done',
-  'canceled',
-  'merged',
-  'closed',
-]);
+// PAN-3917: a stopped agent is a backend pane the terminal backend reports as
+// `exited`. A specialist pane on an issue that already landed is finished, not
+// waiting for the operator, so it never counts as stopped.
+const SPECIALIST_PANE_ROLES = new Set<BackendPane['role']>(['plan', 'review', 'test', 'uat']);
+const SETTLED_ISSUE_STATES = new Set<DerivedIssueStateName>(['merged', 'closed']);
 
 export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner' | 'pill' } = {}) {
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const issues = useDashboardStore(selectIssues) as Array<Record<string, unknown>>;
+  const panesById = useDashboardStore((s) => s.backendPanesById);
+  const derivedByIssueId = useDashboardStore((s) => s.derivedIssueStateByIssueId);
 
-  // issueId (upper-cased) → canonicalStatus, for the advanced-past-role check below.
-  const issueStatusById = new Map<string, string>();
   const issueTitleById = new Map<string, string>();
   for (const issue of issues) {
     const id = typeof issue['identifier'] === 'string' ? (issue['identifier'] as string).toUpperCase() : null;
-    const status = typeof issue['canonicalStatus'] === 'string' ? (issue['canonicalStatus'] as string) : null;
     const title = typeof issue['title'] === 'string' ? (issue['title'] as string) : null;
-    if (id && status) issueStatusById.set(id, status);
     if (id && title) issueTitleById.set(id, title);
   }
 
@@ -63,59 +48,23 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
     prevApiErrorAgentsRef.current = currentApiErrorAgents;
   }, [agents]);
 
-  const PIPELINE_ROLES = new Set(['plan', 'work', 'review', 'test', 'ship']);
+  const stoppedAgents = useMemo(() => {
+    const agentForPane = (pane: BackendPane): Agent | undefined =>
+      agents.find((a) => a.id === pane.id || a.id === pane.terminalId)
+      ?? agents.find((a) => a.issueId?.toUpperCase() === pane.issue?.toUpperCase() && a.role === pane.role);
 
-  const RECENT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-  const recentStoppedAgents = agents.filter((a) => {
-    if (!a.issueId) return false;
-    if (classifyDashboardAgent({
-      issueId: a.issueId,
-      status: a.status as AgentStatus,
-      hasLiveTmuxSession: a.hasLiveTmuxSession ?? a.lifecycle?.hasLiveTmuxSession,
-      lastActivity: a.lastActivity,
-      startedAt: a.startedAt,
-    }) !== 'stopped') return false;
-    if (a.runtimeState === 'completed') return false;
-    if (a.resolution === 'completed' || a.resolution === 'done') return false;
-    if (a.lifecycle?.isCompleted) return false;
-    if (!a.role) return false;
-    if (!PIPELINE_ROLES.has(a.role)) return false;
-    // Drop phantom stops: a stopped plan/review/test/ship agent whose issue has
-    // advanced past that stage is finished, not waiting for the operator.
-    if (SPECIALIST_ROLES.has(a.role)) {
-      const issueStatus = issueStatusById.get(a.issueId.toUpperCase());
-      if (issueStatus && ISSUE_ADVANCED_STATUSES.has(issueStatus)) return false;
+    // One row per issue — the backend can leave several exited panes behind.
+    const byIssue = new Map<string, Agent>();
+    for (const pane of Object.values(panesById)) {
+      if (pane.state !== 'exited' || !pane.issue) continue;
+      const derivedState = derivedByIssueId[pane.issue]?.state;
+      if (SPECIALIST_PANE_ROLES.has(pane.role) && derivedState && SETTLED_ISSUE_STATES.has(derivedState)) continue;
+      const agent = agentForPane(pane);
+      if (!agent) continue;
+      if (!byIssue.has(pane.issue)) byIssue.set(pane.issue, agent);
     }
-    // Only show recently-active agents — old state files are historical debris
-    const lastActivity = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-    const startedAt = a.startedAt ? new Date(a.startedAt).getTime() : 0;
-    const lastRelevant = Math.max(lastActivity, startedAt);
-    return lastRelevant > 0 && Date.now() - lastRelevant < RECENT_MS;
-  });
-
-  // Deduplicate by issueId — keep only the most recent per issue
-  const stoppedAgentsByIssue = new Map<string, Agent>();
-  for (const agent of recentStoppedAgents) {
-    const key = agent.issueId || agent.id;
-    const existing = stoppedAgentsByIssue.get(key);
-    if (!existing) {
-      stoppedAgentsByIssue.set(key, agent);
-      continue;
-    }
-    const existingTime = Math.max(
-      existing.lastActivity ? new Date(existing.lastActivity).getTime() : 0,
-      existing.startedAt ? new Date(existing.startedAt).getTime() : 0,
-    );
-    const agentTime = Math.max(
-      agent.lastActivity ? new Date(agent.lastActivity).getTime() : 0,
-      agent.startedAt ? new Date(agent.startedAt).getTime() : 0,
-    );
-    if (agentTime > existingTime) {
-      stoppedAgentsByIssue.set(key, agent);
-    }
-  }
-  const stoppedAgents = Array.from(stoppedAgentsByIssue.values());
+    return Array.from(byIssue.values());
+  }, [agents, panesById, derivedByIssueId]);
   const [dismissed, setDismissed] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [results, setResults] = useState<RestartResult[] | null>(null);
@@ -237,7 +186,7 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
           >
             <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-warning-foreground">
               <AlertTriangle className="h-3.5 w-3.5" />
-              {stoppedAgents.length} stopped · pipeline agents, last 7 days
+              {stoppedAgents.length} stopped · panes the backend reports exited
             </div>
             <div className="mb-3 max-h-64 overflow-y-auto">
               {stoppedAgents.map((agent) => {

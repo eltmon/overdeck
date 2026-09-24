@@ -3,7 +3,7 @@ import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import type { DomainEvent } from '@overdeck/contracts';
 
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { jsonResponse } from '../http-helpers.js';
 import { formatFrame } from './events.js';
 import { getEventStore, type StoredEvent } from '../event-store.js';
@@ -30,7 +30,7 @@ export function isLoopbackOrigin(origin: string | undefined): boolean {
 }
 
 export function validateInternalEventsHeaders(headers: HeaderMap): { ok: true } | { ok: false; status: number; error: string } {
-  const expected = getInternalTokenSync();
+  const expected = getInternalToken();
   const provided = getHeaderFromMap(headers, INTERNAL_TOKEN_HEADER);
   if (!expected || !constantTimeTokenEqual(provided, expected)) {
     return { ok: false, status: 401, error: 'unauthorized' };

@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import {
+  classifyInFlightSlots,
   resetSwarmLoopSafetyForTests,
-  swarmJanitorPass,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
 
 const issueId = 'PAN-3680';
 const workspacePath = '/repo/workspaces/feature-pan-3680';
 
+const slot = { itemId: 'wi-1', slotIndex: 1, status: 'in-flight' as const, branch: 'swarm/pan-3680/slot-1', agentId: 'agent-pan-3680-slot-1' };
+
 function deps(outputDigest: () => string): CoordinateSwarmSlotsDeps {
-  const slot = { itemId: 'wi-1', slotIndex: 1, status: 'in-flight' as const, branch: 'swarm/pan-3680/slot-1', agentId: 'agent-pan-3680-slot-1' };
   return {
     listFeatureWorkspaces: vi.fn(() => [{ issueId, workspacePath, projectPath: '/repo' }]),
     findSpecByIssue: vi.fn(() => Effect.succeed({ document: { plan: { items: [], edges: [] } } })),
@@ -32,7 +33,17 @@ function deps(outputDigest: () => string): CoordinateSwarmSlotsDeps {
   } as unknown as CoordinateSwarmSlotsDeps;
 }
 
-describe('swarm janitor stall events', () => {
+/**
+ * The stall signal comes from classifyInFlightSlots (live: `pan swarm status` / `pan swarm wait`).
+ * The janitor pass that forwarded it to the foreman was deleted in PAN-3958 CH-8 (no production
+ * caller since PAN-3917 W5), so these tests read the signal directly.
+ */
+async function stallSignals(fake: CoordinateSwarmSlotsDeps): Promise<number[]> {
+  const classified = await classifyInFlightSlots([slot] as never, fake, { issueId, workspacePath });
+  return classified.filter(candidate => candidate.signal === 'stall-event').map(candidate => candidate.stalledForMs ?? 0);
+}
+
+describe('swarm stall events', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-14T00:00:00Z'));
@@ -44,33 +55,30 @@ describe('swarm janitor stall events', () => {
     delete process.env.PAN_SWARM_STALL_THRESHOLD_MS;
   });
 
-  it('sends one foreman event after the no-progress threshold without writing recovery state', async () => {
+  it('signals a stall once after the no-progress threshold without writing recovery state', async () => {
     process.env.PAN_SWARM_STALL_THRESHOLD_MS = String(30 * 60_000);
     const fake = deps(() => 'unchanged output');
 
-    await swarmJanitorPass(fake);
+    expect(await stallSignals(fake)).toEqual([]);
     await vi.advanceTimersByTimeAsync(30 * 60_000 + 1);
-    const actions = await swarmJanitorPass(fake);
-    await swarmJanitorPass(fake);
+    const stalled = await stallSignals(fake);
+    expect(stalled).toHaveLength(1);
+    expect(Math.floor(stalled[0]! / 60_000)).toBe(30);
+    expect(await stallSignals(fake)).toEqual([]);
 
-    expect(fake.sendStallEvent).toHaveBeenCalledOnce();
-    expect(fake.sendStallEvent).toHaveBeenCalledWith('agent-pan-3680', '[swarm-event] slot 1 stalled (no progress 30m)');
-    expect(actions).toContain('[swarm-janitor] notified PAN-3680 foreman that slot 1 stalled');
     expect(fake).not.toHaveProperty('recordStalledSlotRecovery');
   });
 
-  it('sends no event when pane output progresses before the threshold', async () => {
+  it('signals nothing when pane output progresses before the threshold', async () => {
     process.env.PAN_SWARM_STALL_THRESHOLD_MS = String(30 * 60_000);
     let output = 'first output';
     const fake = deps(() => output);
 
-    await swarmJanitorPass(fake);
+    expect(await stallSignals(fake)).toEqual([]);
     await vi.advanceTimersByTimeAsync(29 * 60_000);
     output = 'new output';
-    await swarmJanitorPass(fake);
+    expect(await stallSignals(fake)).toEqual([]);
     await vi.advanceTimersByTimeAsync(29 * 60_000);
-    await swarmJanitorPass(fake);
-
-    expect(fake.sendStallEvent).not.toHaveBeenCalled();
+    expect(await stallSignals(fake)).toEqual([]);
   });
 });

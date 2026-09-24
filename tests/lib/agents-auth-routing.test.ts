@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,7 +21,6 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/config-yaml.js')>();
   return {
     ...actual,
-    loadConfig: mockLoadYamlConfig,
     loadConfigSync: mockLoadYamlConfig,
   };
 });
@@ -32,21 +30,17 @@ vi.mock('../../src/lib/providers.js', async (importOriginal) => {
   return {
     ...actual,
     getProviderForModel: mockGetProviderForModel,
-    getProviderForModelSync: mockGetProviderForModel,
     getProviderEnv: mockGetProviderEnv,
-    getProviderEnvSync: mockGetProviderEnv,
   };
 });
 
 vi.mock('../../src/lib/openai-auth.js', () => ({
-  getOpenAIAuthStatusSync: mockOpenAIAuthStatus,
-  getOpenAIAuthStatus: (...args: unknown[]) => Effect.succeed(mockOpenAIAuthStatus(...args)),
+  getOpenAIAuthStatus: async (...args: unknown[]) => mockOpenAIAuthStatus(...args),
 }));
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
   CLIPROXY_BASE_URL: 'http://127.0.0.1:8317',
-  bridgeGeminiAuthToCliproxy: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
-  bridgeGeminiAuthToCliproxyProgram: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
+  bridgeGeminiAuthToCliproxy: (...args: Parameters<typeof mockBridgeGeminiAuth>) => mockBridgeGeminiAuth(...args),
   getCliproxyClientEnv: () => ({
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
     ANTHROPIC_AUTH_TOKEN: 'overdeck-local-cliproxy-key',
@@ -54,7 +48,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
-import { generateLauncherScriptSync } from '../../src/lib/launcher-generator.js';
+import { generateLauncherScript } from '../../src/lib/launcher-generator.js';
 import { buildSpawnEnvForModel, getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, roleAgentDefinitionPath } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
@@ -186,7 +180,7 @@ describe('agents auth routing', () => {
 
   it.each(['kimi-k2.6', 'k3', 'k3[1m]'])('launches Kimi model %s directly with Claude Code', async (model) => {
     expect(await getAgentRuntimeBaseCommand(model)).toBe(
-      `claude --permission-mode bypassPermissions --model '${model}'`
+      `claude --permission-mode bypassPermissions --model '${model === 'k3' ? 'k3-256k' : model}'`
     );
   });
 
@@ -263,6 +257,7 @@ describe('agents auth routing', () => {
         'unset NOUS_API_KEY',
         'unset DASHSCOPE_API_KEY',
         'unset QUANTUMLLAMA_API_KEY',
+        'export CLAUDE_CODE_AUTO_COMPACT_WINDOW="200000"',
         '',
       ].join('\n')
     );
@@ -290,11 +285,11 @@ describe('agents auth routing', () => {
       expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"');
       expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="272000"');
 
-      const launcher = generateLauncherScriptSync({
+      const launcher = generateLauncherScript({
         role: 'work',
         workingDir: '/workspace/project',
         providerExports,
-        baseCommand: `claude --agent pan-work-agent --model '${model}'`,
+        baseCommand: `claude --agent pan-work-agent --model '${model === 'k3' ? 'k3-256k' : model}'`,
       });
       expect(launcher).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"');
       expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="272000"');
@@ -326,20 +321,20 @@ describe('agents auth routing', () => {
     },
   );
 
-  it('preserves the conservative GPT-5.5 auto-compaction policy without a maximum override', async () => {
+  it('migrates a retired GPT selection to the pinned 272K budget', async () => {
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
 
     const providerExports = await getProviderExportsForModel('gpt-5.5');
     expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
-    expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
-    expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="150000"');
+    expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"');
+    expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="272000"');
 
     const spawnEnv = await buildSpawnEnvForModel('gpt-5.5', {
       CLAUDE_CODE_MAX_CONTEXT_TOKENS: '372000',
       CLAUDE_CODE_AUTO_COMPACT_WINDOW: '372000',
     });
-    expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
-    expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('150000');
+    expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBe('272000');
+    expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('272000');
   });
 
   it('exports the registry context window as Claude Code auto-compact window for Kimi K2.7', async () => {
@@ -352,11 +347,11 @@ describe('agents auth routing', () => {
 
     const providerExports = await getProviderExportsForModel('kimi-k2.7-code');
     expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
-    expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="262144"');
     expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
     expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
 
-    const launcher = generateLauncherScriptSync({
+    const launcher = generateLauncherScript({
       role: 'work',
       workingDir: '/workspace/project',
       providerExports,
@@ -384,16 +379,16 @@ describe('agents auth routing', () => {
     expect(providerExports).toContain(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextWindow}"`);
     expect(providerExports).toContain(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextWindow}"`);
 
-    const launcher = generateLauncherScriptSync({
+    const launcher = generateLauncherScript({
       role: 'work',
       workingDir: '/workspace/project',
       providerExports,
-      baseCommand: `claude --agent pan-work-agent --model '${model}'`,
+      baseCommand: `claude --agent pan-work-agent --model '${model === 'k3' ? 'k3-256k' : model}'`,
     });
 
     expect(launcher).toContain(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextWindow}"`);
     expect(launcher).toContain(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextWindow}"`);
-    expect(launcher).toContain(`exec claude --agent pan-work-agent --model '${model}'`);
+    expect(launcher).toContain(`exec claude --agent pan-work-agent --model '${model === 'k3' ? 'k3-256k' : model}'`);
   });
 
   it('sanitizes and sets both context limits for programmatic K3 spawns', async () => {
@@ -422,7 +417,7 @@ describe('agents auth routing', () => {
     expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
     expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
     expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
-    expect(providerExports).not.toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+    expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="200000"');
 
     const spawnEnv = await buildSpawnEnvForModel('claude-sonnet-4-6', {
       CLAUDE_CODE_MAX_CONTEXT_TOKENS: '372000',
@@ -430,7 +425,7 @@ describe('agents auth routing', () => {
       KEEP_ME: 'yes',
     });
     expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
-    expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined();
+    expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('200000');
     expect(spawnEnv.KEEP_ME).toBe('yes');
   });
 });

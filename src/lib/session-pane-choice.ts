@@ -6,9 +6,9 @@ import {
   parsePaneChoiceMenu,
   type PaneChoiceConfidence,
 } from './pane-choice-menu.js'
-import { capturePaneText, sendRawKeystroke, sessionExists } from './tmux.js'
+import { capturePane, sendRawKeystroke, sessionExists } from './tmux.js'
 
-const PANE_CAPTURE_LINES = 90
+export const PANE_CAPTURE_LINES = 90
 const KEYSTROKE_GAP_MS = 60
 const DELIVERY_CONFIRM_WAIT_MS = 700
 
@@ -48,7 +48,7 @@ export interface SessionPaneChoiceResult {
 
 export async function captureSessionPaneChoice(
   sessionName: string,
-  capture: (sessionName: string, lines: number) => Promise<string> = capturePaneText,
+  capture: (sessionName: string, lines: number) => Promise<string> = capturePane,
 ): Promise<PendingPaneChoice | null> {
   let pane: string
   try {
@@ -56,6 +56,11 @@ export async function captureSessionPaneChoice(
   } catch {
     return null
   }
+  return paneChoiceFromText(pane)
+}
+
+/** The choice menu on a captured screen, or null when there is none. */
+export function paneChoiceFromText(pane: string): PendingPaneChoice | null {
   const menu = parsePaneChoiceMenu(pane)
   if (!menu) return null
   return {
@@ -94,7 +99,7 @@ export async function answerSessionPaneChoice(
       return { body: { error: 'Conversation session is not running' }, status: 409 }
     }
 
-    const capture = deps.capture ?? capturePaneText
+    const capture = deps.capture ?? capturePane
     const sendKey = deps.sendKey
       ?? ((name: string, key: string) => Effect.runPromise(sendRawKeystroke(name, key, 'pane-choice')))
     const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))

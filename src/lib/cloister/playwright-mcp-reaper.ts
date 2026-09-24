@@ -21,8 +21,8 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { logDeaconEventSync } from '../persistent-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { logDeaconEvent } from '../persistent-logger.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 
 const execFileAsync = promisify(execFile);
@@ -203,8 +203,8 @@ export async function reapLeftoverPlaywrightBrowsers(deps: PlaywrightReapDeps = 
       try { kill(pid, 'SIGKILL'); } catch { /* race: gone between check and kill */ }
     }
     const message = `Reaped ${label} pid ${pid}`;
-    logDeaconEventSync(`[playwright-reaper] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Deacon ${message.toLowerCase()}` });
+    logDeaconEvent(`[playwright-reaper] ${message}`);
+    emitActivityEntry({ source: 'cloister', level: 'warn', message: `Deacon ${message.toLowerCase()}` });
     actions.push(message);
   }
   return actions;

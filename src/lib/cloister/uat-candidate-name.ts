@@ -10,7 +10,7 @@
  * stable hash of label + day so rebuilds for the same day reuse the same branch.
  */
 
-export const UAT_CODENAMES: readonly string[] = [
+const UAT_CODENAMES: readonly string[] = [
   'otter', 'falcon', 'cedar', 'quartz', 'ember', 'marlin', 'willow', 'cobalt',
   'sable', 'heron', 'onyx', 'larch', 'perch', 'flint', 'dune', 'reef', 'vale',
   'crow', 'moss', 'thorn', 'birch', 'koi', 'slate', 'wren',

@@ -9,11 +9,8 @@ import {
   drainMailOnce,
   formatAgentMessageBlock,
   formatMailFileContent,
-  isMonitorLive,
-  listInboxMessagesSync,
-  MONITOR_PRESENCE_FRESHNESS_MS,
+  listInboxMessages,
   parseMailFile,
-  writeMonitorPresence,
 } from '../monitor-transport.js';
 
 const AGENT_ID = 'agent-pan-test';
@@ -66,33 +63,6 @@ describe('formatAgentMessageBlock', () => {
   });
 });
 
-describe('isMonitorLive', () => {
-  it('is live with a fresh heartbeat and a live pid', () => {
-    const now = new Date('2026-07-24T12:00:00.000Z');
-    writeMonitorPresence(AGENT_ID, process.pid, now, now);
-    expect(isMonitorLive(AGENT_ID, now.getTime())).toBe(true);
-  });
-
-  it('is dead when the heartbeat exceeds the freshness window', () => {
-    const beat = new Date('2026-07-24T12:00:00.000Z');
-    writeMonitorPresence(AGENT_ID, process.pid, beat, beat);
-    const later = beat.getTime() + MONITOR_PRESENCE_FRESHNESS_MS + 1;
-    expect(isMonitorLive(AGENT_ID, later)).toBe(false);
-  });
-
-  it('is dead when the pid is gone', () => {
-    const now = new Date('2026-07-24T12:00:00.000Z');
-    writeMonitorPresence(AGENT_ID, process.pid, now, now);
-    vi.spyOn(process, 'kill').mockImplementation(() => {
-      throw new Error('ESRCH');
-    });
-    expect(isMonitorLive(AGENT_ID, now.getTime())).toBe(false);
-  });
-
-  it('is dead with no presence file', () => {
-    expect(isMonitorLive(AGENT_ID, Date.now())).toBe(false);
-  });
-});
 
 describe('drainMailOnce', () => {
   it('emits plain mail oldest-first, moves it to read/, and skips pending/json', async () => {
@@ -145,20 +115,20 @@ describe('drainMailOnce', () => {
   });
 });
 
-describe('listInboxMessagesSync', () => {
+describe('listInboxMessages', () => {
   it('returns read + unread full bodies oldest-first under the limit, moving nothing', async () => {
     writeMail('2026-01-01T00-00-00-000Z.md', '# Message\n\nold\n');
     await drainMailOnce(AGENT_ID, () => {}); // moves "old" into read/
     writeMail('2026-01-02T00-00-00-000Z.md', formatMailFileContent('x'.repeat(6000), 'deacon', new Date('2026-01-02T00:00:00Z')));
 
-    const messages = listInboxMessagesSync(AGENT_ID, 10);
+    const messages = listInboxMessages(AGENT_ID, 10);
     expect(messages.map((m) => [m.read, m.body.length])).toEqual([
       [true, 3],
       [false, 6000], // full body — inbox never truncates
     ]);
 
     expect(existsSync(join(agentMailDir(AGENT_ID), '2026-01-02T00-00-00-000Z.md'))).toBe(true);
-    expect(listInboxMessagesSync(AGENT_ID, 1)).toHaveLength(1);
-    expect(listInboxMessagesSync(AGENT_ID, 1)[0].read).toBe(false);
+    expect(listInboxMessages(AGENT_ID, 1)).toHaveLength(1);
+    expect(listInboxMessages(AGENT_ID, 1)[0].read).toBe(false);
   });
 });

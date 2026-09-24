@@ -1,0 +1,373 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-14T05:25:28.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1641: Run agents on local GPU models via a managed Ollama sidecar (delta: review-cycle-2 blockers)",
+    "updated": "2026-08-14T05:33:47.021Z"
+  },
+  "plan": {
+    "id": "pan-1641",
+    "title": "Run agents on local GPU models via a managed Ollama sidecar — review-cycle-2 delta",
+    "status": "proposed",
+    "uid": "7e583334-8158-4421-b960-576d748c9bbc",
+    "author": "agent:k3[1m]",
+    "sequence": 3,
+    "created": "2026-08-14T05:25:28.000Z",
+    "updated": "2026-08-14T05:33:47.021Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1641",
+        "label": "PAN-1641",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3684",
+        "label": "PAN-3684 acceptance spawn",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "ollama",
+      "pi",
+      "ohmypi",
+      "local-models",
+      "review-delta"
+    ],
+    "metadata": {
+      "sizeJustification": "The async-omp-provisioning item spans 9 generateLauncherScriptSync call sites because the review-prescribed fix (hoist provisioning out of the sync generator) is only safe as one atomic change: a partial hoist leaves some spawns unprovisioned and others double-provisioned. The remaining three items are small and separable but all gate the same review-cycle-2 unblock, so sibling issues would only add pipeline overhead.",
+      "canonicalFilename": "2026-08-14-PAN-1641-run-agents-on-local-gpu-models-via-a-managed-ollama-sidecar-review-cycle-2-delta.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-1641's implementation completed all 9 original xBRIEF items on 2026-08-13, but review cycle 2 (agent-pan-1641-review-6370a390) returned CHANGES REQUESTED with two blocking findings: (1) performance — provisionOhmypiProviderForModel does synchronous read/parse/rewrite of ~/.omp/agent/models.json inside generateLauncherScriptSync, which runs on the dashboard's long-lived Node event loop; (2) requirements — the E2E verification invoked omp directly instead of spawning a work agent through Overdeck, so AC 28/29 (Overdeck-spawned Pi agent on ollama:gemma4:12b with localhost-only, zero-cloud evidence) remain unproven. Three non-blocking findings ride along: unbounded response.json() in checkOllamaHealth, compounding health-probe retries (~189 s worst case), and a missing AC 19 regression test for the stopped-agent fresh-launch fallback.",
+      "Proposal": "Delta plan of four items. WI-1: replace sync provisioning with provisionOhmypiProviderForModelAsync (node:fs/promises), skip unchanged writes, serialize per registry path via a promise-chain map, hoist the call out of generateLauncherScriptSync into all 9 async call sites. WI-2: bound checkOllamaHealth's body read by the probe timeout, add a knownUnhealthy hint to ensureOllamaServeRunning, and replace the fixed-attempt retry loop with one overall 30 s startup deadline. WI-3: regression test pinning the AC 19 preflight-before-session-recreation ordering in messageAgent's stopped-agent fallback. WI-4: run the acceptance flow through the existing PAN-3684 spawn issue, record agent identity/launch path/result/localhost-only traffic/absent cloud credentials in docs/audits/pan-1641-local-ollama-verification.md, and close PAN-3684.",
+      "NonGoals": "- Re-planning or re-implementing the 9 completed PAN-1641 items (provider routing, lifecycle module, config, Pi env, install, doctor, docs)\n- Extending Ollama to the Claude Code or Codex harnesses (tracked in the follow-up issue named in PAN-1641)\n- A dashboard model picker for local Ollama tags (follow-up issue)\n- Generalizing openai-compatible-proxy.ts as an Anthropic-compatible shim (follow-up issue)\n- Refactoring launcher-generation call sites beyond the provisioning hoist\n- Changing the documented Gemma 4 12B default model or the ollama: model-ref syntax"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Delta plan covering only the review-cycle-2 blocking findings plus the three adjacent non-blocking findings; the 9 completed items are not re-planned.",
+        "rationale": "The record shows every original item completed and inspectStatus passed; re-planning finished work would churn already-reviewed diffs. The two blocking findings are the precise reason the pipeline cannot advance."
+      },
+      {
+        "summary": "Provisioning fix follows the reviewer's prescribed shape: async fs/promises, hoisted before sync generation, unchanged-write skip, per-path serialization.",
+        "rationale": "The review gate owns this shape and will re-check it next cycle; a cheaper sync fast-path would also violate the repo's no-sync-I/O-in-server rule."
+      },
+      {
+        "summary": "The sync provisionOhmypiProviderForModel is removed rather than kept alongside the async variant.",
+        "rationale": "All 9 generateLauncherScriptSync call sites sit inside async functions, so no caller needs the sync path; one door avoids drift between two provisioning implementations."
+      },
+      {
+        "summary": "E2E evidence runs through the existing PAN-3684 acceptance issue instead of a new ad-hoc acceptance flow.",
+        "rationale": "PAN-3684 was created on 2026-08-13 with its own xBRIEF for exactly this acceptance spawn; duplicating the vehicle would split the evidence trail."
+      },
+      {
+        "summary": "The three non-blocking findings (body-read bound, startup deadline, AC 19 regression test) are included in this delta.",
+        "rationale": "Each is small, precisely specified by the review, and would otherwise resurface as next cycle's blocking findings."
+      }
+    ],
+    "items": [
+      {
+        "id": "async-omp-provisioning",
+        "title": "Make omp registry provisioning async, unchanged-skipping, and serialized; hoist it out of generateLauncherScriptSync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T05:25:28.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1641",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "e2e-overdeck-spawn-evidence"
+          ],
+          "files_scope": [
+            "src/lib/ohmypi-models.ts",
+            "src/lib/launcher-generator.ts",
+            "src/lib/runtimes/ohmypi.ts",
+            "src/lib/agents/messaging.ts",
+            "src/lib/agents/recovery.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/cloister/inspect-agent.ts",
+            "src/lib/remote/remote-agents.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/runtime/claude.ts",
+            "src/lib/__tests__/ohmypi-models-ollama.test.ts",
+            "tests/lib/ohmypi-models.test.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/ohmypi-models-ollama.test.ts tests/lib/ohmypi-models.test.ts src/lib/__tests__/launcher-generator.test.ts",
+            "npm run typecheck",
+            "grep -n \"provisionOhmypiProviderForModel\" src/lib/launcher-generator.ts || echo PROVISIONING-HOISTED"
+          ],
+          "expected_outputs": [
+            "all three named test files pass",
+            "typecheck completes without errors",
+            "grep prints PROVISIONING-HOISTED (no provisioning call left in the sync generator)"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Touches only the launcher-provisioning path and its call sites; the other wave-0 items edit disjoint files (src/lib/ollama.ts, provider-env.ts, a new test file), so this item runs in its own slot without conflicts.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the synchronous provisionOhmypiProviderForModel in src/lib/ohmypi-models.ts with an async version using node:fs/promises (readFile/mkdir/writeFile/rename; existence via readFile catch, not existsSync). Keep the corrupt-registry error text and the agentDir test hook. Skip the write entirely when the existing registry entry is deep-equal (node:util isDeepStrictEqual) to the computed def. Serialize updates per absolute registry path with a module-level Map<string, Promise<void>> promise chain (cleaned up in .finally); different paths run in parallel. Delete the provisioning block and import from src/lib/launcher-generator.ts (lines 6 and 247-253) and update its doc comment to state callers must await provisioning first. Update all 9 generateLauncherScriptSync call sites (src/lib/runtimes/ohmypi.ts:354, src/lib/agents/messaging.ts:360, src/lib/agents/recovery.ts:650, src/lib/agents/spawn.ts:382, src/lib/cloister/inspect-agent.ts:246, src/lib/remote/remote-agents.ts:622, src/lib/planning/spawn-planning-session.ts:697, src/lib/runtime/claude.ts:104, and the Effect wrapper at src/lib/launcher-generator.ts:905 — provisioning becomes an Effect.promise step before Effect.sync generation) to await provisionOhmypiProviderForModel(config.model) under the same harness === 'ohmypi' && model guard immediately before generation. Update src/lib/__tests__/ohmypi-models-ollama.test.ts and tests/lib/ohmypi-models.test.ts to async; add cases: unchanged entry produces no writeFile call; two concurrent calls with different providers both land; corrupt registry throws the same message. Add a launcher-generator test asserting generateLauncherScriptSync with an ohmypi+ollama config performs no registry write. Full step list and before/after snippet: .pan/drafts/PAN-1641.md WI-1."
+        },
+        "items": [
+          {
+            "id": "async-omp-provisioning.ac1",
+            "title": "src/lib/ohmypi-models.ts contains fs imports only from node:fs/promises, and its async provisionOhmypiProviderForModel returns Promise<void>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "async-omp-provisioning.ac2",
+            "title": "generateLauncherScriptSync contains no provisioning call and no ohmypi-models import; all 9 former call sites await provisioning before generation (verified by grep)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "async-omp-provisioning.ac3",
+            "title": "a unit test proves an unchanged registry entry produces zero writeFile calls (no tmp file, no rename)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "async-omp-provisioning.ac4",
+            "title": "a unit test proves two concurrent provisioning calls for the same registry path both persist their providers (no lost update), and a corrupt existing models.json still throws the manual-fix error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "async-omp-provisioning.ac5",
+            "title": "npm run typecheck exits without errors and each of the three named test files passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bound-ollama-health-timeouts",
+        "title": "Bound Ollama health body reads and enforce one overall startup deadline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T05:25:28.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/ollama.ts",
+            "src/lib/agents/provider-env.ts",
+            "src/lib/__tests__/ollama.test.ts",
+            "src/lib/__tests__/provider-env-ollama.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/ollama.test.ts src/lib/__tests__/provider-env-ollama.test.ts"
+          ],
+          "expected_outputs": [
+            "both named test files pass with fake-timer deadline coverage (no real 5s waits)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/ollama.ts: (1) checkOllamaHealth — keep the AbortController timeout armed through response.json() so the 5s probe budget covers headers AND body; on body timeout cancel the body and return the standard endpointReachable:false result. (2) ensureOllamaServeRunning — add a knownUnhealthy?: boolean option that skips the initial isOllamaHealthy probe; getProviderEnvForModel (src/lib/agents/provider-env.ts:48-49) passes knownUnhealthy:true because it just observed endpointReachable:false. (3) Replace the fixed maxHealthAttempts loop in waitForOllamaHealth with one overall startup deadline (default startupDeadlineMs 30_000): each attempt's probe timeout is min(OLLAMA_PROBE_TIMEOUT_MS, remaining budget), the 1s retry gap stays, connection-refused still retries fast, and expiry throws the same OllamaEnsureError. All new retry/deadline tests MUST use vi.useFakeTimers() + advanceTimersByTime (repo rule — never real waits). Details: .pan/drafts/PAN-1641.md WI-2."
+        },
+        "items": [
+          {
+            "id": "bound-ollama-health-timeouts.ac1",
+            "title": "a fake-timer test shows checkOllamaHealth returns endpointReachable:false within the 5s probe budget when the response body never arrives, and cancels the body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-ollama-health-timeouts.ac2",
+            "title": "a test shows getProviderEnvForModel's ensure call skips the duplicate pre-start probe when knownUnhealthy is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-ollama-health-timeouts.ac3",
+            "title": "a fake-timer test proves a stalled endpoint fails startup within the 30s overall deadline (not ~189s), while connection-refused retries at 1s cadence and succeeds once the endpoint is up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preflight-fallback-regression-test",
+        "title": "Pin AC 19: regression test that the stopped-agent fresh-launch fallback preflights Ollama before session recreation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T05:25:28.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "tests/unit/lib/agents/messaging-ollama-preflight.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/messaging-ollama-preflight.test.ts"
+          ],
+          "expected_outputs": [
+            "the new regression test passes, and fails if the preflight is moved after createSession"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add tests/unit/lib/agents/messaging-ollama-preflight.test.ts driving the messageAgent() stopped-agent fresh-launch fallback (src/lib/agents/messaging.ts, block starting ~line 330) with agentState.model = 'ollama:gemma4:12b'. Mock the provider-env module boundary (checkOllamaHealth/ensureOllamaServeRunning via getProviderEnvForModel) and createSession; assert the Ollama preflight resolves before createSession is invoked, and that a failing preflight aborts the fallback without creating a session. Code reading suggests the ordering already holds (getProviderExportsForModel awaited at messaging.ts:331 precedes createSession at ~line 377, and it routes through getProviderEnvForModel's Ollama preflight at provider-env.ts:45-56). Decision rule: if the test exposes wrong ordering, hoist the preflight above the session-recreation block in messaging.ts — fix the ordering, never weaken the test. Details: .pan/drafts/PAN-1641.md WI-3."
+        },
+        "items": [
+          {
+            "id": "preflight-fallback-regression-test.ac1",
+            "title": "the new test proves createSession is called only after the Ollama preflight resolves in the stopped-agent fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preflight-fallback-regression-test.ac2",
+            "title": "the new test proves a failing preflight (endpoint down or model missing) rejects the fallback and createSession is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-overdeck-spawn-evidence",
+        "title": "Record Overdeck-spawned Pi work-agent E2E evidence (AC 28/29) via PAN-3684 and close it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-14T05:25:28.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-1641-local-ollama-verification.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh issue view 3684 --repo eltmon/overdeck --json state --jq .state",
+            "grep -n \"Overdeck-spawned agent verification\" docs/audits/pan-1641-local-ollama-verification.md",
+            "git log --all --oneline -- LOCAL_OLLAMA_OK.txt"
+          ],
+          "expected_outputs": [
+            "gh prints CLOSED",
+            "grep finds the new audit section naming the agent id and pushed commit SHA",
+            "git log lists the acceptance commit that created LOCAL_OLLAMA_OK.txt"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint (live verification): run the acceptance flow through the existing PAN-3684 issue rather than a direct omp invocation. Preconditions: ollama installed, gemma4:12b pulled (ollama list), GPU free — if any fails, stop and report the blocker; never fake or transcribe evidence from a direct-omp run. Steps: (1) pan start 3684 — its xBRIEF spawns a Pi work agent with model ollama:gemma4:12b that creates LOCAL_OLLAMA_OK.txt containing exactly LOCAL_OK, commits, pushes, and runs pan task done. (2) Watch it to completion (pan show 3684, tmux capture); record the agent id, the spawn path (pan start → workspace → launcher), and the pushed commit SHA. (3) Capture on the spawned agent: env shows OPENAI_BASE_URL=http://localhost:11434/v1 and no ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN/ANTHROPIC_API_KEY; localhost-only model traffic via strace-connect summary or /proc socket check for the omp process (loopback :11434, no api.anthropic.com/api.openai.com connections) — the audit's existing direct-run section demonstrates the strace technique. (4) Add an 'Overdeck-spawned agent verification (AC 28/29)' section to docs/audits/pan-1641-local-ollama-verification.md with agent identity, launch path, result, and both evidence captures; keep the direct-omp section as supporting evidence. (5) Close PAN-3684 with a comment linking the audit section. Details: .pan/drafts/PAN-1641.md WI-4."
+        },
+        "items": [
+          {
+            "id": "e2e-overdeck-spawn-evidence.ac1",
+            "title": "the audit doc's new section records the Overdeck agent id, the pan start launch path, and the pushed LOCAL_OLLAMA_OK.txt commit SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-overdeck-spawn-evidence.ac2",
+            "title": "the section records the spawned agent's env: OPENAI_BASE_URL points at localhost:11434/v1 and no ANTHROPIC_* credentials are present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-overdeck-spawn-evidence.ac3",
+            "title": "the section records localhost-only traffic evidence (loopback :11434 connections, no api.anthropic.com or api.openai.com connections) for the Overdeck-spawned process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-overdeck-spawn-evidence.ac4",
+            "title": "PAN-3684 closes with a comment linking the audit section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "async-omp-provisioning",
+        "to": "preflight-fallback-regression-test",
+        "type": "blocks"
+      },
+      {
+        "from": "async-omp-provisioning",
+        "to": "e2e-overdeck-spawn-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "bound-ollama-health-timeouts",
+        "to": "e2e-overdeck-spawn-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "preflight-fallback-regression-test",
+        "to": "e2e-overdeck-spawn-evidence",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

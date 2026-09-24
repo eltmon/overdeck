@@ -154,6 +154,32 @@ describe('conversation subagent list emission', () => {
     expect(subagent.subagents).toBeUndefined();
   });
 
+  it('returns Codex children and reads the selected child instead of the parent', async () => {
+    const name = createConversationRecord();
+    const folder = join(tempDir, 'codex-home', 'sessions', '2026', '09', '08');
+    await mkdir(folder, { recursive: true });
+    sessionFile = join(folder, 'rollout-parent.jsonl');
+    const childFile = join(folder, 'rollout-child.jsonl');
+    for (const [file, id, source, message] of [
+      [sessionFile, 'parent', 'cli', 'Parent output'],
+      [childFile, 'child', { subagent: { thread_spawn: { parent_thread_id: 'parent', depth: 1 } } }, 'Child output'],
+    ] as const) {
+      await writeFile(file, [
+        { type: 'session_meta', payload: { id, source } },
+        { type: 'event_msg', payload: { type: 'agent_message', message } },
+        { type: 'event_msg', payload: { type: 'task_complete' } },
+      ].map(entry => JSON.stringify(entry)).join('\n') + '\n');
+    }
+    expect((await readMessages(name)).body).toMatchObject({
+      messages: [{ text: 'Parent output' }], subagents: [{ agentId: 'child', status: 'done' }],
+    });
+    const child = await readMessages(name, 'child');
+    expect(child.body).toMatchObject({ messages: [{ text: 'Child output' }] });
+    expect((child.body as Record<string, unknown>).subagents).toBeUndefined();
+    expect((await readMessages(name, 'parent')).status).toBe(400);
+    expect((await readMessages(name, '../child')).status).toBe(400);
+  });
+
   it('rejects traversal-unsafe subagent ids before parsing a transcript', async () => {
     const name = createConversationRecord();
     await writeFile(sessionFile, '');

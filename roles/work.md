@@ -1,6 +1,6 @@
 ---
 name: work
-description: Overdeck work role — claims tasks, writes code, commits per item, and runs Jidoka inspection gates.
+description: Overdeck work role — claims tasks, writes code, commits one item per commit with an Item trailer, and pushes before closing each item.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.work.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
@@ -52,16 +52,6 @@ Work is one undifferentiated mode. Do not switch models or behavior by internal 
 
 Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Development and verification target only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.overdeck.localhost`).
 
-## Message inbox (Claude Code sessions)
-
-Before claiming your first task, start your message inbox as a background task and leave it running for the whole session:
-
-```bash
-pan monitor
-```
-
-Run it in the background (`run_in_background`), never in the foreground — it blocks forever by design. Messages from the operator and the pipeline then arrive as `[overdeck:agent-message]` blocks in background output instead of being typed into your prompt. Long messages are truncated; run `pan inbox` to read the full body. Do not kill the monitor to "clean up" — it is your delivery channel.
-
 If a Linear MCP tool call fails with an authentication error: call `mcp__linear__authenticate` ONCE, state the returned authorization URL in one sentence, then stop and wait — Overdeck is notified automatically and will wake you when authentication is restored. Do not retry the tool in a loop and do not improvise other auth commands. When you receive a "Linear MCP authentication has been restored" message, re-check with one lightweight Linear read and resume your canonical task.
 
 ## Per-Task Workflow
@@ -70,17 +60,13 @@ For every item:
 
 1. `pan task next <ISSUE-ID>` — find the next unblocked item scoped to this issue.
 2. `pan task claim <ISSUE-ID> <item-id>` — claim it.
-3. Implement only that item.
-4. `git add` specific files and `git commit` — one item = one commit.
+3. Implement only that item. Run only the tests it touched, with the project's test runner scoped to those files (`npx vitest run <files>` in a vitest project). Never run the full suite yourself — the verification gate runs it after `pan done`.
+4. `git add` specific files and `git commit` — one item = one commit, with the body line `Item: <item-id>`.
 5. Immediately push that commit with `git push -u origin "$(git branch --show-current)"`. Every completed item must exist on origin before its status is closed; generic project Git profiles do not override this managed-work invariant.
-6. `pan task done <ISSUE-ID> <item-id> --reason="…"`. (The canonical writer records item status automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
-7. Re-read this item's plan-item metadata (merged view via the spec on main) after the commit.
-8. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --item <item-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
-9. If `metadata.requiresInspection === false`, skip inspection and continue.
-10. On `INSPECTION BLOCKED`: fix with a new commit, push it, `pan task done` again, then re-run the same inspection.
-11. Continue with the next ready item.
+6. `pan task done <ISSUE-ID> <item-id>` — verifies the pushed commit carries the `Item:` trailer and records completion in the continue file. It takes no extra flags. Do **not** write to `.overdeck/continue.json` directly.
+7. `metadata.requiresInspection` is a subscription signal for a standing tier-supervisor; it asks nothing of you. Continue with the next ready item.
 
-Never batch multiple tasks into a single commit. A one-item diff is what makes inspection, review, and rollback tractable.
+Never batch multiple tasks into a single commit. Each commit's `Item:` trailer is how `pan task done` finds its evidence, and a one-item diff is what makes review and rollback tractable.
 
 ## Foreman gated-command protocol
 
@@ -98,18 +84,6 @@ Use this protocol when the xBRIEF is swarm-eligible. The parent Work agent stays
 
 Keep the foreman context shallow. Offload bounded research when useful. If context quality degrades, use `pan handoff` with a file-backed state summary and continue in a fresh persistent session.
 
-## Jidoka Inspection Gates
-
-### Fast depth: `inspect`
-
-Tasks tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth: "fast"` or no depth run the fast inspector after the item commit and before claiming more work. The question is deliberately narrow: **was the deed done?** The inspect sub-run checks the item narrative and acceptance criteria against the just-created diff and blocks if the commit is missing required artifacts, includes unrelated files, or leaves obvious broken behavior.
-
-### Deep depth: `inspect-deep`
-
-Tasks tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth: "deep"` run the deep inspector instead. The question is broader: **was it done correctly?** The deep sub-run examines architecture, edge cases, safety invariants, and whether the change is robust enough for downstream tasks to rely on.
-
-The work role does not choose models for these gates. The selected `pan inspect` command controls the sub-role: `pan inspect` resolves through `resolveModel('work', 'inspect')`, and `pan inspect --deep` resolves through `resolveModel('work', 'inspect-deep')`.
-
 ## Completion
 
 Summaries lead with anomalies and deviations — never bury them after the wins.
@@ -117,10 +91,12 @@ Summaries lead with anomalies and deviations — never bury them after the wins.
 When all tasks are closed and the tree is clean:
 
 ```bash
-npm test
+<test runner> <test files you changed or whose subjects you changed>
 git push -u origin "$(git branch --show-current)"
 pan done <ISSUE-ID> -c "<terse summary>"
 ```
+
+`pan done` runs the verification gate. Where the project's tests run on CI (`verification.tests: ci`), it runs typecheck and lint locally and the full suite runs once, on CI, against the PR head; otherwise it runs the full suite locally. Either way a test failure returns to you as verification feedback (`Failed check: test`).
 
 The final push is a verification pass; every item commit was already pushed before its
 item was closed. Work agents push only their feature branch. Never push to `origin/main` or merge into
@@ -148,4 +124,4 @@ The four push-back shapes that require this signal: **self-abort** (the work can
 - Never delete `.jsonl` Claude session files.
 - Never send destructive HTTP requests speculatively.
 - Never approve, deny, dismiss, or answer permission prompts with `tmux send-keys`, `tmux paste-buffer`, `sendKeys`, `sendKeysAsync`, or any other session-input mechanism.
-- Do not self-review in place of the pipeline; Jidoka only checks the item before handoff.
+- Do not self-review in place of the pipeline; review runs from the PR after `pan done`.

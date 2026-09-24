@@ -16,13 +16,13 @@ import { userInfo } from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { closeOut, type WorkflowResult } from '../../lib/lifecycle/index.js';
-import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../../lib/projects.js';
-import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam } from '../../lib/projects.js';
+import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
 import { acceptFlagFor, canAcceptDodMisses, DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
 import { isTrackerIssueClosed } from '../../lib/cloister/issue-closed.js';
 import { createDeaconEventClient } from '../../lib/cloister/deacon-event-client.js';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -31,7 +31,7 @@ async function notifyCloseOutMembershipRefresh(issueId: string): Promise<void> {
   let outcome: 'appended' | 'duplicate' | 'failed' = 'failed';
   try {
     outcome = await createDeaconEventClient({
-      dashboardUrl: getDashboardApiUrlSync(),
+      dashboardUrl: getDashboardApiUrl(),
       appendOnceTimeoutMs: 2_000,
     }).appendOnce({
       type: 'issue.statusChanged',
@@ -199,7 +199,7 @@ export async function readGitHubCloseState(owner: string, repo: string, number: 
 }
 
 export async function closeOutCommand(id: string, options: CloseOutOptions): Promise<void> {
-  const issueId = resolveBareNumericIdSync(id);
+  const issueId = resolveBareNumericId(id);
   if (!issueId) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(
@@ -288,7 +288,7 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
 
   // Resolve project
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
   let projectPath = '';
 
   if (projectConfig) {

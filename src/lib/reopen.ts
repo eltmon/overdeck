@@ -4,25 +4,20 @@
  * Called by both the CLI `pan reopen` command and the dashboard
  * `POST /api/issues/:id/reopen` endpoint to ensure consistent behavior.
  *
+ * PAN-3917: reopening used to rewrite a `review_status` row back to `pending`
+ * across a dozen mirrored fields. Every one of those fields is now derived from
+ * the tracker and the PR, and reopening the tracker issue (plus closing the old
+ * PR) is what changes them. What is left here is the state Overdeck does own:
+ * the issue-closed cache and the scope xBRIEF's continue-file breadcrumb.
+ *
  * All filesystem I/O uses fs/promises so this is safe on the dashboard event loop.
  */
 
-import {
-  getReviewStatusSync,
-  setReviewStatusSync,
-} from './review-status.js';
-import { Data, Effect } from 'effect';
-import { getProjectSync, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
+import { resolveProjectFromIssueSync } from './projects.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
-import { clearRecordPipelineClosedOutSync } from './pan-dir/record-update.js';
 
 export interface ReopenResult {
-  specialistStatesReset: boolean;
-  previousReviewStatus: string | null;
-  previousTestStatus: string | null;
-  previousMergeStatus: string | null;
-  queueItemsRemoved: Record<string, number>;
   /** True when a `reason: 'resume'` entry was appended to the continue file. */
   continueFileUpdated: boolean;
   reason?: string;
@@ -31,80 +26,28 @@ export interface ReopenResult {
 export interface ReopenOptions {
   reason?: string;
   trackerContext?: string;
-}async function reopenWorkspaceStatePromise(
+}
+
+/** Reset a workspace's pipeline state so a closed issue can re-enter the pipeline. */
+export async function reopenWorkspaceState(
   issueId: string,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  workspacePath: string,
+  workspacePath: string | null,
   options: ReopenOptions = {}
 ): Promise<ReopenResult> {
   const result: ReopenResult = {
-    specialistStatesReset: false,
-    previousReviewStatus: null,
-    previousTestStatus: null,
-    previousMergeStatus: null,
-    queueItemsRemoved: {},
     continueFileUpdated: false,
     reason: options.reason,
   };
 
   clearIssueClosedCache(issueId);
 
-  // 1. Reset specialist states — single-row atomic update, no TOCTOU risk.
-  // setReviewStatus() reads only this issue's row and upserts only this issue's row.
-  const existing = getReviewStatusSync(issueId);
-
-  if (existing) {
-    result.previousReviewStatus = existing.reviewStatus;
-    result.previousTestStatus = existing.testStatus;
-    result.previousMergeStatus = existing.mergeStatus ?? null;
-  }
-
-  setReviewStatusSync(issueId, {
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    verificationStatus: 'pending',
-    mergeStatus: 'pending',
-    reviewNotes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
-    testNotes: undefined,
-    mergeNotes: undefined,
-    readyForMerge: false,
-    prUrl: existing?.prUrl,
-    autoRequeueCount: 0,
-    // PAN-653: clear stuck state so Deacon resumes processing this issue.
-    // reviewedAtCommit is cleared so the next approve cycle records the new commit SHA.
-    stuck: undefined,
-    stuckReason: undefined,
-    stuckAt: undefined,
-    stuckDetails: undefined,
-    reviewedAtCommit: undefined,
-  });
-  result.specialistStatesReset = true;
-
-  // 2. Append a reopen breadcrumb to the scope xBRIEF's continue file.
   const resolved = resolveProjectFromIssueSync(issueId);
-  if (resolved) {
-    // Clear the terminal close-out marker: status writes deliberately preserve
-    // closedOut (records.ts), so without this a reopened issue stays invisible
-    // to review dispatch and the dashboard forever (MIN-850, 2026-07-24).
-    const project = getProjectSync(resolved.projectKey);
-    if (project) clearRecordPipelineClosedOutSync(project, issueId.toUpperCase());
-  }
   if (resolved) {
     try {
       const noteParts: string[] = [`Reopened on ${new Date().toISOString().slice(0, 10)}`];
       if (options.reason) noteParts.push(`reason: ${options.reason}`);
-      if (result.previousReviewStatus) {
-        noteParts.push(`review: ${result.previousReviewStatus} → pending`);
-      }
-      if (result.previousTestStatus) {
-        noteParts.push(`test: ${result.previousTestStatus} → pending`);
-      }
-      if (result.previousMergeStatus) {
-        noteParts.push(`merge: ${result.previousMergeStatus} → pending`);
-      }
-      if (options.trackerContext) {
-        noteParts.push('tracker context attached');
-      }
+      if (options.trackerContext) noteParts.push('tracker context attached');
 
       appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
         reason: 'resume',
@@ -112,35 +55,9 @@ export interface ReopenOptions {
       });
       result.continueFileUpdated = true;
     } catch {
-      // Non-fatal — specialist states were still reset above.
+      // Non-fatal — the issue-closed cache was still cleared above.
     }
   }
 
   return result;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Tagged error for reopen Effect variants. */
-export class ReopenError extends Data.TaggedError('ReopenError')<{
-  readonly issueId: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `reopenWorkspaceState`. */
-export const reopenWorkspaceState = (
-  issueId: string,
-  workspacePath: string,
-  options: ReopenOptions = {},
-): Effect.Effect<ReopenResult, ReopenError> =>
-  Effect.tryPromise({
-    try: () => reopenWorkspaceStatePromise(issueId, workspacePath, options),
-    catch: (cause) =>
-      new ReopenError({
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-

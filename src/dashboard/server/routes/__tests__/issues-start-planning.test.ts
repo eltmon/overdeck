@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+// PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
+// it transitively (config-yaml → tier-table → record, workspaces/resolver →
+// overdeck/infra → record). Stub the chain entry so the route under test loads.
+
 const {
   issueDataServiceMock,
   mockResolveProjectFromIssue,
@@ -61,8 +65,8 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/tracker-utils.js')>();
   return {
     ...actual,
-    resolveGitHubIssueSync: mockResolveGitHubIssue,
-    resolveTrackerTypeSync: () => 'github',
+    resolveGitHubIssue: mockResolveGitHubIssue,
+    resolveTrackerType: () => 'github',
   };
 });
 
@@ -79,6 +83,12 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
+  listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   listSessionNames: mockListSessionNames,
   killSession: vi.fn(() => Effect.void),
   sessionExists: vi.fn(() => Effect.succeed(false)),
@@ -86,15 +96,14 @@ vi.mock('../../../../lib/tmux.js', () => ({
 
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(),
-  getAgentStateSync: vi.fn(),
   saveAgentStateSync: mockSaveAgentStateSync,
   getProviderAuthMode: vi.fn(() => Promise.resolve('api')),
   normalizeAgentId: vi.fn((id: string) => id),
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
+  emitActivityEntry: vi.fn(),
+  emitActivityTts: vi.fn(),
 }));
 
 vi.mock('../../../../lib/planning/spawn-planning-session.js', () => ({

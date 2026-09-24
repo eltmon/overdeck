@@ -2,11 +2,9 @@
  * Multi-project merge-train view (PAN-1696 fe-merge-train-view).
  *
  * This is the shared body of the merge-train surface. It replaces the
- * single-project card that read `/api/flywheel/uat-generations` and
- * `/api/flywheel/merge-queue`: those answered for the dashboard's own repo
- * only, and only while a flywheel run was active. This view reads the
- * aggregate `/api/merge-train/*` namespace instead, so a ready feature in ANY
- * tracked project shows up whether or not a flywheel run exists.
+ * single-project card that answered for the dashboard's own repo only. This
+ * view reads the aggregate `/api/merge-train/*` namespace instead, so a ready
+ * feature in ANY tracked project shows up.
  *
  * Layout per project section — unchanged in substance from the old card:
  * plain-language intro · batches newest-first (ready / assembling /
@@ -89,6 +87,8 @@ interface QueuesEntry {
   projectKey: string;
   projectName: string;
   enabled: boolean;
+  /** PAN-3965: the project holds merges for UAT, so one ready feature still gets a batch. */
+  holdsForUat?: boolean;
   queue: MergeTrainQueueItem[];
 }
 
@@ -105,11 +105,20 @@ interface MergeBackendStatus {
   detail: string;
 }
 
+/**
+ * PAN-3965: the reconciler assembles no batch for a single ready feature — a
+ * one-member batch is the PR branch itself and its CI run a duplicate — unless
+ * the project holds merges for UAT, where that batch is the UAT stack.
+ */
+export const SINGLE_FEATURE_READY_LINE = '1 feature ready — merges directly; batches assemble when 2+ are ready.';
+
 /** One project's merged view: its queue, its generations, and its flag. */
 export interface MergeTrainProjectSection {
   projectKey: string;
   projectName: string;
   enabled: boolean;
+  /** PAN-3965: unknown (undefined) is treated as held — the batch copy stays. */
+  holdsForUat?: boolean;
   queue: MergeTrainQueueItem[];
   generations: UatGenerationPayload[];
 }
@@ -154,6 +163,7 @@ export function mergeTrainSections(
     projectKey: q.projectKey,
     projectName: q.projectName,
     enabled: q.enabled,
+    ...(typeof q.holdsForUat === 'boolean' ? { holdsForUat: q.holdsForUat } : {}),
     queue: Array.isArray(q.queue) ? q.queue : [],
     generations: generationsByProject.get(q.projectKey)?.generations ?? [],
   }));
@@ -207,11 +217,10 @@ function writeStoredFilter(keys: string[] | null): void {
 }
 
 /**
- * The view's data reads, shared so a host can label itself (e.g. the Flywheel
- * rail card's count) from the same payloads the sections render. React Query
- * dedupes by key, so calling this alongside <MergeTrainView> costs no extra
- * requests. `active` only controls polling — the reads happen either way, which
- * is what lets the Flywheel rail render with no run in progress.
+ * The view's data reads, shared so a host can label itself (e.g. a rail card's
+ * count) from the same payloads the sections render. React Query dedupes by
+ * key, so calling this alongside <MergeTrainView> costs no extra requests.
+ * `active` only controls polling — the reads happen either way.
  */
 export function useMergeTrainData(active: boolean) {
   const queuesQuery = useQuery({
@@ -233,15 +242,15 @@ export function useMergeTrainData(active: boolean) {
 }
 
 /**
- * Capability probe, not flywheel run state: whether a GitHub App or gh CLI can
- * merge at all. Deliberately NOT part of useMergeTrainData — only the full view
- * renders the warning, so a host that just wants counts (the Flywheel rail card,
- * the cockpit summary) should not pay for this request.
+ * Capability probe: whether a GitHub App or gh CLI can merge at all.
+ * Deliberately NOT part of useMergeTrainData — only the full view renders the
+ * warning, so a host that just wants counts (the rail card, the cockpit
+ * summary) should not pay for this request.
  */
 export function useMergeBackendStatus(active: boolean): { unavailable: boolean } {
   const query = useQuery({
     queryKey: ['merge-train-merge-backend'],
-    queryFn: () => fetchJson<MergeBackendStatus>('/api/flywheel/merge-backend'),
+    queryFn: () => fetchJson<MergeBackendStatus>('/api/merge-train/merge-backend'),
     refetchInterval: active ? 15000 : false,
   });
   return { unavailable: query.data?.available === false };
@@ -379,6 +388,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     onSuccess: (data) => {
       const action = data.projects[0]?.result?.action;
       if (action === 'assembled') toast.success('Rebuilt the UAT batch');
+      else if (action === 'single-feature') toast.info(SINGLE_FEATURE_READY_LINE);
       else toast.info(`Rebuild: ${action ?? data.projects[0]?.error ?? 'no change'}`);
       invalidate();
     },
@@ -511,7 +521,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
               ? `Could not probe the stack: ${gen.stack.probeError ?? 'unknown error'} — the stack record is preserved`
               : detail || `Not serving: ${down.join(', ') || 'a declared service'} — restart the stack`
           }
-          className="inline-flex items-center gap-1 rounded border border-amber-500/50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-400 hover:bg-amber-500/10 disabled:opacity-60"
+          className="inline-flex items-center gap-1 rounded border border-warning/[0.32] px-2 py-0.5 text-[10.5px] font-medium text-warning-foreground hover:bg-warning/[0.08] disabled:opacity-60"
         >
           {starting
             ? (<><Loader2 className="h-3 w-3 animate-spin" /> Restarting…</>)
@@ -527,7 +537,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
           href={gen.stack.frontendUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 rounded border border-emerald-500/40 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-400 hover:bg-emerald-500/10"
+          className="inline-flex items-center gap-1 rounded border border-success/[0.32] px-2 py-0.5 text-[10.5px] font-medium text-success hover:bg-success/[0.08]"
         >
           ▶ {compact ? 'Open' : 'Open UAT frontend'}
         </a>
@@ -539,7 +549,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
         disabled={starting}
         onClick={() => void onStack(gen)}
         title="Starts a live dashboard stack serving this exact batch (~1 min), then opens it"
-        className="inline-flex items-center gap-1 rounded border border-emerald-500/40 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-60"
+        className="inline-flex items-center gap-1 rounded border border-success/[0.32] px-2 py-0.5 text-[10.5px] font-medium text-success hover:bg-success/[0.08] disabled:opacity-60"
       >
         {starting ? (<><Loader2 className="h-3 w-3 animate-spin" /> Starting… ~1 min</>) : (<>▶ {compact ? 'Start & open' : 'Start & open UAT frontend'}</>)}
       </button>
@@ -640,6 +650,8 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                     <p className="px-1 pb-1 text-[11px] leading-snug text-muted-foreground">
                       {featureCount === 0 && promotedPendingCount > 0 ? (
                         <><span className="font-semibold text-foreground">{promotedPendingCount} promoted batch{promotedPendingCount === 1 ? '' : 'es'}</span> await{promotedPendingCount === 1 ? 's' : ''} version ship. Supply the version below to satisfy each member&apos;s ship row.</>
+                      ) : featureCount === 1 && batchCount === 0 && section.holdsForUat === false ? (
+                        <span data-testid={`merge-train-single-feature-${section.projectKey}`}>{SINGLE_FEATURE_READY_LINE}</span>
                       ) : (
                         <><span className="font-semibold text-foreground">{featureCount} feature{featureCount === 1 ? '' : 's'}</span> passed review &amp; tests.
                           {batchCount > 0
@@ -716,7 +728,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                     type="button"
                                     disabled={shipMutation.isPending}
                                     onClick={() => setVersionAction({ generationName: gen.name, mode: 'ship', version: '' })}
-                                    className="rounded border border-amber-500/50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+                                    className="rounded border border-warning/[0.32] px-2 py-0.5 text-[10.5px] font-medium text-warning-foreground hover:bg-warning/[0.08] disabled:opacity-50"
                                   >
                                     {shipMutation.isPending && shipMutation.variables?.name === gen.name ? 'Shipping…' : 'Ship version'}
                                   </button>

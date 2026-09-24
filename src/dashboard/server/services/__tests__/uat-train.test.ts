@@ -13,39 +13,36 @@ import {
 } from '../uat-train.js';
 import type { UatReconcilerDeps } from '../../../../lib/cloister/uat-reconciler.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
-import type { PromoteResult, UatPromoteDeps } from '../../../../lib/cloister/uat-promote.js';
+import type { PromoteResult } from '../../../../lib/cloister/uat-promote.js';
 
 const mocks = vi.hoisted(() => ({
-  findProjectByPathSync: vi.fn(),
+  findProjectByPath: vi.fn(),
   getDashboardIdentity: vi.fn(),
-  readCurrentFlywheelStatusForDashboard: vi.fn(),
-  listUatGenerationsSync: vi.fn(),
+  listUatGenerations: vi.fn(),
   probeUatStack: vi.fn(),
   teardownUatStack: vi.fn(),
   promoteUatGeneration: vi.fn(),
   buildUatPromoteGitDeps: vi.fn(),
   buildUatGenerationStore: vi.fn(),
-  getUatGenerationSync: vi.fn(),
-  notifyFlywheelOfUatPromote: vi.fn(),
-  recordUatPromotionVerdicts: vi.fn(),
+  getUatGeneration: vi.fn(),
   findXBriefByIssue: vi.fn(),
   readXBriefDocument: vi.fn(),
   reviewRecordEligibility: vi.fn(),
   isMergeTrainEnabledForProject: vi.fn(),
-  listEligibleCandidatesByProject: vi.fn(),
+  listReadyIssuesForProject: vi.fn(),
   reconcileUatGenerations: vi.fn(),
   assemblePolyrepoUatGeneration: vi.fn(),
   buildPolyrepoGitDeps: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
-  resolveProjectReposFromResolvedIssueSync: vi.fn(),
-  hasUncleanedTerminalUatGenerationSync: vi.fn(),
+  resolveProjectReposFromResolvedIssue: vi.fn(),
+  hasUncleanedTerminalUatGeneration: vi.fn(),
 }));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/projects.js')>();
   return {
     ...original,
-    findProjectByPathSync: mocks.findProjectByPathSync,
+    findProjectByPath: mocks.findProjectByPath,
     resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
   };
 });
@@ -54,7 +51,7 @@ vi.mock('../../../../lib/project-repos.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/project-repos.js')>();
   return {
     ...original,
-    resolveProjectReposFromResolvedIssueSync: mocks.resolveProjectReposFromResolvedIssueSync,
+    resolveProjectReposFromResolvedIssue: mocks.resolveProjectReposFromResolvedIssue,
   };
 });
 
@@ -82,19 +79,15 @@ vi.mock('../../identity.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../flywheel-actions.js', () => ({
-  readCurrentFlywheelStatusForDashboard: mocks.readCurrentFlywheelStatusForDashboard,
-}));
-
-// uat-train.ts now imports listUatGenerationsSync from overdeck/merge-sync (not database/uat-generations-db)
+// uat-train.ts now imports listUatGenerations from overdeck/merge-sync (not database/uat-generations-db)
 vi.mock('../../../../lib/overdeck/merge-sync.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/overdeck/merge-sync.js')>();
   return {
     ...original,
-    getUatGenerationSync: mocks.getUatGenerationSync,
-    listUatGenerationsSync: mocks.listUatGenerationsSync,
+    getUatGeneration: mocks.getUatGeneration,
+    listUatGenerations: mocks.listUatGenerations,
     isMergeTrainEnabledForProject: mocks.isMergeTrainEnabledForProject,
-    hasUncleanedTerminalUatGenerationSync: mocks.hasUncleanedTerminalUatGenerationSync,
+    hasUncleanedTerminalUatGeneration: mocks.hasUncleanedTerminalUatGeneration,
   };
 });
 
@@ -116,20 +109,23 @@ vi.mock('../../../../lib/cloister/uat-promote.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../lib/cloister/uat-promote-notify.js', () => ({
-  notifyFlywheelOfUatPromote: mocks.notifyFlywheelOfUatPromote,
-}));
 
-vi.mock('../../../../lib/cloister/uat-promote-verification.js', () => ({
-  recordUatPromotionVerdicts: mocks.recordUatPromotionVerdicts,
-}));
+// PAN-3917: the candidate list is the forge's — every open PR that is
+// approved, green, and mergeable — not a record-backed eligibility scan.
+vi.mock('../derived-issue-state.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../derived-issue-state.js')>();
+  return {
+    ...original,
+    listReadyIssuesForProject: async () => mocks.listReadyIssuesForProject(),
+  };
+});
 
 vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/flywheel-merge-order.js')>();
   return {
     ...original,
     reviewRecordEligibility: mocks.reviewRecordEligibility,
-    listEligibleCandidatesByProject: mocks.listEligibleCandidatesByProject,
+    listReadyIssuesForProject: mocks.listReadyIssuesForProject,
   };
 });
 
@@ -191,7 +187,7 @@ describe('getUatGenerationsPayload', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.findProjectByPathSync.mockReturnValue(null);
+    mocks.findProjectByPath.mockReturnValue(null);
     mocks.getDashboardIdentity.mockReturnValue({ repoRoot: process.cwd(), mode: 'primary' });
     mocks.probeUatStack.mockResolvedValue({ status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost' });
   });
@@ -215,7 +211,7 @@ describe('getUatGenerationsPayload', () => {
         },
       ],
     } as UatGeneration;
-    mocks.listUatGenerationsSync.mockReturnValue([polyGen]);
+    mocks.listUatGenerations.mockReturnValue([polyGen]);
     mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
 
     const payload = await getUatGenerationsPayload('/repos/myn');
@@ -245,7 +241,7 @@ describe('getUatGenerationsPayload', () => {
         mergeOrder: 0, promotedAt: null, mergeSha: null,
       }],
     } as UatGeneration;
-    mocks.listUatGenerationsSync.mockReturnValue([monoGen]);
+    mocks.listUatGenerations.mockReturnValue([monoGen]);
     mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
 
     const payload = await getUatGenerationsPayload('/repos/myn');
@@ -258,7 +254,7 @@ describe('getUatGenerationsPayload', () => {
   // project, resolving each member's xBRIEF against the DASHBOARD's repo left
   // every non-PAN batch with an empty "What to UAT" checklist.
   it("resolves acceptance criteria in the generation's own project, not the dashboard's", async () => {
-    mocks.listUatGenerationsSync.mockReturnValue([
+    mocks.listUatGenerations.mockReturnValue([
       gen([{ issueId: 'MIN-831', title: 'Compass', branch: 'feature/min-831', headSha: 'h1', mergeOrder: 1 }]),
     ]);
     mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
@@ -267,7 +263,7 @@ describe('getUatGenerationsPayload', () => {
 
     // The lookup root must be the MYN repo the caller asked for.
     expect(mocks.findXBriefByIssue).toHaveBeenCalledWith('/repos/myn', 'MIN-831');
-    expect(mocks.listUatGenerationsSync).toHaveBeenCalledWith(
+    expect(mocks.listUatGenerations).toHaveBeenCalledWith(
       expect.objectContaining({ projectRoot: '/repos/myn' }),
     );
   });
@@ -276,7 +272,7 @@ describe('getUatGenerationsPayload', () => {
   // no criteria — the UAT panel renders that as a factual claim and deletes the
   // operator's checklist.
   it('marks a member whose spec cannot be resolved as planResolved: false', async () => {
-    mocks.listUatGenerationsSync.mockReturnValue([
+    mocks.listUatGenerations.mockReturnValue([
       gen([{ issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', headSha: 'h1', mergeOrder: 1 }]),
     ]);
     mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
@@ -291,7 +287,7 @@ describe('getUatGenerationsPayload', () => {
     tmp = await mkdtemp(join(tmpdir(), 'pan-uat-train-'));
     const specPath = join(tmp, 'PAN-3158.xbrief.json');
     await writeFile(specPath, '{}');
-    mocks.listUatGenerationsSync.mockReturnValue([
+    mocks.listUatGenerations.mockReturnValue([
       gen([{ issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', headSha: 'h1', mergeOrder: 1 }]),
     ]);
     mocks.findXBriefByIssue.mockReturnValue(Effect.succeed({
@@ -317,7 +313,7 @@ describe('getUatGenerationsPayload', () => {
     const generation = gen([
       { issueId: 'PAN-1', title: 'One', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 },
     ]);
-    mocks.listUatGenerationsSync.mockReturnValue([generation]);
+    mocks.listUatGenerations.mockReturnValue([generation]);
     // For a ready generation, probeUatStack succeeds; AC items get cached empty list
     mocks.probeUatStack.mockResolvedValue({ status: 'running', frontendUrl: 'http://test' });
 
@@ -326,7 +322,7 @@ describe('getUatGenerationsPayload', () => {
     // Should return the generation even without a flywheel run
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe(generation.name);
-    expect(mocks.listUatGenerationsSync).toHaveBeenCalled();
+    expect(mocks.listUatGenerations).toHaveBeenCalled();
   });
 
   it('bounds member xBRIEF reads and reuses unchanged checklist summaries', async () => {
@@ -342,8 +338,7 @@ describe('getUatGenerationsPayload', () => {
     let activeReads = 0;
     let maxActiveReads = 0;
 
-    mocks.readCurrentFlywheelStatusForDashboard.mockResolvedValue({ runId: 'RUN-1' });
-    mocks.listUatGenerationsSync.mockReturnValue([gen(members)]);
+    mocks.listUatGenerations.mockReturnValue([gen(members)]);
     mocks.findXBriefByIssue.mockImplementation((_root: string, issueId: string) => Effect.succeed({
       path: pathByIssue.get(issueId)!,
       lifecycleDir: 'proposed',
@@ -374,12 +369,12 @@ describe('getUatGenerationsPayload', () => {
 describe('getUatCandidatePayload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.findProjectByPathSync.mockReturnValue(null);
+    mocks.findProjectByPath.mockReturnValue(null);
     mocks.getDashboardIdentity.mockReturnValue({ repoRoot: process.cwd(), mode: 'primary' });
   });
 
   it('returns the newest ready generation as the active UAT candidate', async () => {
-    mocks.listUatGenerationsSync.mockReturnValue([gen([
+    mocks.listUatGenerations.mockReturnValue([gen([
       { issueId: 'PAN-1', title: 'One', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 },
       { issueId: 'PAN-2', title: 'Two', branch: 'feature/pan-2', headSha: 'h2', mergeOrder: 2 },
     ])]);
@@ -389,7 +384,7 @@ describe('getUatCandidatePayload', () => {
       bundled: ['PAN-1', 'PAN-2'],
       status: 'ready',
     });
-    expect(mocks.listUatGenerationsSync).toHaveBeenCalledWith({
+    expect(mocks.listUatGenerations).toHaveBeenCalledWith({
       projectRoot: resolveUatProjectRoot(),
       statuses: ['ready'],
       limit: 1,
@@ -397,7 +392,7 @@ describe('getUatCandidatePayload', () => {
   });
 
   it('returns null when no ready UAT candidate exists', async () => {
-    mocks.listUatGenerationsSync.mockReturnValue([]);
+    mocks.listUatGenerations.mockReturnValue([]);
 
     await expect(getUatCandidatePayload()).resolves.toBeNull();
   });
@@ -406,7 +401,7 @@ describe('getUatCandidatePayload', () => {
 describe('UAT train project root and startup gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.findProjectByPathSync.mockReturnValue(null);
+    mocks.findProjectByPath.mockReturnValue(null);
   });
 
   it('resolves feature workspace cwd back to the project root', () => {
@@ -415,13 +410,13 @@ describe('UAT train project root and startup gate', () => {
   });
 
   it('prefers the registered project root when the registry matches the cwd', () => {
-    mocks.findProjectByPathSync.mockReturnValue({ path: '/registered/repo' });
+    mocks.findProjectByPath.mockReturnValue({ path: '/registered/repo' });
 
     expect(resolveUatProjectRoot('/registered/repo/workspaces/feature-pan-2148')).toBe('/registered/repo');
   });
 
   it('lets only the primary dashboard process start the UAT reconciler', () => {
-    mocks.findProjectByPathSync.mockReturnValue({ path: '/repo' });
+    mocks.findProjectByPath.mockReturnValue({ path: '/repo' });
 
     mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
     expect(canStartUatTrainReconciler()).toBe(true);
@@ -437,48 +432,15 @@ describe('UAT train project root and startup gate', () => {
 describe('postUatGenerationPromotePayload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.findProjectByPathSync.mockReturnValue(null);
+    mocks.findProjectByPath.mockReturnValue(null);
     mocks.buildUatPromoteGitDeps.mockReturnValue({ git: 'deps' });
     mocks.buildUatGenerationStore.mockReturnValue({ listChain: vi.fn(), update: vi.fn() });
-    mocks.notifyFlywheelOfUatPromote.mockResolvedValue(undefined);
   });
 
-  it('wires UAT promotion verdict recording into the promote dependencies', async () => {
-    const result: PromoteResult = {
-      success: true,
-      generation: 'uat/pan-cobalt-0703',
-      mergeSha: 'abc123',
-      members: ['PAN-2294'],
-      postMergeStarted: ['PAN-2294'],
-      invalidated: [],
-    };
-    const generation = gen([
-      { issueId: 'PAN-2294', title: 'Feature', branch: 'feature/pan-2294', headSha: 'head-sha', mergeOrder: 1 },
-    ]);
-    mocks.promoteUatGeneration.mockResolvedValue(result);
-
-    await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
-
-    const deps = mocks.promoteUatGeneration.mock.calls[0]![2] as UatPromoteDeps;
-    deps.recordVerification?.(generation, 'abc123');
-    expect(mocks.recordUatPromotionVerdicts).toHaveBeenCalledWith(generation, 'abc123');
-  });
-
-  it('passes the promote result to notifyFlywheelOfUatPromote', async () => {
-    const result: PromoteResult = {
-      success: true,
-      generation: 'uat/pan-cobalt-0703',
-      mergeSha: 'abc123',
-      members: ['PAN-2294'],
-      postMergeStarted: ['PAN-2294'],
-      invalidated: [],
-    };
-    mocks.promoteUatGeneration.mockResolvedValue(result);
-
-    await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
-
-    expect(mocks.notifyFlywheelOfUatPromote).toHaveBeenCalledWith(result);
-  });
+  // PAN-3917: promotion used to stamp a verification verdict onto every
+  // member's record. The merge is the evidence — the generation row carries the
+  // merge sha and readiness is re-derived from each PR — so there is no
+  // recordVerification dependency left to wire.
 
   it('returns the exact promote result object unchanged for success and failure results', async () => {
     const success: PromoteResult = {
@@ -501,20 +463,6 @@ describe('postUatGenerationPromotePayload', () => {
     await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(failure);
   });
 
-  it('still resolves with the promote result when notifyFlywheelOfUatPromote rejects', async () => {
-    const result: PromoteResult = {
-      success: true,
-      generation: 'uat/pan-cobalt-0703',
-      mergeSha: 'abc123',
-      members: ['PAN-2294'],
-      postMergeStarted: ['PAN-2294'],
-      invalidated: [],
-    };
-    mocks.promoteUatGeneration.mockResolvedValue(result);
-    mocks.notifyFlywheelOfUatPromote.mockRejectedValue(new Error('delivery failed'));
-
-    await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(result);
-  });
 });
 
 // PAN-3093: polyrepo projects used to be skipped outright by a guard in
@@ -532,17 +480,17 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
-    mocks.listEligibleCandidatesByProject.mockReturnValue([
+    mocks.listReadyIssuesForProject.mockReturnValue([
       { issueId: 'MIN-901', title: 'MIN-901' },
     ]);
-    mocks.listUatGenerationsSync.mockReturnValue([]);
+    mocks.listUatGenerations.mockReturnValue([]);
     mocks.buildUatGenerationStore.mockReturnValue({});
     mocks.buildPolyrepoGitDeps.mockReturnValue(new Map());
     mocks.reconcileUatGenerations.mockResolvedValue({ action: 'idle', invalidated: [] });
     mocks.resolveProjectFromIssueSync.mockReturnValue({
       projectKey: 'mind-your-now', projectName: 'MYN', projectPath: POLY_ROOT,
     });
-    mocks.resolveProjectReposFromResolvedIssueSync.mockReturnValue([
+    mocks.resolveProjectReposFromResolvedIssue.mockReturnValue([
       {
         projectKey: 'mind-your-now', projectPath: POLY_ROOT, repoKey: 'fe',
         repoPath: `${POLY_ROOT}/fe`, forge: 'github', sourceBranch: 'feature/min-901',
@@ -554,7 +502,7 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
   // The removed guard returned no-queue before any git work; reaching the
   // reconciler at all is the runtime proof that it is gone.
   it('reconciles a polyrepo project instead of skipping it', async () => {
-    mocks.findProjectByPathSync.mockReturnValue({
+    mocks.findProjectByPath.mockReturnValue({
       name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
     });
 
@@ -565,7 +513,7 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
   });
 
   it('gives the polyrepo path composite anchor deps', async () => {
-    mocks.findProjectByPathSync.mockReturnValue({
+    mocks.findProjectByPath.mockReturnValue({
       name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
     });
 
@@ -577,7 +525,7 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
   });
 
   it('checks containment for read-only generation repositories', async () => {
-    mocks.findProjectByPathSync.mockReturnValue({
+    mocks.findProjectByPath.mockReturnValue({
       name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
     });
     const isBranchContainedInMain = vi.fn().mockResolvedValue(true);
@@ -597,7 +545,7 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
   });
 
   it('invokes polyrepo assembly, not the monorepo engine, for a polyrepo project', async () => {
-    mocks.findProjectByPathSync.mockReturnValue({
+    mocks.findProjectByPath.mockReturnValue({
       name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
     });
     mocks.assemblePolyrepoUatGeneration.mockResolvedValue({ name: 'uat/min-otter-0727' });
@@ -624,7 +572,7 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
   });
 
   it('leaves the monorepo path on single-SHA staleness with no anchor deps', async () => {
-    mocks.findProjectByPathSync.mockReturnValue({ name: 'overdeck', path: MONO_ROOT });
+    mocks.findProjectByPath.mockReturnValue({ name: 'overdeck', path: MONO_ROOT });
 
     await runUatTrainReconcile({ projectRoot: MONO_ROOT });
 
@@ -662,18 +610,18 @@ describe('runUatTrainReconcile — terminal generation cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
-    mocks.listEligibleCandidatesByProject.mockReturnValue([]);
+    mocks.listReadyIssuesForProject.mockReturnValue([]);
     mocks.buildUatGenerationStore.mockReturnValue({
       insert: vi.fn(), update: vi.fn(), listNames: () => [], listChain: () => [],
     });
-    mocks.findProjectByPathSync.mockReturnValue({
+    mocks.findProjectByPath.mockReturnValue({
       name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
     });
   });
 
   it('cleans an uncleaned promoted generation even with no candidates and no live rows', async () => {
-    mocks.listUatGenerationsSync.mockReturnValue([]);
-    mocks.hasUncleanedTerminalUatGenerationSync.mockReturnValue(true);
+    mocks.listUatGenerations.mockReturnValue([]);
+    mocks.hasUncleanedTerminalUatGeneration.mockReturnValue(true);
 
     await runUatTrainReconcile({ projectRoot: POLY_ROOT });
 
@@ -683,10 +631,10 @@ describe('runUatTrainReconcile — terminal generation cleanup', () => {
   });
 
   it('does no cleanup work when every terminal generation is already cleaned', async () => {
-    mocks.listUatGenerationsSync.mockReturnValue([]);
+    mocks.listUatGenerations.mockReturnValue([]);
     // The idle tick must answer this with a single existence query, never by
     // hydrating the retained terminal history.
-    mocks.hasUncleanedTerminalUatGenerationSync.mockReturnValue(false);
+    mocks.hasUncleanedTerminalUatGeneration.mockReturnValue(false);
 
     const result = await runUatTrainReconcile({ projectRoot: POLY_ROOT });
 
@@ -705,18 +653,18 @@ describe('runUatTrainReconcile — ref-refresh outage preserves the live generat
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
-    mocks.listEligibleCandidatesByProject.mockReturnValue([{ issueId: 'MIN-901', title: 'MIN-901' }]);
-    mocks.listUatGenerationsSync.mockReturnValue([{ name: 'uat/min-otter-0727', status: 'ready' }]);
+    mocks.listReadyIssuesForProject.mockReturnValue([{ issueId: 'MIN-901', title: 'MIN-901' }]);
+    mocks.listUatGenerations.mockReturnValue([{ name: 'uat/min-otter-0727', status: 'ready' }]);
     mocks.buildUatGenerationStore.mockReturnValue({});
     mocks.buildPolyrepoGitDeps.mockReturnValue(new Map());
     mocks.reconcileUatGenerations.mockResolvedValue({ action: 'no-queue', invalidated: [] });
-    mocks.findProjectByPathSync.mockReturnValue({
+    mocks.findProjectByPath.mockReturnValue({
       name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
     });
     mocks.resolveProjectFromIssueSync.mockReturnValue({
       projectKey: 'mind-your-now', projectName: 'MYN', projectPath: POLY_ROOT,
     });
-    mocks.resolveProjectReposFromResolvedIssueSync.mockReturnValue([
+    mocks.resolveProjectReposFromResolvedIssue.mockReturnValue([
       {
         projectKey: 'mind-your-now', projectPath: POLY_ROOT, repoKey: 'api',
         repoPath: `${POLY_ROOT}/api`, forge: 'github', sourceBranch: 'feature/min-901',

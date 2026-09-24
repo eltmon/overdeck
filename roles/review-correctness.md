@@ -28,9 +28,36 @@ Do not review security vulnerabilities, performance regressions, style, architec
 
 ## Effect diagnostics ratchet
 
-Run `npm run lint:effect-diagnostics` for the branch under review.
+For Overdeck TypeScript, Effect dependency, or compiler/diagnostic configuration
+changes, verify `npm run lint:effect-diagnostics` for the reviewed HEAD. Reuse
+trustworthy successful exact-HEAD evidence or run it once. For documentation/
+style-only changes without that impact, record not applicable; this does not
+disable mandatory CI/pipeline gates.
 Any `NEW:` finding is a blocking correctness finding and must prevent approval.
 `known:` findings are baselined, pre-existing debt and are not the author's to fix.
+
+## Coverage and evidence discipline
+
+Finish all assigned changed files and checklist areas before reporting; finding
+one blocker is not a stopping condition. Do a second coverage pass and include
+a changed-file coverage ledger. There is no finding quota or maximum.
+
+Trace each candidate through its real entry point, callers, validation,
+normalization, and error handling; compare the baseline. A helper probe using
+input rejected upstream does not prove a reachable product defect. Distinguish
+implementation defects, specification defects, validation gaps, pre-existing
+issues, and hypotheses. Quote the explicit requirement when the implementation
+faithfully follows a flawed spec. Keep speculative future changes and optional
+hardening advisory; a clean report is valid. Deduplicate by root cause/trigger.
+
+Use existing successful verification tied to the exact HEAD when available.
+Never run the full test suite; the verification gate already ran it — on CI
+against the PR head where the project's tests run on CI (read it with
+`gh pr checks <pr-number>`), otherwise locally before review (its record is the
+`overdeck/verification` check). Otherwise run focused checks to answer a
+specific uncertainty. Isolated scratch probes may use a temporary directory; do not edit
+tracked files or use live operator state as fixtures. Record checks not run.
+Use fake timers for synthetic delays and retries.
 
 ## Method
 
@@ -38,7 +65,7 @@ Any `NEW:` finding is a blocking correctness finding and must prevent approval.
 2. Start with risk-ranked changed files from the summary.
 3. Inspect changed hunks likely to affect runtime behavior, data flow, state transitions, async control flow, or type boundaries.
 4. Use targeted Grep/Glob only to trace a specific changed symbol, caller, or repeated bug pattern.
-5. Validate each finding against the changed diff before reporting it.
+5. Validate each finding against the changed diff before reporting it. Check defaults, explicit overrides, aliases, and frontend/backend normalization against the exact value used by the real operation.
 
 Do not run broad `git diff`, rediscover all changed files, or perform an unbounded whole-repository sweep.
 
@@ -108,6 +135,6 @@ If you find no correctness bugs, still write the report with `## Findings` set t
 
 ## Write contract
 
-Write only to the output file from your spawn prompt. Do not edit source, tests, config, git history, issue state, or any other review report.
+Write only the final report to the output file from your spawn prompt; isolated temporary scratch probes are also allowed. Do not edit source, tests, config, git history, issue state, or any other review report.
 
 After writing the output file, you are done — stop. Do not run any `pan` command and do not signal synthesis. The Overdeck launcher that started you detects your completion on process exit and signals the synthesis agent automatically (REVIEWER_READY when the output file was written, REVIEWER_FAILED otherwise).

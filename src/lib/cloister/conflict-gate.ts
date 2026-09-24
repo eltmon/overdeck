@@ -1,14 +1,15 @@
 import { exec, type ExecOptions } from 'node:child_process';
 import { promisify } from 'node:util';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
-import { getReviewStatusSync, setReviewStatusSync, type BlockerReason, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { getPrFacts, type PrFacts } from './pr-facts.js';
 
 const execAsync = promisify(exec);
 const GIT_TIMEOUT_MS = 30_000;
 const GIT_MAX_BUFFER = 4 * 1024 * 1024;
-const MERGE_BLOCKER_TYPES = new Set<BlockerReason['type']>(['merge_conflict', 'not_mergeable']);
+/** Forge merge states that mean the branch cannot land as it stands. */
+const CONFLICTING_MERGE_STATES = new Set(['dirty', 'blocked', 'behind']);
 const PROBE_CACHE_MS = 3 * 60 * 1000;
 const DISPATCH_THROTTLE_MS = 30 * 60 * 1000;
 
@@ -38,17 +39,14 @@ export interface DispatchResolverInput {
   issueId: string;
   workspacePath: string;
   targetBranch: string;
-  blockerReasons: BlockerReason[];
+  /** What the forge says blocks the merge, for the resolver prompt. */
+  blockerSummary: string;
   reason: string;
 }
 
 export interface ResolveConflictGateDeps {
-  getReviewStatus: (issueId: string) => ReviewStatus | null | Promise<ReviewStatus | null>;
-  setReviewStatus: (
-    issueId: string,
-    update: ReviewStatusUpdate,
-    existing?: ReviewStatus,
-  ) => ReviewStatus | Promise<ReviewStatus>;
+  /** The forge's view of the issue's PR. PAN-3917: no stored blocker rows. */
+  getFacts: (issueId: string) => PrFacts | Promise<PrFacts>;
   probeMergeability?: (workspacePath: string, targetBranch: string) => BranchMergeability | Promise<BranchMergeability>;
   dispatchResolver: (input: DispatchResolverInput) => ResolverDispatchState | void | Promise<ResolverDispatchState | void>;
   now?: () => Date;
@@ -58,9 +56,8 @@ export interface ResolveConflictGateDeps {
 interface RealConflictGateDepsOverrides {
   spawnRun?: typeof spawnRun;
   messageAgent?: typeof messageAgent;
-  getReviewStatus?: typeof getReviewStatusSync;
-  setReviewStatus?: typeof setReviewStatusSync;
-  emitActivityEntry?: typeof emitActivityEntrySync;
+  getFacts?: (issueId: string) => PrFacts | Promise<PrFacts>;
+  emitActivityEntry?: typeof emitActivityEntry;
   now?: () => Date;
   log?: (message: string) => void;
 }
@@ -149,14 +146,11 @@ export function parseMergeTreeNameOnly(stdout: string): string[] {
 export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrides = {}): ResolveConflictGateDeps {
   const runSpawn = overrides.spawnRun ?? spawnRun;
   const deliverMessage = overrides.messageAgent ?? messageAgent;
-  const readStatus = overrides.getReviewStatus ?? getReviewStatusSync;
-  const writeStatus = overrides.setReviewStatus ?? setReviewStatusSync;
-  const emitActivity = overrides.emitActivityEntry ?? emitActivityEntrySync;
+  const emitActivity = overrides.emitActivityEntry ?? emitActivityEntry;
   const now = overrides.now ?? (() => new Date());
 
   return {
-    getReviewStatus: readStatus,
-    setReviewStatus: writeStatus,
+    getFacts: overrides.getFacts ?? getPrFacts,
     probeMergeability: checkBranchMergeability,
     now,
     log: overrides.log,
@@ -175,9 +169,6 @@ export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrid
         }
       }
 
-      const dispatchedAt = now().toISOString();
-      const existing = readStatus(input.issueId) ?? undefined;
-      writeStatus(input.issueId, { conflictResolutionDispatchedAt: dispatchedAt }, existing);
       emitActivity({
         source: 'review',
         level: 'info',
@@ -198,24 +189,18 @@ export async function resolveConflictGate(
   targetBranch: string,
   deps: ResolveConflictGateDeps,
 ): Promise<ConflictGateResult> {
-  const status = await deps.getReviewStatus(issueId);
-  const mergeBlockers = (status?.blockerReasons ?? []).filter(isMergeBlocker);
-  if (!status || mergeBlockers.length === 0) return { gated: false };
+  const facts = await deps.getFacts(issueId);
+  const blockerSummary = describeMergeBlock(facts);
+  if (!blockerSummary) return { gated: false };
 
   const now = deps.now ?? (() => new Date());
   const checkedAtMs = now().getTime();
   const mergeability = await getCachedMergeability(issueId, checkedAtMs, workspacePath, targetBranch, deps);
 
   if (mergeability === 'clean') {
-    const remainingBlockers = (status.blockerReasons ?? []).filter((blocker) => !isMergeBlocker(blocker));
-    await deps.setReviewStatus(
-      issueId,
-      {
-        blockerReasons: remainingBlockers.length > 0 ? remainingBlockers : undefined,
-      },
-      status,
-    );
-    deps.log?.(`[conflict-gate] ${issueId}: cleared stale merge blocker; review can proceed`);
+    // The forge's mergeability is computed against a snapshot and goes stale;
+    // a clean local probe is the newer answer, so review proceeds.
+    deps.log?.(`[conflict-gate] ${issueId}: forge reports a merge block the branch no longer has; review can proceed`);
     return { gated: false, clearedStaleBlocker: true };
   }
 
@@ -224,14 +209,17 @@ export async function resolveConflictGate(
     : `mergeability against ${targetBranch} could not be verified; deferring review conservatively`;
 
   let resolverDispatchState: ResolverDispatchState;
-  if (!isResolverDispatchThrottled(status, mergeBlockers, checkedAtMs)) {
+  if (!isResolverDispatchThrottled(issueId, checkedAtMs)) {
     resolverDispatchState = await deps.dispatchResolver({
       issueId,
       workspacePath,
       targetBranch,
-      blockerReasons: mergeBlockers,
+      blockerSummary,
       reason,
     }) ?? 'dispatched';
+    // The throttle is read here, so it is stamped here — an injected
+    // dispatcher gets the same one-per-window behaviour as the real one.
+    lastResolverDispatchMs.set(issueId.toUpperCase(), checkedAtMs);
   } else {
     resolverDispatchState = 'throttled';
     deps.log?.(`[conflict-gate] ${issueId}: conflict resolver dispatch is throttled`);
@@ -247,6 +235,7 @@ export async function resolveConflictGate(
 export function __resetConflictGateProbeCacheForTests(): void {
   probeCache.clear();
   probeInFlight.clear();
+  lastResolverDispatchMs.clear();
 }
 
 /**
@@ -298,22 +287,17 @@ async function getCachedMergeability(
   return promise;
 }
 
-function isResolverDispatchThrottled(
-  status: ReviewStatus,
-  mergeBlockers: BlockerReason[],
-  nowMs: number,
-): boolean {
-  if (!status.conflictResolutionDispatchedAt) return false;
-  const dispatchedAtMs = Date.parse(status.conflictResolutionDispatchedAt);
-  if (!Number.isFinite(dispatchedAtMs)) return false;
+/**
+ * PAN-3917: the dispatch timestamp used to live on the review_status row. It is
+ * bookkeeping for this process's own dispatches, not pipeline state, so it
+ * lives here. A restart re-arms the gate, which costs one extra resolver
+ * dispatch — the resolver itself is idempotent.
+ */
+const lastResolverDispatchMs = new Map<string, number>();
 
-  const newestBlockerMs = Math.max(
-    ...mergeBlockers
-      .map((blocker) => Date.parse(blocker.detectedAt))
-      .filter((detectedAtMs) => Number.isFinite(detectedAtMs)),
-  );
-  if (Number.isFinite(newestBlockerMs) && dispatchedAtMs < newestBlockerMs) return false;
-
+function isResolverDispatchThrottled(issueId: string, nowMs: number): boolean {
+  const dispatchedAtMs = lastResolverDispatchMs.get(issueId.toUpperCase());
+  if (dispatchedAtMs === undefined) return false;
   return nowMs - dispatchedAtMs < DISPATCH_THROTTLE_MS;
 }
 
@@ -341,14 +325,21 @@ function enforceProbeCacheSizeLimit(): void {
   }
 }
 
-function isMergeBlocker(blocker: BlockerReason): boolean {
-  return MERGE_BLOCKER_TYPES.has(blocker.type);
+/** One line describing why the forge says the PR cannot merge, or null. */
+function describeMergeBlock(facts: PrFacts): string | null {
+  if (!facts.open) return null;
+  if (facts.mergeable === false) {
+    return `forge reports the pull request is not mergeable${facts.mergeableState ? ` (state=${facts.mergeableState})` : ''}`;
+  }
+  const state = (facts.mergeableState ?? '').toLowerCase();
+  if (state && CONFLICTING_MERGE_STATES.has(state)) {
+    return `forge reports merge state \`${state}\``;
+  }
+  return null;
 }
 
 function buildConflictResolverPrompt(input: DispatchResolverInput): string {
-  const blockerSummary = input.blockerReasons
-    .map((blocker) => `- ${blocker.type}: ${blocker.summary} (detected ${blocker.detectedAt})`)
-    .join('\n');
+  const blockerSummary = `- ${input.blockerSummary}`;
 
   return [
     `Review for ${input.issueId} was deferred because the feature branch has a standing merge conflict with origin/${input.targetBranch}.`,

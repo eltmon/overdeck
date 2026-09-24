@@ -142,27 +142,27 @@ describe('HomePage', () => {
         running: makeAgent({ id: 'running', status: 'running' }),
         liveStopped: makeAgent({ id: 'liveStopped', status: 'stopped', hasLiveTmuxSession: true }),
         paused: makeAgent({ id: 'paused', status: 'stopped', paused: true }),
-        troubled: makeAgent({ id: 'troubled', status: 'stopped', troubled: true, consecutiveFailures: 2 }),
         failedAgent: makeAgent({ id: 'failedAgent', status: 'failed', consecutiveFailures: 1 }),
         staleStoppedFailure: makeAgent({ id: 'staleStoppedFailure', status: 'stopped', consecutiveFailures: 1 }),
       },
-      reviewStatusByIssueId: {
-        recentMerge: { issueId: 'PAN-1', mergeStatus: 'merged', updatedAt: '2026-05-25T00:00:00.000Z' },
-        oldMerge: { issueId: 'PAN-2', mergeStatus: 'merged', updatedAt: '2026-05-23T00:00:00.000Z' },
-        failedVerification: { issueId: 'PAN-3', verificationStatus: 'failed' },
-        blocked: {
-          issueId: 'PAN-4',
-          blockerReasons: [{ type: 'merge_conflict', summary: 'Conflicts', detectedAt: '2026-05-25T00:00:00.000Z' }],
+      derivedIssueStateByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          state: 'ready',
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
+        'PAN-2': { issueId: 'PAN-2', state: 'merged' },
+        'PAN-3': { issueId: 'PAN-3', state: 'working', attention: 'needs-you' },
+        'PAN-4': { issueId: 'PAN-4', state: 'in-review', attention: 'stuck' },
       },
     });
 
     renderHomePage({ now: new Date('2026-05-25T12:00:00.000Z') });
 
     expect(summaryCard('Running agents')).toHaveTextContent('2');
-    expect(summaryCard('Paused / troubled')).toHaveTextContent('3');
-    expect(summaryCard('Merged today')).toHaveTextContent('1');
-    expect(summaryCard('Needs verification')).toHaveTextContent('2');
+    expect(summaryCard('Paused')).toHaveTextContent('1');
+    expect(summaryCard('Ready to merge')).toHaveTextContent('1');
+    expect(summaryCard('Needs you')).toHaveTextContent('1');
     expect(await screen.findByText('$12.35')).toBeInTheDocument();
   });
 
@@ -182,7 +182,13 @@ describe('HomePage', () => {
       issuesRaw: [{ identifier: 'PAN-1204', title: 'Build Home', description: 'Render Home workspace list' }],
       statusByIssueId: { 'PAN-1204': memoryStatus },
       observationsByIssueId: { 'PAN-1204': [makeObservation({ tags: ['commit'] })] },
-      reviewStatusByIssueId: { 'PAN-1204': { issueId: 'PAN-1204', prUrl: 'https://example.com/pr/1' } },
+      derivedIssueStateByIssueId: {
+        'PAN-1204': {
+          issueId: 'PAN-1204',
+          state: 'in-review',
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'REVIEW_REQUESTED', checks: 'pending', mergeable: true },
+        },
+      },
     });
 
     renderHomePage({ onOpenWorkspaceHome, now: new Date('2026-05-25T00:20:00.000Z') });

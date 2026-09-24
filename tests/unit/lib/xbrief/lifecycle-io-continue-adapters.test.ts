@@ -1,23 +1,18 @@
 /**
- * PAN-1919: lifecycle-io continue adapters rerouted to the per-issue record.
+ * PAN-3917 W1: the lifecycle-io continue adapters write to the plan home's
+ * continue file, `<planHome>/.pan/continues/<ISSUE>.xbrief.json`.
  *
- * Verifies ACs:
  * AC1 — appendContinueSessionEntryForIssue / appendFeedbackEntryForIssue
- *        persist to the per-issue record (not .pan/continues/).
- * AC2 — clearFeedbackForIssue empties record.feedback;
- *        readContinueStateForIssue surfaces the record's continue-view.
- * AC3 — readContinueStateForIssue returns the record's continue-view fields.
+ *        persist to that file.
+ * AC2 — clearFeedbackForIssue empties its feedback list.
+ * AC3 — readContinueStateForIssue surfaces what those adapters wrote, and
+ *        returns null when the issue has no continue file.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, existsSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-
-const mockQueueAutoCommit = vi.hoisted(() => vi.fn());
-vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
-  queueAutoCommit: mockQueueAutoCommit,
-}));
 
 import {
   appendContinueSessionEntryForIssue,
@@ -25,39 +20,35 @@ import {
   clearFeedbackForIssue,
   readContinueStateForIssue,
 } from '../../../../src/lib/xbrief/lifecycle-io.js';
-import { appendFeedbackEntry, readIssueRecordSync } from '../../../../src/lib/pan-dir/record.js';
 
-describe('PAN-1919: lifecycle-io continue adapters → per-issue record', () => {
+const ISSUE = 'PAN-1919';
+
+describe('lifecycle-io continue adapters → .pan/continues', () => {
   let projectRoot: string;
+
+  const continuePath = (): string => join(projectRoot, '.pan', 'continues', `${ISSUE}.xbrief.json`);
 
   beforeEach(() => {
     projectRoot = mkdtempSync(join(tmpdir(), 'pan-lifecycle-io-test-'));
-    mkdirSync(join(projectRoot, '.pan', 'records'), { recursive: true });
-    mockQueueAutoCommit.mockClear();
   });
 
   afterEach(() => {
     rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it('AC1: appendContinueSessionEntryForIssue persists to record.sessionHistory, not .pan/continues/', () => {
-    appendContinueSessionEntryForIssue(projectRoot, 'PAN-1919', {
-      reason: 'resume',
-      note: 'test entry',
-    });
+  it('AC1: appendContinueSessionEntryForIssue persists to the continue file', () => {
+    appendContinueSessionEntryForIssue(projectRoot, ISSUE, { reason: 'resume', note: 'test entry' });
 
-    const record = readIssueRecordSync({ name: 'test', path: projectRoot }, 'PAN-1919');
-    expect(record?.sessionHistory).toHaveLength(1);
-    expect(record?.sessionHistory![0].reason).toBe('resume');
-    expect(record?.sessionHistory![0].note).toBe('test entry');
-    expect(record?.sessionHistory![0].timestamp).toBeDefined();
-
-    // Must NOT write .pan/continues/
-    expect(existsSync(join(projectRoot, '.pan', 'continues', 'pan-1919.vbrief.json'))).toBe(false);
+    expect(existsSync(continuePath())).toBe(true);
+    const state = JSON.parse(readFileSync(continuePath(), 'utf8'));
+    expect(state.sessionHistory).toHaveLength(1);
+    expect(state.sessionHistory[0].reason).toBe('resume');
+    expect(state.sessionHistory[0].note).toBe('test entry');
+    expect(state.sessionHistory[0].timestamp).toBeDefined();
   });
 
-  it('AC1: appendFeedbackEntryForIssue persists to record.feedback, not .pan/continues/', () => {
-    appendFeedbackEntryForIssue(projectRoot, 'PAN-1919', {
+  it('AC1: appendFeedbackEntryForIssue persists to the continue file', () => {
+    appendFeedbackEntryForIssue(projectRoot, ISSUE, {
       seq: 1,
       specialist: 'review-agent',
       outcome: 'CHANGES_REQUESTED',
@@ -65,15 +56,13 @@ describe('PAN-1919: lifecycle-io continue adapters → per-issue record', () => 
       markdownBody: '## Issues found\n- Fix X',
     });
 
-    const record = readIssueRecordSync({ name: 'test', path: projectRoot }, 'PAN-1919');
-    expect(record?.feedback).toHaveLength(1);
-    expect(record?.feedback![0].specialist).toBe('review-agent');
-    expect(record?.feedback![0].outcome).toBe('CHANGES_REQUESTED');
-
-    expect(existsSync(join(projectRoot, '.pan', 'continues', 'pan-1919.vbrief.json'))).toBe(false);
+    const state = readContinueStateForIssue(projectRoot, ISSUE)!;
+    expect(state.feedback).toHaveLength(1);
+    expect(state.feedback![0].specialist).toBe('review-agent');
+    expect(state.feedback![0].outcome).toBe('CHANGES_REQUESTED');
   });
 
-  it('does not append feedback identical to the last record entry', () => {
+  it('does not append feedback identical to the last entry', () => {
     const entry = {
       seq: 1,
       specialist: 'review-agent' as const,
@@ -81,71 +70,44 @@ describe('PAN-1919: lifecycle-io continue adapters → per-issue record', () => 
       timestamp: '2026-06-21T00:00:00.000Z',
       markdownBody: '## Issues found\n- Fix X',
     };
-    appendFeedbackEntryForIssue(projectRoot, 'PAN-1919', entry);
-    appendFeedbackEntryForIssue(projectRoot, 'PAN-1919', entry);
+    appendFeedbackEntryForIssue(projectRoot, ISSUE, entry);
+    appendFeedbackEntryForIssue(projectRoot, ISSUE, entry);
 
-    const record = readIssueRecordSync({ name: 'test', path: projectRoot }, 'PAN-1919');
-    expect(record?.feedback).toEqual([entry]);
+    expect(readContinueStateForIssue(projectRoot, ISSUE)?.feedback).toEqual([entry]);
   });
 
-  it('does not append an asynchronous feedback entry identical to the last record entry', async () => {
-    const entry = {
-      seq: 1,
-      specialist: 'review-agent' as const,
-      outcome: 'CHANGES_REQUESTED',
-      timestamp: '2026-06-21T00:00:00.000Z',
-      markdownBody: '## Issues found\n- Fix X',
-    };
-    const project = { name: 'test', path: projectRoot };
-    await appendFeedbackEntry(project, 'PAN-1919', entry, { autoCommit: false });
-    await appendFeedbackEntry(project, 'PAN-1919', entry, { autoCommit: false });
+  it('AC2: clearFeedbackForIssue empties the feedback list', () => {
+    appendFeedbackEntryForIssue(projectRoot, ISSUE, {
+      seq: 1, specialist: 'test-agent', outcome: 'FAILED',
+      timestamp: '2026-06-21T00:00:00.000Z', markdownBody: 'failures',
+    });
+    appendFeedbackEntryForIssue(projectRoot, ISSUE, {
+      seq: 2, specialist: 'review-agent', outcome: 'APPROVED',
+      timestamp: '2026-06-21T01:00:00.000Z', markdownBody: 'lgtm',
+    });
 
-    const record = readIssueRecordSync(project, 'PAN-1919');
-    expect(record?.feedback).toEqual([entry]);
+    clearFeedbackForIssue(projectRoot, ISSUE);
+
+    expect(readContinueStateForIssue(projectRoot, ISSUE)?.feedback).toEqual([]);
   });
 
-  it('AC2: clearFeedbackForIssue empties record.feedback', () => {
-    appendFeedbackEntryForIssue(projectRoot, 'PAN-1919', {
-      seq: 1,
-      specialist: 'test-agent',
-      outcome: 'FAILED',
-      timestamp: '2026-06-21T00:00:00.000Z',
-      markdownBody: 'failures',
-    });
-    appendFeedbackEntryForIssue(projectRoot, 'PAN-1919', {
-      seq: 2,
-      specialist: 'review-agent',
-      outcome: 'APPROVED',
-      timestamp: '2026-06-21T01:00:00.000Z',
-      markdownBody: 'lgtm',
+  it('AC3: readContinueStateForIssue returns what the adapters wrote', () => {
+    appendContinueSessionEntryForIssue(projectRoot, ISSUE, { reason: 'resume', note: 'init' });
+    appendFeedbackEntryForIssue(projectRoot, ISSUE, {
+      seq: 1, specialist: 'review-agent', outcome: 'APPROVED',
+      timestamp: '2026-06-21T00:00:00.000Z', markdownBody: 'all good',
     });
 
-    clearFeedbackForIssue(projectRoot, 'PAN-1919');
-
-    const record = readIssueRecordSync({ name: 'test', path: projectRoot }, 'PAN-1919');
-    expect(record?.feedback).toEqual([]);
-  });
-
-  it('AC3: readContinueStateForIssue returns the record continue-view', () => {
-    appendContinueSessionEntryForIssue(projectRoot, 'PAN-1919', { reason: 'resume', note: 'init' });
-    appendFeedbackEntryForIssue(projectRoot, 'PAN-1919', {
-      seq: 1,
-      specialist: 'review-agent',
-      outcome: 'APPROVED',
-      timestamp: '2026-06-21T00:00:00.000Z',
-      markdownBody: 'all good',
-    });
-
-    const state = readContinueStateForIssue(projectRoot, 'PAN-1919');
+    const state = readContinueStateForIssue(projectRoot, ISSUE);
     expect(state).not.toBeNull();
+    expect(state?.issueId).toBe(ISSUE);
     expect(state?.feedback).toHaveLength(1);
     expect(state?.feedback![0].specialist).toBe('review-agent');
     expect(state?.sessionHistory).toHaveLength(1);
     expect(state?.sessionHistory![0].reason).toBe('resume');
   });
 
-  it('AC3: readContinueStateForIssue returns null when no record exists', () => {
-    const state = readContinueStateForIssue(projectRoot, 'PAN-MISSING');
-    expect(state).toBeNull();
+  it('AC3: readContinueStateForIssue returns null when no continue file exists', () => {
+    expect(readContinueStateForIssue(projectRoot, 'PAN-MISSING')).toBeNull();
   });
 });

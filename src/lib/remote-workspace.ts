@@ -10,14 +10,13 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Data, Effect } from 'effect';
+import { Effect } from 'effect';
 import { loadConfigSync } from './config.js';
 import { createFlyProviderFromConfig } from './remote/index.js';
 import { writeRemoteFile } from './remote/remote-agents.js';
-import { saveWorkspaceMetadataSync } from './remote/workspace-metadata.js';
+import { saveWorkspaceMetadata } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
-import { isStateMigrated } from './state-home.js';
+import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
 
 const execAsync = promisify(exec);
 
@@ -25,7 +24,10 @@ export interface CreateRemoteWorkspaceOptions {
   dryRun?: boolean;
   spinner?: { text: string };
   tier?: 'ephemeral' | 'durable';
-}async function createRemoteWorkspacePromise(
+}
+
+/** Create a remote (Fly) workspace for an issue and return its metadata. */
+export async function createRemoteWorkspace(
   issueId: string,
   options: CreateRemoteWorkspaceOptions = {}
 ): Promise<RemoteWorkspaceMetadata> {
@@ -43,14 +45,8 @@ export interface CreateRemoteWorkspaceOptions {
 
   // Determine project context
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
   const projectRoot = projectConfig?.path || process.cwd();
-  if (projectConfig && await isStateMigrated(projectConfig)) {
-    throw new Error(
-      `Remote work is blocked for ${projectConfig.name} because this project uses Dolt-native beads authority and the remote VM does not yet have authenticated refs/dolt/data mutation routing. Running it would create a second JSONL authority.`,
-    );
-  }
-
   // Determine project identifier for VM name
   let projectId = teamPrefix?.toLowerCase();
   if (!projectId && projectConfig && getIssuePrefix(projectConfig)) {
@@ -213,33 +209,7 @@ export interface CreateRemoteWorkspaceOptions {
     location: 'remote',
   };
 
-  saveWorkspaceMetadataSync(metadata);
+  saveWorkspaceMetadata(metadata);
 
   return metadata;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Tagged error for remote-workspace Effect variants. */
-export class RemoteWorkspaceError extends Data.TaggedError('RemoteWorkspaceError')<{
-  readonly issueId: string;
-  readonly stage: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `createRemoteWorkspace`. */
-export const createRemoteWorkspace = (
-  issueId: string,
-  options: CreateRemoteWorkspaceOptions = {},
-): Effect.Effect<RemoteWorkspaceMetadata, RemoteWorkspaceError> =>
-  Effect.tryPromise({
-    try: () => createRemoteWorkspacePromise(issueId, options),
-    catch: (cause) =>
-      new RemoteWorkspaceError({
-        issueId,
-        stage: 'createRemoteWorkspace',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

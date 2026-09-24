@@ -4,7 +4,7 @@
  * write door and persists exact path/mtime/size skip verdicts for later sweeps.
  */
 import { Effect } from 'effect';
-import { reclassifyUnknownCostEventsSync } from '../../../lib/costs/attribution.js';
+import { reclassifyUnknownCostEvents } from '../../../lib/costs/attribution.js';
 import {
   recordCostEventsThroughOverdeck,
   type PiCollectBatch,
@@ -56,7 +56,7 @@ async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<voi
         console.warn(`[cost-reconciler] ${err.path}: ${err.error}`);
       }
     }
-    const backfillResult = reclassifyUnknownCostEventsSync();
+    const backfillResult = reclassifyUnknownCostEvents();
     if (backfillResult.updated > 0) {
       console.log(`[cost-reconciler] ${reason} UNKNOWN backfill: ${backfillResult.updated} updated`);
     }

@@ -1,8 +1,9 @@
 import { Effect } from 'effect';
 
-import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
+import { getBackendPanes } from '../../services/backend-inventory.js';
 import type { CostEvent } from '../../../../lib/costs/events.js';
-import { queryCostEventsSync } from '../../../../lib/overdeck/cost-sync.js';
+import type { AgentCostStats } from '../../../../lib/overdeck/cost-sync.js';
+import { getAgentCostStatsSnapshot } from '../../services/dashboard-poll-snapshots.js';
 import { getRuntimeCensus, panePidsForSession } from '../../../../lib/runtime-census.js';
 const BURN_WINDOW_MS = 30 * 60 * 1000;
 
@@ -28,22 +29,50 @@ export interface AgentStatsOptions {
   sessionRoots: AgentSessionRoot[];
   processes: AgentProcessRecord[];
   costEventsByAgent?: Map<string, AgentCostEvent[]>;
+  costStatsByAgent?: Map<string, AgentCostStats>;
   nowMs?: number;
 }
 
 export interface AgentStatsSnapshotDeps {
-  listAgents?: () => MinimalAgentState[];
+  listAgents?: () => Promise<MinimalAgentState[]>;
   listSessionNames?: () => Effect.Effect<readonly string[], unknown, never>;
   listPanePids?: (sessionName: string) => Effect.Effect<readonly number[], unknown, never>;
   readProcessTable?: () => Promise<AgentProcessRecord[]>;
   queryCostEvents?: (options: { agentId: string; startTs?: string }) => AgentCostEvent[];
+  readCostStats?: (agentIds: string[]) => Promise<Array<[string, AgentCostStats]>>;
   nowMs?: number;
 }
 
-export type MinimalAgentState = Pick<
-  AgentState,
-  'id' | 'issueId' | 'status' | 'role' | 'model' | 'startedAt' | 'lastActivity'
->;
+/**
+ * PAN-3917 FR-12: an agent row is a live backend pane, not a row in an agent
+ * mirror. `status` carries the backend's own agent state.
+ */
+export interface MinimalAgentState {
+  id: string;
+  issueId: string;
+  status: string;
+  role: string;
+  model: string;
+  startedAt?: string;
+  lastActivity?: string;
+}
+
+/** The live inventory, in the shape the stats snapshot reads. */
+export async function listAgentPanes(): Promise<MinimalAgentState[]> {
+  return (await getBackendPanes())
+    .filter((pane) => pane.state !== 'exited')
+    .map((pane) => {
+      const since = pane.stateSince === undefined ? undefined : new Date(pane.stateSince).toISOString();
+      return {
+        id: pane.id,
+        issueId: pane.issue ?? '',
+        status: pane.state,
+        role: pane.role,
+        model: pane.model,
+        ...(since ? { startedAt: since, lastActivity: since } : {}),
+      };
+    });
+}
 
 export interface AgentResourceRow {
   id: string;
@@ -82,11 +111,11 @@ export function buildAgentStatsSnapshot(options: AgentStatsOptions): AgentStatsS
   const nowMs = options.nowMs ?? Date.now();
   const processTotalsByRoot = buildProcessTotalsByRoot(options.sessionRoots, options.processes);
   const rows = options.agents
-    .filter((agent) => agent.status !== 'stopped')
+    .filter((agent) => agent.status !== 'exited')
     .map((agent): AgentResourceRow => {
       const root = options.sessionRoots.find((sessionRoot) => sessionRoot.agentId === agent.id);
       const processTotals = root ? processTotalsByRoot.get(root.rootPid) : undefined;
-      const costStats = computeAgentCostStats(
+      const costStats = options.costStatsByAgent?.get(agent.id) ?? computeAgentCostStats(
         options.costEventsByAgent?.get(agent.id) ?? [],
         nowMs,
       );
@@ -134,8 +163,11 @@ export function getAgentStatsSnapshotEffect(
 ): Effect.Effect<AgentStatsSnapshot, never, never> {
   return Effect.gen(function* () {
     const nowMs = deps.nowMs ?? Date.now();
-    const agents = (deps.listAgents ?? listAgentStates)()
-      .filter((agent) => agent.status !== 'stopped');
+    const agents = (yield* Effect.promise(() => (deps.listAgents ?? listAgentPanes)()))
+      .filter((agent) => agent.status !== 'exited');
+    if (agents.length === 0) {
+      return buildAgentStatsSnapshot({ agents, sessionRoots: [], processes: [], nowMs });
+    }
     const sessionNames = yield* (deps.listSessionNames ?? defaultListSessionNames)().pipe(
       Effect.catch(() => Effect.succeed([] as readonly string[])),
     );
@@ -156,22 +188,18 @@ export function getAgentStatsSnapshotEffect(
           Effect.catch(() => Effect.succeed([])),
         )
       : [];
-    const costEventsByAgent = new Map<string, AgentCostEvent[]>();
-    const costQuery = deps.queryCostEvents ?? queryCostEventsSync;
-
-    for (const agent of agents) {
-      // One query per agent: computeAgentCostStats derives the burn window from
-      // event timestamps itself, so a second startTs-bounded query was pure
-      // duplicate work — and concatenating it double-counted recent events in
-      // totalUsd/burn (every recent event appeared twice).
-      costEventsByAgent.set(agent.id, costQuery({ agentId: agent.id }));
-    }
+    // Keep injected event readers compatible; production reads only grouped
+    // totals from the worker, never a synchronous event list for each agent.
+    const queryCostEvents = deps.queryCostEvents;
+    const costStatsByAgent = queryCostEvents
+      ? new Map(agents.map(agent => [agent.id, computeAgentCostStats(queryCostEvents({ agentId: agent.id }), nowMs)]))
+      : new Map(yield* Effect.promise(() => (deps.readCostStats ?? getAgentCostStatsSnapshot)(agents.map(agent => agent.id))));
 
     return buildAgentStatsSnapshot({
       agents,
       sessionRoots,
       processes,
-      costEventsByAgent,
+      costStatsByAgent,
       nowMs,
     });
   });

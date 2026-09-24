@@ -4,10 +4,10 @@ import { Effect } from 'effect';
 
 import { readFeedbackAgentStates } from '../agents/agent-state-source.js';
 import { getReadableWorkspacePanPaths } from '../pan-dir/continue.js';
-import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { readIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
-import { updateIssueRecord } from '../pan-dir/record-update.js';
-import { listSessionNames, sessionExists } from '../tmux.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
+import { listSessionNames } from '../tmux.js';
+import { readSwarmSlotAssignments } from './deacon-swarm-record.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 
 export type IssueFeedbackTarget =
   | { agentId: string }
@@ -15,12 +15,29 @@ export type IssueFeedbackTarget =
 
 export interface ResolveIssueFeedbackTargetOptions {
   itemId?: string;
-  /** Test hook — replaces the default resurrection attempt for non-live targets. */
+  /**
+   * Replaces the default resurrection attempt for non-live targets;
+   * `async () => false` disables it (the verification stuck notice, #4019).
+   * Also a test hook.
+   */
   revivePipelinePausedAgent?: (agentId: string, issueId: string) => Promise<boolean>;
+  /**
+   * A pipeline pause the default resurrection must leave in place, checked
+   * against the pause reason read at the moment of resurrection (not when the
+   * caller started). The verification door passes its stuck pause, so an
+   * escalation that lands while this delivery is resolving is still honored.
+   */
+  keepPause?: (pausedReason: string) => boolean;
 }
 
+// PAN-3849 (W32): liveness is the single oracle, not a bare has-session. A
+// remain-on-exit pane whose harness process exited still "exists" as a tmux
+// session, and feedback pasted into that dead shell was previously reported
+// as delivered (pipeline-reliability-review F12, last bullet).
 async function isLiveSession(agentId: string): Promise<boolean> {
-  return Effect.runPromise(sessionExists(agentId));
+  // An indeterminate probe is not death: deliver to the session and let the
+  // transport fail naturally rather than resurrecting a possibly-live agent.
+  return !isConfirmedDead(await isAlive(agentId));
 }
 
 function isWorkFeedbackTarget(role: string): boolean {
@@ -43,33 +60,6 @@ async function findLiveUnregisteredSlot(issueId: string): Promise<{ agentId: str
   return null;
 }
 
-function selfHealSlotAssignment(record: PanIssueRecord, agentId: string, slotIndex: number, itemId?: string): PanIssueRecord {
-  const assignments = record.swarm?.slotAssignments ?? [];
-  const existing = assignments.find((assignment) => assignment.slotIndex === slotIndex || assignment.agentId === agentId);
-  const assignedAt = new Date().toISOString();
-  const slotAssignments = existing
-    ? assignments.map((assignment) => assignment === existing
-      ? { ...assignment, agentId, itemId: itemId ?? assignment.itemId, assignedAt: assignment.assignedAt ?? assignedAt }
-      : assignment)
-    : [
-      ...assignments,
-      {
-        slotIndex,
-        itemId: itemId ?? `slot-${slotIndex}`,
-        agentId,
-        assignedAt,
-      },
-    ];
-
-  return {
-    ...record,
-    swarm: {
-      ...record.swarm,
-      slotAssignments,
-    },
-  };
-}
-
 export async function resolveIssueFeedbackTarget(
   issueId: string,
   opts: ResolveIssueFeedbackTargetOptions = {},
@@ -82,10 +72,13 @@ export async function resolveIssueFeedbackTarget(
     return { agentId: wholeIssueAgentId };
   }
 
+  // PAN-3917: slot assignments live in the issue's own `.pan/continues` slot
+  // ledger, read from the feature workspace.
   const resolved = resolveProjectFromIssueSync(normalizedIssue);
-  const project = resolved ? getProjectSync(resolved.projectKey) : null;
-  const record = project ? readIssueRecordSync(project, normalizedIssue) : null;
-  const assignments = record?.swarm?.slotAssignments ?? [];
+  const workspacePath = resolved
+    ? join(resolved.projectPath, 'workspaces', `feature-${issueLower}`)
+    : undefined;
+  const assignments = workspacePath ? readSwarmSlotAssignments(workspacePath, normalizedIssue) : [];
 
   const requestedItemId = opts.itemId?.trim();
   if (requestedItemId) {
@@ -101,13 +94,10 @@ export async function resolveIssueFeedbackTarget(
     if (await isLiveSession(agentId)) return { agentId };
   }
 
-  if (project && record) {
-    const fallback = await findLiveUnregisteredSlot(normalizedIssue);
-    if (fallback) {
-      await updateIssueRecord(project, normalizedIssue, (current) => selfHealSlotAssignment(current, fallback.agentId, fallback.slotIndex, requestedItemId));
-      return { agentId: fallback.agentId };
-    }
-  }
+  // A live slot session that no ledger entry names is still a delivery target:
+  // the pane is the fact. Nothing is written back to make the ledger agree.
+  const fallback = await findLiveUnregisteredSlot(normalizedIssue);
+  if (fallback) return { agentId: fallback.agentId };
 
   const registeredAgents = readFeedbackAgentStates();
   if (registeredAgents) {
@@ -126,11 +116,15 @@ export async function resolveIssueFeedbackTarget(
   // Operator pauses are the one gate never overridden. Escalating to a human (or any
   // mailbox-style deferred delivery, PAN-2255) is strictly the last resort after
   // resurrection of every candidate has failed.
-  const workspacePath = resolved
-    ? join(resolved.projectPath, 'workspaces', `feature-${issueLower}`)
-    : undefined;
+  // A pause the caller must keep stops the whole ladder, not just that
+  // candidate: the issue is held for the operator, so no slot is revived either.
+  let pauseKept = false;
   const revive = opts.revivePipelinePausedAgent
-    ?? ((agentId, reviveIssueId) => resurrectAgentForFeedback(agentId, reviveIssueId, workspacePath));
+    ?? (async (agentId: string, reviveIssueId: string) => {
+      const outcome = await resurrectAgentForFeedback(agentId, reviveIssueId, workspacePath, opts.keepPause);
+      if (outcome === PAUSE_KEPT) pauseKept = true;
+      return outcome === true;
+    });
   const candidates: string[] = [wholeIssueAgentId];
   if (requestedItemId) {
     const assigned = assignments.find(a => a.itemId === requestedItemId);
@@ -144,6 +138,7 @@ export async function resolveIssueFeedbackTarget(
     if (attempted.has(candidate)) continue;
     attempted.add(candidate);
     if (await revive(candidate, normalizedIssue)) return { agentId: candidate };
+    if (pauseKept) break;
   }
 
   const suffix = requestedItemId ? ` for item ${requestedItemId}` : '';
@@ -166,7 +161,8 @@ export async function resolveIssueFeedbackTarget(
  *   cannot loop unboundedly.
  * - Plain stopped/completed/crashed → resume, then canonical start if resume fails.
  * - Missing registry row + healthy workspace continue state → canonical start.
- * - OPERATOR pauses (pan pause, any non-pipeline pausedReason) are never overridden.
+ * - OPERATOR pauses (pan pause, any non-pipeline pausedReason) are never overridden,
+ *   nor is a pipeline pause the caller's `keepPause` names.
  */
 async function startAgentForFeedback(
   agentId: string,
@@ -206,30 +202,64 @@ async function startAgentForFeedback(
   return live;
 }
 
+/** Resurrection refused because the agent holds a pause the caller must keep. */
+const PAUSE_KEPT = 'pause-kept' as const;
+
+type PausedFacts = { paused?: boolean; pausedReason?: string; yieldedByScheduler?: boolean };
+
+/** How the ladder treats an agent's current pause: nothing to lift, liftable, or held. */
+function classifyPause(
+  state: PausedFacts,
+  keepPause: ((pausedReason: string) => boolean) | undefined,
+): 'none' | 'pipeline' | 'operator' | 'kept' {
+  if (state.paused !== true) return 'none';
+  const reason = state.pausedReason ?? '';
+  const pipelinePause = reason.startsWith('needs-you:')
+    || reason.startsWith('[governor-slot]')
+    || state.yieldedByScheduler === true;
+  if (!pipelinePause) return 'operator';
+  return keepPause?.(reason) ? 'kept' : 'pipeline';
+}
+
 async function resurrectAgentForFeedback(
   agentId: string,
   issueId: string,
   workspacePath: string | undefined,
-): Promise<boolean> {
+  keepPause?: (pausedReason: string) => boolean,
+): Promise<boolean | typeof PAUSE_KEPT> {
   try {
-    const { getAgentStateSync, clearAgentPausedSync, clearAgentTroubledSync } = await import('../agents/agent-state.js');
-    const state = getAgentStateSync(agentId);
+    const { getAgentState, clearAgentPausedSync, clearAgentTroubled } = await import('../agents/agent-state.js');
+    const state = getAgentState(agentId);
     if (!state) {
       console.warn(`[feedback-target] Cannot resume ${agentId} for ${issueId} feedback: agent registry row is missing; trying the start path`);
       return startAgentForFeedback(agentId, issueId, workspacePath);
     }
 
-    if (state.paused === true) {
-      const reason = state.pausedReason ?? '';
-      const pipelinePause = reason.startsWith('needs-you:')
-        || reason.startsWith('[governor-slot]')
-        || state.yieldedByScheduler === true;
-      if (!pipelinePause) {
-        console.log(`[feedback-target] ${agentId} is operator-paused (${reason || 'no reason'}) — not overriding to deliver ${issueId} feedback`);
-        return false;
-      }
+    const pause = classifyPause(state, keepPause);
+    const reason = state.pausedReason ?? '';
+    if (pause === 'operator') {
+      console.log(`[feedback-target] ${agentId} is operator-paused (${reason || 'no reason'}) — not overriding to deliver ${issueId} feedback`);
+      return false;
+    }
+    if (pause === 'kept') {
+      console.log(`[feedback-target] ${agentId} holds a pause this delivery must keep (${reason}) — not resuming it for ${issueId} feedback`);
+      return PAUSE_KEPT;
+    }
+    if (pause === 'pipeline') {
       console.log(`[feedback-target] ${agentId} is pipeline-paused (${reason || 'scheduler yield'}) — unpausing to deliver feedback for ${issueId}`);
-      clearAgentPausedSync(agentId);
+      // Compare-and-clear: the pause is re-classified on the state read inside
+      // the clear, right before its write, so a pause another process set in
+      // the meantime (the local gate's stuck escalation runs in its own
+      // worker) is not lifted.
+      const cleared = clearAgentPausedSync(agentId, (current) => {
+        const now = classifyPause(current, keepPause);
+        return now === 'pipeline' || now === 'none';
+      });
+      if (!cleared) {
+        const current = getAgentState(agentId);
+        console.log(`[feedback-target] ${agentId}'s pause changed before it could be lifted (${current?.pausedReason ?? 'unknown'}) — not resuming it for ${issueId} feedback`);
+        return current && classifyPause(current, keepPause) === 'kept' ? PAUSE_KEPT : false;
+      }
     }
 
     if (state.troubled === true || (state.consecutiveFailures ?? 0) > 0) {
@@ -238,7 +268,7 @@ async function resurrectAgentForFeedback(
         `failures=${state.consecutiveFailures ?? 0}) — clearing for one resurrection attempt to ` +
         `deliver ${issueId} feedback; failure tracking re-trips the gate on another crash`,
       );
-      clearAgentTroubledSync(agentId);
+      await Effect.runPromise(clearAgentTroubled(agentId));
     }
 
     const { resumeAgent } = await import('../agents/resume.js');
@@ -257,37 +287,30 @@ async function resurrectAgentForFeedback(
   }
 }
 
+/**
+ * Report that feedback for an issue has no reachable agent and needs a human.
+ *
+ * PAN-3917: this used to write a `stuck` flag onto the issue's `review_status`
+ * row for the dashboard to read back. The flag is gone; the delivery failure is
+ * announced on the activity stream, where the dashboard already listens, and
+ * the feedback file the caller wrote remains on disk as the durable artifact.
+ */
 export async function surfaceIssueFeedbackNeedsYou(
   issueId: string,
   reason: string,
   details: Record<string, unknown> = {},
 ): Promise<void> {
+  const { emitActivityEntry } = await import('../activity-logger.js');
   try {
-    const { markWorkspaceStuck, FEEDBACK_DELIVERY_STUCK_REASON } = await import('../review-status.js');
-    // PAN-3511: consult evidence from the host-recorded active review run
-    // before mutating the row. A workspace artifact never authorizes a terminal
-    // verdict; the canonical review done signal owns that transition, so a
-    // delivery failure still receives its protective stuck mark.
-    try {
-      const [{ getAgentStateSync }, { readLatestSynthesisVerdictAsync }] = await Promise.all([
-        import('../agents/agent-state.js'),
-        import('./synthesis-verdict.js'),
-      ]);
-      const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
-      const artifact = await readLatestSynthesisVerdictAsync(issueId, {
-        runId: state?.reviewRunId,
-        workspacePath: state?.workspace,
-      });
-      if (artifact) console.warn(`[feedback-target] ${issueId}: found fresh ${artifact.verdict} artifact for the active run; awaiting canonical review signal. ${reason}`);
-    } catch (err) {
-      console.warn(`[feedback-target] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}; proceeding with the stuck mark`);
-    }
-    markWorkspaceStuck(issueId, FEEDBACK_DELIVERY_STUCK_REASON, {
-      reason,
-      ...details,
+    emitActivityEntry({
+      source: 'cloister',
+      level: 'warn',
+      message: `${issueId} needs you: ${reason}`,
+      issueId,
+      details: Object.keys(details).length > 0 ? JSON.stringify(details) : undefined,
     });
   } catch (err) {
-    console.warn(`[feedback-target] Failed to mark ${issueId} as needing human attention: ${err instanceof Error ? err.message : String(err)}`);
+    console.warn(`[feedback-target] Failed to announce needs-you for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
   }
   console.warn(`[feedback-target] ${reason}`);
 }

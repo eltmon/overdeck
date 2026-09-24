@@ -18,13 +18,70 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitHubApiError, ConfigError, FsError } from './errors.js';
 import { ensureBotCredentialFile, resolveWorkspaceRemote } from './github-credentials.js';
-import { withConcurrencyLimitPromise } from './concurrency.js';
+import { withConcurrencyLimit } from './concurrency.js';
 import { isAdvisoryCheckName } from './advisory-checks.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 const APP_DIR = join(homedir(), '.overdeck', 'github-app');
+
+/**
+ * Upper bound on one GitHub App API request, including reading its body
+ * (PAN-4047). Without it a hung connection blocks the caller forever.
+ */
+export const GITHUB_API_TIMEOUT_MS = 30_000;
+
+/**
+ * A GitHub App API request did not finish within its timeout. It is an Error,
+ * so every caller that already catches a failed forge call handles it.
+ */
+export class GitHubRequestTimeoutError extends Error {
+  readonly _tag = 'GitHubRequestTimeoutError';
+
+  constructor(
+    readonly operation: string,
+    readonly timeoutMs: number,
+  ) {
+    super(`GitHub API ${operation} timed out after ${timeoutMs}ms`);
+    this.name = 'GitHubRequestTimeoutError';
+  }
+}
+
+/**
+ * Run one GitHub request under an AbortController that fires after
+ * `timeoutMs`. `run` receives the signal to pass to fetch and should read the
+ * response body inside the callback so a stalled body is bounded too. The
+ * race makes the bound hold even if the request ignores the signal.
+ */
+async function withGitHubTimeout<T>(
+  operation: string,
+  run: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number = GITHUB_API_TIMEOUT_MS,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new GitHubRequestTimeoutError(operation, timeoutMs);
+      controller.abort(error);
+      reject(error);
+    }, timeoutMs);
+  });
+  const request = run(controller.signal);
+  try {
+    return await Promise.race([request, timedOut]);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new GitHubRequestTimeoutError(operation, timeoutMs);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    // The losing side of the race must not surface as an unhandled rejection.
+    request.catch(() => {});
+  }
+}
 
 export interface GitHubAppConfig {
   appId: string;
@@ -64,16 +121,10 @@ export interface GitHubPullRequestState extends GitHubPullRequestRef {
   mergeableState: string | null;
   draft: boolean;
   headSha: string;
+  headRef: string;
   baseBranch: string;
   checksPending: boolean;
   checksFailed: boolean;
-}
-
-export interface GitHubPullRequestHeadState extends GitHubPullRequestRef {
-  url?: string;
-  state: 'OPEN' | 'CLOSED';
-  merged: boolean;
-  headSha: string;
 }
 
 export interface GitHubPullRequestForHead {
@@ -281,7 +332,9 @@ function generateJWT(appId: string, privateKey: string): string {
   const signature = signer.sign(privateKey, 'base64url');
 
   return `${header}.${payload}.${signature}`;
-}async function generateInstallationTokenPromise(
+}
+
+async function generateInstallationTokenBody(
   config?: GitHubAppConfig
 ): Promise<InstallationToken> {
   const appConfig = config || loadGitHubAppConfig();
@@ -291,28 +344,31 @@ function generateJWT(appId: string, privateKey: string): string {
 
   const jwt = generateJWT(appConfig.appId, appConfig.privateKey);
 
-  const response = await fetch(
-    `https://api.github.com/app/installations/${appConfig.installationId}/access_tokens`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'overdeck',
-      },
+  const data = await withGitHubTimeout('POST installation access token', async (signal) => {
+    const response = await fetch(
+      `https://api.github.com/app/installations/${appConfig.installationId}/access_tokens`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwt}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'overdeck',
+        },
+        signal,
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to generate installation token: ${response.status} ${text}`);
     }
-  );
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Failed to generate installation token: ${response.status} ${text}`);
-  }
-
-  const data = await response.json() as {
-    token: string;
-    expires_at: string;
-    permissions?: Record<string, string>;
-  };
+    return await response.json() as {
+      token: string;
+      expires_at: string;
+      permissions?: Record<string, string>;
+    };
+  });
   return {
     token: data.token,
     expiresAt: data.expires_at,
@@ -335,24 +391,27 @@ async function githubApiWithToken<T>(
   init: RequestInit = {},
   extraHeaders: Record<string, string> = {}
 ): Promise<{ data: T; headers: Headers; status: number }> {
-  const response = await fetch(`https://api.github.com${path}`, {
-    ...init,
-    headers: {
-      'Authorization': `token ${token}`,
-      'Accept': 'application/vnd.github+json',
-      'User-Agent': 'overdeck',
-      ...extraHeaders,
-      ...(init.headers || {}),
-    },
+  return withGitHubTimeout(`${init.method || 'GET'} ${path}`, async (signal) => {
+    const response = await fetch(`https://api.github.com${path}`, {
+      ...init,
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'overdeck',
+        ...extraHeaders,
+        ...(init.headers || {}),
+      },
+      signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`GitHub API ${init.method || 'GET'} ${path} failed: ${response.status} ${text}`);
+    }
+
+    const data = response.status === 204 ? undefined as T : await response.json() as T;
+    return { data, headers: response.headers, status: response.status };
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`GitHub API ${init.method || 'GET'} ${path} failed: ${response.status} ${text}`);
-  }
-
-  const data = response.status === 204 ? undefined as T : await response.json() as T;
-  return { data, headers: response.headers, status: response.status };
 }
 
 async function githubApi<T>(
@@ -478,7 +537,11 @@ function summarizeCiCheckRuns(
   };
 }
 
-export async function getCiCheckRunsStatePromise(
+/**
+ * Check-runs-only CI verdict for one commit SHA.
+ * Unlike getPullRequestState(), this intentionally ignores commit statuses.
+ */
+export async function getCiCheckRunsState(
   owner: string,
   repo: string,
   sha: string,
@@ -511,7 +574,10 @@ async function getCommitCheckState(
     pending: pendingStatus || ciState.pendingRuns.length > 0,
     failed: failedStatus || ciState.failed,
   };
-}async function getPullRequestStatePromise(
+}
+
+/** Fetch a pull request's state and aggregate its checks through the GitHub App. */
+export async function getPullRequestState(
   owner: string,
   repo: string,
   number: number,
@@ -523,15 +589,13 @@ async function getCommitCheckState(
     mergeable?: boolean | null;
     mergeable_state?: string | null;
     draft?: boolean;
-    head?: { sha?: string };
+    head?: { sha?: string; ref?: string };
     base?: { ref?: string };
   }>(`/repos/${owner}/${repo}/pulls/${number}`);
-
   const headSha = pull.head?.sha || '';
   const checkState = headSha
     ? await getCommitCheckState(owner, repo, headSha)
     : { pending: false, failed: false };
-
   return {
     owner,
     repo,
@@ -543,36 +607,15 @@ async function getCommitCheckState(
     mergeableState: pull.mergeable_state ?? null,
     draft: pull.draft === true,
     headSha,
+    headRef: pull.head?.ref || '',
     baseBranch: pull.base?.ref || 'main',
     checksPending: checkState.pending,
     checksFailed: checkState.failed,
   };
 }
 
-async function getPullRequestHeadStatePromise(
-  owner: string,
-  repo: string,
-  number: number,
-): Promise<GitHubPullRequestHeadState> {
-  const pull = await githubApi<{
-    html_url?: string;
-    state: 'open' | 'closed';
-    merged?: boolean;
-    head?: { sha?: string };
-  }>(`/repos/${owner}/${repo}/pulls/${number}`);
-
-  return {
-    owner,
-    repo,
-    number,
-    url: pull.html_url,
-    state: pull.state === 'open' ? 'OPEN' : 'CLOSED',
-    merged: pull.merged === true,
-    headSha: pull.head?.sha || '',
-  };
-}
-
-export async function listPullRequestsForHeadPromise(
+/** List pull requests for a head branch through the GitHub App REST API (no GraphQL). */
+export async function listPullRequestsForHead(
   owner: string,
   repo: string,
   branch: string,
@@ -601,7 +644,8 @@ export async function listPullRequestsForHeadPromise(
   }));
 }
 
-export async function getIssueStatePromise(
+/** Look up an issue's state through the GitHub App REST API (no GraphQL). */
+export async function getIssueState(
   owner: string,
   repo: string,
   number: number,
@@ -610,7 +654,8 @@ export async function getIssueStatePromise(
   return { state: issue.state };
 }
 
-export async function listOpenIssuesWithLabelsPromise(
+/** List open issues with their labels through the GitHub App REST API (paginated). */
+export async function listOpenIssuesWithLabels(
   owner: string,
   repo: string,
 ): Promise<GitHubOpenIssueLabels[]> {
@@ -630,13 +675,13 @@ export async function listOpenIssuesWithLabelsPromise(
     }));
 }
 
-export async function listIssuesWithAnyLabelPromise(
+export async function listIssuesWithAnyLabel(
   owner: string,
   repo: string,
   labels: readonly string[],
 ): Promise<GitHubIssueLabels[]> {
   const byNumber = new Map<number, GitHubIssueLabels>();
-  const issueGroups = await withConcurrencyLimitPromise(labels.map((label) => async () =>
+  const issueGroups = await withConcurrencyLimit(labels.map((label) => async () =>
     githubApiAllPages<{
       number: number;
       state: 'open' | 'closed';
@@ -659,7 +704,8 @@ export async function listIssuesWithAnyLabelPromise(
   return [...byNumber.values()];
 }
 
-async function mergePullRequestWithAppPromise(
+/** Merge a pull request through the GitHub App. */
+export async function mergePullRequestWithApp(
   owner: string,
   repo: string,
   number: number,
@@ -667,33 +713,37 @@ async function mergePullRequestWithAppPromise(
   sha?: string,
 ): Promise<{ merged: boolean; message?: string }> {
   const token = await getInstallationAccessToken();
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/merge`,
-    {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'overdeck',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        merge_method: method,
-        ...(sha ? { sha } : {}),
-      }),
+  const path = `/repos/${owner}/${repo}/pulls/${number}/merge`;
+  return withGitHubTimeout(`PUT ${path}`, async (signal) => {
+    const response = await fetch(
+      `https://api.github.com${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'overdeck',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          merge_method: method,
+          ...(sha ? { sha } : {}),
+        }),
+        signal,
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json() as { merged?: boolean; message?: string };
+      return {
+        merged: data.merged === true,
+        message: data.message,
+      };
     }
-  );
 
-  if (response.ok) {
-    const data = await response.json() as { merged?: boolean; message?: string };
-    return {
-      merged: data.merged === true,
-      message: data.message,
-    };
-  }
-
-  const text = await response.text();
-  throw new Error(`GitHub merge failed: ${response.status} ${text}`);
+    const text = await response.text();
+    throw new Error(`GitHub merge failed: ${response.status} ${text}`);
+  });
 }
 
 /**
@@ -768,34 +818,39 @@ export async function reportCommitStatus(
 
   const { token } = await Effect.runPromise(generateInstallationToken(config));
 
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'overdeck',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ state: status, context, description }),
-    }
-  );
+  const path = `/repos/${owner}/${repo}/statuses/${sha}`;
+  await withGitHubTimeout(`POST ${path}`, async (signal) => {
+    const response = await fetch(
+      `https://api.github.com${path}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'overdeck',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state: status, context, description }),
+        signal,
+      }
+    );
 
-  if (!response.ok) {
-    const text = await response.text();
-    console.warn(`[github-app] Failed to report status: ${response.status} ${text}`);
-  }
+    if (!response.ok) {
+      const text = await response.text();
+      console.warn(`[github-app] Failed to report status: ${response.status} ${text}`);
+    }
+  });
 }
 
 /**
  * Post the `overdeck/tests` commit status for the HEAD of a workspace.
  *
  * Used by verification-runner (pre-review gate) and the test specialist
- * (post-review gate) to signal that Overdeck has run the test suite
- * against this exact commit. The `test` job in .github/workflows/ci.yml
- * reads this status and skips its own vitest run when it's `success`,
- * eliminating duplicate test execution for pipeline-managed PRs.
+ * (post-review gate) to record that Overdeck's changed-file-scoped
+ * verification gate passed against this exact commit. PAN-3847 (FR-13): CI
+ * no longer reads this status — the `test` job in .github/workflows/ci.yml
+ * runs vitest on every push. The context keeps its name because branch
+ * protection requires it (Decision 7).
  *
  * Non-pipeline pushes (no workspace, no `overdeck/tests` status) cause
  * CI to fall through and run vitest as normal — defense in depth.
@@ -809,27 +864,33 @@ export async function postOverdeckTestsStatus(
   repo: string,
   status: 'success' | 'failure',
   description: string,
+  /** PAN-3847 (FR-13): the stamp binds to the tested sha when the caller provides it. */
+  sha?: string,
 ): Promise<void> {
   if (!isGitHubAppConfigured()) return;
   try {
-    const { stdout } = await execAsync('git rev-parse HEAD', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-      timeout: 5000,
-    });
-    const sha = stdout.trim();
-    if (!sha) return;
+    const resolvedSha = sha ?? await (async () => {
+      const { stdout } = await execAsync('git rev-parse HEAD', {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      return stdout.trim();
+    })();
+    if (!resolvedSha) return;
     // Context name MUST match branch protection's required_status_checks.contexts
     // for main, which is the singular "overdeck/test". Don't change to plural
     // without coordinating the branch protection rule update.
-    await reportCommitStatus(owner, repo, sha, status, 'overdeck/test', description);
+    await reportCommitStatus(owner, repo, resolvedSha, status, 'overdeck/test', description);
     console.log(
-      `[github-app] Posted overdeck/test=${status} for ${sha.slice(0, 8)} in ${owner}/${repo}`,
+      `[github-app] Posted overdeck/test=${status} for ${resolvedSha.slice(0, 8)} in ${owner}/${repo}`,
     );
   } catch (err: any) {
     console.warn(`[github-app] Failed to post overdeck/test status: ${err.message}`);
   }
-}async function refreshWorkspaceTokenPromise(
+}
+
+async function refreshWorkspaceTokenBody(
   workspacePath: string,
 ): Promise<void> {
   const config = loadGitHubAppConfig();
@@ -865,7 +926,7 @@ export function getAppStatus(): {
   return { configured: false, mode: 'fallback' };
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 const apiCatch = (operation: string) => (cause: unknown) =>
   new GitHubApiError({
@@ -890,91 +951,9 @@ export const generateInstallationToken = (
       );
     }
     return yield* Effect.tryPromise({
-      try: () => generateInstallationTokenPromise(cfg),
+      try: () => generateInstallationTokenBody(cfg),
       catch: apiCatch('generateInstallationToken'),
     });
-  });
-
-/** Effect-native getPullRequestState — typed-error fetch + check aggregator. */
-export const getPullRequestState = (
-  owner: string,
-  repo: string,
-  number: number,
-): Effect.Effect<GitHubPullRequestState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getPullRequestStatePromise(owner, repo, number),
-    catch: apiCatch('getPullRequestState'),
-  });
-
-/** Effect-native lightweight PR state fetch without commit status/check aggregation. */
-export const getPullRequestHeadState = (
-  owner: string,
-  repo: string,
-  number: number,
-): Effect.Effect<GitHubPullRequestHeadState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getPullRequestHeadStatePromise(owner, repo, number),
-    catch: apiCatch('getPullRequestHeadState'),
-  });
-
-/** Effect-native listPullRequestsForHead — App REST head lookup, no GraphQL. */
-export const listPullRequestsForHead = (
-  owner: string,
-  repo: string,
-  branch: string,
-  state: 'open' | 'closed' | 'all',
-): Effect.Effect<GitHubPullRequestForHead[], GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => listPullRequestsForHeadPromise(owner, repo, branch, state),
-    catch: apiCatch('listPullRequestsForHead'),
-  });
-
-/** Effect-native getIssueState — App REST issue state lookup, no GraphQL. */
-export const getIssueState = (
-  owner: string,
-  repo: string,
-  number: number,
-): Effect.Effect<GitHubIssueState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getIssueStatePromise(owner, repo, number),
-    catch: apiCatch('getIssueState'),
-  });
-
-/** Effect-native listOpenIssuesWithLabels — paginated App REST issue labels. */
-export const listOpenIssuesWithLabels = (
-  owner: string,
-  repo: string,
-): Effect.Effect<GitHubOpenIssueLabels[], GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => listOpenIssuesWithLabelsPromise(owner, repo),
-    catch: apiCatch('listOpenIssuesWithLabels'),
-  });
-
-/**
- * Effect-native check-runs-only CI verdict for one commit SHA.
- * Unlike getPullRequestState(), this intentionally ignores commit statuses.
- */
-export const getCiCheckRunsState = (
-  owner: string,
-  repo: string,
-  sha: string,
-): Effect.Effect<GitHubCiCheckRunsState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getCiCheckRunsStatePromise(owner, repo, sha),
-    catch: apiCatch('getCiCheckRunsState'),
-  });
-
-/** Effect-native mergePullRequestWithApp — typed-error merge call. */
-export const mergePullRequestWithApp = (
-  owner: string,
-  repo: string,
-  number: number,
-  method: 'merge' | 'squash' | 'rebase' = 'squash',
-  sha?: string,
-): Effect.Effect<{ merged: boolean; message?: string }, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => mergePullRequestWithAppPromise(owner, repo, number, method, sha),
-    catch: apiCatch('mergePullRequestWithApp'),
   });
 
 /** Effect-native refreshWorkspaceToken — fails with FsError or GitHubApiError. */
@@ -989,7 +968,7 @@ export const refreshWorkspaceToken = (
       );
     }
     return yield* Effect.tryPromise({
-      try: () => refreshWorkspaceTokenPromise(workspacePath),
+      try: () => refreshWorkspaceTokenBody(workspacePath),
       catch: (cause) =>
         new FsError({
           path: workspacePath,

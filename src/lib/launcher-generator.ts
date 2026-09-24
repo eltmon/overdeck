@@ -1,21 +1,24 @@
-import { Effect } from 'effect';
+import { museDataHome } from './runtimes/storage/muse.js';
+import { prepareClaudeContext } from './launcher-context.js';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel, resolveKimiCodeModelAlias } from './providers.js';
 import { provisionOhmypiProviderForModel } from './ohmypi-models.js';
-import { shellQuoteModelIdSync } from './model-validation.js';
+import { shellQuoteModelId } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
-import { buildGitGuardLines } from './launcher-git-guard.js';
-import { buildCodexCommand } from './launcher-codex-command.js';
+import { buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
+import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
+import { resolveKimiNativeEffort } from './kimi-effort.js';
+import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 
-export interface LauncherConfig {
+export interface LauncherConfig extends CodexNativeEndpointOption {
   role: Role;
   spawnMode?: LauncherSpawnMode;
   workingDir: string;
@@ -58,6 +61,7 @@ export interface LauncherConfig {
    *   - 'app-server': persistent Codex app-server host process
    */
   codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
+  codexEffort?: string;
   /**
    * Per-agent CODEX_HOME directory path (e.g. ~/.overdeck/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.
@@ -84,6 +88,8 @@ export interface LauncherConfig {
   acpBinaryPath?: string;
   /** Materialized Overdeck context bundle injected into the first fresh ACP prompt. */
   acpContextFile?: string;
+  /** Requested effort applied after the ACP model is selected. */
+  acpEffort?: string;
 
   /**
    * Native Kimi Code CLI model alias (e.g. 'k3'), passed as `kimi -m <model>`.
@@ -93,10 +99,20 @@ export interface LauncherConfig {
    * workDirKey bucket.
    */
   kimiCodeModel?: string;
+  /** Per-launch effort supplied without editing the shared Kimi config. */
+  kimiCodeEffort?: string;
   /** Auto-approve regular tool calls (`kimi --yolo`). Required for harness='kimi-code'. */
   kimiCodeYolo?: boolean;
   /** Additional workspace directories (`kimi --add-dir <dir>`, repeatable). */
   kimiCodeAddDirs?: string[];
+  /** Required proof that managed context will be delivered as Kimi's first user message. */
+  kimiContextDelivery?: 'initial-message';
+
+  /** Exact Muse model and saved native UUID; never reuse a Claude session id. */
+  museModel?: string;
+  museResumeSessionId?: string;
+  museEffort?: string;
+  museContextFile?: string;
 
   // Command construction
   /**
@@ -108,6 +124,7 @@ export interface LauncherConfig {
   promptFile?: string;
   promptFileMode?: 'argument' | 'stdin';
   promptInline?: string;
+  gitGuardMode?: GitGuardMode; // PAN-3920: `read-only` refuses every git write in `workingDir`
 
   /**
    * PAN-1201: absolute path to the workspace's assembled context bundle
@@ -133,6 +150,9 @@ export interface LauncherConfig {
    * launcher's own bash process — it only fails to signal if SIGKILLed.
    */
   reviewSignal?: {
+    /** The reviewer's own agent id (agent-<issue>-review-<role>) — the launcher
+     * reports process exit for it via `pan admin agents exited` (PAN-3848 W26). */
+    agentId: string;
     synthesisAgentId: string;
     subRole: string;
     outputPath: string;
@@ -149,6 +169,7 @@ export interface LauncherConfig {
   resumeSessionId?: string;
   sessionId?: string;
   model?: string;
+  piEffort?: string;
   permissionFlags?: string[];
   extraArgs?: string;
 
@@ -158,6 +179,13 @@ export interface LauncherConfig {
   unsetProviderEnv?: boolean;
   cavemanExports?: string;
   overdeckEnv?: { agentId?: string; issueId?: string; sessionType?: string };
+  /**
+   * Stable Overdeck-private state identity for launch/relaunch continuity.
+   * Unlike overdeckEnv.agentId, this does not export workflow identity or
+   * enable git guards; conversation launchers use it solely to retain their
+   * context receipt identity across resume.
+   */
+  managedStateKey?: string;
   unsetOverdeckEnv?: boolean;
   extraEnvExports?: string[];
 
@@ -241,7 +269,9 @@ function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
  * and baseCommand strings — the generator does NOT call helper functions
  * internally (keeps coupling low, tests simple).
  */
-export function generateLauncherScriptSync(config: LauncherConfig): string {
+export function generateLauncherScript(config: LauncherConfig): string {
+  const preparedContext = prepareClaudeContext(config);
+  config = preparedContext.config;
   const lines: string[] = [];
 
   // PAN-3531: omp resolves --model against its bundled catalog plus the user
@@ -323,7 +353,7 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   }
 
   if (config.overdeckEnv?.agentId && config.spawnMode !== 'conversation') {
-    lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir));
+    lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir, config.gitGuardMode ?? 'default'));
   }
 
   // Extra env exports
@@ -331,6 +361,35 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     for (const expr of config.extraEnvExports) {
       lines.push(expr);
     }
+  }
+
+  for (const file of preparedContext.sources) {
+    lines.push(`if [ ! -f ${shellQuote(file)} ] || [ ! -r ${shellQuote(file)} ]; then printf '%s\\n' ${shellQuote(`Required launch context is unreadable: ${file}`)} >&2; exit 1; fi`);
+  }
+  lines.push(...preparedContext.lines);
+
+  // Persist the exact launch-time context composition beside agent state. This
+  // is a receipt, not another instruction source: it records paths/hashes and
+  // delivery channel for audit/debugging across spawn, resume, and recovery.
+  const managedStateKey = config.managedStateKey ?? config.overdeckEnv?.agentId ?? config.sessionId;
+  const receiptKey = managedStateKey;
+  const receiptFiles = [
+    ...preparedContext.sources,
+    ...(config.acpContextFile ? [config.acpContextFile] : []),
+  ];
+  if (receiptKey && receiptFiles.length > 0) {
+    const receiptPath = join(getOverdeckHome(), 'agents', receiptKey, 'context-receipt.json');
+    const receiptChannel = config.harness === 'codex'
+      ? 'developer_instructions'
+      : config.harness === 'ohmypi'
+        ? 'append-system-prompt'
+        : config.harness === 'kimi-code'
+          ? 'initial-message-envelope'
+        : config.harness === 'acp'
+          ? 'acp-initial-context'
+          : 'append-system-prompt-file';
+    const receiptScript = 'const fs=require("fs"),c=require("crypto"),p=require("path");const [out,ch,...files]=process.argv.slice(1);const sources=files.filter(f=>fs.existsSync(f)).map(path=>{const b=fs.readFileSync(path);return{path,bytes:b.length,estimatedTokens:Math.ceil(b.length/4),sha256:c.createHash("sha256").update(b).digest("hex")}});fs.mkdirSync(p.dirname(out),{recursive:true});const t=out+".tmp-"+process.pid;fs.writeFileSync(t,JSON.stringify({version:1,generatedAt:new Date().toISOString(),deliveryChannel:ch,sources},null,2)+"\\n",{mode:384});fs.renameSync(t,out)';
+    lines.push(`node -e ${shellQuote(receiptScript)} ${shellQuote(receiptPath)} ${shellQuote(receiptChannel)} ${receiptFiles.map(shellQuote).join(' ')}`);
   }
 
   // Codex: per-agent CODEX_HOME so each agent has isolated sessions/config
@@ -431,19 +490,6 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   return script;
 }
 
-/**
- * Generate the outer `script -qfaec` wrapper for launchers that need tty logging.
- * Returns null if useScriptWrapper is false.
- */
-export function generateLauncherWrapperSync(config: LauncherConfig): string | null {
-  if (!config.useScriptWrapper || !config.scriptLogFile) {
-    return null;
-  }
-
-  const inner = (config.innerScriptPath ?? `${config.workingDir}/run-claude.sh`).replace(/'/g, "'\\'");
-  return `#!/bin/bash\nexec script -qfaec "bash '${inner}'" ${shellQuote(config.scriptLogFile)}\n`;
-}
-
 /** Env vars that may leak from a parent tmux server and must be unset. */
 const PROVIDER_ENV_UNSETS = [
   'ANTHROPIC_API_KEY',
@@ -460,6 +506,7 @@ const PROVIDER_ENV_UNSETS = [
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (behavior.launchCommandKind === 'muse-tui') return buildMuseCommand(config, config.spawnMode !== 'conversation');
 
   if (config.spawnMode === 'conversation') {
     if (behavior.launchCommandKind === 'ohmypi-rpc') {
@@ -479,6 +526,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.baseCommand) {
       let cmd = config.baseCommand;
       cmd += buildChannelsArgs(config);
+      for (const file of systemPromptFiles(config)) {
+        cmd += ` --append-system-prompt-file ${shellQuote(file)}`;
+      }
       const args: string[] = [];
       if (config.resumeSessionId) {
         args.push(`--resume ${shellQuote(config.resumeSessionId)}`);
@@ -541,6 +591,22 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
     `else`,
     `  pan tell ${synth} "REVIEWER_FAILED ${role} reviewer exited (code $CLAUDE_EXIT) without writing report" || true`,
     `fi`,
+    // PAN-3848 (W26, FR-21): the transition writes its own state — the launcher
+    // records the reviewer's exit instead of a patrol inferring it from a
+    // missing tmux session. PAN-3848 (F5): a failed exit write is retried, not
+    // swallowed — a transient state-store failure must not silently downgrade
+    // the exit to an orphan-misclassification. If the write still fails,
+    // cleanup proceeds and Deacon's orphan recovery reconciles the stopped
+    // row from session liveness on its next sweep.
+    `PAN_EXIT_RECORDED=false`,
+    `for PAN_EXIT_ATTEMPT in 1 2 3; do`,
+    `  if pan admin agents exited ${shellQuote(sig.agentId)} --code "$CLAUDE_EXIT"; then`,
+    `    PAN_EXIT_RECORDED=true`,
+    `    break`,
+    `  fi`,
+    `  sleep 2`,
+    `done`,
+    `if [ "$PAN_EXIT_RECORDED" != "true" ]; then echo "[launcher] WARNING: failed to record reviewer exit for ${shellQuote(sig.agentId)} after 3 attempts (code $CLAUDE_EXIT) — orphan recovery will reconcile from session liveness" >&2; fi`,
     `touch ${shellQuote(sig.signalMarkerPath)}`,
     `rm -f ${pidFile}`,
   ];
@@ -555,6 +621,7 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (config.harness === 'muse') return buildMuseCommand(config, useExec);
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return buildOhmypiCommand(config, useExec);
@@ -596,7 +663,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
     cmd += ` --session-id ${shellQuote(config.sessionId)}`;
   }
   if (config.model) {
-    cmd += ` --model ${shellQuoteModelIdSync(config.model)}`;
+    cmd += ` --model ${shellQuoteModelId(getClaudeCodeLaunchModel(config.model))}`;
   }
   if (config.extraArgs) {
     cmd += ` ${config.extraArgs}`;
@@ -665,8 +732,9 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (piMode === 'rpc') {
     tokens.push('--mode', 'rpc');
   }
+  tokens.push('--thinking', shellQuote(config.piEffort ?? 'high'));
   if (config.model) {
-    tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
+    tokens.push('--model', shellQuoteModelId(qualifyPiModel(config.model)));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {
@@ -674,8 +742,12 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   }
   // NOTE: --no-context-files is intentionally absent — removed in omp (docs/ohmypi-contract.md).
 
-  for (const file of systemPromptFiles(config)) {
-    tokens.push('--append-system-prompt', `"$(cat ${shellQuote(file)} 2>/dev/null)"`);
+  // OMP accepts one append value. Repeating the flag loses earlier layers.
+  const promptSections = systemPromptFiles(config).map(file => `"$(cat -- ${shellQuote(file)})"`);
+  if (config.promptFile) promptSections.push('"$prompt"');
+  else if (config.promptInline) promptSections.push(shellQuote(config.promptInline));
+  if (promptSections.length > 0) {
+    tokens.push('--append-system-prompt', `"$(printf '%s\\n\\n' ${promptSections.join(' ')})"`);
   }
 
   if (config.resumeSessionId) {
@@ -684,12 +756,6 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   if (config.extraArgs) {
     tokens.push(config.extraArgs);
   }
-  if (config.promptFile) {
-    tokens.push('--append-system-prompt', '"$prompt"');
-  } else if (config.promptInline) {
-    tokens.push('--append-system-prompt', shellQuote(config.promptInline));
-  }
-
   let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
 
   if (piMode === 'rpc') {
@@ -778,10 +844,17 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--resume', shellQuote(config.resumeSessionId));
   }
   if (config.model) {
-    tokens.push('--model', shellQuoteModelIdSync(config.model));
+    tokens.push('--model', shellQuoteModelId(config.model));
+  }
+  if (config.harness === 'opencode' && config.acpEffort) {
+    tokens.push('--effort', shellQuote(config.acpEffort));
   }
   if (config.acpContextFile) {
     tokens.push('--context-file', shellQuote(config.acpContextFile));
+  }
+  if (config.acpProvider === 'kimi' && config.model) {
+    const effort = resolveKimiNativeEffort(config.model, config.acpEffort);
+    if (effort) tokens.push('--effort', shellQuote(effort));
   }
 
   const cmd = tokens.join(' ');
@@ -803,6 +876,11 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   if (!config.kimiCodeModel) {
     throw new Error('kimi-code launcher requires kimiCodeModel');
   }
+  if (systemPromptFiles(config).length > 0 && config.kimiContextDelivery !== 'initial-message') {
+    throw new Error(
+      'Managed kimi-code launch blocked: required context must declare the initial-message envelope transport.',
+    );
+  }
 
   // Translate here, at the single chokepoint every kimi-code launch passes
   // through, rather than at each caller. Only the work-agent path translated;
@@ -812,7 +890,7 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   // an already-native `kimi-code/<alias>` passes through unchanged.
   const kimiCodeModel = resolveKimiCodeModelAlias(config.kimiCodeModel);
 
-  const tokens: string[] = ['kimi', '-m', shellQuoteModelIdSync(kimiCodeModel)];
+  const tokens: string[] = ['kimi', '-m', shellQuoteModelId(kimiCodeModel)];
   if (config.resumeSessionId) {
     // `-S <id>` resumes that specific session; `kimi`'s own `-c` continue flag
     // picks "most recent for this cwd" and can't target a captured id (PAN-1837).
@@ -826,88 +904,32 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   }
 
   const cmd = wrapWithSupervisor(config, tokens.join(' '));
-  return [useExec ? `exec ${cmd}` : cmd];
+  const effort = resolveKimiNativeEffort(config.kimiCodeModel, config.kimiCodeEffort);
+  return [
+    // 0.40.1 reads this operational override after model/config effort
+    // resolution. It applies to managed OAuth models without a synthetic model.
+    effort ? `export KIMI_MODEL_THINKING_EFFORT=${shellQuote(effort)}` : 'unset KIMI_MODEL_THINKING_EFFORT',
+    useExec ? `exec ${cmd}` : cmd,
+  ];
 }
 
-export function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
-  const piMode = config.piMode ?? 'rpc';
-  if (!config.piSessionDir) {
-    throw new Error('Pi launcher requires piSessionDir');
+/** Persistent native TUI, verified against Muse Code 1.0.2. */
+function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const model = config.museModel ?? config.model;
+  if (model !== 'muse-spark-1.3' && model !== 'muse-spark-1.3-contributor') {
+    throw new Error('Muse launcher requires an explicit supported Muse Spark model');
   }
-  if (piMode === 'rpc') {
-    if (!config.piExtensionPath) {
-      throw new Error('Pi launcher (rpc mode) requires piExtensionPath');
-    }
-    if (!config.piFifoPath) {
-      throw new Error('Pi launcher (rpc mode) requires piFifoPath');
-    }
-  }
-
-  const tokens: string[] = ['pi'];
-  if (piMode === 'rpc') {
-    tokens.push('--mode', 'rpc');
-  }
-  if (config.model) {
-    // Provider-qualify so Pi binds the model to the intended provider
-    // (bare 'kimi-k2.6' resolves to keyless moonshotai instead of
-    // kimi-coding — agent boots but every prompt fails; PAN-1799).
-    tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
-  }
-  tokens.push('--session-dir', shellQuote(config.piSessionDir));
-  if (config.piExtensionPath) {
-    tokens.push('--extension', shellQuote(config.piExtensionPath));
-  }
-  tokens.push('--no-context-files');
-
-  // PAN-1566: deliver Overdeck's injected context (global engineering-rules
-  // layer, workspace/briefing) via --append-system-prompt. The pi-extension
-  // session_start fold cannot do this — @earendil-works/pi-coding-agent's ctx
-  // exposes no appendSystemPrompt method, so that path silently no-ops. The CLI
-  // flag reads the file CONTENTS at launch via bash command substitution and is
-  // the reliable delivery path; absent/empty files contribute nothing.
-  for (const file of systemPromptFiles(config)) {
-    tokens.push('--append-system-prompt', `"$(cat ${shellQuote(file)} 2>/dev/null)"`);
-  }
-
-  if (config.resumeSessionId) {
-    tokens.push('--session', shellQuote(config.resumeSessionId));
-  }
-  if (config.extraArgs) {
-    tokens.push(config.extraArgs);
-  }
-  if (config.promptFile) {
-    tokens.push('--append-system-prompt', '"$prompt"');
-  } else if (config.promptInline) {
-    tokens.push('--append-system-prompt', shellQuote(config.promptInline));
-  }
-
-  let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
-
-  if (piMode === 'rpc') {
-    // stdin redirection from the per-agent fifo. Pi reads JSONL RPC commands
-    // from stdin in --mode rpc. Use bash read-write redirection (`<>`) instead
-    // of read-only (`<`): opening a FIFO read-only blocks until a writer is
-    // present, which means Pi could never exec and never write `ready.json`
-    // before any external writer attached, deadlocking work-agent launches.
-    // `<>` opens the FIFO without blocking, lets Pi start, emit its ready
-    // marker, and then read JSONL commands as the dashboard writer pushes them.
-    cmd = `${cmd} <> ${shellQuote(config.piFifoPath!)}`;
-  }
-  // TUI mode: leave stdin attached to the tmux pane so the user (or paste-buffer
-  // delivery from the dashboard) can type into Pi directly.
-
-  return [useExec ? `exec ${cmd}` : cmd];
+  const agentId = config.overdeckEnv?.agentId;
+  if (!agentId) throw new Error('Muse launcher requires an agent identity for durable sessions');
+  const effort = config.museEffort ?? 'high';
+  if (!['low', 'medium', 'high', 'xhigh'].includes(effort)) throw new Error('Unsupported Muse reasoning effort');
+  const tokens = ['muse', '--model', shellQuote(model), '--reasoning-effort', shellQuote(effort),
+    '--workspace', shellQuote(config.workingDir), '--trust-workspace'];
+  if (config.museResumeSessionId) tokens.push('resume', shellQuote(config.museResumeSessionId));
+  const command = wrapWithSupervisor(config, tokens.join(' '));
+  return [
+    `export XDG_DATA_HOME=${shellQuote(museDataHome(agentId))}`,
+    ...(config.museContextFile ? [`export TBH_EVAL_APPEND_DEVELOPER_PROMPT_FILE=${shellQuote(config.museContextFile)}`] : []),
+    useExec ? `exec ${command}` : command,
+  ];
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure-sync launcher emission — additive Effect.sync wrappers.
-
-/** Build the bash launcher script body for a Cloister role spawn. Pure. */
-export const generateLauncherScript = (
-  config: LauncherConfig,
-): Effect.Effect<string> => Effect.sync(() => generateLauncherScriptSync(config));
-
-/** Build an optional launcher wrapper (returns null when not needed). Pure. */
-export const generateLauncherWrapper = (
-  config: LauncherConfig,
-): Effect.Effect<string | null> => Effect.sync(() => generateLauncherWrapperSync(config));

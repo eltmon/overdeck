@@ -28,6 +28,8 @@ export interface Conversation {
   isWorking?: boolean;
   /** Tool name currently executing (e.g. "Bash", "Read"). Null when idle or not in a tool call. */
   currentTool?: string | null;
+  /** Transcript mtime when an ACP turn has remained open without activity for five minutes. */
+  stalledSince?: string | null;
   isFavorited?: boolean;
   /** Absolute path to the Claude Code JSONL session file. Null until discovered. Legacy fallback. */
   sessionFile?: string | null;
@@ -46,7 +48,7 @@ export interface Conversation {
   /** Model used for this conversation. Null until backfilled from session file. */
   model?: string | null;
   /** Harness used to spawn this conversation. */
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null;
   /** Effort level used when spawning this conversation. */
   effort?: string | null;
   /** Async fork provisioning status. Null = not a fork or completed. */

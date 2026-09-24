@@ -12,17 +12,17 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  const { closeOverdeckDatabaseSync } = await import('../../../../src/lib/overdeck/infra.js');
+  const { closeOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
   const { resetDiscoveredSessionsSchemaBootstrap } = await import('../../../../src/lib/overdeck/discovered-sessions.js');
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   resetDiscoveredSessionsSchemaBootstrap();
   delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });
 
 async function db() {
-  const { getOverdeckDatabaseSync } = await import('../../../../src/lib/overdeck/infra.js');
-  return getOverdeckDatabaseSync();
+  const { getOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
+  return getOverdeckDatabase();
 }
 
 function iso(ms: number): string {

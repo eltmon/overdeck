@@ -12,8 +12,9 @@ import type { AgentStatus } from '@overdeck/contracts';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
-import { claudeSessionTranscriptExists, getOverdeckHome } from '../../../../lib/paths.js';
-import { resolvePrimaryWorkspaceRepoDirSync } from '../../../../lib/project-repos.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
+import { claudeSessionTranscriptExists } from '../../../../lib/runtimes/storage/claude-code.js';
+import { resolvePrimaryWorkspaceRepoDir } from '../../../../lib/project-repos.js';
 import {
   appendAgentLifecycleLog,
   launchPanCommandDetached,
@@ -21,26 +22,24 @@ import {
 } from '../../../../lib/composer-commands/detached.js';
 import {
   getAgentDir,
-  getLatestSessionIdSync,
+  getLatestSessionId,
   normalizeAgentId,
   type AgentRuntimeState,
   type AgentState,
 } from '../../../../lib/agents.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getGitHubConfig } from '../../services/tracker-config.js';
-import { getClosedIssueIdsForReadSource } from '../../read-model.js';
 import { recordFeatureRegistryLifecycle } from '../../../../lib/registry/feature-registry-population.js';
 import {
-  getClaudeProjectDir as getClaudeProjectDirShared,
-  getActiveSessionPath as getActiveSessionPathShared,
-  getAgentWorkspace as getAgentWorkspaceShared,
-  getAgentJsonlPath as getAgentJsonlPathShared,
-  getPendingQuestions as getPendingQuestionsShared,
-  getAgentPendingQuestions as getAgentPendingQuestionsShared,
+  getClaudeProjectDir,
+  getAgentWorkspace,
+  getAgentJsonlPath,
+  getPendingQuestions,
+  getAgentPendingQuestions,
 } from '../../../../lib/agent-enrichment.js';
-import { issueOwesReworkSync, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
+import type { WorkAgentLifecycleState, WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
 import { hasCompletionMarkerForAgent } from '../../../../lib/agents/supervisor-channels.js';
-import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../../services/system-health-service.js';
 import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
 import { capturePane } from '../../../../lib/tmux.js';
@@ -54,7 +53,14 @@ type StartAgentPhase = 'stackHealthGate' | 'guardrails' | 'spawn';
 
 export function buildPanStartArgs(input: {
   issueId: string;
-  model: string;
+  /**
+   * Explicit operator-chosen model only. When omitted, no `--model` is emitted
+   * and `pan start` resolves staffing itself (tier table / issue override /
+   * role default). Forwarding a resolved default here made `pan start` treat
+   * it as an explicit override — skipping tier resolution and stamping it as
+   * the durable per-issue `record.workModel` (PAN-3857).
+   */
+  model?: string | null;
   harness?: RuntimeName | null;
   allowHost?: boolean;
   offBook?: boolean;
@@ -63,8 +69,7 @@ export function buildPanStartArgs(input: {
     'start',
     input.issueId,
     '--local',
-    '--model',
-    input.model,
+    ...(input.model ? ['--model', input.model] : []),
     ...(input.harness ? ['--harness', input.harness] : []),
     ...(input.allowHost ? ['--host', '--yes'] : []),
     ...(input.offBook ? ['--off-book'] : []),
@@ -125,7 +130,7 @@ function emitStartAgentPhase(
   details: Record<string, unknown> = {},
 ): void {
   const timestamp = new Date().toISOString();
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'start-agent',
     level: status === 'failure' ? 'error' : status === 'skipped' ? 'warn' : 'info',
     message: `start-agent.phase=${phase}`,
@@ -204,16 +209,6 @@ export function invalidateAgentsCache(): void {
   agentsCache.timestamp = 0;
 }
 
-function filterClosedIssueAgents<T>(agents: T[], issues: unknown[]): T[] {
-  const closedIssueIds = getClosedIssueIdsForReadSource(issues);
-  if (closedIssueIds.size === 0) return agents;
-  return agents.filter((agent) => {
-    if (!agent || typeof agent !== 'object') return true;
-    const issueId = (agent as { issueId?: unknown }).issueId;
-    return typeof issueId !== 'string' || !closedIssueIds.has(issueId.toUpperCase());
-  });
-}
-
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
 // Read the request body as unknown JSON
@@ -279,10 +274,10 @@ function buildStoppedAgentLifecycle(
   const hasAgentState = true;
   const hasLiveTmuxSession = false;
   // claudeSessionId only covers claude-code agents — codex agents keep their
-  // resumable thread in codex-thread-id, which getLatestSessionIdSync resolves
+  // resumable thread in codex-thread-id, which getLatestSessionId resolves
   // (PAN-1988). Without the fallback the listing reports canResumeSession=false
   // for every stopped codex agent and the UI never offers Resume.
-  const sessionId = getLatestSessionIdSync(agentId) ?? runtimeData.claudeSessionId ?? null;
+  const sessionId = getLatestSessionId(agentId) ?? runtimeData.claudeSessionId ?? null;
   const hasSavedSession = !!sessionId;
   const hasWorkspace = typeof state.workspace === 'string' && state.workspace.length > 0;
   const hasResumableTranscript = !sessionId
@@ -292,21 +287,21 @@ function buildStoppedAgentLifecycle(
   const agentStatus = state.status || 'unknown';
   const runtime = runtimeData.state || 'uninitialized';
   const isCompleted = runtimeData.resolution === 'completed';
-  const isPlaceholder = agentStatus === 'starting' && typeof state.model === 'string' && state.model.startsWith('pending-');
   const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
   const isRunning = false;
-  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isCrashed = agentStatus === 'running' && !hasLiveTmuxSession;
   const isRunningButStuck = false;
-  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const hasResumableBackingState = hasAgentState && hasWorkspace;
   const handedOff = typeof state.id === 'string' && state.id.length > 0
     ? hasCompletionMarkerForAgent(state as AgentState)
     : false;
-  // PAN-3555: an owed-rework handoff is resumable again — mirror the canonical door.
-  const owesRework = handedOff && issueOwesReworkSync(state.issueId);
-  const canWarmResumeAfterHandoff = owesRework && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
+  // Handed-off no longer blocks resume (operator decision 2026-09-21,
+  // supersedes the PAN-3334 read-door exclusion): this listing mirrors the
+  // canonical doors in src/lib/work-agent-lifecycle.ts, which now gate resume
+  // only on a saved, resumable session.
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
-    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+    || (hasAgentState && !hasWorkspace)
   );
   const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
 
@@ -318,14 +313,14 @@ function buildStoppedAgentLifecycle(
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
       : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
-  } else if (canWarmResumeAfterHandoff) {
-    recommendedAction = 'resume';
-    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
   } else if (handedOff) {
-    // PAN-3334: mirror getWorkAgentLifecycleState — a handed-off agent is never
-    // offered a plain resume; there is nothing to continue.
-    recommendedAction = 'none';
-    reason = `Agent ${agentId} finished and handed off its work (completion marker on disk) — there is nothing to resume. The session is preserved for inspection; message it with 'pan tell ${agentOrIssueId}', or start over with 'pan start ${agentOrIssueId} --fresh'.`;
+    // Mirror getWorkAgentLifecycleState: a handed-off agent's saved session
+    // stays resumable so the operator can keep talking to it.
+    const warmResumable = hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
+    recommendedAction = warmResumable ? 'resume' : 'none';
+    reason = warmResumable
+      ? `Agent ${agentId} finished and handed off its work (completion marker on disk). Use 'pan resume ${agentOrIssueId}' to continue its saved session, or 'pan start ${agentOrIssueId} --fresh' to start over.`
+      : `Agent ${agentId} finished and handed off its work (completion marker on disk) and has no resumable saved session. Start over with 'pan start ${agentOrIssueId} --fresh'.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or run 'pan reset-session ${agentOrIssueId}' before starting a new session.`;
@@ -344,7 +339,6 @@ function buildStoppedAgentLifecycle(
     hasSavedSession,
     hasResumableTranscript,
     hasWorkspace,
-    isPlaceholder,
     isOrphaned,
     isRunning,
     isRunningButStuck,
@@ -352,11 +346,10 @@ function buildStoppedAgentLifecycle(
     isCompleted,
     isCrashed,
     handedOff,
-    owesRework,
     runtimeState: runtime,
     agentStatus,
     canStartFresh: !requiresSessionResetBeforeFreshStart || isOrphaned,
-    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && (!handedOff || owesRework),
+    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
@@ -376,9 +369,7 @@ async function readRemoteAgentState(agentId: string): Promise<Record<string, unk
 }
 
 async function captureAgentOutputBeforeKill(agentId: string): Promise<void> {
-  const output = await Effect.runPromise(
-    capturePane(agentId, 5000).pipe(Effect.catch(() => Effect.succeed(''))),
-  );
+  const output = await capturePane(agentId, 5000).catch(() => '');
   if (!output) return;
 
   const agentDir = getAgentDir(agentId);
@@ -434,7 +425,7 @@ async function getWorkspaceLocation(issueId: string): Promise<'local' | 'remote'
 async function getGitStatusAsync(issueId: string, workspacePath: string): Promise<{ branch: string; uncommittedFiles: number; latestCommit: string } | null> {
   try {
     if (!existsSync(workspacePath)) return null;
-    const repoDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspacePath);
+    const repoDir = resolvePrimaryWorkspaceRepoDir(issueId, workspacePath);
     const [branchResult, uncommittedResult, commitResult] = await Promise.all([
       execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""', { cwd: repoDir }),
       execAsync('git status --porcelain 2>/dev/null | wc -l', { cwd: repoDir }),
@@ -653,14 +644,6 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
   };
 }
 
-// Shared enrichment utilities (PAN-440) — aliases for readability
-const getClaudeProjectDir = getClaudeProjectDirShared;
-const getActiveSessionPath = getActiveSessionPathShared;
-const getAgentWorkspace = getAgentWorkspaceShared;
-const getAgentJsonlPath = getAgentJsonlPathShared;
-const getPendingQuestions = getPendingQuestionsShared;
-const getAgentPendingQuestions = getAgentPendingQuestionsShared;
-
 function flyExecCmd(vmName: string, command: string): string {
   const appName = vmName.replace(/\/.*$/, ''); // simplified: use vmName as app name
   return `fly ssh console -a ${appName} -C ${JSON.stringify(command)}`;
@@ -675,7 +658,6 @@ export {
   updateRegistryForAgentStart,
   getIssueDataService,
   AGENTS_CACHE_TTL_MS,
-  filterClosedIssueAgents,
   readJsonBody,
   toAgentStatusPayload,
   buildAgentControlEventPayload,
@@ -690,7 +672,6 @@ export {
   resolveAgentCountEnv,
   formatLeakedSpecialistSummary,
   getClaudeProjectDir,
-  getActiveSessionPath,
   getAgentWorkspace,
   getAgentJsonlPath,
   getPendingQuestions,

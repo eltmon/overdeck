@@ -13,24 +13,19 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { DomainEvent } from '@overdeck/contracts';
-
 import { getOverdeckHome } from '../paths.js';
-import { registerProjectSync } from '../projects.js';
-import { saveOverdeckAgentStateSync } from '../overdeck/agent-state-sync.js';
-import { upsertReviewStatusSync } from '../overdeck/review-status-sync.js';
+import { registerProject } from '../projects.js';
+import { saveAgentStateSync } from '../agents/agent-state.js';
 import { emitActivityEntryOnce } from '../activity-logger.js';
 import { serializeXBriefDocument } from '../xbrief/io.js';
 import {
   FIXTURE_ISSUE_ID,
   FIXTURE_PROJECT_KEY,
-  FIXTURE_WORKSPACE_CLAUDE_MD,
   fixtureActivityEntries,
   fixtureAgentStates,
   fixtureContinueJson,
   fixtureNormalizedIssue,
   fixtureProjectConfig,
-  fixtureReviewStatus,
   fixtureWorkspacePath,
   fixtureXBriefDoc,
 } from './fixture-data.js';
@@ -50,7 +45,7 @@ export interface SeedReport {
  * src/dashboard/server/identity.ts:86-89 uses, rather than an
  * environment variable a host process could set by hand.
  */
-export function isRunningInContainer(): boolean {
+function isRunningInContainer(): boolean {
   return existsSync('/.dockerenv') || existsSync('/run/.containerenv');
 }
 
@@ -98,7 +93,7 @@ export async function seedUatFixturesLocal(options: SeedUatFixturesOptions = {})
   const home = getOverdeckHome();
   await mkdir(home, { recursive: true });
 
-  registerProjectSync(FIXTURE_PROJECT_KEY, fixtureProjectConfig());
+  registerProject(FIXTURE_PROJECT_KEY, fixtureProjectConfig());
 
   const { CacheService } = await import('../../dashboard/server/services/cache-service.js');
   const cache = new CacheService();
@@ -110,34 +105,19 @@ export async function seedUatFixturesLocal(options: SeedUatFixturesOptions = {})
 
   const agents = fixtureAgentStates();
   for (const agent of agents) {
-    saveOverdeckAgentStateSync(agent);
+    saveAgentStateSync(agent);
   }
 
-  const { initEventStore, getEventStore } = await import('../../dashboard/server/event-store.js');
-  await initEventStore();
-  const store = getEventStore();
-  const { emitReviewStatusChanged } = await import('../../dashboard/server/review-status-emit.js');
+  // PAN-3917: review status is no longer a stored record (A.3's review_status
+  // table and its emit path are gone) — the drawer's PR-link/review affordances
+  // now read PR state directly, so there is nothing left for this fixture to
+  // seed here.
 
-  const reviewStatus = fixtureReviewStatus();
-  upsertReviewStatusSync(reviewStatus);
-  // upsertReviewStatusSync() is a raw DB upsert — it never appends the
-  // review.status_changed event the rest of the pipeline relies on to push
-  // review status into the server's in-memory read model (and from there,
-  // over the RPC snapshot/stream, into the frontend Issue store). Without
-  // this, GET /api/review/FIX-1/status reads the fresh DB row correctly, but
-  // the drawer's PR-link action (bound to the Issue store's reviewStatus, not
-  // a live fetch) never learns prUrl exists. The container's own reconciler
-  // (review-status-reconcile-service.ts) can't backstop this — it only runs
-  // in 'primary' dashboard mode, and workspace containers always run 'peer'
-  // (OVERDECK_DISABLE_DEACON=1, the single-deacon invariant). Emit the same
-  // way review-status-reconcile-service.ts does, reusing the exact status
-  // object just written so the DB row and the event agree byte-for-byte
-  // (review finding, PAN-3362 UAT cycle 2).
-  emitReviewStatusChanged(
-    (event) => store.append(event as Omit<DomainEvent, 'sequence'>),
-    FIXTURE_ISSUE_ID,
-    reviewStatus,
-  );
+  // emitActivityEntryOnce() below needs the activity event store provider
+  // registered (activity-logger.ts's setActivityEventStoreProvider); nothing
+  // else in this container-boot path does that for it.
+  const { initEventStore } = await import('../../dashboard/server/event-store.js');
+  await initEventStore();
 
   const activityEntries = fixtureActivityEntries();
   for (const entry of activityEntries) {
@@ -159,12 +139,7 @@ export async function seedUatFixturesLocal(options: SeedUatFixturesOptions = {})
   // PAN-3362 UAT cycle 1).
   const workspaceRoot = fixtureWorkspacePath();
 
-  // Marker file so the workspace-structure check in getWorkspaceRoute
-  // (src/dashboard/server/routes/workspaces/workspace-data.ts) does not
-  // report the seeded directory as corrupted — see FIXTURE_WORKSPACE_CLAUDE_MD.
   await mkdir(workspaceRoot, { recursive: true });
-  await writeFile(join(workspaceRoot, 'CLAUDE.md'), FIXTURE_WORKSPACE_CLAUDE_MD);
-
   const workspaceOverdeckDir = join(workspaceRoot, '.overdeck');
   await mkdir(workspaceOverdeckDir, { recursive: true });
   const planPath = join(workspaceOverdeckDir, 'spec.vbrief.json');

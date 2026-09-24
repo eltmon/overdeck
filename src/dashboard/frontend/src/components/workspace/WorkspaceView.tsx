@@ -37,14 +37,6 @@ import { fetchWithTimeout } from '../../lib/apiFetch';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { Agent } from '../../types';
 
-interface WorkspacePipelineBadge {
-  reviewStatus?: string;
-  testStatus?: string;
-  mergeStatus?: string;
-  verificationStatus?: string;
-  readyForMerge?: boolean;
-}
-
 interface WorkspaceRegistryDetail {
   id: string;
   projectId: string;
@@ -55,7 +47,6 @@ interface WorkspaceRegistryDetail {
   layoutConfig: string | null;
   title: string | null;
   isFavorite: boolean;
-  pipeline: WorkspacePipelineBadge | null;
   /** PAN-3331 quick-action band inputs. */
   isGitRepository?: boolean;
   runCommand?: string | null;

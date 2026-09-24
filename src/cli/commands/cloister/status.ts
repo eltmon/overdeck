@@ -35,30 +35,25 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   console.log(chalk.bold('\n🔔 Cloister Agent Watchdog\n'));
 
   // Service status
-  const patrolStatus = status.patrol?.status;
-  const runningStatus =
-    patrolStatus === 'running'
-      ? chalk.green('Running')
-      : patrolStatus === 'starting'
-        ? chalk.yellow('Starting')
-        : patrolStatus === 'stale'
-          ? chalk.red('Stale')
-          : status.running
-            ? chalk.yellow('Starting')
-            : chalk.red('Stopped');
+  const loopRunning = status.patrol?.running === true;
+  const runningStatus = loopRunning
+    ? chalk.green('Running')
+    : status.running
+      ? chalk.yellow('Starting')
+      : chalk.red('Stopped');
   console.log(`Status: ${runningStatus}`);
 
   if (status.patrol) {
-    if (status.patrol.status === 'stale') {
-      const age = status.patrol.secondsSinceLastPatrol;
-      const ageLabel = age === null ? 'unknown age' : `${age}s ago`;
-      console.log(`Patrol heartbeat: ${chalk.red('stale')} (last patrol ${ageLabel}; expected within ${status.patrol.staleAfterSeconds}s)`);
-    } else if (status.patrol.lastPatrol) {
-      const age = status.patrol.secondsSinceLastPatrol;
-      const ageLabel = age === null ? 'unknown age' : `${age}s ago`;
-      console.log(`Patrol heartbeat: ${ageLabel}`);
-    } else if (status.patrol.status === 'starting') {
-      console.log(`Patrol heartbeat: ${chalk.yellow('waiting for first patrol')}`);
+    if (status.patrol.lastRunAt) {
+      const age = Math.floor((Date.now() - Date.parse(status.patrol.lastRunAt)) / 1000);
+      const label = Number.isFinite(age) ? `${age}s ago` : 'unknown age';
+      const stale = Number.isFinite(age) && age > (status.patrol.intervalMs / 1000) * 3;
+      console.log(`Deacon loop: last run ${stale ? chalk.red(label) : label} (every ${Math.round(status.patrol.intervalMs / 1000)}s)`);
+    } else if (loopRunning) {
+      console.log(`Deacon loop: ${chalk.yellow('waiting for first run')}`);
+    }
+    if (status.patrol.lastRunError) {
+      console.log(`Deacon loop error: ${chalk.red(status.patrol.lastRunError)}`);
     }
   }
 

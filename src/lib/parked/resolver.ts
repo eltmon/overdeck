@@ -1,59 +1,43 @@
 /**
- * Single authoritative parked-population resolver (PAN-3485, epic phase 1).
+ * Single authoritative parked-population resolver (PAN-3485; cut to the
+ * derived model by PAN-3917).
  *
  * A "parked orbit" is any state an issue can sit in where no autonomous actor
- * will advance it within 24h without operator or flywheel intervention. Over
- * months of incident response, each failure mode grew its own safety valve —
- * stuck flags, needs-you trips, deacon-ignore, resume gates, UAT gates, merge
- * retry caps, and circuit breakers — and every one of them converts autonomous
- * motion into operator work. Nine of those valves exist today, in six subsystems,
- * and no surface could answer "what is stalled, why, and what would release it."
- * This resolver is that answer: ONE read door that unions all nine orbits into
- * typed rows, so the CLI, the API, the dashboard, and the stall sweeper all agree
- * by construction.
+ * will advance it within 24h without operator or flywheel intervention, and no
+ * surface could answer "what is stalled, why, and what would release it."
+ * This resolver is that answer: ONE read door that unions the orbits into typed
+ * rows, so the CLI, the API, the dashboard, and the stall sweeper all agree by
+ * construction.
  *
  * Modeled on `resolvePipelineMembership()` (src/lib/pipeline-membership.ts):
- * a pure classifier over gathered signals, with the gathering done here through
- * existing read doors only (review-status door, agents table, tmux liveness,
- * the per-issue record door for recovery trips). No surface may re-derive
- * parking independently.
+ * a pure classifier over gathered signals. Every signal it reads has an owner
+ * outside Overdeck — the agents table and the liveness oracle for sessions, the
+ * tracker for closedness. Nothing is read from a stored pipeline copy.
  *
- * The nine orbits (see docs/PARKED-POPULATION.md):
+ * The three orbits (see docs/PARKED-POPULATION.md):
  *
- *   1. stuck-flag        review_status.stuck = 1 (any stuck_reason)
- *   2. needs-you         an open recovery trip in the permanent record
- *   3. deacon-ignored    review_status.deaconIgnored = true
- *   4. operator-gate     paused (operator, not yield) / troubled / stoppedByUser
- *   5. uat-failed        uatStatus failed with merge still pending
- *   6. merge-failed      mergeStatus failed (retries saturated or abandoned)
- *   7. zombie-session    live agent whose issue is merged/closed
- *   8. idle-running      live agent, no pipeline owner, idle beyond threshold
- *   9. circuit-breaker   autoRequeueCount >= 25 (dead-end recovery exhausted)
+ *   1. operator-gate    paused (operator, not yield) / troubled / stoppedByUser
+ *   2. zombie-session   live agent whose issue is closed
+ *   3. idle-running     live agent, no pipeline owner, idle beyond threshold
+ *
+ * The record-backed orbits (stuck-flag, needs-you, deacon-ignored, uat-failed,
+ * merge-failed, circuit-breaker, invariant-mismatch) came from the state layer
+ * and went with it; their replacements are derived from the PR and its checks.
  */
 
-import { loadReviewStatuses, type ReviewStatus } from '../review-status.js';
 import { listAgentStates, listRunningAgentsSync } from '../agents/queries.js';
+import { isAliveSync, isConfirmedDead } from '../agents/liveness.js';
 import type { AgentState } from '../agents.js';
-import { FAILED_MERGE_MAX_RETRIES } from '../cloister/deacon-merge.js';
-import { shouldSkipReviewStatus } from '../cloister/stuck-remediation.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
-import { readIssueRecord } from '../pan-dir/record.js';
-import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { isRecordPipelineTerminal } from '../cloister/parked-residue.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from '../paths.js';
 
 export const PARKED_ORBITS = [
-  'stuck-flag',
-  'needs-you',
-  'deacon-ignored',
   'operator-gate',
-  'uat-failed',
-  'merge-failed',
   'zombie-session',
   'idle-running',
-  'circuit-breaker',
 ] as const;
 
 export type ParkedOrbit = (typeof PARKED_ORBITS)[number];
@@ -66,13 +50,7 @@ export type ParkedOrbit = (typeof PARKED_ORBITS)[number];
  */
 export const PARKED_ORBIT_SEVERITY: readonly ParkedOrbit[] = [
   'zombie-session',
-  'merge-failed',
-  'uat-failed',
-  'stuck-flag',
-  'circuit-breaker',
   'idle-running',
-  'needs-you',
-  'deacon-ignored',
   'operator-gate',
 ];
 
@@ -85,67 +63,9 @@ export interface ParkedRow {
   parkReason: string;
   /** Operator-facing sentence: what would release it. */
   unparkCondition: string;
-  /** Orbit-specific evidence (stuck reason, gate kind, idle minutes, …). */
+  /** Orbit-specific evidence (gate kind, agent id, idle minutes, …). */
   details?: Record<string, unknown>;
 }
-
-/** A human sentence per stuck_reason — the stuck flag carries the machine code, the resolver owns the copy.
- * GUARD-EXIT INVARIANT (PAN-3488): every stuck_reason written anywhere in src/ MUST have an entry
- * here — scripts/guard-park-exits.sh fails the lint on an undocumented flavor. */
-const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
-  feedback_delivery_needs_you: {
-    park: 'review/test feedback could not be delivered — the work agent is not running and nothing resumed it',
-    unpark: 'resume the work agent with its pending feedback through the established work-resume door',
-  },
-  review_infrastructure_failure: {
-    park: 'the review pipeline failed repeatedly for infrastructure reasons, not verdict reasons',
-    unpark: 're-dispatch a fresh review through the review door once the infra cause is resolved',
-  },
-  review_parent_stalled_needs_you: {
-    park: 'the review parent exceeded its deadline with no terminal verdict in the row or verdict artifact',
-    unpark: 'inspect the parent pane and review artifacts, then pan unstick <id> and pan review restart <id> if a fresh review is required',
-  },
-  verification_stuck: {
-    park: 'verification exhausted its cycles without passing',
-    unpark: 're-drive the verification feedback to a resumed work agent',
-  },
-  'dead-end-rebuild': {
-    park: 'dead-end recovery exhausted 25 requeues',
-    unpark: 'operator decision — decompose or pan unstick after the root cause is fixed',
-  },
-  main_diverged: {
-    park: 'the PR branch diverged from main and cannot merge cleanly',
-    unpark: 'sync-main and resolve conflicts, then re-drive through the normal pipeline',
-  },
-  model_divergence: {
-    park: 'the agent hit a model/API divergence error and was parked for investigation',
-    unpark: 'investigate the model error (pane + transcript), then pan unstick and resume',
-  },
-  usage_limit: {
-    park: 'the agent hit a provider usage limit and stopped mid-flight',
-    unpark: 'wait for the provider window to reset, then pan unstick and resume',
-  },
-  context_overflow: {
-    park: 'the agent overflowed its context window and cannot continue in this session',
-    unpark: 'pan unstick after compaction/fork — resume with a fresh session',
-  },
-  review_convoy_unrecoverable: {
-    park: 'the review convoy died and could not be recovered in place',
-    unpark: 're-dispatch a fresh review convoy through the review door after the root cause is resolved',
-  },
-  test_signal_strand: {
-    park: 'a test verdict was written but never delivered to the pipeline',
-    unpark: 're-drive the stranded verdict to a resumed work agent',
-  },
-  'review-not-converging': {
-    park: 'review cycles stopped converging (stall or reversal across ≥3 cycles) — rework is suppressed',
-    unpark: 'decompose into sibling issues, or pan unstick to clear the gate and attempt rework',
-  },
-  state_derived_verification_hold: {
-    park: 'verification is held by a derived-state rule (the recorded state forbids advancing)',
-    unpark: 'fix the underlying state mismatch, then pan unstick to release the hold',
-  },
-};
 
 /** Idle threshold for the idle-running orbit: below this a live idle agent is warm, not parked. */
 export const IDLE_RUNNING_THRESHOLD_MS = 6 * 60 * 60_000;
@@ -159,18 +79,15 @@ export const IDLE_RUNNING_THRESHOLD_MS = 6 * 60 * 60_000;
  * new dispatch for 90 minutes. A "stopped orchestrator" is not a freed slot;
  * it is the pipeline going silent.
  */
-export const IDLE_EXEMPT_ROLES: ReadonlySet<string> = new Set(['flywheel', 'sequencer', 'conversation', 'knowledge']);
+const IDLE_EXEMPT_ROLES: ReadonlySet<string> = new Set(['flywheel', 'sequencer', 'conversation', 'knowledge']);
 
 /** Per-issue gathered signals — the classifier's entire input. Gathered through read doors, never stores. */
 export interface ParkedSignals {
   issueId: string;
-  reviewStatus: ReviewStatus | null;
   /** All agents (any status) carrying this issue id. */
   agents: AgentState[];
-  /** Live (running + tmux-active) agents for this issue. */
+  /** Live (running + liveness-confirmed) agents for this issue. */
   liveAgents: (AgentState & { tmuxActive: boolean })[];
-  /** Open recovery trips from the permanent record (needs-you orbit). */
-  openRecoveryTrips: { recoveryPath: string; needsYouEmittedAt?: string }[];
   /** Tracker-closed (only resolved for live-agent candidates; null = unknown/not checked). */
   issueClosed: boolean | null;
   now: number;
@@ -194,7 +111,7 @@ function isoOr(ts: string | number | null | undefined, fallback: number): string
  * 00:02:26Z, self-cleared 80s later by the rework resume). A completed
  * handoff marker means finished, not parked.
  */
-export function hasCompletedHandoffMarker(agentId: string): boolean {
+function hasCompletedHandoffMarker(agentId: string): boolean {
   const dir = join(getOverdeckHome(), 'agents', agentId);
   return existsSync(join(dir, 'completed')) || existsSync(join(dir, 'completed.processed'));
 }
@@ -205,31 +122,22 @@ export function hasCompletedHandoffMarker(agentId: string): boolean {
  * review-status row and trip enrichment. Uppercase always; for bare numerics
  * that fail project resolution, retry with the PAN- prefix.
  */
-export function normalizeParkedIssueId(raw: string): string {
+function normalizeParkedIssueId(raw: string): string {
   const upper = raw.trim().toUpperCase();
   if (!/^\d+$/.test(upper)) return upper;
   if (resolveProjectFromIssueSync(upper)) return upper;
   return `PAN-${upper}`;
 }
 
-function stuckCopy(reason: string | undefined): { park: string; unpark: string } {
-  if (reason && STUCK_REASON_COPY[reason]) return STUCK_REASON_COPY[reason];
-  return {
-    park: `stuck flag set${reason ? ` (${reason})` : ''} — nothing autonomous will advance this issue`,
-    unpark: 'pan unstick after the underlying cause is fixed',
-  };
-}
-
 /**
  * Classify one issue's parked orbits from gathered signals. Pure — unit-tested
  * with fixtures. Emits at most one row per orbit; an issue may legitimately
- * occupy several orbits at once (e.g. a stuck flag AND a dead operator-stopped
- * agent). idle-running is only emitted when no other orbit already explains
+ * occupy several orbits at once (e.g. an operator-stopped agent AND a live
+ * idle one). idle-running is only emitted when no other orbit already explains
  * the stall — it is the orbit of last resort ("live but leaderless").
  */
 export function classifyParked(s: ParkedSignals): ParkedRow[] {
   const rows: ParkedRow[] = [];
-  const r = s.reviewStatus;
   const issueId = s.issueId;
   const push = (orbit: ParkedOrbit, parkedAt: string, parkReason: string, unparkCondition: string, details?: Record<string, unknown>) => {
     rows.push({ issueId, orbit, parkedAt, parkReason, unparkCondition, ...(details ? { details } : {}) });
@@ -241,35 +149,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
   // gather resolves it for row-producing issues and re-classifies (pass 2).
   const closed = s.issueClosed === true;
 
-  // 1. stuck-flag
-  if (!closed && r?.stuck) {
-    const copy = stuckCopy(r.stuckReason);
-    push('stuck-flag', isoOr(r.stuckAt ?? r.updatedAt, s.now), copy.park, copy.unpark, { stuckReason: r.stuckReason ?? null });
-  }
-
-  // 2. needs-you (open recovery trips from the permanent record)
-  if (!closed) for (const trip of s.openRecoveryTrips) {
-    push(
-      'needs-you',
-      isoOr(trip.needsYouEmittedAt, s.now),
-      `a durable needs-you escalation fired (${trip.recoveryPath}) and went silent — the operator never answered`,
-      'answer the escalation (pan answer / dashboard needs-you), or let the sweeper re-surface it on its TTL',
-      { recoveryPath: trip.recoveryPath },
-    );
-  }
-
-  // 3. deacon-ignored
-  if (!closed && r?.deaconIgnored) {
-    push(
-      'deacon-ignored',
-      isoOr(r.deaconIgnoredAt ?? r.updatedAt, s.now),
-      `deacon is ignoring this issue${r.deaconIgnoredReason ? ` — ${r.deaconIgnoredReason}` : ''}`,
-      'clear the ignore flag once the reason it was set is resolved',
-      { reason: r.deaconIgnoredReason ?? null },
-    );
-  }
-
-  // 4. operator-gate — operator-set resume gates on this issue's agents,
+  // 1. operator-gate — operator-set resume gates on this issue's agents,
   //    grouped one row per gate kind (an issue with three stopped agents has
   //    ONE operator-stop park, not three). A scheduler YIELD reuses the paused
   //    flag but is self-clearing (the preemptive scheduler resumes yielded
@@ -310,58 +190,19 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
     }
   }
 
-  // 5. uat-failed — the feedback relay already owns rework while work is live.
-  const hasLiveWorkAgent = s.liveAgents.some((agent) => agent.role === 'work');
-  if (!closed && r?.uatStatus === 'failed' && r.mergeStatus !== 'merged' && !r.readyForMerge && !hasLiveWorkAgent) {
-    push(
-      'uat-failed',
-      isoOr(r.updatedAt, s.now),
-      'UAT failed and no work agent is live to rework it — the merge gate will not take the issue and the UAT-failure relay found no delivery target',
-      'pan start <id> to put a work agent on the UAT feedback; the relay redelivers on the next failed verdict',
-      { uatNotes: r.uatNotes ?? null },
-    );
-  }
-
-  // 6. merge-failed — a failed merge that nothing is retrying
-  if (!closed && r?.mergeStatus === 'failed') {
-    const retries = r.mergeRetryCount ?? 0;
-    push(
-      'merge-failed',
-      isoOr(r.updatedAt, s.now),
-      retries >= FAILED_MERGE_MAX_RETRIES
-        ? `merge failed and its ${FAILED_MERGE_MAX_RETRIES} automatic retries are exhausted`
-        : 'merge failed and no retry is in flight',
-      'one fresh merge attempt once main CI is green and the branch is conflict-free (sweeper tries once per scan window)',
-      { mergeRetryCount: retries, mergeNotes: r.mergeNotes ?? null },
-    );
-  }
-
-  // 7. zombie-session — live agent whose issue is already merged/closed
+  // 2. zombie-session — live agent whose issue is already closed
   for (const agent of s.liveAgents) {
-    const merged = r?.mergeStatus === 'merged' || s.issueClosed === true;
-    if (!merged) continue;
+    if (s.issueClosed !== true) continue;
     push(
       'zombie-session',
       isoOr(agent.lastActivity ?? agent.startedAt, s.now),
-      `${agent.id} is still running but the issue is ${r?.mergeStatus === 'merged' ? 'merged' : 'closed'} — it holds a session and a concurrency slot for nothing`,
+      `${agent.id} is still running but the issue is closed — it holds a session and a concurrency slot for nothing`,
       'reap the session through the established merged-zombie teardown door',
-      { agentId: agent.id, mergeStatus: r?.mergeStatus ?? null },
+      { agentId: agent.id },
     );
   }
 
-  // 9. circuit-breaker — dead-end recovery exhausted
-  const requeues = r?.autoRequeueCount ?? 0;
-  if (!closed && requeues >= 25) {
-    push(
-      'circuit-breaker',
-      isoOr(r?.updatedAt, s.now),
-      `dead-end recovery used all ${requeues}/25 requeues — the circuit breaker is permanently open`,
-      'operator decision — decompose the change or pan unstick after the root cause is fixed',
-      { autoRequeueCount: requeues },
-    );
-  }
-
-  // 8. idle-running — live agent, no pipeline owner, idle beyond threshold, and
+  // 3. idle-running — live agent, no pipeline owner, idle beyond threshold, and
   //    no other orbit already explains the stall (orbit of last resort).
   if (!closed && rows.length === 0) {
     for (const agent of s.liveAgents) {
@@ -373,9 +214,6 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
       if (!Number.isFinite(lastMs)) continue;
       const idleMs = s.now - lastMs;
       if (idleMs < IDLE_RUNNING_THRESHOLD_MS) continue;
-      // Warm-idle on a pipeline-owned issue is the intended state (PAN-2579):
-      // review/test/merge owns the next move, the agent is SUPPOSED to wait.
-      if (shouldSkipReviewStatus(r)) continue;
       push(
         'idle-running',
         new Date(lastMs).toISOString(),
@@ -392,54 +230,8 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
 /** Options for the gather pass — injectable for tests. */
 export interface ResolveParkedOptions {
   now?: number;
-  /** Per-issue open recovery trips (defaults to the record door). */
-  readOpenTrips?: (issueId: string) => Promise<{ recoveryPath: string; needsYouEmittedAt?: string }[]>;
   /** Tracker-closed check (defaults to isIssueClosed). Only called for live-agent candidates. */
   isClosed?: (issueId: string) => Promise<boolean>;
-  /**
-   * Cheap local terminality evidence from the per-issue record (defaults to
-   * defaultReadRecordTerminal). Checked BEFORE any tracker call — a record
-   * this resolver already reads for trips, so a tracker blip can never
-   * resurrect a record-terminal issue into the parked population (PAN-3727).
-   */
-  readRecordTerminal?: (issueId: string) => Promise<boolean>;
-}
-
-/**
- * Record-level terminality via the shared isRecordPipelineTerminal predicate
- * (also used by the terminal-issue residue patrol, PAN-3727) — closedOut, or
- * mergeStatus='merged' with no reopenedAt. Any throw or missing record is
- * "not terminal" so this check can only suppress, never invent, a park.
- */
-export async function defaultReadRecordTerminal(issueId: string): Promise<boolean> {
-  try {
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) return false;
-    const project = getProjectSync(resolved.projectKey);
-    if (!project) return false;
-    const record = await readIssueRecord(project, issueId);
-    if (!record) return false;
-    return isRecordPipelineTerminal(record);
-  } catch {
-    return false;
-  }
-}
-
-async function defaultReadOpenTrips(issueId: string): Promise<{ recoveryPath: string; needsYouEmittedAt?: string }[]> {
-  try {
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) return [];
-    const project = getProjectSync(resolved.projectKey);
-    if (!project) return [];
-    const record = await readIssueRecord(project, issueId);
-    return (record?.recoveryTrips ?? [])
-      .filter((trip) => trip.open === true)
-      .map((trip) => ({ recoveryPath: trip.recoveryPath, ...(trip.needsYouEmittedAt ? { needsYouEmittedAt: trip.needsYouEmittedAt } : {}) }));
-  } catch {
-    // A record that cannot be read must never fail the whole resolve — the
-    // issue simply loses its needs-you enrichment for this pass.
-    return [];
-  }
 }
 
 /**
@@ -452,13 +244,18 @@ async function defaultReadOpenTrips(issueId: string): Promise<{ recoveryPath: st
  */
 export async function resolveParkedPopulation(options: ResolveParkedOptions = {}): Promise<ParkedRow[]> {
   const now = options.now ?? Date.now();
-  const readTrips = options.readOpenTrips ?? defaultReadOpenTrips;
   const isClosed = options.isClosed ?? isIssueClosed;
-  const readRecordTerminal = options.readRecordTerminal ?? defaultReadRecordTerminal;
 
-  const statuses = loadReviewStatuses();
   const allAgents = listAgentStates();
-  const liveAgents = listRunningAgentsSync().filter((a) => a.tmuxActive && (a.status === 'running' || a.status === 'starting'));
+  // PAN-3849 (W32): "live" is the liveness oracle's verdict (session + live
+  // pane + harness process in the pane subtree), not the batch tmux listing —
+  // a remain-on-exit zombie pane no longer counts as a live agent. The oracle
+  // replaces the tmuxActive check, NOT the status gate: a stopped/error agent
+  // with a live session is resumable residue, not a running agent, and must
+  // not mint zombie-session/idle-running rows. A failed probe
+  // (runtime-indeterminate) counts as live — never park an issue out from
+  // under an agent the probe could not observe.
+  const liveAgents = listRunningAgentsSync().filter((a) => (a.status === 'running' || a.status === 'starting') && !isConfirmedDead(isAliveSync(a.id)));
 
   const agentsByIssue = new Map<string, AgentState[]>();
   for (const agent of allAgents) {
@@ -477,38 +274,24 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
     liveByIssue.set(issueId, list);
   }
 
-  const candidateIds = new Set<string>([...Object.keys(statuses).map((id) => id.toUpperCase()), ...agentsByIssue.keys(), ...liveByIssue.keys()]);
+  const candidateIds = new Set<string>([...agentsByIssue.keys(), ...liveByIssue.keys()]);
 
-  // Pass 1: classify with closedness unknown (null) except where cheap local
-  // evidence already decides (live-agent zombie checks resolve it below).
+  // Pass 1: classify with closedness unknown (null) except where a live agent
+  // makes the tracker call worth making (zombie detection).
   // Pass 2: for every issue that PRODUCED a row, resolve tracker-closed
-  // (TTL-cached, shadow-state-first) and re-classify — a closed issue keeps
-  // only its zombie-session rows; every other orbit is moot residue.
+  // (TTL-cached) and re-classify — a closed issue keeps only its
+  // zombie-session rows; every other orbit is moot residue.
   const closedByIssue = new Map<string, boolean>();
   const classifyOne = async (issueId: string): Promise<ParkedRow[]> => {
-    const statusKey = Object.keys(statuses).find((key) => key.toUpperCase() === issueId) ?? issueId;
-    const reviewStatus = statuses[statusKey] ?? null;
     const live = liveByIssue.get(issueId) ?? [];
     let issueClosed = closedByIssue.get(issueId) ?? null;
-    if (issueClosed === null && await readRecordTerminal(issueId)) {
-      // Cheap local terminality evidence decides before any tracker call — a
-      // tracker blip (fail-open toward "open", negative-cached for minutes)
-      // must never resurrect a record-terminal issue into the population.
-      issueClosed = true;
-      closedByIssue.set(issueId, true);
-    } else if (issueClosed === null && live.length > 0 && reviewStatus?.mergeStatus !== 'merged') {
-      // Zombie detection needs tracker-closed only when the cheap local signals
-      // can't decide (strikes bypass the review pipeline, so mergeStatus never
-      // records their merge). Bound the check to live-agent candidates.
+    if (issueClosed === null && live.length > 0) {
       try { issueClosed = await isClosed(issueId); closedByIssue.set(issueId, issueClosed); } catch { issueClosed = null; }
     }
-    const trips = issueClosed === true ? [] : await readTrips(issueId);
     return classifyParked({
       issueId,
-      reviewStatus,
       agents: agentsByIssue.get(issueId) ?? [],
       liveAgents: live,
-      openRecoveryTrips: trips,
       issueClosed,
       now,
     });

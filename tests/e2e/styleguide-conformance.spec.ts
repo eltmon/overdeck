@@ -20,11 +20,6 @@ let linkedFrontendNodeModules = false;
 const linkedFrontendPackages: string[] = [];
 const projectRoot = process.cwd();
 const frontendRoot = join(projectRoot, 'src/dashboard/frontend');
-const bootReconciliationSourceFiles = [
-  join(frontendRoot, 'src/components/BootReconciliationModal.tsx'),
-  join(frontendRoot, 'src/components/GraceCountdown.tsx'),
-];
-const forbiddenBootReconciliationColorClass = /\b(?:bg|text|border)-(?:neutral|orange|emerald|gray|zinc|sky|red)-|\btext-(?:white|black)\b/g;
 const packageResolutionRoots = [
   frontendRoot,
   projectRoot,
@@ -152,15 +147,11 @@ const feature = {
   hasState: true,
   isShadow: false,
   cost: 1.25,
-  readyForMerge: false,
   sessions: [{
     sessionId: 'agent-pan-1148',
     type: 'work',
     role: 'work',
     presence: 'active',
-    troubled: true,
-    troubledReason: 'Review handoff failed',
-    troubledAt: now,
     consecutiveFailures: 0,
     queuedMailCount: 2,
   }],
@@ -183,7 +174,10 @@ const snapshot = {
   agents: [agent],
   specialists: [],
   agentRuntimeById: {},
-  reviewStatuses: [],
+  derivedIssueStates: [{ issueId: 'PAN-1148', state: 'working' }],
+  // The fixture's work agent is a live backend pane under the derived read model;
+  // without it the card is idle and renders no verb badge.
+  backendPanes: [{ id: 'pane-pan-1148', issue: 'PAN-1148', role: 'work', harness: 'claude-code', model: 'claude-sonnet-5', state: 'working' }],
   resources: null,
   issues: [issue],
   channelPermissionRequests: [],
@@ -211,7 +205,6 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/version') return json({ version: 'test', supervisorUrl: null });
       if (path === '/api/tracker-status') return json({ primary: 'github', configured: [] });
       if (path === '/api/confirmations') return json([]);
-      if (path === '/api/boot-reconciliation') return json({ decision: null, perAgent: {}, decidedAt: null, bootId: null, graceDeadline: null, set: [] });
       if (path === '/api/cloister/status') return json({
         running: true,
         lastCheck: new Date().toISOString(),
@@ -222,6 +215,17 @@ async function newContext(): Promise<BrowserContext> {
       // flag so the route renders its FleetAgentsView instead of redirecting
       // to /home. See src/lib/experimentalFeatures.ts (EXPERIMENTAL_TAB_IDS).
       if (path === '/api/settings') return json({ tts: { enabled: false }, experimental: { experimentalFeatures: true } });
+      // PAN-3920: the Agents Directory is the default /agents view.
+      if (path === '/api/agent-directory') return json({
+        generatedAt: new Date().toISOString(),
+        windowHours: 24,
+        entries: [{
+          id: 'agent-pan-1148', kind: 'agent', label: 'work · PAN-1148', location: 'local', projectKey: 'overdeck',
+          issueId: 'PAN-1148', issueTitle: 'Styleguide conformance issue', parentId: null, role: 'work', harness: 'claude-code', model: 'claude-opus-4-7',
+          state: 'working', startedAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(),
+          costUsd: null, source: 'overdeck', transcript: { route: 'agent', agentId: 'agent-pan-1148' },
+        }],
+      });
       if (path === '/api/tts/health') return json({ ok: true, queue: 0, model: 'test-tts' });
       if (path === '/api/deacon/status') return json({
         isRunning: true,
@@ -283,12 +287,6 @@ async function newContext(): Promise<BrowserContext> {
         topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
       });
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
-      if (path === '/api/agents/agent-pan-1148/untroubled') {
-        const win = window as typeof window & { __troubledClearRequests?: Array<{ path: string; method: string }> };
-        win.__troubledClearRequests = win.__troubledClearRequests ?? [];
-        win.__troubledClearRequests.push({ path, method });
-        return json({ ok: true });
-      }
       if (path === '/api/backlog/issue-state') return json({
         issueId: new URL(url, window.location.origin).searchParams.get('issueId') ?? 'PAN-1148',
         state: {
@@ -313,8 +311,6 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/git-activity') return json([]);
       if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
-      if (path === '/api/flywheel/current') return json(null);
-      if (path === '/api/flywheel/runs') return json([]);
       return json(search ? { search } : {});
     };
   }, { snapshotFixture: snapshot, featureFixture: feature });
@@ -416,17 +412,6 @@ afterAll(async () => {
 });
 
 describe('styleguide rendered surface conformance', () => {
-  it('keeps boot reconciliation countdown surfaces on semantic color tokens', async () => {
-    const violations: string[] = [];
-    for (const file of bootReconciliationSourceFiles) {
-      const source = await readFile(file, 'utf8');
-      const matches = source.match(forbiddenBootReconciliationColorClass) ?? [];
-      violations.push(...matches.map((match) => `${file}: ${match}`));
-    }
-
-    expect(violations).toEqual([]);
-  });
-
   it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', async () => {
     const pipeline = await openRoute('/pipeline');
     await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count(), renderPoll).toBeGreaterThan(0);
@@ -446,10 +431,14 @@ describe('styleguide rendered surface conformance', () => {
     await expect.poll(() => commandDeck.page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await commandDeck.context.close();
 
-    const agents = await openRoute('/agents');
+    const agents = await openRoute('/agents?view=grid');
     await expect.poll(() => agents.page.locator('[data-component="agent-card"][data-agent-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
     await expect.poll(() => agents.page.locator('[data-component="verb-badge"]').count(), renderPoll).toBeGreaterThan(0);
     await agents.context.close();
+
+    const directory = await openRoute('/agents');
+    await expect.poll(() => directory.page.locator('[data-component="directory-row"][data-entry-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
+    await directory.context.close();
 
     const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
     await expect.poll(() => drawer.page.locator('[data-component="drawer-action-bar"]').count(), renderPoll).toBe(1);
@@ -467,6 +456,10 @@ describe('styleguide rendered surface conformance', () => {
     const { context, page } = await openRoute('/agents');
 
     await expect.poll(() => page.locator('[data-component="top-bar-segmented-control"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => page.locator('[data-component="agents-directory"]').count(), renderPoll).toBe(1);
+
+    await page.getByRole('button', { name: 'grid' }).click();
+    await expect.poll(() => page.url(), renderPoll).toContain('view=grid');
     await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(1);
 
     await page.getByRole('button', { name: 'table' }).click();
@@ -478,9 +471,9 @@ describe('styleguide rendered surface conformance', () => {
     await expect.poll(() => page.url(), renderPoll).toContain('view=timeline');
     await expect.poll(() => page.locator('[data-component="agents-coming-soon"]').count(), renderPoll).toBe(1);
 
-    await page.getByRole('button', { name: 'grid' }).click();
+    await page.getByRole('button', { name: 'directory' }).click();
     await expect.poll(() => page.url(), renderPoll).not.toContain('view=');
-    await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => page.locator('[data-component="agents-directory"]').count(), renderPoll).toBe(1);
 
     await page.getByRole('button', { name: 'Start agent' }).click();
     await expect.poll(() => page.url(), renderPoll).toBe(`${baseUrl}/board`);
@@ -489,7 +482,7 @@ describe('styleguide rendered surface conformance', () => {
   }, 45_000);
 
   it('agents page Open issue scrolls drawer to active-agent section', async () => {
-    const { context, page } = await openRoute('/agents');
+    const { context, page } = await openRoute('/agents?view=grid');
 
     await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(1);
     await page.getByText('Open issue').click();
@@ -506,51 +499,6 @@ describe('styleguide rendered surface conformance', () => {
       return rect.top >= parentRect.top && rect.bottom <= parentRect.bottom;
     });
     expect(isInViewport).toBe(true);
-
-    await context.close();
-  }, 45_000);
-
-  it('renders and clears a troubled Command Deck badge for the exact session', async () => {
-    const { context, page } = await openRoute('/command-deck');
-    await page.getByText('Overdeck', { exact: true }).nth(1).click();
-
-    const featureRow = page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]');
-    await expect.poll(() => featureRow.count(), renderPoll).toBe(1);
-    const badge = featureRow.locator('[data-testid="feature-troubled"]');
-    await expect.poll(() => badge.count(), renderPoll).toBe(1);
-    await expect.poll(() => badge.innerText(), renderPoll).toContain('Troubled · 2 queued');
-
-    const title = await badge.getAttribute('title');
-    expect(title).toContain('Session: agent-pan-1148.');
-    expect(title).toContain('Reason: Review handoff failed.');
-    expect(title).toContain('Failures: 0.');
-    expect(title).toContain('Likely spurious: troubled with 0 failures.');
-
-    const overlapFree = await badge.evaluate((node) => {
-      const badgeRect = node.getBoundingClientRect();
-      const row = node.closest('[data-component="feature-item"]');
-      const rowRect = row?.getBoundingClientRect();
-      if (!rowRect) return false;
-      return (
-        badgeRect.width > 0 &&
-        badgeRect.height > 0 &&
-        badgeRect.left >= rowRect.left &&
-        badgeRect.right <= rowRect.right &&
-        badgeRect.top >= rowRect.top &&
-        badgeRect.bottom <= rowRect.bottom
-      );
-    });
-    expect(overlapFree).toBe(true);
-
-    if (process.env.PAN_2257_CAPTURE_TROUBLED_BADGE === '1') {
-      await featureRow.screenshot({ path: '/tmp/pan-2257-troubled-badge.png' });
-    }
-
-    await badge.click();
-    await expect.poll(() => page.evaluate(() => {
-      const win = window as typeof window & { __troubledClearRequests?: Array<{ path: string; method: string }> };
-      return win.__troubledClearRequests ?? [];
-    }), renderPoll).toEqual([{ path: '/api/agents/agent-pan-1148/untroubled', method: 'POST' }]);
 
     await context.close();
   }, 45_000);

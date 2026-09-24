@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../infra.js';
+import { closeOverdeckDatabase, getOverdeckDatabase } from '../infra.js';
 import { requeueOrphanedMergingAutoMerges } from '../merge-sync.js';
 
 /**
@@ -21,11 +21,11 @@ describe('requeueOrphanedMergingAutoMerges', () => {
     testHome = join(tmpdir(), `auto-merge-orphan-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testHome, { recursive: true });
     process.env.OVERDECK_HOME = testHome;
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
   });
 
   afterEach(() => {
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
     if (originalOverdeckHome === undefined) {
       delete process.env.OVERDECK_HOME;
     } else {
@@ -35,17 +35,17 @@ describe('requeueOrphanedMergingAutoMerges', () => {
   });
 
   function seed(issueId: string, status: string): void {
-    getOverdeckDatabaseSync().prepare(
+    getOverdeckDatabase().prepare(
       'INSERT INTO issues (id, stage, updated_at) VALUES (?, ?, ?)',
     ).run(issueId, 'merging', Date.now());
-    getOverdeckDatabaseSync().prepare(`
+    getOverdeckDatabase().prepare(`
       INSERT INTO pending_auto_merges (issue_id, pr_url, project_key, forge, status, scheduled_merge_at, scheduled_at)
       VALUES (?, ?, 'pan', 'github', ?, ?, ?)
     `).run(issueId, `https://github.com/eltmon/overdeck/pull/1`, status, Date.now(), Date.now());
   }
 
   function statusOf(issueId: string): string {
-    const row = getOverdeckDatabaseSync()
+    const row = getOverdeckDatabase()
       .prepare('SELECT status FROM pending_auto_merges WHERE issue_id = ?')
       .get(issueId) as { status: string } | undefined;
     return row?.status ?? 'missing';

@@ -5,11 +5,16 @@
  * skipped silently; permission failures are reported through warnings.
  */
 
+import { listMuseSessionPaths } from '../runtimes/storage/muse.js';
 import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
+import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
+import { codexAgentSessionsDir, codexDefaultHome, codexSessionsRoot } from '../runtimes/storage/codex.js';
+import { piSessionsRoot, piUserAgentDir } from '../runtimes/storage/pi.js';
+import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 
-export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 
 export interface DiscoveredFile {
   jsonlPath: string;
@@ -25,15 +30,15 @@ export interface DiscoverySource {
 
 type AgentStateHarness = DiscoveredHarness | string;
 
-export const discoverySources: DiscoverySource[] = [
+const discoverySources: DiscoverySource[] = [
   {
     harness: 'claude-code',
-    roots: () => [join(homedir(), '.claude', 'projects')],
+    roots: () => [claudeProjectsRoot()],
     collect: collectClaudeProjectFiles,
   },
   {
     harness: 'pi',
-    roots: () => [join(homedir(), '.pi', 'agent', 'sessions')],
+    roots: () => [piSessionsRoot(piUserAgentDir())],
     collect: (root, warnings) => collectPiFamilyRoot(root, 'pi', warnings),
   },
   {
@@ -43,7 +48,7 @@ export const discoverySources: DiscoverySource[] = [
   },
   {
     harness: 'codex',
-    roots: () => [join(homedir(), '.codex', 'sessions')],
+    roots: () => [codexSessionsRoot(codexDefaultHome())],
     collect: (root, warnings) => collectJsonlFiles(root, root, 'codex', warnings ?? []),
   },
   {
@@ -141,12 +146,19 @@ async function collectAgentDirFiles(root: string, warnings: string[] = []): Prom
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const agentDir = join(root, entry.name);
-    const agentHarness = await readAgentHarness(agentDir);
+    let agentHarness = await readAgentHarness(agentDir);
+    if (!agentHarness && (entry.name.startsWith('conv-') || entry.name.startsWith('conversation-'))) {
+      const { getConversationByTmuxSession } = await import('../overdeck/conversations.js');
+      agentHarness = getConversationByTmuxSession(entry.name)?.harness ?? null;
+    }
     const piHarness = agentHarness === 'pi' || agentHarness === 'ohmypi' ? agentHarness : 'ohmypi';
 
-    result.push(...await collectPiFamilyRoot(join(agentDir, 'sessions'), piHarness, warnings));
-    await collectAgentRootFiles(agentDir, piHarness, warnings, result);
-    await collectJsonlFiles(join(agentDir, 'codex-home', 'sessions'), join(agentDir, 'codex-home', 'sessions'), 'codex', warnings, result);
+    result.push(...await collectPiFamilyRoot(piSessionsRoot(agentDir), piHarness, warnings));
+    await collectAgentRootFiles(agentDir, piHarness, warnings, result, agentHarness === 'opencode' ? 'opencode' : 'acp');
+    await collectJsonlFiles(codexAgentSessionsDir(agentDir), codexAgentSessionsDir(agentDir), 'codex', warnings, result);
+    for (const jsonlPath of await listMuseSessionPaths(entry.name, root)) {
+      result.push({ projectDir: agentDir, jsonlPath, harness: 'muse' });
+    }
   }
 
   return result;
@@ -157,6 +169,7 @@ async function collectAgentRootFiles(
   piHarness: 'pi' | 'ohmypi',
   warnings: string[],
   result: DiscoveredFile[],
+  acpHarness: 'acp' | 'opencode',
 ): Promise<void> {
   let entries: import('fs').Dirent[];
   try {
@@ -171,8 +184,8 @@ async function collectAgentRootFiles(
   for (const entry of entries) {
     const name = String(entry.name);
     if (!entry.isFile()) continue;
-    if (name === 'acp-session.jsonl') {
-      result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness: 'acp' });
+    if (name === ACP_TRANSCRIPT_FILE) {
+      result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness: acpHarness });
     } else if (isPiWorkAgentJsonl(name)) {
       result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness: piHarness });
     }

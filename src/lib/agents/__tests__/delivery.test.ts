@@ -5,6 +5,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+/** The real timer, captured before any test installs a fake clock. */
+const realSetTimeout = globalThis.setTimeout.bind(globalThis);
+
 let tmpHome: string;
 let stateDir: string;
 let socketDir: string;
@@ -31,6 +34,7 @@ import { resolveConversationDeliveryMethod } from '../../overdeck/conversation-d
 import { deliverAgentMessage } from '../delivery.js';
 import { resolveAgentDeliveryMethod } from '../messaging.js';
 import { sendKeys } from '../../tmux.js';
+import { KIMI_CONTEXT_START, KIMI_TASK_START } from '../../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agent-state.js';
 
 interface FakeBridgeOptions {
@@ -85,6 +89,7 @@ function makeAcpHostRuntime(): AcpHostRuntime {
     prompt: () => Effect.succeed({ stopReason: 'end_turn' as const }),
     cancel: Effect.void,
     setModel: () => Effect.void,
+    setConfigOption: () => Effect.succeed({ configOptions: [] }),
   };
 }
 
@@ -146,9 +151,9 @@ describe('acp delivery tier', () => {
     rmSync(tmpHome, { recursive: true, force: true });
   });
 
-  it('returns acp and leaves transcript echo ownership with the host', async () => {
+  it.each(['acp', 'opencode'])('delivers %s through ACP and leaves transcript echo ownership with the host', async (harness) => {
     const agentId = 'agent-acp-success';
-    writeAgentState(agentId, { harness: 'acp' });
+    writeAgentState(agentId, { harness });
     const host = new AcpHost({
       agentId,
       provider: 'kimi',
@@ -357,13 +362,75 @@ describe('app-server delivery tier', () => {
     const server = await startFakeBridge(join(socketDir, `appserver-${agentId}.sock`), { delayMs: 20_000 });
     try {
       const delivered = deliverAgentMessage(agentId, 'timeout', 'timeout-caller');
-      await vi.advanceTimersByTimeAsync(8_100);
+      // PAN-3917: the delivery door asks the terminal backend where this agent
+      // lives before it reaches the app-server tier, so the 8s timer is armed a
+      // few real I/O turns in. Advance in slices, yielding the event loop
+      // between them, instead of one jump that lands before the timer exists.
+      let settled = false;
+      void delivered.then(() => { settled = true; });
+      for (let slice = 0; slice < 100 && !settled; slice += 1) {
+        await vi.advanceTimersByTimeAsync(500);
+        // A real pause between slices, on the timer captured before the fake
+        // clock was installed: the probe's socket round trip needs event-loop
+        // turns that advancing a fake clock does not provide.
+        await new Promise<void>((resolve) => { realSetTimeout(resolve, 10); });
+      }
       const result = await delivered;
       expect(result).toMatchObject({ ok: true, path: 'tmux' });
       expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'timeout');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  }, 20_000);
+});
+
+describe('native Kimi context delivery', () => {
+  beforeEach(() => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'pan-kimi-delivery-'));
+    stateDir = join(tmpHome, 'agents');
+    socketDir = join(tmpHome, 'sockets');
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(socketDir, { recursive: true });
+    process.env.OVERDECK_HOME = tmpHome;
+    vi.mocked(sendKeys).mockClear();
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_HOME;
+    rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it('wraps the first work-agent message and leaves later messages unchanged in the same session', async () => {
+    const agentId = 'agent-kimi-work';
+    const workspace = join(tmpHome, 'workspace');
+    mkdirSync(workspace, { recursive: true });
+    writeAgentState(agentId, { harness: 'kimi-code', workspace, deliveryMethod: 'tmux' });
+    writeFileSync(join(stateDir, agentId, 'kimi-session-id'), 'session-work\n');
+
+    await deliverAgentMessage(agentId, 'First task', 'work-kickoff', 'tmux');
+    const firstMessage = vi.mocked(sendKeys).mock.calls[0]?.[1] as string;
+    expect(firstMessage).toContain(KIMI_CONTEXT_START);
+    expect(firstMessage).toContain(`${KIMI_TASK_START}\nFirst task`);
+
+    await deliverAgentMessage(agentId, 'Follow-up', 'work-follow-up', 'tmux');
+    expect(vi.mocked(sendKeys)).toHaveBeenLastCalledWith(agentId, 'Follow-up');
+    expect(existsSync(join(stateDir, agentId, 'kimi-context-delivery.json'))).toBe(true);
+  });
+
+  it('supports conversation sessions that have no AgentState via explicit context identity', async () => {
+    const agentId = 'conv-kimi-context';
+    const workspace = join(tmpHome, 'conversation-workspace');
+    mkdirSync(join(stateDir, agentId), { recursive: true });
+    mkdirSync(workspace, { recursive: true });
+    writeFileSync(join(stateDir, agentId, 'kimi-session-id'), 'session-conversation\n');
+
+    await deliverAgentMessage(agentId, 'Conversation task', 'conversation-message', 'tmux', {
+      kimiContext: { workspace },
+    });
+
+    const delivered = vi.mocked(sendKeys).mock.calls[0]?.[1] as string;
+    expect(delivered).toContain(KIMI_CONTEXT_START);
+    expect(delivered).toContain(`${KIMI_TASK_START}\nConversation task`);
   });
 });
 
@@ -402,6 +469,61 @@ describe('PTY supervisor delivery', () => {
   });
 });
 
+describe('state-projected supervisor method (PAN-3743 review-loop stall)', () => {
+  beforeEach(() => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'pan-state-supervisor-delivery-'));
+    stateDir = join(tmpHome, 'agents');
+    socketDir = join(tmpHome, 'sockets');
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(socketDir, { recursive: true });
+    process.env.OVERDECK_HOME = tmpHome;
+    vi.mocked(sendKeys).mockClear();
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_HOME;
+    rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  // Reproduces the 2026-08-16 PAN-3743 stall: a codex app-server work agent
+  // whose state.json carries deliveryMethod: 'supervisor' (projected from
+  // supervisorEnabled) but has no PTY supervisor socket. A state-routed
+  // delivery (the inspect verdict) previously threw socket-missing with no
+  // fallback; it must now ride the resilient cascade to the app-server tier.
+  it('routes a state-stamped supervisor method to the live app-server socket', async () => {
+    const agentId = 'agent-state-supervisor-appserver';
+    writeAgentState(agentId, { deliveryMethod: 'supervisor', supervisorEnabled: true });
+    writeAppServerToken(agentId);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(join(socketDir, `appserver-${agentId}.sock`), { capture });
+    try {
+      const result = await deliverAgentMessage(agentId, 'inspect verdict', 'inspect-verdict');
+      expect(result).toEqual({ ok: true, path: 'app-server' });
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({ op: 'message', content: 'inspect verdict' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('falls through to tmux when a state-stamped supervisor method has no sockets at all', async () => {
+    const agentId = 'agent-state-supervisor-tmux';
+    writeAgentState(agentId, { deliveryMethod: 'supervisor', supervisorEnabled: true });
+    const result = await deliverAgentMessage(agentId, 'inspect verdict', 'inspect-verdict');
+    expect(result).toMatchObject({ ok: true, path: 'tmux' });
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'inspect verdict');
+  });
+
+  it('keeps the strict PAN-1769 contract for an explicit supervisor argument', async () => {
+    const agentId = 'agent-explicit-supervisor-strict';
+    writeAgentState(agentId);
+    await expect(
+      deliverAgentMessage(agentId, 'resume continue', 'test-caller', 'supervisor'),
+    ).rejects.toThrow(/PTY supervisor delivery failed.*socket-missing/);
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+  });
+});
+
 describe('keyedSupervisorFailureKind (PAN-1837)', () => {
   it('classifies connect-phase failures as definitive, never ambiguous', async () => {
     const { keyedSupervisorFailureKind } = await import('../delivery.js');
@@ -425,5 +547,14 @@ describe('keyedSupervisorFailureKind (PAN-1837)', () => {
       Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }),
     )).toBe('ambiguous');
     expect(keyedSupervisorFailureKind(undefined)).toBe('ambiguous');
+  });
+});
+
+describe('deliverMessageWithTranscriptConfirmation (PAN-3846)', () => {
+  it('is exported under both the new name and the one-release resume alias', async () => {
+    const delivery = await import('../delivery.js');
+    expect(typeof delivery.deliverMessageWithTranscriptConfirmation).toBe('function');
+    expect(delivery.deliverResumeMessageWithTranscriptConfirmation)
+      .toBe(delivery.deliverMessageWithTranscriptConfirmation);
   });
 });

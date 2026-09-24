@@ -3,19 +3,23 @@ import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
-import { getAgentState, messageAgent, spawnAgent } from '../../../../lib/agents.js';
+import { messageAgent, spawnAgent } from '../../../../lib/agents.js';
+import { isAlive } from '../../../../lib/agents/liveness.js';
 import {
-  clearYieldForResumeSync,
+  clearYieldForResume,
   decideResumeGate,
   getAgentResumeGateBlockReason,
-  getAgentStateSync,
+  getAgentState,
   saveAgentStateSync,
 } from '../../../../lib/agents/agent-state.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
+import { evaluateIssueMergeGate } from '../../../../lib/cloister/merge-gate.js';
+import type { MergeReadiness } from '../../../../lib/cloister/pr-facts.js';
 import type { VerificationRunnerOptions } from '../../../../lib/cloister/verification-types.js';
-import type { ReviewStatus, ReviewStatusUpdate } from '../../../../lib/review-status.js';
+import type { DerivedIssueState } from '@overdeck/contracts';
 import { rebaseFeatureBranch } from '../../../../lib/cloister/merge-rebase.js';
 import { sessionExists } from '../../../../lib/tmux.js';
+import type { MergeRunPatch, MergeRunPhase } from '../../services/merge-queue-service.js';
 
 const execAsync = promisify(exec);
 
@@ -34,28 +38,6 @@ export function mergeVerificationOptions(
 }
 
 /**
- * PAN-3067: the PAN-2487 CI-green skip bypasses the verification runner — which
- * is what records verificationStatus on local runs — and that skip is the exact
- * path every strike merge takes (its CI is already green). Record the verdict
- * here so DoD row 3 has evidence and close-out can proceed.
- */
-export async function recordCiGreenVerificationVerdict(issueId: string, workspacePath: string): Promise<void> {
-  try {
-    const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
-    const verifiedAnchor = await snapshotWorkspaceHeadsPromise(issueId, workspacePath).catch(() => undefined);
-    const { setReviewStatusSync } = await import('../../../../lib/review-status.js');
-    setReviewStatusSync(issueId, {
-      verificationStatus: 'passed',
-      verificationNotes: 'merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)',
-      ...(verifiedAnchor ? { lastVerifiedCommit: verifiedAnchor } : {}),
-    });
-  } catch (recordErr) {
-    const message = recordErr instanceof Error ? recordErr.message : String(recordErr);
-    console.warn(`[merge] Could not record CI-green verification verdict for ${issueId}: ${message}`);
-  }
-}
-
-/**
  * PAN-3120: resume the work agent for a merge-requested rebase and narrate it to
  * the operator (Awaiting Merge tracker + ship log), so a scheduler-yielded agent
  * shows as "Preparing work agent" rather than a silent step or a dead end.
@@ -69,18 +51,18 @@ export async function prepareWorkAgentForRebase(opts: {
   rebaseMsg: string;
   allowFreshStart?: boolean;
   scopeNote: string;
-  setStatus: (update: ReviewStatusUpdate) => void;
+  setStatus: (update: MergeRunPatch) => void;
   deferFailureStatus?: boolean;
 }): Promise<{ ok: true; detail: string } | { ok: false; error: string }> {
   const { appendShipLog } = await import('../../../../lib/cloister/ship-log.js');
-  opts.setStatus({ mergeStep: 'preparing-work-agent', mergeNotes: `Preparing work agent ${opts.agentId} to rebase ${opts.scopeNote}…` });
+  opts.setStatus({ step: 'preparing-work-agent', notes: `Preparing work agent ${opts.agentId} to rebase ${opts.scopeNote}…` });
   appendShipLog(opts.issueId, `Preparing work agent ${opts.agentId} for rebase…`, 'rebasing');
   try {
     const recovery = await ensureAgentReadyForMerge(opts.issueId, opts.workspacePath, opts.rebaseMsg, {
       agentId: opts.agentId,
       ...(opts.allowFreshStart === undefined ? {} : { allowFreshStart: opts.allowFreshStart }),
     });
-    opts.setStatus({ mergeStep: 'rebasing', mergeNotes: `${recovery.detail} Waiting for ${opts.scopeNote} to be rebased and pushed.` });
+    opts.setStatus({ step: 'rebasing', notes: `${recovery.detail} Waiting for ${opts.scopeNote} to be rebased and pushed.` });
     appendShipLog(opts.issueId, `✓ ${recovery.detail}`, 'rebasing');
     console.log(`[merge] ${recovery.detail}`);
     return { ok: true, detail: recovery.detail };
@@ -88,8 +70,8 @@ export async function prepareWorkAgentForRebase(opts: {
     const message = prepError instanceof Error ? prepError.message : String(prepError);
     const error = `Work agent ${opts.agentId} could not be prepared for the rebase: ${message}`;
     opts.setStatus(opts.deferFailureStatus
-      ? { mergeNotes: error }
-      : { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+      ? { notes: error }
+      : { phase: 'failed', notes: error });
     appendShipLog(opts.issueId, `✗ ${error}`, 'rebasing');
     return { ok: false, error };
   }
@@ -102,9 +84,10 @@ export interface TriggerMergeResult {
   retryable?: boolean;
   deferred?: boolean;
   message?: string;
-  reviewStatus?: string;
-  testStatus?: string;
-  mergeStatus?: string;
+  /** The issue's derived pipeline state at the moment the merge was refused. */
+  state?: DerivedIssueState['state'];
+  /** Phase of THIS merge run (in-memory), never a stored pipeline status. */
+  outcome?: MergeRunPhase;
   prUrl?: string;
   remote?: boolean;
   repos?: Array<{ repo: string; success: boolean; message: string; testsStatus?: string }>;
@@ -113,61 +96,31 @@ export interface TriggerMergeResult {
   mergeResult?: unknown;
 }
 
-export function parseStrikeMergeRequest(raw: unknown): StrikeMergeRequest | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const request = raw as Record<string, unknown>;
-  return request.kind === 'strike'
-    && typeof request.markerHead === 'string'
-    && typeof request.workspacePath === 'string'
-    && typeof request.branchName === 'string'
-    && typeof request.recoveryTarget === 'string'
-    ? request as unknown as StrikeMergeRequest
-    : null;
-}
-
-export function mergeCompletionStatus(request: TriggerMergeRequest): Pick<ReviewStatus, 'strikeLandingState' | 'strikeReadyHead' | 'strikeReadyAt' | 'strikeTransportRetryCount' | 'strikeNextAttemptAt'> | Record<string, never> {
-  return request.kind === 'strike'
-    ? {
-        strikeLandingState: 'landed',
-        strikeReadyHead: undefined,
-        strikeReadyAt: undefined,
-        strikeTransportRetryCount: undefined,
-        strikeNextAttemptAt: undefined,
-      }
-    : {};
-}
 export function activeStrikeMerge(currentMerge: string | null, pendingOperation?: { type: string; status: string } | null): boolean {
   return currentMerge !== null || (pendingOperation?.type === 'merge' && pendingOperation.status === 'running');
 }
 export interface MergeEligibilityResult {
-  success: false; statusCode: number; error: string; reviewStatus?: string; testStatus?: string; mergeStatus?: string;
+  success: false; statusCode: number; error: string; state?: DerivedIssueState['state']; outcome?: MergeRunPhase;
 }
 
 export interface MergeQueueAdvanceDeps {
   dequeue: (projectKey: string, completedIssueId?: string) => string | null;
-  getReviewStatus: (issueId: string) => ReviewStatus | null;
-  getProjectPath: (issueId: string) => string;
-  triggerMerge: (issueId: string, request?: StrikeMergeRequest) => Promise<unknown>;
+  /** The issue's derived pipeline state — approvals, checks, and mergeability. */
+  getDerivedState: (issueId: string) => Promise<DerivedIssueState>;
+  /**
+   * The merge gate over the forge's PR facts (`cloister/merge-gate.ts`): the
+   * CI test job in a `verification.tests: ci` project (#4021) and a failed
+   * required UAT at the head (#4036), on top of FR-9.
+   */
+  checkMergeGate?: (issueId: string) => Promise<MergeGateVerdict>;
+  triggerMerge: (issueId: string) => Promise<unknown>;
   log: (message: string) => void;
   warn: (message: string) => void;
 }
 
-/** Rebuild the strike merge request a queued strike entry needs, or undefined for a normal merge. */
-export function strikeRequestForQueueEntry(
-  issueId: string,
-  status: ReviewStatus | null,
-  projectPath: string,
-): StrikeMergeRequest | undefined {
-  if (!status?.strikeReadyHead) return undefined;
-  if (status.strikeLandingState !== 'ready' && status.strikeLandingState !== 'landing') return undefined;
-  const issueLower = issueId.toLowerCase();
-  return {
-    kind: 'strike',
-    markerHead: status.strikeReadyHead,
-    workspacePath: `${projectPath}/workspaces/feature-${issueLower}-strike`,
-    branchName: `strike/${issueLower}`,
-    recoveryTarget: `strike-${issueLower}`,
-  };
+/** What `evaluateIssueMergeGate` answers, narrowed to what the merge doors read. */
+export interface MergeGateVerdict extends MergeReadiness {
+  facts?: { headBranch: string | null };
 }
 
 /**
@@ -175,33 +128,38 @@ export function strikeRequestForQueueEntry(
  * the first one that can.
  *
  * PAN-3328: the queue used to advance by handing its single head entry to
- * `triggerMerge()` and stopping. `triggerMerge()` rejects an issue that is not
- * `readyForMerge` — closed, or with its review-status record gone — *before* it
- * ever claims the queue, so a dead head bounced on every advance and was never
- * removed. One such row wedged the whole queue permanently: 12 entries stacked up
- * behind it over 26 days with every `started_at` still NULL, and live work parked
- * silently forever. Walking past unstartable heads is what makes the queue
- * self-draining; a dropped issue re-enqueues itself if it becomes mergeable later.
+ * `triggerMerge()` and stopping. `triggerMerge()` rejects an issue whose PR is
+ * not approved-green-mergeable *before* it ever claims the queue, so a dead head
+ * bounced on every advance and was never removed. One such row wedged the whole
+ * queue permanently: 12 entries stacked up behind it over 26 days with every
+ * `started_at` still NULL, and live work parked silently forever. Walking past
+ * unstartable heads is what makes the queue self-draining; a dropped issue
+ * re-enqueues itself if it becomes mergeable later.
+ *
+ * #4016: every entry passes the same gate. The queue used to turn an entry
+ * into a strike landing whenever `origin/strike/<issue>` existed and skip the
+ * gate for it, so a strike branch merged without approval or green checks.
+ * Only `triggerMerge` enqueues, and only for a normal merge; since PAN-3973 a
+ * strike opens its own PR that the operator merges, so the queue no longer
+ * looks for strike branches at all.
  */
-export function advanceMergeQueue(
+export async function advanceMergeQueue(
   deps: MergeQueueAdvanceDeps,
   projectKey: string,
   completedIssueId?: string,
-): void {
-  const strikeRequestFor = (issueId: string): StrikeMergeRequest | undefined =>
-    strikeRequestForQueueEntry(issueId, deps.getReviewStatus(issueId), deps.getProjectPath(issueId));
-
+): Promise<void> {
   // `dropped` guarantees termination even if a dequeue keeps handing back the
   // same entry — the queue must never be able to spin this loop.
   const dropped = new Set<string>();
+  const checkMergeGate = deps.checkMergeGate ?? evaluateIssueMergeGate;
   let nextIssueId = deps.dequeue(projectKey, completedIssueId);
   while (nextIssueId && !dropped.has(nextIssueId)) {
-    const strikeRequest = strikeRequestFor(nextIssueId);
-    const unstartable = strikeRequest ? null : normalMergeEligibility(deps.getReviewStatus(nextIssueId));
+    const unstartable = normalMergeEligibility(await deps.getDerivedState(nextIssueId))
+      ?? mergeGateRefusal(await checkMergeGate(nextIssueId));
     if (!unstartable) {
       deps.log(`[merge] Dequeuing next merge: ${nextIssueId}`);
       const issueId = nextIssueId;
-      void deps.triggerMerge(issueId, strikeRequest).catch((err: unknown) =>
+      void deps.triggerMerge(issueId).catch((err: unknown) =>
         deps.warn(`[merge] Queue error for ${issueId}: ${err}`),
       );
       return;
@@ -212,24 +170,97 @@ export function advanceMergeQueue(
   }
 }
 
-export function normalMergeEligibility(status: ReviewStatus | null, activelyMerging = false): MergeEligibilityResult | null {
-  if (!status?.readyForMerge) return { success: false, statusCode: 400, error: 'Cannot merge: review and tests have not passed yet', reviewStatus: status?.reviewStatus || 'pending', testStatus: status?.testStatus || 'pending' };
-  if (status.mergeStatus === 'merging' && activelyMerging) return { success: false, statusCode: 400, error: 'Merge already in progress', mergeStatus: 'merging' };
-  if (status.mergeStatus === 'merged') return { success: false, statusCode: 400, error: 'Already merged', mergeStatus: 'merged' };
+/**
+ * #4016/#4021/#4036: `triggerMerge`'s gate over the forge's PR facts, for
+ * every merge, strike or normal — approval, green checks, the CI test job in a
+ * `verification.tests: ci` project, and no failed required UAT at the head. A
+ * strike is gated on its own `strike/<issue>` PR (`expectedBranch`).
+ */
+export async function forgeMergeGateRefusal(
+  issueId: string,
+  expectedBranch?: string,
+  gate: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateVerdict>
+    = (id, options) => evaluateIssueMergeGate(id, {}, options),
+): Promise<MergeEligibilityResult | null> {
+  const verdict = expectedBranch ? await gate(issueId, { preferBranch: expectedBranch }) : await gate(issueId);
+  return mergeGateRefusal(verdict, expectedBranch);
+}
+
+/**
+ * The merge gate's refusal, or null when it lets the merge through.
+ *
+ * `expectedBranch` pins the PR the gate judged: a strike landing must be
+ * gated on the `strike/<issue>` PR, never on the issue's feature PR.
+ */
+export function mergeGateRefusal(
+  gate: MergeGateVerdict,
+  expectedBranch?: string,
+): MergeEligibilityResult | null {
+  if (!gate.ready) {
+    return { success: false, statusCode: 400, error: `Cannot merge: ${gate.reason ?? 'the merge gate refused'}` };
+  }
+  if (expectedBranch && gate.facts?.headBranch !== expectedBranch) {
+    return {
+      success: false,
+      statusCode: 400,
+      error: `Cannot merge: the open pull request is on ${gate.facts?.headBranch ?? 'no branch'}, not ${expectedBranch}`,
+    };
+  }
   return null;
 }
 
+/**
+ * The merge gate (FR-9): approvals, green checks, and forge mergeability, which
+ * together are exactly `DerivedIssueState.state === 'ready'`.
+ */
+export function normalMergeEligibility(
+  derived: DerivedIssueState | null,
+  activelyMerging = false,
+  run?: { phase: MergeRunPhase } | null,
+): MergeEligibilityResult | null {
+  if (derived?.state === 'merged') {
+    return { success: false, statusCode: 400, error: 'Already merged', state: 'merged' };
+  }
+  if (derived?.state !== 'ready') {
+    const reason = mergeBlockReason(derived);
+    return {
+      success: false,
+      statusCode: 400,
+      error: `Cannot merge: ${reason}`,
+      ...(derived?.state ? { state: derived.state } : {}),
+    };
+  }
+  if (run?.phase === 'merging' && activelyMerging) {
+    return { success: false, statusCode: 400, error: 'Merge already in progress', outcome: 'merging' };
+  }
+  return null;
+}
+
+/** Which of the three forge conditions is missing, in the operator's words. */
+export function mergeBlockReason(derived: DerivedIssueState | null): string {
+  const pr = derived?.pr;
+  if (!pr) return 'no open pull request for this issue';
+  if (pr.reviewState === 'changes-requested') return 'the latest review requested changes';
+  if (pr.reviewState !== 'approved') return 'the pull request is not approved yet';
+  if (pr.checks === 'red') return 'checks are failing';
+  if (pr.checks !== 'green') return 'checks have not finished';
+  if (pr.mergeable === false) return 'the forge reports the pull request as conflicting';
+  return 'the forge has not finished computing mergeability';
+}
+
+/**
+ * Validate a strike landing against git, which owns it. The marker HEAD the
+ * caller recorded must still be `origin/strike/<issue>`, and the workspace and
+ * branch identity must match — a stale signal or a moved branch aborts.
+ */
 export async function validateStrikeMergeRequest(
   issueId: string,
   request: StrikeMergeRequest,
-  status: ReviewStatus | null,
   deps: { projectPath: string; git: (args: string[], cwd: string) => Promise<string> },
 ): Promise<string | null> {
   const issueLower = issueId.toLowerCase();
   const expectedBranch = `strike/${issueLower}`;
   const expectedWorkspace = `${deps.projectPath}/workspaces/feature-${issueLower}-strike`;
-  if (status?.strikeLandingState !== 'ready' && status?.strikeLandingState !== 'landing') return `Strike landing state is ${status?.strikeLandingState ?? 'missing'}, expected ready or landing`;
-  if (status.strikeReadyHead !== request.markerHead) return `Strike marker HEAD changed from ${request.markerHead} to ${status.strikeReadyHead ?? 'missing'}`;
   if (request.branchName !== expectedBranch || request.workspacePath !== expectedWorkspace || request.recoveryTarget !== `strike-${issueLower}`) return `Strike request identity does not match ${expectedWorkspace} on ${expectedBranch}`;
   try {
     const root = await deps.git(['rev-parse', '--show-toplevel'], request.workspacePath);
@@ -253,14 +284,14 @@ export async function validateStrikeMergeRequest(
  * was cleared so the operator sees why the agent came back.
  */
 async function clearMergePreparationGate(agentId: string): Promise<string | null> {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (!state) return null;
   const decision = decideResumeGate(getAgentResumeGateBlockReason(state), 'merge-preparation');
   if (decision.decision === 'block') throw new Error(decision.reason);
   if (decision.decision !== 'proceed') return null;
 
   if (decision.clearYield) {
-    clearYieldForResumeSync(agentId);
+    clearYieldForResume(agentId);
     return `cleared scheduler yield (${state.pausedReason ?? 'yielded'})`;
   }
   if (decision.clearStoppedByUser) {
@@ -289,7 +320,7 @@ export async function ensureAgentReadyForMerge(issueId: string, workspacePath: s
     assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));
     return { recovered: true, agentId, detail: `Work agent already running; sent merge preparation request${gateSuffix}.` };
   }
-  const agentState = await Effect.runPromise(getAgentState(agentId));
+  const agentState = getAgentState(agentId);
   if (agentState) try {
     assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));
     const updatedLifecycle = getWorkAgentLifecycleStateSync(agentId);
@@ -319,9 +350,17 @@ export async function rebaseWithAgentFallback(options: {
   agentId: string;
   rebaseMsg: string;
   allowFreshStart: boolean;
-  setStatus: (update: ReviewStatusUpdate) => void;
+  /**
+   * Hand the request only to an agent the liveness oracle confirms is running
+   * now; never resume one that has exited or whose state cannot be told. A
+   * finished strike sits idle at its prompt and still takes a PR update
+   * request, but once its session has exited, resuming it would revive an
+   * agent whose contract ended with the PR URL.
+   */
+  liveAgentOnly?: boolean;
+  setStatus: (update: MergeRunPatch) => void;
 }): Promise<RebaseEscalationResult> {
-  const { issueId, workspacePath, branchName, targetBranch, agentId, rebaseMsg, allowFreshStart, setStatus } = options;
+  const { issueId, workspacePath, branchName, targetBranch, agentId, rebaseMsg, allowFreshStart, liveAgentOnly, setStatus } = options;
   let serverRebaseReason: string | undefined;
   let conflictFiles: string[] = [];
 
@@ -341,6 +380,23 @@ export async function rebaseWithAgentFallback(options: {
         : message || 'Server-side rebase failed';
       console.warn(`[merge] ${serverRebaseReason} — escalating to the work agent for ${issueId}`);
     }
+  }
+
+  // Positive evidence only: an indeterminate probe (a Herdr socket that does
+  // not answer, a failed ps) is not "live", or the resume path below would
+  // revive an exited strike.
+  const verdict = liveAgentOnly ? await isAlive(agentId) : null;
+  if (verdict && !verdict.alive) {
+    const state = verdict.reason === 'runtime-indeterminate' ? 'cannot be confirmed running' : 'has exited';
+    const agentReason = `${agentId} ${state}, so no agent can update ${branchName}; `
+      + `update its pull request by hand or run \`pan strike ${issueId}\` again`;
+    console.log(`[merge] ${agentReason} — not resuming it`);
+    return {
+      success: false,
+      reason: serverRebaseReason ? `${serverRebaseReason}; ${agentReason}` : agentReason,
+      conflictFiles,
+      retryable: false,
+    };
   }
 
   try {

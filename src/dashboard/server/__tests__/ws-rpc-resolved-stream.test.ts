@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { Effect, Stream } from 'effect';
 
 // Stub the transcript resolvers so the dispatch can be asserted on the exact
@@ -6,16 +9,27 @@ import { Effect, Stream } from 'effect';
 const resolverMock = vi.hoisted(() => ({
   resolveAgentHarness: vi.fn(async () => 'claude-code'),
   resolvePiSessionPath: vi.fn(async () => null),
-  resolveCodexRolloutPath: vi.fn(async () => null),
+  resolveCodexRolloutPath: vi.fn(async (): Promise<string | null> => null),
   resolveAcpTranscriptPath: vi.fn(async () => null),
   resolveKimiWirePath: vi.fn(async () => null),
+  resolveJsonlPath: vi.fn(async () => null),
+  listAgentTranscriptCandidates: vi.fn(async () => [] as Array<{ kind: 'claude'; path: string; model?: string }>),
+  listAgentTranscriptWatchRoots: vi.fn(async () => [] as string[]),
+  resolveAgentTranscriptCandidate: vi.fn(async () => null as { kind: 'claude'; path: string; model?: string } | null),
   readLauncherPinnedSessionId: vi.fn(async () => null),
 }));
-vi.mock('../routes/jsonl-resolver.js', () => resolverMock);
+vi.mock('../../../lib/agents/transcript-resolver.js', () => resolverMock);
+vi.mock('../services/dashboard-db-task.js', () => ({
+  runDashboardDbJob: vi.fn(async (_operation: string, input: { sessionFile: string }) => {
+    const { parseCodexConversationMessages } = await import('../services/codex-conversation-parser.js');
+    return parseCodexConversationMessages(input.sessionFile);
+  }),
+}));
 
 import {
   streamHarnessFullParseSnapshots,
   streamResolvedFullParseSnapshots,
+  watchForAgentTranscriptCandidate,
 } from '../ws-rpc.js';
 import type { ParseResult } from '../services/conversation-service.js';
 
@@ -29,7 +43,24 @@ import type { ParseResult } from '../services/conversation-service.js';
 
 const emptyParse = vi.fn<(file: string) => Promise<ParseResult>>();
 
+async function waitUntil(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) throw new Error('timed out waiting for condition');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+}
+
 describe('streamHarnessFullParseSnapshots — ACP dispatch', () => {
+  it('leaves Claude sessions to the worker-backed incremental stream', () => {
+    const stream = streamHarnessFullParseSnapshots('agent-pan-3950', 'claude-code', null, true);
+    expect(stream).toBeNull();
+  });
+
   it('creates a ready stream for an ACP conversation before its transcript exists', async () => {
     const stream = streamHarnessFullParseSnapshots(
       'agent-nonexistent-acp-stream',
@@ -128,5 +159,209 @@ describe('streamResolvedFullParseSnapshots — unresolved transcript', () => {
     );
 
     expect(Array.from(first)).toEqual([{ kind: 'discovering' }]);
+  });
+});
+
+describe('synthetic agent transcript discovery', () => {
+  it('discovers from an initially empty candidate list and closes every watcher on unsubscribe', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'synthetic-agent-stream-'));
+    const transcript = join(dir, 'delayed.jsonl');
+    const candidate = { kind: 'claude' as const, path: transcript, model: 'claude-sonnet-4-6' };
+    const watched: Array<{ path: string; listener: () => void; closed: boolean }> = [];
+    let signalRegistered!: () => void;
+    const registered = new Promise<void>((resolve) => { signalRegistered = resolve; });
+    resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+    resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([dir]);
+    resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+    const watch = vi.fn((path: string, _options: { recursive: boolean }, listener: () => void) => {
+      const handle = { path, listener, closed: false };
+      watched.push(handle);
+      if (path === dir) signalRegistered();
+      return { close: () => { handle.closed = true; } };
+    });
+
+    try {
+      const eventsPromise = Effect.runPromise(
+        watchForAgentTranscriptCandidate('agent-pan-3950', '', { watch }).pipe(Stream.take(1), Stream.runCollect),
+      );
+      await registered;
+      expect(resolverMock.resolveAgentTranscriptCandidate).toHaveBeenCalledWith(
+        'agent-pan-3950',
+        '',
+        {},
+        [],
+      );
+
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([candidate]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(candidate);
+      watched.find(entry => entry.path === dir)!.listener();
+
+      const events = Array.from(await eventsPromise);
+      expect(events).toEqual([candidate]);
+      expect(watched.length).toBeGreaterThan(0);
+      expect(watched.every(entry => entry.closed)).toBe(true);
+    } finally {
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+      resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  // PAN-3950 W6: a watch root whose fs.watch() attachment throws (e.g. the
+  // directory disappears between listing and watch()) must not be abandoned
+  // forever — it has to be retried the next time a surviving watcher fires.
+  it('retries a watch root whose watch() call failed once a surviving watcher fires', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'synthetic-agent-retry-'));
+    const rootA = join(dir, 'a');
+    const rootB = join(dir, 'b');
+    await mkdir(rootA, { recursive: true });
+    await mkdir(rootB, { recursive: true });
+    const transcript = join(rootA, 'late.jsonl');
+    const candidate = { kind: 'claude' as const, path: transcript, model: 'claude-sonnet-4-6' };
+
+    let allowA = false;
+    let aListener: (() => void) | undefined;
+    let bListener: (() => void) | undefined;
+    const watch = vi.fn((path: string, _options: { recursive: boolean }, listener: () => void) => {
+      if (path === rootA) {
+        if (!allowA) throw new Error('simulated watch failure');
+        aListener = listener;
+      } else if (path === rootB) {
+        bListener = listener;
+      }
+      return { close: vi.fn() };
+    });
+
+    resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+    resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([rootA, rootB]);
+    resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+
+    try {
+      const eventsPromise = Effect.runPromise(
+        watchForAgentTranscriptCandidate('agent-pan-3950-retry', '', { watch }).pipe(Stream.take(1), Stream.runCollect),
+      );
+
+      await waitUntil(() => bListener !== undefined);
+      expect(aListener).toBeUndefined(); // root A's watch() has never succeeded yet
+
+      // root A can now attach; firing the surviving watcher (B) is what
+      // triggers the retry — nothing else does.
+      allowA = true;
+      bListener!();
+      await waitUntil(() => aListener !== undefined);
+
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([candidate]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(candidate);
+      aListener!();
+
+      const events = Array.from(await eventsPromise);
+      expect(events).toEqual([candidate]);
+    } finally {
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+      resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  // PAN-3950 W6: a watch root whose watch() call always throws must be
+  // retried exactly once per surviving event — never spontaneously, and
+  // never via a timer (the retry scheme uses none).
+  it('grows watch attempts for a permanently failing root by exactly one per surviving event, and schedules no timers', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'synthetic-agent-permanent-fail-'));
+    const rootA = join(dir, 'a');
+    const rootB = join(dir, 'b');
+    await mkdir(rootA, { recursive: true });
+    await mkdir(rootB, { recursive: true });
+    const transcript = join(rootB, 'late.jsonl');
+    const candidate = { kind: 'claude' as const, path: transcript, model: 'claude-sonnet-4-6' };
+
+    let watchCallsA = 0;
+    let bListener: (() => void) | undefined;
+    const watch = vi.fn((path: string, _options: { recursive: boolean }, listener: () => void) => {
+      if (path === rootA) {
+        watchCallsA++;
+        throw new Error('simulated permanent watch failure');
+      }
+      if (path === rootB) bListener = listener;
+      return { close: vi.fn() };
+    });
+
+    resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+    resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([rootA, rootB]);
+    resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+
+    try {
+      const eventsPromise = Effect.runPromise(
+        watchForAgentTranscriptCandidate('agent-pan-3950-permanent-fail', '', { watch }).pipe(Stream.take(1), Stream.runCollect),
+      );
+
+      // A vi.getTimerCount() check here would be vacuous: fake timers only
+      // track timers scheduled while active, and nothing schedules any while
+      // this stream runs — the retry path is driven entirely by watch()
+      // events, never a timer. The real guard against a timer creeping back
+      // in is the source-level check in ws-rpc.ts's own test coverage (the
+      // setInterval/setTimeout count stays pinned to its e42bb79eb39
+      // baseline; see w6's verify_commands).
+      await waitUntil(() => bListener !== undefined);
+      await waitUntil(() => watchCallsA >= 1);
+      await settle();
+      const settledCalls = watchCallsA;
+
+      bListener!();
+      await waitUntil(() => watchCallsA === settledCalls + 1);
+      await settle();
+      expect(watchCallsA).toBe(settledCalls + 1); // grew by exactly one, no runaway retries
+
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([candidate]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(candidate);
+      bListener!();
+
+      const events = Array.from(await eventsPromise);
+      expect(events).toEqual([candidate]);
+    } finally {
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+      resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+
+describe('Codex subagent stream dispatch', () => {
+  it('emits a parent list and streams only the selected child with no nested list', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'codex-subagent-stream-'));
+    const folder = join(dir, 'sessions', '2026', '09', '08');
+    await mkdir(folder, { recursive: true });
+    const parent = join(folder, 'rollout-parent.jsonl');
+    const child = join(folder, 'rollout-child.jsonl');
+    try {
+      for (const [file, id, source, message] of [
+        [parent, 'parent', 'cli', 'Parent'],
+        [child, 'child', { subagent: { thread_spawn: { parent_thread_id: 'parent' } } }, 'Child'],
+      ] as const) {
+        await writeFile(file, [
+          { type: 'session_meta', payload: { id, source } },
+          { type: 'event_msg', payload: { type: 'agent_message', message } },
+          { type: 'event_msg', payload: { type: 'task_complete' } },
+        ].map(e => JSON.stringify(e)).join('\n') + '\n');
+      }
+      resolverMock.resolveCodexRolloutPath.mockResolvedValue(parent);
+      const stream = streamHarnessFullParseSnapshots('conv-codex', 'codex', null, true)!;
+      const events = Array.from(await Effect.runPromise(stream.pipe(Stream.take(2), Stream.runCollect)));
+      expect(events[0]).toMatchObject({ kind: 'messages', messages: [{ text: 'Parent' }] });
+      expect(events[1]).toMatchObject({ kind: 'subagents', subagents: [{ agentId: 'child' }] });
+      const selected = streamHarnessFullParseSnapshots('conv-codex', 'codex', null, true, null, 'child')!;
+      const childEvents = Array.from(await Effect.runPromise(selected.pipe(Stream.take(1), Stream.runCollect)));
+      expect(childEvents).toEqual([expect.objectContaining({ kind: 'messages', messages: [expect.objectContaining({ text: 'Child' })] })]);
+      const invalid = streamHarnessFullParseSnapshots('conv-codex', 'codex', null, true, null, 'parent')!;
+      expect(Array.from(await Effect.runPromise(invalid.pipe(Stream.take(1), Stream.runCollect))))
+        .toEqual([{ kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true }]);
+    } finally {
+      resolverMock.resolveCodexRolloutPath.mockResolvedValue(null);
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

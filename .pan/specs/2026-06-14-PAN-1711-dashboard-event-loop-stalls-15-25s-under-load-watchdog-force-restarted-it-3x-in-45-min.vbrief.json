@@ -1,0 +1,461 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-14T19:10:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1711: Dashboard event loop stalls 15-25s under load — watchdog force-restarted it 3x in 45 min",
+    "updated": "2026-06-14T19:09:52.162Z"
+  },
+  "plan": {
+    "id": "pan-1711",
+    "title": "Dashboard event loop stalls 15-25s under load — watchdog force-restarted it 3x in 45 min",
+    "status": "proposed",
+    "uid": "ef176494-ba15-4b9c-ba9f-5a4f04c700e0",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-14T19:10:00.000Z",
+    "updated": "2026-06-14T19:09:52.162Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1711",
+        "label": "PAN-1711",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1817",
+        "label": "PAN-1817 (companion: tracker quota health signal)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1714",
+        "label": "PAN-1714 (watchdog dead-vs-busy)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "performance",
+      "dashboard",
+      "event-loop",
+      "deacon",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "The dashboard server is single-threaded; the lifecycle watchdog (Deacon) runs IN-PROCESS with it (main.ts:557+). Under heavy concurrency (~6-15 agents + review convoys + flywheel) the event loop is held for 15-25s at a time — a queue-drain signature in the Traefik log (a batch of /api/resources and /api/conversations requests completing together with descending durations). The supervisor watchdog polls /api/health every 10s and force-restarted the dashboard 3x in 45 min; PAN-1714 now defers the kill when 'slow but alive', but the underlying stalls remain and degrade tmux delivery to review convoys (review synthesis lags, merge cascade crawls). Static analysis confirms the loop is held by cumulative SYNCHRONOUS fs work in the in-process Deacon patrols (per-agent readFileSync/writeFileSync of state.json), the orphan-proposed-reconciler overrunning its interval (sequential spec/bead reads + sequential gh pr list), and IssueDataService fetching 3 repos' issues sequentially on a background timer. tmux delivery is a victim (its async verification poll is starved), not a cause. RAM is healthy throughout — this is CPU/event-loop, not memory.",
+      "Proposal": "Instrument first, then offload the confirmed synchronous blockers. (1) Add durable event-loop-delay metrics (perf_hooks.monitorEventLoopDelay) to /api/health plus a threshold WARN and per-patrol-cycle timing, so the dominant offender is attributable now and regressions are caught later (mirrors PAN-1817's health-signal pattern). (2) Remove the agent-state readFileSync churn from every in-process patrol loop via an internal write-through, short-TTL cache backing getAgentStateSync/getAgentState (zero call-site changes) and convert the one per-patrol write BURST (deacon brake, concurrency.ts:200-203) to the async write path. (3) Make the orphan-proposed-reconciler complete within its interval (parallelize spec reads, bead counts, and PR checks; cache bead counts by mtime; async access). (4) Parallelize IssueDataService's per-repo GitHub fetches with single-flight. (5) Add a per-session tmux delivery serialization guard so concurrent deliveries to one session don't race into redundant re-paste/re-verify loops. The embedding/search reindex is RULED OUT (runs in a worker thread). No /api/resources or /api/conversations endpoint bead — their sync surfaces are already cached; their stalls are symptoms of the in-process blockers.",
+      "NonGoals": "- Do NOT convert all ~60 getAgentStateSync / 34 saveAgentStateSync call sites to async; only back them with a cache and convert the single per-patrol write burst. CLI-only sync paths (done.ts, pause.ts, start.ts, kill.ts, reopen.ts, etc.) stay synchronous.\n- Do NOT add batch/debounce of agent-state writes in this issue — async + the read-cache remove the event-loop block; debounce is an fs-throughput optimization deferred until instrumentation shows residual churn.\n- Do NOT add an /api/resources or /api/conversations endpoint-specific code change — those are queue-drain symptoms; loadProjectsConfigSync is already mtime-cached and the conversations list already coalesces (PAN-1705).\n- Do NOT rewrite tmux delivery internals or tune the sendKeys verify timeouts — delivery is a victim of the stall; only add the per-session serialization guard.\n- Do NOT touch the embedding/search reindex — it already runs in a worker thread (dashboard-db-worker.ts), off the main loop.\n- Do NOT weaken the reconciler's scanInFlight single-flight guard, the postMergeLifecycle in-flight guard, or the ToS harness gate.\n- Do NOT move the in-process Deacon to a separate process or add worker threads in this issue (larger architectural change; out of scope)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Build durable event-loop instrumentation (monitorEventLoopDelay + /api/health + patrol timing) rather than a one-off --cpu-prof.",
+        "rationale": "The stall is intermittent under load; a permanent signal root-causes now AND catches regressions, mirroring PAN-1817's surface-as-health-signal pattern. A one-off profile would not survive the run or guard against recurrence."
+      },
+      {
+        "summary": "Remove agent-state read churn via an internal write-through cache, not by converting ~60 sync read sites to async.",
+        "rationale": "The Deacon is in-process; its per-agent patrol reads (readFileSync, agents.ts:1045-1052) block the dashboard loop. A cache removes them all at once with zero call-site changes; mass async conversion is sprawling and high-risk (NFR-3)."
+      },
+      {
+        "summary": "Convert only the per-patrol write burst (deacon brake, concurrency.ts:200-203) to async — not all 34 saveAgentStateSync sites.",
+        "rationale": "On-demand writes (pause/unpause/spawn/restart/done) are low-frequency; converting them is high-risk for little gain. The brake's per-agent-in-a-loop write is the real per-tick burst."
+      },
+      {
+        "summary": "Defer batch/debounce of agent-state writes (a strike suggestion) to NonGoals.",
+        "rationale": "Async + the read-cache remove the EVENT-LOOP BLOCK; debounce only reduces fs throughput, warranted only if FR-1 instrumentation shows residual write churn after this issue."
+      },
+      {
+        "summary": "Rule out the embedding/conversation-search reindex as the blocker — no bead.",
+        "rationale": "It runs in a worker thread (dashboard-db-worker.ts: worker_threads/parentPort/embedSessions), off the main event loop. The issue asked to rule this out; confirmed via code."
+      },
+      {
+        "summary": "No dedicated /api/resources or /api/conversations code bead.",
+        "rationale": "loadProjectsConfigSync is already mtime-cached (projects.ts:180); the conversations list already coalesces concurrent enrichments (PAN-1705, conversations.ts:2058-2105) and already removed the per-row JSONL context scan (2123-2128). Their stalls are queue-drain symptoms; fixing the in-process blockers fixes them. Adding endpoint beads would treat symptoms."
+      },
+      {
+        "summary": "Scope the tmux work to a per-session serialization guard; do not rewrite delivery or tune timeouts.",
+        "rationale": "Delivery is fully async and a victim of loop starvation; the 'Submitted text still visible after 2000ms' warning stops once the loop is relieved. A per-session guard fixes the genuine concurrent-paste race."
+      },
+      {
+        "summary": "Event-loop block WARN threshold default 1000ms; acceptance keeps max delay < ~2000ms under the target load.",
+        "rationale": "Baseline /api/health is ~5ms; 500-1000ms was already 'degraded' in the issue. Keeping max delay below ~2000ms ensures the supervisor's 10s ×3-strike probe never trips (NFR-1). Threshold is configurable."
+      }
+    ],
+    "items": [
+      {
+        "id": "eventloop-lag-health",
+        "title": "Expose event-loop delay metrics on /api/health + threshold WARN",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1711",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Start a perf_hooks.monitorEventLoopDelay() histogram at server boot (src/dashboard/server/main.ts / server.ts). Add an `eventLoopDelayMs` object with numeric p50/p99/max (ms) to the GET /api/health response (server.ts:107-109, currently returns { status: 'ok' }). Add a coarse-interval (1-5s) sampler that reads the histogram max, logs a WARN containing the measured block duration when it exceeds a configurable threshold (default 1000ms), then resets the histogram. The sampler must do no fs and no large JSON work (H5)."
+        },
+        "items": [
+          {
+            "id": "eventloop-lag-health.ac1",
+            "title": "GET /api/health returns a body whose eventLoopDelayMs object exposes numeric p50, p99, and max fields (ms)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eventloop-lag-health.ac2",
+            "title": "When event-loop max delay since the last sample exceeds the configured threshold (default 1000ms), the server emits a WARN log line containing the measured block duration in ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eventloop-lag-health.ac3",
+            "title": "The histogram resets after each sample interval so each WARN reflects the latest window and the /api/health max preserves per-window accuracy rather than cumulative delay",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eventloop-lag-health.ac4",
+            "title": "A unit test asserts the /api/health handler produces the eventLoopDelayMs metrics object without calling fs.readFileSync (no synchronous fs added to the loop)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-patrol-timing",
+        "title": "Log Deacon patrol-cycle duration for stall attribution",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1711",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Wrap the runPatrol() cycle (src/lib/cloister/deacon.ts:4678) with a start/end timer and log the cycle number plus wall-clock duration on completion. When a cycle exceeds a threshold, identify the slowest sub-check (orphan recovery / resume / orphan-proposed-reconciler / closed-issue / strike-workspace — the awaited calls at deacon.ts:4756-4780) by name. This pairs with eventloop-lag-health to attribute long event-loop blocks to a specific in-process patrol."
+        },
+        "items": [
+          {
+            "id": "deacon-patrol-timing.ac1",
+            "title": "Each completed runPatrol cycle logs a line containing the cycle number and its wall-clock duration in ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-patrol-timing.ac2",
+            "title": "When a patrol cycle exceeds the threshold, the log emits the name of the slowest sub-check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-patrol-timing.ac3",
+            "title": "A unit test asserts runPatrol produces a duration log entry for a completed cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-state-read-cache",
+        "title": "Back getAgentStateSync/getAgentState with an in-memory write-through cache",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1711",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "async-patrol-checkpoint-writes"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an internal process-local cache (Map keyed by normalized agentId) inside src/lib/agents.ts backing getAgentStateSync (1045-1052) and getAgentState (1055-1064). Serve cached reads within a short TTL (e.g. 500ms-1s); on TTL expiry validate via statSync mtime before re-reading (H1). Make saveAgentStateSync (1066-1088) AND saveAgentState (1091-1120) write through to the cache so reads stay consistent. No call-site changes — this removes the readFileSync churn from every in-process Deacon patrol loop and dashboard route at once. Keep the cache process-local (do not assume cross-process coherence beyond the TTL)."
+        },
+        "items": [
+          {
+            "id": "agent-state-read-cache.ac1",
+            "title": "Given the same agent state read twice within the cache TTL, getAgentStateSync returns the cached object on the second call without a second fs.readFileSync (verified by spying readFileSync)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-state-read-cache.ac2",
+            "title": "After saveAgentStateSync or saveAgentState persists a state, a subsequent getAgentStateSync returns the updated state (write-through consistency)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-state-read-cache.ac3",
+            "title": "After the TTL elapses and the file changed out-of-process, getAgentStateSync re-validates against the file mtime and returns the fresh state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-state-read-cache.ac4",
+            "title": "getAgentState (Effect variant) serves from the same cache and returns state consistent with getAgentStateSync for the same agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "async-patrol-checkpoint-writes",
+        "title": "Convert the Deacon brake per-agent state write to the async path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1711",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In the deacon brake trim loop (src/lib/cloister/concurrency.ts:194-209), replace the synchronous getAgentStateSync + saveAgentStateSync (lines 200-203) per-agent write with the async saveAgentState path (await Effect.runPromise) so the patrol tick performs no writeFileSync burst. Preserve the stop -> clear stoppedByUser -> save ordering and await each write before the next iteration so same-agent writes do not interleave (H2). Reads may use the cache from agent-state-read-cache."
+        },
+        "items": [
+          {
+            "id": "async-patrol-checkpoint-writes.ac1",
+            "title": "A unit test asserts the brake trim checkpoint produces no fs.writeFileSync call and persists the cleared state via the async saveAgentState path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "async-patrol-checkpoint-writes.ac2",
+            "title": "After the brake trims an agent, the persisted state has stoppedByUser removed so the deacon re-admits it when a slot frees (preserves the existing brake behavior)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "async-patrol-checkpoint-writes.ac3",
+            "title": "Each per-agent async write is awaited before the next loop iteration so concurrent same-agent writes do not interleave (last-write-wins preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconciler-stay-under-interval",
+        "title": "Make orphan-proposed-reconciler complete within its scan interval",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-14T19:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1711",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/orphan-proposed-reconciler.ts: parallelize the per-spec readJsonFile (currently sequential at 182-187) and per-issue countBeadsForIssue (207) with Promise.all; cache bead counts keyed by the beads file mtime so an unchanged beads file is not re-parsed (countBeadsForIssue, 117-136); replace existsSync (180) with async access; and in reconcileOrphanProposedSpecs parallelize the per-candidate defaultHasOpenPrForBranch gh pr list calls (loop at 327). Keep the scanInFlight single-flight guard (312-315) and return candidates in deterministic order (H3)."
+        },
+        "items": [
+          {
+            "id": "reconciler-stay-under-interval.ac1",
+            "title": "findOrphanProposedSpecsForReconciler reads per-project spec files concurrently (Promise.all) and returns the combined candidate list; a test verifies multiple spec reads run in parallel rather than one-await-at-a-time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-stay-under-interval.ac2",
+            "title": "Per-candidate open-PR checks run concurrently (Promise.all) rather than sequentially, and the reconcile pass produces the same actions as the sequential version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-stay-under-interval.ac3",
+            "title": "Bead counts are cached by beads-file mtime: an unchanged beads file returns the cached count without re-reading/parsing the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-stay-under-interval.ac4",
+            "title": "A test asserts the reconciler scan path produces no existsSync and no readFileSync calls (existsSync replaced with async access)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-stay-under-interval.ac5",
+            "title": "The scanInFlight single-flight guard is preserved (a concurrent reconcile call returns [] without starting a second scan) and candidate order is deterministic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issuedata-parallel-fetch",
+        "title": "Parallelize IssueDataService per-repo GitHub fetches + single-flight",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-14T19:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1711",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/issue-data-service.ts pollGitHub (793-822), replace the sequential `for (const ... of config.repos)` loop (803) and its awaited open (806) + closed (812) fetches with a Promise.all over repos, each doing Promise.all([openFetch, closedFetch]). Add a single-flight guard so an overlapping pollGitHub awaits the in-flight promise instead of starting a second fetch; clear the in-flight promise on settle (success or failure) so errors are not masked (H4). Preserve the PAN-1817 skipPolling cache-only mode and quota-health handling."
+        },
+        "items": [
+          {
+            "id": "issuedata-parallel-fetch.ac1",
+            "title": "pollGitHub fetches open and closed issues for all configured repos concurrently (Promise.all) and produces the merged issue set; a test verifies the per-repo fetch runs in parallel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issuedata-parallel-fetch.ac2",
+            "title": "An overlapping pollGitHub call resolves by awaiting the in-flight promise instead of starting a second fetch (single-flight)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issuedata-parallel-fetch.ac3",
+            "title": "The in-flight promise is cleared on settle (success or failure) so the next poll produces a fresh fetch and per-tracker errors are not masked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmux-per-session-delivery-guard",
+        "title": "Serialize concurrent tmux message deliveries per session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-14T19:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1711",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a per-session serialization guard (a Map<sessionName, Promise> queue) around the load-buffer/paste-buffer delivery in src/lib/tmux.ts (sendKeys delivery) / deliverAgentMessage in src/lib/agents.ts, so two concurrent deliveries to the SAME session run one-after-another and their paste-buffer operations cannot interleave. Key by session name so different sessions still deliver concurrently. Add a timeout so a stuck delivery cannot block the per-session queue indefinitely (H6). This prevents the concurrent-paste race that produces redundant re-verify/'Submitted text still visible' churn under load."
+        },
+        "items": [
+          {
+            "id": "tmux-per-session-delivery-guard.ac1",
+            "title": "Given two concurrent deliveries to the same tmux session, the guard serializes them so the second sends only after the first completes and paste-buffer operations do not interleave (verified by a test ordering two same-session deliveries)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-per-session-delivery-guard.ac2",
+            "title": "The guard keys by session name and preserves concurrency across different sessions (deliveries to different sessions are not serialized by a global lock)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-per-session-delivery-guard.ac3",
+            "title": "A timeout releases the per-session lock so the queue survives a stuck delivery and other sessions still receive messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "eventloop-lag-health",
+        "to": "agent-state-read-cache",
+        "type": "informs"
+      },
+      {
+        "from": "eventloop-lag-health",
+        "to": "reconciler-stay-under-interval",
+        "type": "informs"
+      },
+      {
+        "from": "agent-state-read-cache",
+        "to": "async-patrol-checkpoint-writes",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-14-PAN-1711-dashboard-event-loop-stalls-15-25s-under-load-watchdog-force-restarted-it-3x-in-45-min.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

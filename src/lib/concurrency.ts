@@ -1,6 +1,4 @@
-import { Effect } from 'effect';
-
-export function withConcurrencyLimitPromise<T>(
+export function withConcurrencyLimit<T>(
   tasks: Array<() => Promise<T>>,
   max: number,
 ): Promise<T[]> {
@@ -94,19 +92,3 @@ export function createPromiseConcurrencyLimiter(max: number) {
     drain();
   });
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native semaphore: run at most `max` Effects concurrently, preserving
- * order. Mirrors withConcurrencyLimit but composes with Effect's typed error
- * channel via Effect.all + concurrency option.
- *
- * Use this for new Effect-flavored call-sites; existing Promise-based callers
- * keep using withConcurrencyLimit.
- */
-export const withConcurrencyLimit = <T, E, R>(
-  tasks: ReadonlyArray<Effect.Effect<T, E, R>>,
-  max: number,
-): Effect.Effect<readonly T[], E, R> =>
-  Effect.all(tasks, { concurrency: max });

@@ -22,7 +22,7 @@ vi.mock('../../../../lib/config-yaml.js', async () => {
   const actual = await vi.importActual<typeof import('../../../../lib/config-yaml.js')>('../../../../lib/config-yaml.js');
   return {
     ...actual,
-    getConversationSearchConfigSync: vi.fn(),
+    getConversationSearchConfig: vi.fn(),
   };
 });
 
@@ -34,7 +34,7 @@ vi.mock('../../../../lib/conversation-search/embedding-provider.js', async () =>
   };
 });
 
-import { getConversationSearchConfigSync } from '../../../../lib/config-yaml.js';
+import { getConversationSearchConfig } from '../../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../../lib/conversation-search/embedding-provider.js';
 import { runMemoryFtsStatement } from '../../../../lib/memory/fts-db.js';
 import { getConversationByClaudeSessionId } from '../../../../lib/overdeck/conversations.js';
@@ -74,10 +74,8 @@ function jsonlMessage(role: string, text: string): string {
 }
 
 describe('palette conversation search', () => {
-  it('offers reset-to-planned in the command palette', () => {
-    expect(PAN_COMMANDS).toContainEqual(expect.objectContaining({
-      name: 'pan reset-to-planned <id>',
-    }));
+  it('no longer offers the deleted reset-to-planned verb (PAN-3917)', () => {
+    expect(PAN_COMMANDS.some((c) => c.name.startsWith('pan reset-to-planned'))).toBe(false);
   });
 
   beforeEach(() => {
@@ -110,7 +108,7 @@ describe('palette conversation search', () => {
     };
     const dimensions = dimensionsForModel(config.model);
     const provider = fakeProvider(dimensions);
-    vi.mocked(getConversationSearchConfigSync).mockReturnValue(config);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
     vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
     vi.mocked(listProjectsSync).mockReturnValue([{
       key: 'overdeck-key',
@@ -176,7 +174,7 @@ describe('palette conversation search', () => {
     };
     const dimensions = dimensionsForModel(config.model);
     const provider = fakeProvider(dimensions);
-    vi.mocked(getConversationSearchConfigSync).mockReturnValue(config);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
     vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
 
     const db = openEmbeddingsDb(config.dbPath, dimensions);
@@ -204,7 +202,7 @@ describe('palette conversation search', () => {
       apiKeyRef: undefined,
       dbPath: join(tmpDir!, 'embeddings.db'),
     };
-    vi.mocked(getConversationSearchConfigSync).mockReturnValue(config);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
     vi.mocked(listProjectsSync).mockReturnValue([{ key: 'overdeck' } as ReturnType<typeof listProjectsSync>[number]]);
     vi.mocked(runMemoryFtsStatement).mockResolvedValue([{
       rowid: 7,

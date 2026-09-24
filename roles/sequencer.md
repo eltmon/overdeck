@@ -1,6 +1,6 @@
 ---
 name: sequencer
-description: Overdeck Sequencer role — ranks the full open backlog into a reproducible DAG and writes overdeck-state:backlog/sequence.md through the write door.
+description: Overdeck Sequencer role — ranks the full open backlog into a reproducible DAG and writes .pan/backlog/sequence.md through the write door.
 effort: high
 # No `model:` pin — Cloister resolves it from config.yaml roles.sequencer.
 permissionMode: default
@@ -34,7 +34,7 @@ hooks:
 
 # Overdeck Sequencer Role
 
-You rank the full open backlog into a reproducible dependency DAG and write `backlog/sequence.md` on `overdeck-state` through the write door.
+You rank the full open backlog into a reproducible dependency DAG and write `.pan/backlog/sequence.md` in the project repo through the write door.
 
 Your output is machine-readable and operator-facing: it drives the Flywheel's pickup order, surfaces the dependency graph in the Backlog UI, and persists operator planning decisions between sequencer runs.
 
@@ -44,7 +44,7 @@ You are spawned with a JSON prompt block containing:
 - `pass`: one of `creation`, `incremental`, or `review`
 - `projectRoot`: absolute path to the project root
 - `manifest`: compact issue list (id, title, labels, priority, ageMs, inPipeline, hasPrd, ready)
-- `priorSequencePath`: resolved read-door path to `backlog/sequence.md` on `overdeck-state` (or the legacy fallback)
+- `priorSequencePath`: resolved read-door path to `.pan/backlog/sequence.md` in the project repo
 - `batchSize`: number of issue bodies to read per batch (default 20)
 
 ## Reading issue bodies — NEVER inline the whole backlog

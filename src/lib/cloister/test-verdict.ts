@@ -4,7 +4,7 @@
  * The test role narrates "tests pass" but the agent (often Haiku 4.5) sometimes
  * never POSTs the verdict, stranding the issue at test=pending. To make the
  * verdict recoverable the test role writes a small work-product artifact at
- * `.pan/test/result.json` BEFORE it POSTs testStatus — symmetric with how the
+ * `.pan/test/result.json` BEFORE it signals its verdict — symmetric with how the
  * review convoy reviewers write report files / the synthesis agent writes
  * `synthesis.md`, which `checkCompletedButUnsignaledReviews` already reads.
  *
@@ -20,7 +20,6 @@
  */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { XBriefDocument } from '../xbrief/types.js';
 
 export interface TestVerdictArtifact {
   status: 'passed' | 'failed';
@@ -95,97 +94,3 @@ export type UnsignaledTestDecision =
   | ({ action: 'auto-complete' } & RecoveredTestVerdict)
   | ({ action: 'nudge-verdict' } & RecoveredTestVerdict)
   | { action: 'nudge-write' };
-
-/**
- * Pure decision core for `checkCompletedButUnsignaledTests`. Given the test
- * session's liveness/idleness, whether we already nudged this cycle, and the
- * recovered verdict artifact (or null), decide what the deacon should do.
- *
- * Safety rule (D6): NEVER fabricate a verdict. `auto-complete` happens only from
- * a written artifact; with no artifact the most we do is nudge once to prompt
- * the agent to write+POST, then defer to the strand-surfacing path. A false
- * "passed" would ship unverified code; a surfaced stuck state is the safe
- * failure mode.
- */
-export function decideUnsignaledTestAction(input: {
-  /** session exists AND its pane is not dead */
-  sessionLive: boolean;
-  /** idle past the settle window (only meaningful when sessionLive) */
-  idle: boolean;
-  /** already nudged within the dedup window this cycle */
-  alreadyNudged: boolean;
-  artifact: TestVerdictArtifact | null;
-}): UnsignaledTestDecision {
-  const { sessionLive, idle, alreadyNudged, artifact } = input;
-
-  // Dead session: recover only from a written verdict. With no artifact there is
-  // nothing to recover here — checkPendingTestDispatch / the orphan sweep own
-  // re-dispatch, and the strand-surfacing path owns visibility.
-  if (!sessionLive) {
-    if (artifact) return { action: 'auto-complete', ...artifact };
-    return { action: 'none' };
-  }
-
-  // Alive but still working — leave it alone until it goes idle past the settle
-  // window. (A genuinely running agent emits activity and is never "idle" here.)
-  if (!idle) return { action: 'wait' };
-
-  // Alive + idle.
-  if (artifact) {
-    // Already nudged once and still no signal → the agent is unresponsive;
-    // complete from the artifact so the pipeline isn't blocked.
-    if (alreadyNudged) return { action: 'auto-complete', ...artifact };
-    return { action: 'nudge-verdict', ...artifact };
-  }
-
-  // No artifact: never guess. Nudge once to write+POST; if the agent is still
-  // unresponsive after that, escalate to the operator. PAN-3092 (MIN-858): the
-  // old `none` here was terminal — a live agent holding a finished verdict in
-  // its pane and nothing else sat there for six hours while every surface
-  // reported it healthy. No automatic path can recover a pane-only verdict, so
-  // the honest move is to tell a human, not to keep quiet.
-  if (alreadyNudged) return { action: 'escalate' };
-  return { action: 'nudge-write' };
-}
-
-/**
- * PAN-3092: surface an `escalate` decision to the operator, once per test
- * dispatch generation. Returns the needs-you line to log, or undefined when this
- * generation already tripped. Never touches the verdict itself (D6) — a
- * pane-only verdict is a human's call to read and apply.
- */
-export async function recordUnsignaledTestEscalation(
-  workspacePath: string,
-  issueId: string,
-  testSession: string,
-  generation: string,
-): Promise<string | undefined> {
-  const { recordRecoveryFailure } = await import('./recovery-trip.js');
-  const { emitNeedsYou } = await recordRecoveryFailure(
-    workspacePath, issueId, 'unsignaled-test-verdict', generation, 1,
-  );
-  if (!emitNeedsYou) return undefined;
-  return (
-    `needs-you ${issueId}: the test agent (${testSession}) is alive but has not responded to a verdict ` +
-    `nudge, and it wrote no .pan/test/result.json — its verdict may exist only in the agent's pane, where ` +
-    `nothing can recover it automatically. Read the pane ` +
-    `(tmux -L overdeck capture-pane -t ${testSession} -p -S -200), then either apply the verdict yourself ` +
-    `(pan admin specialists done test ${issueId} --status passed|failed) or run pan kill ${issueId} and ` +
-    `re-dispatch the test.`
-  );
-}
-
-export function resolveSlotFeedbackAgentId(
-  issueId: string,
-  slotItemId: string | undefined,
-  _doc: XBriefDocument | null | undefined,
-  slotOwnership: Array<{ slotIndex: number; slotItemId?: string; itemId?: string }> = [],
-): string | null {
-  const normalizedItemId = slotItemId?.trim();
-  if (!normalizedItemId) return null;
-
-  const persistedOwner = slotOwnership.find(slot => (slot.slotItemId ?? slot.itemId) === normalizedItemId);
-  if (persistedOwner) return `agent-${issueId.toLowerCase()}-slot-${persistedOwner.slotIndex}`;
-
-  return null;
-}

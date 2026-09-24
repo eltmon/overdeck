@@ -1,4 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// W1 deleted src/lib/state-read-home.ts and src/lib/state-home.ts; W3 deletes
+// the record plane and the mirror syncs that import them. They are still on
+// this module's import chain in this tree, so stub the importers rather than
+// loading them. Every entry here disappears once W3 lands.
+vi.mock('../../../../../lib/remote-workspace.js', () => ({}));
+vi.mock('../../../../../lib/remote/remote-agents.js', () => ({}));
+vi.mock('../../../../../lib/overdeck/planning-promotion.js', () => ({}));
+vi.mock('../../../../../lib/overdeck/conversation-retrospective.js', () => ({}));
+vi.mock('../../../../../lib/cloister/flywheel.js', () => ({}));
+vi.mock('../../../../../lib/agents/spawn.js', () => ({ spawnRun: vi.fn(), spawnAgent: vi.fn(), spawnRunPromise: vi.fn() }));
+vi.mock('../../../../../lib/agents.js', () => ({ transitionIssueToInReview: vi.fn(), spawnRun: vi.fn() }));
+
+
 
 import { parseRequestedReviewMode } from '../review-pipeline.js';
 

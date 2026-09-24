@@ -15,15 +15,13 @@ import {
   useIssueCheckRunsQuery,
   useIssueCostsQuery,
   usePrQuery,
-  useReviewStatusQuery,
   type ActivitySection,
   type IssueCheckRun,
   type PullRequestData,
-  type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
-import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../lib/store'
+import { selectAgents, useBackendPanes, useDerivedIssueState, useDashboardStore } from '../../../lib/store'
 import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
 import { currentPhase, phaseLabel, type Phase } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
@@ -39,7 +37,6 @@ import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
 import type { PaneType } from '../../../lib/panesStore'
-import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { trackerIssueUrl } from '../../../lib/issueLinks'
 import { taskStatusRollup } from '../../../lib/taskStatus'
 import { TasksPanel } from '../../TasksPanel'
@@ -49,7 +46,6 @@ import { IssueTreeLane } from './IssueTreeLane'
 import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { ChangedFilesView } from './ChangedFilesView'
 import { CockpitPhaseRail } from './CockpitPhaseRail'
-import { StatusHistoryTab } from './StatusHistoryTab'
 import { IssueOverviewTab } from './IssueOverviewTab'
 import { PlanMapCard } from './PlanMapCard'
 import { StatusNarrative } from './StatusNarrative'
@@ -57,7 +53,7 @@ import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import { useCockpitNeedsYouActions } from './useCockpitNeedsYouActions'
 import { useDeferredSessionSelection } from './useDeferredSessionSelection'
 import type { SessionNode } from '@overdeck/contracts'
-import type { Agent } from '../../../types'
+import type { Agent, DerivedIssueState } from '../../../types'
 import styles from './cockpitBody.module.css'
 
 export interface IssueMissionControlProps {
@@ -74,7 +70,7 @@ export interface IssueMissionControlProps {
 }
 
 type MissionTab = 'overview' | 'session' | 'plan' | 'changes' | 'activity' | 'discussion'
-type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'prd' | 'files' | 'checks' | 'artifacts' | 'feed' | 'history'
+type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'prd' | 'files' | 'checks' | 'artifacts' | 'feed'
 type TabSelection = { tab: MissionTab; subView?: MissionSubView }
 
 /** Tabs whose bodies delegate to the ONE IssueDetail component for at least one sub-view. */
@@ -97,7 +93,7 @@ const LEGACY_TAB_MAP: Record<string, TabSelection> = {
   code: { tab: 'changes', subView: 'checks' },
   files: { tab: 'changes', subView: 'files' },
   artifacts: { tab: 'changes', subView: 'artifacts' },
-  timeline: { tab: 'activity', subView: 'history' },
+  timeline: { tab: 'activity', subView: 'feed' },
   costs: { tab: 'overview' },
   ship: { tab: 'overview' },
 }
@@ -127,21 +123,6 @@ type IssueTreeContext = 'issue'
 
 const SPINE_COLLAPSED_KEY = 'overdeck.cockpit.spineCollapsed'
 
-// Explicit, literal Tailwind classes — interpolated utilities get purged.
-// PAN-1991 #4: active = blue (a machine is working), not purple (purple is
-// reserved for review/ship/planning specialist activity). done = emerald,
-// failed = red, ahead = neutral track.
-// PAN-1991 #5: gate dots follow the law — emerald=passing, red=failing,
-// blue=running (a machine is working; was purple), neutral=pending/rest.
-function statusToTone(status: string | undefined | null): CockpitTone {
-  const normalized = (status ?? '').toLowerCase()
-  if (['passed', 'success', 'completed', 'merged', 'ready'].includes(normalized)) return 'success'
-  if (['failed', 'blocked', 'dispatch_failed', 'timed_out', 'action_required', 'startup_failure', 'failure'].includes(normalized)) return 'destructive'
-  if (['running', 'reviewing', 'testing', 'queued', 'merging', 'verifying', 'in_progress'].includes(normalized)) return 'info'
-  if (['skipped', 'neutral', 'cancelled'].includes(normalized)) return 'muted'
-  return 'warning'
-}
-
 function checkRunLabel(run: Pick<IssueCheckRun, 'status' | 'conclusion'>): string {
   if (run.status !== 'completed') return run.status.replace(/_/g, ' ')
   return (run.conclusion ?? 'unknown').replace(/_/g, ' ')
@@ -152,21 +133,23 @@ function checkRunLabel(run: Pick<IssueCheckRun, 'status' | 'conclusion'>): strin
 // six-word vocabulary (phaseLabel), same as the board, drawer, and rail.
 function pillTone(state: PipelineState): CockpitTone {
   if (state === 'merged' || state === 'done') return 'success'
-  if (state === 'in_review_changes_requested' || state === 'testing_failures' || state === 'verification_failing' || state === 'canceled') return 'destructive'
+  if (state === 'in_review_changes_requested' || state === 'canceled') return 'destructive'
+  if (state === 'ready_to_merge') return 'warning'
   if (state === 'generic') return 'muted'
   return 'info'
 }
 
-function nextAction(rs: ReviewStatusData | undefined): string {
-  if (!rs) return 'start work'
-  if (rs.mergeStatus === 'merged') return 'merged — close out'
-  if (rs.readyForMerge) return 'merge to main'
-  if (rs.reviewStatus === 'blocked' || rs.reviewStatus === 'failed') return 'work agent fixes → re-review'
-  if (rs.reviewStatus === 'reviewing') return 'review in progress'
-  if (rs.testStatus === 'testing') return 'test in progress'
-  if (rs.testStatus === 'failed' || rs.testStatus === 'dispatch_failed') return 'fix tests → re-run'
-  if (rs.reviewStatus === 'passed' && rs.testStatus !== 'passed' && rs.testStatus !== 'skipped') return 'dispatch test'
-  return 'awaiting pipeline'
+function nextAction(issue: DerivedIssueState | undefined): string {
+  switch (issue?.state) {
+    case 'merged': return 'merged — close out'
+    case 'closed': return 'closed'
+    case 'ready': return 'merge to main'
+    case 'changes-requested': return 'work agent fixes → re-review'
+    case 'in-review': return issue.pr?.checks === 'red' ? 'fix the failing checks' : 'review in progress'
+    case 'working': return 'finish the work, then open the PR'
+    case 'planned': return 'start work'
+    default: return 'plan it'
+  }
 }
 
 function githubCompareUrl(issueUrl: string | null, branch: string): string | null {
@@ -350,33 +333,33 @@ const NOW_DOT: Record<CockpitTone, string> = {
 }
 
 interface NowState { tone: CockpitTone; text: string; agentType?: string; agentLabel?: string }
-function deriveNow(rs: ReviewStatusData | undefined, active: { type: string; model?: string } | undefined): NowState {
+function deriveNow(issue: DerivedIssueState | undefined, active: { type: string; model?: string } | undefined): NowState {
   const label = active ? (NOW_LABEL[active.type] ?? active.type) : ''
   const model = active ? nowModel(active.model) : ''
   const agentLabel = active ? (model ? `${label.toLowerCase()} · ${model}` : label.toLowerCase()) : undefined
-  if (rs?.mergeStatus === 'merged') return { tone: 'success', text: 'Merged — ready to close out' }
-  if (rs?.readyForMerge) return { tone: 'success', text: 'Review & tests passed — ready to merge' }
-  if (rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed') {
+  if (issue?.state === 'merged') return { tone: 'success', text: 'Merged — ready to close out' }
+  if (issue?.state === 'ready') return { tone: 'warning', text: 'Approved and green — waiting on you to merge' }
+  if (issue?.state === 'changes-requested') {
     const onIt = active?.type === 'work'
-    return { tone: 'destructive', text: onIt ? 'Review blocked — work agent is fixing it' : 'Review blocked — awaiting the work agent', agentType: onIt ? 'work' : undefined, agentLabel: onIt ? agentLabel : undefined }
+    return {
+      tone: 'destructive',
+      text: onIt ? 'Changes requested — work agent is fixing it' : 'Changes requested — awaiting the work agent',
+      ...(onIt ? { agentType: 'work', agentLabel } : {}),
+    }
   }
-  if (rs?.testStatus === 'testing') return { tone: 'info', text: 'Tests running' }
-  if (rs?.verificationStatus === 'running') return { tone: 'info', text: 'Verification running' }
+  if (issue?.pr?.checks === 'red') return { tone: 'destructive', text: 'Checks are failing on the PR' }
+  if (issue?.pr?.checks === 'pending') return { tone: 'info', text: 'Checks running' }
   if (active) return { tone: 'info', text: `${label} agent is working`, agentType: active.type, agentLabel }
-  return { tone: 'muted', text: 'Idle — awaiting the pipeline' }
+  return { tone: 'muted', text: 'Idle' }
 }
 
 /** Lean Overview "Now" panel (PAN-1991 #9) — only what the header gates, the
  * Agents lane, and the beads rail don't already show: what's happening, the next
  * action, the diff size, and the last few status events. No status grid. */
-function NowPanel({ reviewStatus: rs, pr: p, sections, onTab, onOpenAgent }: { reviewStatus: ReviewStatusData | undefined; pr: PullRequestData | null | undefined; sections: readonly ActivitySection[]; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void }) {
+function NowPanel({ issue, pr: p, sections, onTab, onOpenAgent }: { issue: DerivedIssueState | undefined; pr: PullRequestData | null | undefined; sections: readonly ActivitySection[]; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void }) {
   const active = sections.find((s) => s.status === 'running' || s.status === 'active' || s.status === 'starting')
   const hasWork = sections.some((s) => s.type === 'work')
-  const now = deriveNow(rs, active)
-  const recent = [...(rs?.history ?? [])]
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 3)
-  const nowDate = new Date()
+  const now = deriveNow(issue, active)
   const lk = 'rounded-[8px] border border-border px-2.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:bg-accent'
 
   return (
@@ -391,7 +374,7 @@ function NowPanel({ reviewStatus: rs, pr: p, sections, onTab, onOpenAgent }: { r
         )}
       </div>
       <div className="mt-2.5 text-[12.5px]">
-        <span className="text-muted-foreground">Next:</span> {nextAction(rs)}
+        <span className="text-muted-foreground">Next:</span> {nextAction(issue)}
         {p && <> · <span className="text-muted-foreground">diff</span> <span className="text-success-foreground">+{p.additions}</span> <span className="text-destructive-foreground">−{p.deletions}</span> · {p.changedFiles} file{p.changedFiles === 1 ? '' : 's'}</>}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -399,21 +382,6 @@ function NowPanel({ reviewStatus: rs, pr: p, sections, onTab, onOpenAgent }: { r
         {p && <button type="button" className={lk} onClick={() => onTab('changes', 'checks')}>Open diff →</button>}
         {p?.url && <a className={lk} href={p.url} target="_blank" rel="noreferrer">Open PR ↗</a>}
       </div>
-      {recent.length > 0 && (
-        <div className="mt-3.5">
-          <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-            <span>Recent activity</span>
-            <button type="button" className="text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground" onClick={() => onTab('activity', 'history')}>→ Timeline</button>
-          </div>
-          {recent.map((h, i) => (
-            <div key={`${h.type}-${h.timestamp}-${i}`} className="flex items-baseline gap-2.5 py-1 text-[12.5px]">
-              <span className={`mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full ${NOW_DOT[statusToTone(h.status)]}`} />
-              <span className="capitalize">{h.type} {h.status}</span>
-              <span className="ml-auto text-[10.5px] text-muted-foreground">{formatRelativeTime(h.timestamp, nowDate)}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -467,7 +435,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     staleTime: 60_000,
   })
   const tasksRollup = taskStatusRollup(planQuery.data?.plan?.items ?? [])
-  const review = useReviewStatusQuery(issueId)
+  const derivedIssue = useDerivedIssueState(issueId)
+  const backendPanes = useBackendPanes(issueId)
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
@@ -482,17 +451,12 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     })),
     [issueView.activity.sections],
   )
-  const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
   const issueRecord = useDashboardStore((s) =>
     (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string; url?: string }> | undefined)?.find(
       (candidate) => candidate.identifier === issueId,
     ),
   )
-  const preferredReviewStatus = reviewSnapshot ?? review.data
-  const cockpitShip = useMemo(
-    () => deriveShip(preferredReviewStatus as ReviewStatusData | undefined, issueView.ship.log),
-    [issueView.ship.log, preferredReviewStatus],
-  )
+  const cockpitShip = useMemo(() => deriveShip(derivedIssue), [derivedIssue])
   const cockpitIssueView = useMemo(
     () => ({ ...issueView, ship: cockpitShip }),
     [cockpitShip, issueView],
@@ -500,10 +464,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   // PAN-2908 C-VOCAB/one-data-model: the header pill runs on the shared
   // pipeline machine (WS snapshot first, HTTP detail as warmup fallback) —
   // no bespoke phase re-derivation on this surface.
-  const primaryAgent = useMemo(() => {
-    const live = issueAgents.filter((a) => a.status === 'running' || a.status === 'starting')
-    return live.find((a) => a.role === 'work') ?? live[0] ?? issueAgents[0] ?? null
-  }, [issueAgents])
   const workAgentRunning = useMemo(
     () => issueAgents.some((a) => a.role === 'work' && (a.status === 'running' || a.status === 'starting')),
     [issueAgents],
@@ -511,12 +471,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const hasLiveSession = issueAgents.some((agent) => agent.status === 'running' || agent.status === 'starting')
     || treeSessions.some((session) => session.presence === 'active')
   const pipelineState = derivePipelineState({
-    reviewStatus: preferredReviewStatus ?? null,
-    agent: primaryAgent,
-    hasPlan: headerActions.state.hasPlan,
-    hasTasks: tasksRollup.total > 0,
+    derived: derivedIssue ?? null,
+    panes: backendPanes,
     issueCanonicalState: issueRecord?.state ?? issueRecord?.status ?? null,
-    isMerged: preferredReviewStatus?.mergeStatus === 'merged',
   })
   const currentPhaseKey = currentPhase(pipelineState)
   const phase = currentPhaseKey
@@ -573,7 +530,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     cancelPhaseSession()
     applySessionSelection(session)
   }
-  const resolveNeedsYouAction = useCockpitNeedsYouActions(issueId, treeSessions, selectSessionFromTree)
+  const resolveNeedsYouAction = useCockpitNeedsYouActions(treeSessions, selectSessionFromTree)
   // Open an agent's conversation by session type (work/review/test/…). Shared by
   // the pipeline phases (#4) and the Overview "Now" links (#9).
   const openAgentByType = (type: string): boolean => {
@@ -623,7 +580,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       hasPlan={headerActions.state.hasPlan}
       workRunning={workAgentRunning}
       mergedCommit={mergeCommitOid(pr.data?.pr?.mergeCommit)}
-      reviewSummary={review.data?.reviewNotes ?? review.data?.mergeNotes}
     />
   )
 
@@ -728,7 +684,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         pipelineState={pipelineState}
         agents={issueView.agents}
         ship={cockpitShip}
-        testStatus={preferredReviewStatus?.testStatus}
         onSelectPhase={selectPipelinePhase}
       />
 
@@ -812,7 +767,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                     if (selection) selectTab(selection.tab, selection.subView)
                   }}
                   agents={issueAgents}
-                  reviewStatus={reviewSnapshot}
                   className={activeTab === 'session' ? 'min-h-0 flex-1' : undefined}
                 />
               </div>
@@ -882,26 +836,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             )}
             {activeTab === 'activity' && (
               <div data-section="Plan / Activity / Discussion tabs" className="space-y-3.5">
-                <div role="tablist" aria-label="Activity views" className="flex gap-1 border-b border-border pb-2">
-                  {(['feed', 'history'] as const).map((subView) => (
-                    <button
-                      key={subView}
-                      type="button"
-                      role="tab"
-                      aria-selected={activeSubView === subView}
-                      onClick={() => selectTab('activity', subView)}
-                      className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                        activeSubView === subView
-                          ? 'bg-primary/9 text-primary'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                      }`}
-                    >
-                      {subView === 'feed' ? 'Feed' : 'Status history'}
-                    </button>
-                  ))}
-                </div>
-                {activeSubView === 'feed' ? <ActivityTab issueId={issueId} /> : null}
-                {activeSubView === 'history' ? <StatusHistoryTab issueId={issueId} /> : null}
+                <ActivityTab issueId={issueId} />
               </div>
             )}
             {activeTab === 'discussion' && <div data-section="Plan / Activity / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
@@ -909,7 +844,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         </main>
         <aside data-section="Awareness rail" className={styles.awarenessRail} aria-label="Issue awareness">
           <section data-testid="right-rail-now" className="rounded-[var(--radius)] border border-border bg-card p-3">
-            <div data-section="NowPanel"><NowPanel reviewStatus={review.data} pr={pr.data?.pr} sections={issueView.activity.sections} onTab={selectTab} onOpenAgent={openAgentByType} /></div>
+            <div data-section="NowPanel"><NowPanel issue={derivedIssue} pr={pr.data?.pr} sections={issueView.activity.sections} onTab={selectTab} onOpenAgent={openAgentByType} /></div>
           </section>
           <RunDetailsCard model={issueView} />
           <section data-testid="right-rail-gates" className="rounded-[var(--radius)] border border-border bg-card p-3">

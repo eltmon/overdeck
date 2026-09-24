@@ -235,7 +235,7 @@ free -h
 |-------|---------|--------|
 | **running** | Agent actively working | Normal - no action needed |
 | **idle** | Agent waiting for input/task | May need message or new task |
-| **completed** | Agent finished work | Review with `pan review pending` |
+| **completed** | Agent finished work | Review with `gh pr view` |
 | **crashed** | Agent encountered error | Check logs, use `pan recover` |
 | **blocked** | Agent stuck or waiting | Send message with `pan tell` |
 
@@ -437,7 +437,7 @@ Regular health check checklist:
 - [ ] Run `pan status` - check all agents are in expected state
 - [ ] Run `pan doctor` - verify system health
 - [ ] Check dashboard at http://localhost:3001
-- [ ] Review `pan review pending` for completed work
+- [ ] Review `gh pr list --search "is:open review-requested:@me"` for completed work
 - [ ] Check disk usage: `df -h ~/overdeck/workspaces/`
 - [ ] Review logs for errors: `grep ERROR ~/.overdeck/logs/*.log`
 - [ ] Check Docker containers: `docker ps`
@@ -483,7 +483,7 @@ Based on status:
 
 **If agents are idle:**
 - Send new tasks: `pan tell <id> "Next task..."`
-- Approve completed work: `pan approve <id>`
+- Review and approve the PR on the forge
 
 **If agents crashed:**
 - Use `/session-health` skill
@@ -501,7 +501,6 @@ Based on status:
 - `/pan-up` / `/pan-down` - Service management
 - `/session-health` - Fix crashed agents
 - `/pan-issue` - Create new workspaces
-- `/pan-approve` - Review completed work
 
 ## More Information
 

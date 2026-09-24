@@ -26,7 +26,7 @@ import { Effect } from 'effect';
 import { recordDockerContainerLifecycleSnapshot } from '../docker-stats.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
-import { ensureDevcontainerSync } from './ensure-devcontainer.js';
+import { ensureDevcontainer } from './ensure-devcontainer.js';
 import {
   collectDockerContainerLifecycleSnapshot,
   composeProjectNameForWorkspace,
@@ -34,6 +34,7 @@ import {
   requireComposeProjectNameForWorkspace,
 } from './stack-health.js';
 import { reconcileTraefikNetworks } from './traefik-connect.js';
+import { repairWorkspaceBindMounts } from './rebuild-bind-mounts.js';
 
 // Canonical home is stack-health.ts (health checks need it too); re-export so
 // existing consumers of this module keep working.
@@ -101,7 +102,7 @@ export interface RebuildWorkspaceStackOptions {
  * poison token-based health matching and can hold port bindings. Never touches
  * a running container: a live foreign stack is left for a human.
  */
-export const removeStaleIssueContainers = (
+const removeStaleIssueContainers = (
   issueId: string,
   composeProjectName: string,
 ): Effect.Effect<number> =>
@@ -166,24 +167,21 @@ export const rebuildWorkspaceStack = (
 
   return Effect.gen(function* () {
     const closed = yield* Effect.promise(() => isIssueClosed(issueId));
-    const reviewStatus = closed
-      ? null
+    const merged = closed
+      ? true
       : yield* Effect.promise(async () => {
-          const { resolveCanonicalReviewStatus } = await import('../cloister/review-status-source.js');
-          return resolveCanonicalReviewStatus(issueId);
+          const { getPrFacts } = await import('../cloister/pr-facts.js');
+          return (await getPrFacts(issueId)).merged;
         });
-    if (closed || reviewStatus?.status?.mergeStatus === 'merged') {
+    if (closed || merged) {
       return {
         success: false,
         error: 'Issue is terminal (closed/merged) — skipping stack rebuild',
       } satisfies RebuildWorkspaceStackResult;
     }
-    if (!reviewStatus?.available) {
-      return {
-        success: false,
-        error: 'Issue terminal status is unavailable — skipping stack rebuild',
-      } satisfies RebuildWorkspaceStackResult;
-    }
+    // PAN-3917: terminality is the forge's answer, not a stored row — a
+    // closed issue or a merged PR is terminal, and a forge lookup failure
+    // surfaces through Effect.promise above rather than failing open.
 
     // Pre-render name: the workspace's current devcontainer state, if any.
     // Resolves the fallback cleanly when nothing is declared yet (matching
@@ -218,7 +216,7 @@ export const rebuildWorkspaceStack = (
     if (existsSync(devcontainerDir)) {
       rmSync(devcontainerDir, { recursive: true, force: true });
     }
-    const ensured = ensureDevcontainerSync({ workspacePath, issueId: normalizedIssueId });
+    const ensured = ensureDevcontainer({ workspacePath, issueId: normalizedIssueId });
     if (!ensured.step.success) {
       return {
         success: false,
@@ -235,6 +233,15 @@ export const rebuildWorkspaceStack = (
         workspacePath,
       } satisfies RebuildWorkspaceStackResult;
     }
+
+    progress('Repairing workspace bind mounts...');
+    yield* Effect.promise(() => repairWorkspaceBindMounts({
+      workspacePath,
+      issueId: normalizedIssueId,
+      projectConfig,
+      composeFile,
+      onProgress: progress,
+    }));
 
     // Strict: a freshly rendered workspace must declare a resolvable name.
     // Silently falling back here is exactly the loud failure PAN-3049 needs —

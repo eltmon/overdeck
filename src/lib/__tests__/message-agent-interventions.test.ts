@@ -12,6 +12,11 @@ const interventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(),
 }));
 
+vi.mock('../agents/runtime-pid-probe.js', () => ({
+  findAgentRuntimePidInSubtree: vi.fn(async () => 4242),
+  findAgentRuntimePidInSubtreeSync: vi.fn(() => 4242),
+}));
+
 vi.mock('../operator-interventions.js', () => ({
   appendOperatorInterventionEvent: interventionMocks.appendOperatorInterventionEvent,
   operatorInterventionEvent: vi.fn(),
@@ -29,9 +34,10 @@ vi.mock('../tmux.js', () => ({
   sessionExistsSync: vi.fn(() => true),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
   getAgentSessionsSync: vi.fn(() => []),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   capturePaneSync: vi.fn(() => ''),
-  listPaneValues: vi.fn(() => Effect.succeed([])),
+  // PAN-3849: one live pane row ('<pid>\t<dead>') so the liveness oracle reads alive.
+  listPaneValues: vi.fn(async () => ['4242\t0']),
   listPaneValuesSync: vi.fn(() => []),
   setOption: vi.fn(() => Effect.void),
 }));
@@ -55,9 +61,22 @@ vi.mock('../paths.js', async (importOriginal) => {
   };
 });
 
+// PR #3870 finding 2: unkeyed Claude Code deliveries now go through the
+// transcript-confirming primitive. Stub the confirmation (not the transport)
+// so the sendKeys assertions below still exercise the real delivery cascade.
+vi.mock('../agents/delivery.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof import('../agents/delivery.js');
+  return {
+    ...actual,
+    deliverMessageWithTranscriptConfirmation: async (args: { agentId: string; message: string; caller: string; deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux' }) => {
+      const delivery = await actual.deliverAgentMessage(args.agentId, args.message, args.caller, args.deliveryMethod);
+      return { delivered: delivery.ok, attempts: 1, lastDelivery: delivery };
+    },
+  };
+});
+
 // PAN-3015 monitor tier is mocked so tests can flip liveness per case.
 vi.mock('../agents/monitor-transport.js', () => ({
-  isMonitorLive: vi.fn(() => false),
   formatMailFileContent: vi.fn(
     (body: string, source: string, date: Date) =>
       `# Message\n\nsource: ${source}\ndate: ${date.toISOString()}\n\n${body}\n`,
@@ -92,6 +111,7 @@ function writeAgentState(agentId: string, partial: Partial<AgentState> = {}): vo
     status: 'running',
     startedAt: '2026-05-25T00:00:00.000Z',
     deliveryMethod: 'tmux',
+    sessionId: `session-${agentId}`,
     ...partial,
   };
   writeFileSync(join(dir, 'state.json'), JSON.stringify(state));
@@ -163,9 +183,7 @@ describe('messageAgent monitor tier vs keyed deliveries (PAN-2997 cycle 7)', () 
   });
 
   it('BYPASSES the live monitor tier for a keyed delivery and uses the keyed door', async () => {
-    const { isMonitorLive } = await import('../agents/monitor-transport.js');
     const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
-    vi.mocked(isMonitorLive).mockReturnValue(true);
     vi.mocked(sendKeysDedup).mockClear();
     vi.mocked(completeKeyedSubmit).mockClear();
     writeAgentState('agent-pan-2997');
@@ -187,17 +205,20 @@ describe('messageAgent monitor tier vs keyed deliveries (PAN-2997 cycle 7)', () 
     expect(existsSync(join(stateDir, 'agent-pan-2997', 'mail'))).toBe(false);
   });
 
-  it('still routes UNKEYED mid-session tells through a live monitor', async () => {
-    const { isMonitorLive } = await import('../agents/monitor-transport.js');
+  it('ignores a live monitor for UNKEYED mid-session tells (PAN-3846)', async () => {
     const { sendKeysDedup } = await import('../tmux-dedup.js');
-    vi.mocked(isMonitorLive).mockReturnValue(true);
     vi.mocked(sendKeysDedup).mockClear();
     writeAgentState('agent-pan-3015');
 
     const result = await messageAgent('agent-pan-3015', 'ordinary tell', 'internal');
 
-    expect(result).toMatchObject({ delivered: true, queuedToMail: true, reason: 'monitor' });
+    // The monitor tier is gone from the automatic cascade: a live monitor.json
+    // does not change the outcome — the tell rides the normal transport.
+    expect(result.delivered).toBe(true);
+    expect(result.reason).not.toBe('monitor');
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith('agent-pan-3015', 'ordinary tell');
     expect(vi.mocked(sendKeysDedup)).not.toHaveBeenCalled();
+    // The mail file is the post-delivery backup, not the delivery itself.
     expect(existsSync(join(stateDir, 'agent-pan-3015', 'mail'))).toBe(true);
   });
 

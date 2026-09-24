@@ -16,16 +16,15 @@
  *     so the pipeline can always drain instead of deadlocking with work agents.
  */
 
+import { Effect } from 'effect';
 import { loadCloisterConfigSync } from './config.js';
 import {
-  listRunningAgentsSync,
+  listRunningAgentsSync, listRunningAgents,
   stopAgentSync,
   getAgentRuntimeStateSync,
 } from '../agents.js';
-import { countAgentsByStatus } from '../overdeck/agents.js';
-import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
-import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
-import { readReviewStatusMap } from './review-status-source.js';
+import { isIdle } from '../agents/liveness.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
@@ -84,35 +83,17 @@ export interface RunningCounts {
   total: number;
 }
 
-/**
- * Human-readable breakdown of what currently counts against the ceiling, for
- * deferral diagnostics (PAN-1716). Lists the offending session ids so a
- * starvation is diagnosable from the patrol log alone — the original livelock
- * (completed review/test sessions that never get reaped) is invisible from a
- * bare "ceiling reached" line.
- */
-export function describeRunningAgents(): string {
-  const alive = listRunningAgentsSync().filter(a => a.tmuxActive);
-  const swarm = alive.filter(a => a.role === 'work' && SWARM_SLOT_ID.test(a.id) && !isTerminalSwarmSlotAgent(a)).map(a => a.id);
-  const work = alive.filter(a => a.role === 'work' && !SWARM_SLOT_ID.test(a.id)).map(a => a.id);
-  const advancing = alive.filter(a => a.role && ADVANCING_ROLES.has(a.role)).map(a => a.id);
-  const warmIdle = countWarmIdleAdvancingAgents(alive);
-  const { totalCeiling } = getConcurrencyLimits();
-  return `counts: work=${work.length} advancing=${advancing.length} (warm-idle=${warmIdle}, excluded) swarm=${swarm.length} total=${work.length + Math.max(0, advancing.length - warmIdle)}/${totalCeiling}`
-    + ` | advancing=[${advancing.join(', ')}] work=[${work.join(', ')}] swarm=[${swarm.join(', ')}]`;
-}
-
 /** Count currently-running agents by role class.
  *
  * PAN-1908: the agents table is the authoritative runtime registry. Counts are
  * derived from status='running' rows grouped by role; the deacon's event-driven
  * updates keep status in sync with tmux liveness.
  */
-/** Count tmux-alive swarm-slot work agents (agent-<issue>-slot-N) — PAN-2212. */
-function countRunningSwarmSlots(): { total: number; active: number } {
-  const slots = listRunningAgentsSync().filter(
-    a => a.tmuxActive && a.role === 'work' && SWARM_SLOT_ID.test(a.id),
-  );
+/** Count live swarm-slot work agents (agent-<issue>-slot-N) — PAN-2212. */
+function countRunningSwarmSlots(
+  agents: ReturnType<typeof listRunningAgentsSync>,
+): { total: number; active: number } {
+  const slots = agents.filter(a => a.role === 'work' && SWARM_SLOT_ID.test(a.id));
   return {
     total: slots.length,
     active: slots.filter(agent => !isTerminalSwarmSlotAgent(agent)).length,
@@ -145,28 +126,45 @@ export function countRunningSwarmSlotsForIssue(
  * the warm-by-default lifecycle. They are free capacity, not load: excluding
  * them from the ceiling is what lets warm sessions persist without recreating
  * the PAN-1716 livelock (completed reviewers starving every new dispatch).
- * Best-effort: if the review-status source is unregistered or unreadable,
- * count nothing as warm-idle (the ceiling stays conservative). The status map
- * is read through the cycle-free review-status-source leaf, registered by
- * review-status.ts at module load.
+ * PAN-3917: warm-idle used to mean "the stored verdict for this role is
+ * terminal". It now means what it always described: the pane has stopped
+ * working. `isIdle` is the same liveness oracle every other surface uses, so a
+ * reviewer that finished (or a reviewer that was never busy) frees its slot
+ * without anything needing to have written a verdict down first.
  */
-export function countWarmIdleAdvancingAgents(
+function countWarmIdleAdvancingAgents(
   agents: ReturnType<typeof listRunningAgentsSync> = listRunningAgentsSync(),
 ): number {
   const advancingRows = agents.filter(a => a.role && ADVANCING_ROLES.has(a.role) && a.issueId);
   if (advancingRows.length === 0) return 0;
-  const statuses = readReviewStatusMap();
-  if (!statuses) return 0;
   let warmIdle = 0;
   for (const row of advancingRows) {
-    const status = statuses[row.issueId!.toUpperCase()];
-    if (status && isRoleTerminal(row.role as AdvancingRole, status)) warmIdle++;
+    if (isIdle(row.id)) warmIdle++;
   }
   return warmIdle;
 }
 
-export function countRunningAgents(): RunningCounts {
-  const counts = countAgentsByStatus('running');
+/**
+ * PAN-3917: this used to count rows in the overdeck.db mirror, which the boot
+ * backfill reconciled against tmux. The mirror is gone and nothing corrects a
+ * crashed agent's state file, so the ceiling would count stale `running` files
+ * forever and starve dispatch — liveness has to come from somewhere live.
+ *
+ * That somewhere is the SELECTED terminal backend's inventory, not a tmux
+ * census: under Herdr no agent has a tmux session, so a tmux census would
+ * report the box empty and dispatch would never stop. An unreadable inventory
+ * fails open (every `running` state file counts), because the ceiling's job is
+ * to hold work back, and holding back on incomplete evidence is the safe side.
+ */
+export async function countRunningAgents(): Promise<RunningCounts> {
+  const liveIds = await listLiveAgentIds();
+  const live = (await Effect.runPromise(listRunningAgents())).filter(
+    agent => agent.status === 'running' && (liveIds === null || liveIds.has(agent.id)),
+  );
+  const counts: Record<string, number> = {};
+  for (const agent of live) {
+    counts[agent.role] = (counts[agent.role] ?? 0) + 1;
+  }
   const workTotal = counts['work'] ?? 0;
   let advancingTotal = 0;
   for (const role of ADVANCING_ROLES) {
@@ -175,123 +173,33 @@ export function countRunningAgents(): RunningCounts {
   // Swarm slots are work-role sessions but draw from the dedicated swarm reserve,
   // so subtract them from `work` (PAN-2212): the swarm neither starves nor is
   // starved by the work/advancing ceiling.
-  const swarmSlots = countRunningSwarmSlots();
+  const swarmSlots = countRunningSwarmSlots(live);
   const swarm = swarmSlots.active;
   const work = Math.max(0, workTotal - swarmSlots.total);
   // PAN-2579: warm-idle advancing sessions (verdict terminal, kept alive for the
   // next cycle) do not occupy the ceiling.
-  const advancing = Math.max(0, advancingTotal - countWarmIdleAdvancingAgents());
+  const advancing = Math.max(0, advancingTotal - countWarmIdleAdvancingAgents(live));
   return { work, advancing, swarm, total: work + advancing };
 }
 
-const GIB = 1024 ** 3;
-
-/**
- * PAN-2504: additional work-agent admissions permitted by the *memory* budget,
- * rather than the fixed `max_work_agents` count. This is what makes the box fill
- * toward its RAM instead of idling at a hardcoded 6.
- *
- *   additional = floor((availableBytes - softReserve) / work_footprint)
- *   capped by (memory_driven_max_work_agents - runningWork)
- *
- * The SOFT reserve is read from the cached memory verdict's
- * `thresholds.warningBytes` — the governor already publishes it there, so this
- * needs no import of memory-governor.ts (which would close a real dependency
- * cycle; see memory-verdict-cache.ts).
- *
- * Returns null — meaning "use the count-based cap" — when memory-driven mode is
- * off OR the governor has not published a verdict yet (fail safe to the fixed
- * cap rather than admitting blind). availableBytes already reflects the RSS of
- * currently-running agents, so `additional` is genuinely how many *more* fit;
- * the per-iteration `assessMemoryPressure()` brake in the deacon loops still
- * catches an under-estimated footprint mid-fill.
- */
-export function memoryDrivenWorkSlots(runningWork: number): number | null {
-  const c = loadCloisterConfigSync().concurrency;
-  if (c?.memory_driven !== true) return null;
-  const verdict = getCachedMemoryVerdict();
-  if (!verdict) return null;
-  const perAgentBytes = Math.max(0.25, c?.work_footprint_gb ?? 2) * GIB;
-  const budgetBytes = verdict.availableBytes - verdict.thresholds.warningBytes;
-  const fits = budgetBytes > 0 ? Math.floor(budgetBytes / perAgentBytes) : 0;
-  const ceiling = normalizeCount(c?.memory_driven_max_work_agents, 24, 1);
-  return Math.max(0, Math.min(fits, ceiling - runningWork));
-}
-
-/**
- * How many work agents the deacon may resume/spawn this patrol. Zero when already
- * at or over the cap — the deacon then resumes nothing and lets attrition drain.
- *
- * PAN-2504: when `concurrency.memory_driven` is on and the governor has a cached
- * verdict, the ceiling is the memory budget (`memoryDrivenWorkSlots`) instead of
- * the fixed count cap.
- */
-export function workResumeSlotsAvailable(
-  counts: RunningCounts = countRunningAgents(),
-  limits: ConcurrencyLimits = getConcurrencyLimits(),
-): number {
-  const memSlots = memoryDrivenWorkSlots(counts.work);
-  if (memSlots !== null) return memSlots;
-  return Math.max(0, limits.maxWorkAgents - counts.work);
-}
-
-/**
- * Whether an advancing-role (review/test/ship) dispatch is allowed. Gated on the
- * overall ceiling so review/test/ship can always claim their reserved headroom —
- * and, per PAN-2500 specialist-budget, on the memory governor: don't reserve GB
- * for a specialist under memory pressure. Count-slot semantics are UNCHANGED
- * when the cached band is 'ok' (or no patrol has assessed memory yet).
- */
-export function canDispatchAdvancing(
-  counts: RunningCounts = countRunningAgents(),
-  limits: ConcurrencyLimits = getConcurrencyLimits(),
-): boolean {
-  const verdict = getCachedMemoryVerdict();
-  if (verdict && verdict.band !== 'ok') return false;
-  return counts.total < limits.totalCeiling;
-}
-
 // ---------------------------------------------------------------------------
-// Per-patrol advancing-dispatch reservation
+// Swarm-dispatch reservation
 //
-// countRunningAgents() only sees tmux-alive sessions. Agents dispatched earlier
-// in the SAME patrol haven't registered a session yet, so several dispatch
-// functions (checkOrphanedReviewStatuses, checkMissingReviewStatuses,
-// checkPendingTestDispatch, checkPostReviewCommits) running back-to-back would
-// each see the stale low count and blow past the ceiling. runPatrol() resets
-// this counter at the top of every cycle; each dispatch site reserves a slot.
+// countRunningAgents() only sees live sessions. Slots dispatched earlier in the
+// same pass haven't registered a session yet, so each dispatch reserves one
+// here. Swarm dispatch runs from one-shot `pan swarm` processes, so the budget
+// starts at zero with each run.
 // ---------------------------------------------------------------------------
-let advancingReservedThisPatrol = 0;
-/** Dedicated per-patrol swarm-dispatch budget, isolated from advancing (PAN-2212). */
+/** Dedicated swarm-dispatch budget, isolated from advancing (PAN-2212). */
 let swarmReservedThisPatrol = 0;
 
-/** Reset the per-patrol dispatch budgets. Called once at patrol start. */
-export function resetPatrolDispatchBudget(): void {
-  advancingReservedThisPatrol = 0;
-  swarmReservedThisPatrol = 0;
-}
-
 /**
- * Claim one advancing-role (review/test/ship) dispatch slot for this patrol.
- * Returns false when the total ceiling is reached, or (PAN-2500 specialist-budget)
- * when the memory governor's cached band is not 'ok' — the caller must DEFER
- * (leave status untouched so a later patrol retries), never fail. Counts both
- * tmux-alive agents and advancing dispatches already reserved this patrol.
+ * Reset the swarm-dispatch budget.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function tryReserveAdvancingSlot(
-  counts: RunningCounts = countRunningAgents(),
-  limits: ConcurrencyLimits = getConcurrencyLimits(),
-): boolean {
-  const verdict = getCachedMemoryVerdict();
-  if (verdict && verdict.band !== 'ok') return false;
-  if (counts.total + advancingReservedThisPatrol >= limits.totalCeiling) return false;
-  advancingReservedThisPatrol++;
-  return true;
-}
-
-/** Release a same-patrol advancing reservation when dispatch was calmly gated. */
-export function releaseAdvancingSlot(): void {
-  advancingReservedThisPatrol = Math.max(0, advancingReservedThisPatrol - 1);
+export function resetPatrolDispatchBudget(): void {
+  swarmReservedThisPatrol = 0;
 }
 
 /**
@@ -301,7 +209,7 @@ export function releaseAdvancingSlot(): void {
  * DEFERS (leave the item unclaimed so a later patrol retries), never fails.
  */
 export function tryReserveSwarmSlot(
-  counts: RunningCounts = countRunningAgents(),
+  counts: RunningCounts,
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): boolean {
   if (counts.swarm + swarmReservedThisPatrol >= limits.reservedSwarmSlots) return false;

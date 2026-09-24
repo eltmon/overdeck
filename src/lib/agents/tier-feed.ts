@@ -15,9 +15,8 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { renderWorkspaceGitShowPromise } from '../git-utils.js';
+import { renderWorkspaceGitShow } from '../git-utils.js';
 import { deliverAgentMessage, type DeliveryResult } from './delivery.js';
-import type { StandingTierAgent } from './standing-tiers.js';
 import { estimateFeedDeliveryTokens, recordTierFeedDelivery } from './tier-metrics.js';
 import type { ValidatedTieredExecutionFeedConfig } from './tier-table.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG } from './tier-table.js';
@@ -37,8 +36,14 @@ export interface BroadcastCommitOptions {
   itemId?: string;
   /** Commit subject used by feed.exclude_subjects. Defaults to itemTitle for legacy callers. */
   commitSubject?: string;
-  /** The standing tier agents to deliver to — every one of them hears it. */
-  tiers: Array<Pick<StandingTierAgent, 'tierName' | 'agentId'>>;
+  /**
+   * The standing tier agents to deliver to — every one of them hears it.
+   * Structurally matches the deleted standing-tiers.ts's StandingTierAgent
+   * (PAN-3917: agents/standing-tiers.ts is gone, Appendix A.5; this caller
+   * — cloister/swarm-tiered-hooks.ts — supplies the two fields this module
+   * actually needs).
+   */
+  tiers: Array<{ tierName: string; agentId: string }>;
   /** Issue id for delivery metrics. */
   issueId?: string;
   /** Dashboard API base URL used in the listener call-out curl snippet. */
@@ -85,14 +90,14 @@ async function runGitShow(workspace: string, sha: string, args: string[] = []): 
   return stdout;
 }
 
-export function shouldSkipFeedSubject(
+function shouldSkipFeedSubject(
   subject: string,
   feedConfig: Pick<ValidatedTieredExecutionFeedConfig, 'exclude_subjects'>,
 ): boolean {
   return feedConfig.exclude_subjects.some(prefix => subject.startsWith(prefix));
 }
 
-export async function renderCommitFeedDiff(
+async function renderCommitFeedDiff(
   workspace: string,
   sha: string,
   feedConfig: ValidatedTieredExecutionFeedConfig = DEFAULT_FEED_CONFIG,
@@ -102,11 +107,11 @@ export async function renderCommitFeedDiff(
   const pathspecArgs = feedConfig.exclude.length > 0
     ? ['--', '.', ...feedConfig.exclude.map(glob => `:(exclude)${glob}`)]
     : [];
-  const diff = await renderWorkspaceGitShowPromise(deps.issueId, workspace, sha, pathspecArgs, gitShow);
+  const diff = await renderWorkspaceGitShow(deps.issueId, workspace, sha, pathspecArgs, gitShow);
   const maxBytes = feedConfig.max_diff_bytes;
   if (maxBytes === null || Buffer.byteLength(diff, 'utf-8') <= maxBytes) return diff;
 
-  const stat = await renderWorkspaceGitShowPromise(deps.issueId, workspace, sha, ['--stat', ...pathspecArgs], gitShow);
+  const stat = await renderWorkspaceGitShow(deps.issueId, workspace, sha, ['--stat', ...pathspecArgs], gitShow);
   return [
     stat.trimEnd(),
     '',
@@ -115,7 +120,7 @@ export async function renderCommitFeedDiff(
   ].join('\n');
 }
 
-export function resolveFeedApiUrl(env: NodeJS.ProcessEnv = process.env): string {
+function resolveFeedApiUrl(env: NodeJS.ProcessEnv = process.env): string {
   return env.OVERDECK_DASHBOARD_URL
     ?? env.DASHBOARD_URL
     ?? `http://localhost:${env.API_PORT ?? env.PORT ?? '3011'}`;
@@ -125,7 +130,7 @@ export function resolveFeedApiUrl(env: NodeJS.ProcessEnv = process.env): string 
  * Compose the ingestion-only feed message for one commit. Deterministic over
  * (sha, itemTitle, diff) so replay reconstructs byte-identical messages.
  */
-export function composeCommitFeedMessage(
+function composeCommitFeedMessage(
   sha: string,
   itemTitle: string,
   diff: string,

@@ -7,6 +7,7 @@ import {
   importCrews,
   providerDefaultHarness,
   renderYamlPreview,
+  tierFitnessWarnings,
   serializeCrews,
   type Crew,
 } from '../tiered-crews';
@@ -57,14 +58,10 @@ describe('tiered crews mapping', () => {
 
   it('labels crews and blends only catalogued costs', () => {
     const imported = importCrews(liveConfig);
-    expect(crewLabel(imported.crews[0])).toBe('Kimi K2.7 Code');
+    expect(crewLabel(imported.crews[0])).toBe('Kimi K2.7 Code (256K context)');
     expect(crewLabel(imported.crews[1])).toBe('4-model mix');
-    // Weighted over modelCatalog costs: haiku 1x10 + sonnet 6x40 + terra 7x30
-    // + gemini 7x20 = 600 over weight 100. Was 6.525 while terra was priced
-    // 8.75; PAN-3388 repriced it to 7 for the 272K billing tier and left this
-    // literal behind. The catalog is the source of truth for price — this
-    // asserts the blending math, so it tracks the catalog.
-    expect(blendedCost(imported.crews[1])).toBeCloseTo(6);
+    // Catalog weights: (3×10 + 6×40 + 7×30 + 7×20) / 100 = 6.2.
+    expect(blendedCost(imported.crews[1])).toBeCloseTo(6.2);
     expect(blendedCost({ id: 'unknown', model: 'missing', harness: 'ohmypi' })).toBeNull();
   });
 
@@ -121,5 +118,85 @@ describe('tiered crews mapping', () => {
       { ...imported.assign, trivial: 'standard' },
       imported.rest,
     )).toThrow("Move or remove docs kind overrides before unassigning this crew's final difficulty.");
+  });
+});
+
+
+// PAN-3842 (adjudicated F-4): Settings built knownModelIds from
+// MODELS_BY_PROVIDER alone, which has no groq/cerebras/mistral groups, so it
+// called models the server knows "not in the model catalog".
+describe('tierFitnessWarnings model catalog agreement', () => {
+  const settings = {
+    models: { providers: { anthropic: true, openai: true, zai: true } },
+  } as unknown as Pick<SettingsConfig, 'models'>;
+
+  const tierWith = (model: string): TieredExecutionConfig => ({
+    enabled: true,
+    tiers: { standard: { model, harness: 'claude-code', difficulties: ['medium'] } },
+    by_kind: {},
+    replay_threshold: 0.5,
+  } as unknown as TieredExecutionConfig);
+
+  it.each(['mistral-large-latest', 'llama-3.3-70b-versatile'])(
+    'does not call %s unknown — the server catalog has it',
+    (model) => {
+      const codes = tierFitnessWarnings(tierWith(model), settings).map((warning) => warning.code);
+      expect(codes).not.toContain('unknown-model');
+    },
+  );
+
+  it('still reports a genuinely absent id as unknown', () => {
+    const codes = tierFitnessWarnings(tierWith('not-a-real-model'), settings).map((warning) => warning.code);
+    expect(codes).toEqual(['unknown-model']);
+  });
+
+  it('classifies a shared-table model the frontend catalog omits', () => {
+    // Being known is not enough — the band check must reach it too.
+    // mistral-large-latest is frontier; a trivial-only tier caps at workhorse.
+    const trivialTier = {
+      enabled: true,
+      tiers: { cheap: { model: 'mistral-large-latest', harness: 'claude-code', difficulties: ['trivial'] } },
+      by_kind: {},
+      replay_threshold: 0.5,
+    } as unknown as TieredExecutionConfig;
+    const codes = tierFitnessWarnings(trivialTier, settings).map((warning) => warning.code);
+    expect(codes).toContain('overpowered');
+  });
+
+  it('runs the band check on a groq model the frontend catalog omits', () => {
+    // llama-3.3-70b-versatile is workhorse; an expert tier needs frontier.
+    const expertTier = {
+      enabled: true,
+      tiers: { top: { model: 'llama-3.3-70b-versatile', harness: 'claude-code', difficulties: ['expert'] } },
+      by_kind: {},
+      replay_threshold: 0.5,
+    } as unknown as TieredExecutionConfig;
+    const codes = tierFitnessWarnings(expertTier, settings).map((warning) => warning.code);
+    expect(codes).toContain('underpowered');
+  });
+});
+
+// PAN-3842 (adjudicated F-1): the frontend builder must scope the
+// provider-not-enabled warning the same way the server does.
+describe('tierFitnessWarnings provider scoping', () => {
+  const settings = {
+    models: { providers: { anthropic: true } },
+  } as unknown as Pick<SettingsConfig, 'models'>;
+
+  const tierWith = (model: string): TieredExecutionConfig => ({
+    enabled: true,
+    tiers: { standard: { model, harness: 'claude-code', difficulties: ['medium'] } },
+    by_kind: {},
+    replay_threshold: 0.5,
+  } as unknown as TieredExecutionConfig);
+
+  it('warns when a configurable provider is switched off', () => {
+    const codes = tierFitnessWarnings(tierWith('glm-5.1'), settings).map((warning) => warning.code);
+    expect(codes).toContain('provider-not-enabled');
+  });
+
+  it('stays silent for a provider with no Settings control', () => {
+    const codes = tierFitnessWarnings(tierWith('mistral-large-latest'), settings).map((warning) => warning.code);
+    expect(codes).not.toContain('provider-not-enabled');
   });
 });

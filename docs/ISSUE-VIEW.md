@@ -12,6 +12,7 @@ The kit currently owns these reusable pieces:
 
 - `IssueView` is the semantic boundary used by all three shells. `IssueViewFullscreenButton` and `RailShipProgress` provide the shared promotion and compact ship controls.
 - `AgentStepRow` renders work, review, test, and ship sessions with the same status, model, cost, verdict, and operator affordances.
+- Registered workers (`pan worker run`, role `worker`, PAN-3920) appear in the issue's agent list and in the session tree (the crew spine) as `work`-type rows labeled **Worker &lt;n&gt;**, one per `agent-<issue>-worker-<n>` state directory. Their transcript resolves from the worker's own working directory (`.swarm/worker-<n>` or the workspace).
 - `ActiveAgentPanel` renders selected-agent metadata plus resume and message actions; the rich transcript stays in the Session surface.
 - `TellComposer` is the shared message form used by `ActiveAgentPanel`; the Session transcript keeps its own selected-agent composer inside `IssueDetail`, so one visible conversation cannot send to another agent.
 - `NeedsYouSlot` prioritizes one operator decision. Shared issue actions use the registry; cockpit-specific alerts use the existing exact-agent and review-unstick simple actions, leaving the protected `IssueActionMenu` subsystem unchanged.

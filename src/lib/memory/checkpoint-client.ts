@@ -1,5 +1,4 @@
 import { Worker } from 'node:worker_threads';
-import { Effect } from 'effect';
 import type {
   ClaimTranscriptRangeInput,
   ClaimTranscriptRangeResult,
@@ -93,44 +92,34 @@ function postWorkerRequest<T>(operation: string, payload: unknown): Promise<T> {
 
 const toError = (cause: unknown): Error => cause instanceof Error ? cause : new Error(String(cause));
 
-export const claimTranscriptRange = (
-  input: ClaimTranscriptRangeInput,
-): Effect.Effect<ClaimTranscriptRangeResult, Error> =>
-  Effect.tryPromise({
-    try: () => postWorkerRequest('claimTranscriptRange', input),
-    catch: toError,
+/** Run one checkpoint-worker request; a rejection is always an `Error`. */
+function request<T>(operation: string, payload: unknown): Promise<T> {
+  return postWorkerRequest<T>(operation, payload).catch((cause: unknown) => {
+    throw toError(cause);
   });
+}
 
-export const commitTranscriptRange = (
-  input: CommitTranscriptRangeInput,
-): Effect.Effect<CommitTranscriptRangeResult, Error> =>
-  Effect.tryPromise({
-    try: () => postWorkerRequest('commitTranscriptRange', input),
-    catch: toError,
-  });
+/** Claim a transcript byte range for memory extraction (checkpoint worker). */
+export function claimTranscriptRange(input: ClaimTranscriptRangeInput): Promise<ClaimTranscriptRangeResult> {
+  return request('claimTranscriptRange', input);
+}
 
-export const releaseTranscriptRange = (
-  sessionId: string,
-  expectedFromOffset: number,
-  toOffset: number,
-): Effect.Effect<void, Error> =>
-  Effect.tryPromise({
-    try: () => postWorkerRequest('releaseTranscriptRange', { sessionId, expectedFromOffset, toOffset }),
-    catch: toError,
-  });
+/** Commit a previously claimed transcript range (checkpoint worker). */
+export function commitTranscriptRange(input: CommitTranscriptRangeInput): Promise<CommitTranscriptRangeResult> {
+  return request('commitTranscriptRange', input);
+}
 
-export const getTranscriptCheckpoint = (
-  sessionId: string,
-): Effect.Effect<TranscriptCheckpoint | null, Error> =>
-  Effect.tryPromise({
-    try: () => postWorkerRequest('getTranscriptCheckpoint', sessionId),
-    catch: toError,
-  });
+/** Release a claimed transcript range without committing it (checkpoint worker). */
+export function releaseTranscriptRange(sessionId: string, expectedFromOffset: number, toOffset: number): Promise<void> {
+  return request('releaseTranscriptRange', { sessionId, expectedFromOffset, toOffset });
+}
 
-export const listTranscriptCheckpoints = (
-  limit?: number,
-): Effect.Effect<TranscriptCheckpoint[], Error> =>
-  Effect.tryPromise({
-    try: () => postWorkerRequest('listTranscriptCheckpoints', limit),
-    catch: toError,
-  });
+/** Read the transcript checkpoint for a session, or null (checkpoint worker). */
+export function getTranscriptCheckpoint(sessionId: string): Promise<TranscriptCheckpoint | null> {
+  return request('getTranscriptCheckpoint', sessionId);
+}
+
+/** List transcript checkpoints, up to `limit` (checkpoint worker). */
+export function listTranscriptCheckpoints(limit?: number): Promise<TranscriptCheckpoint[]> {
+  return request('listTranscriptCheckpoints', limit);
+}

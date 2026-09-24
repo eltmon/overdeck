@@ -51,7 +51,6 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: (...args: unknown[]) => mockResolveGitHubIssue(...args),
-  resolveGitHubIssueSync: (...args: unknown[]) => mockResolveGitHubIssue(...args),
   resolveTrackerType: vi.fn(() => 'github'),
 }));
 
@@ -73,10 +72,6 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentStateAsync: vi.fn(),
   normalizeAgentId: vi.fn((s: string) => s),
-}));
-vi.mock('../../../../../src/lib/database/index.js', () => ({
-  getDatabase: vi.fn(() => ({ prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn(), all: vi.fn() })) })),
-  resetDatabase: vi.fn(),
 }));
 vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
   getSharedIssueService: vi.fn(),
@@ -171,6 +166,27 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
     expect(strikeCmdCall![0]).toContain('--head strike/pan-830');
     expect(viewCmdCall![0]).toContain('gh pr view 642');
     expect(viewCmdCall![0]).toContain('eltmon/overdeck');
+  });
+
+  it('reads the strike PR first for a strike landing, even with the feature PR open too (#4016)', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 830,
+    });
+    mockExec
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 900, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({ number: 900, headRefName: 'strike/pan-830' }), stderr: '' });
+
+    const result = await fetchIssuePullRequest('PAN-830', { preferBranch: 'strike/pan-830' });
+
+    expect(result.pr?.number).toBe(900);
+    const [firstProbe, secondProbe, viewCmdCall] = mockExec.mock.calls;
+    expect(firstProbe![0]).toContain('--head strike/pan-830');
+    expect(secondProbe![0]).toContain('--head feature/pan-830');
+    expect(viewCmdCall![0]).toContain('gh pr view 900');
   });
 
   it('prefers a merged strike PR over a closed feature PR', async () => {

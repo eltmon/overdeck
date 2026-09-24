@@ -2,11 +2,12 @@
  * pan conversations scan — scan ~/.claude/projects/ for JSONL sessions (PAN-457)
  */
 
+import { Effect } from 'effect';
 import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import { scan } from '../../../lib/conversations/scanner.js';
 import type { ScanProgress } from '../../../lib/conversations/scanner.js';
-import { getConversationsConfigSync } from '../../../lib/config-yaml.js';
+import { getConversationsConfig } from '../../../lib/config-yaml.js';
 
 export async function scanAction(opts: {
   mode?: string;
@@ -46,7 +47,7 @@ export async function scanAction(opts: {
   const result = await scan({
     mode,
     dirs: opts.dirs,
-    watchDirs: getConversationsConfigSync().watchDirs,
+    watchDirs: (await Effect.runPromise(getConversationsConfig())).watchDirs,
     dryRun: opts.dryRun,
     maxParallel: opts.maxParallel ? parseInt(opts.maxParallel, 10) : undefined,
     onProgress: renderProgress,

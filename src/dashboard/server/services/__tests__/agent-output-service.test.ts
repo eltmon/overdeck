@@ -6,7 +6,13 @@ const mockAppendAsync = vi.hoisted(() => vi.fn((_event: unknown) => Promise.reso
 const mockEventStore = { emitOnly: mockEmitOnly, appendAsync: mockAppendAsync }
 
 vi.mock('../../event-store.js', () => ({ getEventStore: () => mockEventStore }))
-vi.mock('../../../../lib/tmux.js', () => ({ capturePane: vi.fn() }))
+vi.mock('../../../../lib/tmux.js', () => ({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
+  listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
+ capturePane: vi.fn() }))
 vi.mock('../../../../lib/agents.js', () => ({ listRunningAgents: vi.fn() }))
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(() => Promise.reject(new Error('no remote state'))),
@@ -112,8 +118,8 @@ describe('AgentOutputService', () => {
 
   it('captures each explicitly interested agent once and emits only new lines', async () => {
     mockCapturePane
-      .mockReturnValueOnce(Effect.succeed('boot\nworking on PAN-TEST'))
-      .mockReturnValueOnce(Effect.succeed('boot\nworking on PAN-TEST\nnew line'))
+      .mockResolvedValueOnce('boot\nworking on PAN-TEST')
+      .mockResolvedValueOnce('boot\nworking on PAN-TEST\nnew line')
     const state = createState(['agent-pan-test'])
 
     await pollOnce(state)
@@ -134,8 +140,8 @@ describe('AgentOutputService', () => {
 
   it('skips empty and missing-session output', async () => {
     mockCapturePane
-      .mockReturnValueOnce(Effect.succeed('Session not found'))
-      .mockReturnValueOnce(Effect.succeed(''))
+      .mockResolvedValueOnce('Session not found')
+      .mockResolvedValueOnce('')
     const state = createState(['agent-one', 'agent-two'])
 
     await pollOnce(state)
@@ -144,7 +150,7 @@ describe('AgentOutputService', () => {
   })
 
   it('starts with an immediate capture and stops after the final release', async () => {
-    mockCapturePane.mockReturnValue(Effect.succeed('same output'))
+    mockCapturePane.mockResolvedValue('same output')
     startAgentOutputService()
 
     const releaseFirst = retainAgentOutputInterest('agent-pan-test')
@@ -166,9 +172,9 @@ describe('AgentOutputService', () => {
 
   it('coalesces an immediate capture with an overlapping poll', async () => {
     let resolveCapture!: (value: string) => void
-    mockCapturePane.mockReturnValue(Effect.promise(() => new Promise((resolve) => {
+    mockCapturePane.mockImplementation(() => new Promise((resolve) => {
       resolveCapture = resolve
-    })))
+    }))
     startAgentOutputService()
 
     const release = retainAgentOutputInterest('agent-pan-test')
@@ -182,9 +188,9 @@ describe('AgentOutputService', () => {
 
   it('does not emit a slow capture after its interest is released', async () => {
     let resolveCapture!: (value: string) => void
-    mockCapturePane.mockReturnValue(Effect.promise(() => new Promise((resolve) => {
+    mockCapturePane.mockImplementation(() => new Promise((resolve) => {
       resolveCapture = resolve
-    })))
+    }))
     startAgentOutputService()
 
     const release = retainAgentOutputInterest('agent-pan-test')
@@ -201,7 +207,7 @@ describe('AgentOutputService', () => {
       { id: 'agent-one', tmuxActive: true },
       { id: 'agent-stopped', tmuxActive: false },
     ] as never))
-    mockCapturePane.mockReturnValue(Effect.succeed('output'))
+    mockCapturePane.mockResolvedValue('output')
     startAgentOutputService()
 
     const release = retainAllAgentOutputInterest()

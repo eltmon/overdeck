@@ -1,6 +1,5 @@
-import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
-import { buildTtsSpeakPayloadSync, resolveAndSpeak } from '../tts-speak.js';
+import { buildTtsSpeakPayload, resolveAndSpeak } from '../tts-speak.js';
 import type { NormalizedTtsDaemonConfig } from '../config-yaml.js';
 import type { TtsVoice } from '../tts-voices.js';
 
@@ -59,7 +58,7 @@ function findVoiceById(id: string): Promise<TtsVoice | undefined> {
 
 describe('buildTtsSpeakPayload', () => {
   it('builds daemon payloads for preset, design, and clone voices', () => {
-    expect(buildTtsSpeakPayloadSync(PRESET_VOICE, 'hello', CONFIG)).toEqual({
+    expect(buildTtsSpeakPayload(PRESET_VOICE, 'hello', CONFIG)).toEqual({
       text: 'hello',
       voice: 'Vivian',
       instruct: 'calm',
@@ -68,7 +67,7 @@ describe('buildTtsSpeakPayload', () => {
       mode: 'custom',
     });
 
-    expect(buildTtsSpeakPayloadSync({ ...PRESET_VOICE, kind: 'design', description: 'warm narrator' }, 'hello', CONFIG)).toEqual({
+    expect(buildTtsSpeakPayload({ ...PRESET_VOICE, kind: 'design', description: 'warm narrator' }, 'hello', CONFIG)).toEqual({
       text: 'hello',
       voice: 'warm narrator',
       instruct: 'calm',
@@ -77,7 +76,7 @@ describe('buildTtsSpeakPayload', () => {
       mode: 'design',
     });
 
-    expect(buildTtsSpeakPayloadSync(CLONE_VOICE, 'hello', CONFIG)).toEqual({
+    expect(buildTtsSpeakPayload(CLONE_VOICE, 'hello', CONFIG)).toEqual({
       text: 'hello',
       voice: 'clone',
       instruct: 'bright',
@@ -93,11 +92,11 @@ describe('resolveAndSpeak', () => {
   it('posts a preset voice payload to the configured daemon', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'hello' }, {
+    await expect(resolveAndSpeak({ text: 'hello' }, {
       config: CONFIG,
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('spoken');
+    })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       method: 'POST',
@@ -108,11 +107,11 @@ describe('resolveAndSpeak', () => {
   it('uses the status voice for routine priority 2 utterances', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'routine update', priority: 2 }, {
+    await expect(resolveAndSpeak({ text: 'routine update', priority: 2 }, {
       config: CONFIG,
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('spoken');
+    })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       body: JSON.stringify({ text: 'routine update', voice: 'Ryan', instruct: '', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
@@ -122,11 +121,11 @@ describe('resolveAndSpeak', () => {
   it('uses voiceMap and sends clone embeddings', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'merged', eventType: 'mergeStatus.merged' }, {
-      config: { ...CONFIG, voiceMap: { 'mergeStatus.merged': 'voice-clone' } },
+    await expect(resolveAndSpeak({ text: 'merged', eventType: 'mergeOutcome.merged' }, {
+      config: { ...CONFIG, voiceMap: { 'mergeOutcome.merged': 'voice-clone' } },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('spoken');
+    })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       body: JSON.stringify({
@@ -144,11 +143,11 @@ describe('resolveAndSpeak', () => {
   it('does not call the daemon for automatic playback when tts is disabled', async () => {
     const fetchMock = vi.fn();
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'skip' }, {
+    await expect(resolveAndSpeak({ text: 'skip' }, {
       config: { ...CONFIG, enabled: false },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('muted');
+    })).resolves.toBe('muted');
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -156,11 +155,11 @@ describe('resolveAndSpeak', () => {
   it('posts direct user-triggered preview payloads when tts is disabled', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'preview', voice: 'Vivian', instruct: 'calm' }, {
+    await expect(resolveAndSpeak({ text: 'preview', voice: 'Vivian', instruct: 'calm' }, {
       config: { ...CONFIG, enabled: false },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('spoken');
+    })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       body: JSON.stringify({ text: 'preview', voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
@@ -170,11 +169,11 @@ describe('resolveAndSpeak', () => {
   it('posts saved voice preview payloads when tts is disabled', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'preview', voiceId: 'voice-preset', preview: true }, {
+    await expect(resolveAndSpeak({ text: 'preview', voiceId: 'voice-preset', preview: true }, {
       config: { ...CONFIG, enabled: false },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('spoken');
+    })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       body: JSON.stringify({ text: 'preview', voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
@@ -184,11 +183,11 @@ describe('resolveAndSpeak', () => {
   it('keeps saved voice playback muted when it is not an explicit preview', async () => {
     const fetchMock = vi.fn();
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'skip', voiceId: 'voice-preset' }, {
+    await expect(resolveAndSpeak({ text: 'skip', voiceId: 'voice-preset' }, {
       config: { ...CONFIG, enabled: false },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('muted');
+    })).resolves.toBe('muted');
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -196,11 +195,11 @@ describe('resolveAndSpeak', () => {
   it('truncates utterances to maxChars before posting to the daemon', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'abcdef' }, {
+    await expect(resolveAndSpeak({ text: 'abcdef' }, {
       config: { ...CONFIG, maxChars: 3 },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('spoken');
+    })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       body: JSON.stringify({ text: 'abc', voice: 'Vivian', instruct: 'calm', volume: 0.8, rate: 1.1, maxChars: 3, dropInfoWhenFull: true, mode: 'custom' }),
@@ -210,17 +209,17 @@ describe('resolveAndSpeak', () => {
   it('does not call the daemon for muted sources or issues', async () => {
     const fetchMock = vi.fn();
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'skip', source: 'merge-agent' }, {
+    await expect(resolveAndSpeak({ text: 'skip', source: 'merge-agent' }, {
       config: { ...CONFIG, mutedSources: ['merge-agent'] },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('muted');
+    })).resolves.toBe('muted');
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'skip', issueId: 'PAN-829' }, {
+    await expect(resolveAndSpeak({ text: 'skip', issueId: 'PAN-829' }, {
       config: { ...CONFIG, mutedIssues: ['PAN-829'] },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('muted');
+    })).resolves.toBe('muted');
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -228,11 +227,11 @@ describe('resolveAndSpeak', () => {
   it('applies utterance template substitution before speaking', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'original', eventType: 'reviewStatus.passed', issueId: 'PAN-829' }, {
-      config: { ...CONFIG, utteranceTemplates: { 'reviewStatus.passed': '{issueId} passed review' } },
+    await expect(resolveAndSpeak({ text: 'original', eventType: 'reviewOutcome.passed', issueId: 'PAN-829' }, {
+      config: { ...CONFIG, utteranceTemplates: { 'reviewOutcome.passed': '{issueId} passed review' } },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('spoken');
+    })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       body: JSON.stringify({ text: 'PAN-829 passed review', voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
@@ -242,32 +241,32 @@ describe('resolveAndSpeak', () => {
   it('returns no-voice when no configured voice can be resolved', async () => {
     const fetchMock = vi.fn();
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'hello' }, {
+    await expect(resolveAndSpeak({ text: 'hello' }, {
       config: { ...CONFIG, voice: '', statusVoice: undefined },
       findVoiceById,
       fetch: fetchMock,
-    }))).resolves.toBe('no-voice');
+    })).resolves.toBe('no-voice');
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('returns daemon-unavailable when the daemon request fails', async () => {
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'hello' }, {
+    await expect(resolveAndSpeak({ text: 'hello' }, {
       config: CONFIG,
       findVoiceById,
       fetch: vi.fn(async () => { throw new TypeError('ECONNREFUSED'); }),
-    }))).resolves.toBe('daemon-unavailable');
+    })).resolves.toBe('daemon-unavailable');
   });
 
   it('passes direct preview payloads through without loading a saved voice', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
     const findVoice = vi.fn();
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'preview', voice: 'warm narrator', instruct: 'clear', volume: 0.4, mode: 'design' }, {
+    await expect(resolveAndSpeak({ text: 'preview', voice: 'warm narrator', instruct: 'clear', volume: 0.4, mode: 'design' }, {
       config: CONFIG,
       findVoiceById: findVoice,
       fetch: fetchMock,
-    }))).resolves.toBe('spoken');
+    })).resolves.toBe('spoken');
 
     expect(findVoice).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({

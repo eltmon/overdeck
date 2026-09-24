@@ -1,3 +1,4 @@
+import { parseMuseConversationMessages } from '../muse-conversation-parser.js';
 import { stat } from 'node:fs/promises';
 import { getHarnessBehavior } from '../../../../lib/runtimes/behavior.js';
 import { projectAcpConversationActivity } from '../acp-conversation-parser.js';
@@ -16,6 +17,7 @@ import type { ConversationActivitySummary } from './types.js';
  * can't spin forever.
  */
 const WORKING_STALENESS_MS = 180_000;
+export const ACP_STALLED_TURN_MS = 300_000;
 
 /** In-memory cache mapping sessionFile path → { mtimeMs, size, summary } */
 const ACTIVITY_SUMMARY_CACHE_MAX = 100;
@@ -44,21 +46,31 @@ export async function summarizeConversationActivity(
   const behavior = getHarnessBehavior(options.harness as Parameters<typeof getHarnessBehavior>[0]);
   const cached = activitySummaryCache.get(cacheKey);
   if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
+    if (behavior.transcriptKind === 'acp-jsonl') {
+      const fileAgeMs = Date.now() - cached.mtimeMs;
+      return {
+        ...cached.summary,
+        currentTool: fileAgeMs < 30_000 ? cached.summary.currentTool : null,
+        stalledSince: cached.summary.isWorking && fileAgeMs > ACP_STALLED_TURN_MS
+          ? new Date(cached.mtimeMs).toISOString()
+          : undefined,
+      };
+    }
     return cached.summary;
   }
 
   if (behavior.transcriptKind === 'acp-jsonl') {
     const projected = await projectAcpConversationActivity(sessionFile);
-    const workingFileRecent = Date.now() - projected.mtimeMs < WORKING_STALENESS_MS;
+    const fileAgeMs = Date.now() - projected.mtimeMs;
     const lastMsg = projected.messages[projected.messages.length - 1];
-    const isWorking = workingFileRecent && !projected.lastTurnCompletedAt && (
+    const isWorking = !projected.lastTurnCompletedAt && (
       projected.streaming
       || projected.pendingToolCount > 0
       || projected.messages.length === 0
       || lastMsg?.role === 'user'
       || (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
     );
-    const fileRecent = Date.now() - projected.mtimeMs < 30_000;
+    const fileRecent = fileAgeMs < 30_000;
     const summary: ConversationActivitySummary = {
       // Reuse the parser's existing message view instead of cloning the complete
       // transcript for activity-only enrichment on every append.
@@ -66,12 +78,16 @@ export async function summarizeConversationActivity(
       streaming: projected.streaming,
       isWorking,
       currentTool: fileRecent ? projected.currentTool : null,
+      stalledSince: isWorking && fileAgeMs > ACP_STALLED_TURN_MS
+        ? new Date(projected.mtimeMs).toISOString()
+        : undefined,
     };
     return cacheActivitySummary(cacheKey, fileStats.mtimeMs, fileStats.size, summary);
   }
 
   const parsed = behavior.transcriptKind === 'codex-rollout-jsonl' ? await parseCodexConversationMessages(sessionFile)
     : behavior.transcriptKind === 'ohmypi-jsonl' || isOhmypiSessionFile(sessionFile) ? await parseOhmypiConversationMessages(sessionFile)
+    : behavior.transcriptKind === 'muse-jsonl' ? await parseMuseConversationMessages(sessionFile)
     : behavior.transcriptKind === 'kimi-wire-jsonl' ? await parseKimiConversationMessages(sessionFile)
     : isPiSessionFile(sessionFile) ? await parsePiConversationMessages(sessionFile)
       // Parse from the last compact boundary instead of the full file — avoids

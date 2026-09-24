@@ -6,17 +6,21 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { ensureSessionContextBriefingFile } from '../../../../lib/briefing-freshness.js';
-import { getClaudePermissionFlagsStringSync } from '../../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsString } from '../../../../lib/claude-permissions.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../../../../lib/config-yaml.js';
 import { workspaceContextFile } from '../../../../lib/context-layers/layers.js';
-import { extractPrefixSync } from '../../../../lib/issue-id.js';
+import { extractPrefix } from '../../../../lib/issue-id.js';
 import { prepareHarnessLaunch } from '../../../../lib/harness-binary.js';
-import { generateLauncherScriptSync } from '../../../../lib/launcher-generator.js';
+import { generateLauncherScript } from '../../../../lib/launcher-generator.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
-import { extractTeamPrefix, findProjectByTeamSync } from '../../../../lib/projects.js';
+import { extractTeamPrefix, findProjectByTeam } from '../../../../lib/projects.js';
 import { loadRemoteAgentState } from '../../../../lib/remote/remote-agents.js';
-import { createSession, killSession, resizeWindow, sendKeys, sessionExists } from '../../../../lib/tmux.js';
+import { getAgentState, saveAgentStateSync } from '../../../../lib/agents/agent-state.js';
+import { deliverAgentMessage } from '../../../../lib/agents/delivery.js';
+import { isAlive, isConfirmedDead } from '../../../../lib/agents/liveness.js';
+import { closeAgentPane, closeAgentPaneDetailed, launchAgentPane } from '../../../../lib/terminal-backends/launch.js';
+import { resizeWindow } from '../../../../lib/tmux.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -43,6 +47,33 @@ const checkPlanStatus = (
   return Boolean(status && matchStatus(status));
 });
 
+/**
+ * How long after a launch a planner counts as live whatever the oracle says
+ * (review of #4018, L3). Until the harness is in the pane — the launcher runs
+ * first on tmux, and Herdr detection can take up to a minute — the oracle
+ * reports a starting planner as dead, and a second message in that window
+ * would close it and launch another.
+ */
+export const PLANNER_LAUNCH_GRACE_MS = 60_000;
+
+function plannerIsLaunching(sessionName: string, now = Date.now()): boolean {
+  const state = getAgentState(sessionName);
+  if (!state || (state.status !== 'starting' && state.status !== 'running')) return false;
+  const startedAtMs = Date.parse(state.startedAt);
+  return Number.isFinite(startedAtMs) && now - startedAtMs < PLANNER_LAUNCH_GRACE_MS;
+}
+
+/**
+ * Live, not confirmed dead, or launched moments ago: an indeterminate probe
+ * never counts as finished, and neither does a planner still starting.
+ */
+async function plannerIsLive(sessionName: string): Promise<boolean> {
+  const verdict = await isAlive(sessionName).catch(
+    () => ({ alive: false, reason: 'runtime-indeterminate' }) as const,
+  );
+  return !isConfirmedDead(verdict) || plannerIsLaunching(sessionName);
+}
+
 // ─── Route: GET /api/planning/:issueId/status ────────────────────────────────
 
 const getPlanningStatusRoute = HttpRouter.add(
@@ -56,7 +87,7 @@ const getPlanningStatusRoute = HttpRouter.add(
     const issueId = parts[3] || '';
     const sessionName = `planning-${issueId.toLowerCase()}`;
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
       try {
@@ -65,16 +96,14 @@ const getPlanningStatusRoute = HttpRouter.add(
         const remoteState = loadRemoteAgentState(sessionName);
         const isRemote = !!remoteState;
         const vmName = remoteState?.vmName ?? '';
-        const { getAgentStateSync } = await import('../../../../lib/agents.js');
-        const agentState = getAgentStateSync(sessionName);
-        const agentStarting = agentState?.status === 'starting';
-
-        let tmuxSessionAlive = false;
-        if (!isRemote) {
-          try {
-            tmuxSessionAlive = await Effect.runPromise(sessionExists(sessionName));
-          } catch {}
-        }
+        // Review of #3992 (M1): the liveness oracle, on this host's backend — not
+        // "a pane exists". A finished planner leaves its Herdr pane behind (and
+        // may leave an `exited` agent record), and that residue is not an active
+        // session. The same predicate gates the message route, so the dialog and
+        // the relaunch decision agree. A probe that could not answer is treated
+        // as live, never as a finished planner. A starting planner already runs
+        // its launcher in the pane, so the oracle reports it too.
+        const plannerLive = isRemote ? false : await plannerIsLive(sessionName);
 
         const panDir = join(workspacePath, PAN_DIRNAME);
         const panContinueFile = join(panDir, PAN_CONTINUE_FILENAME);
@@ -93,7 +122,7 @@ const getPlanningStatusRoute = HttpRouter.add(
           : false;
 
         return jsonResponse({
-          active: tmuxSessionAlive || agentStarting,
+          active: plannerLive,
           sessionName,
           workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
           planningCompleted,
@@ -167,7 +196,7 @@ const postPlanningMessageRoute = HttpRouter.add(
         }
         if (!projectPath) {
           const teamPrefix = extractTeamPrefix(issueId);
-          const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+          const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
           projectPath = projectConfig?.path || '';
         }
 
@@ -190,16 +219,17 @@ const postPlanningMessageRoute = HttpRouter.add(
         // Check if session is remote
         const isRemote = !!loadRemoteAgentState(sessionName);
 
-        // Check if local session exists (skip remote for now)
-        let tmuxSessionAlive = false;
-        if (!isRemote) {
-          try {
-            tmuxSessionAlive = await Effect.runPromise(sessionExists(sessionName));
-          } catch {}
-        }
+        // Check if the local planner is live (skip remote for now). Review of
+        // #3992 (M1): liveness comes from the oracle, not pane existence — a
+        // finished planner's Herdr pane outlives it, and a message delivered to
+        // it lands in a dead shell while the planner is never relaunched.
+        const paneAlive = isRemote ? false : await plannerIsLive(sessionName);
 
-        if (tmuxSessionAlive) {
-          await Effect.runPromise(sendKeys(sessionName, message, 'planning user message'));
+        if (paneAlive) {
+          const delivery = await deliverAgentMessage(sessionName, message, 'planning user message');
+          if (!delivery.ok) {
+            throw new Error(delivery.failure ?? `delivery via ${delivery.path} failed`);
+          }
           await Effect.runPromise(eventStore.append({
             type: 'planning.sync',
             timestamp: new Date().toISOString(),
@@ -280,13 +310,13 @@ Continue the PLANNING session. Do NOT implement anything.
           await rename(outputFile, backupPath);
         }
 
-        const { getAgentCommandSync } = await import('../../../../lib/settings.js');
+        const { getAgentCommand } = await import('../../../../lib/settings.js');
         let msgPlanningModel = 'claude-sonnet-5';
         try {
           msgPlanningModel = resolveModel('plan', undefined, loadYamlConfig().config);
         } catch { /* fall back to default */ }
-        const msgAgentCmd = getAgentCommandSync(msgPlanningModel);
-        const msgPermissionFlags = getClaudePermissionFlagsStringSync();
+        const msgAgentCmd = getAgentCommand(msgPlanningModel);
+        const msgPermissionFlags = getClaudePermissionFlagsString();
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0
             ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} ${msgPermissionFlags}`
@@ -298,7 +328,7 @@ Continue the PLANNING session. Do NOT implement anything.
 
         await writeFile(
           launcherScript,
-          generateLauncherScriptSync({
+          generateLauncherScript({
             role: 'plan',
             workingDir: agentCwd,
             baseCommand: msgCmdWithArgs,
@@ -309,11 +339,64 @@ Continue the PLANNING session. Do NOT implement anything.
           { mode: 0o755 },
         );
 
-        await Effect.runPromise(createSession(sessionName, agentCwd, `bash '${launcherScript}'`));
+        // Mark the planner as starting BEFORE anything is closed or launched,
+        // with the claude-code harness the continuation runs (the oracle looks
+        // for the harness named here). A second message during the launch then
+        // reads it as live and is delivered, instead of closing it and
+        // launching another (review of #4018, L3).
+        const launchStartedAt = new Date().toISOString();
+        saveAgentStateSync({
+          ...(getAgentState(sessionName)
+            ?? { id: sessionName, issueId, workspace: agentCwd, role: 'plan' as const }),
+          status: 'starting',
+          harness: 'claude-code',
+          model: msgPlanningModel,
+          startedAt: launchStartedAt,
+        });
 
-        try {
-          await Effect.runPromise(resizeWindow(sessionName, 200, 50));
-        } catch {}
+        // Close whatever the finished planner left — a Herdr pane back at its
+        // shell prompt, or a dead tmux session — before the relaunch, as every
+        // other relaunch path does. Otherwise a second pane with the same agent
+        // id sits next to the residue, and a later stop can close the wrong one.
+        await closeAgentPane(sessionName);
+
+        // PAN-3960: the continuation planner launches through the host's
+        // terminal backend like every other agent, stamped role=plan.
+        const pane = await launchAgentPane({
+          issueId,
+          cwd: agentCwd,
+          agentId: sessionName,
+          argv: ['bash', launcherScript],
+          env: {
+            OVERDECK_AGENT_ID: sessionName,
+            OVERDECK_ISSUE_ID: issueId,
+            OVERDECK_SESSION_TYPE: 'plan',
+          },
+          tokens: {
+            issue: issueId,
+            role: 'plan',
+            harness: 'claude-code',
+            model: msgPlanningModel,
+          },
+        }).catch((error: unknown) => {
+          // A launch that failed is not a planner starting: drop the grace window.
+          const failedState = getAgentState(sessionName);
+          if (failedState) saveAgentStateSync({ ...failedState, status: 'error' });
+          throw error;
+        });
+
+        // The pane is up: record where it landed. `startedAt` stays the launch
+        // time, so the grace window still covers the harness starting in it.
+        const launchedState = getAgentState(sessionName);
+        if (launchedState) {
+          saveAgentStateSync({ ...launchedState, status: 'running', backend: pane.backend, paneId: pane.paneId });
+        }
+
+        if (pane.backend === 'tmux') {
+          try {
+            await Effect.runPromise(resizeWindow(sessionName, 200, 50));
+          } catch {}
+        }
 
         await Effect.runPromise(eventStore.append({
           type: 'planning.sync',
@@ -352,21 +435,19 @@ const deletePlanningSessionRoute = HttpRouter.add(
     const sessionName = `planning-${issueId.toLowerCase()}`;
 
     return yield* Effect.promise(async () => {
-      try {
-        await Effect.runPromise(killSession(sessionName));
-        return jsonResponse({ success: true });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        // tmux reports "can't find session" when the session is already gone — treat as success.
-        if (/can't find session|session not found|no session found/i.test(msg)) {
-          return jsonResponse({ success: true, alreadyStopped: true });
-        }
-        console.error(`[delete-planning] kill-session failed for ${sessionName}:`, msg);
+      // PAN-3960: close the planner through the terminal backend — a Herdr pane
+      // has no tmux session to kill. Review of #3992 (L2): a close that failed
+      // is a failure, not "already stopped" — the planner may still be running.
+      const result = await closeAgentPaneDetailed(sessionName);
+      if (result.outcome === 'failed') {
         return jsonResponse(
-          { error: 'Failed to stop planning: ' + msg },
+          { success: false, error: `Failed to stop planning session ${sessionName}: ${result.reason}` },
           { status: 500 },
         );
       }
+      return result.outcome === 'closed'
+        ? jsonResponse({ success: true })
+        : jsonResponse({ success: true, alreadyStopped: true });
     });
   }),
 );

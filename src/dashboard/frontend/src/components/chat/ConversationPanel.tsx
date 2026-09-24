@@ -1,3 +1,4 @@
+import { useComposerEchoes } from './useComposerEchoes';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
@@ -7,7 +8,7 @@ import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
-import { XTerminal } from '../XTerminal';
+import { ConversationTerminalView } from './ConversationTerminalView';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
@@ -22,10 +23,8 @@ import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import {
   useComposerStore,
-  useConversationOptimistic,
-  useConversationOptimisticBaseCount,
 } from '../../lib/composerStore';
-import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, TURN_STALL_MS, type WorkingPhase } from '../../lib/workingPhase';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
@@ -43,6 +42,7 @@ import { ForkProgressView } from './ForkProgressView';
 import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
+import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // PAN-1635: a turn that has shown no transcript progress for this long is
@@ -164,6 +164,7 @@ export function ConversationPanel({
   const [sendResumeContract, setSendResumeContract] = useState(true);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const confirm = useConfirm();
   // Self-hosted mutations + ForkModal so the header can favorite / stop / hand
   // off / fork without threading callbacks through every embed site.
@@ -242,8 +243,8 @@ export function ConversationPanel({
   }, [conversation.name]);
 
   // Query messages at this level so we can drive the header working-spinner.
-  // Live claude-code conversations are pushed through useConversationMessagesStream;
-  // keep the existing polling path for non-claude harnesses and historical views.
+  // Live transcripts are pushed through WS/RPC. HTTP supplies the initial
+  // snapshot/backfill and is the sole read path for stopped history.
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
     queryFn: async ({ signal }) => {
@@ -261,8 +262,8 @@ export function ConversationPanel({
       }
       return fetched;
     },
-    enabled: !streamMessagesEnabled,
-    refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
+    enabled: true,
+    refetchInterval: streamMessagesEnabled || agentId ? false : (conversation.sessionAlive ? 2000 : false),
   });
   // PAN-2876 — the rail lists the main agent plus every subagent; picking a subagent swaps the body to its transcript.
   const subagents = messagesData?.subagents ?? [];
@@ -408,6 +409,10 @@ export function ConversationPanel({
       // resumedAwaitingConfirm clear effect below.
       toastResumeOutcome(conversation.name);
       setResumedAwaitingConfirm(true);
+    },
+    // A failed resume must say so; without this the button did nothing visible.
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
     },
   });
 
@@ -800,6 +805,7 @@ export function ConversationPanel({
               {/* Overflow menu — long-tail / prefs / config / destructive */}
               <div className={styles.headerMenuWrap}>
                 <button
+                  ref={menuTriggerRef}
                   className={styles.copyLinkButton}
                   onClick={() => setMenuOpen(v => !v)}
                   title="More actions"
@@ -811,20 +817,22 @@ export function ConversationPanel({
                 </button>
                 {menuOpen && (
                   <>
-                    <div className={styles.headerMenuOverlay} onClick={() => setMenuOpen(false)} />
-                    <div role="menu" className={styles.headerMenu}>
-                      <button
-                        role="menuitem"
-                        className={`${styles.headerMenuItem} ${conversation.isFavorited ? styles.headerMenuItemActive : ''}`}
+                    <MenuOverlay onClick={() => setMenuOpen(false)} />
+                    <MenuSurface
+                      aria-label="Conversation actions"
+                      onClose={() => setMenuOpen(false)}
+                      returnFocusRef={menuTriggerRef}
+                      className="absolute right-0 top-full z-[1000] mt-1 min-w-[220px]"
+                    >
+                      <MenuItemButton
+                        active={conversation.isFavorited}
                         onClick={() => { convMutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); setMenuOpen(false); }}
                       >
                         <Star size={14} style={{ fill: conversation.isFavorited ? 'currentColor' : 'none' }} />
                         {conversation.isFavorited ? 'Unfavorite' : 'Favorite'}
-                      </button>
+                      </MenuItemButton>
 
-                      <button
-                        role="menuitem"
-                        className={styles.headerMenuItem}
+                      <MenuItemButton
                         onClick={() => { retitleMutation.mutate(); setMenuOpen(false); }}
                         disabled={retitleMutation.isPending}
                       >
@@ -832,7 +840,7 @@ export function ConversationPanel({
                           ? <Loader2 size={14} className={styles.spinnerIcon} />
                           : <Sparkles size={14} />}
                         Regenerate title
-                      </button>
+                      </MenuItemButton>
 
                       {conversation.harness === 'claude-code' && (
                         <div className={styles.headerMenuDeliveryRow}>
@@ -852,77 +860,64 @@ export function ConversationPanel({
                         </div>
                       )}
 
-                      <div className={styles.headerMenuDivider} />
+                      <MenuSeparator />
                       {conversation.claudeSessionId && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.openForkModal(conversation, { mode: 'handoff' }); setMenuOpen(false); }}
                         >
                           <Share2 size={14} />
                           Hand off to new conversation
-                        </button>
+                        </MenuItemButton>
                       )}
                       {conversation.claudeSessionId && conversation.harness !== 'pi' && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.openForkModal(conversation); setMenuOpen(false); }}
                         >
                           <GitBranchPlus size={14} />
                           Create summary fork
-                        </button>
+                        </MenuItemButton>
                       )}
-                      <button
-                        role="menuitem"
-                        className={styles.headerMenuItem}
+                      <MenuItemButton
                         onClick={() => { handleExportTranscript(); setMenuOpen(false); }}
                       >
                         <Download size={14} />
                         Export transcript
-                      </button>
+                      </MenuItemButton>
 
                       {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
-                        <div className={styles.headerMenuDivider} />
+                        <MenuSeparator />
                       )}
                       {conversation.handoffDocPath && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { openHandoffDoc(); setMenuOpen(false); }}
                         >
                           <FileText size={14} />
                           Open handoff doc
-                        </button>
+                        </MenuItemButton>
                       )}
                       {conversation.handoffTargetConvId && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { openHandoffTarget(); setMenuOpen(false); }}
                         >
                           <ExternalLink size={14} />
                           Open handoff target
-                        </button>
+                        </MenuItemButton>
                       )}
 
                       {(conversation.sessionAlive || onArchived) && (
-                        <div className={styles.headerMenuDivider} />
+                        <MenuSeparator />
                       )}
                       {conversation.sessionAlive && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.stop(conversation.name); setMenuOpen(false); }}
                         >
                           <Square size={14} />
                           Stop agent
-                        </button>
+                        </MenuItemButton>
                       )}
                       {onArchived && (
-                        <button
-                          role="menuitem"
-                          className={`${styles.headerMenuItem} ${styles.headerMenuItemDestructive}`}
+                        <MenuItemButton
+                          destructive
                           onClick={async () => {
                             setMenuOpen(false);
                             const ok = await confirm({
@@ -939,9 +934,9 @@ export function ConversationPanel({
                         >
                           <Archive size={14} />
                           Archive conversation
-                        </button>
+                        </MenuItemButton>
                       )}
-                    </div>
+                    </MenuSurface>
                   </>
                 )}
               </div>
@@ -1029,7 +1024,7 @@ export function ConversationPanel({
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
           {showTerminal && effectiveViewMode === 'terminal' && (
-            <XTerminal sessionName={conversation.tmuxSession} />
+            <ConversationTerminalView conversation={conversation} />
           )}
           {(effectiveViewMode === 'conversation' || !showTerminal) && (selectedSubagent ? (
             <SubagentTranscript conversation={conversation} subagent={selectedSubagent} resolvedTheme={resolvedTheme} onBack={clearSubagent} />
@@ -1129,6 +1124,7 @@ interface MessagesResponse {
   /** Server-side resolution failure to surface in the panel (e.g. the live
    * session could not be resolved from the launcher). Rendered as a banner. */
   error?: string;
+  checked?: string[];
 }
 
 export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
@@ -1136,13 +1132,19 @@ export async function fetchMessages(name: string, signal?: AbortSignal, agentId?
   // during a server restart rejects (and retries) instead of pinning the
   // panel on "Loading…" forever, and switching conversations cancels the
   // previous conversation's fetch.
-  const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
-  // An agent the store knows (queued specialist, wiped workspace, cleaned
-  // session file) 404s here — that means "no saved history", not an incident.
-  // Render the honest empty state instead of the warning card. Real user
-  // conversations (no agentId) keep the failure card + Retry.
+  const path = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
+    : `/api/conversations/${encodeURIComponent(name)}/messages`;
+  const res = await fetchWithTimeout(path, { signal });
   if (res.status === 404 && agentId) {
-    return { messages: [], workLog: [], streaming: false };
+    const missing = await res.json() as { error?: string; checked?: string[] };
+    return {
+      messages: [],
+      workLog: [],
+      streaming: false,
+      error: missing.error ?? `No transcript found for ${agentId}.`,
+      checked: missing.checked ?? [],
+    };
   }
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
@@ -1199,12 +1201,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
   // composer store so switching panes cannot discard them (PAN-1591).
-  const optimisticMessages = useConversationOptimistic(conversation.name);
-  const optimisticBaseCount = useConversationOptimisticBaseCount(conversation.name);
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
   const acknowledgeOptimistic = useComposerStore((s) => s.acknowledgeOptimistic);
-  const clearOptimistic = useComposerStore((s) => s.clearOptimistic);
-  const failSend = useComposerStore((s) => s.failSend);
   const queryClient = useQueryClient();
 
   // When forkStatus transitions from non-null to null (fork completed),
@@ -1240,6 +1238,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     conversation,
     agentId,
     serverBaseCount: serverMessages.length,
+    serverMessageIds: serverMessages.map((message) => message.id),
     onSendFailed: onSendFailedProp,
   });
   // PAN-1523: ContextWindowMeter lives in the composer toolbar (matches
@@ -1250,61 +1249,18 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     data?.contextUsage ?? conversation.contextUsage ?? null,
   );
 
-  // Reconcile optimistic messages against what the server has actually echoed.
-  // Count only USER turns added since the send baseline — an optimistic bubble is
-  // "absorbed" when its real user message comes back, NOT merely when the total
-  // message count grows. Counting all messages let a concurrent assistant turn
-  // prematurely clear the "Sending…" bubble before the user's own message echoed,
-  // so it sometimes disappeared entirely until the next poll (PAN-1591).
-  const echoedUserCount = serverMessages
-    .slice(optimisticBaseCount)
-    .filter((m) => m.role === 'user').length;
-  const absorbedCount = Math.min(optimisticMessages.length, echoedUserCount);
-  const visibleOptimistic = optimisticMessages.slice(absorbedCount);
-  const serverCaughtUp = optimisticMessages.length > 0 && visibleOptimistic.length === 0;
+  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages);
   const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
 
-  const handleMessageSent = useCallback((text: string) => {
-    addOptimistic(conversation.name, text, serverMessages.length);
-  }, [addOptimistic, conversation.name, serverMessages.length]);
-
-  const handleMessageAcknowledged = useCallback((text: string) => {
-    if (conversation.harness !== 'ohmypi' && conversation.harness !== 'pi') return;
-    acknowledgeOptimistic(conversation.name, text);
-  }, [acknowledgeOptimistic, conversation.harness, conversation.name]);
-
-  // Failed messages are NOT cleared on conversation switch — they persist in the
-  // store keyed per-conversation so the retry outbox survives navigating away
-  // and back (the whole point of moving them out of component-local state).
-
-  // Clean up optimistic messages once the server catches up.
-  useEffect(() => {
-    if (serverCaughtUp) clearOptimistic(conversation.name);
-  }, [serverCaughtUp, clearOptimistic, conversation.name]);
-
-  // PAN-1635: a sent message can be silently eaten when Claude Code compacts on
-  // submit (the paste+Enter races the compaction state-transition) — the prompt
-  // is dropped and never echoes, leaving the optimistic bubble "Sending…" forever.
-  // Detect it: a compact boundary that appeared at/after the send means the prompt
-  // was eaten (surface fast); otherwise fall back to a plain stall timeout. Either
-  // way, move it to the retry outbox so the user can re-send instead of waiting on
-  // a response that will never come.
-  useEffect(() => {
-    if (visibleOptimistic.length === 0) return;
-    const oldest = visibleOptimistic[0];
-    const sentTs = Date.parse(oldest.createdAt || '');
-    if (Number.isNaN(sentTs)) return;
-    const eatenByCompaction = (data?.compactBoundaries ?? []).some((b) => {
-      const bt = Date.parse(b.timestamp);
-      return !Number.isNaN(bt) && bt >= sentTs;
+  const handleMessageSent = useCallback((text: string, clientMessageId?: string) => {
+    addOptimistic(conversation.name, text, serverMessages.length, {
+      clientMessageId, echoBaselineIds: serverMessages.map((message) => message.id),
     });
-    const deadline = sentTs + (eatenByCompaction ? 20_000 : TURN_STALL_MS);
-    const timer = setTimeout(
-      () => failSend(conversation.name, oldest.text),
-      Math.max(0, deadline - Date.now()),
-    );
-    return () => clearTimeout(timer);
-  }, [visibleOptimistic, data?.compactBoundaries, failSend, conversation.name]);
+  }, [addOptimistic, conversation.name, serverMessages]);
+
+  const handleMessageAcknowledged = useCallback((text: string, clientMessageId?: string) => {
+    acknowledgeOptimistic(conversation.name, text, clientMessageId);
+  }, [acknowledgeOptimistic, conversation.name]);
 
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
@@ -1313,7 +1269,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // PAN-3744: before this subscription emits, the transcript is loading rather
   // than empty. Keep this signal hook-local because query-cache entries survive
   // conversation switches and could flash a stale empty state.
-  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0;
+  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0 && !data?.error;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
   // the CLIProxy 7.2 upgrade (2026-08-03) GPT-harness sessions emit only
@@ -1372,7 +1328,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
             ⚠ Session could not be resolved
           </p>
-          <p className={styles.conversationEmptyStateSubtitle}>{data.error}</p>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            {data.error}{data.checked && data.checked.length > 0 ? ` Checked: ${data.checked.join(', ')}` : ''}
+          </p>
         </div>
       ) : messagesFetchFailed ? (
         <div className={styles.conversationEmptyState}>

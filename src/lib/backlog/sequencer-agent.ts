@@ -6,11 +6,12 @@ import { Effect } from 'effect';
 import {
   spawnRun,
   determineModel,
-  listRunningAgentsSync,
-  getAgentStateSync,
+  getAgentState,
   getAgentRuntimeStateSync,
   stopAgent,
 } from '../agents.js';
+import { isAlive } from '../agents/liveness.js';
+import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
 import type { PassMode } from './types.js';
 import type { CollectOpenBacklogResult } from './backlog-input.js';
@@ -22,7 +23,7 @@ export type SequencerRunStatus = {
   running: boolean;
   done: boolean;
   startedAt: string | null;
-  doneReason: 'fresh-sequence' | 'idle' | null;
+  doneReason: 'fresh-sequence' | 'idle' | 'pane-dead' | null;
 };
 
 export type SpawnSequencerOptions = {
@@ -37,11 +38,21 @@ export type SpawnSequencerOptions = {
    * before ranking — callers must NOT pre-cast to `Issue[]` (the shapes differ).
    */
   issues?: ReadonlyArray<Record<string, unknown>>;
+  /** Test seam for the finished-run reap; production callers pass nothing. */
+  stopFinishedRun?: () => Promise<void>;
 };
 
-export function getSequencerRunStatus(projectRoot: string): SequencerRunStatus {
-  const alive = listRunningAgentsSync().some((a) => a.id === SEQUENCER_AGENT_ID && a.tmuxActive);
-  const startedAt = alive ? (getAgentStateSync(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
+export async function getSequencerRunStatus(projectRoot: string): Promise<SequencerRunStatus> {
+  // Liveness comes from the one backend-aware oracle. The tmux census used
+  // here before never listed a Herdr pane, so a finished Herdr run read as
+  // "gone" while `spawnRun`'s own pane check still saw it — every retry was
+  // refused as "already running" and nothing ever reaped it (749 refusals in
+  // the dashboard log before this was traced).
+  const verdict = await isAlive(SEQUENCER_AGENT_ID);
+  // A pane whose harness has exited is still a pane `spawnRun` refuses over.
+  const paneDead = !verdict.alive && verdict.reason === 'pane-dead';
+  const alive = verdict.alive || paneDead;
+  const startedAt = alive ? (getAgentState(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
   const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
 
   let freshSequence = false;
@@ -55,7 +66,7 @@ export function getSequencerRunStatus(projectRoot: string): SequencerRunStatus {
 
   const runtimeState = alive ? getAgentRuntimeStateSync(SEQUENCER_AGENT_ID)?.state ?? null : null;
   const idle = runtimeState === 'idle' || runtimeState === 'stopped' || runtimeState === 'suspended';
-  const doneReason = freshSequence ? 'fresh-sequence' : idle ? 'idle' : null;
+  const doneReason = paneDead ? 'pane-dead' : freshSequence ? 'fresh-sequence' : idle ? 'idle' : null;
   const done = alive && doneReason !== null;
 
   return {
@@ -67,11 +78,29 @@ export function getSequencerRunStatus(projectRoot: string): SequencerRunStatus {
   };
 }
 
+const REAP_SETTLE_MS = 3_000;
+
+/**
+ * Stop the finished sequencer the way `spawnRun` will notice: state bookkeeping
+ * through `stopAgent`, then the pane itself (tmux dies with `stopAgent`; a
+ * Herdr pane needs an explicit close), then wait — bounded — for the backend
+ * to stop reporting it, since Herdr drops the record asynchronously.
+ */
+async function stopSequencerRun(): Promise<void> {
+  await Effect.runPromise(stopAgent(SEQUENCER_AGENT_ID)).catch(() => {});
+  await closeAgentPane(SEQUENCER_AGENT_ID);
+  const deadline = Date.now() + REAP_SETTLE_MS;
+  while (Date.now() < deadline) {
+    if (!(await agentPaneExists(SEQUENCER_AGENT_ID).catch(() => false))) return;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+
 export async function clearFinishedSequencerRun(
   projectRoot: string,
-  stop: () => Promise<void> = () => Effect.runPromise(stopAgent(SEQUENCER_AGENT_ID)),
+  stop: () => Promise<void> = stopSequencerRun,
 ): Promise<SequencerRunStatus> {
-  const status = getSequencerRunStatus(projectRoot);
+  const status = await getSequencerRunStatus(projectRoot);
   if (status.done) {
     await stop();
   }
@@ -82,6 +111,12 @@ export async function spawnSequencerAgent(
   pass: PassMode | 'auto',
   opts: SpawnSequencerOptions = {},
 ): Promise<AgentState> {
+  const assertUnpaused = () => {
+    if (getAgentState(SEQUENCER_AGENT_ID)?.paused) {
+      throw new Error('Sequencer is paused. Run pan unpause sequencer-runner before starting it again.');
+    }
+  };
+  assertUnpaused();
   const projectRoot = opts.projectRoot ?? process.cwd();
   const projectKey = opts.projectKey ?? 'overdeck';
   const batchSize = opts.batchSize ?? 20;
@@ -152,6 +187,13 @@ export async function spawnSequencerAgent(
   const model = determineModel({ role: 'sequencer', model: opts.model, spawnKey: 'sequencer:global' });
   const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });
 
+  // The sequencer is a singleton one-shot: the previous pass's pane lingers
+  // after it finishes, and `spawnRun` refuses over any live pane. Reap a
+  // finished run here so the auto-trigger path benefits, not only the route.
+  await clearFinishedSequencerRun(projectRoot, opts.stopFinishedRun);
+
+  // Backlog collection and manifest writes yield; an operator may pause meanwhile.
+  assertUnpaused();
   return spawnRun(SEQUENCER_AGENT_ID, 'sequencer', {
     agentId: SEQUENCER_AGENT_ID,
     workspace: opts.workspace ?? projectRoot,
@@ -238,7 +280,7 @@ After completing your analysis, write the SequenceDoc JSON to a temp file and su
   pan backlog write-sequence /tmp/sequence-result.json
 
 The \`pan backlog write-sequence\` command validates the JSON, writes the formatted
-\`.pan/backlog/sequence.md\`, and queues an auto-commit — so DO NOT write the file
+\`.pan/backlog/sequence.md\`, and commits it — so DO NOT write the file
 directly with the Write tool. Always go through this command.
 
 The SequenceDoc JSON must conform to the schema:

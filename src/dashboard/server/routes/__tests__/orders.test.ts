@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -14,15 +15,13 @@ const {
   mockGetProjectSync,
   mockFindProjectByPathSync,
   mockListProjectsSync,
-  mockResolveStateReadHomeSync,
-  mockResolveStateReadHomeAsync,
+  mockGetProjectPanPaths,
   mockStartFlywheelRun,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockFindProjectByPathSync: vi.fn(),
   mockListProjectsSync: vi.fn(),
-  mockResolveStateReadHomeSync: vi.fn(),
-  mockResolveStateReadHomeAsync: vi.fn(),
+  mockGetProjectPanPaths: vi.fn(),
   mockStartFlywheelRun: vi.fn(),
 }));
 
@@ -31,7 +30,7 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   return {
     ...actual,
     getProjectSync: mockGetProjectSync,
-    findProjectByPathSync: mockFindProjectByPathSync,
+    findProjectByPath: mockFindProjectByPathSync,
     listProjectsSync: mockListProjectsSync,
   };
 });
@@ -40,12 +39,13 @@ vi.mock('../../../../cli/commands/flywheel.js', () => ({
   startFlywheelRun: mockStartFlywheelRun,
 }));
 
-vi.mock('../../../../lib/state-read-home.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../lib/state-read-home.js')>();
+// PAN-3917 FR-2: order books live under the project repo's `.pan/`, resolved by
+// getProjectPanPaths — there is no state worktree to read from any more.
+vi.mock('../../../../lib/pan-dir/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/pan-dir/paths.js')>();
   return {
     ...actual,
-    resolveStateReadHomeSync: mockResolveStateReadHomeSync,
-    resolveStateReadHomeAsync: mockResolveStateReadHomeAsync,
+    getProjectPanPaths: mockGetProjectPanPaths,
   };
 });
 
@@ -54,15 +54,31 @@ interface RouteResult {
   body: Record<string, unknown>;
 }
 
+/** getProjectPanPaths' shape, with the fixture root standing in for `.pan/`. */
+function panPaths(panDir: string) {
+  return {
+    panDir,
+    specsDir: join(panDir, 'specs'),
+    draftsDir: join(panDir, 'drafts'),
+    continuesDir: join(panDir, 'continues'),
+  };
+}
+
 const roots: string[] = [];
+let defaultPanHome = '';
 const at = '2026-07-18T12:00:00.000Z';
 
 function git(args: string[], cwd: string): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
 
+/**
+ * PAN-3917: every fixture plan home lives under the OS temp dir. These used to
+ * be created inside `process.cwd()`, so a forked run wrote `.pan/orders/` into
+ * the repo root and left it behind.
+ */
 function gitFixture(): string {
-  const root = join(process.cwd(), `.test-orders-routes-${process.pid}-${roots.length}`);
+  const root = mkdtempSync(join(tmpdir(), 'pan-orders-routes-'));
   const origin = `${root}-origin.git`;
   roots.push(root, origin);
   mkdirSync(root, { recursive: true });
@@ -72,10 +88,12 @@ function gitFixture(): string {
   writeFileSync(join(root, 'migration-complete.json'), JSON.stringify({ seededAt: at }), 'utf8');
   git(['add', 'migration-complete.json'], root);
   git(['commit', '-m', 'seed'], root);
-  git(['branch', '-M', 'overdeck-state'], root);
+  // PAN-3917: order books live in the project's own `.pan/`, on its own
+  // branch — there is no state branch to seed.
+  git(['branch', '-M', 'main'], root);
   execFileSync('git', ['init', '--bare', origin], { encoding: 'utf8' });
   git(['remote', 'add', 'origin', origin], root);
-  git(['push', '-u', 'origin', 'overdeck-state'], root);
+  git(['push', '-u', 'origin', 'main'], root);
   return root;
 }
 
@@ -153,12 +171,11 @@ beforeEach(() => {
   mockGetProjectSync.mockReset().mockReturnValue(null);
   mockFindProjectByPathSync.mockReset().mockReturnValue(null);
   mockListProjectsSync.mockReset().mockReturnValue([]);
-  mockResolveStateReadHomeSync.mockReset();
-  // Delegates to whatever the sync mock is configured to return, so tests only
-  // need to configure one mock regardless of which resolution path they exercise.
-  mockResolveStateReadHomeAsync.mockReset().mockImplementation(
-    async (project: ProjectConfig, key?: string) => mockResolveStateReadHomeSync(project, key),
-  );
+  // Default to a throwaway plan home so an unconfigured resolution path can
+  // never fall through to the repo's own `.pan/`.
+  defaultPanHome = mkdtempSync(join(tmpdir(), 'pan-orders-default-'));
+  roots.push(defaultPanHome);
+  mockGetProjectPanPaths.mockReset().mockReturnValue(panPaths(defaultPanHome));
   mockStartFlywheelRun.mockReset();
 });
 
@@ -371,10 +388,9 @@ describe('/api/orders routes', () => {
       if (key === 'project-b') return projectB;
       return null;
     });
-    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
-      root: project === projectA ? rootA : rootB,
-      migrated: true,
-    }));
+    mockGetProjectPanPaths.mockImplementation((projectRoot: string) => panPaths(
+      projectRoot === projectA.path ? rootA : rootB,
+    ));
 
     const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
     await expect(requestOrdersRoute(layer, '/api/orders?project=project-a', mutation('POST', {
@@ -424,10 +440,9 @@ describe('/api/orders routes', () => {
       { key: 'default-project', config: defaultProject },
       { key: 'other-project', config: otherProject },
     ]);
-    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
-      root: project === defaultProject ? defaultRoot : otherRoot,
-      migrated: true,
-    }));
+    mockGetProjectPanPaths.mockImplementation((projectRoot: string) => panPaths(
+      projectRoot === defaultProject.path ? defaultRoot : otherRoot,
+    ));
 
     const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
     await requestOrdersRoute(layer, '/api/orders?project=other-project', mutation('POST', {
@@ -452,10 +467,9 @@ describe('/api/orders routes', () => {
       { key: 'default-project', config: defaultProject },
       { key: 'other-project', config: otherProject },
     ]);
-    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
-      root: project === defaultProject ? defaultRoot : otherRoot,
-      migrated: true,
-    }));
+    mockGetProjectPanPaths.mockImplementation((projectRoot: string) => panPaths(
+      projectRoot === defaultProject.path ? defaultRoot : otherRoot,
+    ));
 
     const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-nowhere')).resolves.toMatchObject({
@@ -468,7 +482,7 @@ describe('/api/orders routes', () => {
     const otherRoot = gitFixture();
     const otherProject = { path: '/fake/other-project' } as ProjectConfig;
     mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
-    mockResolveStateReadHomeSync.mockReturnValue({ root: otherRoot, migrated: true });
+    mockGetProjectPanPaths.mockReturnValue(panPaths(otherRoot));
     mockListProjectsSync.mockReturnValue([{ key: 'other-project', config: otherProject }]);
 
     const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
@@ -481,7 +495,7 @@ describe('/api/orders routes', () => {
     const otherRoot = gitFixture();
     const otherProject = { path: '/fake/other-project' } as ProjectConfig;
     mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
-    mockResolveStateReadHomeSync.mockReturnValue({ root: otherRoot, migrated: true });
+    mockGetProjectPanPaths.mockReturnValue(panPaths(otherRoot));
     mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-OTHER' });
 
     const states = new Map<string, OrderIssueState>([['PAN-20', { issue: 'PAN-20', open: true, parked: false }]]);
@@ -499,12 +513,12 @@ describe('/api/orders routes', () => {
     expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: '2026-07-18-cross-start' });
   });
 
-  it('keeps starting from the server cwd when the book is in the default project', async () => {
+  it('keeps starting from the default project root when the book lives there', async () => {
     const defaultRoot = gitFixture();
-    const defaultProject = { path: process.cwd() } as ProjectConfig;
+    const defaultProject = { path: defaultPanHome } as ProjectConfig;
     mockFindProjectByPathSync.mockReturnValue(defaultProject);
     mockListProjectsSync.mockReturnValue([{ key: 'default-project', config: defaultProject }]);
-    mockResolveStateReadHomeSync.mockReturnValue({ root: defaultRoot, migrated: true });
+    mockGetProjectPanPaths.mockReturnValue(panPaths(defaultRoot));
     mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-DEFAULT' });
 
     const states = new Map<string, OrderIssueState>([['PAN-21', { issue: 'PAN-21', open: true, parked: false }]]);
@@ -519,6 +533,6 @@ describe('/api/orders routes', () => {
 
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-default-start/start', mutation('POST')))
       .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-DEFAULT', warnings: [] } });
-    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: process.cwd(), orders: '2026-07-18-default-start' });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: defaultPanHome, orders: '2026-07-18-default-start' });
   });
 });

@@ -1,17 +1,17 @@
+import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, realpathSync, rmSync, unlinkSync } from 'fs';
 import { join, dirname, basename, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Effect } from 'effect';
 import {
-  replacePlaceholdersSync,
-  getDefaultWorkspaceConfigSync,
+  replacePlaceholders,
+  getDefaultWorkspaceConfig,
 } from '../workspace-config.js';
 import { addDnsEntry, syncDnsToWindows } from '../dns.js';
 import { addTunnelIngress } from '../tunnel.js';
 import { createHumeConfig } from '../hume.js';
-import { mergeSkillsIntoWorkspaceSync, mergePanSkillsIntoWorkspaceSync } from '../skills-merge.js';
+import { mergeSkillsIntoWorkspace, mergePanSkillsIntoWorkspace } from '../skills-merge.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import {
   PAN_CONTEXT_FILENAME,
@@ -20,28 +20,30 @@ import {
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
 } from '../pan-dir/index.js';
-import { copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync } from './migration.js';
+import { copyOverdeckSettingsToWorkspace, ensurePanGitignore } from './migration.js';
 import {
   assignPort,
   copyProjectTemplateDirs,
   createWorktree,
   installPreRebaseHook,
-  preTrustDirectorySync,
+  preTrustDirectory,
   relocateVenvScripts,
-  restorePreWorktreeMetadataSync,
-  stagePreWorktreeMetadataSync,
+  restorePreWorktreeMetadata,
+  stagePreWorktreeMetadata,
   validateFeatureName,
 } from './worktree-ops.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import { getProjectByPath, getWorkspaceForIssue } from '../workspaces/resolver.js';
-import { createWorkspace, deleteWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
+import { createWorkspace as createWorkspaceRow, deleteWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
 import { listProjectsSync } from '../projects.js';
 import {
-  createWorkspacePlaceholdersSync as createPlaceholders,
-  sanitizeComposeFileSync,
-  renderDevcontainerSync,
-  processTemplatesSync,
+  createWorkspacePlaceholders as createPlaceholders,
+  sanitizeComposeFile,
+  renderDevcontainer,
+  processTemplates,
 } from '../workspace/devcontainer-renderer.js';
+
+export { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
 
 const execAsync = promisify(exec);
 
@@ -53,28 +55,18 @@ interface PolyrepoWorkspaceRepoRef {
  * PAN-2386: ensure a polyrepo scaffold workspace has a .gitignore that excludes
  * sub-repository directories. The scaffold repo is separate from the sub-repos;
  * without these entries, git status shows hundreds of untracked files and blocks
- * agent auto-start. Durable Overdeck records must stay trackable.
+ * agent auto-start.
  *
- * Returns the entries that were added or removed (empty arrays if nothing changed).
+ * Returns the entries that were added (the `removed` half is kept in the return
+ * shape for callers that still report it; nothing is removed any more).
  */
-export function ensurePolyrepoWorkspaceGitignoreSync(
+export function ensurePolyrepoWorkspaceGitignore(
   workspacePath: string,
   repos: readonly PolyrepoWorkspaceRepoRef[],
 ): { added: string[]; removed: string[] } {
   const gitignorePath = join(workspacePath, '.gitignore');
   let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
   const removed: string[] = [];
-  const filteredLines = content.split('\n').filter(line => {
-    const trimmed = line.trim();
-    if (trimmed === '.pan/records/' || trimmed === '.pan/records') {
-      removed.push(trimmed);
-      return false;
-    }
-    return true;
-  });
-  if (removed.length > 0) {
-    content = filteredLines.join('\n');
-  }
 
   const normalizedLines = content.split('\n').map(l => l.trim()).filter(Boolean);
   const added: string[] = [];
@@ -87,9 +79,8 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
   }
 
   // PAN-2541: the workspace .overdeck/ dir is disposable issue runtime
-  // (continue.json, transcripts, feedback); durable state lives on the
-  // overdeck-state branch. Without this entry the scaffold repo shows
-  // `?? .overdeck/` and agents invent local .git/info/exclude edits.
+  // (continue.json, transcripts, feedback). Without this entry the scaffold
+  // repo shows `?? .overdeck/` and agents invent local .git/info/exclude edits.
   const runtimeEntries: string[] = [];
   if (!normalizedLines.includes('.overdeck/') && !normalizedLines.includes('.overdeck')) {
     runtimeEntries.push('.overdeck/');
@@ -120,7 +111,7 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
     content += added.join('\n') + '\n';
   }
   if (runtimeEntries.length > 0) {
-    content += '\n# Overdeck workspace runtime (PAN-2541: durable state lives on overdeck-state; devcontainer harness is generated)\n';
+    content += '\n# Overdeck workspace runtime (PAN-2541: disposable issue runtime; devcontainer harness is generated)\n';
     content += runtimeEntries.join('\n') + '\n';
     added.push(...runtimeEntries);
   }
@@ -165,7 +156,8 @@ export async function commitPolyrepoWorkspaceGitignoreAsync(workspacePath: strin
   }
 }
 
-export async function createWorkspacePromise(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
+/** Create a new workspace (git worktree + scaffolding). */
+export async function createWorkspace(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
   const { projectConfig, featureName, startDocker, dryRun, onProgress } = options;
   const progress = (label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
     onProgress?.({ label, detail, status });
@@ -191,7 +183,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     return result;
   }
 
-  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfigSync();
+  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfig();
   const workspacesDir = join(projectConfig.path, workspaceConfig.workspaces_dir || 'workspaces');
   const featureFolder = `feature-${featureName}`;
   const workspacePath = join(workspacesDir, featureFolder);
@@ -243,7 +235,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
       upsertProjectFromConfig(projectKey, projectConfig);
       project = getProjectByPath(projectConfig.path);
     }
-    createdWorkspaceRowId = await createWorkspace({
+    createdWorkspaceRowId = await createWorkspaceRow({
       projectId: project!.id,
       kind: 'issue',
       name: featureFolder,
@@ -259,7 +251,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   // then merge it back into the real worktree after creation.
   let stagedMetadataPath: string | null = null;
   if (existsSync(workspacePath)) {
-    stagedMetadataPath = stagePreWorktreeMetadataSync(workspacePath);
+    stagedMetadataPath = stagePreWorktreeMetadata(workspacePath);
     if (stagedMetadataPath) {
       result.steps.push('Staged pre-worktree .pan metadata');
     } else {
@@ -339,7 +331,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   }
 
   if (!result.success) {
-    restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
+    restorePreWorktreeMetadata(stagedMetadataPath, workspacePath);
     progress('Creating git worktree', 'Worktree creation failed', 'error');
     return result;
   }
@@ -347,7 +339,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   // The worktree (or every polyrepo sub-repo worktree/symlink) now exists on
   // disk — any failure from here on must not delete the workspace row.
   worktreeCreated = true;
-  restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
+  restorePreWorktreeMetadata(stagedMetadataPath, workspacePath);
 
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     // PAN-2386: polyrepo scaffold workspaces are separate git repos that check out
@@ -355,7 +347,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     // sub-repo directories show as untracked and block agent auto-start. Write a
     // scaffold .gitignore before any git status checks.
     try {
-      const { added, removed } = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, workspaceConfig.repos);
+      const { added, removed } = ensurePolyrepoWorkspaceGitignore(workspacePath, workspaceConfig.repos);
       if (added.length > 0 || removed.length > 0) {
         result.steps.push(`Updated .gitignore for polyrepo workspace (${added.length} added, ${removed.length} removed)`);
         // The .gitignore itself must be committed or it becomes the untracked file
@@ -405,7 +397,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   // Ensure runtime-only Overdeck and Claude Code sync paths are in the project's .gitignore
   try {
-    ensurePanGitignoreSync(projectConfig.path);
+    ensurePanGitignore(projectConfig.path);
     result.steps.push('Verified runtime-only Overdeck and Claude Code sync paths are in .gitignore');
   } catch (gitignoreErr: any) {
     // Non-fatal — log but don't block workspace creation
@@ -419,7 +411,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const composeFiles = readdirSync(devcontainerDir)
       .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
     for (const composeFile of composeFiles) {
-      sanitizeComposeFileSync(join(devcontainerDir, composeFile));
+      sanitizeComposeFile(join(devcontainerDir, composeFile));
     }
     if (composeFiles.length > 0) {
       result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
@@ -555,8 +547,8 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
       }
 
       // Start TLDR daemon for this workspace
-      const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
-      const tldrService = getTldrDaemonServiceSync(workspacePath, venvPath);
+      const { getTldrDaemonService } = await import('../tldr-daemon.js');
+      const tldrService = getTldrDaemonService(workspacePath, venvPath);
       await tldrService.start(true);
       result.steps.push('Started TLDR daemon');
 
@@ -583,7 +575,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   if (workspaceConfig.dns) {
     const dnsMethod = workspaceConfig.dns.sync_method || 'wsl2hosts';
     for (const entryPattern of workspaceConfig.dns.entries) {
-      const hostname = replacePlaceholdersSync(entryPattern, placeholders);
+      const hostname = replacePlaceholders(entryPattern, placeholders);
 
       if (addDnsEntry(dnsMethod, hostname)) {
         result.steps.push(`Added DNS entry: ${hostname} (${dnsMethod})`);
@@ -616,14 +608,14 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   // Install base Overdeck skills/agents/rules from cache
   progress('Installing skills & templates', 'Overdeck skills, agents, rules');
-  const mergeResult = mergeSkillsIntoWorkspaceSync(workspacePath);
+  const mergeResult = mergeSkillsIntoWorkspace(workspacePath);
   const mergeTotal = mergeResult.added.length + mergeResult.updated.length;
   if (mergeTotal > 0) {
     result.steps.push(`Installed ${mergeTotal} Overdeck files (${mergeResult.added.length} new, ${mergeResult.updated.length} updated)`);
   }
 
   // Overlay project-local skills from .pan/skills/ (higher precedence than global cache)
-  const panMergeResult = mergePanSkillsIntoWorkspaceSync(projectConfig.path, workspacePath);
+  const panMergeResult = mergePanSkillsIntoWorkspace(projectConfig.path, workspacePath);
   if (panMergeResult.added.length > 0) {
     result.steps.push(`Installed ${panMergeResult.added.length} project-local skill file(s) from .pan/skills/ (${panMergeResult.overlayed.join(', ')})`);
   }
@@ -633,16 +625,24 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const templateDir = join(projectConfig.path, workspaceConfig.agent.template_dir);
 
     // Process template files
-    const templateSteps = processTemplatesSync(
+    const configuredTemplates = workspaceConfig.agent.templates;
+    const discoveredTemplates = configuredTemplates === undefined
+      ? readdirSync(templateDir)
+        .filter((source) => source.endsWith('.template'))
+        .map((source) => ({ source, target: source.slice(0, -'.template'.length) }))
+      : configuredTemplates;
+    const safeTemplates = discoveredTemplates.filter(({ target }) => !isHarnessNativeTarget(target));
+    const templateSteps = processTemplates(
       templateDir,
       workspacePath,
       placeholders,
-      workspaceConfig.agent.templates
+      safeTemplates,
     );
     result.steps.push(...templateSteps);
 
     // Copy .claude/ directories from project template (copy_dirs replaces legacy symlinks)
-    const dirsToSync = workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks;
+    const dirsToSync = (workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks)
+      ?.filter((dir) => !isHarnessNativeTarget(dir));
     if (dirsToSync) {
       const copySteps = copyProjectTemplateDirs(templateDir, workspacePath, dirsToSync, placeholders);
       result.steps.push(...copySteps);
@@ -651,19 +651,19 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   // Generate .env file
   if (workspaceConfig.env?.template) {
-    const envContent = replacePlaceholdersSync(workspaceConfig.env.template, placeholders);
+    const envContent = replacePlaceholders(workspaceConfig.env.template, placeholders);
     writeFileSync(join(workspacePath, '.env'), envContent);
     result.steps.push('Created .env file');
   }
 
   // Render the workspace's `.devcontainer/` from the project's compose
   // template. All template processing, file copies, $HOME sanitization, and
-  // ./dev symlink wiring lives in `renderDevcontainer` so the same code path
+  // ./dev symlink wiring lives in `renderDevcontainerSync` so the same code path
   // is used here, by `ensureDevcontainer` (self-heal), and by any future
   // re-render command. See `./workspace/devcontainer-renderer.ts`.
   if (workspaceConfig.docker?.compose_template) {
     try {
-      const renderResult = renderDevcontainerSync({
+      const renderResult = renderDevcontainer({
         workspacePath,
         projectConfig,
         featureName,
@@ -683,7 +683,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   // Set up Cloudflare tunnel for external access (before Docker so containers can use tunnel URLs)
   if (workspaceConfig.tunnel) {
-    const tunnelResult = await Effect.runPromise(addTunnelIngress(workspaceConfig.tunnel, placeholders));
+    const tunnelResult = await addTunnelIngress(workspaceConfig.tunnel, placeholders);
     result.steps.push(...tunnelResult.steps);
     if (!tunnelResult.success) {
       result.errors.push('Tunnel setup had failures (see steps for details)');
@@ -692,7 +692,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   // Create Hume EVI config and write env file for Docker (before Docker so containers pick up the config ID)
   if (workspaceConfig.hume) {
-    const humeResult = await Effect.runPromise(createHumeConfig(workspaceConfig.hume, placeholders));
+    const humeResult = await createHumeConfig(workspaceConfig.hume, placeholders);
     result.steps.push(...humeResult.steps);
     if (humeResult.configId) {
       writeFileSync(
@@ -764,7 +764,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt
   try {
-    preTrustDirectorySync(workspacePath);
+    preTrustDirectory(workspacePath);
     result.steps.push('Pre-trusted workspace in Claude Code');
   } catch {
     // Non-fatal — agent can still work, user will just see trust prompt
@@ -776,7 +776,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const yamlConfig = loadYamlConfig();
     const cavemanConfig = yamlConfig.config.caveman;
     const variant = determineCavemanVariant(cavemanConfig);
-    await Effect.runPromise(injectCavemanSettings(workspacePath, variant));
+    await injectCavemanSettings(workspacePath, variant);
     if (variant === 'enabled') {
       result.steps.push('Injected caveman compression hooks into .claude/settings.json');
     } else if (variant === 'disabled') {
@@ -790,7 +790,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   // Copy Overdeck global settings into workspace so agents testing Overdeck
   // itself have the same projects, model assignments, and hooks.
   try {
-    const settingsResult = copyOverdeckSettingsToWorkspaceSync(workspacePath);
+    const settingsResult = copyOverdeckSettingsToWorkspace(workspacePath);
     if (settingsResult.copied.length > 0) {
       result.steps.push(`Copied Overdeck settings into workspace (${settingsResult.copied.length} file(s))`);
     }

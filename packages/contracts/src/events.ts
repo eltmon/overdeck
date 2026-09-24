@@ -13,11 +13,12 @@ import {
   ProjectCiSuite,
   ResourceStats,
   RestartGateSnapshot,
-  ReviewStatusSnapshot,
   Role,
   SequenceNumber,
   WaitingReason,
 } from "./types"
+import { DerivedIssueState } from "./derived-issue-state"
+import { BackendPane } from "./backend-pane"
 import {
   MemoryObservation,
   MemoryStatus,
@@ -579,14 +580,38 @@ export type PlanItemsUnblockedEvent = typeof PlanItemsUnblockedEvent.Type
 
 // ─── Pipeline / Merge Events ──────────────────────────────────────────────────
 
-/** Replaces socket.io `pipeline:status` */
-export const PipelineStatusChangedEvent = Schema.Struct({
-  type: Schema.Literal("pipeline.status_changed"),
+/**
+ * PAN-3917 FR-6 — an issue's derived pipeline state changed.
+ *
+ * Emitted with `emitOnly`: derived state is recomputed from the tracker, the
+ * forge and the terminal backend on every boot, so persisting it would be
+ * storing a status Overdeck can derive.
+ */
+export const IssueStateChangedEvent = Schema.Struct({
+  type: Schema.Literal("issue_state.changed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), status: ReviewStatusSnapshot }),
+  payload: Schema.Struct({ issueState: DerivedIssueState }),
 })
-export type PipelineStatusChangedEvent = typeof PipelineStatusChangedEvent.Type
+export type IssueStateChangedEvent = typeof IssueStateChangedEvent.Type
+
+/** PAN-3917 FR-12 — a live agent pane appeared or changed. `emitOnly`. */
+export const BackendPaneChangedEvent = Schema.Struct({
+  type: Schema.Literal("backend_pane.changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ pane: BackendPane }),
+})
+export type BackendPaneChangedEvent = typeof BackendPaneChangedEvent.Type
+
+/** PAN-3917 FR-12 — a pane left the backend inventory. `emitOnly`. */
+export const BackendPaneRemovedEvent = Schema.Struct({
+  type: Schema.Literal("backend_pane.removed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ paneId: Schema.String }),
+})
+export type BackendPaneRemovedEvent = typeof BackendPaneRemovedEvent.Type
 
 /** Replaces socket.io `merge:ready` */
 export const MergeReadyEvent = Schema.Struct({
@@ -596,15 +621,6 @@ export const MergeReadyEvent = Schema.Struct({
   payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type MergeReadyEvent = typeof MergeReadyEvent.Type
-
-/** New — review status changed */
-export const ReviewStatusChangedEvent = Schema.Struct({
-  type: Schema.Literal("review.status_changed"),
-  sequence: SequenceNumber,
-  timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), status: ReviewStatusSnapshot }),
-})
-export type ReviewStatusChangedEvent = typeof ReviewStatusChangedEvent.Type
 
 /** New — review specialist dispatched */
 export const PipelineReviewStartedEvent = Schema.Struct({
@@ -974,6 +990,18 @@ export const IssuesSnapshotEvent = Schema.Struct({
   payload: Schema.Struct({ issues: Schema.Array(Schema.Unknown) }),
 })
 export type IssuesSnapshotEvent = typeof IssuesSnapshotEvent.Type
+
+/** Complete changed rows since the initial snapshot; preserves tracker ordering. */
+export const IssuesDeltaEvent = Schema.Struct({
+  type: Schema.Literal("issues.delta"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    length: Schema.Number,
+    changes: Schema.Array(Schema.Struct({ index: Schema.Number, issue: Schema.Unknown })),
+  }),
+})
+export type IssuesDeltaEvent = typeof IssuesDeltaEvent.Type
 
 /** Replaces socket.io `issues:updated` */
 export const IssuesUpdatedEvent = Schema.Struct({
@@ -1487,9 +1515,10 @@ export const DomainEvent = Schema.Union([
   PlanItemStatusChangedEvent,
   PlanSubitemStatusChangedEvent,
   PlanItemsUnblockedEvent,
-  PipelineStatusChangedEvent,
+  IssueStateChangedEvent,
+  BackendPaneChangedEvent,
+  BackendPaneRemovedEvent,
   MergeReadyEvent,
-  ReviewStatusChangedEvent,
   PipelineReviewStartedEvent,
   PipelineReviewCompletedEvent,
   PipelineTestStartedEvent,
@@ -1517,6 +1546,7 @@ export const DomainEvent = Schema.Union([
   ResourcesUpdatedEvent,
   SystemHealthSeverityChangedEvent,
   IssuesSnapshotEvent,
+  IssuesDeltaEvent,
   IssuesUpdatedEvent,
   IssueStatusChangedEvent,
   ActivityUpdatedEvent,

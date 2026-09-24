@@ -43,7 +43,7 @@ Wrapping every CLI verb in a skill is a tax, not a feature. A skill exists to ad
 - Compose with other commands the agent should know about.
 - Have failure modes that need specific recovery advice.
 
-`pan pause`, `pan unpause`, and `pan untroubled` are intentionally wrapped because their persistent gate semantics and interaction with `pan start` / `pan kill` need more guidance than `--help` can provide.
+`pan pause` and `pan unpause` are intentionally wrapped because their persistent gate semantics and interaction with `pan start` / `pan kill` need more guidance than `--help` can provide.
 
 Verbs that **don't** get wrapped (current exclusion list, with rationale):
 
@@ -53,15 +53,13 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan backup`, `pan restore` | `--help` is sufficient; no judgment calls. |
 | `pan caveman-compress` | Internal-only utility. |
 | `pan fork`, `pan unarchive-conversation`, `pan resume` | Single-purpose, output is self-explanatory. |
-| `pan inspect` | Diagnostic output is intended for humans to read directly. |
 | `pan map` | No CLI verb exists; `/pan-map` is a topical skill for bootstrapping `.pan/context/codebase/` orientation files. |
 | `pan open` | Trivial — opens an editor. |
-| `pan recover`, `pan restore` | Recovery flows are documented in workflow skills (`pan-diagnose`, `pan-workflow`). |
-| `pan scope`, `pan staffing`, `pan swarm`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
+| `pan recover`, `pan restore` | Recovery flows are documented in workflow skills (`pan-diagnose`). |
+| `pan scope`, `pan staffing`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
 | `pan cost`, `pan update`, `pan serve` | Operations whose `--help` is self-contained. |
 | `pan health` | Distinct from `pan doctor`; runtime-health output is meant to be read directly. |
 | `pan admin conversations` | Internal backfill utility; `--help` covers the single subcommand. |
-| `pan admin migrate-legacy-agent-dirs` | One-time idempotent migration; `--help` states the complete behavior. |
 | `pan admin seed-uat-fixtures` | Guidance lives in `roles/test.md` (when to seed) and `docs/WORKSPACE-CONTAINERS.md` (what it does); `--help` covers the mechanics. |
 
 This list is **deliberate, not aspirational.** Adding a wrapper for any of these should be justified case-by-case.
@@ -102,6 +100,12 @@ skills/pan-<verb>/SKILL.md            (canonical, committed)
 ```
 
 Run `pan sync` after editing any skill source to push it through to your active Claude sessions.
+
+A handful of skills live in `sync-sources/dev-skills/` instead: same shape and
+same `pan-<verb>` convention, but they document Overdeck-repo-development
+workflows (e.g. `pan-swarm`, `pan-commit`, `pan-dashboard-restart`) rather than
+end-user CLI usage, so they are not installed by default and are exempt from
+`lint-skills.sh`'s CLI cross-check.
 
 ## Creating a new wrapper skill
 

@@ -16,7 +16,7 @@ const remoteMocks = vi.hoisted(() => ({
 // singleton IDs and known prefixes must not get a naive `agent-` prefix, and
 // issue IDs can resolve to non-work agents when that is the registered run.
 vi.mock('../../../lib/agents.js', () => ({
-  resolveAgentTargetSync: (id: string) => {
+  resolveAgentTarget: (id: string) => {
     const lower = id.toLowerCase();
     if (lower === 'pan-1820') return 'strike-pan-1820';
     if (
@@ -31,7 +31,18 @@ vi.mock('../../../lib/agents.js', () => ({
     }
     return `agent-${lower}`;
   },
+  getAgentState: (id: string) => ({ id, issueId: 'PAN-123' }),
   messageAgent: agentMocks.messageAgent,
+}));
+
+vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
+  issueOwesRework: vi.fn(async () => false),
+}));
+
+// W4 (PAN-3846): tellCommand now ends through exitCli on success and failure —
+// intercept it so process.exit never fires inside the test runner.
+vi.mock('../../exit.js', () => ({
+  exitCli: vi.fn(async (_code: number) => undefined as never),
 }));
 
 vi.mock('../../../lib/remote/index.js', () => ({
@@ -53,25 +64,26 @@ describe('tellCommand agent ID resolution (PAN-1749)', () => {
       'flywheel-orchestrator',
       'strike PAN-1: parking — need operator decision',
       'pan-tell',
+      { owesRework: false },
     );
   });
 
   it('prefixes bare issue IDs with agent-', async () => {
     const { tellCommand } = await import('../tell.js');
     await tellCommand('PAN-123', 'hello');
-    expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-123', 'hello', 'pan-tell');
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-123', 'hello', 'pan-tell', { owesRework: false });
   });
 
   it('can resolve an issue ID to its registered strike agent', async () => {
     const { tellCommand } = await import('../tell.js');
     await tellCommand('PAN-1820', 'hello strike');
-    expect(agentMocks.messageAgent).toHaveBeenCalledWith('strike-pan-1820', 'hello strike', 'pan-tell');
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('strike-pan-1820', 'hello strike', 'pan-tell', { owesRework: false });
   });
 
   it('preserves known agent prefixes like planning-', async () => {
     const { tellCommand } = await import('../tell.js');
     await tellCommand('planning-pan-123', 'hello');
-    expect(agentMocks.messageAgent).toHaveBeenCalledWith('planning-pan-123', 'hello', 'pan-tell');
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('planning-pan-123', 'hello', 'pan-tell', { owesRework: false });
   });
 });
 

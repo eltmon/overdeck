@@ -18,19 +18,17 @@
  * per-home discovery location.
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, chmodSync, copyFileSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
 import { getManagedTmuxSocketName } from '../tmux.js';
-import { dirname, join, basename } from 'node:path'
+import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { request as httpRequest } from 'node:http'
-import { Effect } from 'effect'
+import { codexAgentHome, codexAgentSessionsDir, codexDefaultHome, codexHome, codexSessionsRoot, extractThreadIdFromRollout, findLatestRollout, findRolloutPath } from './storage/codex.js'
 import yaml from 'js-yaml'
 import type {
-  AgentRuntime,
   AgentRuntimeSync,
-  AgentRuntimeError,
   HarnessBehavior,
   Heartbeat,
   TokenUsage,
@@ -42,9 +40,10 @@ import type {
 import { CODEX_BEHAVIOR } from './behavior.js'
 import { syncCodexSkillsIntoHome } from './codex-skills.js'
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
-import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
-import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
+import { parseCodexSession } from '../cost-parsers/codex-parser.js'
+import { appendSessionIdToHistory } from '../session-history.js'
+
 
 const execAsync = promisify(exec)
 
@@ -193,11 +192,6 @@ function readCodexTransportFromYaml(filePath: string): unknown {
   }
 }
 
-/** Resolve $CODEX_HOME: env var → ~/.codex fallback. */
-export function codexHome(): string {
-  return process.env.CODEX_HOME ?? join(homedir(), '.codex')
-}
-
 /** Read the persisted Codex thread-id for session lookup. */
 function readThreadId(agentId: string): string | null {
   const p = threadIdPathFor(agentId)
@@ -214,61 +208,15 @@ export function writeThreadId(agentId: string, threadId: string): void {
   writeFileSync(threadIdPathFor(agentId), threadId, { mode: 0o600 })
 }
 
-/** Cache resolved rollout paths to avoid repeated synchronous directory walks. */
-const rolloutPathCache = new Map<string, string>()
-
-/**
- * Walk $CODEX_HOME/sessions looking for a rollout file whose name ends with
- * `-<threadId>.jsonl`.  The directory tree is YYYY/MM/DD/…, so we walk it
- * recursively.
- *
- * Results are cached by (codexHomeDir, threadId) so the walk runs at most once
- * per unique thread; the hot paths (getHeartbeat tier-2, getTokenUsage,
- * getSessionCost) pay only an existsSync check on subsequent calls.
- */
-export function findRolloutPath(codexHomeDir: string, threadId: string): string | null {
-  const cacheKey = `${codexHomeDir}:${threadId}`
-  const cached = rolloutPathCache.get(cacheKey)
-  if (cached) {
-    if (existsSync(cached)) return cached
-    // File was deleted — evict and re-walk.
-    rolloutPathCache.delete(cacheKey)
-  }
-  const sessionsRoot = join(codexHomeDir, 'sessions')
-  if (!existsSync(sessionsRoot)) return null
-  const result = walkForThread(sessionsRoot, threadId)
-  if (result) rolloutPathCache.set(cacheKey, result)
-  return result
-}
-
-function walkForThread(dir: string, threadId: string): string | null {
-  let entries: string[]
-  try {
-    entries = readdirSync(dir)
-  } catch {
-    return null
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry)
-    let isDir = false
-    try {
-      isDir = statSync(full).isDirectory()
-    } catch {
-      continue
-    }
-    if (isDir) {
-      const hit = walkForThread(full, threadId)
-      if (hit) return hit
-    } else if (entry.endsWith(`-${threadId}.jsonl`)) {
-      return full
-    }
-  }
-  return null
+/** Persist the thread-id and record the rollout path in the session index. */
+export function recordCodexRolloutSession(agentId: string, threadId: string, rolloutPath: string): void {
+  writeThreadId(agentId, threadId)
+  appendSessionIdToHistory(agentId, threadId, 'capture', { harness: 'codex', path: rolloutPath })
 }
 
 const SPAWN_READY_TIMEOUT_MS = 60_000
 
-export class CodexSpawnTimeout extends Error {
+class CodexSpawnTimeout extends Error {
   readonly code = 'CODEX_SPAWN_TIMEOUT' as const
   constructor(agentId: string) {
     super(`Codex agent ${agentId} did not start within ${SPAWN_READY_TIMEOUT_MS}ms`)
@@ -297,6 +245,8 @@ export class CodexSpawnTimeout extends Error {
  */
 export interface InitCodexHomeOpts {
   trustedDir?: string
+  model?: string
+  effort?: string
   approvalPolicy?: string
   sandboxMode?: string
   approvalsReviewer?: string
@@ -308,17 +258,26 @@ export interface InitCodexHomeOpts {
  *   <codexHomeDir>/
  *     config.toml   — Codex settings (approval_policy, sandbox_mode, project
  *                     trust, notify hooks)
- *     AGENTS.md     — Populated by context-layering bead; placeholder for now
  *     rules/        — Symlink to the user's global Codex execpolicy rules
  *     sessions/     — Codex writes rollout JSONL here
  */
 export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}): void {
-  mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
+  mkdirSync(codexHomeDir, { recursive: true, mode: 0o700 })
+  if (codexHomeDir.endsWith('/codex-home-v2')) {
+    // Keep transcript data in the established private root while using a new
+    // config root that cannot discover historical codex-home/AGENTS.md.
+    const persistentSessions = codexAgentSessionsDir(dirname(codexHomeDir))
+    mkdirSync(persistentSessions, { recursive: true, mode: 0o700 })
+    const sessionsLink = codexSessionsRoot(codexHomeDir)
+    if (!existsSync(sessionsLink)) {
+      symlinkSync(persistentSessions, sessionsLink, 'dir')
+    }
+  } else {
+    mkdirSync(codexSessionsRoot(codexHomeDir), { recursive: true, mode: 0o700 })
+  }
 
   const configPath = join(codexHomeDir, 'config.toml')
-  // Always (re)write config.toml so permission-mode changes take effect on
-  // resume. The file is Overdeck-managed ("do not edit manually") and
-  // contains no user state — only launch-time settings.
+  // Rewrite managed launch settings on resume so permission, effort, and context changes apply.
   {
     // Codex config keys are flat top-level scalars, NOT TOML table sections:
     // `model`/`approval_policy`/`sandbox_mode` are strings and `notify` is a
@@ -331,6 +290,8 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
       '# model/provider set at launch via -m flag',
       '',
       `approval_policy = "${opts.approvalPolicy ?? 'never'}"`,
+      `model_reasoning_effort = ${JSON.stringify(opts.effort ?? 'high')}`,
+      ...((opts.model === 'gpt-6-astra' || opts.model?.startsWith('gpt-5.6-')) ? [`model_context_window = ${opts.model.endsWith('[372k]') ? 372_000 : 272_000}`] : []),
     ]
     if (opts.sandboxMode) {
       lines.push(`sandbox_mode = "${opts.sandboxMode}"`)
@@ -396,7 +357,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   // `codex login` heals everyone. Best-effort: if the user has never signed in
   // to Codex globally there is nothing to link, and onboarding will (correctly)
   // prompt for a real first-time login.
-  const globalCodexHome = join(homedir(), '.codex')
+  const globalCodexHome = codexDefaultHome()
   const homeAuthPath = join(codexHomeDir, 'auth.json')
   const globalAuthPath = join(globalCodexHome, 'auth.json')
   seedCodexAuthSymlink(homeAuthPath, globalAuthPath)
@@ -408,25 +369,12 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   seedCodexRulesSymlink(join(codexHomeDir, 'rules'), join(globalCodexHome, 'rules'))
 
   // Skills are copied rather than linked: every managed CODEX_HOME remains
-  // isolated, while `pan sync` updates in the Agent Skills standard home are
-  // refreshed on each init/resume.
+  // isolated, while `pan sync` updates the shared native skill tree.
   syncCodexSkillsIntoHome(
     join(homedir(), '.agents', 'skills'),
     join(codexHomeDir, 'skills'),
   )
 
-  const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
-  if (!existsSync(agentsMdPath)) {
-    // Seed from the pre-rendered Codex global context layer if available;
-    // fall back to a placeholder. The static file is written by `pan sync`
-    // via syncContextLayersSync → renderGlobalLayer('codex', …).
-    const globalCodexContext = join(homedir(), '.overdeck', 'context', 'codex-global.md')
-    if (existsSync(globalCodexContext)) {
-      copyFileSync(globalCodexContext, agentsMdPath)
-    } else {
-      writeFileSync(agentsMdPath, '# Overdeck Agent Instructions\n\n<!-- run `pan sync` to populate -->\n', { mode: 0o644 })
-    }
-  }
 }
 
 /**
@@ -447,7 +395,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
  * Exported for unit testing over temp dirs. Privacy: a symlink's permissions
  * follow its target (the global file is 0600), so no chmod is needed here.
  */
-export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: string): void {
+function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: string): void {
   if (!existsSync(globalAuthPath)) return
 
   // If the home path is already a symlink pointing at the global file, we're done.
@@ -486,7 +434,7 @@ export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: strin
  * authorize out-of-sandbox execution, so Overdeck must never silently discard
  * or redirect a rule directory it did not create.
  */
-export function seedCodexRulesSymlink(homeRulesPath: string, globalRulesPath: string): void {
+function seedCodexRulesSymlink(homeRulesPath: string, globalRulesPath: string): void {
   if (!existsSync(globalRulesPath)) return
 
   try {
@@ -536,103 +484,6 @@ export async function waitForCodexRollout(codexHomeDir: string, timeoutMs: numbe
   return null
 }
 
-/**
- * Extract the thread-id from a rollout filename.
- *
- * Codex names rollouts `rollout-<timestamp>-<threadId>.jsonl`, where threadId
- * is the session UUID (8-4-4-4-12) — e.g.
- * `rollout-2026-06-09T01-47-53-019eaaec-4dfa-7ab1-90ba-9104d16534d1.jsonl`
- * → `019eaaec-4dfa-7ab1-90ba-9104d16534d1`. Extract the trailing UUID;
- * splitting on `-` and taking the last segment truncates the id to its final
- * group, which breaks `codex exec resume <threadId>` and findRolloutPath.
- */
-export function extractThreadIdFromRollout(rolloutPath: string): string | null {
-  const name = basename(rolloutPath, '.jsonl')
-  const m = name.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i)
-  return m ? m[1]! : null
-}
-
-/**
- * Read the first line (the session_meta record) of a rollout file without
- * loading the whole multi-megabyte JSONL.
- */
-function readRolloutMetaLine(path: string, maxBytes = 131072): string | null {
-  let fd: number
-  try {
-    fd = openSync(path, 'r')
-  } catch {
-    return null
-  }
-  try {
-    const buf = Buffer.alloc(maxBytes)
-    const n = readSync(fd, buf, 0, maxBytes, 0)
-    const text = buf.subarray(0, n).toString('utf-8')
-    const nl = text.indexOf('\n')
-    return nl === -1 ? text : text.slice(0, nl)
-  } catch {
-    return null
-  } finally {
-    closeSync(fd)
-  }
-}
-
-/**
- * True when a rollout belongs to a Codex-internal subagent thread (e.g. the
- * guardian approval supervisor), per the session_meta `thread_source` field.
- * Subagent rollouts live in the same per-agent CODEX_HOME as the main thread
- * and are written concurrently, so raw mtime cannot tell them apart
- * (PAN-1805). Unknown/unparseable meta is treated as a user thread — older
- * Codex versions predate `thread_source`.
- */
-function isSubagentRollout(path: string): boolean {
-  const line = readRolloutMetaLine(path)
-  if (!line) return false
-  try {
-    const meta = JSON.parse(line) as { payload?: { thread_source?: unknown } }
-    return meta.payload?.thread_source === 'subagent'
-  } catch {
-    return false
-  }
-}
-
-/**
- * Return the most-recently-modified *user-thread* rollout JSONL under
- * <codexHomeDir>/sessions, or null. A per-conversation/-agent CODEX_HOME holds
- * only that session's rollouts, so the newest user thread is its current
- * conversation. Subagent (guardian) rollouts are skipped — they interleave
- * writes with the main thread and would otherwise win the mtime race
- * (PAN-1805). Used to resolve the transcript when no thread-id was persisted —
- * the spawn-time capture is a one-shot window, but Codex only writes its
- * rollout on the first turn.
- */
-export function findLatestRollout(codexHomeDir: string): string | null {
-  const sessionsRoot = join(codexHomeDir, 'sessions')
-  const paths: string[] = []
-  const walk = (dir: string): void => {
-    let entries: string[]
-    try { entries = readdirSync(dir) } catch { return }
-    for (const entry of entries) {
-      const full = join(dir, entry)
-      let isDir = false
-      try { isDir = statSync(full).isDirectory() } catch { continue }
-      if (isDir) walk(full)
-      else if (entry.startsWith('rollout-') && entry.endsWith('.jsonl')) paths.push(full)
-    }
-  }
-  walk(sessionsRoot)
-  const byMtimeDesc = paths
-    .map((p) => {
-      try { return { p, mtimeMs: statSync(p).mtimeMs } } catch { return null }
-    })
-    .filter((e): e is { p: string; mtimeMs: number } => e !== null)
-    .sort((a, b) => b.mtimeMs - a.mtimeMs)
-  for (const { p } of byMtimeDesc) {
-    if (!isSubagentRollout(p)) return p
-  }
-  // All rollouts are subagent threads — better to show one than nothing.
-  return byMtimeDesc[0]?.p ?? null
-}
-
 // ─── Sync runtime ─────────────────────────────────────────────────────────────
 
 export class CodexRuntimeSync implements AgentRuntimeSync {
@@ -647,7 +498,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (!threadId) return null
     // Use per-agent CODEX_HOME, not the global ~/.codex; each agent's rollouts
     // are written to ~/.overdeck/agents/<id>/codex-home/sessions/.
-    return findRolloutPath(join(agentDirFor(agentId), 'codex-home'), threadId)
+    return findRolloutPath(codexAgentHome(agentDirFor(agentId)), threadId)
   }
 
   getLastActivity(agentId: string): Date | null {
@@ -706,14 +557,14 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   getTokenUsage(agentId: string): TokenUsage | null {
     const path = this.getSessionPath(agentId)
     if (!path) return null
-    const parsed = parseCodexSessionSync(path)
+    const parsed = parseCodexSession(path)
     return parsed?.usage ?? null
   }
 
   getSessionCost(agentId: string): CostBreakdown | null {
     const path = this.getSessionPath(agentId)
     if (!path) return null
-    const parsed = parseCodexSessionSync(path)
+    const parsed = parseCodexSession(path)
     if (!parsed) return null
     return {
       inputCost: 0,
@@ -736,7 +587,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (!threadId) {
       throw new Error(`Codex agent ${agentId}: no captured thread-id — cannot send message`)
     }
-    const codexHomeDir = join(agentDirFor(agentId), 'codex-home')
+    const codexHomeDir = join(agentDirFor(agentId), 'codex-home-v2')
     const cmd = `CODEX_HOME=${shellQuote(codexHomeDir)} codex exec resume -c sandbox_mode=read-only ${shellQuote(threadId)} ${shellQuote(message)}`
     await execAsync(cmd)
   }
@@ -801,10 +652,10 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     const harnessLaunch = await prepareHarnessLaunch('codex')
     const agentId = config.agentId
 
-    // Per-agent CODEX_HOME: ~/.overdeck/agents/<id>/codex-home
-    const codexHomeDir = config.codexHome ?? join(homedir(), '.overdeck', 'agents', agentId, 'codex-home')
+    // Per-agent CODEX_HOME: ~/.overdeck/agents/<id>/codex-home-v2
+    const codexHomeDir = config.codexHome ?? join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2')
 
-    // 1. Create CODEX_HOME structure (config.toml + AGENTS.md + sessions/).
+    // 1. Create the private CODEX_HOME structure (config + sessions; no AGENTS.md).
     initCodexHome(codexHomeDir)
 
     // 2. Build the codex exec command — shell-quote every interpolated value.
@@ -833,7 +684,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     // 5. Capture thread-id from the rollout filename and persist it.
     const threadId = extractThreadIdFromRollout(rolloutPath)
     if (threadId) {
-      writeThreadId(agentId, threadId)
+      recordCodexRolloutSession(agentId, threadId, rolloutPath)
     }
 
     return {
@@ -848,7 +699,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
 
   listSessions(_workspace?: string): Session[] {
     const sessions: Session[] = []
-    const sessionsRoot = join(codexHome(), 'sessions')
+    const sessionsRoot = codexSessionsRoot(codexHome())
     if (!existsSync(sessionsRoot)) return sessions
     collectRollouts(sessionsRoot, sessions)
     return sessions
@@ -906,92 +757,6 @@ function collectRollouts(dir: string, out: Session[]): void {
   }
 }
 
-export function createCodexRuntimeSync(): CodexRuntimeSync {
+export function createCodexRuntime(): CodexRuntimeSync {
   return new CodexRuntimeSync()
-}
-
-// ─── Effect variant ────────────────────────────────────────────────────────────
-
-export class CodexRuntime implements AgentRuntime {
-  readonly name = 'codex' as const
-  private readonly inner: CodexRuntimeSync
-
-  constructor(inner: CodexRuntimeSync = new CodexRuntimeSync()) {
-    this.inner = inner
-  }
-
-  getSessionPath(agentId: string): string | null {
-    return this.inner.getSessionPath(agentId)
-  }
-  getHarnessBehavior(): HarnessBehavior {
-    return this.inner.getHarnessBehavior()
-  }
-  getLastActivity(agentId: string): Date | null {
-    return this.inner.getLastActivity(agentId)
-  }
-  getHeartbeat(agentId: string): Heartbeat | null {
-    return this.inner.getHeartbeat(agentId)
-  }
-  getTokenUsage(agentId: string): TokenUsage | null {
-    return this.inner.getTokenUsage(agentId)
-  }
-  getSessionCost(agentId: string): CostBreakdown | null {
-    return this.inner.getSessionCost(agentId)
-  }
-  listSessions(workspace?: string): Session[] {
-    return this.inner.listSessions(workspace)
-  }
-
-  sendMessage(agentId: string, message: string): Effect.Effect<void, AgentRuntimeError> {
-    return Effect.tryPromise({
-      try: () => this.inner.sendMessage(agentId, message),
-      catch: (cause) =>
-        new TmuxError({
-          command: 'codex-exec-resume',
-          message: cause instanceof Error ? cause.message : String(cause),
-          cause,
-        }),
-    })
-  }
-
-  killAgent(agentId: string): Effect.Effect<void, AgentRuntimeError> {
-    return Effect.tryPromise({
-      try: () => this.inner.killAgent(agentId),
-      catch: (cause) =>
-        new TmuxError({
-          command: 'kill-session',
-          message: cause instanceof Error ? cause.message : String(cause),
-          cause,
-        }),
-    })
-  }
-
-  spawnAgent(config: SpawnConfig): Effect.Effect<Agent, AgentRuntimeError> {
-    return Effect.tryPromise({
-      try: () => this.inner.spawnAgent(config),
-      catch: (cause) => {
-        if (cause instanceof CodexSpawnTimeout) {
-          return new ProcessTimeoutError({
-            command: 'codex',
-            args: ['exec'],
-            timeoutMs: 60_000,
-          })
-        }
-        return new ProcessSpawnError({
-          command: 'codex',
-          args: ['exec'],
-          message: cause instanceof Error ? cause.message : String(cause),
-          cause,
-        })
-      },
-    })
-  }
-
-  isRunning(agentId: string): Effect.Effect<boolean> {
-    return Effect.promise(() => this.inner.isRunning(agentId))
-  }
-}
-
-export function createCodexRuntime(): CodexRuntime {
-  return new CodexRuntime()
 }

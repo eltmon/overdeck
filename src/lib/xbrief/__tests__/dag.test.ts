@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Effect } from 'effect';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import { criticalPath, readPlanFile } from '../dag.js';
+import { criticalPath } from '../dag.js';
 import type { XBriefDocument } from '../types.js';
 
 function makeDoc(items: Array<{ id: string }>, edges: Array<{ from: string; to: string; type?: string }>): XBriefDocument {
@@ -114,35 +110,3 @@ describe('criticalPath', () => {
   });
 });
 
-describe('readPlanFile', () => {
-  it('preserves xBRIEFInfo v0.8 documents as the canonical envelope', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'xbrief-dag-'));
-    try {
-      const path = join(dir, 'plan.xbrief.json');
-      writeFileSync(
-        path,
-        JSON.stringify(
-          {
-            xBRIEFInfo: { version: '0.8', created: '2026-06-30T00:00:00Z' },
-            plan: makeDoc([{ id: 'a' }], []).plan,
-          },
-          null,
-          2,
-        ),
-        'utf-8',
-      );
-
-      const doc = await Effect.runPromise(readPlanFile(path));
-      doc.xBRIEFInfo.updated = '2026-07-01T00:00:00Z';
-
-      expect(doc.xBRIEFInfo).toEqual({
-        version: '0.8',
-        created: '2026-06-30T00:00:00Z',
-        updated: '2026-07-01T00:00:00Z',
-      });
-      expect(doc.vBRIEFInfo).toBeUndefined();
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-});

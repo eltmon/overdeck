@@ -3,7 +3,6 @@ import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { Effect, FileSystem, Option } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
-import { flushAutoCommits, queueAutoCommit } from './auto-commit.js'
 
 import { getProjectPanPaths, ensurePanDirs } from './specs.js'
 
@@ -77,26 +76,8 @@ export function writeIssueDraft(
     yield* fs.writeFileString(path, content).pipe(
       Effect.mapError((cause) => new FsError({ path, operation: 'writeFileString', cause })),
     )
-    queueAutoCommit({
-      projectRoot,
-      paths: [path],
-      subject: `chore(state): update PRD draft for ${issueId.toUpperCase()}`,
-    })
-    // Commit+push synchronously through the door. queueAutoCommit alone defers
-    // via setTimeout(0), which a short-lived CLI (e.g. a planning agent that
-    // writes the draft and exits) never fires, stranding the draft as a dirty
-    // state-worktree file (PAN-2677). Mirror the spec door: fail loudly if a
-    // configured origin did not accept the push.
-    const flushed = yield* flushAutoCommits(projectRoot)
-    if (flushed.errored || flushed.pushed === false) {
-      return yield* Effect.fail(
-        new FsError({
-          path,
-          operation: 'pushDraft',
-          cause: new Error(flushed.reason ?? 'PRD draft commit was not pushed'),
-        }),
-      )
-    }
+    // PAN-3917: the draft is a tracked file in the plan home; the agent that
+    // wrote it commits it on its own branch.
     return path
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }
@@ -199,7 +180,7 @@ export interface PrdGateResult {
  * lowercase → workspacePath uppercase → workspacePath lowercase. A null/empty
  * root skips its candidates. Non-trivial means at least MIN_PRD_LINES lines.
  */
-export function checkPrdGateSync(args: {
+export function checkPrdGate(args: {
   projectRoot?: string | null
   workspacePath?: string | null
   issueId: string

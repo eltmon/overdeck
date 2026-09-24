@@ -13,17 +13,9 @@ const COPY: Record<OperatorNeedsYou['kind'], { title: string; fallback: string }
     title: 'This issue is stuck',
     fallback: 'The pipeline cannot continue until the stuck state is cleared.',
   },
-  troubled: {
-    title: 'The agent stopped after repeated failures',
-    fallback: 'Fix the underlying failure, then clear the troubled gate.',
-  },
   paused: {
     title: 'The agent is paused',
     fallback: 'Unpause the agent when it is safe to continue.',
-  },
-  stale_review: {
-    title: 'Review has leftover specialist sessions',
-    fallback: 'Clear the stale review sessions before starting a clean review.',
   },
   blocker: {
     title: 'A merge blocker needs attention',
@@ -45,23 +37,19 @@ const COPY: Record<OperatorNeedsYou['kind'], { title: string; fallback: string }
 
 const ACTION_KEY: Partial<Record<OperatorNeedsYou['kind'], string>> = {
   awaiting_input: 'tell',
-  troubled: 'untroubled',
   paused: 'unpause',
-  stale_review: 'purgeReview',
-  blocker: 'recoverReview',
+  blocker: 'viewPr',
   stopped: 'recoverAgent',
   ready_for_merge: 'merge',
 };
 
 const SECTION_MARKER: Partial<Record<OperatorNeedsYou['kind'], string>> = {
-  stale_review: 'Stale-review warning',
   blocker: 'IssueBlockerSpotlight',
   pickup_gate: 'PickupGateCard',
 };
 
 const AGENT_SCOPED_KINDS = new Set<OperatorNeedsYou['kind']>([
   'awaiting_input',
-  'troubled',
   'paused',
   'stopped',
 ]);

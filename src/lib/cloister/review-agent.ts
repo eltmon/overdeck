@@ -23,9 +23,9 @@
  * reactive scheduler review branch, and the dashboard kanban "Review again"
  * button — flows through
  * spawnReviewRoleForIssue → spawnRun(issueId, 'review'). The review role
- * launches four isolated review sub-role sessions via `pan review spawn-reviewer`,
- * then writes the report and signals the verdict via Overdeck's CLI inside
- * the role itself (see roles/review.md).
+ * runs a combined quick review or receives four server-launched specialist
+ * reports in full mode. Dispatch owns mode-specific workflow; roles/review.md
+ * supplies shared evidence, coverage, and verdict standards.
  *
  * Surface area kept:
  *   - spawnReviewRoleForIssue       — the only review entry point
@@ -44,31 +44,27 @@ import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
-import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
-import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
-import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
-import { clearSupersededReviewInfrastructureFailure } from '../review-verdict-guards.js';
+import { listAgentIdsByPrefix } from '../overdeck/agents.js';
 import { loadConfigSync as loadYamlConfig, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { createPromiseCoalescer } from './in-flight-guard.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
-import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import { isReviewSessionForIssue } from './specialists-registry.js';
-import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import {
   recoverMissingConvoyReviewers,
-  launchConvoyReviewersPromise,
+  launchConvoyReviewers,
 } from './review-convoy.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
-import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
+import { AGENTS_DIR, packageRoot } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
+import { getAgentState } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { withReviewLifecycleGuard } from '../review-lifecycle-guard.js';
 
 const execAsync = promisify(exec);
 // PAN-1531: review-temp stash helpers removed.
@@ -76,7 +72,7 @@ const execAsync = promisify(exec);
 // PAN-2584: liveness budget for the review PARENT (discovery + convoy + synthesis).
 // Sub-reviewers get their own 20-minute deadlines in review-convoy.ts; the parent
 // needs headroom for all three phases. Enforced by checkStalledReviewParents.
-export const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
+const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 // Review now runs against the committed diff only. The dirty-worktree gate
 // at pan done time (and the same gate added to /api/review/:id/request)
 // guarantees the worktree is clean before specialists see the diff.
@@ -86,11 +82,11 @@ const selfReviewReportPath = (reviewDir: string): string => join(reviewDir, 'rev
 
 async function deriveReviewRunHead8(issueId: string, workspace: string): Promise<string> {
   try {
-    const { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
-    const roots = resolveWorkspaceRepoRootsSync(issueId, workspace);
+    const { resolvePrimaryWorkspaceRepoDir, resolveWorkspaceRepoRoots } = await import('../project-repos.js');
+    const roots = resolveWorkspaceRepoRoots(issueId, workspace);
     if (roots.some(root => root.isPolyrepo)) {
-      const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-      const anchor = await snapshotWorkspaceHeadsPromise(issueId, workspace);
+      const { snapshotWorkspaceHeads } = await import('../git-utils.js');
+      const anchor = await snapshotWorkspaceHeads(issueId, workspace);
       return anchor
         ? createHash('sha1').update(anchor).digest('hex').substring(0, 8)
         : 'unknown';
@@ -99,7 +95,7 @@ async function deriveReviewRunHead8(issueId: string, workspace: string): Promise
     // PAN-3037: the primary code repo is resolved through the shared helper —
     // the polyrepo wrapper's HEAD never moves, so a wrapper-derived runId would
     // mismatch every live run and kill a healthy convoy on each dispatch.
-    const probeDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspace);
+    const probeDir = resolvePrimaryWorkspaceRepoDir(issueId, workspace);
     const { stdout } = await execAsync(['git', 'rev-parse', '--short=8', 'HEAD'].join(' '), {
       cwd: probeDir,
       encoding: 'utf-8',
@@ -140,6 +136,10 @@ export function buildReviewRolePrompt(opts: {
     'poll anything. Just wait — the reviewers notify you when they finish, and',
     'Deacon is the failsafe if one never starts or never completes. Acting early',
     'wastes tokens reviewing nothing.',
+    'Operator-requested early reads may summarize one completed report, but do not',
+    'lift the all-signals gate. Failed or timed-out lanes, or missing/empty/unreadable',
+    'reports after READY, block approval. Keep waiting for the other terminal signals.',
+    'Record each lane, signal, report path, and blocker count in the synthesis.',
     '',
     'STALE-SIGNAL GUARD (PAN-3549): terminal signals from a dead prior attempt of',
     'this same branch can replay into your session when you resume — every signal',
@@ -183,10 +183,12 @@ export function buildReviewRolePrompt(opts: {
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
     `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}"`,
     '',
+    `Your final chat message is exactly this shape: first line \`✓ Review verdict: APPROVED for ${opts.issueId}.\` or \`✗ Review verdict: CHANGES REQUESTED for ${opts.issueId}.\`, then one or two sentences saying why, then the report path.`,
+    '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
     // review cycle without a cold re-spawn. Exiting before the signal command is
-    // what stranded reviews at reviewStatus=reviewing.
+    // what stranded reviews mid-convoy.
     'After running the signal command above, STOP and wait — do not exit, do not run',
     'any further commands. The session stays open for the next review cycle.',
     '',
@@ -198,12 +200,7 @@ export function buildReviewRolePrompt(opts: {
   return prompt;
 }
 
-// PAN-1981 (quick path to production): the review role agent reviews the diff
-// ITSELF — no convoy, no synthesis. `buildReviewRolePrompt` above (the synthesis
-// "stand by, wait for the convoy" prompt) is kept for when we restore the convoy
-// as an opt-in (#1982 fast-follow); for now the review agent gets this self-review
-// prompt instead. We will decide convoy-vs-self-review (and better per-harness
-// message transmission) in the fast-follow.
+// Quick review receives no convoy workflow; the shared role supplies all four checklists.
 function buildSelfReviewPrompt(opts: {
   issueId: string;
   workspace: string;
@@ -243,23 +240,26 @@ function buildSelfReviewPrompt(opts: {
         ].join('\n')
       : opts.contextManifestPath
         ? `Context manifest: ${opts.contextManifestPath}`
-        : 'Context manifest: (missing — inspect the diff directly: git diff origin/main...HEAD)',
+        : 'Context manifest: (missing — report the missing scope/requirements and block review)',
     '',
     'How to review:',
-    '1. Read the diff — use the manifest risk ranking, `git diff` the high-risk files,',
-    '   and read the surrounding code as needed.',
+    '1. Review every changed file, starting with the manifest risk ranking; trace',
+    '   actual callers, validators, defaults, and overrides as needed.',
     '2. Evaluate correctness, security, requirements/AC, and performance. Use the',
-    '   severity + verdict vocabulary in roles/review.md.',
-    `3. Write your findings to ${reviewReportPath}.`,
+    '   complete checklists, evidence classification, and verdict rules in roles/review.md.',
+    '   Finish all dimensions even after finding blockers; do a second coverage pass.',
+    `3. Write your findings, changed-file ledger, AC evidence, and check results to ${reviewReportPath}.`,
     '',
     'Then signal the verdict with the Overdeck CLI (exactly one):',
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
     `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}"`,
     '',
+    `Your final chat message is exactly this shape: first line \`✓ Review verdict: APPROVED for ${opts.issueId}.\` or \`✗ Review verdict: CHANGES REQUESTED for ${opts.issueId}.\`, then one or two sentences saying why, then the report path.`,
+    '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
     // review cycle without a cold re-spawn. Exiting before the signal command is
-    // what stranded reviews at reviewStatus=reviewing.
+    // what stranded reviews mid-convoy.
     'After running the signal command above, STOP and wait — do not exit, do not run',
     'any further commands. The session stays open for the next review cycle.',
     '',
@@ -270,15 +270,10 @@ function buildSelfReviewPrompt(opts: {
   console.log(`[review-agent] Self-review prompt for ${opts.issueId}: ${sizeBytes} bytes`);
   return prompt;
 }
-async function spawnReviewRoleForIssuePromise(
+async function spawnReviewRoleForIssueBody(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const dispatchStartedAtMs = Date.now();
-  if (!opts.model) {
-    const project = resolveProjectForIssue(opts.issueId);
-    const issueModel = project ? readIssueRecordSync(project, opts.issueId)?.reviewModel : undefined;
-    if (issueModel) opts = { ...opts, model: issueModel };
-  }
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
   // PAN-2420: GitHub-authoritative guard. Do not waste time on conflict-gate
@@ -287,7 +282,7 @@ async function spawnReviewRoleForIssuePromise(
   if (mergedGuard.skip) {
     const message = `[review-agent] Skipping review dispatch for ${opts.issueId} — ${mergedGuard.reason}`;
     console.log(message);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: opts.issueId });
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: opts.issueId });
     return { success: false, message };
   }
 
@@ -296,19 +291,12 @@ async function spawnReviewRoleForIssuePromise(
   // Deacon re-dispatch site all honor it without per-call-site logic. The pre-review
   // verification gate (typecheck/lint/test floor) has already run by the time any
   // caller reaches here — 'none' skips only the AI review, never the quality floor.
-  // reviewSpawnedAt is stamped so the durable reviewRequestedAt intent counts as
-  // serviced (otherwise needsReviewDispatch would re-fire this skip every read).
-  // Setting reviewStatus 'skipped' advances the lifecycle exactly like an approved
-  // review (the setReviewStatusSync write path emits review.approved for it).
+  // PAN-3917: nothing is stamped. Skipping the AI review leaves the PR
+  // unreviewed, which is exactly what the forge then reports.
   if (resolveReviewMode(opts.issueId) === 'none') {
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'skipped',
-      reviewNotes: 'Review mode: none — AI review skipped by configuration; verification gate still enforced',
-      reviewSpawnedAt: new Date().toISOString(),
-    });
-    const message = `Review skipped for ${opts.issueId} (mode=none) — advancing to test`;
+    const message = `Review skipped for ${opts.issueId} (mode=none) — AI review disabled by configuration; the verification gate still applies`;
     console.log(`[review-agent] ${message}`);
-    emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
+    emitActivityEntry({ source: 'review', level: 'info', message, issueId: opts.issueId });
     return { success: true, message };
   }
 
@@ -319,8 +307,19 @@ async function spawnReviewRoleForIssuePromise(
   //
   // Force mode (human override from dashboard) kills the old session and
   // respawns so the review runs against current HEAD, not stale state.
+  if (opts.force) {
+    const stopped = await killAllReviewerSessions(undefined, opts.issueId);
+    if (stopped.failed.length > 0) {
+      return {
+        success: false,
+        message: `Review replacement aborted — could not stop ${stopped.failed.join(', ')}`,
+        error: `Review sessions still live: ${stopped.failed.join(', ')}`,
+      };
+    }
+  }
+
   try {
-    const sessions = await Effect.runPromise(listSessionNames());
+    const sessions = opts.force ? [] : await Effect.runPromise(listSessionNames());
     if (sessions.includes(reviewSessionName)) {
       const paneDead = await Effect.runPromise(isPaneDead(reviewSessionName));
 
@@ -344,7 +343,7 @@ async function spawnReviewRoleForIssuePromise(
           const head8 = await deriveReviewRunHead8(opts.issueId, opts.workspace);
           if (head8 === 'unknown') throw new Error('workspace HEAD unavailable');
           currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${head8}`;
-          const synthReviewRunId = getAgentStateSync(reviewSessionName)?.reviewRunId;
+          const synthReviewRunId = getAgentState(reviewSessionName)?.reviewRunId;
           // A missing identity cannot prove that the live pane covers the
           // current obligation, so legacy/unknown sessions are stale too.
           if (!synthReviewRunId || synthReviewRunId !== currentRunId) {
@@ -361,72 +360,30 @@ async function spawnReviewRoleForIssuePromise(
         }
       }
 
-      // PAN-1131 residual + PAN-2579: a runId-matching live pane is only "actively
-      // reviewing" while this cycle's verdict is UNRECORDED. Once the verdict is
-      // terminal, the session is warm-idle (kept alive by the warm-by-default
-      // lifecycle) — a re-dispatch request must NOT be swallowed by the guard, or
-      // the issue jams at a stale verdict with a live-but-finished reviewer. Fall
-      // through to the respawn path below: it kills the convoy tmux and the spawn
-      // machinery resumes the saved session with its context intact (warm reuse).
+      // PAN-1131 residual / PAN-2579, re-pointed by PAN-3917: a runId-matching
+      // live pane is only "actively reviewing" until this run's report lands on
+      // disk. The round artifacts are the verdict of record — once
+      // `.pan/review/<runId>/` holds a report or a synthesis, the session is
+      // warm-idle and a fresh dispatch must fall through to the respawn path,
+      // which kills the convoy tmux and resumes the saved session with its
+      // context intact. There is no stored review row to consult any more.
       let finishedIdle = false;
-      if (!paneDead && !opts.force && !staleRunId) {
+      if (!paneDead && !opts.force && !staleRunId && currentRunId) {
         try {
-          const status = getReviewStatusSync(opts.issueId);
-          const terminal = status?.reviewStatus === 'passed'
-            || status?.reviewStatus === 'blocked'
-            || status?.reviewStatus === 'failed';
-          // Warm-reuse ONLY for a genuinely un-serviced newer request (same
-          // ISO-string comparison as needsReviewDispatch). A terminal verdict
-          // with NO newer request means this call is a stale duplicate dispatch
-          // racing the verdict (the PAN-399 shape) — skip below and leave the
-          // verdict alone rather than re-entering 'reviewing'.
-          const newerRequest = !!status?.reviewRequestedAt
-            && (!status.reviewSpawnedAt || Date.parse(status.reviewRequestedAt) > new Date(status.reviewSpawnedAt).getTime());
-          // PAN-2584: a lost verdict leaves the status non-terminal while the
-          // reviewer already wrote its report for this exact HEAD — that session
-          // is finished, not reviewing. Report-on-disk for the current runId is
-          // terminal evidence too; without it a newer request deadlocks behind
-          // the guard forever.
-          let reportWritten = false;
-          if (currentRunId) {
-            try {
-              const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', currentRunId);
-              reportWritten = existsSync(selfReviewReportPath(reviewDir))
-                || existsSync(reviewSynthesisPath(reviewDir));
-            } catch { /* probe failure — fall back to verdict-only evidence */ }
-          }
-          const reviewAgents = listAgentIdsByPrefixSync(reviewSessionName)
-            .map(id => getAgentStateFileSync(id))
-            .filter(state => state !== null && state !== undefined);
-          const convoyLiveness = evaluateReviewConvoyLiveness(opts.issueId, status ?? {}, reviewAgents);
-          finishedIdle = (terminal || reportWritten || !convoyLiveness.active) && newerRequest;
+          const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', currentRunId);
+          finishedIdle = existsSync(selfReviewReportPath(reviewDir))
+            || existsSync(reviewSynthesisPath(reviewDir));
           if (finishedIdle) {
             console.log(
-              `[review-agent] ${reviewSessionName} is finished-idle (verdict ${status?.reviewStatus}, newer request pending) — warm-reusing for the new review cycle`,
-            );
-          } else if (terminal) {
-            console.log(
-              `[review-agent] ${reviewSessionName} has a terminal verdict (${status?.reviewStatus}) and no newer request — treating this dispatch as a stale duplicate; leaving the verdict intact`,
+              `[review-agent] ${reviewSessionName} already wrote its report for run ${currentRunId} — warm-reusing for the new review cycle`,
             );
           }
-        } catch (statusErr) {
-          console.warn(`[review-agent] Could not probe review status for finished-idle check on ${opts.issueId}:`, statusErr);
+        } catch (probeErr) {
+          console.warn(`[review-agent] Could not probe review artifacts for ${opts.issueId}:`, probeErr);
         }
       }
 
       if (!paneDead && !opts.force && !staleRunId && !finishedIdle) {
-        const convergence = currentRunId
-          ? await convergeRowFromVerdictOfRecord(opts.issueId, {
-            runId: currentRunId,
-            workspacePath: opts.workspace,
-            writer: 'dispatch-converge',
-          })
-          : { converged: false };
-        if (convergence.converged) {
-          const message = `Review dispatch converged from the verdict of record: ${opts.issueId}`;
-          emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
-          return { success: true, message };
-        }
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: false, message: `Review dispatch skipped — already running: ${reviewSessionName}` };
       }
@@ -438,11 +395,14 @@ async function spawnReviewRoleForIssuePromise(
         : staleRunId ? 'stale runId'
         : 'finished-idle (warm reuse for new cycle)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
-      await Effect.runPromise(
-        killAllReviewerSessions(undefined, opts.issueId).pipe(
-          Effect.catch(() => Effect.succeed({ killed: [], failed: [] })),
-        ),
-      );
+      const stopped = await killAllReviewerSessions(undefined, opts.issueId);
+      if (stopped.failed.length > 0) {
+        return {
+          success: false,
+          message: `Review replacement aborted — could not stop ${stopped.failed.join(', ')}`,
+          error: `Review sessions still live: ${stopped.failed.join(', ')}`,
+        };
+      }
     }
   } catch (err) {
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
@@ -458,10 +418,6 @@ async function spawnReviewRoleForIssuePromise(
       ? `merge conflict with ${targetBranch} must be resolved before review dispatch`
       : `mergeability against ${targetBranch} could not be verified; deferring review conservatively`;
     const message = `Review dispatch deferred: ${reason}`;
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'pending',
-      reviewNotes: message,
-    });
     return { success: false, gated: true, message };
   }
 
@@ -473,18 +429,14 @@ async function spawnReviewRoleForIssuePromise(
   );
   if (gate.gated) {
     const message = `Review dispatch deferred: ${gate.reason ?? 'merge conflict must be resolved first'}`;
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'pending',
-      reviewNotes: message,
-    });
     return { success: false, gated: true, message };
   }
 
   // Clear feedback from any previous review cycle so the work agent only
   // sees current-cycle feedback when it reads .pan/feedback/.
   try {
-    const { archiveFeedbackFiles } = await import('./feedback-writer.js');
-    await Effect.runPromise(archiveFeedbackFiles(opts.workspace));
+    const { clearFeedbackFiles } = await import('./feedback-writer.js');
+    await clearFeedbackFiles(opts.workspace);
   } catch {
     // Non-fatal: archiving is best-effort
   }
@@ -494,43 +446,16 @@ async function spawnReviewRoleForIssuePromise(
   // pan review request before reaching here. If callers somehow bypass the
   // gate, uncommitted scratch becomes visible in the review — that's the
   // correct fail-loud behavior, not a reason to silently stash.
-  const convergence = await convergeRowFromVerdictOfRecord(opts.issueId, {
-    runId: getAgentStateSync(reviewSessionName)?.reviewRunId,
-    workspacePath: opts.workspace,
-    writer: 'dispatch-converge',
-  });
-  if (convergence.converged) {
-    const message = `Review dispatch converged from the verdict of record: ${opts.issueId}`;
-    emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
-    return { success: true, message };
-  }
-
   try {
-    const currentStatus = getReviewStatusSync(opts.issueId);
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'reviewing',
-      reviewSpawnedAt: new Date().toISOString(),
-      ...clearSupersededReviewInfrastructureFailure(currentStatus),
-    });
-  } catch (err) {
-    console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);
-    return {
-      success: false,
-      message: 'Failed to initialize review status',
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-
-  try {
-    const { notifyPipelineSync } = await import('../pipeline-notifier.js');
-    notifyPipelineSync({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
+    notifyPipeline({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
   } catch {
     // Non-fatal
   }
 
   try {
-    const { spawnRun, saveAgentState, getAgentState, getAgentStateSync, getLatestSessionIdSync, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
-    const workAgentState = await Effect.runPromise(getAgentState(`agent-${opts.issueId.toLowerCase()}`));
+    const { spawnRun, saveAgentState, getAgentState, getLatestSessionId, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
+    const workAgentState = getAgentState(`agent-${opts.issueId.toLowerCase()}`);
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
     // Build the shared context manifest before spawning so all reviewers
@@ -548,12 +473,12 @@ async function spawnReviewRoleForIssuePromise(
     let contextManifestPath: string | undefined;
     let tier1Summary: string | undefined;
     try {
-      const manifest = await Effect.runPromise(buildReviewContext({
+      const manifest = await buildReviewContext({
         runId,
         issueId: opts.issueId,
         workspace: opts.workspace,
         branch: opts.branch,
-      }));
+      });
       contextManifestPath = manifest.manifestPath;
       tier1Summary = formatTier1Summary(manifest);
       console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files)`);
@@ -568,7 +493,7 @@ async function spawnReviewRoleForIssuePromise(
       : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
 
     const spawnConvoyReviewers = (synthesisAgentId: string) =>
-      launchConvoyReviewersPromise({
+      launchConvoyReviewers({
         issueId: opts.issueId,
         workspace: opts.workspace,
         runId,
@@ -586,14 +511,14 @@ async function spawnReviewRoleForIssuePromise(
     // different agent then) or there is no resumable saved session. The resume delivery is
     // resilient (supervisor → tmux fallback, PAN-1988).
     const reviewAgentId = `agent-${opts.issueId.toLowerCase()}-review`;
-    const savedReview = getAgentStateSync(reviewAgentId);
+    const savedReview = getAgentState(reviewAgentId);
     const canResumeReview = reviewResumeDecision({
       requestedModel: opts.model,
       requestedHarness: opts.harness,
       savedModel: savedReview?.model,
       savedHarness: savedReview?.harness,
       hasSavedState: !!savedReview,
-      hasSavedSession: !!getLatestSessionIdSync(reviewAgentId),
+      hasSavedSession: !!getLatestSessionId(reviewAgentId),
     });
     if (canResumeReview) {
       console.log(`[review-agent] Resuming saved review session for ${opts.issueId} — model/harness unchanged, preserving context (PAN-1862)`);
@@ -601,7 +526,7 @@ async function spawnReviewRoleForIssuePromise(
       if (resumeResult.success) {
         try {
           // Keep the idempotency guard's HEAD-staleness detection honest for the resumed run.
-          const resumed = getAgentStateSync(reviewAgentId);
+          const resumed = getAgentState(reviewAgentId);
           if (resumed) {
             resumed.reviewRunId = runId;
             // PAN-2584: arm the parent's liveness deadline for this cycle.
@@ -637,7 +562,7 @@ async function spawnReviewRoleForIssuePromise(
     }
     // Fresh review: wipe any stale review state (harness/model changed, or the resume above
     // failed) so the new session does not inherit a mismatched saved session id.
-    if (savedReview || getLatestSessionIdSync(reviewAgentId)) {
+    if (savedReview || getLatestSessionId(reviewAgentId)) {
       try { await wipeAgentStateDirs(opts.issueId, { rolePrefix: 'review' }); }
       catch (wipeErr) { console.warn(`[review-agent] review state wipe before fresh spawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`); }
     }
@@ -664,7 +589,7 @@ async function spawnReviewRoleForIssuePromise(
     if (fullReview) {
       await spawnConvoyReviewers(run.id);
       console.log(`[review-agent] Review role (convoy synthesis) spawned for ${opts.issueId}: ${run.id}`);
-      emitActivityEntrySync({ source: 'review', level: 'info', message: `Convoy review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+      emitActivityEntry({ source: 'review', level: 'info', message: `Convoy review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
       return {
         success: true,
         message: `Convoy review spawned: ${run.id}`,
@@ -672,7 +597,7 @@ async function spawnReviewRoleForIssuePromise(
     }
 
     console.log(`[review-agent] Review role (self-review) spawned for ${opts.issueId}: ${run.id}`);
-    emitActivityEntrySync({ source: 'review', level: 'info', message: `Self-review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+    emitActivityEntry({ source: 'review', level: 'info', message: `Self-review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
 
     return {
       success: true,
@@ -688,7 +613,7 @@ async function spawnReviewRoleForIssuePromise(
     // created: an older startedAt means a pre-existing session that must not
     // be killed here.
     try {
-      const orphan = getAgentStateSync(reviewSessionName);
+      const orphan = getAgentState(reviewSessionName);
       const orphanStartedMs = orphan?.startedAt ? Date.parse(orphan.startedAt) : Number.NaN;
       const createdByThisDispatch = orphan !== null && orphan !== undefined
         && Number.isFinite(orphanStartedMs) && orphanStartedMs >= dispatchStartedAtMs - 5_000;
@@ -702,10 +627,6 @@ async function spawnReviewRoleForIssuePromise(
         await Effect.runPromise(saveAgentState(orphan)).catch(() => {});
       }
     } catch { /* teardown is best-effort; the status write below still lands */ }
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'failed',
-      reviewNotes: `Review role spawn failed: ${err instanceof Error ? err.message : String(err)}`,
-    });
     return {
       success: false,
       message: 'Failed to spawn review role',
@@ -713,6 +634,8 @@ async function spawnReviewRoleForIssuePromise(
     };
   }
 }
+
+export { isReviewSessionForIssue };
 
 /**
  * Kill all canonical reviewer sessions for one issue.
@@ -727,10 +650,9 @@ async function spawnReviewRoleForIssuePromise(
  *
  * Matches the parent review role, convoy children, and legacy coordinator
  * sessions so callers do not need to know which review phase has started.
+ * Session-kill failures are aggregated into `failed`; this never rejects.
  */
-export { isReviewSessionForIssue };
-
-async function killAllReviewerSessionsPromise(
+export async function killAllReviewerSessions(
   projectKey: string | undefined,
   issueId: string,
 ): Promise<{ killed: string[]; failed: string[] }> {
@@ -742,7 +664,10 @@ async function killAllReviewerSessionsPromise(
     allSessions = await Effect.runPromise(listSessionNames());
   } catch (err) {
     console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
-    return { killed, failed };
+    return {
+      killed,
+      failed: [`agent-${issueId.toLowerCase()}-review`],
+    };
   }
 
   const sessionsToKill = allSessions.filter(s => isReviewSessionForIssue(s, projectKey, issueId));
@@ -759,7 +684,13 @@ async function killAllReviewerSessionsPromise(
     }),
   );
   return { killed, failed };
-}async function killAllReviewSessionsPromise(): Promise<{ killed: string[]; failed: string[] }> {
+}
+
+/**
+ * Kill every review session (any issue) during shutdown. Session-kill failures
+ * are aggregated into `failed`; this never rejects.
+ */
+export async function killAllReviewSessions(): Promise<{ killed: string[]; failed: string[] }> {
   const killed: string[] = [];
   const failed: string[] = [];
 
@@ -801,13 +732,8 @@ async function killAllReviewerSessionsPromise(
   return { killed, failed };
 }
 
-// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
+// ─── Effect API ──────────────────────────────────────────────────────────────
 
-/**
- * Effect variant of {@link buildConvoyPrompt}. Template reads are the only
- * fallible step; any failure here is fatal and propagates via Effect's defect
- * channel through `Effect.promise`.
- */
 // PAN-2695: dispatch has multiple legitimate callers (request route, deacon
 // reconcile, dispatch reconcile) that can fire near-simultaneously. An
 // uncoalesced second invocation sees the first's milliseconds-old agent state,
@@ -824,26 +750,11 @@ export const spawnReviewRoleForIssue = (
     if (reviewDispatchCoalescer.isInFlight(key)) {
       console.log(`[review-agent] Review dispatch already in flight for ${key} — coalescing concurrent dispatch (PAN-2695)`);
     }
-    return reviewDispatchCoalescer.run(key, () => spawnReviewRoleForIssuePromise(opts));
+    return reviewDispatchCoalescer.run(
+      key,
+      () => withReviewLifecycleGuard(key, () => spawnReviewRoleForIssueBody(opts)),
+    );
   });
-
-/**
- * Effect variant of {@link killAllReviewerSessions}. Session-kill failures are
- * already aggregated into the `failed` array — this wrapper preserves that
- * contract.
- */
-export const killAllReviewerSessions = (
-  projectKey: string | undefined,
-  issueId: string,
-): Effect.Effect<{ killed: string[]; failed: string[] }> =>
-  Effect.promise(() => killAllReviewerSessionsPromise(projectKey, issueId));
-
-/**
- * Effect variant of {@link killAllReviewSessions}. Same aggregation semantics
- * as the Promise version.
- */
-export const killAllReviewSessions = (): Effect.Effect<{ killed: string[]; failed: string[] }> =>
-  Effect.promise(() => killAllReviewSessionsPromise());
 
 // PAN-1862 resume-vs-fresh decision lives in its own pure module (review-resume-decision.ts) so
 // it is unit-testable without importing this heavy file. Re-exported for external callers.
@@ -857,32 +768,10 @@ export {
 } from './review-convoy.js';
 
 /**
- * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a
- * prior cycle? PAN-2697: full-convoy review runs today, so "any sub-reviewer exists"
- * (the old quick-mode assumption) false-flagged every legitimate convoy — and the
- * always-on review supervisor matched the prefix too. A sub-reviewer is stale only
- * when its reviewRunId differs from the parent's active run.
+ * PAN-3917: the per-issue record override is gone with the record. Review mode
+ * is project/global configuration; a one-off run passes its own flags.
  */
-export function isReviewStaleSync(issueId: string): boolean {
-  const issueLower = issueId.toLowerCase();
-  const prefix = `agent-${issueLower}-review-`;
-  const parentRunId = getAgentStateFileSync(`agent-${issueLower}-review`)?.reviewRunId;
-  return listAgentIdsByPrefixSync(prefix).some((id) => {
-    const subRole = id.slice(prefix.length);
-    if (!(REVIEW_SUB_ROLES as readonly string[]).includes(subRole)) return false;
-    return !parentRunId || getAgentStateFileSync(id)?.reviewRunId !== parentRunId;
-  });
-}
-
-export function resolveReviewMode(issueId?: string): ReviewMode {
-  if (issueId) {
-    const project = resolveProjectForIssue(issueId);
-    const issueMode = project ? readIssueRecordSync(project, issueId)?.reviewMode : undefined;
-    if (issueMode === 'quick' || issueMode === 'full' || issueMode === 'none') {
-      return issueMode;
-    }
-  }
-
+export function resolveReviewMode(_issueId?: string): ReviewMode {
   const configMode = loadYamlConfig().config.roles?.review?.mode;
   return configMode === 'full' || configMode === 'none' ? configMode : 'quick';
 }
@@ -890,8 +779,8 @@ export function resolveReviewMode(issueId?: string): ReviewMode {
 /**
  * Is EXTENDED (convoy) review enabled for this issue?
  *
- * `resolveReviewMode` is the single source of truth: per-issue record override
- * beats merged project/global config, and quick remains the default.
+ * `resolveReviewMode` is the single source of truth: merged project/global
+ * config, with quick as the default.
  */
 export function isExtendedReviewEnabled(issueId?: string): boolean {
   return resolveReviewMode(issueId) === 'full';
@@ -908,9 +797,9 @@ export async function purgeReviewAgentsForIssue(
   projectKey: string | undefined,
   issueId: string,
 ): Promise<{ killed: string[]; removed: string[] }> {
-  const killResult = await killAllReviewerSessionsPromise(projectKey, issueId);
+  const killResult = await killAllReviewerSessions(projectKey, issueId);
   const removed: string[] = [];
-  for (const agentId of listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review`)) {
+  for (const agentId of listAgentIdsByPrefix(`agent-${issueId.toLowerCase()}-review`)) {
     await removeAgent(agentId);
     removed.push(agentId);
   }

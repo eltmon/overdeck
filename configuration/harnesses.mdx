@@ -8,11 +8,12 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 # Harnesses
 
 A **harness** is the underlying CLI that drives a workspace agent — the binary
-that runs in tmux. The **model** is what the binary calls. They are picked
+that runs in a terminal-backend pane (Herdr by default; see
+[Terminal backend](/configuration/terminal-backend)). The **model** is what the binary calls. They are picked
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, and `kimi-code`. For the wider
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, and `muse`. For the wider
 field of coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -24,10 +25,12 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 | `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
+| `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.31. |
+| `muse` | Muse Code (`muse`) | Meta Muse Spark models | Persistent native terminal sessions with separate Standard and Contributor model choices. |
 
 ## Composer commands across harnesses
 
-The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, `acp`, and `kimi-code`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
+The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, `acp`, `kimi-code`, and `muse`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
 
 Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface.
 
@@ -41,6 +44,10 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
   `claude` and run.
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
+- The model picker includes Claude Opus 5.5 (`claude-opus-5-5`): 1M context,
+  128K maximum output, always-on adaptive thinking, and low through max effort.
+  API pricing is $4/M input and $20/M output; subscription availability depends
+  on the Anthropic account.
 - Proxied models use a dedicated Claude Code context policy rather than copying
   every value from the generic model registry. GPT-6 Astra and GPT-5.6 Sol,
   Terra, and Luna default to a `272000`-token pin for both
@@ -62,6 +69,47 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
   `1048576` for `k3[1m]`, matching Kimi's Claude Code recipe. Anthropic models
   receive neither override, so Claude Code's native context behavior remains in
   control.
+
+### Muse Code
+
+Install Muse Code and sign in with `muse login`. For API-key authentication,
+use `muse auth set --api-key-stdin`; Muse owns its credentials. Overdeck uses
+the installed `muse` binary and does not route these models through CLIProxy.
+The integration is verified with Muse Code 1.0.2.
+
+Enable **Meta (Muse)** in Settings → Providers, then choose either model in
+the model picker. Both use a 1,048,576-token context window:
+
+| Model ID | Input / million tokens | Cached input / million tokens | Output / million tokens |
+| --- | --- | --- | --- |
+| `muse-spark-1.3` | $1.25 | $0.15 | $4.25 |
+| `muse-spark-1.3-contributor` | $0.10 | $0.002 | $0.20 |
+
+The Contributor tier requires contributing prompts and completions for model
+training. Choose it explicitly when that data use fits your work. Standard
+and Contributor remain separate model IDs throughout launch and accounting.
+These catalog prices are estimates; your Meta account's billing terms apply.
+
+You can also enable the provider in `~/.overdeck/config.yaml`:
+
+```yaml
+models:
+  providers:
+    meta:
+      enabled: true
+      harness: muse
+```
+
+Choose a Muse model explicitly for a conversation or role; enabling the
+provider does not change your configured default model. Muse runs with high
+reasoning effort by default and keeps its native tool-approval behavior.
+
+Overdeck supplies its context layers and role instructions through a managed
+developer-context file. Muse sessions are isolated by agent identity, and
+resume uses the native session UUID. The dashboard displays committed user
+and assistant messages and reports token costs. Use the Terminal tab for
+Muse's detailed tool activity and approval prompts. Native reasoning and
+internal configuration records are excluded from the chat feed.
 
 ### oh-my-pi / ohmypi (alternative)
 
@@ -91,6 +139,18 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
   Both transports are persistent sessions — never one-shot `codex exec`.
 - The app-server transport requires Codex CLI `0.144.0` or newer. Upgrade with
   your normal Codex CLI install method, then verify with `codex --version`.
+- Conversations (not work or review agents) run their app-server on a private
+  native endpoint, a Unix socket at
+  `~/.overdeck/agents/<id>/codex-native/app.sock` (directory `0700`, socket
+  `0600`), and Overdeck connects to it as a WebSocket client instead of stdio.
+  That lets **Terminal** attach the native Codex CLI to the same thread with
+  `codex resume --remote`, while the dashboard keeps its structured connection;
+  see [Native Codex CLI in Terminal](/features/conversations#native-codex-cli-in-terminal).
+  The native CLI needs Codex CLI `0.153.4` or newer. With an older CLI the
+  conversation keeps working over stdio and Terminal explains the upgrade.
+  Conversations started before this release show **Restart required for the
+  native CLI** until they are stopped and resumed. Protocol evidence:
+  `docs/CODEX-APP-SERVER-PROTOCOL.md`.
 - Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning
   enables session introspection and cost parsing
   (`src/lib/cost-parsers/codex-parser.ts`).
@@ -306,6 +366,101 @@ session id and it cannot be preset) enables transcript resolution
 (`resolveKimiWirePath` in `src/dashboard/server/routes/jsonl-resolver.ts`) and
 cost parsing (`src/lib/cost-parsers/kimi-parser.ts`).
 
+### OpenCode with Go and Zen
+
+Overdeck supports the OpenCode harness with OpenCode Go and OpenCode Zen.
+The integration was verified against OpenCode **1.18.31**. Install or update the
+CLI with `npm install -g opencode-ai@latest`, then check `opencode --version`.
+The official release feed is [anomalyco/opencode](https://github.com/anomalyco/opencode/releases).
+
+Run `opencode auth login` on the host and select **OpenCode Zen** or **OpenCode Go**.
+OpenCode owns the saved credentials. Overdeck does not copy them into a workspace
+or require a second API key. The `OPENCODE_API_KEY` environment variable is also
+recognized by OpenCode. Go requires an active Go subscription; Zen uses its own
+billing. See [Go](https://opencode.ai/docs/go/) and [Zen](https://opencode.ai/docs/zen/).
+
+Enable the provider under **Settings → Providers**, then select a model in the
+conversation picker. Overdeck discovers the installed CLI's available models,
+prices, and effort variants with `opencode models --verbose`; the discovery cache
+lasts one minute. Sign in to Go before expecting Go models to appear.
+
+The provider IDs also work in configuration:
+
+```yaml
+models:
+  providers:
+    opencode:
+      enabled: true
+      harness: opencode
+    opencode-go:
+      enabled: true
+      harness: opencode
+```
+
+Choose an exact model ID from `opencode models`, such as `opencode/<model-id>`
+for Zen or `opencode-go/<model-id>` for Go. These namespaces remain distinct from
+OpenRouter and the model manufacturer's direct API. OpenCode model IDs only
+launch through the OpenCode harness; invalid combinations fail before launch.
+There is no fallback model when the requested model is unavailable.
+
+Overdeck runs a persistent `opencode acp` process through its ACP host. Dashboard
+messages, interruption, restart, session resume, and transcript rendering use
+that transport. The conversation's **Terminal** view attaches the native OpenCode
+CLI (`opencode attach http://127.0.0.1:<port> --session <id> --dir <cwd>`) to
+the same server and session, with the ACP host log under **Runtime log**; see
+[Conversations](/features/conversations#native-opencode-cli-in-terminal).
+Plain transcript forks are unavailable; use a summary fork instead.
+The existing ACP transport does not report session token usage or billed cost.
+Catalog prices shown in the picker are model rates, not a session billing report.
+
+OpenCode receives Overdeck's rendered context at session start. Use
+`harness:opencode` blocks for OpenCode-specific instructions. Native OpenCode
+rules and its Agent Skills discovery remain available. Effort defaults to `high`
+when the selected model exposes effort controls. An unsupported explicit effort
+or an unavailable model fails visibly instead of selecting another value.
+
+#### Permission deadlock protection
+
+OpenCode can lose a permission request from a Task subagent before ACP sends it
+to Overdeck. Overdeck prevents that request from blocking the parent turn by
+setting this launch-time policy:
+
+```json
+{"external_directory":"allow","doom_loop":"allow","read":{"*.env":"allow","*.env.*":"allow"}}
+```
+
+These are the only permissions that OpenCode defaults to `ask`. The policy does
+not change `question`, `plan_enter`, `plan_exit`, or other permission keys. The
+`OPENCODE_PERMISSION` environment value takes precedence over matching rules in
+the user's `opencode.jsonc`, so an explicit deny for these three keys is also
+overridden. This narrow override prevents an unobservable subagent ask from
+deadlocking the complete conversation.
+
+Each OpenCode ACP host also reserves a loopback HTTP port and records it in
+`~/.overdeck/agents/<conversation>/opencode-port`. While a prompt is running,
+the host checks once per minute. After 180 seconds without an ACP runtime event,
+it lists pending permissions and replies `always` to each one. A recovered ask
+is recorded in `acp-session.jsonl` with `"source":"watchdog"`.
+
+If an older host is already stuck, inspect and answer its pending request:
+
+```bash
+CONVERSATION=conv-YYYYMMDD-NNNN
+OPENCODE_PORT=$(cat "$HOME/.overdeck/agents/$CONVERSATION/opencode-port")
+curl -sS "http://127.0.0.1:$OPENCODE_PORT/permission"
+curl -sS -X POST \
+  "http://127.0.0.1:$OPENCODE_PORT/permission/<permission-id>/reply" \
+  -H 'content-type: application/json' \
+  -d '{"reply":"always"}'
+```
+
+For hosts created before the port file existed, use `ss -ltnp` to find the
+loopback port owned by that conversation's `opencode acp` process.
+
+The same port file and `acp-session-id` drive the native CLI in Terminal. A
+conversation without `opencode-port` shows a restart-required message there;
+stop and resume it to record the port.
+
 ## Installing oh-my-pi
 
 oh-my-pi is **not** auto-installed. Install it once, then run `pan doctor` to confirm.
@@ -387,6 +542,29 @@ The Settings page is also where you wire up tracker API keys and project
 configuration, so harness routing for autonomous role runs lives alongside the
 rest of the orchestrator's defaults — set the harness once per role here and
 every pipeline spawn for that role inherits it.
+
+## Use Overdeck workers instead of harness plugins
+
+To hand a task to another agent, run `pan worker run` (skill `/pan-worker`)
+rather than a harness plugin such as the Codex plugin. A bundled rule tells
+agents the same. See [Workers](/reference/workers) for the commands.
+
+| | Overdeck worker (`pan worker run`) | Harness plugin (for example the Codex plugin) |
+| --- | --- | --- |
+| Visibility | In the Agents Directory, under its parent and its issue | Codex-plugin jobs appear in the Agents Directory as read-only external agents; other plugins only if something runs `pan worker register` |
+| Issue link | Always linked to an issue | Only when the job ran in a `workspaces/feature-<issue>` directory |
+| Transcript | On the agent transcript route, like any agent | Codex-plugin jobs: the Codex rollout, read-only on the agent transcript route |
+| Cost | Attributed to the issue | Not attributed |
+| Control | `pan tell`, `pan kill`, restart | None from Overdeck |
+| Harness and model | Any harness through role routing (`roles.worker`), or `--harness` / `--model` | The plugin's own |
+| Result | The report comes back to the caller on stdout | The plugin returns its result as a tool result |
+| Sandbox | None. `--read-only` adds a PATH shim against accidental git writes to the issue's repository; it restricts no file or network writes | The plugin's file-system and network sandbox |
+| Setup | Needs the issue's workspace (`pan start` first) | None |
+
+Codex-plugin jobs are registered automatically the first time the dashboard
+sees them, so they are visible, but they stay read-only: Overdeck cannot tell,
+stop or restart them, and their cost is not attributed. See
+[Workers — Externally spawned agents](/reference/workers#externally-spawned-agents).
 
 ## ToS rules
 
@@ -481,6 +659,11 @@ or newer and the `codex app-server` subcommand. If the version is too old,
 upgrade Codex CLI and start a fresh session. To keep work moving during a
 rollout, set `codex.transport: tui` to use the legacy TUI transport temporarily.
 
+The native Codex CLI in a conversation's Terminal needs `0.153.4` or newer.
+Below that, the conversation's host falls back to stdio and logs
+`[terminal] native Codex terminal unavailable: cli-unsupported` in Runtime log.
+Upgrade, then stop and resume the conversation.
+
 ## Tradeoffs
 
 ### RPC over named pipe vs tmux paste-buffer
@@ -534,6 +717,34 @@ using the OS-bundled `curl` and `tar` tools.
 - `src/lib/runtimes/kimi-code.ts` — `KimiCodeRuntimeSync` (native Kimi Code adapter)
 - `src/lib/cost-parsers/kimi-parser.ts` — Kimi `wire.jsonl` usage/cost parser
 
+## Storage paths
+
+Each harness has one module that knows where it keeps transcripts and
+sessions: `src/lib/runtimes/storage/<harness>.ts`. Everything else asks that
+module for a path instead of building one.
+
+| Module | What it owns |
+| --- | --- |
+| `storage/claude-code.ts` | `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl` (`claudeProjectsRoot`, `claudeProjectDir`, `sessionFilePath`) |
+| `storage/codex.ts` | `$CODEX_HOME/sessions/**/rollout-*.jsonl`, the per-conversation `CODEX_HOME`, and each agent's `<agentDir>/codex-home/sessions` (`codexHome`, `codexSessionsRoot`, `codexAgentHome`, `codexAgentSessionsDir`, `findRolloutPath`) |
+| `storage/kimi-code.ts` | `~/.kimi-code/sessions/<work-dir-key>/<session-id>/agents/main/wire.jsonl` (`kimiHomeDefault`, `kimiSessionsRoot`, `kimiWirePath`) |
+| `storage/pi.ts` | `<agentDir>/sessions/**.jsonl` and the user's own `~/.pi/agent` (`piSessionsRoot`, `findPiTranscriptPath`) |
+| `storage/acp.ts` | `<agentDir>/acp-session.jsonl`, the transcript for ACP agents including OpenCode (`ACP_TRANSCRIPT_FILE`, `acpTranscriptPath`) |
+| `storage/muse.ts` | `<agentDir>/muse-data/muse/sessions/…/session.jsonl` (`museSessionsRoot`, `resolveMuseSessionPath`) |
+
+These modules import only `node:*` and `src/lib/paths.ts`, so any layer can
+use them without an import cycle. The transcript resolver
+(`src/lib/agents/transcript-resolver.ts`) still prefers the absolute path
+recorded in `sessions.json`; it uses these modules only for entries recorded
+before PAN-3959.
+
+`npm run lint:harness-storage` (part of `npm run lint`) fails when a storage
+path literal appears in `src/` outside `src/lib/runtimes/storage/`. A line that
+needs one for another reason, such as a permission rule, goes in the allowlist
+at the top of `scripts/lint-harness-storage.sh` as `file|anchor # reason`. The
+anchor is a fixed piece of the allowed line's text, so edits elsewhere in the
+file don't break the row.
+
 ## See also
 
 - [Harness Landscape](/reference/harness-landscape) — survey of coding-agent
@@ -542,3 +753,22 @@ using the OS-bundled `curl` and `tar` tools.
   loading curated skill bundles into a single conversation
 - [Skills System](/features/skills) — how Overdeck distributes skills across
   harnesses
+
+## Context and reasoning effort
+
+Model pickers show the configured session context beside each model. This budget differs from the provider's maximum API context and from the remaining space shown in a running session. Runtime overhead and response reservations reduce usable space.
+
+Astra and GPT 5.6 Sol, Terra, and Luna default to **272K**. The explicit GPT 5.6 **372K** variants opt into a larger budget. Managed Codex sessions pass this budget and default to **High** reasoning effort. A dashboard effort change on Codex app-server or Kimi ACP applies after the runtime accepts it, starting with subsequent turns. Terminal-only routes use their launch setting and native terminal controls.
+
+Fable 5.1 supports **1M** context and requires **Claude Code 2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort.
+
+Subscription usage allowances are not API token prices. A larger window can consume more of your allowance, but API long-input multipliers should not be read as subscription-credit multipliers.
+
+
+## OpenRouter favorites
+
+Saved OpenRouter favorites remain selectable even when OpenRouter's model catalog
+omits them. Overdeck displays the model ID and marks pricing and context as
+unknown until the catalog includes the model again. Catalog omission alone does
+not determine whether OpenRouter can serve a model. You can remove these saved
+models from Settings → OpenRouter like any other favorite.

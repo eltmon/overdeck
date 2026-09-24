@@ -1,13 +1,31 @@
-import { Effect } from 'effect';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import type { AgentState } from '../agent-state.js';
 import {
   getLatestSessionId,
-  resolveClaudeSessionRecoverySync,
-  resolveLatestSessionIdSync,
+  resolveClaudeSessionRecovery,
+  resolveLatestSessionId,
   type ClaudeSessionRecoveryDeps,
 } from '../activity.js';
+import { appendSessionIdToHistory } from '../../session-history.js';
+
+let tempHome: string;
+let previousHome: string | undefined;
+
+beforeEach(() => {
+  tempHome = mkdtempSync(join(tmpdir(), 'pan-activity-session-'));
+  previousHome = process.env.OVERDECK_HOME;
+  process.env.OVERDECK_HOME = tempHome;
+});
+
+afterEach(() => {
+  if (previousHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = previousHome;
+  rmSync(tempHome, { recursive: true, force: true });
+});
 
 const agentState: AgentState = {
   id: 'agent-min-839',
@@ -22,137 +40,99 @@ const agentState: AgentState = {
 
 function deps(overrides: Partial<ClaudeSessionRecoveryDeps> = {}): ClaudeSessionRecoveryDeps {
   return {
-    readAgentPlaneRecord: () => null,
     readEventSessionId: () => null,
     transcriptExists: () => false,
-    listTranscriptSessionIds: () => [],
     log: vi.fn(),
     ...overrides,
   };
 }
 
 describe('Claude session reconstruction fallback', () => {
-  it('keeps sync and async resolution aligned for a durable-plane-only session', async () => {
+  it('prefers the newest indexed Claude session over launcher and projected state', () => {
+    const dir = join(tempHome, 'agents', agentState.id);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'launcher.sh'), "claude --resume '11111111-1111-1111-1111-111111111111'\n");
+    appendSessionIdToHistory(agentState.id, 'indexed-session', 'test');
+
+    const result = resolveLatestSessionId(agentState.id, deps({
+      getAgentState: () => ({ ...agentState, sessionId: 'stale-state-session' }),
+    }));
+
+    expect(result.sessionId).toBe('indexed-session');
+  });
+
+  it('does not apply retained Codex state to a Claude harness', () => {
+    const dir = join(tempHome, 'agents', agentState.id);
+    mkdirSync(join(dir, 'codex-home'), { recursive: true });
+    writeFileSync(join(dir, 'codex-thread-id'), 'retained-codex-thread\n');
+
+    expect(resolveLatestSessionId(agentState.id, deps({
+      getAgentState: () => agentState,
+    })).sessionId).toBeNull();
+  });
+
+  it('resolves Codex state only when the current harness is Codex', () => {
+    const dir = join(tempHome, 'agents', agentState.id);
+    mkdirSync(join(dir, 'codex-home'), { recursive: true });
+    writeFileSync(join(dir, 'codex-thread-id'), 'current-codex-thread\n');
+
+    expect(resolveLatestSessionId(agentState.id, deps({
+      getAgentState: () => ({ ...agentState, harness: 'codex' }),
+    })).sessionId).toBe('current-codex-thread');
+  });
+
+  it('keeps sync and async resolution aligned for an event-store-only session', async () => {
     const recoveryDeps = deps({
       getAgentState: () => agentState,
-      readAgentPlaneRecord: () => ({
-        version: 1,
-        agentId: agentState.id,
-        issueId: agentState.issueId,
-        projectKey: 'myn',
-        role: 'work',
-        origin: { machineId: 'origin', overdeckHome: '/home/origin/.overdeck' },
-        launch: { harness: 'claude-code', model: 'claude-opus-5', workspace: agentState.workspace, branch: 'feature/min-839' },
-        sessions: [
-          { id: 'durable-only-session', startedAt: '2026-08-01T11:00:00.000Z', reason: 'spawn' },
-        ],
-        lifecycle: [],
-        archiveRef: null,
-        recovered: false,
-      }),
-      transcriptExists: (_workspace, sessionId) => sessionId === 'durable-only-session',
+      readEventSessionId: () => 'event-only-session',
+      transcriptExists: (_workspace, sessionId) => sessionId === 'event-only-session',
     });
 
-    const syncSessionId = resolveLatestSessionIdSync(agentState.id, recoveryDeps).sessionId;
-    const asyncSessionId = await Effect.runPromise(getLatestSessionId(agentState.id, recoveryDeps));
+    const syncSessionId = resolveLatestSessionId(agentState.id, recoveryDeps).sessionId;
+    const asyncSessionId = getLatestSessionId(agentState.id, recoveryDeps);
 
-    expect(syncSessionId).toBe('durable-only-session');
+    expect(syncSessionId).toBe('event-only-session');
     expect(asyncSessionId).toBe(syncSessionId);
   });
 
-  it('does not reconstruct a reset session from the durable agents plane', () => {
-    const result = resolveLatestSessionIdSync(agentState.id, deps({
+  it('does not reconstruct a reset session from the event store', () => {
+    const result = resolveLatestSessionId(agentState.id, deps({
       isSessionReset: () => true,
-      readAgentPlaneRecord: () => ({
-        version: 1,
-        agentId: agentState.id,
-        issueId: agentState.issueId,
-        projectKey: 'myn',
-        role: 'work',
-        origin: { machineId: 'origin', overdeckHome: '/home/origin/.overdeck' },
-        launch: { harness: 'claude-code', model: 'claude-opus-5', workspace: agentState.workspace, branch: 'feature/min-839' },
-        sessions: [{ id: 'reset-session', startedAt: '2026-08-01T11:00:00.000Z', reason: 'spawn' }],
-        lifecycle: [],
-        archiveRef: null,
-        recovered: false,
-      }),
+      readEventSessionId: () => 'reset-session',
       transcriptExists: () => true,
     }));
 
     expect(result).toEqual({ sessionId: null, checked: ['session reset marker'] });
   });
 
-  it('uses the freshest agents-plane session that has a local transcript', () => {
-    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
-      readAgentPlaneRecord: () => ({
-        version: 1,
-        agentId: agentState.id,
-        issueId: agentState.issueId,
-        projectKey: 'myn',
-        role: 'work',
-        origin: { machineId: 'origin', overdeckHome: '/home/origin/.overdeck' },
-        launch: { harness: 'claude-code', model: 'claude-opus-5', workspace: agentState.workspace, branch: 'feature/min-839' },
-        sessions: [
-          { id: 'older-session', startedAt: '2026-08-01T10:00:00.000Z', reason: 'spawn' },
-          { id: 'newer-session', startedAt: '2026-08-01T11:00:00.000Z', reason: 'rotation' },
-        ],
-        lifecycle: [],
-        archiveRef: null,
-        recovered: false,
-      }),
-      transcriptExists: (_workspace, sessionId) => sessionId === 'newer-session',
-    }));
-
-    expect(result).toEqual({
-      sessionId: 'newer-session',
-      checked: ['durable agents plane'],
-      needsPointerRepair: true,
-    });
-  });
-
   it('uses the latest event-store session when its transcript exists', () => {
-    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
+    const result = resolveClaudeSessionRecovery(agentState.id, agentState, deps({
       readEventSessionId: () => 'event-session',
       transcriptExists: (_workspace, sessionId) => sessionId === 'event-session',
     }));
 
     expect(result).toEqual({
       sessionId: 'event-session',
-      checked: ['durable agents plane', 'agent.model_set event history'],
-      needsPointerRepair: true,
+      checked: ['agent.model_set event history'],
     });
   });
 
-  it('accepts a transcript-directory fallback only when exactly one JSONL exists', () => {
-    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
-      listTranscriptSessionIds: () => ['only-session'],
-    }));
-
-    expect(result.sessionId).toBe('only-session');
-    expect(result.checked).toContain('exactly-one transcript-directory scan');
-  });
-
-  it('refuses an ambiguous transcript directory', () => {
-    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
-      listTranscriptSessionIds: () => ['reviewer-session', 'work-session'],
-    }));
+  it('PAN-3849: never adopts a transcript by directory listing, even when exactly one JSONL exists', () => {
+    // The planner and the work agent share a workspace path, so "exactly one
+    // file" proved nothing about ownership — an unreferenced transcript
+    // resolves to null, and only the event-store source is consulted
+    // (PAN-3917: the durable agent-plane source this also checked is gone
+    // with the record plane).
+    const result = resolveClaudeSessionRecovery(agentState.id, agentState, deps());
 
     expect(result.sessionId).toBeNull();
-    expect(result.checked).toEqual([
-      'durable agents plane',
-      'agent.model_set event history',
-      'exactly-one transcript-directory scan',
-    ]);
+    expect(result.checked).toEqual(['agent.model_set event history']);
   });
 
-  it('returns null with every recovery source named when all are empty', () => {
-    expect(resolveClaudeSessionRecoverySync(agentState.id, agentState, deps())).toEqual({
+  it('returns null with the recovery source named when empty', () => {
+    expect(resolveClaudeSessionRecovery(agentState.id, agentState, deps())).toEqual({
       sessionId: null,
-      checked: [
-        'durable agents plane',
-        'agent.model_set event history',
-        'exactly-one transcript-directory scan',
-      ],
+      checked: ['agent.model_set event history'],
     });
   });
 });

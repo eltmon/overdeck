@@ -1,3 +1,13 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `stopAgentSync` (async: `stopAgent`): src/cli/commands/swarm.ts:140,147,401,698,
+ *   src/lib/cloister/concurrency.ts:276.
+ * It blocks on a child process: never call it from src/dashboard/** or src/lib/cloister/** (FR-8).
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { readFileSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { mkdir as mkdirAsync, rm, writeFile as writeFileAsync } from 'fs/promises';
 import { exec, execSync } from 'child_process';
@@ -6,7 +16,6 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import {
   getAgentDir,
-  getAgentStateSync,
   getAgentState,
   saveAgentStateSync,
   saveAgentState,
@@ -23,7 +32,6 @@ import {
   killSessionSync,
   sessionExists,
   capturePane,
-  killSession,
 } from '../tmux.js';
 import { FsError, TmuxError } from '../errors.js';
 
@@ -146,6 +154,12 @@ async function killLauncherProcessAsync(agentId: string): Promise<void> {
  * Stop an agent. `cause` records whether an operator asked for the stop; it
  * defaults to `'system'` so machinery-initiated stops never latch the
  * operator-stop gate (PAN-3324). See `AgentStopCause`.
+ *
+ * TMUX ONLY (PAN-3947): this sync variant can kill a tmux session but cannot
+ * close a Herdr pane — Herdr is reached over an async socket. On a Herdr host
+ * it rewrites state while the pane and its harness stay alive. Every caller
+ * that can await must use the async `stopAgent`, which terminates through the
+ * terminal backend.
  */
 export function stopAgentSync(agentId: string, cause: AgentStopCause = 'system'): void {
   const normalizedId = normalizeAgentId(agentId);
@@ -177,7 +191,7 @@ export function stopAgentSync(agentId: string, cause: AgentStopCause = 'system')
     // Non-fatal — stopping the agent must succeed even if guard cleanup fails.
   }
 
-  const state = getAgentStateSync(normalizedId);
+  const state = getAgentState(normalizedId);
   if (state) {
     // Ensure id is set — runtime state files may lack it (PAN-150)
     if (!state.id) state.id = normalizedId;
@@ -204,9 +218,10 @@ export const stopAgent = (
   const normalizedId = normalizeAgentId(agentId);
 
   return Effect.gen(function* () {
-    if (yield* sessionExists(normalizedId)) {
+    // A failed probe must not skip the backend close below.
+    if (yield* sessionExists(normalizedId).pipe(Effect.catch(() => Effect.succeed(false)))) {
       yield* Effect.gen(function* () {
-        const output = yield* capturePane(normalizedId, 5000);
+        const output = yield* Effect.promise(() => capturePane(normalizedId, 5000));
         if (!output) return;
 
         const agentDir = getAgentDir(normalizedId);
@@ -220,13 +235,26 @@ export const stopAgent = (
           catch: (cause) => new FsError({ operation: 'write', path: outputFile, cause }),
         });
       }).pipe(Effect.catch(() => Effect.void));
-
-      yield* killSession(normalizedId);
     }
 
-    // PAN-1527: same orphan-launcher kill as stopAgentSync. Runs after
-    // killSession so tmux gets the first chance to take everything down
-    // cleanly; falls through and kills any survivor by command-line match.
+    // PAN-3947: terminate through the host's terminal backend. On tmux that is
+    // `kill-session`; on Herdr it closes the agent's pane (and the idle harness
+    // in it). Before this, a Herdr stop only rewrote state.json and the pane
+    // stayed alive, so liveness readers kept seeing the agent and the next start
+    // was refused as "already running".
+    yield* Effect.promise(async () => {
+      try {
+        const { closeAgentPane } = await import('../terminal-backends/launch.js');
+        return await closeAgentPane(normalizedId);
+      } catch (err) {
+        console.warn(`[agents] Backend close failed for ${normalizedId} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+        return false;
+      }
+    });
+
+    // PAN-1527: same orphan-launcher kill as stopAgentSync. Runs after the
+    // backend close so the terminal gets the first chance to take everything
+    // down cleanly; falls through and kills any survivor by command-line match.
     yield* Effect.tryPromise({
       try: () => killLauncherProcessAsync(normalizedId),
       catch: (cause): never => { throw cause; },
@@ -240,7 +268,10 @@ export const stopAgent = (
       }
     });
 
-    const state = yield* getAgentState(normalizedId);
+    const state = yield* Effect.try({
+      try: () => getAgentState(normalizedId),
+      catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${normalizedId}`, cause }),
+    });
     if (state) {
       if (!state.id) state.id = normalizedId;
 

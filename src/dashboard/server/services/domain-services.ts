@@ -15,7 +15,7 @@ import type { StoredEvent } from '../event-store.js';
 import { ReadModelService } from '../read-model.js';
 import { startSessionContextWriter } from './session-context-writer.js';
 import { markEventStoreProjectionReady } from './project-ci-refill-startup.js';
-import { emitActivityDetailedSync } from '../../../lib/activity-logger.js';
+import { emitActivityDetailed } from '../../../lib/activity-logger.js';
 import { captureCheckpoint, diffCheckpointFiles, isCheckpointTargetDisabled, listCheckpoints } from '../../../lib/checkpoint/checkpoint-manager.js';
 import { isTerminalTurnDiffSummaryStatus } from '@overdeck/contracts';
 import { randomUUID } from 'crypto';
@@ -44,7 +44,7 @@ export class EventStoreService extends Context.Service<
 
 /** Map a domain event to a detailed activity log entry. Returns null for uninteresting events. */
 function shouldRefreshSessionContext(type: string): boolean {
-  return type === 'issues.snapshot' ||
+  return type === 'issues.snapshot' || type === 'issues.delta' ||
     type.startsWith('agent.') ||
     type.startsWith('review.') ||
     type.startsWith('pipeline.') ||
@@ -212,7 +212,7 @@ export const EventStoreServiceLive = Layer.effect(
     store.subscribe((event) => {
       if (event.type.startsWith('activity.')) return;
       const detailed = mapDomainEventToDetailed(event);
-      if (detailed) emitActivityDetailedSync(detailed);
+      if (detailed) emitActivityDetailed(detailed);
     });
 
     // Capture checkpoints when agent activity changes.

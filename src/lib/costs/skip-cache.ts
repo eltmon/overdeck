@@ -1,4 +1,4 @@
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { getOverdeckDatabase } from '../overdeck/infra.js';
 
 export type SkipVerdict = 'imported' | 'no-usage' | 'unknown-model' | 'unpriced-model';
 
@@ -11,7 +11,7 @@ export function lookupSkipVerdict(
   mtimeMs: number,
   size: number,
 ): SkipVerdict | null {
-  const row = getOverdeckDatabaseSync()
+  const row = getOverdeckDatabase()
     .prepare(`
       SELECT verdict
       FROM cost_reconcile_file_state
@@ -28,7 +28,7 @@ export function recordSkipVerdict(
   size: number,
   verdict: SkipVerdict,
 ): void {
-  getOverdeckDatabaseSync()
+  getOverdeckDatabase()
     .prepare(`
       INSERT INTO cost_reconcile_file_state (path, mtime_ms, size, verdict)
       VALUES (?, ?, ?, ?)

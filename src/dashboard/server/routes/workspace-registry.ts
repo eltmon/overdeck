@@ -38,15 +38,18 @@ import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import * as NodePath from '@effect/platform-node/NodePath';
 import type { WorkspaceGitState, WorkspaceRow } from '../../../lib/workspaces/types.js';
 import { getWorkspaceGitState, pullWorkspaceFastForward } from '../../../lib/workspaces/git-state.js';
-import { getReviewStatusSync } from '../../../lib/review-status.js';
+import type { DerivedIssueState } from '@overdeck/contracts';
+import { getDerivedIssueState, loadIssueStatesForProject } from '../services/derived-issue-state.js';
+import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { readCurrentStatus, readRecentObservations } from '../../../lib/memory/rollup.js';
 
+/**
+ * PAN-3917 FR-6: the pipeline badge is the derived issue state, not five
+ * stored status fields.
+ */
 export interface WorkspacePipelineBadge {
-  reviewStatus?: string;
-  testStatus?: string;
-  mergeStatus?: string;
-  verificationStatus?: string;
-  readyForMerge?: boolean;
+  state: DerivedIssueState['state'];
+  attention?: DerivedIssueState['attention'];
 }
 
 /**
@@ -66,24 +69,61 @@ export interface WorkspaceListRow extends Omit<WorkspaceRow, 'runCommand'> {
   memoryPhase: string | null;
 }
 
-function pipelineBadgeForWorkspace(workspace: WorkspaceRow): WorkspacePipelineBadge | null {
-  if (!workspace.issueId) return null;
-  const status = getReviewStatusSync(workspace.issueId);
-  if (!status) return null;
-  return {
-    reviewStatus: status.reviewStatus,
-    testStatus: status.testStatus,
-    mergeStatus: status.mergeStatus,
-    verificationStatus: status.verificationStatus,
-    readyForMerge: status.readyForMerge,
-  };
+function badgeFrom(derived: DerivedIssueState | undefined): WorkspacePipelineBadge | null {
+  if (!derived) return null;
+  return derived.attention
+    ? { state: derived.state, attention: derived.attention }
+    : { state: derived.state };
 }
 
-function toListRow(workspace: WorkspaceRow, memoryPhase: string | null = null): WorkspaceListRow {
+/**
+ * Derive the state of every issue in this list — one batched forge read per
+ * project, not one per row.
+ */
+async function pipelineBadges(
+  workspaces: readonly WorkspaceRow[],
+): Promise<Map<string, WorkspacePipelineBadge>> {
+  const byProject = new Map<string, string[]>();
+  for (const workspace of workspaces) {
+    if (!workspace.issueId) continue;
+    const projectPath = resolveProjectFromIssueSync(workspace.issueId)?.projectPath;
+    if (!projectPath) continue;
+    byProject.set(projectPath, [...(byProject.get(projectPath) ?? []), workspace.issueId]);
+  }
+
+  const badges = new Map<string, WorkspacePipelineBadge>();
+  const loaded = await Promise.allSettled(
+    [...byProject.entries()].map(([projectPath, issueIds]) => loadIssueStatesForProject(projectPath, issueIds)),
+  );
+  for (const outcome of loaded) {
+    if (outcome.status !== 'fulfilled') continue;
+    for (const [issueId, derived] of outcome.value) {
+      const badge = badgeFrom(derived);
+      if (badge) badges.set(issueId, badge);
+    }
+  }
+  return badges;
+}
+
+/** One row's badge, for the single-workspace routes. */
+async function pipelineBadgeFor(workspace: WorkspaceRow): Promise<WorkspacePipelineBadge | null> {
+  if (!workspace.issueId) return null;
+  try {
+    return badgeFrom(await getDerivedIssueState(workspace.issueId));
+  } catch {
+    return null;
+  }
+}
+
+function toListRow(
+  workspace: WorkspaceRow,
+  memoryPhase: string | null = null,
+  pipeline: WorkspacePipelineBadge | null = null,
+): WorkspaceListRow {
   // Destructured out rather than deleted afterwards, so a future field added to
   // WorkspaceRow cannot silently leak through a forgotten delete.
   const { runCommand: _runCommand, ...publicFields } = workspace;
-  return { ...publicFields, pipeline: pipelineBadgeForWorkspace(workspace), memoryPhase };
+  return { ...publicFields, pipeline, memoryPhase };
 }
 
 /**
@@ -132,7 +172,14 @@ const listWorkspaceRegistryRoute = HttpRouter.add(
     // Server-side so the rail needs no per-row fetch; each read is one small
     // local JSON file, and issue rows are skipped entirely.
     const memoryPhases = yield* Effect.promise(() => Promise.all(workspaces.map(readMemoryPhase)));
-    return jsonResponse({ workspaces: workspaces.map((workspace, index) => toListRow(workspace, memoryPhases[index] ?? null)) });
+    const badges = yield* Effect.promise(() => pipelineBadges(workspaces));
+    return jsonResponse({
+      workspaces: workspaces.map((workspace, index) => toListRow(
+        workspace,
+        memoryPhases[index] ?? null,
+        workspace.issueId ? badges.get(workspace.issueId) ?? null : null,
+      )),
+    });
   })),
 );
 
@@ -281,7 +328,7 @@ const getWorkspaceRegistryDetailRoute = HttpRouter.add(
     const runCommandOptions = runCommandOptionsFor(workspace);
     const editorCommand = yield* getOpenInEditorCommand();
     return jsonResponse({
-      ...toListRow(workspace, memoryPhase),
+      ...toListRow(workspace, memoryPhase, yield* Effect.promise(() => pipelineBadgeFor(workspace))),
       memoryStatus,
       runCommand: workspace.runCommand,
       runCommandDefault: runCommandOptions[0]?.command ?? null,
@@ -529,7 +576,7 @@ const putWorkspaceRegistryRunCommandRoute = HttpRouter.add(
     setWorkspaceRunCommand(id, command);
     const updated = getWorkspaceById(id) ?? { ...workspace, runCommand: command };
     return jsonResponse({
-      ...toListRow(updated),
+      ...toListRow(updated, null, yield* Effect.promise(() => pipelineBadgeFor(updated))),
       // Echoed back explicitly: toListRow omits command text from the public
       // DTO, and this route is already session+CSRF guarded.
       runCommand: updated.runCommand,
@@ -630,7 +677,8 @@ const postWorkspaceRegistryActivateRoute = HttpRouter.add(
     const workspace = getWorkspaceById(id);
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
     touchWorkspaceAccessed(id);
-    return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));
+    const row = getWorkspaceById(id) ?? workspace;
+    return jsonResponse(toListRow(row, null, yield* Effect.promise(() => pipelineBadgeFor(row))));
   })),
 );
 
@@ -648,7 +696,8 @@ const postWorkspaceRegistryArchiveRoute = HttpRouter.add(
     if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
     if (body.archived === false) unarchiveWorkspace(id);
     else yield* Effect.promise(() => archiveWorkspace(id));
-    return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));
+    const row = getWorkspaceById(id) ?? workspace;
+    return jsonResponse(toListRow(row, null, yield* Effect.promise(() => pipelineBadgeFor(row))));
   })),
 );
 
@@ -665,7 +714,8 @@ const postWorkspaceRegistryFavoriteRoute = HttpRouter.add(
     const body = (yield* readJsonBody) as { favorite?: unknown } | undefined;
     if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
     setWorkspaceFavorite(id, body.favorite !== false);
-    return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));
+    const row = getWorkspaceById(id) ?? workspace;
+    return jsonResponse(toListRow(row, null, yield* Effect.promise(() => pipelineBadgeFor(row))));
   })),
 );
 
@@ -685,7 +735,8 @@ const putWorkspaceRegistryLayoutRoute = HttpRouter.add(
     if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
     if (body.layout === undefined) return jsonResponse({ error: 'layout is required' }, { status: 400 });
     updateWorkspaceLayout(id, JSON.stringify(body.layout));
-    return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));
+    const row = getWorkspaceById(id) ?? workspace;
+    return jsonResponse(toListRow(row, null, yield* Effect.promise(() => pipelineBadgeFor(row))));
   })),
 );
 

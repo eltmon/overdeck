@@ -6,22 +6,21 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { LinearClient } from '../../dashboard/server/services/linear-client.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
   sanitizeResourceAllocatedIssues,
 } from '../../dashboard/server/services/resource-discovery.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
-import { spawnInspectAgent } from '../cloister/inspect-agent.js';
-import { extractPrefixSync, parseIssueIdSync } from '../issue-id.js';
+import { extractPrefix, parseIssueId } from '../issue-id.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
-import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
-import { readIssueRecordSync } from '../pan-dir/record.js';
-import { findPrdAnywhereSync, readPrdContent } from '../prd-locations.js';
+import { readContinueState } from '../xbrief/continue-state.js';
+import { resolvePlanHome } from '../pan-dir/paths.js';
+import { findPrdAnywhere, readPrdContent } from '../prd-locations.js';
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -29,7 +28,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -76,7 +75,7 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return join(homedir(), 'Projects');
 }
 
-export function resolveIssueProjectPathSync(id: string): string {
+export function resolveIssueProjectPath(id: string): string {
   const githubCheck = isGitHubIssue(id);
   let projectPath = '';
   if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
@@ -84,7 +83,7 @@ export function resolveIssueProjectPathSync(id: string): string {
     projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
   }
   if (!projectPath) {
-    const issuePrefix = extractPrefixSync(id) ?? id.split('-')[0];
+    const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
     try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
   }
   return projectPath;
@@ -98,89 +97,11 @@ async function pathIsDirectory(path: string): Promise<boolean> {
   }
 }
 
-export function analyzeIssue(id: string) {
-  return Effect.gen(function* () {
-    const linear = yield* LinearClient;
-
-    const issue = yield* Effect.promise(() =>
-      Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))),
-    );
-
-    if (!issue) {
-      return jsonResponse({ error: 'Issue not found' }, { status: 404 });
-    }
-
-    const desc = (issue.description || '').toLowerCase();
-    const title = issue.title.toLowerCase();
-    const combined = `${title} ${desc}`;
-
-    const reasons: string[] = [];
-    const subsystems: string[] = [];
-    let estimatedTasks = 1;
-
-    if (combined.includes('frontend') || combined.includes('ui') || combined.includes('component')) subsystems.push('frontend');
-    if (combined.includes('backend') || combined.includes('api') || combined.includes('endpoint')) subsystems.push('backend');
-    if (combined.includes('database') || combined.includes('migration') || combined.includes('schema')) subsystems.push('database');
-    if (combined.includes('test') || combined.includes('e2e') || combined.includes('playwright')) subsystems.push('tests');
-
-    if (subsystems.length > 1) {
-      reasons.push(`Multiple subsystems involved: ${subsystems.join(', ')}`);
-      estimatedTasks += subsystems.length;
-    }
-
-    const ambiguousPatterns = ['should we', 'maybe', 'or', 'consider', 'option', 'approach', 'tbd', 'unclear'];
-    for (const pattern of ambiguousPatterns) {
-      if (combined.includes(pattern)) { reasons.push('Requirements may be ambiguous'); break; }
-    }
-
-    const architecturePatterns = ['refactor', 'architecture', 'redesign', 'migrate', 'integration', 'authentication'];
-    for (const pattern of architecturePatterns) {
-      if (combined.includes(pattern)) {
-        reasons.push(`Architecture decision needed: ${pattern}`);
-        estimatedTasks += 2;
-        break;
-      }
-    }
-
-    if (desc.length > 500) { reasons.push('Detailed description suggests complexity'); estimatedTasks += 1; }
-
-    const labels = issue.labels.map((l) => l.name);
-    const complexLabels = ['complex', 'large', 'epic', 'multi-phase', 'architecture'];
-    for (const label of labels) {
-      if (complexLabels.some((cl: string) => label.toLowerCase().includes(cl))) {
-        reasons.push(`Label indicates complexity: ${label}`);
-        estimatedTasks += 2;
-      }
-    }
-
-    const isComplex = reasons.length >= 2 || subsystems.length > 1 || estimatedTasks >= 4;
-
-    return jsonResponse({
-      issue: {
-        id: issue.id,
-        identifier: issue.identifier,
-        title: issue.title,
-        description: issue.description,
-        status: issue.state.name,
-        priority: issue.priority,
-        url: issue.url,
-        labels,
-      },
-      complexity: {
-        isComplex,
-        reasons,
-        subsystems,
-        estimatedTasks: Math.max(estimatedTasks, subsystems.length + 1),
-      },
-    });
-  });
-}
-
 export function getIssueTasks(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
     const resolvedProject = resolveProjectFromIssueSync(id);
-    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPathSync(id);
+    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPath(id);
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
 
     // Check for remote workspace (reads non-fatal state files)
@@ -209,7 +130,7 @@ export function getIssueTasks(id: string) {
 
     const doc = workspacePath ? readWorkspacePlanSync(workspacePath) : null;
     if (!doc) return jsonResponse({ error: `The xBRIEF for ${id} is missing or unreadable.` }, { status: 404 });
-    const record = projectPath ? readIssueRecordSync({ name: resolvedProject?.projectName ?? id, path: projectPath }, id) : null;
+    const items = workspacePath ? (readContinueState(resolvePlanHome(workspacePath), id)?.items ?? {}) : {};
     const blockers = new Map<string, string[]>();
     for (const edge of doc.plan.edges) if (edge.type === 'blocks') blockers.set(edge.to, [...(blockers.get(edge.to) ?? []), edge.from]);
     // The dashboard task views (TasksRail/TasksPanel) contract is
@@ -223,7 +144,9 @@ export function getIssueTasks(id: string) {
         : item.metadata?.difficulty
           ? [`difficulty:${item.metadata.difficulty}`]
           : [];
-      return { ...item, labels, blockedBy: blockers.get(item.id) ?? [], claim: record?.tasks?.claims[item.id] };
+      const state = items[item.id];
+      const claim = state?.claimedBy ? { agentId: state.claimedBy, claimedAt: state.claimedAt } : undefined;
+      return { ...item, labels, blockedBy: blockers.get(item.id) ?? [], claim };
     });
 
     // Suppress unused variable warning — remoteVmName available for callers if needed
@@ -235,7 +158,6 @@ export function getIssueTasks(id: string) {
       count: tasks.length,
       source: 'vbrief',
       isRemote: isRemoteWorkspace,
-      sequence: record?.tasks?.sequence ?? 0,
     });
   });
 }
@@ -243,8 +165,8 @@ export function getIssueTasks(id: string) {
 export function getIssuePrd(id: string) {
   return Effect.gen(function* () {
     const resolvedProject = resolveProjectFromIssueSync(id);
-    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPathSync(id);
-    const location = projectPath ? findPrdAnywhereSync(projectPath, id) : null;
+    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPath(id);
+    const location = projectPath ? findPrdAnywhere(projectPath, id) : null;
     if (!location) {
       return jsonResponse({ hasPrd: false, error: `No PRD draft for ${id}.` }, { status: 404 });
     }
@@ -264,60 +186,6 @@ export function getIssuePrd(id: string) {
   });
 }
 
-function isValidItemId(itemId: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(itemId);
-}
-
-export function inspectIssueTask(options: {
-  id: string;
-  itemId: string;
-  body: unknown;
-}) {
-  return Effect.gen(function* () {
-    const { id, itemId, body } = options;
-    if (!parseIssueIdSync(id)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-    if (!itemId.trim()) {
-      return jsonResponse({ error: 'Missing item ID' }, { status: 400 });
-    }
-    if (!isValidItemId(itemId)) {
-      return jsonResponse({ error: 'Invalid item ID' }, { status: 400 });
-    }
-
-    const project = resolveProjectFromIssueSync(id);
-    if (!project) {
-      return jsonResponse({ error: `Could not resolve project for ${id}` }, { status: 404 });
-    }
-
-    const issueLower = id.toLowerCase();
-    const workspace = join(project.projectPath, 'workspaces', `feature-${issueLower}`);
-    const workspaceExists = yield* Effect.promise(() => pathIsDirectory(workspace));
-    if (!workspaceExists) {
-      return jsonResponse({ error: `No workspace found for ${id}` }, { status: 404 });
-    }
-
-    const result = yield* spawnInspectAgent({
-      projectKey: project.projectKey,
-      projectPath: project.projectPath,
-      issueId: id,
-      itemId,
-      workspace,
-      branch: `feature/${issueLower}`,
-    }, { deep: (body as { deep?: unknown }).deep === true });
-
-    if (!result.success) {
-      return jsonResponse({ success: false, error: result.error ?? result.message }, { status: 500 });
-    }
-
-    if (result.skipped) {
-      return jsonResponse({ success: true, skipped: true, message: result.message, tmuxSession: result.tmuxSession });
-    }
-
-    return jsonResponse({ success: true, runId: result.runId, tmuxSession: result.tmuxSession });
-  });
-}
-
 export function getResourceAllocatedIssues() {
   return Effect.gen(function* () {
     const issues = yield* Effect.tryPromise({
@@ -330,7 +198,7 @@ export function getResourceAllocatedIssues() {
 
 export function getIssueResourceDetails(rawId: string) {
   return Effect.gen(function* () {
-    const parsedIssueId = parseIssueIdSync(rawId);
+    const parsedIssueId = parseIssueId(rawId);
     if (!parsedIssueId) {
       return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
     }
@@ -348,3 +216,4 @@ export function getIssueResourceDetails(rawId: string) {
     return jsonResponse(details);
   });
 }
+export { deriveIssueState, getDerivedIssueState, loadIssueStateFacts, type IssueStateFacts } from './derived-issue-state.js';

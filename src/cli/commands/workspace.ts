@@ -64,13 +64,15 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--all', 'List workspaces across all registered projects')
     .option('--kind <kind>', 'Filter by workspace kind (main|issue|scratch), reading through the resolver')
     .option('--archived', 'Include archived workspaces (only applies with --kind)')
+    .option('--stale', 'Show reclaim candidates: merged branches still on disk, with sizes')
     .action(listCommand);
 
   workspace
     .command('destroy <issueId>')
-    .description('Destroy workspace')
+    .description('Destroy workspace (all shapes by default: base, strike, and slot worktrees)')
     .option('--force', 'Force removal even with uncommitted changes')
     .option('--project <path>', 'Explicit project path (overrides registry)')
+    .option('--shape <shape>', 'Limit to one shape: base|strike|slot|all (default: all)')
     .option('--purge-memory', 'Also permanently delete the workspace\'s memory home (irreversible)')
     .action(destroyCommand);
 

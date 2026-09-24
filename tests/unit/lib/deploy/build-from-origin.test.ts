@@ -91,6 +91,7 @@ describe('buildDashboardFromOriginMain', () => {
     expect(deployment).toEqual({
       deployRoot: BUILD_WORKTREE,
       serverPath: join(BUILD_WORKTREE, 'dist', 'dashboard', 'server.js'),
+      builtSha: ORIGIN_MAIN_SHA,
     });
     expect(gitCalls).toContainEqual(['worktree', 'add', '--detach', BUILD_WORKTREE, 'origin/main']);
     expect(gitCalls.some((args) => args.includes('merge-base'))).toBe(false);
@@ -261,6 +262,47 @@ describe('buildDashboardFromOriginMain', () => {
     expect(selectDashboardDeploymentRoot(second, [hardRoot(first)])).toBe(second);
     expect(selectDashboardDeploymentRoot(first, [hardRoot(second)])).toBe(first);
     expect(selectDashboardDeploymentRoot(null, [hardRoot(first)])).toBe(second);
+  });
+
+  it('keeps delayed imports from the live generation resolvable while staging its successor', async () => {
+    const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-delayed-import-'));
+    temporaryRoots.push(home);
+    process.env.OVERDECK_HOME = home;
+    const [liveRoot, nextRoot] = dashboardDeploymentRoots();
+    const liveServer = join(liveRoot, 'dist', 'dashboard', 'server.mjs');
+    const liveChunk = join(liveRoot, 'dist', 'dashboard', 'delayed-chunk.mjs');
+    await fs.mkdir(dirname(liveServer), { recursive: true });
+    await fs.writeFile(liveServer, 'export const loadDelayed = () => import("./delayed-chunk.mjs");');
+    await fs.writeFile(liveChunk, 'export default "live generation stayed coherent";');
+
+    const runningServer = await import(`${pathToFileURL(liveServer).href}?test=delayed-${PROCESS_ID}`);
+    const runGit = vi.fn(async (args: string[]) => {
+      const command = args.join(' ');
+      if (command === 'status --porcelain') return { stdout: '', stderr: '' };
+      if (command === 'rev-parse HEAD' || command === 'rev-parse origin/main') {
+        return { stdout: `${ORIGIN_MAIN_SHA}\n`, stderr: '' };
+      }
+      if (args[0] === 'worktree' && args[1] === 'add') {
+        await fs.mkdir(join(nextRoot, 'dist', 'dashboard'), { recursive: true });
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const selectedRoot = selectDashboardDeploymentRoot(liveRoot, [hardRoot(liveRoot)]);
+    expect(selectedRoot).toBe(nextRoot);
+    await buildDashboardFromOriginMain('/repo', {
+      runGit,
+      installAndBuild: vi.fn(async () => {
+        await fs.writeFile(join(nextRoot, 'dist', 'dashboard', 'server.js'), 'successor');
+      }),
+      deploymentRoot: () => selectedRoot,
+      note: vi.fn(),
+      success: vi.fn(),
+    });
+
+    const delayed = await runningServer.loadDelayed() as { default: string };
+    expect(delayed.default).toBe('live generation stayed coherent');
+    await expect(fs.readFile(liveChunk, 'utf8')).resolves.toContain('stayed coherent');
   });
 
   it('lets soft occupants (stray supervisors, smee) warn without wedging deploys', async () => {

@@ -11,16 +11,20 @@ const mockGetLatestSessionIdSync = vi.fn();
 const mockSaveAgentState = vi.fn();
 const mockResolveModel = vi.fn();
 const mockEmitActivityEntrySync = vi.fn();
+const mockGetPrFacts = vi.fn();
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   spawnRun: (...args: Parameters<typeof mockSpawnRun>) => mockSpawnRun(...args),
   messageAgent: vi.fn(),
-  getAgentState: vi.fn(() => Effect.succeed(null)),
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentStateSync>) => mockGetAgentStateSync(...args),
-  getLatestSessionIdSync: (...args: Parameters<typeof mockGetLatestSessionIdSync>) => mockGetLatestSessionIdSync(...args),
+  getAgentState: (...args: Parameters<typeof mockGetAgentStateSync>) => mockGetAgentStateSync(...args),
+  getLatestSessionId: (...args: Parameters<typeof mockGetLatestSessionIdSync>) => mockGetLatestSessionIdSync(...args),
   saveAgentState: (...args: Parameters<typeof mockSaveAgentState>) => mockSaveAgentState(...args),
   resumeAgent: vi.fn(async () => ({ success: false })),
   wipeAgentStateDirs: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
+  getPrFacts: (...args: Parameters<typeof mockGetPrFacts>) => mockGetPrFacts(...args),
 }));
 
 vi.mock('../../../../src/lib/cloister/merge-verification.js', () => ({
@@ -34,6 +38,9 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 vi.mock('../../../../src/lib/review-status.js', () => ({
   setReviewStatusSync: (...args: Parameters<typeof mockSetReviewStatusSync>) => mockSetReviewStatusSync(...args),
   getReviewStatusSync: vi.fn(() => null),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/config-yaml.js', () => ({
@@ -60,25 +67,21 @@ vi.mock('../../../../src/lib/cloister/conflict-gate.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/review-context.js', () => ({
-  buildReviewContext: vi.fn(() => Effect.succeed({ manifestPath: '/tmp/manifest.json', changedFiles: [] })),
+  buildReviewContext: vi.fn(async () => ({ manifestPath: '/tmp/manifest.json', changedFiles: [] })),
   formatTier1Summary: vi.fn(() => ''),
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
-  archiveFeedbackFiles: vi.fn(() => Effect.succeed(undefined)),
+  clearFeedbackFiles: vi.fn(async () => undefined),
 }));
 
-vi.mock('../../../../src/lib/pan-dir/record.js', () => ({
-  resolveProjectForIssue: vi.fn(() => null),
-  readIssueRecordSync: vi.fn(() => undefined),
-}));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
   isIssueClosed: vi.fn(async () => false),
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: (...args: Parameters<typeof mockEmitActivityEntrySync>) => mockEmitActivityEntrySync(...args),
+  emitActivityEntry: (...args: Parameters<typeof mockEmitActivityEntrySync>) => mockEmitActivityEntrySync(...args),
 }));
 
 import { beforeEach } from 'vitest';
@@ -91,21 +94,24 @@ describe('guard-advancing-dispatch', () => {
     vi.clearAllMocks();
     mockSessionExists.mockReturnValue(Effect.succeed(false));
   });
+  // PAN-3917 (FR-8): the test role runs against a pull request, so the dispatch
+  // gate is the PR's own state, not a stored merge status.
   it('test-agent-queue Effect variant skips spawnRun when the PR is already merged', async () => {
     mockResolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project' });
-    mockShouldSkipDispatchAsMerged.mockResolvedValue({ skip: true, reason: 'GitHub PR #2420 is merged' });
+    mockGetPrFacts.mockResolvedValue({ issueId: 'PAN-2420', exists: true, open: false, merged: true });
     mockSpawnRun.mockRejectedValue(new Error('spawnRun should not be called'));
 
     const result = await Effect.runPromise(dispatchTestAgentAndNotify('PAN-2420', '/tmp/workspace', 'feature/pan-2420'));
 
-    expect(mockShouldSkipDispatchAsMerged).toHaveBeenCalledWith('PAN-2420');
+    expect(mockGetPrFacts).toHaveBeenCalledWith('PAN-2420');
     expect(mockSpawnRun).not.toHaveBeenCalled();
     expect(result.delivered).toBe(false);
+    expect(result.reason).toBe('no-open-pr');
   });
 
   it('test-agent-queue Effect variant still dispatches when the PR is open', async () => {
     mockResolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project' });
-    mockShouldSkipDispatchAsMerged.mockResolvedValue({ skip: false, reason: 'open' });
+    mockGetPrFacts.mockResolvedValue({ issueId: 'PAN-2420', exists: true, open: true, merged: false });
     mockSpawnRun.mockResolvedValue({ id: 'test-run-123' });
 
     const result = await Effect.runPromise(dispatchTestAgentAndNotify('PAN-2420', '/tmp/workspace', 'feature/pan-2420'));
@@ -149,7 +155,7 @@ describe('guard-advancing-dispatch', () => {
     mockShouldSkipDispatchAsMerged.mockResolvedValue({ skip: true, reason: 'GitHub PR #2420 is merged' });
     mockSpawnRun.mockRejectedValue(new Error('spawnRun should not be called'));
 
-    await Effect.runPromise(onIssueStateChange('PAN-2420', 'in_progress'));
+    await onIssueStateChange('PAN-2420', 'in_progress');
 
     expect(mockShouldSkipDispatchAsMerged).toHaveBeenCalledWith('PAN-2420');
     expect(mockSpawnRun).not.toHaveBeenCalled();
@@ -159,7 +165,7 @@ describe('guard-advancing-dispatch', () => {
     mockShouldSkipDispatchAsMerged.mockResolvedValue({ skip: false, reason: 'open' });
     mockSpawnRun.mockResolvedValue({ id: 'work-run-123' });
 
-    await Effect.runPromise(onIssueStateChange('PAN-2420', 'in_progress'));
+    await onIssueStateChange('PAN-2420', 'in_progress');
 
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-2420', 'work', expect.objectContaining({
       prompt: expect.stringContaining('in_progress'),

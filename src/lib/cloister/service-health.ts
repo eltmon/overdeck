@@ -1,20 +1,13 @@
 /** Cloister health monitoring seam. */
 import { Effect } from 'effect';
-import { getAgentStateSync, listRunningAgentsSync } from '../agents.js';
+import { getAgentState, listRunningAgents } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import type { HealthState } from '../runtimes/types.js';
 import { writeHealthEvent } from '../overdeck/health-events.js';
 import type { CloisterConfig } from './config.js';
-import {
-  checkAgentForViolations,
-  clearOldViolationsSync,
-  hasExceededMaxNudges,
-  sendNudge,
-  type FPPViolation,
-} from './fpp-violations.js';
 import { checkCostLimits, type CostAlert } from './cost-monitor.js';
 import { performHandoff } from './handoff.js';
-import { createHandoffEvent, logHandoffEventSync } from './handoff-logger.js';
+import { createHandoffEvent, logHandoffEvent } from './handoff-logger.js';
 import { getAgentHealth, getAgentsNeedingAttention, type AgentHealth } from './health.js';
 import { reconcilePiCostEventsForRunningAgents } from './pi-cost-reconciler.js';
 import { checkAndRotateIfNeeded, type SessionRotationResult } from './session-rotation.js';
@@ -29,9 +22,6 @@ export type HealthEvent =
   | { type: 'session_rotated'; specialistName: string; result: SessionRotationResult }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
   | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
-  | { type: 'fpp_violation_detected'; agentId: string; violation: FPPViolation }
-  | { type: 'fpp_nudge_sent'; agentId: string; nudgeCount: number }
-  | { type: 'fpp_max_nudges_exceeded'; agentId: string; violation: FPPViolation }
   | { type: 'cost_alert'; alert: CostAlert }
   | { type: 'error'; error: Error };
 
@@ -46,13 +36,11 @@ export interface HealthHost {
   /** cost-alert keys (`type:entity:level`) already alerted — see checkCostAlerts */
   activeCostAlertKeys: Set<string>;
   handleAgentCrash(agentId: string): Promise<void>;
-  checkCompletionMarkers(): Promise<void>;
   recordHealthEvent(health: AgentHealth): void;
   emit(event: HealthEvent): void;
   pokeAgent(agentId: string): void;
   killAgent(agentId: string): void;
   checkHandoffTriggers(agentHealths: AgentHealth[]): Promise<void>;
-  checkFPPViolations(agentIds: string[]): void;
   checkCostAlerts(agentIds: string[]): void;
   checkSpecialistRotations(): Promise<void>;
   mapHeartbeatSource(source: string): string;
@@ -63,7 +51,7 @@ export interface HealthHost {
  */
 export async function performHealthCheck(host: HealthHost): Promise<void> {
     try {
-      const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
+      const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
       const agentIds = runningAgents.map((a) => a.id);
       const currentRunningSet = new Set(agentIds);
 
@@ -80,12 +68,10 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
       // Update the set of running agents for next check
       host.previousRunningAgents = currentRunningSet;
 
-      // Completion marker check runs regardless of active agents —
-      // completed agents won't have tmux sessions anymore
+      // PAN-3917: the completion-marker fallback scan is deleted with the rest
+      // of Appendix A — `pan done` opens the PR, and the PR is the completion
+      // signal every reader now uses.
       host.healthCheckCount++;
-      if (host.healthCheckCount % 4 === 0) {
-        void host.checkCompletionMarkers();
-      }
 
       if (agentIds.length === 0) {
         host.lastCheck = new Date();
@@ -121,12 +107,12 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
         // state, not a stall. Never poke or kill it (it was spamming itself with
         // "are you stuck?" nudges every cooldown). Health is still recorded above;
         // only the attention/poke/kill action is skipped.
-        const idleAgentState = getAgentStateSync(health.agentId);
+        const idleAgentState = getAgentState(health.agentId);
         if (idleAgentState?.role === 'sequencer') continue;
 
         // Warm-idle on a pipeline-owned issue is expected, not a stall.
-        const { shouldSkipIdlePokeForAgent } = await import('./stuck-remediation.js');
-        if (shouldSkipIdlePokeForAgent(idleAgentState)) {
+        const { shouldSkipIdlePokeForAgent } = await import('./preemption.js');
+        if (await shouldSkipIdlePokeForAgent(idleAgentState)) {
           host.pokeProgress.delete(health.agentId);
           continue;
         }
@@ -162,9 +148,6 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
       // Note: Intentionally not awaiting - runs in background
       void host.checkHandoffTriggers(agentHealths);
 
-      // Check for FPP violations (Phase 6)
-      host.checkFPPViolations(agentIds);
-
       await reconcilePiCostEventsForRunningAgents(runningAgents);
 
       // Check cost limits (Phase 6)
@@ -174,12 +157,6 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
       // Only check periodically (every ~10 checks)
       if (Math.random() < 0.1) {
         void host.checkSpecialistRotations();
-      }
-
-      // Clean up old resolved violations (daily)
-      if (Math.random() < 0.01) {
-        // ~1% chance each check = roughly once per day
-        clearOldViolationsSync(24);
       }
     } catch (error) {
       console.error('Cloister health check failed:', error);
@@ -193,7 +170,7 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
  */
 export async function checkSpecialistRotations(host: HealthHost): Promise<void> {
     // Check merge-agent (the main candidate for rotation)
-    const mergeAgentResult = await Effect.runPromise(checkAndRotateIfNeeded('merge-agent', process.cwd()));
+    const mergeAgentResult = await checkAndRotateIfNeeded('merge-agent', process.cwd());
     if (mergeAgentResult) {
       host.emit({ type: 'session_rotated', specialistName: 'merge-agent', result: mergeAgentResult });
 
@@ -260,21 +237,21 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
     for (const health of agentHealths) {
       try {
         // Get agent state
-        const agentState = getAgentStateSync(health.agentId);
+        const agentState = getAgentState(health.agentId);
         if (!agentState) continue;
 
         // Skip if no workspace (can't determine context)
         if (!agentState.workspace) continue;
 
         // Check all triggers
-        const triggers = await Effect.runPromise(checkAllTriggers(
+        const triggers = await checkAllTriggers(
           health.agentId,
           agentState.workspace,
           agentState.issueId,
           agentState.model,
           health,
           host.config
-        ));
+        );
 
         // Execute handoff for first triggered condition
         // (Priority: stuck > planning > test > completion)
@@ -296,10 +273,10 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
           console.log(`🔔 Handoff triggered for ${health.agentId}: ${trigger.reason}`);
 
           // Perform handoff
-          const result = await Effect.runPromise(performHandoff(health.agentId, {
+          const result = await performHandoff(health.agentId, {
             targetModel: trigger.suggestedModel || 'sonnet',
             reason: trigger.reason,
-          }));
+          });
 
           host.emit({ type: 'handoff_completed', agentId: health.agentId, result });
 
@@ -313,7 +290,7 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
               result.success,
               result.error
             );
-            logHandoffEventSync(event);
+            logHandoffEvent(event);
           }
 
           if (result.success) {
@@ -324,45 +301,6 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
         }
       } catch (error) {
         console.error(`Failed to check handoff triggers for ${health.agentId}:`, error);
-      }
-    }
-
-}
-
-/**
- * Check for FPP violations and send nudges
- */
-export function checkFPPViolations(host: HealthHost, agentIds: string[]): void {
-    for (const agentId of agentIds) {
-      const violation = checkAgentForViolations(agentId);
-      if (!violation) continue;
-
-      // New violation detected
-      if (violation.nudgeCount === 0) {
-        host.emit({ type: 'fpp_violation_detected', agentId, violation });
-      }
-
-      // Check if we should send a nudge
-      const timeSinceLastNudge = violation.lastNudgeAt
-        ? Date.now() - new Date(violation.lastNudgeAt).getTime()
-        : Infinity;
-
-      // Send nudge every 5 minutes until max nudges
-      const NUDGE_INTERVAL_MS = 5 * 60 * 1000;
-      if (timeSinceLastNudge >= NUDGE_INTERVAL_MS || violation.nudgeCount === 0) {
-        if (hasExceededMaxNudges(violation)) {
-          // Max nudges exceeded - alert user
-          host.emit({ type: 'fpp_max_nudges_exceeded', agentId, violation });
-          console.error(
-            `🔔 Agent ${agentId} exceeded max nudges for ${violation.type} - manual intervention required`
-          );
-        } else {
-          // Send nudge
-          const sent = sendNudge(violation);
-          if (sent) {
-            host.emit({ type: 'fpp_nudge_sent', agentId, nudgeCount: violation.nudgeCount });
-          }
-        }
       }
     }
 

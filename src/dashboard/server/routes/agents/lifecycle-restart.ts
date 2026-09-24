@@ -1,8 +1,6 @@
-import { existsSync } from 'node:fs';
-import { readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, basename } from 'node:path';
+import { dirname, join } from 'node:path';
 
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { resolveStaffing } from '../../../../lib/agents/staffing.js';
@@ -10,11 +8,11 @@ import {
   detectPendingOperatorDecision,
   type PendingOperatorDecision,
 } from '../../../../lib/agents/pending-decision-gate.js';
-import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
+import { findPlanSync, readTierOverrides, readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
 import { getDispatchableItems } from '../../../../lib/xbrief/dag.js';
 import { loadConfigSync } from '../../../../lib/config-yaml.js';
-import { getIssueStageSync, isTerminalIssueStage } from '../../../../lib/overdeck/agents.js';
+import { getIssueStage, isTerminalIssueStage } from '../../../../lib/overdeck/agents.js';
 
 import {
   getAgentState,
@@ -22,14 +20,12 @@ import {
   recoverAgent,
   resumeAgent,
   restartAgent,
-  saveAgentStateSync,
-  getAgentDir,
   getProviderAuthMode,
   listRunningAgents,
   wipeAgentStateDirs,
 } from '../../../../lib/agents.js';
-import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
-import { normalizeModelOverrideSync, requireModelOverrideSync } from '../../../../lib/model-validation.js';
+import { canUseHarness } from '../../../../lib/harness-policy.js';
+import { normalizeModelOverride, requireModelOverride } from '../../../../lib/model-validation.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
@@ -45,6 +41,8 @@ import {
   readJsonBody,
   spawnPanCommandDetached,
 } from './shared.js';
+import { claimAgentStart, releaseAgentStart } from './spawn-helpers.js';
+import { clearAgentSessionPointers } from '../../../../lib/agents/session-pointers.js';
 
 function pendingDecisionError(
   agentId: string,
@@ -68,7 +66,7 @@ export const postAgentResumeRoute = HttpRouter.add(
     const { message, model, harness, compact } = body as { message?: string; model?: string; harness?: RuntimeName; compact?: boolean };
     let resumeModel: string | undefined;
     try {
-      resumeModel = normalizeModelOverrideSync(model);
+      resumeModel = normalizeModelOverride(model);
     } catch (err) {
       console.warn(`[agents/resume] ${id} model validation failed: ${err instanceof Error ? err.message : String(err)}`);
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
@@ -80,7 +78,7 @@ export const postAgentResumeRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     // Snapshot lifecycle state BEFORE taking any action so callers can see the
     // temporal context (why was this resume allowed) without recomputing state.
-    const lifecycleBefore = yield* getWorkAgentLifecycleState(id);
+    const lifecycleBefore = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     console.log(`[agents/resume] ${id} lifecycle: canResume=${lifecycleBefore.canResumeSession} hasSavedSession=${lifecycleBefore.hasSavedSession} hasLiveTmux=${lifecycleBefore.hasLiveTmuxSession} isCrashed=${lifecycleBefore.isCrashed} isStopped=${lifecycleBefore.isStopped}`);
     // PAN-1675: a compact-resume targets a context-wedged agent that is usually
     // still 'running' (a live but stuck session), which the normal gate rejects.
@@ -112,7 +110,7 @@ export const postAgentResumeRoute = HttpRouter.add(
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction so the read model transitions agent
       // status from 'stopped' → 'running' and the frontend updates immediately.
-      const agentState = yield* getAgentState(id);
+      const agentState = getAgentState(id);
       if (agentState) {
         yield* saveAgentStateAndEmitEventProgram(agentState, {
           type: 'agent.started',
@@ -142,7 +140,7 @@ export const postAgentResumeRoute = HttpRouter.add(
       // PAN-1985 follow-up: the messageDelivered flag distinguishes "agent is
       // resumed and your message landed in its composer" from "agent is
       // resumed but your message did NOT land in its composer (PTY supervisor
-      // echo-confirm timed out, harness/session.id mismatch, etc.)". The
+      // echo-confirm timed out, harness/session-index mismatch, etc.)". The
       // former gets a 'delivered' toast; the latter gets a clear 'queued in
       // mail' warning so the operator can intervene if needed.
       const delivered = result.messageDelivered !== false;
@@ -154,7 +152,7 @@ export const postAgentResumeRoute = HttpRouter.add(
         hint: delivered
           ? 'Continue prompt delivered to the agent.'
           : 'The continue prompt was queued in the agent mail/ folder because the live delivery path did not confirm in time. The agent will read it on its next session start.',
-        lifecycle: { before: lifecycleBefore, after: yield* getWorkAgentLifecycleState(id) },
+        lifecycle: { before: lifecycleBefore, after: yield* Effect.promise(() => getWorkAgentLifecycleState(id)) },
       });
     } else {
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_failed', {
@@ -163,7 +161,7 @@ export const postAgentResumeRoute = HttpRouter.add(
       }));
       return jsonResponse({
         error: result.error,
-        lifecycle: { before: lifecycleBefore, after: yield* getWorkAgentLifecycleState(id) },
+        lifecycle: { before: lifecycleBefore, after: yield* Effect.promise(() => getWorkAgentLifecycleState(id)) },
       }, { status: 400 });
     }
   })),
@@ -182,12 +180,12 @@ export const postAgentRecoverRoute = HttpRouter.add(
     const { model, force = false } = body as { model?: string; force?: boolean };
     let recoveryModel: string | undefined;
     try {
-      recoveryModel = normalizeModelOverrideSync(model);
+      recoveryModel = normalizeModelOverride(model);
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const stateBeforeRecover = yield* getAgentState(id);
+    const stateBeforeRecover = getAgentState(id);
     if (!stateBeforeRecover) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
@@ -216,7 +214,7 @@ export const postAgentRecoverRoute = HttpRouter.add(
       return jsonResponse({ success: false, error }, { status: result ? 409 : 400 });
     }
 
-    const updatedState = yield* getAgentState(id);
+    const updatedState = getAgentState(id);
     if (updatedState) {
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction.
@@ -263,19 +261,19 @@ export const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message, force = false } = body as {
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
       graceful?: boolean;
       message?: string;
       force?: boolean;
     };
     let restartModel: string | undefined;
     try {
-      restartModel = normalizeModelOverrideSync(model);
+      restartModel = normalizeModelOverride(model);
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
@@ -317,7 +315,7 @@ export const postAgentRestartRoute = HttpRouter.add(
           const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message, force });
 
           if (result.success || result.code === 'pending-operator-decision') {
-            const updatedState = result.success ? await Effect.runPromise(getAgentState(id)) : agentState;
+            const updatedState = result.success ? getAgentState(id) : agentState;
             // PAN-1908: write-through projection — preserve running state when a
             // late operator decision aborts before the destructive stop boundary.
             if (updatedState) {
@@ -364,7 +362,7 @@ export const postAgentRestartRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, graceful: false, message, force }));
 
     if (result.success) {
-      const updatedState = yield* getAgentState(id);
+      const updatedState = getAgentState(id);
       yield* eventStore.appendAsync(operatorInterventionEvent({
         issueId: updatedState?.issueId || agentState.issueId,
         kind: 'restart',
@@ -452,7 +450,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     const { spawn: spawnFlag, model: rawModel, harness, force = false } = body as {
       spawn?: boolean;
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
       force?: boolean;
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
@@ -460,18 +458,18 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     let newModel: string | undefined;
     if (wantsSpawn && rawModel) {
       try {
-        newModel = requireModelOverrideSync(rawModel);
+        newModel = requireModelOverride(rawModel);
       } catch (err) {
         return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
       }
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
     const issueId = agentState.issueId ?? id.replace(/^agent-/, '').toUpperCase();
-    const issueStage = getIssueStageSync(issueId);
+    const issueStage = getIssueStage(issueId);
     if (wantsSpawn && isTerminalIssueStage(issueStage)) {
       return jsonResponse({
         error: `${issueId} is already ${issueStage?.replaceAll('_', ' ')}. Reopen the issue before starting fresh work.`,
@@ -486,10 +484,10 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     // pointers and runtime files without spawning a replacement. Resolve
     // spawnModel and check policy here, before killSession/wipeAgentStateDirs.
     const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-5';
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null = null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null = null;
     if (wantsSpawn && harness) {
       const harnessDecision = yield* Effect.promise(async () =>
-        canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
+        canUseHarness(harness, spawnModel, await getProviderAuthMode(spawnModel)),
       );
       if (!harnessDecision.allowed) {
         return jsonResponse({ error: harnessDecision.reason ?? `Harness "${harness}" is not allowed for model "${spawnModel}".` }, { status: 400 });
@@ -508,7 +506,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       }
     }
 
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     if (lifecycle.hasLiveTmuxSession) {
       return jsonResponse({
         error: `Agent ${id} has a live tmux session. Run 'pan kill ${id}' to stop only this work agent, then retry.`,
@@ -562,7 +560,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
 
     const args = buildPanStartArgs({
       issueId,
-      model: spawnModel,
+      model: newModel ?? null, // PAN-3857: forward only an explicit operator choice
       harness: effectiveHarness,
     });
 
@@ -572,43 +570,41 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       harness: effectiveHarness,
     }));
 
-    // Spawn detached `pan start` — same pattern the existing POST /api/agents
-    // route uses, minus the HTTP hop. We deliberately write a placeholder
-    // state.json (matching the existing spawn flow) so the dashboard
-    // transitions the agent from "stopped" to "starting" within one refresh.
-    saveAgentStateSync({
-      id: agentSessionName,
-      issueId,
-      workspace: workspacePath,
-      harness: effectiveHarness ?? 'claude-code',
-      role: 'work',
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: new Date().toISOString(),
-    });
+    // Spawn detached `pan start` — the POST /api/agents pattern minus the
+    // HTTP hop. PAN-3849 (W34): no placeholder row; the in-flight claim
+    // serializes concurrent spawns (see spawn-helpers.ts).
+    if (!claimAgentStart(agentSessionName)) {
+      return jsonResponse({
+        success: false,
+        error: `Agent ${agentSessionName} is already starting or running.`, code: 'AGENT_START_IN_FLIGHT',
+      }, { status: 409 });
+    }
 
-    try {
-      yield* Effect.promise(() => spawnPanCommandDetached({
-        agentSessionName,
+    // Effect failures are values, not JS exceptions: a JS try/catch/finally
+    // around `yield*` never sees the Effect.promise rejection (it becomes a
+    // defect), so capture the Exit — otherwise the friendly 500 never
+    // renders and the claim leaks, 409ing later spawns until a restart.
+    const spawnExit = yield* Effect.exit(Effect.promise(() => spawnPanCommandDetached({
+      agentSessionName,
+      issueId,
+      role: 'work',
+      workspacePath,
+      args,
+      cwd: workspacePath,
+    })));
+    releaseAgentStart(agentSessionName);
+    if (Exit.isFailure(spawnExit)) {
+      // Wipe removed the old state and the launch failed, so nothing owns a
+      // tmux session: write no agent state (W34 — a failed spawn leaves
+      // nothing to roll back). Visibility lives in the lifecycle log and the
+      // 500 below, never in a recreated row or the `exited` event path.
+      const raw: unknown = Cause.squash(spawnExit.cause);
+      const details = raw instanceof Error ? raw.message : typeof raw === 'string' ? raw : 'unknown spawn failure';
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.restart_fresh_spawn_failed', {
         issueId,
-        role: 'work',
-        workspacePath,
-        args,
-        cwd: workspacePath,
+        error: details,
+        wiped: wipeResult.removed,
       }));
-    } catch (err: any) {
-      saveAgentStateSync({
-        id: agentSessionName,
-        issueId,
-        workspace: workspacePath,
-        harness: effectiveHarness ?? agentState.harness ?? 'claude-code',
-        role: 'work',
-        model: spawnModel,
-        status: 'stopped',
-        startedAt: new Date().toISOString(),
-        stoppedAt: new Date().toISOString(),
-      });
-      const details = err?.message ?? String(err);
       return jsonResponse({
         success: false,
         error: 'The old agent state was cleared, but the fresh agent could not start. Resolve the startup blocker, then try again.',
@@ -720,8 +716,8 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
-    const agentState = yield* getAgentState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found`, lifecycle }, { status: 404 });
     }
@@ -730,7 +726,7 @@ export const postAgentResetSessionRoute = HttpRouter.add(
       return jsonResponse({ error: `Agent ${id} is running. Stop it first.`, lifecycle }, { status: 409 });
     }
 
-    const previousSessionId = yield* getLatestSessionId(id);
+    const previousSessionId = getLatestSessionId(id);
     // Evidence must match the lifecycle assert's: hasSavedSession reads the
     // agents-table session_id column, so a --fresh wipe that cleared only the
     // state-dir files left reset-session refusing (404) while pan start still
@@ -740,25 +736,10 @@ export const postAgentResetSessionRoute = HttpRouter.add(
       return jsonResponse({ error: `Agent ${id} has no saved session to reset`, lifecycle }, { status: 404 });
     }
 
-    const agentDir = getAgentDir(id);
-
-    // Clear session.id
-    yield* Effect.promise(() => rm(join(agentDir, 'session.id'), { force: true })); // PAN-3357: not a dir removal
-
-    // Clear sessions.json
-    yield* Effect.promise(() => rm(join(agentDir, 'sessions.json'), { force: true })); // PAN-3357: not a dir removal
-
-    // Clear claudeSessionId from runtime.json (preserve other fields).
-    // Must read/write directly — saveAgentRuntimeState merges with existing file.
-    const runtimeFile = join(agentDir, 'runtime.json');
-    if (existsSync(runtimeFile)) {
-      try {
-        const runtimeContent = yield* Effect.promise(() => readFile(runtimeFile, 'utf-8'));
-        const runtime = JSON.parse(runtimeContent);
-        delete runtime.claudeSessionId;
-        yield* Effect.promise(() => writeFile(runtimeFile, JSON.stringify(runtime, null, 2)));
-      } catch { /* non-fatal */ }
-    }
+    // Use the same complete reset door as CLI/resume. The route persists its
+    // own stopped projection below, so suppress only the helper's duplicate
+    // runtime event.
+    yield* Effect.promise(() => clearAgentSessionPointers(id, { emitRuntimeEvent: false }));
 
     yield* killSession(id).pipe(Effect.catch(() => Effect.void));
 
@@ -780,7 +761,7 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     const priorSession = previousSessionId ?? agentState.sessionId ?? 'unknown';
     console.log(`[reset-session] Cleared session for ${id} (was: ${priorSession.slice(0, 8)}...)`);
     invalidateAgentsCache();
-    return jsonResponse({ success: true, agentId: id, previousSessionId: previousSessionId ?? agentState.sessionId, lifecycle: yield* getWorkAgentLifecycleState(id) });
+    return jsonResponse({ success: true, agentId: id, previousSessionId: previousSessionId ?? agentState.sessionId, lifecycle: yield* Effect.promise(() => getWorkAgentLifecycleState(id)) });
   })),
 );
 
@@ -918,6 +899,7 @@ async function resolveCurrentStaffing(agentId: string, agentState: any, issueId:
       planMetadata: plan.plan.metadata,
       spawnKey: `work:${issueId.toLowerCase()}`,
       issueId,
+      tierOverrides: readTierOverrides(workspacePath),
       config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
     });
 
@@ -960,7 +942,7 @@ export const postAgentsRestartWithConfigRoute = HttpRouter.add(
           continue;
         }
 
-        const agentState = yield* getAgentState(agentId);
+        const agentState = getAgentState(agentId);
         if (!agentState) {
           results.push({ id: agentId, status: 'not_found', error: `Agent state not found` });
           continue;

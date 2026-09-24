@@ -17,9 +17,8 @@ function git(args: string[], cwd: string): void {
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'prd-promote-project-'));
   workspaceRoot = mkdtempSync(join(tmpdir(), 'prd-promote-ws-'));
-  // writeIssueDraft flushes an auto-commit through the state door; give the
-  // temp project root a real repo on main (no origin → push is skipped, not
-  // failed) so the flush is a benign commit instead of a git error.
+  // promoteWorkspacePrdDraft resolves the project root through git; give it
+  // a real repo on main so path resolution succeeds instead of erroring.
   git(['init', '-b', 'main'], projectRoot);
   git(['config', 'user.email', 'test@test.invalid'], projectRoot);
   git(['config', 'user.name', 'test'], projectRoot);

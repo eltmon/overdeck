@@ -46,6 +46,8 @@ async function startThrowawayDashboard(): Promise<ThrowawayDashboard> {
       OVERDECK_DISABLE_DEACON: '1',
       OVERDECK_HOME: overdeckHome,
       OVERDECK_NO_RESUME: '1',
+      // fix10: never let a UAT host reach a Herdr session.
+      OVERDECK_TERMINAL_BACKEND: 'tmux',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

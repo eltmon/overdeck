@@ -18,139 +18,54 @@
  *     close-out and are still reaped).
  */
 
-import {
-  classifyAdvancingSessionLifecycle,
-  isRoleTerminal,
-  type AdvancingRole,
-  type WarmIdleStatusShape,
-} from './review-status-source.js';
+import type { PrFacts } from './pr-facts.js';
 
-export {
-  isRoleTerminal,
-  type AdvancingRole,
-} from './review-status-source.js';
-
-export type ReapableStatus = WarmIdleStatusShape;
+export type AdvancingRole = 'review' | 'test' | 'ship';
+export type AdvancingSessionLifecycle = 'active' | 'warm' | 'orphaned' | 'unknown';
 
 /**
- * Of the alive sessions, the ones belonging to `issueId`'s advancing `role`.
- * Matches the canonical role session (`agent-<id>-<role>`), the review convoy
- * sub-sessions (`agent-<id>-review-*`), and legacy `specialist-*` sessions.
- * Exact-name matching against the alive set — never a blind prefix kill.
- */
-export function sessionsToReapForRole(
-  issueId: string,
-  role: AdvancingRole,
-  aliveSessions: readonly string[],
-): string[] {
-  const lo = issueId.toLowerCase();
-  const legacy = new RegExp(`-${role}(?:-|$)`);
-  return aliveSessions.filter((s) => {
-    if (role === 'review') {
-      if (s === `agent-${lo}-review` || s.startsWith(`agent-${lo}-review-`)) return true;
-    } else if (s === `agent-${lo}-${role}`) {
-      return true;
-    }
-    return s.startsWith('specialist-') && s.includes(`-${lo}-`) && legacy.test(s);
-  });
-}
-
-/**
- * Across every issue, the alive advancing-role sessions whose phase verdict is
- * terminal — the deacon janitor's kill list. Deduplicated.
- */
-export function selectTerminalAdvancingSessions(
-  statuses: Record<string, ReapableStatus>,
-  aliveSessions: readonly string[],
-): string[] {
-  const kill = new Set<string>();
-  for (const [issueId, status] of Object.entries(statuses)) {
-    for (const role of ['review', 'test', 'ship'] as const) {
-      if (!isRoleTerminal(role, status)) continue;
-      for (const session of sessionsToReapForRole(issueId, role, aliveSessions)) {
-        kill.add(session);
-      }
-    }
-  }
-  return [...kill];
-}
-
-/**
- * Whether an issue's WORK session is safe to reap (PAN-1726).
+ * What the owners of the facts say about an issue's phases (PAN-3917).
  *
- * Once the issue has merged, its work agent (`agent-<id>`) has no remaining
- * work — it sits idle at the prompt yet `countRunningAgents()` still counts it
- * against the PAN-1665 work ceiling, throttling dispatch for every live issue.
- * `postMergeLifecycle` pauses + kills it at merge time, but a server restart
- * mid-lifecycle (PAN-1723) or a deacon read-modify-write race on state.json can
- * resurrect it. This is the work-role sibling of the advancing reaper above.
+ * Every field is derived: the forge for the review verdict and the merge, the
+ * workspace's `.pan/test/result.json` for the test verdict. The module keeps
+ * its pure selection logic; only the inputs changed.
  */
-export function isWorkReapable(status: ReapableStatus): boolean {
-  return status.mergeStatus === 'merged';
+export interface AdvancingPhase {
+  /** The PR carries a decisive review — approved or changes requested. */
+  reviewSettled?: boolean;
+  /** The test role wrote its verdict artifact. */
+  testSettled?: boolean;
+  /** The PR merged. */
+  merged?: boolean;
+  /** The PR is approved, green, and mergeable — the ship phase is settled. */
+  mergeReady?: boolean;
 }
 
-/**
- * Across every issue, the alive WORK sessions whose issue has merged — the
- * deacon janitor's work-role kill list. Matches only the canonical work session
- * `agent-<id>` (never the `agent-<id>-<role>` advancing sub-sessions, which the
- * advancing reaper owns). Exact-name matching against the alive set.
- */
-export function selectMergedWorkSessions(
-  statuses: Record<string, ReapableStatus>,
-  aliveSessions: readonly string[],
-): string[] {
-  const alive = new Set(aliveSessions);
-  const kill: string[] = [];
-  for (const [issueId, status] of Object.entries(statuses)) {
-    if (!isWorkReapable(status)) continue;
-    const session = `agent-${issueId.toLowerCase()}`;
-    if (alive.has(session)) kill.push(session);
-  }
-  return kill;
+export type ReapableStatus = AdvancingPhase;
+
+/** Build an {@link AdvancingPhase} from the forge's account of the PR. */
+export function advancingPhaseFromPrFacts(
+  facts: PrFacts,
+  options: { testSettled?: boolean } = {},
+): AdvancingPhase {
+  return {
+    reviewSettled: facts.approved || facts.changesRequested,
+    ...(options.testSettled === undefined ? {} : { testSettled: options.testSettled }),
+    merged: facts.merged,
+    mergeReady: facts.approved && facts.checks === 'green' && facts.mergeable === true,
+  };
 }
 
-/**
- * Across every merged issue, the alive advancing-role sessions whose issue has
- * already reached merge terminal state. Unlike selectTerminalAdvancingSessions,
- * this intentionally ignores KEEP_SPECIALIST_SESSIONS_ALIVE: after merge, these
- * panes only occupy advancing ceiling slots.
- */
-export function selectMergedAdvancingSessions(
-  statuses: Record<string, ReapableStatus>,
-  aliveSessions: readonly string[],
-): string[] {
-  const kill = new Set<string>();
-  for (const [issueId, status] of Object.entries(statuses)) {
-    for (const role of ['review', 'test', 'ship'] as const) {
-      if (classifyAdvancingSessionLifecycle(role, status, true) !== 'orphaned') continue;
-      for (const session of sessionsToReapForRole(issueId, role, aliveSessions)) {
-        kill.add(session);
-      }
-    }
+/** Has this role finished its phase for the issue? */
+export function isRoleTerminal(role: AdvancingRole, phase: AdvancingPhase): boolean {
+  switch (role) {
+    case 'review':
+      return phase.reviewSettled === true;
+    case 'test':
+      return phase.testSettled === true;
+    case 'ship':
+      return phase.merged === true || phase.mergeReady === true;
   }
-  return [...kill];
-}
-
-/**
- * Alive advancing-role sessions for non-merged issues whose own phase verdict
- * is terminal. The deacon caller applies the runtime idle-duration gate before
- * reaping so operators can still inspect freshly completed panes.
- */
-export function selectNonMergedTerminalAdvancingSessions(
-  statuses: Record<string, ReapableStatus>,
-  aliveSessions: readonly string[],
-): string[] {
-  const kill = new Set<string>();
-  for (const [issueId, status] of Object.entries(statuses)) {
-    if (status.mergeStatus === 'merged') continue;
-    for (const role of ['review', 'test', 'ship'] as const) {
-      if (!isRoleTerminal(role, status)) continue;
-      for (const session of sessionsToReapForRole(issueId, role, aliveSessions)) {
-        kill.add(session);
-      }
-    }
-  }
-  return [...kill];
 }
 
 export interface IdleRuntimeStatus {
@@ -158,55 +73,19 @@ export interface IdleRuntimeStatus {
   lastActivity?: string;
 }
 
-export function isIdlePastThreshold(
-  runtime: IdleRuntimeStatus | null | undefined,
-  thresholdMs: number,
-  nowMs = Date.now(),
-): boolean {
-  if (runtime?.state !== 'idle') return false;
-  const idleSince = Date.parse(runtime.lastActivity ?? '');
-  return Number.isFinite(idleSince) && nowMs - idleSince >= thresholdMs;
-}
-
 /**
- * Whether an issue's WORK session is reapable because it's idle awaiting its
- * test verdict (PAN-1730).
+ * Alive advancing-role sessions that have stopped working (PAN-3917).
  *
- * Review has passed and test is still pending, so the work agent has already
- * handed off via `pan done` and now sits idle at its prompt — yet
- * `countRunningAgents()` keeps counting it against the PAN-1665 work ceiling.
- * When the work pool alone meets the total ceiling (work=7 advancing=4
- * total=11/9 observed) `tryReserveAdvancingSlot()` can never admit the test
- * that would release these agents: a livelock. Reaping returns the work slot
- * (and RAM).
- *
- * This is the status half of the predicate. The idle-duration gate (pane idle
- * ≥10 min) lives in the deacon caller, which has the runtime state — a pure
- * status predicate cannot see it. Unlike `isWorkReapable` (merged), the caller
- * must NOT pause the agent: if the test later FAILS the deacon's auto-resume
- * `needsFix` gate has to be free to bring it back to address the feedback.
+ * The warm-idle shed list used to be "every session whose stored verdict is
+ * terminal". Idleness is the same set without the stored verdict: a reviewer
+ * that finished is idle, and an idle advancing pane is by definition not doing
+ * the work its slot is reserved for. Sessions are matched by the canonical
+ * advancing naming (`agent-<issue>-<role>`, plus the review convoy children).
  */
-export function isAwaitingTestReapable(status: ReapableStatus): boolean {
-  return status.reviewStatus === 'passed' && status.testStatus === 'pending';
-}
-
-/**
- * Across every issue, the alive WORK sessions whose review passed but whose
- * test verdict is still pending — candidates for the idle-awaiting-test reaper
- * (PAN-1730). Matches only the canonical work session `agent-<id>` (never the
- * `agent-<id>-<role>` advancing sub-sessions). The deacon applies the idle-≥10
- * min gate per returned session before killing.
- */
-export function selectAwaitingTestWorkSessions(
-  statuses: Record<string, ReapableStatus>,
+export function selectIdleAdvancingSessions(
   aliveSessions: readonly string[],
+  isIdle: (agentId: string) => boolean,
 ): string[] {
-  const alive = new Set(aliveSessions);
-  const candidates: string[] = [];
-  for (const [issueId, status] of Object.entries(statuses)) {
-    if (!isAwaitingTestReapable(status)) continue;
-    const session = `agent-${issueId.toLowerCase()}`;
-    if (alive.has(session)) candidates.push(session);
-  }
-  return candidates;
+  const advancing = /^agent-[a-z0-9]+-\d+-(review|test|ship)(?:-|$)/;
+  return aliveSessions.filter((session) => advancing.test(session) && isIdle(session));
 }

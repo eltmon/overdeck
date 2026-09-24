@@ -82,7 +82,7 @@ export function getPtySupervisorSocketPath(agentId: string): string {
   return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
 }
 
-export function getPtySupervisorLogPath(agentId: string): string {
+function getPtySupervisorLogPath(agentId: string): string {
   return join(getOverdeckHome(), 'logs', `pty-supervisor-${agentId}.log`);
 }
 
@@ -256,6 +256,128 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ─── Lifecycle events to the dashboard (PAN-3849 W33) ───────────────────────
+//
+// The supervisor is the one process that KNOWS the harness's lifecycle: it
+// spawns the child, accepts injections (a message that starts a turn), and
+// reaps the exit. It posts those facts to POST /api/agents/:id/lifecycle so
+// the projection writes running/stopped from observed truth instead of a
+// patrol inferring exit from a missing tmux session (FR-21, FR-24). `:id` is
+// the supervised session id (OVERDECK_AGENT_ID): an agent id, or a
+// conversation's `conv-<name>` tmux session — the same route records both
+// (PAN-3962).
+//
+// Posts are retried with backoff and never block the child: session-started
+// and turn-started are fire-and-forget; `exited` is awaited before the
+// supervisor exits (the child is already dead by then) but bounded by the
+// same retry budget, so an unreachable dashboard costs a few seconds once,
+// never a hung agent.
+//
+// The supervisor emits `session-started`, `turn-started` (on a confirmed
+// injection) and `exited`. It does NOT emit `turn-ended`: it sees only the
+// PTY byte stream, and "the turn is over" would need a per-harness
+// prompt-ready heuristic. The route still accepts `turn-ended`; idle comes
+// from the harness's own hook (claude-code's Stop hook) where one exists.
+//
+// Every post carries `launchedAt`, this supervisor process's start time. It
+// names the launch generation, so the dashboard can tell an exit of the
+// harness a respawn replaced from an exit of the harness it just started
+// under the same session name (PAN-3962).
+
+export type AgentLifecycleEventName = 'session-started' | 'turn-started' | 'turn-ended' | 'exited';
+
+/** This supervisor's launch generation: when the process started. */
+const SUPERVISOR_LAUNCHED_AT = new Date().toISOString();
+
+const LIFECYCLE_RETRY_DELAYS_MS = [500, 1500] as const;
+
+/**
+ * Per-attempt ceiling for a lifecycle POST. The retry loop only advances
+ * after fetch settles, so without this a dashboard that accepts the
+ * connection but never responds hangs the `exited` path (and the supervisor
+ * with it) indefinitely. A timeout surfaces as a retryable failure like any
+ * other fetch rejection.
+ */
+const LIFECYCLE_POST_TIMEOUT_MS = 10_000;
+
+/** Sleep that never holds the process open (fire-and-forget retries). */
+function sleepUnref(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    const timer = setTimeout(resolve, ms);
+    if (typeof timer === 'object' && typeof timer.unref === 'function') timer.unref();
+  });
+}
+
+export interface PostAgentLifecycleDeps {
+  fetchImpl?: typeof fetch;
+  sleepImpl?: (ms: number) => Promise<void>;
+  dashboardUrl?: string;
+  readToken?: (agentId: string) => Promise<string | null>;
+  /** Override for the per-attempt POST timeout (tests; default 10s). */
+  postTimeoutMs?: number;
+}
+
+export async function postAgentLifecycleEvent(
+  agentId: string,
+  event: AgentLifecycleEventName,
+  details: { at?: string; exitCode?: number; launchedAt?: string } = {},
+  deps: PostAgentLifecycleDeps = {},
+): Promise<boolean> {
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const sleepImpl = deps.sleepImpl ?? sleepUnref;
+  // No config.js here: the supervisor ships vendored with @lydell/node-pty as
+  // its only package. Loopback only: DASHBOARD_URL is the public (TLS) URL and
+  // a lifecycle POST to it fails on the local certificate.
+  const dashboardUrl = deps.dashboardUrl
+    ?? (process.env.OVERDECK_DASHBOARD_URL
+      || `http://127.0.0.1:${process.env.API_PORT || process.env.PORT || '3011'}`);
+  const readToken = deps.readToken ?? readPtyToken;
+  const postTimeoutMs = deps.postTimeoutMs ?? LIFECYCLE_POST_TIMEOUT_MS;
+
+  const token = await readToken(agentId);
+  if (!token) {
+    process.stderr.write(`[pty-supervisor] lifecycle event ${event} not posted: no pty-token for ${agentId}\n`);
+    return false;
+  }
+
+  const url = `${dashboardUrl}/api/agents/${encodeURIComponent(agentId)}/lifecycle`;
+  const body = JSON.stringify({
+    event,
+    at: details.at ?? new Date().toISOString(),
+    launchedAt: details.launchedAt ?? SUPERVISOR_LAUNCHED_AT,
+    ...(details.exitCode !== undefined ? { exitCode: details.exitCode } : {}),
+  });
+
+  for (let attempt = 0; attempt <= LIFECYCLE_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const res = await fetchImpl(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', [PTY_TOKEN_HEADER]: token },
+        body,
+        signal: AbortSignal.timeout(postTimeoutMs),
+      });
+      if (res.ok) return true;
+      throw new Error(`HTTP ${res.status}`);
+    } catch (error) {
+      if (attempt < LIFECYCLE_RETRY_DELAYS_MS.length) {
+        await sleepImpl(LIFECYCLE_RETRY_DELAYS_MS[attempt]!);
+        continue;
+      }
+      process.stderr.write(
+        `[pty-supervisor] lifecycle event ${event} for ${agentId} failed after ${attempt + 1} attempts: `
+        + `${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      return false;
+    }
+  }
+  return false;
+}
+
+/** Fire-and-forget emission — never awaited, never throws. */
+function emitLifecycleEvent(agentId: string, event: AgentLifecycleEventName, details: { exitCode?: number } = {}): void {
+  void postAgentLifecycleEvent(agentId, event, details).catch(() => undefined);
 }
 
 function stripAnsi(value: string): string {
@@ -530,6 +652,8 @@ export function createPtySupervisorServer(
 
       try {
         await injectPtyMessage(child, agentId, payload, deps);
+        // A confirmed injection starts a turn (PAN-3849 W33).
+        emitLifecycleEvent(agentId, 'turn-started');
         // Completed only after a confirmed injection, inside the
         // supervisor's own crash boundary — the dashboard cannot interrupt
         // this ordering.
@@ -549,6 +673,8 @@ export function createPtySupervisorServer(
 
     try {
       await injectPtyMessage(child, agentId, payload, deps);
+      // A confirmed injection starts a turn (PAN-3849 W33).
+      emitLifecycleEvent(agentId, 'turn-started');
       writeJson(res, 200, 'ok');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -693,6 +819,10 @@ async function main(): Promise<void> {
     env: process.env as Record<string, string>,
   });
 
+  // The harness process exists — report it (PAN-3849 W33: agent.started is
+  // emitted from this observed fact, not from a placeholder written earlier).
+  emitLifecycleEvent(agentId, 'session-started');
+
   proxyPtyToStdout(child);
   const childTee = teeChildOutputToLog(child, agentId);
   proxyStdinToPty(child);
@@ -736,6 +866,11 @@ async function main(): Promise<void> {
 
   const result = await childExited;
   noteChildExitInLog(childTee, result.exitCode, result.signal as number | undefined);
+  // PAN-3849 (FR-21): report the exit before this process exits — the
+  // projection marks the agent stopped from this observed fact, so no patrol
+  // has to infer it from a missing tmux session. Awaited (the child is
+  // already dead, so this blocks nothing) but bounded by the retry budget.
+  await postAgentLifecycleEvent(agentId, 'exited', { exitCode: result.exitCode }).catch(() => undefined);
   if (shuttingDown) return;
   shuttingDown = true;
   await cleanup();

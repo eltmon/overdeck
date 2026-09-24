@@ -1,3 +1,14 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `listRunningAgentsSync` (async: `listRunningAgents`): 8 sites in lib/agents/recovery.ts,
+ *   lib/cloister/concurrency.ts, lib/cloister/service.ts, lib/work-agent-conflicts.ts.
+ * It blocks on a child process: never call it from src/dashboard/** or src/lib/cloister/** (FR-8).
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -8,8 +19,10 @@ import { getAgentState, isRole, normalizeAgentId } from '../agents.js';
 import { killSession, listSessionsSync } from '../tmux.js';
 import { getRuntimeCensus, getRuntimeCensusSnapshot } from '../runtime-census.js';
 import { AGENTS_DIR } from '../paths.js';
-import { getRollbackAgentStatePath } from '../overdeck/agent-rollback-state.js';
-import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
+// PAN-3917/lint:circular: agent-state.ts's write side chains back to
+// agents.ts (via registry/feature-registry-population.ts); import the
+// read-only leaf so this pure query module doesn't close that cycle.
+import { getAgentStateFilePath, listAgentStatesSync } from './agent-state-read.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 
 export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[] {
@@ -23,7 +36,7 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
     : new Set(listSessionsSync().map((session) => session.name));
   const tmuxUnavailable = census?.tmuxAvailable === false;
 
-  return listOverdeckAgentStatesSync().map((state) => {
+  return listAgentStatesSync().map((state) => {
     const normalizedId = normalizeAgentId(state.id);
     return {
       ...state,
@@ -34,11 +47,12 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
 }
 
 /**
- * PAN-1908: list all agents in the SQLite registry with optional filtering.
- * This is the replacement for enumerating ~/.overdeck/agents/ directories.
+ * List all agents (scanned from each ~/.overdeck/agents/<id>/state.json) with
+ * optional filtering. PAN-3917: the SQLite mirror is gone; the per-agent JSON
+ * file is the only copy.
  */
 export function listAgentStates(options?: { status?: AgentStatus; role?: Role }): AgentState[] {
-  return listOverdeckAgentStatesSync()
+  return listAgentStatesSync()
     .filter((state) => {
       if (options?.status && state.status !== options.status) return false;
       if (options?.role && state.role !== options.role) return false;
@@ -49,7 +63,8 @@ export function listAgentStates(options?: { status?: AgentStatus; role?: Role })
 
 export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: boolean })[], FsError | TmuxError> =>
   Effect.gen(function* () {
-    // PAN-1908: authoritative registry is the SQLite agents table; no directory scan.
+    // PAN-3917: authoritative registry is the per-agent state.json file, scanned
+    // via listAgentStatesSync (no SQLite mirror any more).
     //
     // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
     // session on the `overdeck` socket. A one-off `tsx -e`/CLI process may not;
@@ -64,7 +79,7 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
     const runtimeCensus = yield* Effect.promise(() => getRuntimeCensus());
     const tmuxNames = runtimeCensus.sessionNames;
 
-    return listOverdeckAgentStatesSync().map((state) => {
+    return listAgentStatesSync().map((state) => {
       const normalizedId = normalizeAgentId(state.id);
       return {
         ...state,
@@ -112,7 +127,7 @@ export async function dropLegacyAgentStatesMissingRoleAsync(): Promise<number> {
       if (!stat.isDirectory()) return;
 
       const agentId = normalizeAgentId(entry);
-      const stateFile = getRollbackAgentStatePath(agentId);
+      const stateFile = getAgentStateFilePath(agentId);
       let raw: { role?: unknown };
       try {
         const contents = await fsp.readFile(stateFile, 'utf8');
@@ -179,7 +194,7 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
       } catch {
         return;
       }
-      const state = await Effect.runPromise(getAgentState(entry));
+      const state = getAgentState(entry);
       if (state?.issueId && /^\d+$/.test(state.issueId)) {
         legacy.push(`${entry} (issueId: "${state.issueId}")`);
       }

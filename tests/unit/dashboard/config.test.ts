@@ -17,7 +17,6 @@ import { ServerConfig, ServerConfigLayer, ServerConfigError } from '../../../src
 // so env var presence/absence is fully controlled by the test.
 vi.mock('../../../src/lib/env-loader.js', () => ({
   loadOverdeckEnv: () => ({ loaded: [], skipped: [] }),
-  loadOverdeckEnvSync: () => ({ loaded: [], skipped: [] }),
 }));
 
 // Make dashboard identity deterministic so the guard results do not depend on

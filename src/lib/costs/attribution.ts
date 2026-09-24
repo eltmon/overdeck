@@ -1,5 +1,5 @@
-import { findConversationForCostSessionSync } from '../overdeck/conversations.js';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { findConversationForCostSession } from '../overdeck/conversations.js';
+import { getOverdeckDatabase } from '../overdeck/infra.js';
 
 export const NO_ISSUE_BUCKETS = {
   conversations: 'CONVERSATIONS',
@@ -29,8 +29,8 @@ interface UnknownCostSessionRow {
   agentId: string | null;
 }
 
-export function reclassifyUnknownCostEventsSync(): { updated: number } {
-  const db = getOverdeckDatabaseSync();
+export function reclassifyUnknownCostEvents(): { updated: number } {
+  const db = getOverdeckDatabase();
   const rows = db.prepare(
     `SELECT DISTINCT session_id AS sessionId, agent_id AS agentId
      FROM cost_events
@@ -45,7 +45,7 @@ export function reclassifyUnknownCostEventsSync(): { updated: number } {
        AND agent_id IS ?`,
   );
   for (const row of rows) {
-    const bucket = classifySessionBucket(row, findConversationForCostSessionSync);
+    const bucket = classifySessionBucket(row, findConversationForCostSession);
     const result = update.run(bucket, row.sessionId, row.agentId);
     updated += result.changes;
   }

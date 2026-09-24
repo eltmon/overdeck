@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import {
-  resolveWorkspaceRepoRootsSync,
+  resolveWorkspaceRepoRoots,
   type WorkspaceRepoRoot,
 } from '../project-repos.js';
 
@@ -47,7 +47,7 @@ export async function pushLocalReviewBranches(
     runGit?: ReviewGitRunner;
   } = {},
 ): Promise<void> {
-  const roots = (dependencies.resolveRoots ?? resolveWorkspaceRepoRootsSync)(issueId, workspacePath);
+  const roots = (dependencies.resolveRoots ?? resolveWorkspaceRepoRoots)(issueId, workspacePath);
   const runGit = dependencies.runGit ?? runReviewGit;
   for (const root of roots) {
     try {

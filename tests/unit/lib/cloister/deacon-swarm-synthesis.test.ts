@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import type { SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
+import type { SlotReconcileResult } from '../../../../src/lib/cloister/swarm-slot-reconcile.js';
 import { analyzeSwarmReadiness } from '../../../../src/lib/xbrief/swarm-readiness.js';
 import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 

@@ -13,24 +13,24 @@ import { validateOrigin } from '../../dashboard/server/routes/origin-validation.
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
-import { getAgentStateSync } from '../agents.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { getAgentState } from '../agents.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
-import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { checkPrdGate, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
 import { PENDING_PROMOTION_FILENAME } from '../pan-dir/types.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
-import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
-import { markWorkspaceStuck } from '../review-status.js';
-import { isStateMigrated } from '../state-home.js';
+import { extractTeamPrefix, findProjectByPath, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
+import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-commit.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { killSession, sessionExists } from '../tmux.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
+import { sessionExists } from '../tmux.js';
+import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../xbrief/quality-lint.js';
-import { flushAutoCommits } from '../pan-dir/auto-commit.js';
-import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { isPreWorktreeMetadataOnlyDir } from '../workspace-manager/worktree-ops.js';
+import { resolveIssueProjectPath } from './issue-reads.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -38,7 +38,7 @@ function getIssueDataService() {
   return getSharedIssueService();
 }
 
-export async function removePendingPromotionMarker(
+async function removePendingPromotionMarker(
   workspacePath: string,
   log: (message: string) => void = console.log,
 ): Promise<boolean> {
@@ -55,7 +55,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -145,7 +145,7 @@ function emitCompletePlanningPhase(
   details: Record<string, unknown> = {},
 ): void {
   const timestamp = new Date().toISOString();
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'complete-planning',
     level: status === 'failure' ? 'error' : status === 'skipped' ? 'warn' : 'info',
     message: `complete-planning.phase=${phase}`,
@@ -176,24 +176,27 @@ export async function completePlanningArtifacts(options: {
   }
   assertPlanQuality(workspaceDoc);
 
-  emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed xBRIEF spec', { projectPath });
-  const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
+  // PAN-3917: the promoted spec lands in the ISSUE WORKSPACE's own `.pan/specs`,
+  // on the feature branch, and is committed there by this function's caller.
+  // `getProjectPanPaths` resolves a workspace path to that workspace's `.pan`.
+  emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed xBRIEF spec', { projectPath: workspacePath });
+  const existingSpec = await Effect.runPromise(findSpecByIssue(workspacePath, upperIssueId));
   let proposed: { path: string; filename: string };
   try {
     proposed = existingSpec
       ? await (async () => {
           const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-          await Effect.runPromise(writeSpecDocument(projectPath, existingSpec.path, nextDoc));
+          await Effect.runPromise(writeSpecDocument(workspacePath, existingSpec.path, nextDoc));
           return { path: existingSpec.path, filename: existingSpec.filename };
         })()
-      : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
+      : await Effect.runPromise(writeSpecForIssue(workspacePath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
     emitCompletePlanningPhase(upperIssueId, 'specWrite', 'success', 'proposed xBRIEF spec written', {
       path: proposed.path,
       filename: proposed.filename,
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'failure', reason, { projectPath });
+    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'failure', reason, { projectPath: workspacePath });
     throw error;
   }
 
@@ -202,19 +205,9 @@ export async function completePlanningArtifacts(options: {
   return { proposed, taskCount: planItemCount, taskWarning: null };
 }
 
-export function completePlanningFilesToStage(projectPath: string, proposedFilename: string, migrated = false): string[] {
-  const filesToStage = migrated ? [] : [`.pan/specs/${proposedFilename}`];
-  if (existsSync(join(projectPath, '.overdeck', 'context', 'codebase'))) {
-    filesToStage.push('.overdeck/context/codebase/');
-  } else if (!migrated && existsSync(join(projectPath, '.pan', 'context', 'codebase'))) {
-    filesToStage.push('.pan/context/codebase/');
-  }
-  return filesToStage;
-}
-
-export function completePlanningWorkspaceGitAddCommands(gitRoot: string, migrated = false): string[][] {
+export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string[][] {
   const commands: string[][] = [];
-  if (!migrated && existsSync(join(gitRoot, '.pan'))) {
+  if (existsSync(join(gitRoot, '.pan'))) {
     commands.push(['add', '.pan/']);
   }
   // PAN-2386: the polyrepo scaffold .gitignore is created during workspace setup
@@ -227,53 +220,75 @@ export function completePlanningWorkspaceGitAddCommands(gitRoot: string, migrate
 }
 
 /**
- * PAN-2386: complete-planning can leave `.pan/records/<issue>.json` modified after
- * the main `chore(plan): complete planning` commit because record writes are
- * queued for debounced auto-commit. If auto-start is requested, the subsequent
- * start-agent dirty-workspace guard refuses to spawn the work agent. Flush any
- * pending auto-commits and explicitly stage/commit the per-issue record so the
- * tree handed to auto-start is clean.
+ * Git-init (when needed), stage, and commit the workspace planning artifacts,
+ * then push when a remote exists.
+ *
+ * Skipped entirely for pre-worktree metadata-only directories (only `.pan/`
+ * and/or `.overdeck/`): git-init'ing those leaves a staged `.git` that makes
+ * `pan workspace create` refuse with "Workspace already exists" — and the
+ * canonical spec was already committed on the state branch by the time this
+ * runs. The `git init` stays for every other shape: PAN-2386 polyrepo
+ * scaffolds are not git repos until this commit lands (see the comment on
+ * completePlanningWorkspaceGitAddCommands).
  */
-export async function commitWorkspaceRecordBeforeAutoSpawn(gitRoot: string, issueId: string): Promise<void> {
-  const project = findProjectByPathSync(gitRoot);
-  if (project && await isStateMigrated(project)) {
-    await Effect.runPromise(flushAutoCommits(project.path));
-    return;
+export async function commitCompletePlanningWorkspaceGit(
+  gitRoot: string,
+  issueId: string,
+  taskWarning: string | null,
+  execImpl: typeof execFileAsync = execFileAsync,
+): Promise<{ pushed: boolean; taskWarning: string | null }> {
+  if (isPreWorktreeMetadataOnlyDir(gitRoot)) {
+    console.log('[complete-planning] workspace ' + gitRoot + ' is a pre-worktree metadata dir; skipping workspace git init/commit');
+    return { pushed: true, taskWarning };
   }
-  if (!existsSync(join(gitRoot, '.git'))) return;
-  const issueLower = issueId.toLowerCase();
+
+  const isGitRepo = existsSync(join(gitRoot, '.git'));
+  if (!isGitRepo) {
+    await execImpl('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
+  }
+
+  for (const args of completePlanningWorkspaceGitAddCommands(gitRoot)) {
+    await execImpl('git', args, { cwd: gitRoot, encoding: 'utf-8' });
+  }
 
   try {
-    await Effect.runPromise(flushAutoCommits(gitRoot));
+    await execImpl('git', ['diff', '--cached', '--quiet'], { cwd: gitRoot, encoding: 'utf-8' });
   } catch {
-    // Non-fatal — explicit status check below will catch uncommitted changes.
+    await execImpl('git', ['commit', '-m', `chore(plan): complete planning for ${issueId}`, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
   }
 
-  const recordPath = join('.pan', 'records', `${issueLower}.json`);
   try {
-    const { stdout: statusOut } = await execFileAsync('git', ['status', '--porcelain', '--', recordPath], {
-      cwd: gitRoot,
-      encoding: 'utf-8',
-    });
-    if (!statusOut.trim()) return;
-
-    await execFileAsync('git', ['add', '--', recordPath], { cwd: gitRoot, encoding: 'utf-8' });
-    try {
-      await execFileAsync('git', ['diff', '--cached', '--quiet', '--', recordPath], { cwd: gitRoot, encoding: 'utf-8' });
-      return;
-    } catch {
-      // There are staged changes — commit them.
+    const { stdout: remotes } = await execImpl('git', ['remote'], { cwd: gitRoot, encoding: 'utf-8' });
+    if (remotes.trim()) {
+      const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
+      pushChild.unref();
     }
+    return { pushed: true, taskWarning };
+  } catch {
+    return { pushed: false, taskWarning };
+  }
+}
 
-    await execFileAsync(
-      'git',
-      ['commit', '-m', `chore(records): update ${issueId.toUpperCase()} per-issue record before auto-start`, '--', recordPath],
-      { cwd: gitRoot, encoding: 'utf-8' },
-    );
-    console.log(`[complete-planning] Committed per-issue record for ${issueId.toUpperCase()} before auto-start`);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[complete-planning] Could not commit per-issue record for ${issueId.toUpperCase()}: ${message}`);
+/**
+ * Commit the issue's `.pan/` plan artifacts on the feature branch before the
+ * work agent is auto-started (PAN-3917).
+ *
+ * No daemon commits .pan/ any more: whoever writes a planning artifact commits it.
+ * Promotion has just written the spec (and possibly the continue file) into the
+ * workspace's own `.pan/`, so the tree handed to auto-start would otherwise be
+ * dirty and the start-agent guard would refuse to spawn.
+ */
+async function commitWorkspacePlanArtifacts(gitRoot: string, issueId: string): Promise<void> {
+  if (!existsSync(join(gitRoot, '.git'))) return;
+  const outcome = await commitPlanArtifacts({
+    cwd: gitRoot,
+    paths: ['.pan'],
+    message: planArtifactCommitMessage(issueId),
+  });
+  if (outcome.committed) {
+    console.log(`[complete-planning] Committed plan artifacts for ${issueId.toUpperCase()} on the feature branch`);
+  } else if (outcome.reason !== 'nothing to commit') {
+    console.warn(`[complete-planning] Could not commit plan artifacts for ${issueId.toUpperCase()}: ${outcome.reason}`);
   }
 }
 
@@ -304,8 +319,7 @@ export async function recordPlanningAutoHandoffFailure(options: {
   result: CompletePlanningAutoSpawnResult;
   eventStore: any;
   now?: () => string;
-  markStuck?: typeof markWorkspaceStuck;
-  emitActivity?: typeof emitActivityEntrySync;
+  emitActivity?: typeof emitActivityEntry;
 }): Promise<string> {
   const skipReason = options.result.workAgentSkipReason ?? 'spawn-failed';
   const error = options.result.workAgentError ?? `Work agent startup failed: ${skipReason}`;
@@ -324,8 +338,7 @@ export async function recordPlanningAutoHandoffFailure(options: {
       ...details,
     },
   }));
-  (options.markStuck ?? markWorkspaceStuck)(options.issueId, 'planning_auto_handoff_failed', details);
-  (options.emitActivity ?? emitActivityEntrySync)({
+  (options.emitActivity ?? emitActivityEntry)({
     source: 'plan',
     level: 'error',
     message: `${options.issueId} planning complete, but work-agent startup failed: ${error}`,
@@ -348,7 +361,7 @@ export async function completePlanningAutoSpawn(options: {
   }
 
   const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
-  const internalToken = getInternalTokenSync();
+  const internalToken = getInternalToken();
   const internalTokenHeaders: Record<string, string> = internalToken
     ? { [INTERNAL_TOKEN_HEADER]: internalToken }
     : {};
@@ -462,7 +475,10 @@ export async function completePlanningAutoSpawnAndKill(options: {
 
   if (options.skipKill) return autoSpawnResult;
 
-  const killSessionImpl = options.killSessionImpl ?? ((target: string) => Effect.runPromise(killSession(target)));
+  // PAN-3960: planners launch through the host's terminal backend, so the
+  // planner is closed through it too — a Herdr pane has no tmux session.
+  const killSessionImpl = options.killSessionImpl
+    ?? (async (target: string) => { await closeAgentPane(target); });
   const logError = options.logError ?? console.error;
   const runKill = async (): Promise<void> => {
     try {
@@ -548,7 +564,7 @@ export async function completePlanningForIssue(options: {
     // in a non-active file, and the active-file lookup can transiently fail with
     // ENOENT as files are renamed. Scanning only the active file is exactly how
     // TIN-1 completed planning while the operator's question was still open.
-    const pendingAuq = await Effect.runPromise(countPendingAskUserQuestionsForAgent(sessionName));
+    const pendingAuq = await countPendingAskUserQuestionsForAgent(sessionName);
     if (pendingAuq > 0) {
       console.log(`[complete-planning] ${id} has ${pendingAuq} pending AskUserQuestion(s) — agent is waiting for the operator, not done. No-op.`);
       return jsonResponse({ ok: true, skipped: 'pending-ask-user-question' });
@@ -576,7 +592,7 @@ export async function completePlanningForIssue(options: {
 
     // Determine project path
     const githubCheck = isGitHubIssue(id);
-    const projectPath = resolveIssueProjectPathSync(id);
+    const projectPath = resolveIssueProjectPath(id);
 
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
     if (workspacePath) {
@@ -586,7 +602,7 @@ export async function completePlanningForIssue(options: {
       if (noPrd) {
         emitCompletePlanningPhase(id, 'prdGate', 'skipped', 'noPrd bypass requested');
       } else {
-        const prdGate = checkPrdGateSync({ projectRoot: projectPath || null, workspacePath, issueId: id });
+        const prdGate = checkPrdGate({ projectRoot: projectPath || null, workspacePath, issueId: id });
         if (!prdGate.ok) {
           emitCompletePlanningPhase(id, 'prdGate', 'failure', prdGate.reason ?? 'missing', { prdGate });
           return jsonResponse({ error: `PRD-first gate: no PRD draft for ${id.toUpperCase()}`, prdGate }, { status: 422 });
@@ -646,73 +662,10 @@ export async function completePlanningForIssue(options: {
       console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
       console.log(`[complete-planning] Finalized ${taskCount} xBRIEF tasks for ${upperIssueId}`);
 
-      const project = findProjectByPathSync(projectPath);
-      const migrated = project ? await isStateMigrated(project) : false;
-      const filesToStage = completePlanningFilesToStage(projectPath, proposed.filename, migrated);
-      // Polyrepo project roots (e.g. myn) have no .git at projectPath — the
-      // sub-worktrees are the repos. Spec promotion still lands on disk; only
-      // the convenience commit on main is skipped.
-      const projectIsGitRepo = existsSync(join(projectPath, '.git'));
-      if (migrated) {
-        await Effect.runPromise(flushAutoCommits(projectPath));
-      } else if (!projectIsGitRepo) {
-        console.log(`[complete-planning] Project root ${projectPath} is not a git repository (polyrepo) — pan spec updated on disk but not committed`);
-      } else {
-        const { stdout: branchStdout } = await execFileAsync(
-          'git',
-          ['rev-parse', '--abbrev-ref', 'HEAD'],
-          { cwd: projectPath, encoding: 'utf-8' },
-        );
-        const currentBranch = branchStdout.trim();
-        if (currentBranch === 'main') {
-          await execFileAsync('git', ['add', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
-          try {
-            await execFileAsync('git', ['diff', '--cached', '--quiet', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
-          } catch {
-            await execFileAsync(
-              'git',
-              ['commit', '-m', `chore(scope): propose ${upperIssueId} xBRIEF`, '--no-verify', '--', ...filesToStage],
-              { cwd: projectPath, encoding: 'utf-8' },
-            );
-            console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
-            try {
-              const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: projectPath, encoding: 'utf-8' });
-              if (remotes.trim()) {
-                const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
-                pushChild.unref();
-              }
-            } catch { /* push failed — no remote or auth — non-fatal */ }
-          }
-        } else {
-          console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
-        }
-      }
-
-      const isGitRepo = existsSync(join(gitRoot, '.git'));
-      if (!isGitRepo) {
-        await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-
-      for (const args of completePlanningWorkspaceGitAddCommands(gitRoot, migrated)) {
-        await execFileAsync('git', args, { cwd: gitRoot, encoding: 'utf-8' });
-      }
-
-      try {
-        await execFileAsync('git', ['diff', '--cached', '--quiet'], { cwd: gitRoot, encoding: 'utf-8' });
-      } catch {
-        await execFileAsync('git', ['commit', '-m', `chore(plan): complete planning for ${id}`, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-
-      try {
-        const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: gitRoot, encoding: 'utf-8' });
-        if (remotes.trim()) {
-          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-          pushChild.unref();
-        }
-        return { pushed: true, taskWarning };
-      } catch {
-        return { pushed: false, taskWarning };
-      }
+      // PAN-3917: the spec is promoted into the workspace's own `.pan/` and
+      // committed on the feature branch below — there is no separate commit on
+      // main, and no state branch to flush.
+      return commitCompletePlanningWorkspaceGit(gitRoot, id, taskWarning);
     })();
 
     // Update Linear/GitHub issue state
@@ -785,10 +738,10 @@ export async function completePlanningForIssue(options: {
     // hasLiveTmuxSession:true after the session died would never self-heal).
     const projectPlanningAgentStopped = async (): Promise<void> => {
       try {
-        const planningState = getAgentStateSync(sessionName);
+        const planningState = getAgentState(sessionName);
         if (!planningState) return;
         const previousStatus = planningState.status;
-        const hasLiveTmuxSession = await Effect.runPromise(sessionExists(sessionName));
+        const hasLiveTmuxSession = await agentPaneExists(sessionName).catch(() => false);
         saveAgentStateAndEmitEvent(
           { ...planningState, status: 'stopped', stoppedAt: planningState.stoppedAt ?? new Date().toISOString() },
           {
@@ -821,12 +774,11 @@ export async function completePlanningForIssue(options: {
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
 
-    // PAN-2386: if auto-start is requested, make sure the workspace tree is clean
-    // before we ask start-agent to spawn. The per-issue record may have been
-    // modified by debounced auto-commit writes during finalize.
+    // PAN-3917: if auto-start is requested, commit the plan artifacts finalize
+    // just wrote so the tree handed to start-agent is clean.
     const effectiveAutoSpawn = autoSpawn || completePlanningLease.autoSpawnRequested();
     if (effectiveAutoSpawn && workspacePath) {
-      await commitWorkspaceRecordBeforeAutoSpawn(workspacePath, id);
+      await commitWorkspacePlanArtifacts(workspacePath, id);
     }
 
     const autoSpawnResult = await completePlanningAutoSpawnAndKill({
@@ -853,7 +805,7 @@ export async function completePlanningForIssue(options: {
         eventStore,
       });
     } else {
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'plan',
         level: 'info',
         message: autoSpawnResult?.workAgentSpawned
@@ -861,7 +813,7 @@ export async function completePlanningForIssue(options: {
           : `${id} planning complete — ready for work`,
         issueId: id,
       });
-      emitActivityTtsSync({
+      emitActivityTts({
         utterance: autoSpawnResult?.workAgentSpawned
           ? `${id} planning complete, work agent starting`
           : `${id} planning complete, ready for work`,

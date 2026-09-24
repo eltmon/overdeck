@@ -1,8 +1,9 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { getAgentStateSync, resolveAgentTargetSync, setAgentPausedSync, stopAgentSync } from '../../lib/agents.js';
-import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
-import { listSessionNamesSync, sessionExistsSync } from '../../lib/tmux.js';
+import { Effect } from 'effect';
+import { getAgentState, listAgentStates, resolveAgentTarget, setAgentPaused, stopAgent } from '../../lib/agents.js';
+import { listSessionNamesSync } from '../../lib/tmux.js';
+import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 
 interface PauseOptions {
@@ -12,7 +13,7 @@ interface PauseOptions {
 export async function pauseCommand(id: string, options: PauseOptions): Promise<void> {
   // PAN-1760: resolve through normalizeAgentId so full agent IDs
   // (strike-pan-1723, inspect-…, agent-…-ship) are addressable, not just issue IDs.
-  const agentId = resolveAgentTargetSync(id);
+  const agentId = resolveAgentTarget(id);
   if (!agentId) {
     if (printSwarmPauseGuidance(id)) return exitCli(1);
     console.error(chalk.red(`Could not resolve agent target "${id}"`));
@@ -21,7 +22,7 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
     ));
     return exitCli(1);
   }
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
 
   if (!state) {
     if (printSwarmPauseGuidance(id)) return exitCli(1);
@@ -30,12 +31,16 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
   }
   const issueId = state.issueId;
 
-  const shouldStop = sessionExistsSync(agentId) || state.status === 'running' || state.status === 'starting';
+  // PAN-3947: a live terminal on the host's backend (tmux session or Herdr pane).
+  const hasLivePane = await agentPaneExists(agentId).catch(() => false);
+  const shouldStop = hasLivePane || state.status === 'running' || state.status === 'starting';
 
   try {
-    setAgentPausedSync(agentId, options.reason, shouldStop);
+    await Effect.runPromise(setAgentPaused(agentId, options.reason, shouldStop));
     if (shouldStop) {
-      stopAgentSync(agentId, 'operator');
+      // Async stop terminates through the terminal backend, so a Herdr pane
+      // closes too — the sync variant could only reach a tmux session.
+      await Effect.runPromise(stopAgent(agentId, 'operator'));
     }
     await appendOperatorInterventionEvent({ issueId, kind: 'pause', source: 'pan pause' });
 
@@ -60,7 +65,12 @@ function printSwarmPauseGuidance(id: string): boolean {
   const slotPattern = new RegExp(`^agent-${escaped}-slot-\\d+$`);
   const slotAgentIds = new Set<string>();
   try {
-    for (const agent of listSlotAgents(issueId)) slotAgentIds.add(agent.agentId);
+    // PAN-3917: agents/slot-reconcile.ts (listSlotAgents) is gone with the
+    // Appendix A.5 reconcilers; the swarm-slot pattern match it did over
+    // listAgentStates is inlined here — this is the only caller left.
+    for (const agent of listAgentStates({ role: 'work' })) {
+      if (slotPattern.test(agent.id)) slotAgentIds.add(agent.id);
+    }
   } catch {
     // Agent registry unavailable — fall through to the live-session probe.
   }

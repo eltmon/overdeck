@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
 
 import { getDefaultDocsConfig, type NormalizedDocsConfig } from '../../../lib/config-yaml.js';
-import { deterministicDocsTestEmbedding } from '../../../lib/docs/index-builder.js';
 import { queryDocsIndex } from '../../../lib/docs/query.js';
 import { createDocsCommand, runDocsReindex } from '../docs.js';
+import { deterministicDocsTestEmbedding } from '../../../../tests/helpers/docs-test-embedding.js';
 
 let rootDir: string;
 let docsDir: string;

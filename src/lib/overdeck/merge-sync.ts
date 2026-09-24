@@ -18,7 +18,7 @@
  * falls back to 'flywheel.merge_train_enabled' when the new key is absent.
  */
 
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 import type { MergeSet, MergeSetRepoState } from '../merge-set.js';
 import type { ForgeType } from '../forge.js';
 
@@ -36,7 +36,7 @@ import {
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 function readFlag(key: string): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as
     | { value: string }
     | undefined;
@@ -55,7 +55,7 @@ export function isFlywheelGloballyPaused(): boolean {
  * 'flywheel.merge_train_enabled' (legacy) when the new key is absent.
  */
 export function isMergeTrainEnabled(): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const newRow = db.prepare('SELECT value FROM app_settings WHERE key = ?').get('merge_train.enabled') as
     | { value: string }
     | undefined;
@@ -134,7 +134,7 @@ function truncateReason(reason: string): string {
 
 /** Drop-in for listDuePendingAutoMerges() from pending-auto-merges-db.ts. */
 export function listDuePendingAutoMerges(nowIso: string): PendingAutoMerge[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const nowMs = millisFromIso(nowIso) ?? Date.now();
   const rows = db.prepare(
     "SELECT * FROM pending_auto_merges WHERE status = 'pending' AND scheduled_merge_at <= ? ORDER BY scheduled_merge_at ASC, id ASC",
@@ -144,7 +144,7 @@ export function listDuePendingAutoMerges(nowIso: string): PendingAutoMerge[] {
 
 /** Drop-in for transitionToMerging() from pending-auto-merges-db.ts. */
 export function transitionToMerging(id: number): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     "UPDATE pending_auto_merges SET status = 'merging' WHERE id = ? AND status = 'pending'",
   ).run(id);
@@ -153,7 +153,7 @@ export function transitionToMerging(id: number): boolean {
 
 /** Drop-in for markFailed() from pending-auto-merges-db.ts. */
 export function markFailed(id: number, reason: string): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     "UPDATE pending_auto_merges SET status = 'failed', failure_reason = ? WHERE id = ? AND status = 'merging'",
   ).run(truncateReason(reason), id);
@@ -162,7 +162,7 @@ export function markFailed(id: number, reason: string): boolean {
 
 /** Drop-in for requeueToPending() from pending-auto-merges-db.ts. */
 export function requeueToPending(id: number, nextScheduledMergeAt: string): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const nextMs = millisFromIso(nextScheduledMergeAt);
   if (nextMs == null) return false;
   const result = db.prepare(
@@ -184,7 +184,7 @@ export function requeueToPending(id: number, nextScheduledMergeAt: string): bool
  * rather than merged twice.
  */
 export function requeueOrphanedMergingAutoMerges(): number {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     "UPDATE pending_auto_merges SET status = 'pending' WHERE status = 'merging'",
   ).run();
@@ -193,7 +193,7 @@ export function requeueOrphanedMergingAutoMerges(): number {
 
 /** Drop-in for markBlocked() from pending-auto-merges-db.ts. */
 export function markBlocked(id: number, reason: string): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     "UPDATE pending_auto_merges SET status = 'blocked', failure_reason = ? WHERE id = ? AND status = 'pending'",
   ).run(truncateReason(reason), id);
@@ -202,7 +202,7 @@ export function markBlocked(id: number, reason: string): boolean {
 
 /** Atomically stop an in-progress auto-merge after its retry circuit breaker opens. */
 export function markMergingBlocked(id: number, reason: string): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     "UPDATE pending_auto_merges SET status = 'blocked', failure_reason = ? WHERE id = ? AND status = 'merging'",
   ).run(truncateReason(reason), id);
@@ -211,7 +211,7 @@ export function markMergingBlocked(id: number, reason: string): boolean {
 
 /** Drop-in for markMerged() from pending-auto-merges-db.ts. */
 export function markMerged(id: number): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     "UPDATE pending_auto_merges SET status = 'merged', merged_at = ? WHERE id = ? AND status IN ('pending','blocked','failed','merging')",
   ).run(nowMillis(), id);
@@ -220,7 +220,7 @@ export function markMerged(id: number): boolean {
 
 /** Drop-in for cancelPending() from pending-auto-merges-db.ts. */
 export function cancelPending(id: number, cancelledBy: string): boolean {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     "UPDATE pending_auto_merges SET status = 'cancelled', cancelled_at = ?, cancelled_by = ? WHERE id = ? AND status IN ('pending','blocked','failed')",
   ).run(nowMillis(), cancelledBy, id);
@@ -229,7 +229,7 @@ export function cancelPending(id: number, cancelledBy: string): boolean {
 
 /** Drop-in for getActionableAutoMerge() from pending-auto-merges-db.ts. */
 export function getActionableAutoMerge(issueId: string): PendingAutoMerge | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db.prepare(
     "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging','blocked','failed') ORDER BY id DESC LIMIT 1",
   ).get(issueId) as OverdeckPendingAutoMergeRow | undefined;
@@ -237,7 +237,7 @@ export function getActionableAutoMerge(issueId: string): PendingAutoMerge | null
 }
 
 export function countActionableAutoMerges(issueId: string): number {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db.prepare(
     "SELECT COUNT(*) AS n FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging','blocked','failed')",
   ).get(issueId) as { n: number } | undefined;
@@ -246,7 +246,7 @@ export function countActionableAutoMerges(issueId: string): number {
 
 /** Drop-in for listActiveAutoMerges() from pending-auto-merges-db.ts. */
 export function listActiveAutoMerges(limit = 100): PendingAutoMerge[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db.prepare(
     "SELECT * FROM pending_auto_merges WHERE status IN ('pending','merging') ORDER BY scheduled_merge_at ASC, id ASC LIMIT ?",
   ).all(limit) as OverdeckPendingAutoMergeRow[];
@@ -255,7 +255,7 @@ export function listActiveAutoMerges(limit = 100): PendingAutoMerge[] {
 
 /** Drop-in for listProblemAutoMerges() from pending-auto-merges-db.ts. */
 export function listProblemAutoMerges(limit = 100): PendingAutoMerge[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db.prepare(
     "SELECT * FROM pending_auto_merges WHERE status IN ('blocked','failed') ORDER BY scheduled_merge_at ASC, id ASC LIMIT ?",
   ).all(limit) as OverdeckPendingAutoMergeRow[];
@@ -279,7 +279,7 @@ export interface ScheduleAutoMergeResult {
 
 /** Drop-in for scheduleAutoMergeWithResult() from pending-auto-merges-db.ts. */
 export function scheduleAutoMergeWithResult(input: ScheduleAutoMergeInput): ScheduleAutoMergeResult {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   // Check for active entry first
   const existing = db.prepare(
     "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging') ORDER BY id DESC LIMIT 1",
@@ -321,7 +321,7 @@ export function getAllActiveQueues(): Array<{
   queue: string[];
   queueLength: number;
 }> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db.prepare(
     "SELECT project_key, issue_id, status FROM merge_queue WHERE status IN ('queued', 'processing') ORDER BY project_key, position ASC",
   ).all() as Array<{ project_key: string; issue_id: string; status: string }>;
@@ -350,7 +350,7 @@ export function getAllActiveQueues(): Array<{
 
 /** Drop-in for resetProcessingToQueued() from merge-queue-db.ts. */
 export function resetProcessingToQueued(): number {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     "UPDATE merge_queue SET status = 'queued', started_at = NULL WHERE status = 'processing'",
   ).run();
@@ -403,11 +403,11 @@ function rowToMergeSetRepos(rows: OverdeckMergeSetRepoRow[]): MergeSetRepoState[
     targetBranch: r.target_branch,
     artifactUrl: r.artifact_url ?? undefined,
     artifactId: r.artifact_id ?? undefined,
-    reviewStatus: r.review_status as MergeSetRepoState['reviewStatus'],
-    testStatus: r.test_status as MergeSetRepoState['testStatus'],
+    repoReview: r.review_status as MergeSetRepoState['repoReview'],
+    repoTests: r.test_status as MergeSetRepoState['repoTests'],
     rebaseStatus: r.rebase_status as MergeSetRepoState['rebaseStatus'],
-    verificationStatus: r.verification_status as MergeSetRepoState['verificationStatus'],
-    mergeStatus: r.merge_status as MergeSetRepoState['mergeStatus'],
+    repoVerification: r.verification_status as MergeSetRepoState['repoVerification'],
+    repoMerge: r.merge_status as MergeSetRepoState['repoMerge'],
     mergeOrder: r.merge_order,
     required: r.required === 1,
   }));
@@ -426,7 +426,7 @@ function rowToMergeSet(row: OverdeckMergeSetRow, repos: MergeSetRepoState[]): Me
   };
 }
 
-function loadReposForMergeSet(db: ReturnType<typeof getOverdeckDatabaseSync>, issueId: string): MergeSetRepoState[] {
+function loadReposForMergeSet(db: ReturnType<typeof getOverdeckDatabase>, issueId: string): MergeSetRepoState[] {
   const rows = db.prepare(`
     SELECT repo_key, repo_path, forge, source_branch, target_branch, artifact_url, artifact_id,
            review_status, test_status, rebase_status, verification_status, merge_status, merge_order, required
@@ -435,9 +435,13 @@ function loadReposForMergeSet(db: ReturnType<typeof getOverdeckDatabaseSync>, is
   return rowToMergeSetRepos(rows);
 }
 
-/** Drop-in for upsertMergeSet() from merge-set-db.ts. */
-export function upsertMergeSet(mergeSet: MergeSet): void {
-  const db = getOverdeckDatabaseSync();
+/**
+ * Insert or replace a merge-set row and its repo rows, as given. Callers
+ * normally go through `upsertMergeSet` in `merge-set.ts`, which canonicalizes
+ * the issue id first.
+ */
+export function upsertMergeSetRow(mergeSet: MergeSet): void {
+  const db = getOverdeckDatabase();
   const createdAtMs = millisFromIso(mergeSet.createdAt) ?? nowMillis();
   const updatedAtMs = millisFromIso(mergeSet.updatedAt) ?? nowMillis();
 
@@ -483,11 +487,11 @@ export function upsertMergeSet(mergeSet: MergeSet): void {
         repo.targetBranch,
         repo.artifactUrl ?? null,
         repo.artifactId ?? null,
-        repo.reviewStatus,
-        repo.testStatus,
+        repo.repoReview,
+        repo.repoTests,
         repo.rebaseStatus,
-        repo.verificationStatus,
-        repo.mergeStatus,
+        repo.repoVerification,
+        repo.repoMerge,
         repo.mergeOrder,
         repo.required ? 1 : 0,
       );
@@ -500,87 +504,15 @@ export function upsertMergeSet(mergeSet: MergeSet): void {
 export interface MergeSetRepoPatch {
   repoKey: string;
   expected: Pick<MergeSetRepoState, 'sourceBranch' | 'targetBranch' | 'artifactUrl' | 'artifactId'>;
-  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'mergeStatus'>>;
-}
-
-const MERGE_SET_REPO_CAS_FAILED = new Error('merge-set-repo-cas-failed');
-
-export function patchMergeSetRepos(issueId: string, patches: MergeSetRepoPatch[]): boolean {
-  const db = getOverdeckDatabaseSync();
-  const effective = patches.filter(({ patch }) => Object.values(patch).some((value) => value !== undefined));
-  if (effective.length === 0) return true;
-
-  try {
-    db.transaction(() => {
-      for (const { repoKey, expected, patch } of effective) {
-        const assignments: string[] = [];
-        const values: unknown[] = [];
-        if (patch.artifactUrl !== undefined) { assignments.push('artifact_url = ?'); values.push(patch.artifactUrl); }
-        if (patch.artifactId !== undefined) { assignments.push('artifact_id = ?'); values.push(patch.artifactId); }
-        if (patch.mergeStatus !== undefined) { assignments.push('merge_status = ?'); values.push(patch.mergeStatus); }
-        const result = db.prepare(`
-          UPDATE merge_set_repos SET ${assignments.join(', ')}
-          WHERE issue_id = ? AND repo_key = ? AND source_branch = ? AND target_branch = ?
-            AND artifact_url IS ? AND artifact_id IS ?
-        `).run(
-          ...values,
-          issueId,
-          repoKey,
-          expected.sourceBranch,
-          expected.targetBranch,
-          expected.artifactUrl ?? null,
-          expected.artifactId ?? null,
-        );
-        if (result.changes !== 1) throw MERGE_SET_REPO_CAS_FAILED;
-      }
-      db.prepare('UPDATE merge_sets SET updated_at = ? WHERE issue_id = ?').run(nowMillis(), issueId);
-    })();
-    return true;
-  } catch (error) {
-    if (error === MERGE_SET_REPO_CAS_FAILED) return false;
-    throw error;
-  }
-}
-
-export function patchMergeSetRepo(
-  issueId: string,
-  repoKey: string,
-  expected: MergeSetRepoPatch['expected'],
-  patch: MergeSetRepoPatch['patch'],
-): boolean {
-  return patchMergeSetRepos(issueId, [{ repoKey, expected, patch }]);
+  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'repoMerge'>>;
 }
 
 /** Drop-in for getMergeSetFromDb() from merge-set-db.ts. */
 export function getMergeSetFromDb(issueId: string): MergeSet | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db.prepare(
     'SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at FROM merge_sets WHERE issue_id = ?',
   ).get(issueId) as OverdeckMergeSetRow | undefined;
   if (!row) return null;
   return rowToMergeSet(row, loadReposForMergeSet(db, issueId));
-}
-
-/** Drop-in for getAllMergeSetsFromDb() from merge-set-db.ts. */
-export function getAllMergeSetsFromDb(projectKey?: string): MergeSet[] {
-  const db = getOverdeckDatabaseSync();
-  const rows = (
-    projectKey
-      ? db.prepare(
-          'SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at FROM merge_sets WHERE project_key = ? ORDER BY updated_at DESC',
-        ).all(projectKey)
-      : db.prepare(
-          'SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at FROM merge_sets ORDER BY updated_at DESC',
-        ).all()
-  ) as OverdeckMergeSetRow[];
-
-  return rows.map((row) => rowToMergeSet(row, loadReposForMergeSet(db, row.issue_id)));
-}
-
-/** Drop-in for deleteMergeSet() from merge-set-db.ts. */
-export function deleteMergeSet(issueId: string): void {
-  const db = getOverdeckDatabaseSync();
-  // Delete repos first — FK to merge_sets has ON DELETE no action
-  db.prepare('DELETE FROM merge_set_repos WHERE issue_id = ?').run(issueId);
-  db.prepare('DELETE FROM merge_sets WHERE issue_id = ?').run(issueId);
 }

@@ -1,7 +1,7 @@
-import { Effect } from 'effect';
 import chalk from 'chalk';
 import { statSync } from 'fs';
 import { resolve } from 'path';
+import { reportComposerReloadProgress } from '../../lib/composer-commands/reload.js';
 import {
   activateDashboardDeployment,
   buildDashboardFromOriginMain,
@@ -15,7 +15,7 @@ import {
   type DashboardDeploymentActivation,
 } from '../../lib/deploy/build-from-origin.js';
 import {
-  readActiveDashboardBundleSync,
+  readActiveDashboardBundle,
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
@@ -25,13 +25,12 @@ import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-loc
 import {
   leavesDashboardRunning,
   parseHealthTimeoutMs,
-  readPlatformConfigSync,
+  readPlatformConfig,
   restartDashboard,
   StageError,
   type DashboardRestartResult,
 } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
-import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 import { restartGateRequesterId, waitForRestartApproval } from '../../lib/restart-gate-client.js';
 import {
   refuseNonPrimaryDashboardCwd,
@@ -107,7 +106,7 @@ async function recordReloadStatus(
   error?: string,
   phase: RestartPhase = success ? 'healthy' : 'failed',
 ): Promise<void> {
-  await Effect.runPromise(writeRestartStatus({
+  await writeRestartStatus({
     ts: new Date().toISOString(),
     trigger: 'pan reload',
     success,
@@ -118,10 +117,31 @@ async function recordReloadStatus(
     pid: process.pid,
     initiator: process.env.OVERDECK_RESTART_INITIATOR ?? process.env.OVERDECK_AGENT_ID,
     issueId: process.env.OVERDECK_ISSUE_ID,
-  }));
+  });
 }
 
 export async function reloadCommand(options: ReloadOptions): Promise<void> {
+  const activityId = process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY;
+  const logPath = process.env.OVERDECK_COMPOSER_RELOAD_LOG;
+  // Do not pass this command's activity identity into the replacement server.
+  delete process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY;
+  delete process.env.OVERDECK_COMPOSER_RELOAD_LOG;
+  const progress = (phase: Parameters<typeof reportComposerReloadProgress>[0]) =>
+    reportComposerReloadProgress(phase, activityId, logPath);
+  await progress('building');
+  try {
+    await runReload(options, progress);
+    await progress(process.exitCode ? 'failed' : 'completed');
+  } catch (error) {
+    await progress('failed');
+    throw error;
+  }
+}
+
+async function runReload(
+  options: ReloadOptions,
+  progress: (phase: Parameters<typeof reportComposerReloadProgress>[0]) => Promise<void>,
+): Promise<void> {
   let startedAt = Date.now();
   let healthTimeoutMs: number;
   try {
@@ -134,25 +154,17 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
   if (refuseNonPrimaryDashboardCwd(process.cwd(), 'reload')) return;
 
-  const restartInitiator = process.env.OVERDECK_AGENT_ID;
-  if (restartInitiator) {
-    const restartBlock = await agentRestartBlockReason({
-      initiator: restartInitiator,
-      force: options.force === true,
-    });
-    if (restartBlock) {
-      console.error(restartBlock);
-      process.exitCode = 1;
-      return;
-    }
+  // A restart is voluntary, so the operator gate below is the only thing that
+  // holds it. There is no deploy queue and no deploy window to consult.
+  if (process.env.OVERDECK_AGENT_ID) {
     console.log(chalk.yellow(
       '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',
     ));
   }
 
-  const lock = await Effect.runPromise(acquireRestartLock('pan reload'));
+  const lock = await acquireRestartLock('pan reload');
   if (!lock) {
-    const holder = await Effect.runPromise(readRestartLockHolder());
+    const holder = await readRestartLockHolder();
     const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
     const error = `restart in progress (${heldBy})`;
     console.error(chalk.yellow(error));
@@ -195,11 +207,11 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       }
     }
 
-    const config = readPlatformConfigSync();
+    const config = readPlatformConfig();
     let repoRoot = process.cwd();
     let deployment: DashboardDeployment | null = null;
     let activation: DashboardDeploymentActivation | null = null;
-    const previousBundle = readActiveDashboardBundleSync();
+    const previousBundle = readActiveDashboardBundle();
     if (!options.skipBuild) {
       try {
         repoRoot = await resolvePrimaryRepoRoot(process.cwd());
@@ -242,7 +254,11 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
         // deployment that dies on ERR_MODULE_NOT_FOUND at boot (PAN-3264).
         const serverBootFailure = dashboardServerBootFailure(deployment.serverPath);
         if (serverBootFailure) throw new Error(serverBootFailure);
-        await writeActiveDashboardBundle({ repoRoot, ...deployment });
+        await writeActiveDashboardBundle({
+          repoRoot,
+          deployRoot: deployment.deployRoot,
+          serverPath: deployment.serverPath,
+        });
         try {
           activation = await activateDashboardDeployment(repoRoot, deployment);
         } catch (error) {
@@ -267,10 +283,18 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     // Everything above is ungated: a build changes nothing the operator can see.
     // The restart below is voluntary, so it waits for the operator's approval
     // first (PAN-3729) and may find that an approved restart already happened.
+    await progress('awaiting-approval');
+    const postMergeIssue = process.env.OVERDECK_RESTART_INITIATOR === 'merge-step0'
+      ? process.env.OVERDECK_ISSUE_ID
+      : undefined;
+    const gateKind = postMergeIssue ? 'deploy' : 'reload';
     const gate = await waitForRestartApproval({
-      requesterId: restartGateRequesterId('reload'),
-      kind: 'reload',
-      reason: 'pan reload — put the freshly built dashboard live',
+      requesterId: restartGateRequesterId(gateKind, postMergeIssue),
+      kind: gateKind,
+      reason: postMergeIssue
+        ? `post-merge deploy for ${postMergeIssue}`
+        : 'pan reload — put the freshly built dashboard live',
+      ...(deployment?.builtSha ? { builtSha: deployment.builtSha } : {}),
     });
     if (!gate.proceed) {
       // Same disposition as a restart that left the old dashboard running: the
@@ -294,6 +318,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     }
     // The approval wait is unbounded, so the pre-wait clock would report a
     // reload that "took" as long as the operator was away from the dashboard.
+    await progress('restarting');
     startedAt = Date.now();
 
     let restartResult: DashboardRestartResult;
@@ -302,14 +327,14 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       // This durable entry must land before restartDashboard sends SIGTERM. If
       // persistence fails, abort while the old dashboard is still running.
       await recordReloadStatus(startedAt, false, undefined, 'stopping');
-      restartResult = await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
+      restartResult = await restartDashboard(config, () => spawnDashboardDetached(config, {
         deacon: options.deacon,
         serverPath: deployment?.serverPath,
         repoRoot,
       }), {
         healthTimeoutMs,
         expectedIdentity: { repoRoot, mode: 'primary' },
-      }));
+      });
     } catch (error) {
       if (deployment) {
         if (leavesDashboardRunning(error)) {

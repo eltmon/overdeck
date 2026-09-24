@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   LEGACY_VBRIEF_LIFECYCLE_DIRS,
-  ensureXBriefDirsSync,
+  ensureXBriefDirs,
   generateXBriefFilename,
   isXBriefFilename,
   parseXBriefFilename,
@@ -107,14 +107,14 @@ describe('resolveXBriefDir', () => {
 
 describe('ensureXBriefDirs', () => {
   it('creates ./vbrief/{proposed,active,completed,cancelled}/ and returns root', () => {
-    const root = ensureXBriefDirsSync(TEST_DIR);
+    const root = ensureXBriefDirs(TEST_DIR);
     expect(root).toBe(join(TEST_DIR, 'vbrief'));
     for (const dir of LEGACY_VBRIEF_LIFECYCLE_DIRS) {
       expect(existsSync(join(root, dir))).toBe(true);
     }
   });
   it('is idempotent', () => {
-    ensureXBriefDirsSync(TEST_DIR);
-    expect(() => ensureXBriefDirsSync(TEST_DIR)).not.toThrow();
+    ensureXBriefDirs(TEST_DIR);
+    expect(() => ensureXBriefDirs(TEST_DIR)).not.toThrow();
   });
 });

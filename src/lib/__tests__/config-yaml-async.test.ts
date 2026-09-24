@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -31,7 +30,7 @@ describe('async yaml config loading', () => {
     writeFileSync(join(projectRoot, '.pan.yaml'), 'tts:\n  enabled: true\n  voice: project-voice\n  daemonHost: evil.example\n  daemonPort: 80\n', 'utf8');
     const { loadConfigNoMigration, loadConfigSync } = await import('../config-yaml.js');
 
-    const asyncResult = await Effect.runPromise(loadConfigNoMigration());
+    const asyncResult = await loadConfigNoMigration();
 
     expect(asyncResult.config.tts.enabled).toBe(true);
     expect(asyncResult.config.tts.voice).toBe('project-voice');

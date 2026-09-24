@@ -11,6 +11,10 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
+  MenuItemButton,
+  MenuOverlay,
+  MenuSeparator,
+  MenuSurface,
 } from '../shared/ContextMenu';
 import {
   IssueActionGroupedBody,
@@ -45,7 +49,6 @@ const AGENT_SCOPE_ACTION_KEYS = new Set<IssueActionKey>([
   'stopAgent',
   'pause',
   'unpause',
-  'untroubled',
   'recoverAgent',
   'resumeSession',
 ]);
@@ -61,11 +64,13 @@ function actionButtonClass(view: IssueActionView, inline: boolean) {
 
 function ActionButton({ view, inline = false, onInvoked }: { view: IssueActionView; inline?: boolean; onInvoked?: () => void }) {
   const [submenuOpen, setSubmenuOpen] = useState(false);
+  const submenuTriggerRef = useRef<HTMLButtonElement>(null);
   const hasSubmenu = !!view.submenu?.length;
 
   return (
     <span className="relative inline-flex">
       <button
+        ref={submenuTriggerRef}
         type="button"
         data-testid={`issue-action-${view.action.key}`}
         className={actionButtonClass(view, inline)}
@@ -87,19 +92,18 @@ function ActionButton({ view, inline = false, onInvoked }: { view: IssueActionVi
       </button>
       {hasSubmenu && submenuOpen ? (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setSubmenuOpen(false)} />
-          <div
-            role="menu"
+          <MenuOverlay onClick={() => setSubmenuOpen(false)} />
+          <MenuSurface
+            aria-label={`${view.action.label} options`}
+            onClose={() => setSubmenuOpen(false)}
+            returnFocusRef={submenuTriggerRef}
             data-testid={`issue-action-submenu-${view.action.key}`}
-            className="absolute left-0 top-full z-50 mt-1 w-[220px] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+            className="absolute left-0 top-full z-[1000] mt-1 w-[220px]"
           >
             {view.submenu!.map((option) => (
-              <button
+              <MenuItemButton
                 key={option.key}
-                type="button"
-                role="menuitem"
                 data-testid={`issue-action-${view.action.key}-option-${option.key}`}
-                className="relative flex w-full cursor-pointer select-none items-center rounded px-3 py-1.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {
                   setSubmenuOpen(false);
                   option.invoke();
@@ -107,9 +111,9 @@ function ActionButton({ view, inline = false, onInvoked }: { view: IssueActionVi
                 }}
               >
                 {option.label}
-              </button>
+              </MenuItemButton>
             ))}
-          </div>
+          </MenuSurface>
         </>
       ) : null}
     </span>
@@ -131,33 +135,33 @@ function createPopoverMenuItem(onClose: () => void, destructive: boolean) {
       : 'text-foreground hover:bg-accent hover:text-accent-foreground';
 
     return (
-      <button
+      <MenuItemButton
         {...props}
-        type="button"
         role={role}
+        destructive={destructive}
         disabled={disabled}
-        className={`relative flex w-full cursor-pointer select-none items-center rounded px-3 py-1.5 text-left text-xs outline-none transition-colors disabled:pointer-events-none disabled:opacity-40 ${colorClass} ${className}`}
+        className={`${colorClass} ${className}`}
         onClick={() => {
           onActivate?.();
           if (!preventClose) onClose();
         }}
       >
         {children}
-      </button>
+      </MenuItemButton>
     );
   };
 }
 
 function PopoverMenuLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
       {children}
     </div>
   );
 }
 
 function PopoverMenuSeparator() {
-  return <div className="mx-1 my-1 h-px bg-border" />;
+  return <MenuSeparator />;
 }
 
 function popoverMenuPrimitives(onClose: () => void): IssueActionMenuPrimitives {
@@ -172,20 +176,24 @@ function popoverMenuPrimitives(onClose: () => void): IssueActionMenuPrimitives {
 function OverflowMenu({
   actions,
   onClose,
+  returnFocusRef,
 }: {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   onClose: () => void;
+  returnFocusRef?: RefObject<HTMLButtonElement>;
 }) {
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div
-        role="menu"
+      <MenuOverlay onClick={onClose} />
+      <MenuSurface
+        aria-label="Issue actions"
+        onClose={onClose}
+        returnFocusRef={returnFocusRef}
         data-testid="issue-action-overflow-menu"
-        className="absolute right-0 top-full z-50 mt-1 max-h-[70vh] w-[320px] overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+        className="absolute right-0 top-full z-[1000] mt-1 w-[320px]"
       >
         <IssueActionGroupedBody actions={actions} primitives={popoverMenuPrimitives(onClose)} />
-      </div>
+      </MenuSurface>
     </>
   );
 }
@@ -288,6 +296,8 @@ function OverflowButton({
         ref={triggerRef}
         type="button"
         data-testid="issue-action-overflow-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
         aria-label={`${more} more issue actions`}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         onClick={() => setOpenMenu(open ? null : key)}
@@ -295,16 +305,10 @@ function OverflowButton({
         <MoreHorizontal className="h-4 w-4" />
         <span>{more} more</span>
       </button>
-      {open ? <OverflowMenu actions={actions} onClose={() => setOpenMenu(null)} /> : null}
+      {open ? <OverflowMenu actions={actions} onClose={() => setOpenMenu(null)} returnFocusRef={triggerRef} /> : null}
     </div>
   );
 }
-
-type TaskTask = {
-  id: string;
-  title: string;
-  status: string;
-};
 
 type ActionDialogFrameProps = {
   label: string;
@@ -370,79 +374,7 @@ function NewOrderBookDialog({ actions, onClose }: { actions: UseIssueActionsResu
   );
 }
 
-function InspectTaskDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
-  const action = actions.activeDialog?.action;
-  const [tasks, setTasks] = useState<TaskTask[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetch(`/api/issues/${encodeURIComponent(issueId)}/tasks`, { credentials: 'include' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Failed to load tasks');
-        return response.json() as Promise<{ tasks?: TaskTask[] }>;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        const nextTasks = data.tasks ?? [];
-        setTasks(nextTasks);
-        setSelectedTaskId(nextTasks[0]?.id ?? '');
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [issueId]);
-
-  if (!action) return null;
-
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedTaskId) return;
-    actions.submitDialogAction(action, undefined, selectedTaskId);
-    onClose();
-  };
-
-  return (
-    <ActionDialogFrame label={action.label} onClose={onClose}>
-      <form className="space-y-3" onSubmit={onSubmit}>
-        {loading ? <p className="text-xs text-muted-foreground">Loading tasks…</p> : null}
-        {error ? <p className="text-xs text-destructive">{error}</p> : null}
-        {!loading && !error && tasks.length === 0 ? <p className="text-xs text-muted-foreground">No tasks are available for inspection.</p> : null}
-        {tasks.length > 0 ? (
-          <label className="block space-y-1 text-xs text-muted-foreground">
-            <span>Task</span>
-            <select
-              value={selectedTaskId}
-              onChange={(event) => setSelectedTaskId(event.target.value)}
-              aria-label="Task to inspect"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            >
-              {tasks.map((task) => (
-                <option key={task.id} value={task.id}>{task.id} — {task.title}</option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={!selectedTaskId || actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-            {actions.isActionPending(action.key) ? 'Starting…' : 'Inspect task'}
-          </button>
-        </div>
-      </form>
-    </ActionDialogFrame>
-  );
-}
-
-export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issueId: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
+export function IssueActionDialogHost({ actions, onAfterClose }: { issueId?: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
   const { activeDialog, issue, workspace, closeDialog } = actions;
   const handleClose = () => {
     const restoreFocus = activeDialog?.key === 'open';
@@ -487,10 +419,6 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
         />
       </ActionDialogFrame>
     );
-  }
-
-  if (activeDialog.key === 'inspectTask') {
-    return <InspectTaskDialog issueId={issueId} actions={actions} onClose={handleClose} />;
   }
 
   if (activeDialog.key === 'addToOrderBook') {

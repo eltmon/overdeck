@@ -41,7 +41,7 @@ export type {
  * by normalizeHarness() on read. normalizeHarness still accepts the raw string
  * 'pi' as input so old rows round-trip safely.
  */
-export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 
 /**
  * Legacy harness strings that can still appear in persisted state or older
@@ -119,6 +119,7 @@ export interface SpawnConfig {
   workspace: string;
   prompt?: string;
   model?: string;
+  effort?: string;
   sessionId?: string; // For resuming existing sessions
   runtime?: RuntimeName;
   env?: Record<string, string>;
@@ -261,11 +262,7 @@ export interface AgentRuntimeSync {
   isRunning(agentId: string): boolean | Promise<boolean>;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Effect-channel runtime interface. The legacy sync/promise AgentRuntimeSync
-// shape above is preserved for the existing registry while new callers compose
-// through the canonical Effect API.
+// ─── Effect runtime interface (Oh My Pi only, #4003) ──────────────────────────
 
 import type { Effect } from 'effect';
 import type {
@@ -285,6 +282,9 @@ export type AgentRuntimeError =
 /**
  * Runtime interface whose side-effecting methods return typed Effects. Pure-sync
  * introspection methods stay sync because they read in-memory state.
+ *
+ * Its only remaining implementor is OhmypiRuntime (never constructed); delete this
+ * interface and AgentRuntimeError together with it in #4003 (PAN-3958).
  */
 export interface AgentRuntime {
   readonly name: RuntimeName;

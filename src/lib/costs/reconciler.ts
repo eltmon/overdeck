@@ -24,14 +24,15 @@ import { readFileSync, existsSync, readdirSync, openSync, readSync, fstatSync, c
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
-import { calculateCostSync, getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
-import { FsError } from '../errors.js';
+import { calculateCost, getPricing, type AIProvider, type TokenUsage } from '../cost.js';
 import { CostDoorLive, CostWriter, type CostEvent as OverdeckCostEvent } from '../overdeck/cost.js';
-import { findConversationForCostSessionSync } from '../overdeck/conversations.js';
+import { findConversationForCostSession } from '../overdeck/conversations.js';
 import type { IssueId } from '../overdeck/issues.js';
 import { classifySessionBucket, type ConversationSessionLookup } from './attribution.js';
 import type { CostEvent } from './events.js';
 import { lookupSkipVerdict, recordSkipVerdict } from './skip-cache.js';
+import { readSessionIndexWithLegacy } from '../session-history.js';
+import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
 
 // ============== Types ==============
 
@@ -55,7 +56,7 @@ export type PiCollectResult = {
 };
 export type PiCollectBatch = Pick<PiCollectResult, 'events' | 'verdicts'>;
 
-interface SessionMapping {
+export interface SessionMapping {
   agentId: string;
   issueId: string | null;
   sessionType: string;  // planning, implementation, review, test, merge
@@ -127,7 +128,7 @@ function getAgentsDir(): string {
 }
 
 function getClaudeProjectsDir(): string {
-  return join(process.env.HOME || homedir(), '.claude', 'projects');
+  return claudeProjectsRoot(process.env.HOME || homedir());
 }
 
 /**
@@ -140,7 +141,7 @@ function extractSessionId(filename: string): string {
 
 export function resolveUnmappedSessionIssueId(
   input: { sessionId?: string | null; agentId?: string | null },
-  lookup: ConversationSessionLookup = findConversationForCostSessionSync,
+  lookup: ConversationSessionLookup = findConversationForCostSession,
 ): string {
   return classifySessionBucket(input, lookup);
 }
@@ -163,7 +164,7 @@ function decodeClaudeDirName(dirName: string): string {
  * 1. sessions.json files in agent directories (authoritative — written by heartbeat hook)
  * 2. Agent state.json for issue/workspace context
  */
-function buildSessionIndex(): Map<string, SessionMapping> {
+export function buildSessionIndex(): Map<string, SessionMapping> {
   const index = new Map<string, SessionMapping>();
   const agentsDir = getAgentsDir();
 
@@ -179,14 +180,7 @@ function buildSessionIndex(): Map<string, SessionMapping> {
   for (const agentDir of entries) {
     const agentPath = join(agentsDir, agentDir);
 
-    // Read sessions.json for the session UUID list
-    const sessionsFile = join(agentPath, 'sessions.json');
-    let sessionIds: string[] = [];
-    if (existsSync(sessionsFile)) {
-      try {
-        sessionIds = JSON.parse(readFileSync(sessionsFile, 'utf-8'));
-      } catch { /* skip */ }
-    }
+    const sessionIds = readSessionIndexWithLegacy(agentDir).map((entry) => entry.sessionId);
 
     // Read state.json for issue/workspace context and role.
     const stateFile = join(agentPath, 'state.json');
@@ -344,11 +338,11 @@ export function extractCostEvents(
 
       // Strip claudish prefix for pricing lookup: "oai@gpt-5.4" → "gpt-5.4"
       const pricingModel = model.replace(/^(?:oai|cx|go)@/, '');
-      const pricing = getPricingSync(provider, pricingModel);
+      const pricing = getPricing(provider, pricingModel);
       if (!pricing) continue;
 
       const tokenUsage: TokenUsage = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheTTL: '5m' };
-      const cost = calculateCostSync(tokenUsage, pricing);
+      const cost = calculateCost(tokenUsage, pricing);
       const timestamp = entry.timestamp || entry.ts || entry.created_at || new Date().toISOString();
 
       events.push({
@@ -414,11 +408,11 @@ export function extractPiCostEvents(
     const provider = piProviderToAiProvider(entry.message?.provider);
     // Strip any routing prefix (oai@/cx@/go@) for pricing lookup.
     const pricingModel = model.replace(/^(?:oai|cx|go)@/, '');
-    const pricing = getPricingSync(provider, pricingModel);
+    const pricing = getPricing(provider, pricingModel);
     if (!pricing) continue;
 
     const tokenUsage: TokenUsage = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheTTL: '5m' };
-    const cost = calculateCostSync(tokenUsage, pricing);
+    const cost = calculateCost(tokenUsage, pricing);
     // Prefer the provider response id for precise dedup; fall back to a
     // session-scoped synthetic id so re-runs are idempotent.
     const requestId = entry.message?.responseId ?? (entry.id ? `${sessionId}#${entry.id}` : undefined);
@@ -655,7 +649,12 @@ function mergeCoverage(
   }
 }
 
-async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } = {}): Promise<ReconcileResult> {
+/**
+ * Catch-up sweep of Claude transcripts into the cost store. Per-file errors are
+ * reported in `result.errors`; it rejects only on a catastrophic failure (for
+ * example, the SQLite open failing).
+ */
+export async function reconcile(opts: { dryRun?: boolean; includePi?: boolean } = {}): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
     cacheSkipped: 0,
@@ -827,16 +826,3 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
 
   return result;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect variant of reconcile. Per-file errors are still surfaced via
- * `result.errors`; only catastrophic failures (e.g. SQLite open failure)
- * surface on the Effect error channel.
- */
-export const reconcile = (opts: { dryRun?: boolean; includePi?: boolean } = {}): Effect.Effect<ReconcileResult, FsError> =>
-  Effect.tryPromise({
-    try: () => reconcilePromise(opts),
-    catch: (cause) => new FsError({ path: '<reconciler>', operation: 'reconcile', cause }),
-  });

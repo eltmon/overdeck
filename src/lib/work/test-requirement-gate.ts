@@ -10,9 +10,9 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
 import { Data, Effect } from 'effect';
-import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
+import { extractNumber, extractPrefix } from '../issue-id.js';
 import { getLinearApiKey } from '../shadow-utils.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { ProcessSpawnError } from '../errors.js';
 
 const execAsync = promisify(exec);
@@ -134,7 +134,7 @@ export class TrackerFetchError extends Data.TaggedError('TrackerFetchError')<{
  */
 export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | null, TrackerFetchError> {
   return Effect.gen(function* () {
-    const ghInfo = resolveGitHubIssueSync(issueId);
+    const ghInfo = resolveGitHubIssue(issueId);
 
     if (ghInfo.isGitHub) {
       const command = `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json body --jq '.body'`;
@@ -151,8 +151,8 @@ export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | n
       return result.stdout.trim();
     }
 
-    const issueNum = extractNumberSync(issueId);
-    const teamKey = extractPrefixSync(issueId);
+    const issueNum = extractNumber(issueId);
+    const teamKey = extractPrefix(issueId);
     if (issueNum === null || teamKey === null) {
       return yield* Effect.fail(
         new TrackerFetchError({

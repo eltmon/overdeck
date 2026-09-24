@@ -20,10 +20,11 @@ import type {
   ProjectCiSnapshot,
   ResourceStats,
   RestartGateSnapshot,
-  ReviewStatusSnapshot,
   ScanProgressSnapshot,
   TurnDiffSummary,
 } from './types'
+import type { DerivedIssueState } from './derived-issue-state'
+import type { BackendPane } from './backend-pane'
 import type {
   MemoryObservation,
   MemoryStatus,
@@ -32,6 +33,7 @@ import type {
   ResetMarker,
 } from './memory'
 import type { DomainEvent } from './events'
+import { applyIssueDelta } from './issue-delta'
 
 // ─── Read model state shape ──────────────────────────────────────────────────
 
@@ -80,7 +82,10 @@ export interface ReadModelState {
    * would cause the whole AgentSnapshot to re-diff on the frontend.
    */
   agentRuntimeById: Record<string, AgentRuntimeSnapshot>
-  reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>
+  /** PAN-3917 FR-6 — derived pipeline state, keyed by issue id. Never persisted. */
+  derivedIssueStateByIssueId: Record<string, DerivedIssueState>
+  /** PAN-3917 FR-12 — live agent panes the terminal backend reports, by pane id. */
+  backendPanesById: Record<string, BackendPane>
   resources: ResourceStats | null
   agentOutputById: Record<string, string[]>
   issuesRaw: unknown[]
@@ -137,7 +142,8 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   sequence: 0,
   agentsById: {},
   agentRuntimeById: {},
-  reviewStatusByIssueId: {},
+  derivedIssueStateByIssueId: {},
+  backendPanesById: {},
   resources: null,
   agentOutputById: {},
   issuesRaw: [],
@@ -285,9 +291,14 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     agentsById[agent.id] = agent
   }
 
-  const reviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {}
-  for (const rs of snapshot.reviewStatuses) {
-    reviewStatusByIssueId[rs.issueId] = rs
+  const derivedIssueStateByIssueId: Record<string, DerivedIssueState> = {}
+  for (const derived of snapshot.derivedIssueStates ?? []) {
+    derivedIssueStateByIssueId[derived.issueId] = derived
+  }
+
+  const backendPanesById: Record<string, BackendPane> = {}
+  for (const pane of snapshot.backendPanes ?? []) {
+    backendPanesById[pane.id] = pane
   }
 
   const channelPermissionRequestsById: Record<string, ChannelPermissionRequestSnapshot> = {}
@@ -313,7 +324,8 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     ...state,
     sequence: snapshot.sequence,
     agentsById,
-    reviewStatusByIssueId,
+    derivedIssueStateByIssueId,
+    backendPanesById,
     agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
     channelPermissionRequestsById,
     channelPermissionRequestIdsByAgentId,
@@ -403,7 +415,18 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     case 'agent.stopped': {
-      const { [event.payload.agentId]: _removed, ...rest } = state.agentsById
+      const stoppedAgent = state.agentsById[event.payload.agentId]
+      const nextAgentsById = stoppedAgent
+        ? {
+            ...state.agentsById,
+            [event.payload.agentId]: {
+              ...stoppedAgent,
+              status: 'stopped' as const,
+              hasLiveTmuxSession: false,
+              lastActivity: event.timestamp,
+            },
+          }
+        : state.agentsById
       // PAN-800 — mark the runtime snapshot stopped too. pan kill bypasses the
       // Stop hook, so without this fold a killed agent shows activity: "idle"
       // forever. Retain the row (don't delete) so the projection cache has the
@@ -446,7 +469,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        agentsById: rest,
+        agentsById: nextAgentsById,
         agentRuntimeById: nextRuntimeById,
         channelPermissionRequestsById: nextPermissionRequestsById,
         channelPermissionRequestIdsByAgentId: restPendingIds,
@@ -576,82 +599,50 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
     }
 
-    case 'pipeline.status_changed':
-    case 'review.status_changed':
+    // PAN-3917 FR-6 — the derived pipeline state of one issue. The server
+    // recomputes it from the tracker, the forge, git and the terminal backend
+    // and fans it out with `emitOnly`; nothing is stored.
+    case 'issue_state.changed':
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        reviewStatusByIssueId: {
-          ...state.reviewStatusByIssueId,
-          [event.payload.issueId]: event.payload.status,
+        derivedIssueStateByIssueId: {
+          ...state.derivedIssueStateByIssueId,
+          [event.payload.issueState.issueId]: event.payload.issueState,
         },
       }
 
-    // PAN-915 — event-driven reviewer sub-status. Avoids tmux polling in
-    // enrichReviewStatusFromSessions for the common case (reviewer dispatched).
-    case 'review.reviewer_started': {
-      const { issueId, role, sessionName } = event.payload
-      const existing = state.reviewStatusByIssueId[issueId]
-      const prevSubs = existing?.reviewSubStatuses ?? {}
-      const prevNames = existing?.reviewSessionNames ?? []
-      const nextNames = prevNames.includes(sessionName) ? prevNames : [...prevNames, sessionName]
-      const nextStatus: ReviewStatusSnapshot = {
-        ...(existing ?? { issueId }),
-        reviewSubStatuses: { ...prevSubs, [role]: 'running' },
-        reviewSessionNames: nextNames,
-      }
+    // PAN-3917 FR-12 — live pane inventory. Also `emitOnly`.
+    case 'backend_pane.changed':
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
+        backendPanesById: {
+          ...state.backendPanesById,
+          [event.payload.pane.id]: event.payload.pane,
+        },
       }
-    }
 
-    case 'review.reviewer_completed': {
-      const { issueId, role } = event.payload
-      const existing = state.reviewStatusByIssueId[issueId]
-      if (!existing) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
-      const prevSubs = existing.reviewSubStatuses ?? {}
-      const nextStatus: ReviewStatusSnapshot = {
-        ...existing,
-        reviewSubStatuses: { ...prevSubs, [role]: 'done' },
-      }
+    case 'backend_pane.removed': {
+      const { [event.payload.paneId]: _removed, ...rest } = state.backendPanesById
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
+        backendPanesById: rest,
       }
     }
 
+    // Review lifecycle telemetry. The reviewer roster and its verdict are read
+    // from the backend pane inventory and the PR, so these are sequence-only.
+    case 'review.reviewer_started':
+    case 'review.reviewer_completed':
     case 'review.specialist.timed_out':
-      // Telemetry-only event. Sequence update lets clients observe the event
-      // stream without mutating the durable review-status snapshot.
-      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
-
-    case 'review.coordinator_started': {
-      const { issueId, sessionName } = event.payload
-      const existing = state.reviewStatusByIssueId[issueId]
-      const nextStatus: ReviewStatusSnapshot = {
-        ...(existing ?? { issueId }),
-        reviewCoordinatorSessionName: sessionName,
-      }
-      return {
-        ...state,
-        sequence: Math.max(state.sequence, event.sequence),
-        reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
-      }
-    }
-
+    case 'review.coordinator_started':
     case 'review.coordinator.died':
-      // Telemetry-only. The durable review-status row is updated by recovery
-      // checks; keep clients in sequence so event stream subscribers can alert.
-      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
-
     case 'pipeline.review-started':
     case 'pipeline.review-completed':
     case 'pipeline.test-started':
     case 'pipeline.test-completed':
-      // Handled by review.status_changed; sequence-only update keeps clients in lockstep.
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'merge.ready':
@@ -768,6 +759,13 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'issues.updated':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
+    case 'issues.delta':
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        issuesRaw: applyIssueDelta(state.issuesRaw, event.payload),
+      }
 
     case 'issue.statusChanged': {
       const { issueId, status, canonicalStatus, labels } = event.payload

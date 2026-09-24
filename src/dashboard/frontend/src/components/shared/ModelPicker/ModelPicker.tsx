@@ -12,14 +12,16 @@ import styles from './ModelPicker.module.css';
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
 
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 export type AuthMode = 'api-key' | 'subscription';
 
 export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [
   { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
   { id: 'ohmypi', label: 'oh-my-pi', description: 'Alternative harness for non-Anthropic models (omp binary)' },
   { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI harness' },
+  { id: 'opencode', label: 'OpenCode', description: 'OpenCode with Go and Zen providers' },
   { id: 'acp', label: 'ACP', description: 'Agent Client Protocol harness' },
+  { id: 'muse', label: 'Muse Code', description: 'Meta Muse Code with Standard or Contributor models' },
   { id: 'kimi-code', label: 'Kimi Code', description: 'Moonshot Kimi Code CLI (native, Kimi models only)' },
 ];
 
@@ -64,17 +66,20 @@ export const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
-      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6 },
-      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15 },
-      { id: 'claude-opus-5', label: 'Claude Opus 5', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45 },
-      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45 },
-      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M', costPer1MTokens: 1 },
+      { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30 },
+      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (1M context)', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6 },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (200K context)', provider: 'anthropic', costDisplay: '$9/1M', costPer1MTokens: 9 },
+      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (1M context)', provider: 'anthropic', costDisplay: '$12/1M', costPer1MTokens: 12 },
+      { id: 'claude-opus-5', label: 'Claude Opus 5 (1M context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15 },
+      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6 (200K context)', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15 },
+      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (200K context)', provider: 'anthropic', costDisplay: '$3/1M', costPer1MTokens: 3 },
     ],
   },
 ];
 
-export function formatCost(costPer1M: number): string {
-  if (costPer1M === 0) return 'FREE';
+export function formatCost(costPer1M: number | null, provider?: string): string {
+  if (costPer1M === null) return 'Pricing unavailable';
+  if (costPer1M === 0) return provider === 'dashscope' ? 'See pricing' : 'FREE';
   if (costPer1M < 1) return `$${costPer1M.toFixed(2)}/1M`;
   return `$${Math.round(costPer1M)}/1M`;
 }
@@ -116,7 +121,7 @@ async function loadAvailableModelsState(): Promise<AvailableModelsState> {
           Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
         >,
         fetch('/api/settings/openrouter/models').then((r) => r.json()) as Promise<{
-          models: Array<{ id: string; name: string; promptCostPer1M: number }>;
+          models: Array<{ id: string; name: string; promptCostPer1M: number | null }>;
           favorites: string[];
         }>,
         fetch('/api/settings').then((r) => r.json()) as Promise<{
@@ -153,7 +158,7 @@ async function loadAvailableModelsState(): Promise<AvailableModelsState> {
             id: m.id,
             label: m.name,
             provider: prov,
-            costDisplay: formatCost(m.costPer1MTokens),
+            costDisplay: formatCost(m.costPer1MTokens, prov),
             costPer1MTokens: m.costPer1MTokens,
           })),
         });
@@ -170,7 +175,7 @@ async function loadAvailableModelsState(): Promise<AvailableModelsState> {
             label: m.name,
             provider: 'openrouter',
             costDisplay: formatCost(m.promptCostPer1M),
-            costPer1MTokens: m.promptCostPer1M,
+            costPer1MTokens: m.promptCostPer1M ?? undefined,
           })),
         });
       }

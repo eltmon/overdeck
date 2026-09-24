@@ -1,15 +1,16 @@
 /**
  * pan review abort <id>
  *
- * Kill all running reviewer tmux sessions for an issue and reset reviewStatus
- * to 'pending'. Does NOT message the work agent — leaves the worker idle.
+ * Kill every running reviewer session for an issue. Does NOT message the work
+ * agent — it leaves the worker idle. Whether the issue is in review is read
+ * from the PR, so there is nothing to reset.
  */
 
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 
-const DASHBOARD_URL = getDashboardApiUrlSync();
+const DASHBOARD_URL = getDashboardApiUrl();
 
 export async function abortReviewCommand(id: string): Promise<void> {
   const issueId = id.toUpperCase();

@@ -105,7 +105,7 @@ const HIDDEN_COCKPIT_SECTION_RULES = collectFiles(COCKPIT_COMPONENTS_ROOT, '.css
  * docs/design/mockups/three-issue-views-naming.html — every section the three
  * issue views render today, read straight from that mockup's "Complete
  * component inventory" refreshed after the Tasks migration and PAN-2696
- * (Console 17 + Cockpit 22 + Rail 15).
+ * (Console 17 + Cockpit 21 + Rail 15).
  *
  * These names are hardcoded INDEPENDENTLY of inventory.ts on purpose: the whole
  * point of the gate is that removing a manifest entry — silently dropping a
@@ -120,7 +120,6 @@ const EXPECTED_CONSOLE_SECTIONS = [
   'DrawerPickupSection / PickupGateControls',
   'DrawerWorkspaceSection',
   'UatEnvironmentPanel',
-  'IssuePolicyStrip / PoliciesControl',
   'DrawerActiveAgent',
   'DrawerPausedBanner',
   'DrawerVerificationGates',
@@ -133,10 +132,12 @@ const EXPECTED_CONSOLE_SECTIONS = [
   'StartAgentCta',
 ] as const;
 
+// PAN-3917 W7: the stale-review warning read `reviewStaleSince` off the record.
+// The record is gone and the PR's own review state is the only truth, so the
+// section is deleted rather than relocated.
 const EXPECTED_COCKPIT_SECTIONS = [
   'Header bar',
   'NeedsYouSlot',
-  'Stale-review warning',
   'StatusNarrative',
   'Pipeline Band',
   'AgentsLane',
@@ -194,12 +195,12 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     ).toEqual([]);
   });
 
-  it('matches the current independent per-view counts: Console 17, Cockpit 22, Rail 15', () => {
+  it('matches the current independent per-view counts: Console 16, Cockpit 21, Rail 15', () => {
     const byView = (view: string) => ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === view).length;
-    expect(byView('console')).toBe(17);
-    expect(byView('cockpit')).toBe(22);
+    expect(byView('console')).toBe(16);
+    expect(byView('cockpit')).toBe(21);
     expect(byView('rail')).toBe(15);
-    expect(ISSUE_VIEW_INVENTORY.length).toBe(54);
+    expect(ISSUE_VIEW_INVENTORY.length).toBe(52);
   });
 
   it('keeps every cockpit density section unchanged and backed by a real visible marker', () => {
@@ -259,9 +260,6 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     expect(homes.get('Session tab')).toBe(missionControl);
     expect(homes.get('Changes tab')).toBe(missionControl);
     expect(homes.get('TasksRail / TasksTab')).toBe(missionControl);
-    expect(homes.get('Stale-review warning')).toBe(
-      'src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx',
-    );
     expect(relocations.get('Session tab')).toBe('Conversation / Files / Terminal tabs');
     expect(relocations.get('Changes tab')).toBe('Code / Files / Artifacts tabs');
     expect(relocations.get('Plan / Activity / Discussion tabs')).toBe('PRD / Timeline / Discussion tabs');

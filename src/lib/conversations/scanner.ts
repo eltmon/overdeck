@@ -14,24 +14,24 @@
 
 import { promises as fs } from 'fs';
 import { basename, join, relative, resolve } from 'path';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { homedir } from 'os';
 
 import {
   getDiscoveredSessionByJsonlPath,
   upsertDiscoveredSession,
 } from '../overdeck/discovered-sessions.js';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { getAgentState } from '../agents/agent-state.js';
 import { parseSessionJsonl } from './jsonl-async.js';
 import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';
 import { Effect } from 'effect';
 import { runWithPool } from './work-pool.js';
-import { buildCorrelationMapSync, buildLocatorCorrelationMapSync, mergeCorrelation, type CorrelationResult } from './correlator.js';
-import { getModelCapabilitySync } from '../model-capabilities.js';
-import { resolveModelIdSync } from '../model-capabilities.js';
+import { buildCorrelationMap, buildLocatorCorrelationMap, mergeCorrelation, type CorrelationResult } from './correlator.js';
+import { getModelCapability } from '../model-capabilities.js';
+import { resolveModelId } from '../model-capabilities.js';
 import { discoverJsonlFiles, type DiscoveredFile } from './harness-discovery.js';
-import { parseAcpSessionMetadata, parseCodexSessionMetadata, parsePiSessionMetadata } from './harness-metadata.js';
+import { parseMuseSessionMetadata, parseAcpSessionMetadata, parseCodexSessionMetadata, parsePiSessionMetadata } from './harness-metadata.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,8 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     if (file.harness === 'codex') {
       return parseCodexSessionMetadata(file.jsonlPath);
     }
-    if (file.harness === 'acp') {
+    if (file.harness === 'muse') return parseMuseSessionMetadata(file.jsonlPath);
+    if (file.harness === 'acp' || file.harness === 'opencode') {
       return parseAcpSessionMetadata(file.jsonlPath);
     }
     return parseJsonl(file.jsonlPath);
@@ -97,7 +98,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     if (cwdFromFirstMessage) {
       return { workspacePath: cwdFromFirstMessage, workspaceHash: null as string | null, warning: null as string | null };
     }
-    if (file.harness === 'codex' || file.harness === 'acp') {
+    if (file.harness === 'codex' || file.harness === 'acp' || file.harness === 'opencode') {
       return { workspacePath: resolveAgentWorkspace(file.jsonlPath), workspaceHash: null as string | null, warning: null as string | null };
     }
     return { workspacePath: null as string | null, workspaceHash: null as string | null, warning: null as string | null };
@@ -148,8 +149,8 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
   // 3. Build correlation map (Overdeck-managed detection)
   const allPaths = filteredFiles.map((f) => f.jsonlPath);
-  const correlationMap = buildCorrelationMapSync(allPaths);
-  const locatorCorrelationMap = buildLocatorCorrelationMapSync();
+  const correlationMap = buildCorrelationMap(allPaths);
+  const locatorCorrelationMap = buildLocatorCorrelationMap();
 
   // 4. Determine parallelism from system-probe
   const caps = await Effect.runPromise(getSystemCapabilities(opts.maxParallel));
@@ -335,10 +336,9 @@ function resolveAgentWorkspace(jsonlPath: string): string | null {
   const match = normalized.match(/\/\.overdeck\/agents\/([^/]+)\//);
   const agentId = match?.[1];
   if (!agentId) return null;
-  const row = getOverdeckDatabaseSync()
-    .prepare(`SELECT workspace FROM agents WHERE id = ?`)
-    .get(agentId) as { workspace: string | null } | undefined;
-  return row?.workspace ?? null;
+  // PAN-3917: the agents table is dropped on every boot — an agent's workspace
+  // lives in its own state file.
+  return getAgentState(agentId)?.workspace ?? null;
 }
 
 // ─── Cost estimation ──────────────────────────────────────────────────────────
@@ -354,8 +354,8 @@ function estimateCost(
 ): number {
   if (!primaryModel) return 0;
   try {
-    const modelId = resolveModelIdSync(primaryModel);
-    const cap = getModelCapabilitySync(modelId);
+    const modelId = resolveModelId(primaryModel);
+    const cap = getModelCapability(modelId);
     // costPer1MTokens is an average blended rate
     return (cap.costPer1MTokens / 1_000_000) * (tokenInput + tokenOutput);
   } catch {

@@ -1,3 +1,4 @@
+import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { randomUUID } from 'node:crypto';
 import { Worker } from 'node:worker_threads';
 import {
@@ -21,7 +22,6 @@ import { enrichSessions, CostThresholdError } from '../../../lib/conversations/e
 import type { EnrichOptions } from '../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
-import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
 import { collectPiCostEvents } from '../../../lib/costs/reconciler.js';
 import { parseAcpConversationMessages } from './acp-conversation-parser.js';
@@ -33,6 +33,10 @@ import { parseEntireConversation } from './conversation-service.js';
 import type { ParseResult } from './conversation-service.js';
 
 export type DashboardDbOperation =
+  | 'getAgentCostStats'
+  | 'getCostsByIssueSnapshot'
+  | 'getConversationSearchStats'
+  | 'getConversationLedgerCosts'
   | 'getDiscoveredStats'
   | 'listDiscoveredSessions'
   | 'listSessionsFeed'
@@ -48,7 +52,6 @@ export type DashboardDbOperation =
   | 'getConversationByName'
   | 'getSetting'
   | 'setSetting'
-  | 'listSubstrateBugWeights'
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug'
@@ -58,7 +61,7 @@ export type DashboardDbOperation =
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
 export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse';
 
-type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'claude-initial';
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
 
 const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
@@ -67,6 +70,7 @@ const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
   codex: parseCodexConversationMessages,
   acp: parseAcpConversationMessages,
   kimi: parseKimiConversationMessages,
+  muse: parseMuseConversationMessages,
   'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
 };
 
@@ -109,11 +113,14 @@ interface WorkerResponse {
 const MAX_PENDING_JOBS = 32;
 const SEMANTIC_SEARCH_TIMEOUT_MS = Number.parseInt(process.env['OVERDECK_SEMANTIC_SEARCH_TIMEOUT_MS'] ?? '15000', 10);
 const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
+  'getAgentCostStats',
+  'getCostsByIssueSnapshot',
+  'getConversationSearchStats',
+  'getConversationLedgerCosts',
   'scanConversations',
   'enrichSessions',
   'embedSessions',
   'searchSessionsSemantic',
-  'listSubstrateBugWeights',
   'parseTranscriptSnapshot',
 ]);
 
@@ -169,6 +176,7 @@ function coalescingKey(operation: DashboardDbOperation, payload: unknown): strin
 }
 
 export function workerLane(operation: DashboardDbOperation): WorkerLane {
+  if (isPollingSnapshot(operation)) return 'read';
   if (operation === 'searchSessionsSemantic') return 'semantic';
   if (operation === 'parseTranscriptSnapshot') return 'parse';
   if (operation === 'costReconcileSweep') return 'long';
@@ -308,10 +316,6 @@ async function executeInline(
       setSetting(input.key, input.value);
       return null;
     }
-    case 'listSubstrateBugWeights': {
-      const input = payload as { window: string; limit: number; offset: number };
-      return listSubstrateBugWeights(input.window, { limit: input.limit, offset: input.offset });
-    }
     case 'getArtifactBySlug': {
       const { getArtifactBySlugJob } = await import('./artifact-index-jobs.js');
       return getArtifactBySlugJob(payload as string);
@@ -352,6 +356,11 @@ async function runInline(
   }
 }
 
+function isPollingSnapshot(operation: DashboardDbOperation): boolean {
+  return operation === 'getAgentCostStats' || operation === 'getCostsByIssueSnapshot' || operation === 'getConversationSearchStats'
+    || operation === 'getConversationLedgerCosts';
+}
+
 export function runDashboardDbJob<T>(
   operation: DashboardDbOperation,
   payload?: unknown,
@@ -364,7 +373,7 @@ export function runDashboardDbJob<T>(
     return existing.promise as Promise<T>;
   }
 
-  if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
+  if (import.meta.url.endsWith('.ts') && process.env['VITEST'] && !isPollingSnapshot(operation)) {
     const progressListeners = new Set<ProgressHandler>();
     if (onProgress) progressListeners.add(onProgress);
     const promise = runInline(operation, payload, onProgress) as Promise<T>;

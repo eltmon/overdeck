@@ -3,10 +3,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('../../../lib/agents.js', () => ({
   spawnRun: vi.fn().mockResolvedValue({ id: 'sequencer-runner', role: 'sequencer' }),
   determineModel: vi.fn().mockReturnValue('claude-opus-4-8'),
-  listRunningAgentsSync: vi.fn().mockReturnValue([]),
-  getAgentStateSync: vi.fn().mockReturnValue(null),
+  getAgentState: vi.fn().mockReturnValue(null),
   getAgentRuntimeStateSync: vi.fn().mockReturnValue(null),
   stopAgent: vi.fn(),
+}));
+
+vi.mock('../../agents/liveness.js', () => ({
+  isAlive: vi.fn().mockResolvedValue({ alive: false, reason: 'no-session' }),
+}));
+
+vi.mock('../../terminal-backends/launch.js', () => ({
+  agentPaneExists: vi.fn().mockResolvedValue(false),
+  closeAgentPane: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('../backlog-input.js', () => ({
@@ -30,16 +38,33 @@ import {
 import {
   spawnRun,
   determineModel,
-  listRunningAgentsSync,
-  getAgentStateSync,
+  getAgentState,
   getAgentRuntimeStateSync,
 } from '../../../lib/agents.js';
+import { isAlive } from '../../agents/liveness.js';
+
+const livePane = () => vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(isAlive).mockResolvedValue({ alive: false, reason: 'no-session' });
 });
 
 describe('spawnSequencerAgent', () => {
+  it('honors the persistent pause before collecting or spawning background work', async () => {
+    vi.mocked(getAgentState).mockReturnValueOnce({ paused: true } as never);
+    const { collectOpenBacklog } = await import('../backlog-input.js');
+    await expect(spawnSequencerAgent('incremental', { issues: [] })).rejects.toThrow('Sequencer is paused');
+    expect(collectOpenBacklog).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('honors a pause applied while preparing a pass', async () => {
+    vi.mocked(getAgentState).mockReturnValueOnce(null).mockReturnValueOnce({ paused: true } as never);
+    await expect(spawnSequencerAgent('review', { projectRoot: '/tmp/proj', issues: [] })).rejects.toThrow('Sequencer is paused');
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
   it('resolves to creation pass when no sequence.md exists', async () => {
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
     await spawnSequencerAgent('auto', { projectRoot: '/tmp/proj', projectKey: 'overdeck' });
@@ -129,13 +154,13 @@ describe('spawnSequencerAgent', () => {
     );
   });
 
-  it('treats a live sequencer with fresh sequence.md as done', () => {
-    (listRunningAgentsSync as ReturnType<typeof vi.fn>).mockReturnValue([{ id: SEQUENCER_AGENT_ID, tmuxActive: true }]);
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
+  it('treats a live sequencer with fresh sequence.md as done', async () => {
+    livePane();
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:01.000Z').getTime() });
 
-    expect(getSequencerRunStatus('/tmp/proj')).toMatchObject({
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({
       alive: true,
       running: false,
       done: true,
@@ -144,8 +169,8 @@ describe('spawnSequencerAgent', () => {
   });
 
   it('clears a finished lingering sequencer before a retry', async () => {
-    (listRunningAgentsSync as ReturnType<typeof vi.fn>).mockReturnValue([{ id: SEQUENCER_AGENT_ID, tmuxActive: true }]);
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
+    livePane();
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:01.000Z').getTime() });
 
@@ -157,8 +182,8 @@ describe('spawnSequencerAgent', () => {
   });
 
   it('does not clear an active sequencer pass', async () => {
-    (listRunningAgentsSync as ReturnType<typeof vi.fn>).mockReturnValue([{ id: SEQUENCER_AGENT_ID, tmuxActive: true }]);
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    livePane();
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
     (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'active' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:00.000Z').getTime() });
@@ -170,17 +195,61 @@ describe('spawnSequencerAgent', () => {
     expect(stop).not.toHaveBeenCalled();
   });
 
-  it('treats an idle live sequencer as done even without a fresh sequence file', () => {
-    (listRunningAgentsSync as ReturnType<typeof vi.fn>).mockReturnValue([{ id: SEQUENCER_AGENT_ID, tmuxActive: true }]);
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+  it('treats an idle live sequencer as done even without a fresh sequence file', async () => {
+    livePane();
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
     (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
-    expect(getSequencerRunStatus('/tmp/proj')).toMatchObject({
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({
       alive: true,
       running: false,
       done: true,
       doneReason: 'idle',
     });
+  });
+
+  it('treats a pane whose harness exited as present and done', async () => {
+    vi.mocked(isAlive).mockResolvedValue({ alive: false, reason: 'pane-dead' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({
+      alive: true,
+      running: false,
+      done: true,
+      doneReason: 'pane-dead',
+    });
+  });
+
+  it('reaps a finished lingering pass before spawning the next one', async () => {
+    // The auto-trigger reaches spawnSequencerAgent directly (never the route),
+    // so the reap has to live inside the spawn itself.
+    livePane();
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:01.000Z').getTime() });
+
+    const order: string[] = [];
+    const stop = vi.fn(async () => { order.push('stop'); });
+    vi.mocked(spawnRun).mockImplementationOnce(async () => { order.push('spawn'); return { id: SEQUENCER_AGENT_ID, role: 'sequencer' } as never; });
+
+    await spawnSequencerAgent('incremental', { projectRoot: '/tmp/proj', issues: [], stopFinishedRun: stop });
+
+    expect(order).toEqual(['stop', 'spawn']);
+  });
+
+  it('does not reap an active pass before spawning', async () => {
+    livePane();
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'active' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:00.000Z').getTime() });
+
+    const stop = vi.fn().mockResolvedValue(undefined);
+    await spawnSequencerAgent('incremental', { projectRoot: '/tmp/proj', issues: [], stopFinishedRun: stop });
+
+    expect(stop).not.toHaveBeenCalled();
   });
 });

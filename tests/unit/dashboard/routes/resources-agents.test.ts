@@ -12,6 +12,39 @@ import {
 const NOW_MS = Date.parse('2026-07-07T12:00:00.000Z');
 
 describe('agent resource stats payload', () => {
+  // PAN-3917 FR-12: an agent row is a live backend pane, so the state that
+  // drops a row is the pane's own `exited` — not a stored `stopped` status.
+  it('does not query tmux or start a cost worker when no agents are active', async () => {
+    const listSessionNames = vi.fn(() => Effect.succeed([]));
+    const readCostStats = vi.fn(async () => []);
+    const snapshot = await Effect.runPromise(getAgentStatsSnapshotEffect({
+      listAgents: async () => [{ ...agent('exited'), status: 'exited' }],
+      listSessionNames,
+      readCostStats,
+    }));
+    expect(snapshot.agents).toEqual([]);
+    expect(snapshot.hostVitals.agents.totalUsd).toBe(0);
+    expect(listSessionNames).not.toHaveBeenCalled();
+    expect(readCostStats).not.toHaveBeenCalled();
+  });
+
+  it('reads one aggregate snapshot for active agents while retaining zero-cost missing rows', async () => {
+    const readCostStats = vi.fn(async () => [['agent-a', {
+      burnUsdPerHour: 2, hypotheticalUsdPerHour: 0.5, totalUsd: 10,
+    }]] as Array<[string, { burnUsdPerHour: number; hypotheticalUsdPerHour: number; totalUsd: number }]>);
+    const snapshot = await Effect.runPromise(getAgentStatsSnapshotEffect({
+      nowMs: NOW_MS,
+      listAgents: async () => [agent('agent-a'), agent('agent-b'), { ...agent('exited'), status: 'exited' }],
+      listSessionNames: () => Effect.succeed([]),
+      readCostStats,
+    }));
+    expect(readCostStats).toHaveBeenCalledExactlyOnceWith(['agent-a', 'agent-b']);
+    expect(snapshot.agents.map(row => [row.id, row.burnUsdPerHour, row.totalUsd])).toEqual([
+      ['agent-a', 2, 10], ['agent-b', 0, 0],
+    ]);
+    expect(snapshot.hostVitals.agents).toEqual({ burnUsdPerHour: 2, hypotheticalUsdPerHour: 0.5, totalUsd: 10 });
+  });
+
   it('extrapolates recent agent cost events into burn dollars per hour', () => {
     const snapshot = buildAgentStatsSnapshot({
       nowMs: NOW_MS,
@@ -64,7 +97,7 @@ describe('agent resource stats payload', () => {
 
     const snapshot = await Effect.runPromise(getAgentStatsSnapshotEffect({
       nowMs: NOW_MS,
-      listAgents: () => [agent('agent-pan-2464-tree')],
+      listAgents: async () => [agent('agent-pan-2464-tree')],
       listSessionNames: () => Effect.succeed(['agent-pan-2464-tree']),
       listPanePids: () => Effect.succeed([100]),
       readProcessTable,

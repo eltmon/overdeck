@@ -24,7 +24,7 @@ import { promises as fsp } from 'fs';
 export const DEFAULT_DOCKER_BRIDGE_POOL_LIMIT = 31;
 
 /** Free slots remaining at which the pool is reported as under pressure. */
-export const BRIDGE_POOL_WARNING_HEADROOM = 5;
+const BRIDGE_POOL_WARNING_HEADROOM = 5;
 
 /** Lists every bridge network on the host, one name per line. */
 export const LIST_BRIDGE_NETWORKS_COMMAND = `docker network ls --filter driver=bridge --format '{{.Name}}'`;

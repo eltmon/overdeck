@@ -31,7 +31,7 @@ import type { PendingAskUserQuestionSnapshot, PendingInputKind } from '../agent-
 import { getOverdeckHome } from '../paths.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
 
-export const CONTROL_ACK_TIMEOUT_MS = 10_000;
+const CONTROL_ACK_TIMEOUT_MS = 10_000;
 
 export interface ConversationControlAck {
   id: string
@@ -209,9 +209,7 @@ export async function handleConversationCodexApproval(
     }
     // Re-detect uncached so we only send keystrokes when the menu is still
     // up, and so we can bound optionNumber to the options actually shown.
-    const detection = await Effect.runPromise(
-      detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false, cache: false }),
-    );
+    const detection = await detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false, cache: false });
     const parsed = detection ? parseCodexApprovalPrompt(detection.prompt) : null;
     if (!parsed) {
       return jsonResponse({ error: 'No Codex approval prompt is currently pending' }, { status: 409 });
@@ -270,7 +268,7 @@ export function isPiControlChannelHarness(harness: RuntimeName | 'pi'): boolean 
   return harness === 'ohmypi' || harness === 'pi';
 }
 
-export function parseThinkingLevel(value: unknown): ThinkingLevel | null {
+function parseThinkingLevel(value: unknown): ThinkingLevel | null {
   return typeof value === 'string' && (THINKING_LEVELS as readonly string[]).includes(value)
     ? value as ThinkingLevel
     : null;
@@ -283,7 +281,7 @@ export function pickDeliverAs(bodyDeliverAs: unknown): ConversationControlDelive
 
 export function resolveConversationDeliveryMethod(conv: Pick<Conversation, 'harness' | 'deliveryMethod'>): 'auto' | 'channels' | 'tmux' {
   const harness = conv.harness ?? 'claude-code';
-  if (harness === 'acp') return 'auto';
+  if (harness === 'acp' || harness === 'opencode') return 'auto';
   if (isPiControlChannelHarness(harness)) return 'auto';
   if (harness === 'codex' && loadConfigSync().config.codex?.transport !== 'tui') return 'auto';
   return conv.deliveryMethod ?? (getHarnessBehavior(harness).deliveryKind === 'rpc-fifo' ? 'tmux' : 'auto');
@@ -367,17 +365,29 @@ export async function handleConversationThinkingLevel(
   if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
-  if (!isPiControlChannelHarness(harness)) {
-    return jsonResponse({ error: 'Thinking level control is only supported for Pi conversations' }, { status: 400 });
+  if (harness !== 'codex' && harness !== 'acp' && harness !== 'opencode' && !isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Thinking level control is supported for Codex, ACP, OpenCode, and Pi conversations' }, { status: 400 });
   }
   if (conv.status === 'ended') {
     return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
   }
 
-  const level = parseThinkingLevel(body['level']);
+  const level = harness === 'codex' || harness === 'acp' || harness === 'opencode'
+    ? (typeof body['level'] === 'string' && ['low', 'medium', 'high', 'xhigh', 'max'].includes(body['level']) ? body['level'] : null)
+    : parseThinkingLevel(body['level']);
   if (!level) return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
 
-  await sendConversationControlCommand(conv, { type: 'set_thinking_level', level });
+  if (harness === 'acp' || harness === 'opencode') {
+    const result = await postCodexAppServerOp<{ effort: string }>(conv.tmuxSession, { op: 'set-effort', effort: level }, 'acp');
+    setConversationEffort(name, result.effort);
+    return jsonResponse({ ok: true, effort: result.effort });
+  }
+  if (harness === 'codex') {
+    // Use the live socket, not a mutable global transport preference.
+    await postCodexAppServerOp(conv.tmuxSession, { op: 'set-effort', effort: level });
+  } else {
+    await sendConversationControlCommand(conv, { type: 'set_thinking_level', level: level as ThinkingLevel });
+  }
   setConversationEffort(name, level);
   const updated = getConversationByName(name) ?? conv;
   return jsonResponse({ ok: true, effort: updated.effort ?? level });
@@ -429,7 +439,7 @@ export async function handleConversationDeliveryMethod(
   return jsonResponse({ ok: true, deliveryMethod });
 }
 
-export const CODEX_APPROVAL_TOOL_PREFIX = 'codex-approval:';
+const CODEX_APPROVAL_TOOL_PREFIX = 'codex-approval:';
 
 export async function codexConversationPendingInput(
   conv: Conversation,
@@ -458,7 +468,7 @@ export async function codexConversationPendingInput(
         },
       };
     }
-    const detection = await Effect.runPromise(detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false }));
+    const detection = await detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false });
     if (!detection) return { kinds: [] };
     if (detection.reason === 'session_resume') return { kinds: ['sessionResume'] };
 
@@ -484,7 +494,7 @@ export async function codexConversationPendingInput(
   }
 }
 
-export async function deliverCodexApprovalChoice(tmuxSession: string, optionNumber: number): Promise<void> {
+async function deliverCodexApprovalChoice(tmuxSession: string, optionNumber: number): Promise<void> {
   for (let i = 1; i < optionNumber; i += 1) {
     await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Down', 'codex-approval'));
     await new Promise((r) => setTimeout(r, 60));
@@ -516,9 +526,9 @@ function formatAppServerApprovalQuestion(request: CodexAppServerPendingRequest):
   return `Codex requests approval for ${request.method}`;
 }
 
-async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>): Promise<T> {
-  const socketPath = join(getOverdeckHome(), 'sockets', `appserver-${tmuxSession}.sock`);
-  const tokenPath = join(getOverdeckHome(), 'agents', tmuxSession, 'appserver-token');
+async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>, transport: 'appserver' | 'acp' = 'appserver'): Promise<T> {
+  const socketPath = join(getOverdeckHome(), 'sockets', `${transport}-${tmuxSession}.sock`);
+  const tokenPath = join(getOverdeckHome(), 'agents', tmuxSession, `${transport}-token`);
   if (!existsSync(socketPath)) throw new Error(`app-server socket missing for ${tmuxSession}`);
   if (!existsSync(tokenPath)) throw new Error(`app-server token missing for ${tmuxSession}`);
   const token = readFileSync(tokenPath, 'utf-8').trim();

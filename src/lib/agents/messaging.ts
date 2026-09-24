@@ -2,18 +2,20 @@ import { createHash } from 'crypto';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { appendOperatorInterventionEvent } from '../operator-interventions.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { logAgentLifecycle } from '../persistent-logger.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
-import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
-import { createSession, killSession, listPaneValues, sessionExists } from '../tmux.js';
+import { closeAgentPane, launchAgentPane } from '../terminal-backends/launch.js';
+import { toPaneRole } from '../terminal-backends/prompt-guard.js';
+import { isAlive, isConfirmedDead } from './liveness.js';
 import {
   clearReadySignal,
   normalizeAgentId,
@@ -23,21 +25,20 @@ import {
   decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
-  getAgentStateSync,
+  getAgentState,
   markAgentRunning,
   saveAgentStateSync,
   type AgentState,
   type MessageAgentRedriveOptions,
   type Role,
 } from './agent-state.js';
-import { getLatestSessionIdSync } from './activity.js';
+import { getLatestSessionId } from './activity.js';
 import {
   deliverAgentMessage,
-  deliverResumeMessageWithTranscriptConfirmation,
+  deliverMessageWithTranscriptConfirmation,
   resilientDeliveryMethod,
 } from './delivery.js';
-import { watchForEatenAgentMessage } from './eaten-message-watcher.js';
-import { formatMailFileContent, isMonitorLive } from './monitor-transport.js';
+import { formatMailFileContent } from './monitor-transport.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   claudeSystemPromptFiles,
@@ -45,7 +46,6 @@ import {
   getCodexAppServerStatus,
   getOhmypiLauncherFields,
   getRoleRuntimeBaseCommand,
-  hasAgentRuntimeInSubtree,
   waitForPromptReady,
 } from './runtime-command.js';
 import {
@@ -63,6 +63,8 @@ export interface MessageDeliveryOutcome {
   queuedToMail: boolean;
   reason?: string;
   deduplicated?: boolean;
+  /** true when a transcript probe saw the message land as a new turn (Claude Code only). */
+  confirmed?: boolean;
 }
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
@@ -133,7 +135,7 @@ const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-m
 export function resolveAgentDeliveryMethod(
   state: Pick<AgentState, 'harness' | 'deliveryMethod'> | null | undefined,
 ): 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined {
-  if (state?.harness === 'acp') return 'auto';
+  if (state?.harness === 'acp' || state?.harness === 'opencode') return 'auto';
   return resilientDeliveryMethod(state?.deliveryMethod);
 }
 
@@ -149,7 +151,7 @@ function claimCodexIdleTurn(agentId: string): boolean {
 async function appendTellInterventionForUserSource(normalizedId: string, caller: string): Promise<void> {
   if (!USER_MESSAGE_INTERVENTION_SOURCES.has(caller)) return;
 
-  const agentState = getAgentStateSync(normalizedId);
+  const agentState = getAgentState(normalizedId);
   if (!agentState?.issueId) {
     console.debug(`[agents] Skipping tell intervention for ${normalizedId}; state.json has no issueId`);
     return;
@@ -212,6 +214,7 @@ async function resumeThenDeliverKeyed(
   return {
     delivered: delivery.ok,
     queuedToMail: false,
+    ...(delivery.failure ? { reason: delivery.failure } : {}),
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
   };
 }
@@ -224,7 +227,27 @@ export async function messageAgent(
   opts: MessageAgentRedriveOptions = {},
 ): Promise<MessageDeliveryOutcome> {
   const normalizedId = normalizeAgentId(agentId);
-  const agentState = getAgentStateSync(normalizedId);
+  const agentState = getAgentState(normalizedId);
+
+  // PAN-3879: conversations (conv-*) have no agents/<id>/state.json, so the
+  // harness must come from the conversation row — the same resolver the
+  // dashboard message path uses. Without this, expectedHarness falls back to
+  // claude-code and a live acp-host/codex pane reads as a zombie, and the
+  // guard below calls resumeAgent, which refuses conversations outright.
+  // Lazy import: overdeck/conversations.js deliberately avoids the agents
+  // graph (import-cycle comment at its call site), and this keeps the
+  // agent hot path import graph unchanged.
+  const isConversationTarget = normalizedId.startsWith('conv-');
+  let conversationHarness: RuntimeName | undefined;
+  if (isConversationTarget && !agentState) {
+    try {
+      const { getConversationByName } = await import('../overdeck/conversations.js');
+      conversationHarness = getConversationByName(normalizedId)?.harness ?? undefined;
+    } catch {
+      // The conversations store may be unavailable in minimal installs or
+      // tests — fall through to the agent-state default below.
+    }
+  }
 
   // PAN-2668: pipeline feedback that owes rework (failed verification/review)
   // is a re-drive, not a casual message. Consult the intent policy so the
@@ -241,7 +264,7 @@ export async function messageAgent(
     });
     if (decision.decision === 'proceed' && decision.clearStoppedByUser && agentState) {
       console.log(`[agents] ${normalizedId} was operator-stopped but owes rework after a completed handoff — clearing stop gate to deliver feedback (PAN-2668)`);
-      logAgentLifecycleSync(normalizedId, 'stoppedByUser cleared: completed handoff owes rework; delivering pipeline feedback (PAN-2668)');
+      logAgentLifecycle(normalizedId, 'stoppedByUser cleared: completed handoff owes rework; delivering pipeline feedback (PAN-2668)');
       delete agentState.stoppedByUser;
       saveAgentStateSync(agentState);
     }
@@ -250,7 +273,7 @@ export async function messageAgent(
   if (agentState?.paused === true) {
     const gateBlockReason = getAgentResumeGateBlockReason(agentState)?.reason ?? 'agent is paused';
     queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
-    logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+    logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
     console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
     return { delivered: false, queuedToMail: true, reason: gateBlockReason };
   }
@@ -262,7 +285,7 @@ export async function messageAgent(
     if (suspendedGate.decision !== 'proceed') {
       const gateBlockReason = suspendedGate.reason ?? 'agent is gated';
       queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
-      logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+      logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
@@ -293,19 +316,19 @@ export async function messageAgent(
   // prior conversation, destroying agent continuity every time feedback arrived.
   //
   // We also restart when the tmux session still exists. Planning/work sessions use
-  // `remain-on-exit on` so the shell persists after the agent process exits, and
-  // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
-  // session before re-creating it.
+  // `remain-on-exit on` so the shell persists after the agent process exits, and the
+  // liveness oracle (src/lib/agents/liveness.ts) reports that dead shell as not alive.
+  // resumeAgent() kills the zombie session before re-creating it.
   if (agentState && agentState.status === 'stopped') {
     const stoppedGate = decideMessageGate();
     if (stoppedGate.decision !== 'proceed') {
       const gateBlockReason = stoppedGate.reason ?? 'agent is gated';
       queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
-      logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+      logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
-    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await Effect.runPromise(sessionExists(normalizedId))})`);
+    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (alive: ${(await isAlive(normalizedId)).alive})`);
 
     if (opts.dedupKey !== undefined) {
       // Keyed deliveries resume bare and then enforce the key at the delivery
@@ -347,24 +370,24 @@ export async function messageAgent(
         : 'resume succeeded but message delivery timed out';
       const stopMsg = `Not restarting ${normalizedId} with a fresh session — ${why}; session rotation is disabled (PAN-1980). Agent left stopped; feedback queued in mail.`;
       console.warn(`[agents] ${stopMsg}`);
-      emitActivityEntrySync({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${stopMsg}`, issueId: agentState.issueId });
+      emitActivityEntry({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${stopMsg}`, issueId: agentState.issueId });
       return { delivered: false, queuedToMail: true, reason: stopMsg };
     }
 
     const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
     if (agentState.model) {
-      const provider = getProviderForModelSync(agentState.model as ModelId);
+      const provider = getProviderForModel(agentState.model as ModelId);
       if (provider.authType === 'credential-file') {
-        setupCredentialFileAuthSync(provider, agentState.workspace);
+        setupCredentialFileAuth(provider, agentState.workspace);
       } else {
-        clearCredentialFileAuthSync(agentState.workspace);
+        clearCredentialFileAuth(agentState.workspace);
       }
     }
 
     clearReadySignal(normalizedId);
-    if (await Effect.runPromise(sessionExists(normalizedId))) {
-      try { await Effect.runPromise(killSession(normalizedId)); } catch { /* ignore */ }
-    }
+    // Close any leftover pane or session unconditionally — closeAgentPane is a
+    // no-op when there is none and never throws.
+    await closeAgentPane(normalizedId);
 
     const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -375,7 +398,7 @@ export async function messageAgent(
     // so the role-specific .claude/agents/* definition file is loaded.
     const resumeRole: Role = agentState.role ?? 'work';
     // PAN-1048 review feedback 006 (S1): Pi-backed resumes need the same
-    // launcher fields the fresh-spawn path threads through generateLauncherScript.
+    // launcher fields the fresh-spawn path threads through generateLauncherScriptSync.
     // buildPiCommand throws on missing piSessionDir, so the previous fallback
     // emitted a launcher that would crash on resume for any Pi role agent.
     const resumeModel = agentState.model || 'claude-sonnet-4-6';
@@ -395,7 +418,7 @@ export async function messageAgent(
       ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
-    const fallbackContent = generateLauncherScriptSync({
+    const fallbackContent = generateLauncherScript({
       role: resumeRole,
       workingDir: agentState.workspace,
       changeDir: false,
@@ -409,13 +432,25 @@ export async function messageAgent(
         fallbackHarness,
       ),
       appendSystemPromptFiles: await claudeSystemPromptFiles(agentState.workspace, fallbackHarness),
+      managedStateKey: normalizedId,
+      overdeckEnv: {
+        agentId: normalizedId,
+        issueId: agentState.issueId,
+        sessionType: resumeRole,
+      },
       useSupervisor: fallbackSupervisorLaunch.useSupervisor,
       supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,
       ...fallbackCodexFields,
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
-    await Effect.runPromise(createSession(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
+    // PAN-3960: relaunch on the backend the host selects now, stamped like a spawn.
+    const fallbackIssueId = agentState.issueId || normalizedId.replace(/^(agent|planning)-/, '').toUpperCase();
+    const fallbackPane = await launchAgentPane({
+      issueId: fallbackIssueId,
+      cwd: agentState.workspace,
+      agentId: normalizedId,
+      argv: ['bash', fallbackLauncher],
       env: {
         ...BLANKED_PROVIDER_ENV,
         OVERDECK_AGENT_ID: normalizedId,
@@ -423,8 +458,16 @@ export async function messageAgent(
         OVERDECK_SESSION_TYPE: agentState.role,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
-      }
-    }));
+      },
+      tokens: {
+        issue: fallbackIssueId,
+        role: toPaneRole(resumeRole),
+        harness: fallbackHarness,
+        model: resumeModel,
+      },
+    });
+    agentState.backend = fallbackPane.backend;
+    agentState.paneId = fallbackPane.paneId;
 
     markAgentRunning(agentState);
     saveAgentStateSync(agentState);
@@ -437,7 +480,7 @@ export async function messageAgent(
     if (resumeMessage.error) {
       reason = resumeMessage.error;
       console.error(`[agents] Fallback-restarted ${normalizedId} but ${resumeMessage.error}`);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'work-agent',
         level: 'error',
         message: `${normalizedId}: ${resumeMessage.error}`,
@@ -445,9 +488,12 @@ export async function messageAgent(
       });
     } else if (ready && resumeMessage.message) {
       if (fallbackHarness === 'claude-code') {
-        const fallbackSessionId = getLatestSessionIdSync(normalizedId);
+        const fallbackSessionId = getLatestSessionId(
+          normalizedId,
+          { getAgentState: () => agentState },
+        );
         if (fallbackSessionId) {
-          const delivery = await deliverResumeMessageWithTranscriptConfirmation({
+          const delivery = await deliverMessageWithTranscriptConfirmation({
             agentId: normalizedId,
             workspace: agentState.workspace,
             sessionId: fallbackSessionId,
@@ -514,30 +560,7 @@ export async function messageAgent(
     return { delivered: true, queuedToMail: true };
   }
 
-  const expectedHarness = agentState?.harness ?? 'claude-code';
-
-  // PAN-3015 monitor tier: when the agent's Claude Code session runs a live
-  // `pan monitor` background task, the durable mail file IS the delivery — the
-  // monitor prints it to stdout and the harness surfaces it to the model,
-  // waking an idle session. No keystroke transport runs, which sidesteps the
-  // whole echo-confirm/paste/Enter failure class (PAN-1769, PAN-2228,
-  // PAN-1988). Mid-session tells only: kickoff/resume never reach this path
-  // (no monitor exists before the session's first turn), and a stale
-  // heartbeat or dead pid falls through to the normal cascade.
-  //
-  // KEYED deliveries never take this tier (PAN-2997 review cycle 7): the
-  // monitor claims a mail file by renaming it before emitting, so a monitor
-  // exit between claim and emit loses the wake, and a dashboard crash after
-  // the emit but before the outbox ack replays it — the mail spool cannot
-  // enforce the key across the complete model-visible side effect. Keyed
-  // messages fall through to the supervisor/tmux door, which can.
-  if (expectedHarness === 'claude-code' && opts.dedupKey === undefined && isMonitorLive(normalizedId)) {
-    queueAgentMail(normalizedId, message, 'queued', opts.dedupKey, caller);
-    logAgentLifecycleSync(normalizedId, `messageAgent delivered via monitor mail (caller: ${caller})`);
-    console.log(`[agents] Delivered message to ${normalizedId} via monitor inbox`);
-    await appendTellInterventionForUserSource(normalizedId, caller);
-    return { delivered: true, queuedToMail: true, reason: 'monitor' };
-  }
+  const expectedHarness = agentState?.harness ?? conversationHarness ?? 'claude-code';
 
   let appServerState: string | undefined;
   try {
@@ -559,7 +582,7 @@ export async function messageAgent(
       // stays deterministic, it just carries the drainable suffix now.
       const mailPath = queueAgentMail(normalizedId, message, 'pending', opts.dedupKey);
       const busyReason = busyAgentQueuedReason(mailPath);
-      logAgentLifecycleSync(normalizedId, `messageAgent: ${busyReason}`);
+      logAgentLifecycle(normalizedId, `messageAgent: ${busyReason}`);
       console.log(`[agents] ${normalizedId}: ${busyReason}`);
       await appendTellInterventionForUserSource(normalizedId, caller);
       return { delivered: true, queuedToMail: true, reason: busyReason };
@@ -572,37 +595,58 @@ export async function messageAgent(
     return {
       delivered: delivery.ok,
       queuedToMail: true,
+      ...(delivery.failure ? { reason: delivery.failure } : {}),
       ...(delivery.deduplicated ? { deduplicated: true } : {}),
     };
   }
 
-  if (!(await Effect.runPromise(sessionExists(normalizedId)))) {
+  // Guard: if the tmux session exists but the harness process is gone (a
+  // remain-on-exit dead shell), resume instead of typing the message into a
+  // bare bash shell. Liveness is the single oracle (PAN-3849): session +
+  // live pane + harness process in the pane's process subtree. Only a
+  // CONFIRMED death takes the resume path — an indeterminate probe delivers
+  // normally and lets the transport fail on its own rather than resuming a
+  // possibly-healthy agent.
+  // PAN-3879: a conversation has no agent state, so the oracle's default
+  // harness reader would fall back to claude-code and report a live
+  // acp-host/codex pane as runtime-missing. Probe with the harness the
+  // conversation row declares.
+  const liveness = await isAlive(normalizedId, { readHarness: () => expectedHarness });
+  if (!liveness.alive && liveness.reason === 'no-session') {
     throw new Error(`Agent ${normalizedId} not running`);
   }
-
-  // Guard: if tmux session exists but Claude Code has exited, resume instead
-  // of typing the message into a bare bash shell.
-  //
-  // Launchers differ: specialists `exec claude` so pane_pid IS claude, but
-  // work-agent launchers run `bash launcher.sh` so pane_pid is bash and claude
-  // runs as a descendant. Walk the pane's process subtree and treat the pane
-  // as live if any descendant is the expected runtime for the saved harness.
-  const panePids = await Effect.runPromise(listPaneValues(normalizedId, '#{pane_pid}'));
-  if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
-    console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
-    if (opts.dedupKey !== undefined) {
-      return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
-    }
-    const { resumeAgent } = await import('../agents.js');
-    const resumeResult = await resumeAgent(normalizedId, message);
-    if (resumeResult.success) {
-      const delivered = resumeResult.messageDelivered !== false;
-      if (delivered) {
-        await appendTellInterventionForUserSource(normalizedId, caller);
+  // PAN-3849 + PAN-3879: the liveness oracle decides whether the pane is a
+  // zombie (one module, and `runtime-indeterminate` is NOT death — a broken
+  // probe must never trigger a resume). The conversation handling below is
+  // PAN-3879's: resumeAgent requires agent state plus a resumable session
+  // pointer and refuses conv- ids outright, so a conversation is never resumed.
+  if (!liveness.alive && isConfirmedDead(liveness)) {
+    if (isConversationTarget) {
+      // For opencode/acp/codex the delivery door already routes by harness
+      // (ACP fails loudly on a dead socket instead of typing into a dead
+      // shell), so skip the zombie resume and hand off.
+      if (expectedHarness === 'opencode' || expectedHarness === 'acp' || expectedHarness === 'codex') {
+        console.warn(`[agents] ${normalizedId} pane shows no ${expectedHarness} runtime (${liveness.reason}) — skipping the zombie resume and handing off to the harness delivery door`);
+        logAgentLifecycle(normalizedId, `messageAgent: pane shows no ${expectedHarness} runtime; handing off to the delivery door (conversations are never resumed, PAN-3879)`);
+      } else {
+        throw new Error(`Conversation ${normalizedId} tmux session is dead (no ${expectedHarness} runtime in its pane) and conversations cannot be resumed by pan tell — resume it from the dashboard, then send again.`);
       }
-      return { delivered, queuedToMail: false };
+    } else {
+      console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
+      if (opts.dedupKey !== undefined) {
+        return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
+      }
+      const { resumeAgent } = await import('../agents.js');
+      const resumeResult = await resumeAgent(normalizedId, message);
+      if (resumeResult.success) {
+        const delivered = resumeResult.messageDelivered !== false;
+        if (delivered) {
+          await appendTellInterventionForUserSource(normalizedId, caller);
+        }
+        return { delivered, queuedToMail: false };
+      }
+      throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
     }
-    throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
   }
 
   // Codex's notify hook writes turn-completed at every idle boundary. Claiming
@@ -617,17 +661,49 @@ export async function messageAgent(
   const deliveryMethod = resolveAgentDeliveryMethod(agentState);
   const deliveryCaller = `messageAgent:${caller}`;
   const transcriptSessionId = getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl'
-    ? agentState?.sessionId ?? getLatestSessionIdSync(normalizedId)
+    ? getLatestSessionId(normalizedId, { getAgentState: () => agentState })
     : undefined;
-  let transcriptWatch: { sessionId: string; fromByteOffset: number } | undefined;
-  if (agentState?.workspace && transcriptSessionId) {
-    const snapshot = await captureTranscriptUserRecordSnapshot(agentState.workspace, transcriptSessionId);
-    transcriptWatch = {
+
+  if (agentState?.workspace && transcriptSessionId && opts.dedupKey === undefined) {
+    // Claude Code, unkeyed: deliver and wait for the transcript to show the turn.
+    const confirmedDelivery = await deliverMessageWithTranscriptConfirmation({
+      agentId: normalizedId,
+      workspace: agentState.workspace,
       sessionId: transcriptSessionId,
-      fromByteOffset: snapshot.readOffset ?? snapshot.fileSize ?? 0,
-    };
+      message,
+      caller: deliveryCaller,
+      // A supervisor-backed agent owns a verified PTY socket; require that path
+      // instead of silently falling back to a tmux paste whose compaction
+      // summary can masquerade as the message landing (same guard as resume).
+      deliveryMethod: agentState.deliveryMethod === 'supervisor' || agentState.supervisorEnabled === true
+        ? 'supervisor'
+        : deliveryMethod,
+    });
+    queueAgentMail(normalizedId, message, 'delivered');
+    await appendTellInterventionForUserSource(normalizedId, caller);
+    if (!confirmedDelivery.delivered) {
+      const reason = `message was injected but no turn appeared in transcript ${transcriptSessionId} within the confirmation window (${confirmedDelivery.attempts} attempts)`;
+      logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);
+      return { delivered: false, queuedToMail: true, confirmed: false, reason };
+    }
+    logAgentLifecycle(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
+    return { delivered: true, queuedToMail: true, confirmed: true };
   }
 
+  // Claude Code agent without an identifiable transcript: the confirmed-turn
+  // contract (PAN-3846 FR-1) cannot be satisfied, so fail loudly instead of
+  // falling through to an unconfirmed composer delivery that reports
+  // delivered:true. Conversations (no agent state) and keyed or non-Claude
+  // deliveries keep the composer-level contract below.
+  if (agentState && getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl' && opts.dedupKey === undefined) {
+    const reason = `cannot confirm delivery: no Claude transcript identifiable for ${normalizedId} (workspace: ${agentState.workspace ?? 'none'}, sessionId: ${transcriptSessionId ?? 'none'})`;
+    logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);
+    queueAgentMail(normalizedId, message, 'queued', undefined, caller);
+    await appendTellInterventionForUserSource(normalizedId, caller);
+    return { delivered: false, queuedToMail: true, confirmed: false, reason };
+  }
+
+  // Keyed deliveries and non-Claude harnesses keep the composer-level contract.
   const delivery = await deliverWithOptionalKey(
     normalizedId,
     message,
@@ -647,28 +723,11 @@ export async function messageAgent(
   }
   await appendTellInterventionForUserSource(normalizedId, caller);
 
-  if (delivery.ok && transcriptWatch && agentState?.workspace) {
-    void watchForEatenAgentMessage({
-      agentId: normalizedId,
-      workspace: agentState.workspace,
-      sessionId: transcriptWatch.sessionId,
-      message,
-      caller: deliveryCaller,
-      deliveryMethod,
-      fromByteOffset: transcriptWatch.fromByteOffset,
-    }).then((outcome) => {
-      if (outcome === 'redelivered') {
-        console.log(`[agents] ${normalizedId}: redelivered message eaten by submit-time compaction`);
-      }
-    }).catch((error: unknown) => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[agents] eaten-message watcher failed for ${normalizedId}: ${errorMessage}`);
-    });
-  }
-
   return {
     delivered: delivery.ok,
     queuedToMail: opts.dedupKey === undefined,
+    confirmed: false,
+    ...(delivery.failure ? { reason: delivery.failure } : {}),
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
   };
 }

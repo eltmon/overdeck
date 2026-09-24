@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { ExternalLink, User, Play, Eye, DollarSign, ChevronDown, ChevronRight, Sparkles, FileText, List, ScrollText } from 'lucide-react';
-import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
+import { useDashboardStore, selectBackendPanes, selectDerivedIssueState } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
 import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueActions';
@@ -16,7 +16,6 @@ import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/wor
 import { IssueActionMenu, useIssueActions } from '../../IssueActionMenu';
 import IssueCardPrimitive from '../../primitives/IssueCard';
 import VerbBadge from '../../primitives/VerbBadge';
-import { VerifyingOnMainBadge } from '../../VerifyingOnMainBadge';
 import { CostBreakdownModal } from '../../CostBreakdownModal';
 import type { WorkspaceData } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import { DifficultyBadge, TrackerShadowBadges } from '../badges';
@@ -204,7 +203,6 @@ export function CompactChildCard({
 }) {
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const dotColor = canonical === 'done' ? 'bg-success' :
-                   canonical === 'verifying_on_main' ? 'bg-info' :
                    canonical === 'in_progress' ? 'bg-warning' :
                    canonical === 'in_review' ? 'bg-signal-review' :
                    'bg-muted-foreground';
@@ -284,7 +282,6 @@ export function ListIssueRow({
 
   // Status indicator color
   const statusColor = canonical === 'done' ? 'bg-success' :
-                      canonical === 'verifying_on_main' ? 'bg-info' :
                       canonical === 'in_review' ? 'bg-signal-review' :
                       canonical === 'in_progress' ? 'bg-warning' :
                       canonical === 'todo' ? 'bg-primary' :
@@ -525,13 +522,12 @@ export function DragOverlayCard({ issue }: DragOverlayCardProps) {
   );
 }
 
-const CARD_VERB_BY_PHASE: Partial<Record<PipelinePhase, 'WORK RUNNING' | 'REVIEW RUNNING' | 'SHIP RUNNING' | 'PLANNING' | 'INPUT' | 'READY TO MERGE' | 'MERGED' | 'CHANGES REQUESTED' | 'QUEUED FOR PLAN'>> = {
+const CARD_VERB_BY_PHASE: Partial<Record<PipelinePhase, 'WORK RUNNING' | 'REVIEW RUNNING' | 'PLANNING' | 'INPUT' | 'READY TO MERGE' | 'MERGED' | 'CHANGES REQUESTED' | 'QUEUED FOR PLAN'>> = {
   QUEUED_FOR_PLAN: 'QUEUED FOR PLAN',
   PLANNING: 'PLANNING',
   WORK_RUNNING: 'WORK RUNNING',
   INPUT: 'INPUT',
   REVIEW_RUNNING: 'REVIEW RUNNING',
-  SHIP_RUNNING: 'SHIP RUNNING',
   CHANGES_REQUESTED: 'CHANGES REQUESTED',
   STUCK: 'CHANGES REQUESTED',
   READY_TO_MERGE: 'READY TO MERGE',
@@ -576,10 +572,10 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     }
   }, [isSelected, isFocused]);
 
-  const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
-  const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
-  const isClosedNotMerged = reviewStatus?.mergeStatus === 'failed' || issue.mergeStatus === 'failed';
-  const isReadyToMerge = !isMerged && !isClosedNotMerged && reviewStatus?.readyForMerge === true;
+  const derived = useDashboardStore(selectDerivedIssueState(issue.identifier || ''));
+  const panes = useDashboardStore(selectBackendPanes(issue.identifier || ''));
+  const isMerged = derived?.state === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
+  const isReadyToMerge = derived?.state === 'ready';
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0] ?? planningAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable);
@@ -588,7 +584,8 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const hasPendingInput = [...issueWorkAgents, ...specialists].some(hasActualPendingQuestion);
   const canonical = issue.state ?? STATUS_LABELS[issue.status] ?? 'backlog';
   const issueActionPhase = deriveIssueActionPhase({
-    reviewStatus,
+    derived,
+    panes,
     agent: activeAgent,
     workspace: { exists: !!(workspaceProp?.path || issue.workspacePath) },
     hasPlan: planningState?.hasPlan ?? issue.hasPlan ?? false,
@@ -599,18 +596,14 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   });
   // PAN-2908 C-VOCAB: the card's mini phase rail, from the same classifier.
   const phaseRail = phaseRailState(derivePipelineState({
-    reviewStatus,
-    agent: activeAgent,
-    hasPlan: planningState?.hasPlan ?? issue.hasPlan ?? false,
-    hasTasks: planningState?.hasTasks ?? issue.hasTasks ?? false,
+    derived,
+    panes,
     issueCanonicalState: canonical,
-    isMerged,
   }));
   const isPipelineStuck = issueActionPhase === 'STUCK';
   const pinActionRow = isRunning || issueActionPhase === 'STUCK' || issueActionPhase === 'INPUT' || issueActionPhase === 'READY_TO_MERGE';
   const cardVerb = CARD_VERB_BY_PHASE[issueActionPhase];
   const cardVerbBadge =
-    canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
     cardVerb ? <VerbBadge variant={cardVerb} /> :
     null;
   const taskProgressColor =
@@ -627,15 +620,13 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     .find((a) => (a as { paused?: boolean }).paused === true);
   const pausedReason = pausedAgent ? (pausedAgent as { pausedReason?: string }).pausedReason : undefined;
 
-  // Surface the troubled gate on the card — troubled agents were quarantined
-  // by the deacon after repeated resume/crash failures and stay down until an
-  // operator investigates and runs `pan untroubled`. Deliberately no one-click
-  // clear here: clearing without investigation just re-enters the crash loop.
-  const troubledAgent = [...issueWorkAgents, ...(planningAgent ? [planningAgent] : [])]
-    .find((a) => (a as { troubled?: boolean }).troubled === true);
-  const troubledFailures = troubledAgent
-    ? (troubledAgent as { consecutiveFailures?: number }).consecutiveFailures
-    : undefined;
+  // PAN-3917: the attention signal comes from the derived issue state, not a
+  // stored agent gate flag. One badge, one meaning.
+  const attentionLabel = derived?.attention === 'api-error'
+    ? '⚠ API error'
+    : derived?.attention === 'stuck'
+      ? '⚠ Stuck'
+      : null;
 
   const agentSubText = activeAgent
     ? (reviewSpecialists.length > 0 && activeAgent.role === 'review'
@@ -722,13 +713,15 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           )}
           <span className="ml-auto flex items-center gap-1.5">
             <StartAgentCta issueId={issue.identifier} density="rail" surface="chip" />
-            {troubledAgent && (
+            {attentionLabel && (
               <span
-                data-testid={`card-troubled-${issue.identifier}`}
+                data-testid={`card-attention-${issue.identifier}`}
                 className="inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium badge-border-destructive badge-bg-destructive text-destructive"
-                title={`Troubled: ${troubledFailures ?? '?'} consecutive failures — investigate, then clear with pan untroubled ${issue.identifier}`}
+                title={derived?.attention === 'api-error'
+                  ? 'The agent is hitting provider API errors.'
+                  : 'This issue is not moving — open it to see why.'}
               >
-                ⚠ Troubled
+                {attentionLabel}
               </span>
             )}
             {pausedAgent && (

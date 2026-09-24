@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * Tests for runQualityGates SSH support and DEFAULT_GATES (PAN-336)
  *
@@ -74,11 +73,11 @@ describe('runQualityGates — SSH remote support', () => {
 
   it('uses SSH prefix for remote workspaces', async () => {
     const onAdmissionPhase = vi.fn();
-    await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
       onAdmissionPhase,
-    }));
+    });
 
     const calls = execMock.mock.calls.map(c => c[0] as string);
     expect(calls.every(cmd => cmd.startsWith('fly ssh console -a'))).toBe(true);
@@ -87,17 +86,17 @@ describe('runQualityGates — SSH remote support', () => {
   });
 
   it('does not set cwd for remote workspaces', async () => {
-    await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
-    }));
+    });
 
     const calls = execMock.mock.calls;
     expect(calls.every(c => c[1]?.cwd === undefined)).toBe(true);
   });
 
   it('uses local cwd for non-remote workspaces', async () => {
-    await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
+    await runQualityGates(DEFAULT_GATES, workspacePath);
 
     const calls = execMock.mock.calls;
     expect(calls.every(c => !(c[0] as string).startsWith('ssh'))).toBe(true);
@@ -107,48 +106,38 @@ describe('runQualityGates — SSH remote support', () => {
   });
 
   it('throws when isRemote is true but vmName is missing', async () => {
-    await expect(Effect.runPromise(
-      runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: undefined })
-    )).rejects.toThrow('Remote workspace requires vmName');
+    await expect(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: undefined })).rejects.toThrow('Remote workspace requires vmName');
   });
 
   it('throws when vmName contains invalid characters', async () => {
-    await expect(Effect.runPromise(
-      runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: 'vm; rm -rf /' })
-    )).rejects.toThrow('Invalid vmName for SSH');
+    await expect(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: 'vm; rm -rf /' })).rejects.toThrow('Invalid vmName for SSH');
   });
 
   it('throws when workspacePath contains unsafe characters for SSH', async () => {
-    await expect(Effect.runPromise(
-      runQualityGates(DEFAULT_GATES, '/path/with spaces/workspace', 'pre_push', {
+    await expect(runQualityGates(DEFAULT_GATES, '/path/with spaces/workspace', 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
-      })
-    )).rejects.toThrow('Workspace path contains unsafe characters');
+      })).rejects.toThrow('Workspace path contains unsafe characters');
   });
 
   it('throws when gate.path produces an unsafe cwd for SSH', async () => {
     const gatesWithBadPath = {
       lint: { command: 'pnpm lint', path: 'frontend;rm -rf /' },
     };
-    await expect(Effect.runPromise(
-      runQualityGates(gatesWithBadPath, workspacePath, 'pre_push', {
+    await expect(runQualityGates(gatesWithBadPath, workspacePath, 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
-      })
-    )).rejects.toThrow('unsafe characters for SSH');
+      })).rejects.toThrow('unsafe characters for SSH');
   });
 
   it('throws when gate.command contains double quotes (SSH injection prevention)', async () => {
     const gatesWithQuotes = {
       lint: { command: 'echo "hello"' },
     };
-    await expect(Effect.runPromise(
-      runQualityGates(gatesWithQuotes, workspacePath, 'pre_push', {
+    await expect(runQualityGates(gatesWithQuotes, workspacePath, 'pre_push', {
         isRemote: true,
         vmName: 'my-vm',
-      })
-    )).rejects.toThrow('double quotes which are unsafe in SSH context');
+      })).rejects.toThrow('double quotes which are unsafe in SSH context');
   });
 
   it('includes gate path subdirectory in SSH command', async () => {
@@ -156,20 +145,20 @@ describe('runQualityGates — SSH remote support', () => {
       lint: { command: 'pnpm lint', path: 'frontend' },
     };
 
-    await Effect.runPromise(runQualityGates(gatesWithPath, workspacePath, 'pre_push', {
+    await runQualityGates(gatesWithPath, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
-    }));
+    });
 
     const cmd = execMock.mock.calls[0][0] as string;
     expect(cmd).toContain(`cd ${workspacePath}/frontend &&`);
   });
 
   it('passes the per-gate command timeout to each execAsync call for SSH', async () => {
-    await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
-    }));
+    });
 
     // Must match the per-gate command timeout in validation.ts (PAN-1989: raised to 20m
     // so a near-total-rename changeset whose `vitest --changed` selects ~the whole suite
@@ -189,7 +178,7 @@ describe('runQualityGates — SSH remote support', () => {
     process.env.DASHBOARD_URL = 'http://localhost:4512';
 
     try {
-      await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
+      await runQualityGates(DEFAULT_GATES, workspacePath);
     } finally {
       if (priorApiPort === undefined) delete process.env.API_PORT;
       else process.env.API_PORT = priorApiPort;
@@ -214,7 +203,7 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
   });
 
   it('runs all 3 default gates when all pass', async () => {
-    const results = await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
+    const results = await runQualityGates(DEFAULT_GATES, workspacePath);
 
     expect(execMock).toHaveBeenCalledTimes(3);
     expect(results).toHaveLength(3);
@@ -229,7 +218,7 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
     });
     execMock.mockRejectedValueOnce(typecheckErr);
 
-    const results = await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
+    const results = await runQualityGates(DEFAULT_GATES, workspacePath);
 
     // Only typecheck ran — lint and test were not called
     expect(execMock).toHaveBeenCalledTimes(1);
@@ -251,9 +240,9 @@ describe('runQualityGates — CPU admission lifecycle', () => {
       .mockRejectedValueOnce(Object.assign(new Error('flaky'), { stdout: '', stderr: '' }))
       .mockResolvedValueOnce({ stdout: 'ok', stderr: '' });
 
-    const results = await Effect.runPromise(runQualityGates({
+    const results = await runQualityGates({
       test: { command: 'npm test', retry: 1 },
-    }, workspacePath, 'pre_push', { issueId: 'PAN-1', onAdmissionPhase }));
+    }, workspacePath, 'pre_push', { issueId: 'PAN-1', onAdmissionPhase });
 
     expect(results[0]?.passed).toBe(true);
     expect(admissionMocks.acquire).toHaveBeenCalledTimes(2);
@@ -262,12 +251,21 @@ describe('runQualityGates — CPU admission lifecycle', () => {
       .toEqual(['queued', 'running', 'queued', 'running']);
   });
 
+  it('gate env carries OVERDECK_GATE_ADMITTED while lease held', async () => {
+    await runQualityGates({
+      test: { command: 'npm test' },
+    }, workspacePath);
+
+    expect(execMock.mock.calls[0]?.[1]?.env?.OVERDECK_GATE_ADMITTED).toBe('1');
+    expect(admissionMocks.release).toHaveBeenCalledOnce();
+  });
+
   it('releases admission after a terminal gate failure', async () => {
     execMock.mockRejectedValueOnce(Object.assign(new Error('failed'), { stdout: '', stderr: '' }));
 
-    const results = await Effect.runPromise(runQualityGates({
+    const results = await runQualityGates({
       test: { command: 'npm test' },
-    }, workspacePath));
+    }, workspacePath);
 
     expect(results[0]?.passed).toBe(false);
     expect(admissionMocks.release).toHaveBeenCalledOnce();
@@ -278,9 +276,9 @@ describe('runQualityGates — CPU admission lifecycle', () => {
       code: 'ETIMEDOUT', stdout: '', stderr: '',
     }));
 
-    const results = await Effect.runPromise(runQualityGates({
+    const results = await runQualityGates({
       test: { command: 'npm test' },
-    }, workspacePath));
+    }, workspacePath);
 
     expect(results[0]?.passed).toBe(false);
     expect(admissionMocks.release).toHaveBeenCalledOnce();
@@ -291,9 +289,9 @@ describe('runQualityGates — CPU admission lifecycle', () => {
     execMock.mockResolvedValue({ stdout: '200', stderr: '' });
     const onAdmissionPhase = vi.fn();
     try {
-      const resultPromise = Effect.runPromise(runQualityGates({
+      const resultPromise = runQualityGates({
         health: { type: 'http_health', phase: 'post_push', command: '', url: 'https://example.test', wait: 0.001 },
-      }, workspacePath, 'post_push', { onAdmissionPhase }));
+      }, workspacePath, 'post_push', { onAdmissionPhase });
       await vi.advanceTimersByTimeAsync(1);
       const results = await resultPromise;
       expect(results[0]?.passed).toBe(true);
@@ -326,7 +324,7 @@ describe('runQualityGates — PAN-666 changed-file scoping placeholders', () => 
 
   it('substitutes {{CHANGED_BASE}} into the gate command before running it', async () => {
     const gates = { test: { command: 'npx vitest run --changed {{CHANGED_BASE}}' } };
-    await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', { placeholders }));
+    await runQualityGates(gates, workspacePath, 'pre_push', { placeholders });
 
     const cmd = execMock.mock.calls[0][0] as string;
     expect(cmd).toContain('--changed origin/main');
@@ -335,7 +333,7 @@ describe('runQualityGates — PAN-666 changed-file scoping placeholders', () => 
 
   it('leaves an unset placeholder literal when no placeholders are provided', async () => {
     const gates = { test: { command: 'npx vitest run --changed {{CHANGED_BASE}}' } };
-    await Effect.runPromise(runQualityGates(gates, workspacePath));
+    await runQualityGates(gates, workspacePath);
 
     const cmd = execMock.mock.calls[0][0] as string;
     // Without a placeholders map there is nothing to substitute — the gate runs

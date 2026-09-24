@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { parse } from 'yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mergeConfigs } from '../../../src/lib/config-yaml.js';
@@ -101,7 +100,7 @@ describe('settings telemetry', () => {
     const settings = loadSettingsApi();
     settings.telemetry = { ...settings.telemetry!, enabled: false };
 
-    await Effect.runPromise(saveSettingsApi(settings));
+    await saveSettingsApi(settings);
 
     const writtenYaml = writeFileMock.mock.calls.at(-1)?.[1];
     expect(parse(String(writtenYaml)).telemetry).toEqual({ enabled: false });
@@ -120,7 +119,7 @@ describe('settings telemetry', () => {
 
     const settings = loadSettingsApi();
     settings.telemetry = { ...settings.telemetry!, enabled: false };
-    await Effect.runPromise(saveSettingsApi(settings));
+    await saveSettingsApi(settings);
     expect(shutdownMock).toHaveBeenCalledTimes(1);
 
     captureMock.mockClear();
@@ -147,7 +146,7 @@ describe('settings telemetry', () => {
     const settings = loadSettingsApi();
     settings.tmux = { config_mode: 'inherit-user' };
 
-    await Effect.runPromise(saveSettingsApi(settings));
+    await saveSettingsApi(settings);
 
     const writtenYaml = writeFileMock.mock.calls.at(-1)?.[1];
     expect(parse(String(writtenYaml)).telemetry).toEqual({ enabled: true });

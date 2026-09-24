@@ -34,7 +34,7 @@ vi.mock('../../agent-input-detection.js', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>;
   return {
     ...actual,
-    detectAwaitingInputForAgent: vi.fn(() => Effect.succeed({
+    detectAwaitingInputForAgent: vi.fn(async () => ({
       reason: 'other',
       prompt: 'Would you like to run the following command?\n\nls\n\n1. Yes\n2. No',
     })),
@@ -68,9 +68,10 @@ vi.mock('node:http', () => ({
   }),
 }));
 
+import { setConversationEffort } from '../conversations.js';
 import { detectAwaitingInputForAgent } from '../../agent-input-detection.js';
 import { sendRawKeystroke } from '../../tmux.js';
-import { codexConversationPendingInput, handleConversationCodexApproval } from '../conversation-delivery.js';
+import { codexConversationPendingInput, handleConversationCodexApproval, handleConversationThinkingLevel } from '../conversation-delivery.js';
 
 function seedAppServerFiles(session = 'conv-test'): void {
   mkdirSync(join(tmpHome, 'agents', session), { recursive: true });
@@ -93,6 +94,20 @@ describe('conversation codex approvals', () => {
     vi.useRealTimers();
     delete process.env.OVERDECK_HOME;
     rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it('acknowledges a live Codex effort change before persisting it', async () => {
+    seedAppServerFiles();
+    const pending = handleConversationThinkingLevel('conv-test', { level: 'high' });
+    expect(setConversationEffort).not.toHaveBeenCalled();
+    await pending;
+    expect(httpBodies).toEqual([{ op: 'set-effort', effort: 'high' }]);
+    expect(setConversationEffort).toHaveBeenCalledWith('conv-test', 'high');
+  });
+
+  it('does not persist an effort change when the live host is unavailable', async () => {
+    await expect(handleConversationThinkingLevel('conv-test', { level: 'high' })).rejects.toThrow('socket missing');
+    expect(setConversationEffort).not.toHaveBeenCalled();
   });
 
   it('sources app-server pending approval input from status without pane capture', async () => {

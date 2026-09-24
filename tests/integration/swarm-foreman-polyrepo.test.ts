@@ -11,11 +11,8 @@ import {
   recordFailedMergeBlock,
   recoverFailedMergeSlot,
   resetSwarmLoopSafetyForTests,
-  swarmJanitorPass,
   type CoordinateSwarmSlotsDeps,
 } from '../../src/lib/cloister/deacon-swarm.js';
-import { createMinimalIssueRecord } from '../../src/lib/cloister/deacon-swarm-record.js';
-import { writeIssueRecordForWorkspaceSync } from '../../src/lib/pan-dir/record.js';
 import { analyzeSwarmReadiness } from '../../src/lib/xbrief/swarm-readiness.js';
 import type { XBriefDocument, XBriefItem } from '../../src/lib/xbrief/types.js';
 import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../helpers/git-record-fixture.js';
@@ -28,6 +25,7 @@ const gitEnv = {
 };
 
 describe('scripted swarm foreman over a sparse polyrepo', () => {
+  let fixtureRoot: string;
   let workspace: string;
   let slotWorkspace: string;
   let recordRemote: string;
@@ -36,14 +34,18 @@ describe('scripted swarm foreman over a sparse polyrepo', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-14T00:00:00Z'));
     resetSwarmLoopSafetyForTests();
-    workspace = mkdtempSync(join(tmpdir(), 'pan-3680-polyrepo-'));
+    // PAN-3917: swarmSlotStatePath() derives the plan home from
+    // <workspace>/../.. , so the fixture must follow the real
+    // <project>/workspaces/feature-<issue> layout, not a flat tmpdir.
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'pan-3680-polyrepo-'));
+    workspace = join(fixtureRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
     slotWorkspace = `${workspace}-slot-1`;
+    mkdirSync(workspace, { recursive: true });
     mkdirSync(slotWorkspace, { recursive: true });
     recordRemote = initGitRecordRoot(workspace);
     initMemberRepo(workspace, 'fe', 'src/app.ts');
     initMemberRepo(workspace, 'api', 'db/schema.sql');
     initMemberRepo(slotWorkspace, 'fe', 'src/app.ts');
-    writeIssueRecordForWorkspaceSync(workspace, issueId, createMinimalIssueRecord(issueId));
   });
 
   afterEach(async () => {
@@ -51,11 +53,10 @@ describe('scripted swarm foreman over a sparse polyrepo', () => {
     delete process.env.PAN_SWARM_STALL_THRESHOLD_MS;
     removeGitRecordRemote(recordRemote);
     await cleanupGitRecordRoot(workspace);
-    rmSync(workspace, { recursive: true, force: true });
-    rmSync(slotWorkspace, { recursive: true, force: true });
+    rmSync(fixtureRoot, { recursive: true, force: true });
   });
 
-  it('drives dispatch, wait, merge, stall notification, isolation failure, and reclaim', async () => {
+  it('drives dispatch, wait, merge, stall signal, isolation failure, and reclaim', async () => {
     const doc = plan();
     const spawnedItems: string[] = [];
     const gateDeps = dispatchDeps(spawnedItems);
@@ -97,17 +98,13 @@ describe('scripted swarm foreman over a sparse polyrepo', () => {
     expect(isolation).toMatchObject({ outsideSlot: true, paths: ['api/db/schema.sql'] });
 
     process.env.PAN_SWARM_STALL_THRESHOLD_MS = String(30 * 60_000);
-    const sendStallEvent = vi.fn(async () => undefined);
-    const janitorDeps = stallJanitorDeps(workspace, doc, liveSchema, sendStallEvent);
-    await swarmJanitorPass(janitorDeps);
+    // The stall signal is classifyInFlightSlots' (the janitor pass that forwarded it was deleted, PAN-3958 CH-8).
+    const stallDeps = stallJanitorDeps(workspace, doc, liveSchema, vi.fn(async () => undefined));
+    await classifyInFlightSlots([liveSchema], stallDeps, { workspacePath: workspace, issueId });
     await vi.advanceTimersByTimeAsync(30 * 60_000 + 1);
-    await swarmJanitorPass(janitorDeps);
-    expect(sendStallEvent).toHaveBeenCalledWith('agent-pan-3680', '[swarm-event] slot 1 stalled (no progress 30m)');
+    const stalled = await classifyInFlightSlots([liveSchema], stallDeps, { workspacePath: workspace, issueId });
+    expect(stalled.filter(slot => slot.signal === 'stall-event').map(slot => Math.floor((slot.stalledForMs ?? 0) / 60_000))).toEqual([30]);
 
-    writeIssueRecordForWorkspaceSync(workspace, issueId, {
-      ...createMinimalIssueRecord(issueId),
-      swarm: { slotAssignments: [{ slotIndex: 3, itemId: 'entities', agentId: 'agent-pan-3680-slot-3' }] },
-    });
     await recordFailedMergeBlock({ issueId, itemId: 'entities', slotIndex: 3, branch: 'feature/pan-3680-slot-3', note: 'isolation failure' }, workspace);
     const reclaimDeps = {
       applyTaskOperationToPlanFile: vi.fn(async () => undefined), clearSlotAssignment: vi.fn(async () => undefined),

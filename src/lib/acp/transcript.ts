@@ -25,7 +25,7 @@ export interface AcpTranscriptEntry {
   readonly content: string;
   readonly sessionId?: string;
   readonly toolCalls?: ReadonlyArray<AcpTranscriptToolCallState>;
-  readonly source?: "orchestrator" | "agent";
+  readonly source?: "orchestrator" | "agent" | "watchdog";
   readonly promptId?: string;
   /** Durable lifecycle record for queued, failed, and completed prompts. */
   readonly event?: "prompt_queued" | "prompt_failed" | "turn_completed";

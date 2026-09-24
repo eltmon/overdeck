@@ -3,7 +3,6 @@ import {
   classifyIssue,
   computeEpicGroups,
   isAutoPickable,
-  isUnblockEligible,
   pickableQueue,
   type ClassifyLookups,
 } from '../../../../src/lib/backlog/pickup.js';
@@ -63,13 +62,6 @@ describe('pickup epic exclusion (PAN-2081)', () => {
     expect(isAutoPickable(classifyIssue(node('PAN-2075'), lk))).toBe(false);
   });
 
-  it('an epic with blocks-main is NOT unblock-eligible (strike a child instead)', () => {
-    const lkEpic = lookups({ 'PAN-2075': ['blocks-main'] }, new Set());
-    expect(isUnblockEligible(classifyIssue(node('PAN-2075', { isEpic: true }), lkEpic))).toBe(false);
-    // control: a non-epic blocks-main issue IS unblock-eligible
-    const lkLeaf = lookups({ 'PAN-9': ['blocks-main'] }, new Set());
-    expect(isUnblockEligible(classifyIssue(node('PAN-9'), lkLeaf))).toBe(true);
-  });
 
   it('pickableQueue drops the epic but keeps its workable children', () => {
     const nodes = [

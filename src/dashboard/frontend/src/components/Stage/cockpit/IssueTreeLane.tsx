@@ -4,12 +4,55 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
-import {
-  useActivityQuery,
-  useReviewStatusQuery,
-  type ReviewStatusData,
-} from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useActivityQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useBackendPanes, useDerivedIssueState } from '../../../lib/store'
+import type { BackendPane, DerivedIssueState } from '../../../types'
 import { AgentsLane } from './AgentsLane'
+
+/**
+ * PAN-3917 FR-5: the issue tree's rows ARE the backend panes in the issue
+ * workspace. A pane's `role` metadata token decides which row it is — so a
+ * reviewer spawned by `pan handoff --issue` renders as the Review row, never as
+ * a loose conversation.
+ */
+const PANE_ROLE_TO_SESSION_TYPE: Record<BackendPane['role'], SessionNode['type']> = {
+  plan: 'planning',
+  work: 'work',
+  worker: 'work',
+  review: 'review',
+  test: 'test',
+  uat: 'test',
+  strike: 'strike',
+}
+
+/** The backend owns pane state; this is the only place it becomes a row status. */
+function paneStatus(state: BackendPane['state']): { status: SessionNode['status']; presence: SessionNode['presence'] } {
+  switch (state) {
+    case 'working': return { status: 'running', presence: 'active' }
+    case 'blocked': return { status: 'running', presence: 'active' }
+    case 'idle': return { status: 'running', presence: 'idle' }
+    case 'done': return { status: 'stopped', presence: 'ended' }
+    case 'exited': return { status: 'stopped', presence: 'ended' }
+    default: return { status: 'unknown', presence: 'ended' }
+  }
+}
+
+function paneToSession(pane: BackendPane): SessionNode {
+  const { status, presence } = paneStatus(pane.state)
+  return {
+    type: PANE_ROLE_TO_SESSION_TYPE[pane.role],
+    role: pane.role,
+    sessionId: pane.id,
+    model: pane.model,
+    harness: pane.harness,
+    startedAt: new Date(0).toISOString(),
+    duration: null,
+    status,
+    presence,
+    ...(pane.terminalId ? { tmuxSession: pane.terminalId } : {}),
+    ...(pane.state === 'blocked' ? { awaitingInput: true } : {}),
+  }
+}
 
 function toCockpitSession(section: {
   type?: string
@@ -59,12 +102,20 @@ function toCockpitSession(section: {
   }
 }
 
-function issueTreeStateLabel(rs: ReviewStatusData | undefined): string {
-  if (rs?.mergeStatus === 'merged') return 'Done'
-  if (rs?.readyForMerge) return 'In Review'
-  if (rs?.testStatus === 'testing') return 'Testing'
-  if (rs?.reviewStatus === 'reviewing' || rs?.reviewStatus === 'passed' || rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed') return 'In Review'
-  return 'In Progress'
+const ISSUE_TREE_STATE_LABEL: Record<DerivedIssueState['state'], string> = {
+  backlog: 'Backlog',
+  parked: 'Parked',
+  planned: 'Planned',
+  working: 'In Progress',
+  'in-review': 'In Review',
+  'changes-requested': 'Changes requested',
+  ready: 'Ready to merge',
+  merged: 'Merged',
+  closed: 'Done',
+}
+
+function issueTreeStateLabel(issue: DerivedIssueState | undefined): string {
+  return issue ? ISSUE_TREE_STATE_LABEL[issue.state] : 'In Progress'
 }
 
 async function fetchCockpitProjectFeature(projectName: string | undefined, issueId: string): Promise<ProjectFeature | null> {
@@ -103,20 +154,17 @@ async function fetchCockpitProjectFeature(projectName: string | undefined, issue
       title: treeFeature?.title ?? issueId,
       projectName: effectiveProject,
       branch: '',
-      status: treeFeature?.sessions.some((session) => session.presence === 'active') ? 'running' : 'has_state',
+      status: 'has_state',
       stateLabel: 'In Progress',
-      agentStatus: treeFeature?.sessions.some((session) => session.presence === 'active') ? 'running' : null,
-      hasPlanning: treeFeature?.sessions.some((session) => session.type === 'planning' || session.type === 'legacy') ?? false,
+      agentStatus: null,
+      hasPlanning: false,
       hasPrd: false,
       hasState: false,
       isShadow: false,
-      sessions: treeFeature?.sessions ?? [],
+      sessions: [],
     }
   }
-  return {
-    ...feature,
-    sessions: treeFeature?.sessions ?? feature.sessions,
-  }
+  return feature
 }
 
 export function IssueTreeLane({
@@ -140,7 +188,8 @@ export function IssueTreeLane({
   onSessionsChange: (sessions: readonly SessionNode[]) => void
   onOpenVerification: () => void
 }) {
-  const review = useReviewStatusQuery(issueId)
+  const issue = useDerivedIssueState(issueId)
+  const panes = useBackendPanes(issueId)
   const activity = useActivityQuery(issueId)
   const actions = useIssueActions(issueId)
   const projectFeature = useQuery({
@@ -153,9 +202,14 @@ export function IssueTreeLane({
     staleTime: 10_000,
   })
   const sessions = useMemo(() => {
-    const base = (activity.data?.sections ?? [])
-      .map((section) => toCockpitSession(section))
-      .filter((session): session is SessionNode => Boolean(session))
+    // Live rows come from the backend's pane inventory; the transcript-derived
+    // activity sections fill in the finished sessions the backend no longer owns.
+    const base = panes.map(paneToSession)
+    const paneTypes = new Set(base.map((session) => session.type))
+    for (const section of activity.data?.sections ?? []) {
+      const session = toCockpitSession(section)
+      if (session && !paneTypes.has(session.type)) base.push(session)
+    }
     if (actions.state.hasPlan && !base.some((session) => session.type === 'planning' || session.type === 'legacy')) {
       base.push({
         type: 'legacy',
@@ -168,7 +222,7 @@ export function IssueTreeLane({
       })
     }
     return base
-  }, [actions.state.hasPlan, activity.data?.sections, issueId])
+  }, [actions.state.hasPlan, activity.data?.sections, issueId, panes])
 
   const fallbackFeature: ProjectFeature = useMemo(() => ({
     issueId,
@@ -176,13 +230,12 @@ export function IssueTreeLane({
     projectName: projectName ?? 'Project',
     branch: '',
     status: sessions.some((session) => session.presence === 'active') ? 'running' : actions.state.hasPlan ? 'has_state' : 'idle',
-    stateLabel: issueTreeStateLabel(review.data),
+    stateLabel: issueTreeStateLabel(issue),
     agentStatus: sessions.some((session) => session.presence === 'active') ? 'running' : null,
     hasPlanning: actions.state.hasPlan,
     hasPrd: actions.state.hasPlan,
     hasState: actions.state.hasPlan,
     isShadow: false,
-    readyForMerge: review.data?.readyForMerge,
     sessions,
     resourceSources: [
       ...(actions.state.hasPlan ? ['vbrief' as const] : []),
@@ -201,20 +254,17 @@ export function IssueTreeLane({
       dockerContainerCount: 0,
       conversations: [],
     },
-  }), [actions.state.hasTasks, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
+  }), [actions.state.hasTasks, actions.state.hasPlan, issue, issueId, projectName, sessions, title])
 
-  const feature = projectFeature.data ?? fallbackFeature
-  const renderedSessions = useMemo(() => feature.sessions ?? [], [feature.sessions])
-
-  // Stale-review detection (PAN-1866): quick review — the current hardcoded mode —
-  // produces a single `review` parent and NO `reviewer` sub-sessions. So any reviewer
-  // session is a leftover extended-review (convoy) ghost from a previous cycle that will
-  // tangle a restart. Surface a warning that offers the complete review reset.
-  // (When extended review returns this becomes a reviewRunId-mismatch check.)
-  const staleReviewers = useMemo(
-    () => renderedSessions.filter((session) => session.type === 'reviewer'),
-    [renderedSessions],
+  // The pane inventory is the tree (FR-5). The project-feature read only
+  // supplies the surrounding metadata (title, branch, resource details) — it
+  // must never replace the rows, or a Herdr-spawned reviewer would vanish
+  // behind whatever the session-tree endpoint happened to remember.
+  const feature: ProjectFeature = useMemo(
+    () => (projectFeature.data ? { ...projectFeature.data, sessions } : fallbackFeature),
+    [fallbackFeature, projectFeature.data, sessions],
   )
+  const renderedSessions = sessions
 
   useEffect(() => {
     onSessionsChange(renderedSessions)
@@ -234,40 +284,6 @@ export function IssueTreeLane({
           {spineCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
         </button>
       </div>
-      {staleReviewers.length > 0 ? (
-        <div
-          data-section="Stale-review warning"
-          className={`mb-2 rounded-[var(--radius-sm)] border border-amber-500/40 bg-amber-500/10 text-[11px] ${spineCollapsed ? 'grid place-items-center p-1' : 'px-2.5 py-2'}`}
-          role="alert"
-        >
-          {spineCollapsed ? (
-            <button
-              type="button"
-              className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-amber-600 hover:bg-amber-500/15 dark:text-amber-400"
-              aria-label={`Stale review state: ${staleReviewers.length} leftover review agent${staleReviewers.length === 1 ? '' : 's'}. Expand agent spine for details and reset.`}
-              title="Stale review state — expand agent spine for details and reset"
-              onClick={onToggleSpine}
-            >
-              <span aria-hidden="true">⚠</span>
-            </button>
-          ) : (
-            <>
-              <div className="font-semibold text-amber-600 dark:text-amber-400">⚠ Stale review state</div>
-              <div className="mt-0.5 text-muted-foreground">
-                {staleReviewers.length} leftover review agent{staleReviewers.length === 1 ? '' : 's'} from a previous
-                cycle (extended-review sub-reviewers). A fresh review can&rsquo;t run cleanly until they&rsquo;re cleared.
-              </div>
-              <button
-                type="button"
-                className="mt-1.5 rounded-[var(--radius-sm)] border border-destructive/50 px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                onClick={() => actions.all.find((view) => view.action.key === 'purgeReview')?.invoke()}
-              >
-                Complete review reset
-              </button>
-            </>
-          )}
-        </div>
-      ) : null}
       <AgentsLane
         issueId={issueId}
         sessions={renderedSessions}

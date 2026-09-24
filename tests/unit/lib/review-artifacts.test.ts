@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,9 +30,7 @@ vi.mock('../../../src/lib/merge-set.js', async (importOriginal) => {
   return {
     ...actual,
     ensureMergeSetForIssue: ensureMergeSetForIssueMock,
-    ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
     upsertMergeSet: upsertMergeSetMock,
-    upsertMergeSetSync: upsertMergeSetMock,
   };
 });
 
@@ -71,11 +68,11 @@ describe('review-artifacts', () => {
           forge: 'gitlab',
           sourceBranch: 'feature/min-632',
           targetBranch: 'main',
-          reviewStatus: 'pending',
-          testStatus: 'pending',
+          repoReview: 'pending',
+          repoTests: 'pending',
           rebaseStatus: 'pending',
           verificationStatus: 'pending',
-          mergeStatus: 'pending',
+          repoMerge: 'pending',
           mergeOrder: 0,
           required: true,
         },
@@ -85,11 +82,11 @@ describe('review-artifacts', () => {
           forge: 'github',
           sourceBranch: 'feature/min-632',
           targetBranch: 'main',
-          reviewStatus: 'pending',
-          testStatus: 'pending',
+          repoReview: 'pending',
+          repoTests: 'pending',
           rebaseStatus: 'pending',
           verificationStatus: 'pending',
-          mergeStatus: 'pending',
+          repoMerge: 'pending',
           mergeOrder: 1,
           required: true,
         },
@@ -115,7 +112,7 @@ describe('review-artifacts', () => {
       id: '7',
     });
 
-    const result = await Effect.runPromise(createReviewArtifactsForIssue('MIN-632', workspacePath));
+    const result = await createReviewArtifactsForIssue('MIN-632', workspacePath);
 
     expect(result.artifacts).toEqual([
       {
@@ -136,7 +133,7 @@ describe('review-artifacts', () => {
       status: 'reviewing',
       repos: expect.arrayContaining([
         expect.objectContaining({ repoKey: 'fe', artifactUrl: 'https://gitlab.example.com/merge_requests/7', artifactId: '7' }),
-        expect.objectContaining({ repoKey: 'api', mergeStatus: 'skipped', reviewStatus: 'skipped' }),
+        expect.objectContaining({ repoKey: 'api', repoMerge: 'skipped', repoReview: 'skipped' }),
       ]),
     }));
   });

@@ -4,20 +4,20 @@ import { Effect } from 'effect';
 const {
   mockGetProjectSync,
   mockResolveProjectFromIssueSync,
-  mockReadIssueRecordSync,
-  mockMarkWorkspaceStuck,
+  mockReadSlotAssignments,
+  mockEmitActivityEntrySync,
   mockSessionExists,
+  mockIsAlive,
   mockListSessionNames,
-  mockUpdateIssueRecord,
   mockListOverdeckAgentStatesSync,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockResolveProjectFromIssueSync: vi.fn(),
-  mockReadIssueRecordSync: vi.fn(),
-  mockMarkWorkspaceStuck: vi.fn(),
+  mockReadSlotAssignments: vi.fn(),
+  mockEmitActivityEntrySync: vi.fn(),
   mockSessionExists: vi.fn(),
+  mockIsAlive: vi.fn(),
   mockListSessionNames: vi.fn(),
-  mockUpdateIssueRecord: vi.fn().mockResolvedValue(undefined),
   mockListOverdeckAgentStatesSync: vi.fn(),
 }));
 
@@ -26,26 +26,30 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: mockResolveProjectFromIssueSync,
 }));
 
-vi.mock('../../../../src/lib/pan-dir/record.js', () => ({
-  readIssueRecordSync: mockReadIssueRecordSync,
+vi.mock('../../../../src/lib/cloister/deacon-swarm-record.js', () => ({
+  readSwarmSlotAssignments: mockReadSlotAssignments,
 }));
 
-vi.mock('../../../../src/lib/pan-dir/record-update.js', () => ({
-  updateIssueRecord: mockUpdateIssueRecord,
+vi.mock('../../../../src/lib/activity-logger.js', () => ({
+  emitActivityEntry: mockEmitActivityEntrySync,
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state-source.js', () => ({
   readFeedbackAgentStates: mockListOverdeckAgentStatesSync,
 }));
 
-vi.mock('../../../../src/lib/review-status.js', () => ({
-  markWorkspaceStuck: mockMarkWorkspaceStuck,
-  FEEDBACK_DELIVERY_STUCK_REASON: 'feedback_delivery_needs_you',
+vi.mock('../../../../src/lib/tmux.js', () => ({
+  listSessionNames: () => Effect.succeed(mockListSessionNames()),
 }));
 
-vi.mock('../../../../src/lib/tmux.js', () => ({
-  sessionExists: (agentId: string) => Effect.succeed(Boolean(mockSessionExists(agentId))),
-  listSessionNames: () => Effect.succeed(mockListSessionNames()),
+// PAN-3849 (W32): feedback routing reads liveness from the single oracle. The
+// default verdict mirrors the legacy mockSessionExists fixture so existing
+// cases keep their meaning; zombie cases override mockIsAlive directly.
+vi.mock('../../../../src/lib/agents/liveness.js', () => ({
+  isAlive: (agentId: string) => Promise.resolve(mockIsAlive(agentId)),
+  // Mirrors the real isConfirmedDead: only a confirmed absence is death.
+  isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
+    !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
 
 import {
@@ -58,32 +62,19 @@ vi.setConfig({ testTimeout: 15_000 });
 describe('resolveIssueFeedbackTarget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsAlive.mockImplementation((agentId: string) => (
+      mockSessionExists(agentId)
+        ? { alive: true, paneAlive: true }
+        : { alive: false, reason: 'no-session' }
+    ));
     mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'test', projectPath: '/repo' });
     mockGetProjectSync.mockReturnValue({ name: 'Test', path: '/repo' });
     mockListSessionNames.mockReturnValue([]);
     mockListOverdeckAgentStatesSync.mockReturnValue([]);
-    mockReadIssueRecordSync.mockReturnValue({
-      issueId: 'PAN-2214',
-      schemaVersion: 2,
-      pipeline: {
-        issueId: 'PAN-2214',
-        reviewStatus: 'pending',
-        testStatus: 'pending',
-        readyForMerge: false,
-        updatedAt: '2026-07-02T00:00:00.000Z',
-      },
-      closeOut: {
-        usage: { byStage: {}, totals: {} },
-        merges: [],
-        ranOn: 'test-host',
-      },
-      swarm: {
-        slotAssignments: [
-          { slotIndex: 1, itemId: 'item-a', agentId: 'agent-pan-2214-slot-1' },
-          { slotIndex: 2, itemId: 'item-b', agentId: 'agent-pan-2214-slot-2' },
-        ],
-      },
-    });
+    mockReadSlotAssignments.mockReturnValue([
+      { slotIndex: 1, itemId: 'item-a', agentId: 'agent-pan-2214-slot-1' },
+      { slotIndex: 2, itemId: 'item-b', agentId: 'agent-pan-2214-slot-2' },
+    ]);
   });
 
   it('keeps existing behavior for a live whole-issue agent', async () => {
@@ -92,7 +83,7 @@ describe('resolveIssueFeedbackTarget', () => {
     await expect(resolveIssueFeedbackTarget('PAN-2214')).resolves.toEqual({
       agentId: 'agent-pan-2214',
     });
-    expect(mockReadIssueRecordSync).not.toHaveBeenCalled();
+    expect(mockReadSlotAssignments).not.toHaveBeenCalled();
   });
 
   it('routes item-specific feedback to the assigned live slot agent', async () => {
@@ -111,6 +102,25 @@ describe('resolveIssueFeedbackTarget', () => {
     });
   });
 
+  it('PAN-3849 AC4: a remain-on-exit zombie pane is not a live feedback target', async () => {
+    // The tmux session exists (has-session passes) but the harness process is
+    // gone from the pane — the oracle says pane-dead / runtime-missing, and
+    // routing must fall through to resurrection instead of pasting feedback
+    // into the dead shell (pipeline-reliability-review F12, last bullet).
+    mockIsAlive.mockImplementation((agentId: string) => (
+      agentId === 'agent-pan-2214'
+        ? { alive: false, reason: 'pane-dead' }
+        : { alive: false, reason: 'no-session' }
+    ));
+
+    const target = await resolveIssueFeedbackTarget('PAN-2214');
+
+    expect(target).toEqual({
+      needsYou: true,
+      reason: expect.stringContaining('No live feedback target for PAN-2214'),
+    });
+  });
+
   it('returns needs-you when no whole-issue or slot session is live', async () => {
     mockSessionExists.mockReturnValue(false);
 
@@ -122,19 +132,13 @@ describe('resolveIssueFeedbackTarget', () => {
     });
   });
 
-  it('falls back to a live unregistered slot session and self-heals the record', async () => {
+  it('falls back to a live slot session the ledger does not name, writing nothing back', async () => {
     mockListSessionNames.mockReturnValue(['agent-pan-2214-slot-3']);
     mockSessionExists.mockImplementation((agentId: string) => agentId === 'agent-pan-2214-slot-3');
 
     await expect(resolveIssueFeedbackTarget('PAN-2214', { itemId: 'item-c' })).resolves.toEqual({
       agentId: 'agent-pan-2214-slot-3',
     });
-
-    expect(mockUpdateIssueRecord).toHaveBeenCalledWith(
-      { name: 'Test', path: '/repo' },
-      'PAN-2214',
-      expect.any(Function),
-    );
   });
 
   it('routes feedback to a live agents-table work session missing from slot assignments', async () => {
@@ -150,7 +154,7 @@ describe('resolveIssueFeedbackTarget', () => {
     })).resolves.toEqual({ agentId: registeredAgentId });
 
     expect(revive).not.toHaveBeenCalled();
-    expect(mockMarkWorkspaceStuck).not.toHaveBeenCalled();
+    expect(mockEmitActivityEntrySync).not.toHaveBeenCalled();
   });
 
   it('skips a live convoy reviewer row and routes to the following work row', async () => {
@@ -193,16 +197,17 @@ describe('resolveIssueFeedbackTarget', () => {
     expect(target).not.toEqual({ agentId: registeredAgentId });
   });
 
-  it('surfaces needs-you feedback as a stuck workspace marker', async () => {
+  it('announces needs-you on the activity stream instead of writing a stuck flag', async () => {
     await surfaceIssueFeedbackNeedsYou('PAN-2214', 'No live feedback target for PAN-2214', {
       specialist: 'test-agent',
       feedbackPath: '/repo/.pan/feedback/001-test-agent-failed.md',
     });
 
-    expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith('PAN-2214', 'feedback_delivery_needs_you', {
-      reason: 'No live feedback target for PAN-2214',
-      specialist: 'test-agent',
-      feedbackPath: '/repo/.pan/feedback/001-test-agent-failed.md',
-    });
+    expect(mockEmitActivityEntrySync).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'cloister',
+      level: 'warn',
+      issueId: 'PAN-2214',
+      message: 'PAN-2214 needs you: No live feedback target for PAN-2214',
+    }));
   });
 });

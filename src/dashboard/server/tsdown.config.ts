@@ -51,28 +51,30 @@ function cliEntrypointExclusionAssertion() {
   };
 }
 
-function strikeLandingDeaconChunkAssertion() {
+// PAN-3917: the deacon child (`deacon-main.ts`) forks Cloister's patrol code
+// into its own bundle so the heavy patrol-only modules never land in the
+// main `server.js` chunk. `deacon.ts` (the old monolithic patrol runner) was
+// replaced by `deacon-lite.ts`, but `deacon-lite.ts` and `hygiene-scheduler.ts`
+// are imported by both `main.ts` and `deacon-main.ts` through the shared
+// Cloister service, so they legitimately land in shared chunks rather than a
+// deacon-exclusive one — there is nothing left to assert isolation for.
+// The original subject of this assertion, the Deacon strike-landing patrol,
+// was deleted (PAN-3973: strikes now open a PR the operator merges). If a
+// future patrol module is deliberately forked into deacon-only code again,
+// add an assertion for that module here.
+function deaconEntryChunkAssertion() {
   return {
-    name: 'strike-landing-deacon-chunk-assertion',
+    name: 'deacon-entry-chunk-assertion',
     writeBundle(
       _outputOptions: unknown,
       bundle: Record<string, { type: string; fileName: string; modules?: Record<string, unknown> }>,
     ) {
-      const chunks = Object.values(bundle).filter((output) => {
-        if (output.type !== 'chunk' || !output.modules) return false;
-        return Object.keys(output.modules).some((moduleId) => {
-          const normalized = moduleId.replaceAll('\\', '/');
-          return normalized.endsWith('/src/lib/cloister/deacon-strike-landing.ts');
-        });
-      });
+      const deaconEntryChunks = Object.values(bundle).filter(
+        (output) => output.type === 'chunk' && (output.fileName === 'deacon.js' || output.fileName?.startsWith('deacon-')),
+      );
 
-      const fileName = chunks[0]?.fileName;
-      if (chunks.length !== 1 || !(fileName === 'deacon.js' || fileName?.startsWith('deacon-'))) {
-        const chunkList = chunks.map((chunk) => chunk.fileName).join(', ') || '(none)';
-        throw new Error(
-          'Expected src/lib/cloister/deacon-strike-landing.ts only in the forked deacon.js entry; '
-          + `found ${chunks.length} chunk(s): ${chunkList}`,
-        );
+      if (deaconEntryChunks.length === 0) {
+        throw new Error('Expected the deacon-main.ts entry to produce a deacon.js (or deacon-*) chunk; found none.');
       }
     },
   };
@@ -136,7 +138,7 @@ export default defineConfig(async () => {
     plugins: [
       cliEntrypointExclusionAssertion(),
       configYamlSingleChunkAssertion(),
-      strikeLandingDeaconChunkAssertion(),
+      deaconEntryChunkAssertion(),
     ],
     deps: {
       alwaysBundle: [/^@overdeck\//],

@@ -5,12 +5,12 @@ import type { AgentSnapshot, SessionNode, SessionNodePresence } from '@overdeck/
 
 import {
   getAgentDir,
-  getAgentStateSync,
+  getAgentState,
   type AgentState,
 } from '../../../lib/agents.js';
 import type { AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import type { ReviewStatus } from '../../../lib/review-status.js';
+import type { BackendPane, DerivedIssueState } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds } from './reviewer-tree.js';
@@ -28,41 +28,6 @@ export function awaitingInputFromProjection(
   };
 }
 
-export async function readSessionGateFields(
-  sessionId: string,
-  state: AgentState | null = getAgentStateSync(sessionId),
-): Promise<{
-  paused?: true;
-  pausedReason?: string;
-  pausedAt?: string;
-  troubled?: true;
-  troubledAt?: string;
-  troubledReason?: string;
-  consecutiveFailures?: number;
-  queuedMailCount?: number;
-}> {
-  if (!state) return {};
-  return {
-    paused: state.paused === true ? true : undefined,
-    pausedReason: state.paused === true ? state.pausedReason : undefined,
-    pausedAt: state.paused === true ? state.pausedAt : undefined,
-    troubled: state.troubled === true ? true : undefined,
-    troubledAt: state.troubled === true ? state.troubledAt : undefined,
-    troubledReason: state.troubled === true ? state.lastFailureReason : undefined,
-    consecutiveFailures: state.troubled === true ? state.consecutiveFailures : undefined,
-    queuedMailCount: state.troubled === true ? await countQueuedMail(sessionId) : undefined,
-  };
-}
-
-async function countQueuedMail(agentId: string): Promise<number> {
-  try {
-    const entries = await readdir(join(getAgentDir(agentId), 'mail'), { withFileTypes: true });
-    return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md')).length;
-  } catch {
-    return 0;
-  }
-}
-
 interface BuildSpecialistSessionNodesOptions {
   issueId: string;
   fallbackProjectKey: string;
@@ -70,15 +35,21 @@ interface BuildSpecialistSessionNodesOptions {
   projectPath: string;
   tmuxSessionNames: ReadonlySet<string>;
   agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
-  centralStatus: ReviewStatus | null;
+  /**
+   * PAN-3917: the issue's derived state (FR-6). Replaces the review-status row
+   * this builder used to read for existence and for the row's status.
+   */
+  derived: DerivedIssueState | null;
+  /** Live panes in the issue's workspace (FR-5). Rows are panes. */
+  panes?: readonly BackendPane[];
 }
-
-function isActiveStatus(status: string, activeStatus: string): boolean {
-  return status === activeStatus || status === 'running' || status === 'starting';
-}
-
-/** Build review/test rows from live resource sessions first, with review-status
- * history as durable enrichment rather than an existence gate. */
+/**
+ * Build the Review and Test rows of an issue tree.
+ *
+ * PAN-3917 FR-5: a row exists because a pane for that role exists in the
+ * issue's workspace, or because the PR shows the issue reached that phase.
+ * There is no review-status row and no status history to read.
+ */
 export async function buildSpecialistSessionNodes(
   options: BuildSpecialistSessionNodesOptions,
 ): Promise<SessionNode[]> {
@@ -89,46 +60,63 @@ export async function buildSpecialistSessionNodes(
     projectPath,
     tmuxSessionNames,
     agentSnapshotsById,
-    centralStatus,
+    derived,
+    panes = [],
   } = options;
   const issueLower = issueId.toLowerCase();
-  const statusHistory = centralStatus?.history ?? [];
   const sections: SessionNode[] = [];
 
-  const latestReview = statusHistory.filter((entry) => entry.type === 'review').at(-1);
+  const paneFor = (role: BackendPane['role']): BackendPane | undefined =>
+    panes.find((pane) => pane.role === role && pane.state !== 'exited');
+
+  // The issue reached review once a PR exists; the PR's own review state says
+  // how it went.
+  const reachedReview = derived?.pr !== undefined;
   const reviewSessionName = `agent-${issueLower}-review`;
-  const reviewIsLive = tmuxSessionNames.has(reviewSessionName);
-  if (latestReview || reviewIsLive) {
+  const reviewPane = paneFor('review');
+  const reviewIsLive = reviewPane !== undefined || tmuxSessionNames.has(reviewSessionName);
+
+  if (reachedReview || reviewIsLive) {
     const projectKey = resolveProjectFromIssueSync(issueId)?.projectKey ?? fallbackProjectKey;
-    const state = getAgentStateSync(reviewSessionName);
-    const rawStatus = latestReview?.status ?? centralStatus?.reviewStatus ?? state?.status ?? 'reviewing';
-    const active = isActiveStatus(rawStatus, 'reviewing');
-    const status = normalizeAgentStatus(active ? 'running' : rawStatus);
-    const startedAt = latestReview?.timestamp ?? state?.startedAt ?? centralStatus?.updatedAt ?? new Date(0).toISOString();
+    const state = getAgentState(reviewSessionName);
+    const status = normalizeAgentStatus(
+      reviewIsLive
+        ? 'running'
+        : derived?.pr?.reviewState === 'approved'
+          ? 'passed'
+          : derived?.pr?.reviewState === 'changes-requested'
+            ? 'blocked'
+            : 'reviewing',
+    );
+    const startedAt = reviewPane?.stateSince
+      ? new Date(reviewPane.stateSince).toISOString()
+      : state?.startedAt ?? new Date(0).toISOString();
     const jsonlPath = await resolveJsonlPath(reviewSessionName, workspacePath);
     const awaitingInput = awaitingInputFromProjection(reviewSessionName, agentSnapshotsById);
     const snapshot = agentSnapshotsById?.get(reviewSessionName);
-    const presence: SessionNodePresence = reviewIsLive ? (active ? 'active' : 'idle') : 'ended';
+    const presence: SessionNodePresence = reviewIsLive
+      ? (reviewPane?.state === 'idle' ? 'idle' : 'active')
+      : 'ended';
 
     sections.push({
       type: 'review',
       sessionId: reviewSessionName,
-      model: state?.model || 'specialist',
-      harness: state?.harness,
+      model: (reviewPane?.model && reviewPane.model !== 'unknown' ? reviewPane.model : state?.model) || 'specialist',
+      harness: (reviewPane?.harness && reviewPane.harness !== 'unknown' ? reviewPane.harness : state?.harness),
       startedAt,
       endedAt: reviewIsLive ? undefined : state?.stoppedAt,
       duration: 0,
       status,
       presence,
       roundMetadata: await readSynthesisRounds(issueId, projectKey) as SessionNode['roundMetadata'],
-      awaitingInput: awaitingInput !== undefined ? awaitingInput !== null : false,
+      awaitingInput: awaitingInput !== undefined ? awaitingInput !== null : reviewPane?.state === 'blocked',
       awaitingInputPrompt: awaitingInput?.prompt,
       awaitingInputReason: awaitingInput?.reason,
       pendingInputKinds: snapshot?.pendingInputKinds ? [...snapshot.pendingInputKinds] : undefined,
       hasJsonl: !!jsonlPath,
-      tmuxSession: reviewIsLive ? reviewSessionName : undefined,
-      ...await readSessionGateFields(reviewSessionName, state),
+      tmuxSession: reviewIsLive ? (reviewPane?.terminalId ?? reviewSessionName) : undefined,
     });
+
     const reviewerNodes = await buildReviewerNodes({
       issueId,
       projectKey,
@@ -143,33 +131,37 @@ export async function buildSpecialistSessionNodes(
     sections.push(...(reviewerNodes as unknown as SessionNode[]));
   }
 
-  const latestTest = statusHistory.filter((entry) => entry.type === 'test').at(-1);
   const testSessionName = `agent-${issueLower}-test`;
-  const testIsLive = tmuxSessionNames.has(testSessionName);
-  if (latestTest || testIsLive) {
-    const state = getAgentStateSync(testSessionName);
-    const rawStatus = latestTest?.status ?? centralStatus?.testStatus ?? state?.status ?? 'testing';
-    const active = isActiveStatus(rawStatus, 'testing');
+  const testPane = paneFor('test');
+  const testIsLive = testPane !== undefined || tmuxSessionNames.has(testSessionName);
+  // Checks are the test phase's durable evidence once the pane is gone.
+  const reachedTest = derived?.pr?.checks !== undefined && derived.pr.checks !== 'pending';
+
+  if (reachedTest || testIsLive) {
+    const state = getAgentState(testSessionName);
     const jsonlPath = await resolveJsonlPath(testSessionName, workspacePath);
     const awaitingInput = awaitingInputFromProjection(testSessionName, agentSnapshotsById);
     const snapshot = agentSnapshotsById?.get(testSessionName);
     sections.push({
       type: 'test',
       sessionId: testSessionName,
-      model: state?.model || 'specialist',
-      harness: state?.harness,
-      startedAt: latestTest?.timestamp ?? state?.startedAt ?? centralStatus?.updatedAt ?? new Date(0).toISOString(),
+      model: (testPane?.model && testPane.model !== 'unknown' ? testPane.model : state?.model) || 'specialist',
+      harness: (testPane?.harness && testPane.harness !== 'unknown' ? testPane.harness : state?.harness),
+      startedAt: testPane?.stateSince
+        ? new Date(testPane.stateSince).toISOString()
+        : state?.startedAt ?? new Date(0).toISOString(),
       endedAt: testIsLive ? undefined : state?.stoppedAt,
       duration: 0,
-      status: normalizeAgentStatus(active ? 'running' : rawStatus),
-      presence: testIsLive ? (active ? 'active' : 'idle') : 'ended',
-      awaitingInput: awaitingInput !== undefined ? awaitingInput !== null : false,
+      status: normalizeAgentStatus(
+        testIsLive ? 'running' : derived?.pr?.checks === 'green' ? 'passed' : 'failed',
+      ),
+      presence: testIsLive ? (testPane?.state === 'idle' ? 'idle' : 'active') : 'ended',
+      awaitingInput: awaitingInput !== undefined ? awaitingInput !== null : testPane?.state === 'blocked',
       awaitingInputPrompt: awaitingInput?.prompt,
       awaitingInputReason: awaitingInput?.reason,
       pendingInputKinds: snapshot?.pendingInputKinds ? [...snapshot.pendingInputKinds] : undefined,
       hasJsonl: !!jsonlPath,
-      tmuxSession: testIsLive ? testSessionName : undefined,
-      ...await readSessionGateFields(testSessionName, state),
+      tmuxSession: testIsLive ? (testPane?.terminalId ?? testSessionName) : undefined,
     });
   }
 

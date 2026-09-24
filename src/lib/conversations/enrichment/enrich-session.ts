@@ -9,10 +9,9 @@
 import { promises as fs } from 'fs';
 import * as readline from 'readline';
 import { createReadStream } from 'fs';
-import { Effect } from 'effect';
 
 import { getDiscoveredSessionById, updateEnrichment, markEnrichmentFailed } from '../../overdeck/discovered-sessions.js';
-import { calculateCostSync, getPricingSync, type AIProvider } from '../../cost.js';
+import { calculateCost, getPricing, type AIProvider } from '../../cost.js';
 import { recordBackgroundAiCost } from '../../background-ai/cost.js';
 
 /** Coarse provider label from a model id, for cost-event tagging. */
@@ -22,10 +21,9 @@ function providerForModel(model: string): AIProvider {
   if (m.includes('gemini') || m.startsWith('go@')) return 'google';
   return 'anthropic';
 }
-import { applyFallbackSync, selectEnrichmentModelForTier } from '../../model-fallback.js';
+import { applyFallback, selectEnrichmentModelForTier } from '../../model-fallback.js';
 import { loadConfigSync as loadYamlConfig } from '../../config-yaml.js';
-import { getProviderEnvSync, getProviderForModelSync } from '../../providers.js';
-import { FsError } from '../../errors.js';
+import { getProviderEnv, getProviderForModel } from '../../providers.js';
 import { redactSensitiveText } from '../../secret-redaction.js';
 import type { TokenUsage } from '../../cost.js';
 import type { EnrichmentTier, EnrichmentTierConfig, ModelProvider } from '../../model-fallback.js';
@@ -381,9 +379,9 @@ Reply ONLY with valid JSON matching this schema:
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 
 export function resolveEnrichmentModel(model: string, enabledProviders?: Set<ModelProvider>): string {
-  if (enabledProviders) return applyFallbackSync(model as ModelId, enabledProviders);
+  if (enabledProviders) return applyFallback(model as ModelId, enabledProviders);
   const { config } = loadYamlConfig();
-  return applyFallbackSync(model as ModelId, config.enabledProviders);
+  return applyFallback(model as ModelId, config.enabledProviders);
 }
 
 function getProviderApiKey(providerName: string, configuredKey?: string): string | undefined {
@@ -403,7 +401,7 @@ async function callClaudeApiWithConfig(
   enrichmentConfig?: EnrichmentApiConfig,
 ): Promise<EnrichmentResponse> {
   const effectiveModel = resolveEnrichmentModel(model, enrichmentConfig?.enabledProviders);
-  const provider = getProviderForModelSync(effectiveModel);
+  const provider = getProviderForModel(effectiveModel);
   const yamlConfig = enrichmentConfig ? undefined : loadYamlConfig().config;
   const configuredKey = enrichmentConfig?.apiKeys?.[provider.name as ModelProvider] ?? yamlConfig?.apiKeys[provider.name as keyof typeof yamlConfig.apiKeys];
   const apiKey = getProviderApiKey(provider.name, configuredKey);
@@ -411,7 +409,7 @@ async function callClaudeApiWithConfig(
     throw new Error(`${provider.displayName} API key is not set — cannot enrich sessions with ${effectiveModel}`);
   }
 
-  const providerEnv = provider.name === 'anthropic' ? {} : getProviderEnvSync(provider, apiKey);
+  const providerEnv = provider.name === 'anthropic' ? {} : getProviderEnv(provider, apiKey);
   const baseUrl = provider.name === 'anthropic'
     ? DEFAULT_ANTHROPIC_BASE_URL
     : providerEnv.ANTHROPIC_BASE_URL ?? DEFAULT_ANTHROPIC_BASE_URL;
@@ -464,8 +462,8 @@ async function callClaudeApiWithConfig(
       const pricingProvider = provider.name === 'anthropic' || provider.name === 'openai' || provider.name === 'google'
         ? provider.name
         : 'custom';
-      const pricing = getPricingSync(pricingProvider, effectiveModel);
-      if (pricing) parsed.usage = { ...usage, cost: calculateCostSync(usage, pricing) };
+      const pricing = getPricing(pricingProvider, effectiveModel);
+      if (pricing) parsed.usage = { ...usage, cost: calculateCost(usage, pricing) };
     }
     return parsed;
   } catch {
@@ -478,7 +476,15 @@ export async function callClaudeApi(
   prompt: string,
 ): Promise<EnrichmentResponse> {
   return callClaudeApiWithConfig(model, prompt);
-}async function enrichSessionPromise(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
+}
+
+/**
+ * Enrich one conversation session using the model selected for its tier.
+ * Catches failures internally and resolves with `error` set (marking the session
+ * failed), so it rarely rejects: only on an unexpected throw outside that guard,
+ * such as the `markEnrichmentFailed` DB mutation itself.
+ */
+export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
   const { sessionId, jsonlPath, tier, config } = opts;
   const requestedModel = opts.modelOverride ?? selectEnrichmentModelForTier(tier, config);
   let model = requestedModel;
@@ -545,22 +551,4 @@ export async function callClaudeApi(
     markEnrichmentFailed(sessionId);
     return { sessionId, tier, model, error: message };
   }
-}
-
-// ─── Effect variant (PAN-1249, additive) ─────────────────────────────────────
-//
-// Additive Effect surface. The underlying `enrichSession` already catches
-// internally and returns a result with `error` set on failure, so this
-// Effect variant rarely fails — FsError is declared for the rare case of
-// an unexpected throw from updateEnrichment / DB mutation.
-
-/** Effect variant of enrichSession. */
-export function enrichSession(
-  opts: EnrichSessionOptions,
-): Effect.Effect<EnrichSessionResult, FsError> {
-  return Effect.tryPromise({
-    try: () => enrichSessionPromise(opts),
-    catch: (cause) =>
-      new FsError({ path: opts.jsonlPath, operation: 'enrich-session', cause }),
-  });
 }

@@ -54,9 +54,9 @@ Because the `projects.yaml` registry (see [Directory Structure](#directory-struc
 
 ### Conversation subagents
 
-When a Claude Code conversation starts subagents through the `Agent` tool, the conversation panel opens a **Subagents** rail on the right. Each row shows the subagent type, description, live status, and nesting depth. Select a row—or choose **Open subagent transcript** from its expanded tool row—to read the subagent's full transcript without leaving the parent conversation.
+When a Claude Code or Codex conversation starts subagents, the conversation panel shows an **Agents** rail on the right. Each row shows the subagent type, description, live status, and nesting depth. Select a row—or choose **Open subagent transcript** from its expanded tool row—to read the subagent's full transcript without leaving the parent conversation.
 
-The selected subagent is stored in the `?subagent=<id>` URL parameter, so a direct link reopens the same transcript. The rail stays hidden when a conversation has no subagents. Pi and Codex conversations are unchanged because they do not use Claude Code's subagent file layout.
+The selected subagent is stored in the `?subagent=<id>` URL parameter, so a direct link reopens the same transcript. The rail stays hidden when a conversation has no subagents. Codex children use the same interaction, including live updates and reopening completed transcripts. The rail includes nested children. Pi conversations do not currently expose subagents in this view.
 
 ## Directory Structure
 
@@ -67,8 +67,6 @@ Overdeck stores all runtime state in `~/.overdeck/`:
   config.yaml           # Main configuration
   projects.yaml         # Multi-project registry with issue routing
   project-mappings.json # Linear project → local path mappings (legacy)
-  session-map.json      # Claude sessions → issue linking
-  runtime-metrics.json  # Runtime performance metrics
 
   skills/               # Shared skills (SKILL.md format)
   commands/             # Slash commands
@@ -181,7 +179,7 @@ When an agent is stuck (no activity for 30+ minutes), Overdeck will:
 2. Record the kill in health.json
 3. Respawn with crash recovery context
 
-The runtime data captured here — persisted to `runtime-metrics.json` in the state directory — feeds the dashboard's **Metrics** page, where per-model runtime comparisons and performance analytics let you see how different models perform across your workflow.
+The dashboard's **Metrics** page shows today's cost, agent health counts and the top spenders, served by `/api/metrics/summary` and `/api/metrics/costs` from Cloister's cost tracking.
 
 <ThemedImage
   light="/images/dashboard/metrics-light.png"

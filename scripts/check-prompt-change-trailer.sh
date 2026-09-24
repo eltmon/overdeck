@@ -28,7 +28,7 @@ resolve_merge_base() {
 changed_prompt_files() {
   local merge_base="$1"
   git diff --name-only "$merge_base" HEAD | while read -r file; do
-    if [[ "$file" == roles/*.md ]] || [[ "$file" == docs/flywheel-brief.md ]]; then
+    if [[ "$file" == roles/*.md ]] || [[ "$file" == sync-sources/skills/pan-flywheel/SKILL.md ]]; then
       echo "$file"
     fi
   done
@@ -56,7 +56,7 @@ check() {
   files="${files% }"
 
   if [[ -z "$files" ]]; then
-    log "no roles/*.md or docs/flywheel-brief.md changes; ok"
+    log "no roles/*.md or sync-sources/skills/pan-flywheel/SKILL.md changes; ok"
     exit 0
   fi
 

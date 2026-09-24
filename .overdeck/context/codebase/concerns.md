@@ -1,8 +1,8 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-07-26.
+Live landmines a change in this repo can step on. Verified 2026-09-20.
 
-- **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
+- **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts:88`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
   passing its winner through this gate; blocked ⇒ collapse to `claude-code`.
   Never bypass, never reorder around it.
@@ -80,7 +80,7 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   loop must use async exec/spawn (PAN-70: ~70 calls cleaned up). Note doctor's
   `checkCommand` (`src/cli/commands/doctor.ts`) is execSync-based — CLI-only, do
   not import it into server-reachable code.
-- **tmux sync primitives are legacy debt** — `sendKeysSync` etc. exist but new
+- **tmux sync primitives are legacy debt** — `capturePaneSync`/`killSessionSync` etc. exist but new
   callers must use async variants; raw `send-keys "text" C-m` drops Enter.
 - **RTK output compression** — when `agents.rtk.enabled`, Bash output agents see
   may be compressed/garbled; trust exit codes over visual output.
@@ -104,5 +104,35 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   instructions; the durable tier mitigates it by mounting a persistent Fly volume at
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
+- **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
+  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts executeCloseOut`
+  is dead (no production caller; PAN-3968 deletes it) — only `isBranchMerged` there is
+  live. Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
+  (keeps `state.json`/`sessions.json`); `removeAgentStateDir` is the destructive door
+  for deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
+  (`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
+  (PAN-3950, PAN-3968).
+- **`tests/unit/lib/lifecycle/workflows.test.ts` has two agent roots** — it mocks
+  `paths.js` `AGENTS_DIR` to `<tmpdir>/overdeck-wf-test-home/agents`, but
+  `listAgentStatesSync`/`saveAgentStateSync` resolve `getOverdeckHome()` (per-worker
+  `OVERDECK_HOME`). Seed agent-state fixtures under `getOverdeckHome()/agents/` or the
+  test proves nothing.
+- **OpenCode ACP drops permission asks from Task-subagent sessions** (PAN-3937) —
+  opencode 1.18.31's `acp/permission.ts` `Handler.process()` looks up the asking
+  session via `ACPSession.tryGet(sessionID)` and returns silently if it misses;
+  a `mode=subagent` session spawned by the `task` tool is never registered as an
+  ACP session, so any permission key opencode defaults to `ask`
+  (`external_directory`, `doom_loop`, `read` for `*.env`/`*.env.*`) deadlocks that
+  subagent — and the parent's `session/prompt` — forever, with no
+  `permission_request` ever written to `acp-session.jsonl`. Subagents inherit the
+  parent session's `external_directory` ruleset verbatim
+  (`agent/subagent-permissions.ts` `deriveSubagentSessionPermission`), so
+  Overdeck's launch-time permission policy (`OPENCODE_PERMISSION` env,
+  `buildOpenCodeAcpSpawnInput`) is the only lever that reaches subagents; the
+  ACP relay auto-approve path (`AcpHost.handlePermissionRequest`,
+  `selectAutoPermissionOutcome`) never fires for them. `OPENCODE_PERMISSION`
+  deep-merges last over the user's own `opencode.jsonc`, including any explicit
+  `deny` — widening the pre-allow keys widens what a user's own denial can no
+  longer block.
 
-<!-- last-verified: 2026-07-28 -->
+<!-- last-verified: 2026-09-20 -->

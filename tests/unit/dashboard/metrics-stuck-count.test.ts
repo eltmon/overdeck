@@ -32,21 +32,9 @@ vi.mock('../../../src/lib/agents.js', () => ({
   listRunningAgentsSync: (...args: unknown[]) => mockListRunningAgents(...args),
 }));
 
-const mockLoadReviewStatuses = vi.fn();
-vi.mock('../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: vi.fn().mockReturnValue(null),
-  loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args),
-}));
-
 // Stub remaining deps so the module loads cleanly
 vi.mock('../../../src/lib/costs/index.js', () => ({
   readEvents: () => [],
-}));
-vi.mock('../../../src/lib/convoy.js', () => ({
-  startConvoy: vi.fn(),
-  stopConvoy: vi.fn(),
-  getConvoyStatus: vi.fn(),
-  listConvoys: vi.fn(() => []),
 }));
 vi.mock('../../../src/lib/git-activity.js', () => ({
   listGitOperations: vi.fn(() => []),
@@ -122,7 +110,7 @@ function computeStuckCount(opts: {
     opts.agentsNeedingAttention,
     (id) => ({ state: opts.agentIdToHealth[id] ?? 'active' }),
     new Map(Object.entries(opts.agentIdToIssueId).map(([k, v]) => [k, v.toUpperCase()])),
-    Object.fromEntries(opts.persistentStuckIssueIds.map(id => [id, { stuck: true as const, issueId: id }])),
+    new Set(opts.persistentStuckIssueIds),
   );
 }
 
@@ -223,7 +211,7 @@ describe('buildMetricsSummaryPayload', () => {
         topIssues: [],
       },
       runningAgents: [],
-      reviewStatuses: {},
+      stuckIssueIds: new Set<string>(),
       getAgentHealth: () => null,
       eventLoop: {
         p50: 1,

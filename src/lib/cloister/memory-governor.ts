@@ -1,15 +1,16 @@
+import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
+import { cpus, loadavg } from 'node:os';
 import { promisify } from 'node:util';
 import { readProcMemory } from '../../dashboard/server/services/system-health-service.js';
 import { loadConfigSync } from '../config-yaml/load.js';
 import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
-import { listRunningAgentsSync } from '../agents/queries.js';
+import { listRunningAgents } from '../agents/queries.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
-import { setAgentPausedSync, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
-import { stopAgentSync } from '../agents/termination.js';
+import { setAgentPaused, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
+import { stopAgent } from '../agents/termination.js';
 import {
   getCachedMemoryVerdict,
   setCachedMemoryVerdict,
@@ -53,9 +54,9 @@ export function classifyMemoryPressure(
 // The deacon governor uses its OWN three reserve thresholds (config-yaml
 // resources.governor{Soft,Hard,Recovery}ReserveGb — NOT memoryWarnGb/
 // memoryBlockGb, which belong to the unrelated HTTP-path predicate above) and
-// a small state machine so it never oscillates: once below SOFT it holds
-// (admits nothing new); once below HARD it sheds; it never re-admits until
-// MemAvailable clears RECOVERY, which is always > SOFT.
+// a small state machine so it never oscillates. Memory pressure can hold or
+// shed. CPU saturation only holds admissions because running work self-heals
+// as it finishes; re-admission waits for lower load as well as memory runway.
 
 export type GovernorMode = 'admitting' | 'holding' | 'shedding';
 
@@ -69,12 +70,15 @@ export interface GovernorRunway {
   swapTotalBytes: number;
   swapFreeBytes: number;
   psiFullAvg10: number | null;
+  loadPerCore: number | null;
 }
 
 export interface GovernorRunwayThresholds {
   swapSoftFreePercent: number;
   swapRecoveryFreePercent: number;
   psiFullShedAvg10: number;
+  cpuSoftLoadPerCore: number;
+  cpuRecoveryLoadPerCore: number;
 }
 
 export interface GovernorPsiCalmConfig {
@@ -119,12 +123,14 @@ export function readGovernorWatchReserveBytes(): number {
   return loadConfigSync().config.resources.governorWatchReserveGb * GIB;
 }
 
-export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
+function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
   const resources = loadConfigSync().config.resources;
   return {
     swapSoftFreePercent: resources.governorSwapSoftFreePercent,
     swapRecoveryFreePercent: resources.governorSwapRecoveryFreePercent,
     psiFullShedAvg10: resources.governorPsiFullShedAvg10,
+    cpuSoftLoadPerCore: resources.governorCpuSoftLoadPerCore,
+    cpuRecoveryLoadPerCore: resources.governorCpuRecoveryLoadPerCore,
   };
 }
 
@@ -156,7 +162,7 @@ export function nextGovernorMode(
   return 'holding';
 }
 
-export function nextGovernorModeWithRunway(
+function nextGovernorModeWithRunway(
   availableBytes: number,
   reserves: GovernorReserves,
   runway: GovernorRunway,
@@ -169,15 +175,17 @@ export function nextGovernorModeWithRunway(
     : previousMode === 'admitting' && memoryMode === 'holding'
       ? { kind: 'soft-dip', readingBytes: availableBytes, thresholdBytes: reserves.softBytes }
       : null;
-  if (runway.swapTotalBytes <= 0) return { mode: memoryMode, trigger: memoryTrigger };
-
+  const swapEnabled = runway.swapTotalBytes > 0;
   const swapSoftBytes = runway.swapTotalBytes * runwayThresholds.swapSoftFreePercent / 100;
   const swapRecoveryBytes = runway.swapTotalBytes * runwayThresholds.swapRecoveryFreePercent / 100;
   const activeSwapThresholdBytes = previousMode === 'admitting' ? swapSoftBytes : swapRecoveryBytes;
-  const swapLow = runway.swapFreeBytes < activeSwapThresholdBytes;
+  const swapLow = swapEnabled && runway.swapFreeBytes < activeSwapThresholdBytes;
   const psiShed = swapLow
     && runway.psiFullAvg10 != null
     && runway.psiFullAvg10 >= runwayThresholds.psiFullShedAvg10;
+  const cpuSaturated = runway.loadPerCore != null && (previousMode === 'admitting'
+    ? runway.loadPerCore >= runwayThresholds.cpuSoftLoadPerCore
+    : runway.loadPerCore >= runwayThresholds.cpuRecoveryLoadPerCore);
 
   if (memoryMode === 'shedding') return { mode: 'shedding', trigger: memoryTrigger };
   if (psiShed) {
@@ -200,6 +208,7 @@ export function nextGovernorModeWithRunway(
       trigger: { kind: 'psi-unavailable', readingBytes: runway.swapFreeBytes, thresholdBytes: activeSwapThresholdBytes },
     };
   }
+  if (cpuSaturated) return { mode: 'holding', trigger: memoryTrigger };
   return { mode: memoryMode, trigger: memoryTrigger };
 }
 
@@ -221,6 +230,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const runwayThresholds = readGovernorRunwayThresholds();
   const psiCalmConfig = readGovernorPsiCalmConfig();
   const snapshot = await readProcMemory();
+  const loadPerCore = loadavg()[0] / Math.max(1, cpus().length);
   const now = Date.now();
   const psiIsCalm = snapshot.psiFullAvg10 != null
     && snapshot.psiFullAvg10 < psiCalmConfig.readmitAvg10;
@@ -232,6 +242,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
       swapTotalBytes: snapshot.swapTotal,
       swapFreeBytes: snapshot.swapFree,
       psiFullAvg10: snapshot.psiFullAvg10,
+      loadPerCore,
     },
     runwayThresholds,
     governorMode,
@@ -263,6 +274,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     && psiCalmSinceMs != null
     && now - psiCalmSinceMs >= psiCalmConfig.windowMs
     && snapshot.memAvailable >= reserves.softBytes
+    && loadPerCore < runwayThresholds.cpuRecoveryLoadPerCore
   ) {
     governorMode = 'admitting';
     governorTrigger = null;
@@ -276,6 +288,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     swapFreeBytes: snapshot.swapFree,
     psiSomeAvg10: snapshot.psiSomeAvg10,
     psiFullAvg10: snapshot.psiFullAvg10,
+    loadPerCore,
     trigger: governorTrigger,
   };
   setCachedMemoryVerdict(verdict);
@@ -293,54 +306,6 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
 // live stack exists yet for the project.
 
 export type FootprintRole = 'work' | 'review' | 'test';
-
-function coldStartFootprintBytes(role: FootprintRole): number {
-  const resources = loadConfigSync().config.resources;
-  const gb =
-    role === 'work' ? resources.governorFootprintDefaultWorkGb
-    : role === 'review' ? resources.governorFootprintDefaultReviewGb
-    : resources.governorFootprintDefaultTestGb;
-  return gb * GIB;
-}
-
-/**
- * Pure core of estimateFootprint — takes already-fetched stacks so it's
- * testable with a stubbed docker-stats map (no live collector needed).
- * Returns the average live memoryBytes across the project's current stacks,
- * or null when no stack exists yet for that project (cold start).
- */
-export function computeLearnedFootprintBytes(stacks: readonly ResourceStack[], projectKey: string): number | null {
-  const projectStacks = stacks.filter((stack) => {
-    if (!stack.issueId) return false;
-    return resolveProjectFromIssueSync(stack.issueId)?.projectKey === projectKey;
-  });
-  if (projectStacks.length === 0) return null;
-  const total = projectStacks.reduce((sum, stack) => sum + stack.aggregates.memoryBytes, 0);
-  const average = total / projectStacks.length;
-  return average > 0 ? average : null;
-}
-
-/**
- * Estimate the footprint (bytes) of an agent about to be admitted for `role`
- * in `projectKey`: the learned average live stack RSS for that project when
- * any of its stacks are currently running, else the configured per-role
- * cold-start default.
- */
-export async function estimateFootprint(role: FootprintRole, projectKey: string): Promise<number> {
-  const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
-  const stacks = getResourceStacks(containers);
-  const learned = computeLearnedFootprintBytes(stacks, projectKey);
-  return learned ?? coldStartFootprintBytes(role);
-}
-
-/**
- * Admission predicate (PRD AC-3, pinned public shape — specialist-budget,
- * tiered-eviction, and memory-paced-boot all call this exact signature):
- * fits only if the footprint leaves the SOFT reserve intact.
- */
-export function canAdmit(footprintBytes: number, availableBytes: number): boolean {
-  return footprintBytes <= availableBytes - readGovernorReserves().softBytes;
-}
 
 // --- PAN-2500 tiered-eviction ------------------------------------------------
 //
@@ -369,7 +334,7 @@ export interface ShedAgentLike {
 /**
  * Pure core: which merged/closed stacks are safe to stop.
  *
- * This mirrors reclaim.ts's isClosedStack (stack.phase === 'merged') + live-
+ * This mirrors reclaim.ts's isClosedStack (stack.state === 'merged') + live-
  * issue exclusion exactly, rather than importing buildReclaimPayload directly:
  * the root tsconfig.json excludes src/dashboard/**, so any import from
  * reclaim.ts pulls its unrelated deleteResourceVenvEffect (a pre-existing,
@@ -390,7 +355,7 @@ export function selectStackShedCandidates(
       .filter((issueId): issueId is string => Boolean(issueId)),
   );
   return stacks.filter(
-    (stack) => stack.issueId && stack.phase === 'merged' && !liveIssueIds.has(stack.issueId.toUpperCase()),
+    (stack) => stack.issueId && stack.state === 'merged' && !liveIssueIds.has(stack.issueId.toUpperCase()),
   );
 }
 
@@ -432,8 +397,8 @@ export async function shed(): Promise<ShedResult> {
   const result: ShedResult = { stoppedStacks: [], pausedAgents: [] };
 
   const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
-  const stacks = getResourceStacks(containers);
-  const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
+  const stacks = await getResourceStacks(containers);
+  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
   const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLiveTmuxSession: a.tmuxActive }));
 
   for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
@@ -444,25 +409,23 @@ export async function shed(): Promise<ShedResult> {
   let verdict = await assessMemoryPressure();
   if (verdict.band !== 'hard') return result;
 
-  // PAN-2579: warm-idle advancing sessions (review/test/ship with a recorded
-  // terminal verdict, kept alive for fast re-review) are the cheapest agent shed —
+  // PAN-2579 (PAN-3917: idleness, not a stored verdict, names the warm set):
+  // warm-idle advancing sessions are the cheapest agent shed —
   // killing one loses no state (the next dispatch resumes the saved session with
   // its context) while an active work agent's pause loses momentum. Shed them
   // before touching any work agent. This shed — plus a reboot — is the ONLY
   // sanctioned way a warm session dies (see docs/ROLES.md warm-by-default policy).
   try {
-    const { loadReviewStatuses } = await import('../review-status.js');
     const { listSessionNames, killSession } = await import('../tmux.js');
-    const { selectNonMergedTerminalAdvancingSessions } = await import('./reap-terminal-sessions.js');
-    const { markAdvancingSessionStopped } = await import('./advancing-selfheal.js');
+    const { selectIdleAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const { isIdle } = await import('../agents/liveness.js');
     const { Effect } = await import('effect');
     const aliveSessions = await Effect.runPromise(listSessionNames());
-    const warmIdle = selectNonMergedTerminalAdvancingSessions(loadReviewStatuses(), [...aliveSessions]);
+    const warmIdle = selectIdleAdvancingSessions([...aliveSessions], (agentId) => isIdle(agentId));
     for (const session of warmIdle) {
       if (verdict.band !== 'hard') break;
       try {
         await Effect.runPromise(killSession(session));
-        markAdvancingSessionStopped(session);
         result.pausedAgents.push(session);
         console.log(`[memory-governor] Shed warm-idle advancing session ${session} under HARD pressure (PAN-2579; resumable with context)`);
       } catch (err) {
@@ -488,8 +451,8 @@ export async function shed(): Promise<ShedResult> {
       exemptOperatorStarted ?? true,
     );
     if (!next) break;
-    setAgentPausedSync(next.id, `${GOVERNOR_SLOT_PAUSE_REASON_PREFIX} memory pressure — shed under HARD reserve`, true);
-    stopAgentSync(next.id);
+    await Effect.runPromise(setAgentPaused(next.id, `${GOVERNOR_SLOT_PAUSE_REASON_PREFIX} memory pressure — shed under HARD reserve`, true));
+    await Effect.runPromise(stopAgent(next.id));
     paused.add(next.id);
     result.pausedAgents.push(next.id);
     verdict = await assessMemoryPressure();

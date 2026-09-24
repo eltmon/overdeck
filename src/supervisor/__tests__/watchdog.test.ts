@@ -8,7 +8,16 @@ import {
   type SpawnRestart,
   type SupervisorWatchdogConfig,
 } from '../watchdog.js';
-import { stampBootReconciliation } from '../../lib/overdeck/control-settings.js';
+import { BOOT_RECONCILIATION_BOOT_ID_KEY, BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, setSetting } from '../../lib/overdeck/control-settings.js';
+
+// Moved here from src/lib/overdeck/control-settings.ts, which no production code called (PAN-3958 CH-8).
+function stampBootReconciliation(bootId: string, graceDeadline: string, bootStartedAt: string): void {
+  setSetting(BOOT_RECONCILIATION_BOOT_ID_KEY, bootId);
+  setSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, bootStartedAt);
+  setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
+  // A fresh boot starts with a fresh extension budget.
+  setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, '0');
+}
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 let testHome: string;
@@ -516,34 +525,7 @@ describe('SupervisorWatchdog', () => {
     expect(spawns.count).toBe(1);
   });
 
-  it('waits three patrol intervals before restarting a missing initial patrol heartbeat', async () => {
-    let now = Date.parse('2026-05-17T15:30:00.000Z');
-    const spawns = { count: 0 };
-    const watchdog = makeWatchdog({
-      spawns,
-      fetchOk: true,
-      config: { ...config, busyFailThreshold: 3 },
-      now: () => now,
-      deaconStatus: {
-        isRunning: true,
-        config: { patrolIntervalMs: 60_000 },
-        state: {},
-      },
-    });
-
-    await watchdog.checkOnce();
-    now += 180_000;
-    await watchdog.checkOnce();
-    expect(spawns.count).toBe(0);
-
-    now += 1_000;
-    await watchdog.checkOnce();
-
-    expect(spawns.count).toBe(1);
-    expect(watchdog.status().lastError).toContain('deacon patrol heartbeat missing');
-  });
-
-  it('grants a fresh patrol-grace window after a triggered restart (PAN-2219)', async () => {
+  it('never restarts on a missing patrol heartbeat — deacon-lite keeps no heartbeat file (PAN-3917)', async () => {
     let now = Date.parse('2026-05-17T15:30:00.000Z');
     const spawns = { count: 0 };
     const watchdog = makeWatchdog({
@@ -553,27 +535,42 @@ describe('SupervisorWatchdog', () => {
       now: () => now,
       deaconStatus: {
         isRunning: true,
+        deaconLite: { running: true, intervalMs: 60_000, lastRunAt: null, lastRunError: null },
         config: { patrolIntervalMs: 60_000 },
         state: {},
       },
     });
 
-    await watchdog.checkOnce(); // starts the missing-heartbeat clock
-    now += 180_001;
-    await watchdog.checkOnce(); // exceeds grace → restart #1
-    expect(spawns.count).toBe(1);
+    await watchdog.checkOnce();
+    now += 3_600_000;
+    await watchdog.checkOnce();
 
-    // The freshly restarted server must get its own full grace window; the
-    // pre-restart staleness clock must not carry over and kill it instantly.
-    now += 1_000;
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status().lastError ?? '').not.toContain('heartbeat');
+  });
+
+  it('restarts on a reported patrol timestamp that has gone stale', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      config: { ...config, busyFailThreshold: 1 },
+      now: () => now,
+      deaconStatus: {
+        isRunning: true,
+        deaconLite: { running: true, intervalMs: 60_000, lastRunAt: '2026-05-17T15:29:00.000Z', lastRunError: null },
+        config: { patrolIntervalMs: 60_000 },
+        state: {},
+      },
+    });
+
+    await watchdog.checkOnce(); // 60s old: within 3 intervals
+    expect(spawns.count).toBe(0);
+    now += 180_000; // 240s old: past the 180s staleness threshold
     await watchdog.checkOnce();
     expect(spawns.count).toBe(1);
-    now += 170_000; // 171s into the new window — still within grace
-    await watchdog.checkOnce();
-    expect(spawns.count).toBe(1);
-    now += 10_001; // past 180s since the restart → second restart is legitimate
-    await watchdog.checkOnce();
-    expect(spawns.count).toBe(2);
+    expect(watchdog.status().lastError).toContain('deacon patrol heartbeat stale');
   });
 
   it('preserves the restart cap across supervisor restarts', async () => {

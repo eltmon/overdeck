@@ -33,11 +33,11 @@ This is the primary Overdeck documentation skill. If you need general prose clea
 
 ## Core Rules
 
-1. **Start with the docs index.** Use `docs/INDEX.md` before guessing where information lives.
+1. **Start with the docs index.** Use the Topic Index in `CLAUDE.md` before guessing where information lives.
 2. **Write for the reader who is new to Overdeck.** Lead with purpose and mental model before code paths or implementation details.
 3. **One document should do one job well.** Keep overview docs, routing references, workflow guides, and implementation deep dives distinct.
 4. **Prefer linking over duplicating.** If another doc already owns the detail, summarize briefly and point there.
-5. **Keep the index current.** If docs coverage changes, update `docs/INDEX.md` too.
+5. **Keep the index current.** If docs coverage changes, update the Topic Index in `CLAUDE.md` too.
 
 For the full writing philosophy and maintenance guidance, read:
 - `.claude/skills/update-overdeck-docs/resources/STYLE_GUIDE.md`
@@ -49,7 +49,7 @@ For the full writing philosophy and maintenance guidance, read:
 ## Workflow
 
 ### 1. Find the right document
-Read `docs/INDEX.md` first.
+Read the Topic Index in `CLAUDE.md` first.
 
 Use:
 - category tables to find the owning document
@@ -75,7 +75,7 @@ When editing:
 
 ### 4. Update the index
 Whenever documentation coverage changes:
-- add new files to `docs/INDEX.md`
+- add new files to the Topic Index in `CLAUDE.md`
 - update descriptions if a file's role changed
 - add or adjust Topic Quick-Find keywords when new topic coverage appears
 
@@ -83,14 +83,14 @@ Whenever documentation coverage changes:
 After editing, check:
 - the file still matches its intended audience and abstraction level
 - links point to the right owner docs
-- `docs/INDEX.md` still helps someone find the topic
+- the Topic Index in `CLAUDE.md` still helps someone find the topic
 
 ---
 
 ## Common Uses
 
 ### Answer a docs question
-1. Read `docs/INDEX.md`
+1. Read the Topic Index in `CLAUDE.md`
 2. Read the identified file(s)
 3. Answer with file references
 
@@ -98,7 +98,7 @@ After editing, check:
 1. Identify the owning document type
 2. Read the full file before editing
 3. Keep the explanation at the right level for that doc
-4. Update `docs/INDEX.md` if discoverability changed
+4. Update the Topic Index in `CLAUDE.md` if discoverability changed
 
 ### Clean up confusing docs
 When a doc feels too low-level for its audience:
@@ -112,7 +112,7 @@ When a doc feels too low-level for its audience:
 
 | Need | Start here |
 |------|------------|
-| Find documentation | `docs/INDEX.md` |
+| Find documentation | the Topic Index in `CLAUDE.md` |
 | Documentation philosophy | `.claude/skills/update-overdeck-docs/resources/STYLE_GUIDE.md` |
 | Where docs belong | `.claude/skills/update-overdeck-docs/resources/DOC_LOCATIONS.md` |
 | Common update patterns | `.claude/skills/update-overdeck-docs/resources/EXAMPLES.md` |
@@ -126,4 +126,4 @@ If the index and docs search do not reveal coverage:
 1. confirm the topic is really missing
 2. choose the smallest correct owning doc
 3. add the documentation there
-4. update `docs/INDEX.md` so the topic is findable next time
+4. update the Topic Index in `CLAUDE.md` so the topic is findable next time

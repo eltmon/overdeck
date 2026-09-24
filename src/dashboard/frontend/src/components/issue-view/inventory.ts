@@ -33,7 +33,6 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'DrawerPickupSection / PickupGateControls', view: 'console', home: 'src/dashboard/frontend/src/components/backlog/PickupGateControls.tsx' },
   { section: 'DrawerWorkspaceSection', view: 'console', home: 'src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx' },
   { section: 'UatEnvironmentPanel', view: 'console', home: 'src/dashboard/frontend/src/components/CommandDeck/UatEnvironmentPanel.tsx' },
-  { section: 'IssuePolicyStrip / PoliciesControl', view: 'console', home: 'src/dashboard/frontend/src/components/ReviewPolicyControl.tsx' },
   { section: 'DrawerActiveAgent', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/ActiveAgentPanel.tsx' },
   { section: 'DrawerPausedBanner', view: 'console', home: 'src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx' },
   { section: 'DrawerVerificationGates', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/VerificationGates.tsx' },
@@ -55,7 +54,6 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
     },
   },
   { section: 'NeedsYouSlot', view: 'cockpit', home: 'src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx' },
-  { section: 'Stale-review warning', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx' },
   { section: 'StatusNarrative', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx' },
   { section: 'Pipeline Band', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/CockpitPhaseRail.tsx' },
   { section: 'AgentsLane', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx' },
@@ -143,7 +141,6 @@ export const AGENT_ROW_SECTIONS = [
   'agent-row-cost',
   'agent-row-verdict',
   'agent-row-context-menu',
-  'agent-row-paused-reason',
 ] as const;
 
 export type AgentRowSection = (typeof AGENT_ROW_SECTIONS)[number];

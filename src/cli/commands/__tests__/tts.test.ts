@@ -185,14 +185,14 @@ describe('pan tts voices', () => {
   it('maps an event key to a named voice', async () => {
     const stdout = { log: vi.fn() };
     const updateMock = vi.fn().mockResolvedValue(undefined);
-    await expect(mapTtsVoice('reviewStatus.passed', 'System Voice', {
+    await expect(mapTtsVoice('reviewOutcome.passed', 'System Voice', {
       findVoiceByName: vi.fn().mockResolvedValue(PRESET_VOICE),
       updateTtsConfig: updateMock,
       stdout,
     })).resolves.toEqual(PRESET_VOICE);
 
-    expect(updateMock).toHaveBeenCalledWith({ voiceMap: { 'reviewStatus.passed': 'voice-1' } });
-    expect(stdout.log).toHaveBeenCalledWith('Mapped reviewStatus.passed → System Voice');
+    expect(updateMock).toHaveBeenCalledWith({ voiceMap: { 'reviewOutcome.passed': 'voice-1' } });
+    expect(stdout.log).toHaveBeenCalledWith('Mapped reviewOutcome.passed → System Voice');
   });
 });
 

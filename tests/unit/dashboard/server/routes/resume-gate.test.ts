@@ -31,8 +31,9 @@ import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../../../../src/lib/agent-runtime-mirror.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../../src/lib/work-agent-lifecycle.js';
 import type { WorkAgentLifecycleState } from '../../../../../src/lib/work-agent-lifecycle.js';
-import * as paths from '../../../../../src/lib/paths.js';
+import * as claudeStorage from '../../../../../src/lib/runtimes/storage/claude-code.js';
 import * as tmux from '../../../../../src/lib/tmux.js';
+import * as liveness from '../../../../../src/lib/agents/liveness.js';
 
 /** The resume route's gate predicate — extracted for contract testing. */
 function resumeGateAllows(lifecycle: WorkAgentLifecycleState): boolean {
@@ -78,7 +79,7 @@ describe('resume route gate predicate', () => {
     }));
     saveSessionId(agentId, 'session-active');
 
-    const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
+    const sessionSpy = vi.spyOn(liveness, 'isAliveSync').mockReturnValue({ alive: true, paneAlive: true });
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must BLOCK — agent is genuinely running, isRunning:true, isRunningButStuck:false.
@@ -113,7 +114,7 @@ describe('resume route gate predicate', () => {
     }));
     saveSessionId(agentId, 'session-stuck');
 
-    const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(true);
+    const sessionSpy = vi.spyOn(liveness, 'isAliveSync').mockReturnValue({ alive: true, paneAlive: true });
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must ALLOW — agent is running-but-stuck, isRunningButStuck:true.
@@ -146,7 +147,7 @@ describe('resume route gate predicate', () => {
     saveSessionId(agentId, 'session-stopped');
 
     const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const transcriptSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must ALLOW — canResumeSession:true (stopped + saved session).

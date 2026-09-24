@@ -10,29 +10,28 @@ import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { invalidateAgentsCache } from '../../dashboard/server/routes/agents.js';
-import { clearReviewStatus } from '../../dashboard/server/review-status.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { cleanupAgentStateDirs } from './workspace-hygiene.js';
 import { getAgentState, getProviderAuthMode, saveAgentStateSync } from '../agents.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { isPlanningComplete, findPlan } from '../xbrief/io.js';
-import { extractPrefixSync } from '../issue-id.js';
+import { extractPrefix } from '../issue-id.js';
 import { spawnPlanningSession, type PlanningIssue } from '../planning/spawn-planning-session.js';
-import { findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { updateIssueRecord } from '../pan-dir/record-update.js';
-import { requireModelOverrideSync } from '../model-validation.js';
-import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../tracker-utils.js';
+import { findProjectByTeam, getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { requireModelOverride } from '../model-validation.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
 import { killSession, listSessionNames, sessionExists } from '../tmux.js';
-import { canUseHarnessSync } from '../harness-policy.js';
+import { closeAgentPane } from '../terminal-backends/launch.js';
+import { canUseHarness } from '../harness-policy.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import { saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
 import { TrackerApiError } from '../../dashboard/server/services/typed-errors.js';
 import type { GitHubClientError, GitHubClientShape, GitHubIssue } from '../../dashboard/server/services/github-client.js';
 import { buildChildStoriesFromRally } from './task-generation.js';
-import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { resolveIssueProjectPath } from './issue-reads.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -78,7 +77,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -139,7 +138,7 @@ export function resolvePlanningEffectiveHarness(
   authMode: AuthMode | undefined,
 ): RuntimeName {
   if (typeof modelOverride === 'string' && modelOverride.trim()) {
-    const decision = canUseHarnessSync(requestedHarness, modelOverride.trim(), authMode);
+    const decision = canUseHarness(requestedHarness, modelOverride.trim(), authMode);
     if (!decision.allowed) {
       throw new Error(decision.reason ?? `Harness "${requestedHarness}" is not allowed for model "${modelOverride.trim()}".`);
     }
@@ -173,7 +172,7 @@ export function startPlanningForIssue(options: {
     } = body as any;
     void skipWorkspace;
     void startDocker;
-    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' ? harness : 'claude-code';
+    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' || harness === 'opencode' || harness === 'muse' ? harness : 'claude-code';
 
     // PAN-1837 review fix: validate the explicit harness/model pair BEFORE any
     // mutation below (the workModel issue-record write, the preliminary
@@ -194,42 +193,28 @@ export function startPlanningForIssue(options: {
     }
 
     // Role-scoped model selection (PAN-2997 flow): `workModel` targets the WORK
-    // agent only. It persists to the issue record — the staffing resolver
-    // ('issue-override' tier) picks it up for the post-planning auto-spawn and
-    // every later work spawn — while `model` keeps targeting the planning
-    // agent. A start that names a model for the work agent therefore leaves
-    // the planning default (the operator's Fable) untouched.
+    // agent only, `model` the planning agent. PAN-3917 removed the per-issue
+    // record this override persisted to, so the value is validated here and the
+    // work model is named explicitly on the spawn that needs it.
     const workModelRaw = (body as any).workModel;
     if (typeof workModelRaw === 'string' && workModelRaw.trim()) {
-      const staffingProject = (() => {
-        const resolved = resolveProjectFromIssueSync(id);
-        return resolved ? getProjectSync(resolved.projectKey) : null;
-      })();
-      if (!staffingProject) {
-        return jsonResponse({ error: `Issue project not found for ${id}` }, { status: 404 });
-      }
-      let normalizedWorkModel: string;
       try {
-        normalizedWorkModel = requireModelOverrideSync(workModelRaw.trim());
+        requireModelOverride(workModelRaw.trim());
       } catch (err) {
         return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
       }
-      yield* Effect.promise(() =>
-        updateIssueRecord(staffingProject, id.toUpperCase(), (record) => { record.workModel = normalizedWorkModel; }),
-      );
-      console.log(`[start-planning] ${id} work agent model recorded: ${normalizedWorkModel} (planning agent uses the configured default)`);
     }
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
     // TTS announcement so the operator hears the lifecycle without watching the dashboard
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'plan',
       level: 'info',
       message: `${id} planning agent starting`,
       issueId: id,
     });
-    emitActivityTtsSync({
+    emitActivityTts({
       utterance: `Planning agent starting for ${id}`,
       priority: 2,
       issueId: id,
@@ -252,7 +237,7 @@ export function startPlanningForIssue(options: {
       }, { status: 409 });
     }
 
-    const trackerTypeForIssue = resolveTrackerTypeSync(id);
+    const trackerTypeForIssue = resolveTrackerType(id);
     const githubCheck = isGitHubIssue(id);
 
     let issue: {
@@ -331,7 +316,7 @@ export function startPlanningForIssue(options: {
       };
     }
 
-    const issuePrefix = extractPrefixSync(issue.identifier) ?? issue.identifier.split('-')[0];
+    const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issue.identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -517,9 +502,10 @@ export function abortPlanningForIssue(options: {
       revertedState = 'Todo';
     }
 
-    // Kill tmux sessions
-    yield* killSession(sessionName).pipe(Effect.ignore);
-    yield* killSession(`planning-${id.toLowerCase()}`).pipe(Effect.ignore);
+    // Close the planner's pane or tmux session through the terminal backend
+    // (PAN-3960: planners launch through it, so a Herdr planner has no session).
+    yield* Effect.promise(() => closeAgentPane(sessionName));
+    yield* Effect.promise(() => closeAgentPane(`planning-${id.toLowerCase()}`));
 
     // Clean up agent state files (non-fatal, so absorbed inside the promise)
     const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
@@ -539,7 +525,7 @@ export function abortPlanningForIssue(options: {
     if (deleteWorkspace && issueIdentifier) {
       const wipeResult = yield* Effect.promise(async (): Promise<{ deleted: boolean; error?: string }> => {
         try {
-          const projectPath = resolveIssueProjectPathSync(issueIdentifier!) || undefined;
+          const projectPath = resolveIssueProjectPath(issueIdentifier!) || undefined;
 
           if (projectPath) {
             const featureWorkspacePath = join(projectPath, 'workspaces', `feature-${issueIdentifier!.toLowerCase()}`);
@@ -605,7 +591,7 @@ export function restartFromPlan(options: {
     const issueLower = id.toLowerCase();
 
     // 1. Resolve workspace path
-    const projectPath = resolveIssueProjectPathSync(id);
+    const projectPath = resolveIssueProjectPath(id);
 
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)
@@ -726,11 +712,11 @@ export function restartFromPlan(options: {
           };
         }
 
-        await Effect.runPromise(runGitResetHard({
+        await runGitResetHard({
           workspacePath,
           ref: found.sha,
           reason: `restart-from-plan ${id} (${found.method})`,
-        }));
+        });
         console.log(`[restart-from-plan] Reset branch to planning commit ${found.sha} for ${id}`);
         return { success: true, commit: found.sha, method: found.method };
       } catch (err: any) {
@@ -755,10 +741,7 @@ export function restartFromPlan(options: {
       return jsonResponse({ success: false, error: errMsg }, { status: 400 });
     }
 
-    // 4. Reset specialist pipeline states
-    clearReviewStatus(id.toUpperCase());
-
-    // 5. Append restart entry to continue file (lifecycle-aware)
+    // 4. Append restart entry to continue file (lifecycle-aware)
     yield* Effect.promise(async () => {
       const upperId = id.toUpperCase();
       try {
@@ -777,7 +760,7 @@ export function restartFromPlan(options: {
     // 7. Emit events
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
     // append in one SQLite transaction.
-    const restartAgentState = yield* getAgentState(`agent-${issueLower}`);
+    const restartAgentState = getAgentState(`agent-${issueLower}`);
     if (restartAgentState) {
       yield* saveAgentStateAndEmitEventProgram(restartAgentState, {
         type: 'agent.stopped',
@@ -789,19 +772,6 @@ export function restartFromPlan(options: {
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
       payload: { issueId: id, status: 'In Progress', canonicalStatus: 'in_progress' },
-    });
-    yield* eventStore.append({
-      type: 'pipeline.status_changed',
-      timestamp: new Date().toISOString(),
-      payload: {
-        issueId: id,
-        status: {
-          issueId: id,
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          readyForMerge: false,
-        },
-      },
     });
     try { getIssueDataService().patchIssue(id, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
 
@@ -819,7 +789,7 @@ export function getPlanningState(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
 
-    const projectPath = resolveIssueProjectPathSync(id);
+    const projectPath = resolveIssueProjectPath(id);
 
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)

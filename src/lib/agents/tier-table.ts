@@ -3,11 +3,9 @@ import type { ModelId } from '../settings.js';
 import type { XBriefDifficulty, XBriefItemKind } from '../xbrief/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import type { ModelProvider } from '../model-fallback.js';
-import { resolveModelIdSync } from '../model-capabilities.js';
-import { getProviderForModelSync, PROVIDERS } from '../providers.js';
-import { canUseHarnessSync } from '../harness-policy.js';
-import { readIssueRecordSync } from '../pan-dir/record.js';
-import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { resolveModelId } from '../model-capabilities.js';
+import { getProviderForModel, PROVIDERS } from '../providers.js';
+import { canUseHarness } from '../harness-policy.js';
 
 export const TIERED_EXECUTION_DIFFICULTIES: readonly XBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
@@ -66,14 +64,12 @@ export interface TieredEscalationConfig {
   enabled?: boolean;
   retries_at_tier?: number;
   max_promotions?: number;
-  flounder_budget_minutes?: Partial<Record<XBriefDifficulty, number>>;
 }
 
 export interface ValidatedEscalationConfig {
   enabled: boolean;
   retries_at_tier: number;
   max_promotions: number;
-  flounder_budget_minutes: Partial<Record<XBriefDifficulty, number>>;
 }
 
 export interface TieredExecutionConfig {
@@ -122,14 +118,13 @@ export const DEFAULT_TIERED_EXECUTION_CONFIG: ValidatedTieredExecutionConfig = {
     enabled: false,
     retries_at_tier: 0,
     max_promotions: 0,
-    flounder_budget_minutes: {},
   },
   compaction_reroute: 'off',
   replay_threshold: 0.5,
   difficultyToTier: {},
 };
 
-export const TIERED_EXECUTION_ISSUE_OVERRIDES = ['on', 'off'] as const;
+const TIERED_EXECUTION_ISSUE_OVERRIDES = ['on', 'off'] as const;
 export type TieredExecutionIssueOverride = typeof TIERED_EXECUTION_ISSUE_OVERRIDES[number];
 
 export function resolveTieredExecutionBlock(
@@ -197,33 +192,22 @@ export function resolveTieredExecutionEnabled(
 
 /**
  * Issue-aware wrapper for resolveTieredExecutionEnabled (PAN-2383 foundation).
- * Reads the per-issue record to extract the record override, applies precedence:
- * record override > plan.metadata.tiered_execution > config.enabled.
+ * PAN-3917: the per-issue record override this used to read
+ * is gone with the record plane and had no surviving writer — precedence
+ * collapses to plan.metadata.tiered_execution > config.enabled. `issueId`
+ * stays in the signature so call sites (spawn-prep.ts) do not need to branch
+ * on whether an issue is known.
  */
 export function resolveTieredExecutionEnabledForIssue(
   config: Pick<TieredExecutionConfig, 'enabled'>,
-  issueId: string,
+  _issueId: string,
   planMetadata?: { [key: string]: unknown },
 ): boolean {
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (!resolved) {
-    // Fallback to plan/config if project cannot be resolved
-    return resolveTieredExecutionEnabled(config, planMetadata);
-  }
-
-  const project = getProjectSync(resolved.projectKey);
-  if (!project) {
-    return resolveTieredExecutionEnabled(config, planMetadata);
-  }
-
-  const record = readIssueRecordSync(project, issueId);
-  const recordOverride = record?.tieredExecutionOverride;
-
-  return resolveTieredExecutionEnabled(config, planMetadata, recordOverride);
+  return resolveTieredExecutionEnabled(config, planMetadata);
 }
 
 function isRuntimeName(value: string): value is RuntimeName {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code';
+  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse';
 }
 
 function isDifficulty(value: string): value is XBriefDifficulty {
@@ -256,12 +240,12 @@ function knownModelIds(): Set<string> {
 
 function validateHarness(harness: string, path: string): asserts harness is RuntimeName {
   if (!isRuntimeName(harness)) {
-    throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, codex, acp, or kimi-code`);
+    throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse`);
   }
 }
 
 function validateModel(model: string, path: string): ModelId {
-  const resolved = resolveModelIdSync(model);
+  const resolved = resolveModelId(model);
   if (!knownModelIds().has(resolved) && !resolved.includes('/')) {
     throw new TieredExecutionConfigError(`${path}.model '${model}' is unknown`);
   }
@@ -274,9 +258,9 @@ function validateModelHarnessPolicy(
   path: string,
   context: TieredExecutionValidationContext,
 ): void {
-  const provider = getProviderForModelSync(model);
+  const provider = getProviderForModel(model);
   const authMode = context.providerAuth?.[provider.name as ModelProvider];
-  const decision = canUseHarnessSync(harness, model, authMode);
+  const decision = canUseHarness(harness, model, authMode);
   if (!decision.allowed) {
     throw new TieredExecutionConfigError(`${path} is not allowed: ${decision.reason ?? 'harness policy rejected this model/harness/auth combination'}`);
   }
@@ -334,22 +318,10 @@ function validateFeedConfig(config?: TieredExecutionFeedConfig): ValidatedTiered
 }
 
 function validateEscalationConfig(config?: TieredEscalationConfig): ValidatedEscalationConfig {
-  const flounderBudget: Partial<Record<XBriefDifficulty, number>> = {};
-  for (const [difficulty, budget] of Object.entries(config?.flounder_budget_minutes ?? {})) {
-    if (!isDifficulty(difficulty)) {
-      throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes contains unknown difficulty '${difficulty}'`);
-    }
-    if (!Number.isFinite(budget) || budget <= 0) {
-      throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes.${difficulty} must be positive`);
-    }
-    flounderBudget[difficulty] = budget;
-  }
-
   return {
     enabled: config?.enabled ?? false,
     retries_at_tier: validateNonNegativeInteger(config?.retries_at_tier, 'tiered_execution.escalation.retries_at_tier', 0),
     max_promotions: validateNonNegativeInteger(config?.max_promotions, 'tiered_execution.escalation.max_promotions', 0),
-    flounder_budget_minutes: flounderBudget,
   };
 }
 

@@ -1,3 +1,4 @@
+import type { ConfigurableProvider } from '../configurable-providers.js';
 import type { ModelId } from '../settings.js';
 import type { ModelProvider } from '../model-fallback.js';
 import type { EffortLevel } from '../model-capabilities.js';
@@ -5,6 +6,7 @@ import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table.js';
+import type { TerminalBackendName } from '../terminal-backends/types.js';
 
 export type { SubscriptionPlan, AuthMode };
 
@@ -171,6 +173,8 @@ export interface ConversationsConfig {
   rich_compaction?: boolean;
   /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
   title_model?: ModelId;
+  /** Model used to author external handoff docs (`pan handoff`) when no per-call model is given. Required for `pan handoff` to work — there is no default (PAN-3860); unset fails the handoff loudly. */
+  handoff_author_model?: ModelId;
   watch_dirs?: string[];
   scan_max_parallel?: number | null;
   embeddings?: boolean;
@@ -355,7 +359,7 @@ export interface WeightedModelRef {
 
 /** Top-level role model: either a scalar model string or a weighted distribution list. */
 export type RoleModelRef = ModelRef | WeightedModelRef[];
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge' | 'worker';
 
 
 /**
@@ -379,7 +383,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /**
@@ -433,6 +437,10 @@ export interface ResourcesConfig {
   governor_psi_calm_readmit_avg10?: number;
   /** PAN-3754: continuous calm-PSI duration required for early re-admission */
   governor_psi_calm_window_ms?: number;
+  /** PAN-3344: hold admissions at or above this one-minute load per core */
+  governor_cpu_soft_load_per_core?: number;
+  /** PAN-3344: re-admit only below this load per core; must be lower than soft */
+  governor_cpu_recovery_load_per_core?: number;
 }
 
 export interface IssuesConfig {
@@ -476,18 +484,7 @@ export interface YamlConfig {
   /** Model configuration */
   models?: {
     /** Provider enable/disable and API keys */
-    providers?: {
-      anthropic?: ProviderConfig | boolean;
-      openai?: ProviderConfig | boolean;
-      google?: ProviderConfig | boolean;
-      minimax?: ProviderConfig | boolean;
-      zai?: ProviderConfig | boolean;
-      kimi?: ProviderConfig | boolean;
-      mimo?: ProviderConfig | boolean;
-      openrouter?: ProviderConfig | boolean;
-      nous?: ProviderConfig | boolean;
-      dashscope?: ProviderConfig | boolean;
-    };
+    providers?: Partial<Record<ConfigurableProvider, ProviderConfig | boolean>>;
 
     /** Per-work-type overrides (explicit model for specific tasks) */
     overrides?: Partial<Record<string, ModelId>>;
@@ -536,6 +533,8 @@ export interface YamlConfig {
 
   /** tmux runtime configuration */
   tmux?: TmuxConfig;
+
+  terminal?: { backend?: TerminalBackendName }; // D10; unset auto-selects (terminal-backends/select.ts)
 
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
@@ -784,6 +783,8 @@ export interface NormalizedConfig {
     configMode: TmuxConfigMode;
   };
 
+  terminal: { backend?: TerminalBackendName }; // D10; unset means auto-select
+
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;
 
@@ -855,6 +856,10 @@ export interface NormalizedConfig {
     manualCompactMode: ManualCompactMode;
     richCompaction: boolean;
     titleModel: ModelId;
+    /** PAN-3860: deliberately no default — unset means the handoff pipeline
+     * must fail loudly (HandoffAuthorModelNotConfiguredError) rather than
+     * hardcode a fallback model. */
+    handoffAuthorModel?: ModelId;
     watchDirs: string[];
     scanMaxParallel: number | null;
     embeddings: boolean;
@@ -952,6 +957,9 @@ export interface NormalizedConfig {
     governorPsiFullShedAvg10: number;
     governorPsiCalmReadmitAvg10: number;
     governorPsiCalmWindowMs: number;
+    /** PAN-3344: CPU runway thresholds. Lower load is healthier. */
+    governorCpuSoftLoadPerCore: number;
+    governorCpuRecoveryLoadPerCore: number;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */

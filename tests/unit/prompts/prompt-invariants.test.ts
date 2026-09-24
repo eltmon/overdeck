@@ -25,7 +25,7 @@ function readPrompt(filename: string): string {
 }
 
 const flywheel = readPrompt('roles/flywheel.md');
-const brief = readPrompt('docs/flywheel-brief.md');
+const brief = readPrompt('sync-sources/skills/pan-flywheel/SKILL.md');
 const review = readPrompt('roles/review.md');
 
 const RAIL_MESSAGE =
@@ -79,22 +79,22 @@ describe('prompt invariants', () => {
   it('brief documents auto_pickup_backlog default OFF with released and blanket release branches', () => {
     expect(
       brief,
-      `Expected docs/flywheel-brief.md to document auto_pickup_backlog with default OFF. ${RAIL_MESSAGE}`,
+      `Expected sync-sources/skills/pan-flywheel/SKILL.md to document auto_pickup_backlog with default OFF. ${RAIL_MESSAGE}`,
     ).toMatch(/auto_pickup_backlog[\s\S]{0,200}default OFF/i);
     expect(
       brief,
-      `Expected docs/flywheel-brief.md to document the OFF branch (operator individually released). ${RAIL_MESSAGE}`,
+      `Expected sync-sources/skills/pan-flywheel/SKILL.md to document the OFF branch (operator individually released). ${RAIL_MESSAGE}`,
     ).toMatch(/OFF[\s\S]{0,400}released/i);
     expect(
       brief,
-      `Expected docs/flywheel-brief.md to document the ON branch (blanket release). ${RAIL_MESSAGE}`,
+      `Expected sync-sources/skills/pan-flywheel/SKILL.md to document the ON branch (blanket release). ${RAIL_MESSAGE}`,
     ).toMatch(/ON[\s\S]{0,400}blanket release/i);
   });
 
   it('brief documents require_uat_before_merge default ON', () => {
     expect(
       brief,
-      `Expected docs/flywheel-brief.md to document require_uat_before_merge with default ON. ${RAIL_MESSAGE}`,
+      `Expected sync-sources/skills/pan-flywheel/SKILL.md to document require_uat_before_merge with default ON. ${RAIL_MESSAGE}`,
     ).toMatch(/require_uat_before_merge[\s\S]{0,200}default ON/i);
   });
 

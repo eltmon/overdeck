@@ -71,6 +71,35 @@ describe('applyOverdeckHookRegistrations', () => {
     expect(settings.hooks?.Stop?.some((entry) =>
       entry.hooks.some((hook) => hook.command.includes('panopticon/bin')))).toBe(false);
   });
+
+  // PAN-3956 D9 / FR-11: Overdeck never installs the Herdr claude integration,
+  // but an operator may. Its SessionStart entry must survive `pan sync`, and
+  // Overdeck's own SessionStart hook registers beside it (both fire in parallel).
+  describe('coexists with the Herdr claude integration', () => {
+    const herdrEntry = {
+      matcher: '',
+      hooks: [{ type: 'command', command: '/home/op/.claude/hooks/herdr-agent-state.sh', timeout: 10 }],
+    };
+
+    it('keeps the foreign Herdr SessionStart entry byte-identical and adds Overdeck\'s beside it', () => {
+      const settings: ClaudeSettings = {
+        hooks: { SessionStart: [structuredClone(herdrEntry)] },
+      };
+      const before = JSON.stringify(herdrEntry);
+
+      const first = applyOverdeckHookRegistrations(settings, '/home/op/.overdeck/bin', { python3Available: true });
+      expect(first.added).toContain('SessionStart:session-start-hook');
+      expect(first.removed).toEqual([]);
+      expect(JSON.stringify(settings.hooks?.SessionStart?.[0])).toBe(before);
+      expect(settings.hooks?.SessionStart?.some((entry) =>
+        entry.hooks.some((hook) => hook.command === '/home/op/.overdeck/bin/session-start-hook'))).toBe(true);
+
+      const second = applyOverdeckHookRegistrations(settings, '/home/op/.overdeck/bin', { python3Available: true });
+      expect(second).toEqual({ added: [], removed: [] });
+      expect(JSON.stringify(settings.hooks?.SessionStart?.[0])).toBe(before);
+      expect(settings.hooks?.SessionStart).toHaveLength(2);
+    });
+  });
 });
 
 describe('provisionClaudeHooks', () => {

@@ -111,7 +111,7 @@ export function parseDarwinSwapUsage(content: string): ParsedDarwinSwapUsage | n
     : { totalBytes, usedBytes, freeBytes };
 }
 
-export function aggregateDarwinCpuCounters(cpuInfo: readonly CpuInfo[]): CpuCounters | null {
+function aggregateDarwinCpuCounters(cpuInfo: readonly CpuInfo[]): CpuCounters | null {
   if (cpuInfo.length === 0) return null;
   let idle = 0;
   let total = 0;

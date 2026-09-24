@@ -7,14 +7,14 @@ import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
-  hashFileSync,
+  hashFile,
   createEmptyManifest,
-  readManifestSync,
-  writeManifestSync,
+  readManifest,
+  writeManifest,
   setManifestEntry,
   removeManifestEntry,
   compareFileToManifest,
-  collectSourceFilesSync,
+  collectSourceFiles,
   buildManifestFromDirectory,
 } from '../manifest.js';
 import type { Manifest } from '../manifest.js';
@@ -34,7 +34,7 @@ describe('hashFile', () => {
   it('returns sha256-prefixed hash', () => {
     const filePath = join(TEST_DIR, 'test.md');
     writeFileSync(filePath, 'hello world');
-    const hash = hashFileSync(filePath);
+    const hash = hashFile(filePath);
     expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
@@ -43,7 +43,7 @@ describe('hashFile', () => {
     const file2 = join(TEST_DIR, 'b.md');
     writeFileSync(file1, 'same content');
     writeFileSync(file2, 'same content');
-    expect(hashFileSync(file1)).toBe(hashFileSync(file2));
+    expect(hashFile(file1)).toBe(hashFile(file2));
   });
 
   it('returns different hashes for different content', () => {
@@ -51,7 +51,7 @@ describe('hashFile', () => {
     const file2 = join(TEST_DIR, 'b.md');
     writeFileSync(file1, 'content A');
     writeFileSync(file2, 'content B');
-    expect(hashFileSync(file1)).not.toBe(hashFileSync(file2));
+    expect(hashFile(file1)).not.toBe(hashFile(file2));
   });
 });
 
@@ -70,8 +70,8 @@ describe('readManifest / writeManifest', () => {
     const manifest = createEmptyManifest();
     setManifestEntry(manifest, 'skills/tasks/SKILL.md', 'sha256:abc123', 'overdeck');
 
-    writeManifestSync(manifestPath, manifest);
-    const loaded = readManifestSync(manifestPath);
+    writeManifest(manifestPath, manifest);
+    const loaded = readManifest(manifestPath);
 
     expect(loaded.version).toBe(1);
     expect(loaded.managed_by).toBe('overdeck');
@@ -80,27 +80,27 @@ describe('readManifest / writeManifest', () => {
   });
 
   it('returns empty manifest for nonexistent file', () => {
-    const m = readManifestSync(join(TEST_DIR, 'does-not-exist.json'));
+    const m = readManifest(join(TEST_DIR, 'does-not-exist.json'));
     expect(m.installed).toEqual({});
   });
 
   it('returns empty manifest for invalid JSON', () => {
     const manifestPath = join(TEST_DIR, 'bad.json');
     writeFileSync(manifestPath, 'not json!!!');
-    const m = readManifestSync(manifestPath);
+    const m = readManifest(manifestPath);
     expect(m.installed).toEqual({});
   });
 
   it('returns empty manifest for wrong schema', () => {
     const manifestPath = join(TEST_DIR, 'wrong.json');
     writeFileSync(manifestPath, JSON.stringify({ version: 99, other: true }));
-    const m = readManifestSync(manifestPath);
+    const m = readManifest(manifestPath);
     expect(m.installed).toEqual({});
   });
 
   it('creates parent directories when writing', () => {
     const manifestPath = join(TEST_DIR, 'deep', 'nested', 'manifest.json');
-    writeManifestSync(manifestPath, createEmptyManifest());
+    writeManifest(manifestPath, createEmptyManifest());
     expect(existsSync(manifestPath)).toBe(true);
   });
 });
@@ -163,7 +163,7 @@ describe('compareFileToManifest', () => {
   it('returns "update" when file hash matches manifest', () => {
     const filePath = join(TEST_DIR, 'managed.md');
     writeFileSync(filePath, 'managed content');
-    const hash = hashFileSync(filePath);
+    const hash = hashFile(filePath);
     setManifestEntry(manifest, 'skills/managed/SKILL.md', hash, 'overdeck');
 
     const result = compareFileToManifest(filePath, 'skills/managed/SKILL.md', manifest);
@@ -173,7 +173,7 @@ describe('compareFileToManifest', () => {
   it('returns "modified" when file hash differs from manifest', () => {
     const filePath = join(TEST_DIR, 'modified.md');
     writeFileSync(filePath, 'original content');
-    const originalHash = hashFileSync(filePath);
+    const originalHash = hashFile(filePath);
     setManifestEntry(manifest, 'skills/mod/SKILL.md', originalHash, 'overdeck');
 
     // User modifies the file
@@ -197,7 +197,7 @@ describe('collectSourceFiles', () => {
     writeFileSync(join(skillsDir, 'pan-help', 'SKILL.md'), 'help skill');
     writeFileSync(join(skillsDir, 'pan-help', 'README.md'), 'readme');
 
-    const files = collectSourceFilesSync(skillsDir, 'skills/');
+    const files = collectSourceFiles(skillsDir, 'skills/');
     const paths = files.map(f => f.relativePath).sort();
 
     expect(paths).toEqual([
@@ -208,7 +208,7 @@ describe('collectSourceFiles', () => {
   });
 
   it('returns empty array for nonexistent directory', () => {
-    const files = collectSourceFilesSync(join(TEST_DIR, 'nope'), 'skills/');
+    const files = collectSourceFiles(join(TEST_DIR, 'nope'), 'skills/');
     expect(files).toEqual([]);
   });
 
@@ -217,7 +217,7 @@ describe('collectSourceFiles', () => {
     mkdirSync(join(skillsDir, 'test'), { recursive: true });
     writeFileSync(join(skillsDir, 'test', 'SKILL.md'), 'test');
 
-    const files = collectSourceFilesSync(skillsDir, 'skills/');
+    const files = collectSourceFiles(skillsDir, 'skills/');
     expect(files).toHaveLength(1);
     expect(existsSync(files[0].absolutePath)).toBe(true);
   });
@@ -252,7 +252,7 @@ describe('buildManifestFromDirectory', () => {
     writeFileSync(filePath, 'test content');
 
     const manifest = buildManifestFromDirectory(TEST_DIR, ['skills'], 'overdeck');
-    const expectedHash = hashFileSync(filePath);
+    const expectedHash = hashFile(filePath);
     expect(manifest.installed['skills/test/SKILL.md'].hash).toBe(expectedHash);
   });
 });

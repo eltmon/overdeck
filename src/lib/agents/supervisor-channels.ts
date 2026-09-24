@@ -3,14 +3,16 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { isClaudeCodeChannelsMcpEnabled } from '../config-yaml.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { isClaudeCodeChannelsMcpEnabled, loadConfigSync } from '../config-yaml.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { hostTerminalBackendName } from '../terminal-backends/select.js';
+import type { TerminalBackendName } from '../terminal-backends/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { getOverdeckHome } from '../paths.js';
-import { getProviderForModelSync } from '../providers.js';
+import { getProviderForModel } from '../providers.js';
 import { writePtyToken } from '../pty-token.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
 import { capturePane, sendRawKeystroke } from '../tmux.js';
@@ -31,6 +33,11 @@ interface SupervisorChannelsSpawnOptions {
   model?: string;
   harness?: RuntimeName;
   allowHost?: boolean;
+  /**
+   * Terminal backend this launch goes to (PAN-3917 W12). Required for the
+   * Herdr ineligibility rule; omitted callers are treated as tmux.
+   */
+  backend?: TerminalBackendName;
 }
 
 export function buildDefaultResumeContinueMessage(issueId: string): string {
@@ -102,7 +109,7 @@ export function markKickoffRedelivered(state: AgentState): void {
 
 export async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<void> {
   await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
-  const failedState = await Effect.runPromise(getAgentState(state.id));
+  const failedState = getAgentState(state.id);
   if (failedState) {
     failedState.status = 'running';
     failedState.kickoffDelivered = false;
@@ -110,7 +117,7 @@ export async function recordKickoffDeliveryFailure(state: AgentState, issueId: s
   }
   state.status = 'running';
   state.kickoffDelivered = false;
-  emitActivityEntrySync({
+  emitActivityEntry({
     source,
     level: 'error',
     message: `${state.id}: kickoff delivery failed`,
@@ -133,11 +140,25 @@ export function decideSupervisorForWorkAgent(
   options: SupervisorChannelsSpawnOptions,
   state: AgentState,
 ): SupervisorDecision {
-  void options;
   const log = (eligible: boolean, reason?: string): void => {
     const tag = eligible ? 'supervisor:eligible' : `supervisor:ineligible:${reason ?? 'unknown'}`;
     console.log(`[${agentId}] ${tag}`);
   };
+
+  // PAN-3917 W12: the PTY supervisor is a TMUX-ONLY delivery mechanism.
+  // node-pty allocates a second pseudo-terminal for the harness, so the pane's
+  // own foreground process stays `node <pty-supervisor.js>` and Herdr's
+  // detector — which reads the pane's foreground process, not its title
+  // (verified live 2026-09-19: the supervisor pane set the correct
+  // `✳ agent-…` terminal title and was still never detected) — never sees
+  // `claude`. `startAgent` then times out and closes the pane, which is how
+  // `pan start PAN-3705` died. Herdr needs none of what the supervisor
+  // provides: `agent.prompt` delivers, `agent.get`/`agent.list` report
+  // liveness, and `terminal.session.observe` streams the terminal.
+  if (options.backend === 'herdr') {
+    log(false, 'herdr-backend');
+    return { eligible: false, reason: 'herdr-backend' };
+  }
 
   if (state.role !== 'work' && state.role !== 'strike') {
     log(false, 'not-a-work-or-strike-agent');
@@ -156,6 +177,19 @@ export function decideSupervisorForWorkAgent(
     return { eligible: false, reason };
   }
 
+  // Codex's app-server transport never wraps the launcher in the PTY
+  // supervisor (the app-server branch of buildCodexCommand skips the wrap), so
+  // a supervisor stamp here would project a strict 'supervisor' deliveryMethod
+  // with no socket behind it — every state-routed delivery then died with
+  // socket-missing (the PAN-3743 review-loop stall). Only the work-tui
+  // transport gets a real supervisor. Matches the launcher's own source of
+  // truth (getCodexLauncherFields reads the merged config the same way) and
+  // the conversation-side precedent in shouldUseSupervisorForConversation.
+  if (state.harness === 'codex' && loadConfigSync().config.codex?.transport !== 'tui') {
+    log(false, 'codex-app-server-transport');
+    return { eligible: false, reason: 'codex-app-server-transport' };
+  }
+
   log(true);
   return { eligible: true };
 }
@@ -165,7 +199,8 @@ export async function prepareSupervisorForFreshLaunch(
   options: SupervisorChannelsSpawnOptions,
   state: AgentState,
 ): Promise<{ useSupervisor: boolean; supervisorScriptPath?: string }> {
-  const supervisorDecision = decideSupervisorForWorkAgent(agentId, options, state);
+  const backend = options.backend ?? (await hostTerminalBackendName());
+  const supervisorDecision = decideSupervisorForWorkAgent(agentId, { ...options, backend }, state);
   if (!supervisorDecision.eligible) {
     delete state.supervisorEnabled;
     return { useSupervisor: false };
@@ -197,6 +232,9 @@ export async function prepareSupervisorForRelaunch(
     model,
     harness,
     allowHost: state.hostOverride,
+    // W12: a relaunch re-derives the backend exactly like a fresh spawn, so a
+    // Herdr host never re-wraps the harness and re-breaks its detector.
+    backend: await hostTerminalBackendName(),
   }, relaunchState);
   if (!supervisorDecision.eligible) {
     delete state.supervisorEnabled;
@@ -266,7 +304,7 @@ export function decideChannelsForWorkAgent(
   // Auth gate. The Channels capability is gated by Anthropic auth in the
   // compiled Claude Code binary; we only attempt the bridge when the model
   // routes to the anthropic provider.
-  const provider = getProviderForModelSync(state.model as ModelId);
+  const provider = getProviderForModel(state.model as ModelId);
   if (provider.name !== 'anthropic') {
     log(false, `provider-${provider.name}`);
     return { eligible: false, reason: `provider-${provider.name}` };
@@ -362,7 +400,7 @@ export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < TIMEOUT_MS) {
     try {
-      const pane = await Effect.runPromise(capturePane(agentId, 50));
+      const pane = await capturePane(agentId, 50);
       if (pane.includes(NEEDLE)) {
         // Dialog is up. Send Enter, then keep re-sending until the needle
         // clears — the first keystroke can land before the TUI is ready to
@@ -371,9 +409,7 @@ export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
         while (Date.now() - dismissStart < DISMISS_BUDGET_MS) {
           await Effect.runPromise(sendRawKeystroke(agentId, 'C-m', 'channels:dismiss-dev-dialog'));
           await new Promise((r) => setTimeout(r, RESEND_INTERVAL_MS));
-          const after = await Effect.runPromise(
-            capturePane(agentId, 50).pipe(Effect.catch(() => Effect.succeed(''))),
-          );
+          const after = await capturePane(agentId, 50).catch(() => '');
           if (!after.includes(NEEDLE)) return;
         }
         console.log(`[${agentId}] channels:dismiss:dialog-still-present-after-budget`);

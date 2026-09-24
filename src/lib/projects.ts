@@ -4,6 +4,60 @@
  * Maps Linear team prefixes and labels to project paths for workspace creation.
  */
 
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `getProjectSync` (async: `getProject`): 28 sites in cli/commands/admin/seed-uat-fixtures.ts,
+ *   cli/commands/conversations/move.ts, cli/commands/doctor-duplicate-stacks.ts, cli/commands/orders.ts,
+ *   cli/commands/strike.ts, cli/commands/task.ts, dashboard/server/routes/issues.ts,
+ *   dashboard/server/routes/orders.ts, dashboard/server/routes/projects.ts,
+ *   dashboard/server/routes/workspace-registry.ts, dashboard/server/routes/workspaces/uat-stack-actions.ts,
+ *   lib/cloister/auto-merge-policy.ts, lib/cloister/merge-eligibility.ts, lib/cloister/merge-gate.ts,
+ *   lib/cloister/merge-train.ts, lib/cloister/specialist-context.ts, lib/cloister/verification-tests-mode.ts,
+ *   lib/overdeck/issue-projects.ts, lib/pan-dir/migrate-plan-home.ts, lib/project-repos.ts, lib/projects.ts,
+ *   lib/swarm-policy.ts, lib/workspace/ensure-devcontainer.ts, lib/workspace/rebuild-stack.ts,
+ *   lib/workspace/stack-health.ts.
+ * - `listProjectsSync` (async: `listProjectsAsync`): 29 sites in scripts/reconcile-work-model-stamps.ts,
+ *   cli/commands/conversations/move.ts, cli/commands/doctor-plan-home-ignore.ts, cli/commands/doctor.ts,
+ *   cli/commands/workspace-list.ts, dashboard/server/routes/misc/meta.ts,
+ *   dashboard/server/routes/misc/trackers.ts, dashboard/server/routes/orders.ts,
+ *   dashboard/server/routes/palette.ts, dashboard/server/routes/projects.ts,
+ *   dashboard/server/routes/workspaces.ts, dashboard/server/services/generation-ship.ts,
+ *   dashboard/server/services/project-resource-refresh-queue.ts, dashboard/server/services/resource-discovery.ts,
+ *   dashboard/server/services/resource-refresh-triggers.ts, dashboard/server/telemetry.ts,
+ *   dashboard/server/ws-rpc.ts, lib/ci/project-ci-observation.ts, lib/cloister/closed-issue-reaper.ts,
+ *   lib/cloister/deacon-main-divergence.ts, lib/cloister/deacon-workspaces.ts, lib/context-layers/detach.ts,
+ *   lib/conversations/hash-resolver.ts, lib/costs/wal.ts, lib/overdeck/project-pipelines.ts,
+ *   lib/pan-dir/fs-lock.ts, lib/prd-draft.ts, lib/sync-startup-gate.ts, lib/workspaces/rebuild.ts.
+ * - `loadProjectsConfigSync` (async: `loadProjectsConfig`): 18 sites in cli/commands/db.ts,
+ *   cli/commands/issues.ts, cli/commands/workspace-render-devcontainer.ts, lib/overdeck/config.ts,
+ *   lib/overdeck/control-settings.ts, lib/projects.ts, lib/projects/project-key.ts, lib/tracker-utils.ts,
+ *   lib/traefik.ts.
+ * - `resolveProjectFromIssueSync` (async: `resolveProjectFromIssue`): 70 sites in
+ *   cli/commands/admin/seed-uat-fixtures.ts, cli/commands/doctor-duplicate-stacks.ts, cli/commands/reopen.ts,
+ *   cli/commands/scope.ts, cli/commands/start.ts, cli/commands/strike.ts, cli/commands/swarm-gates.ts,
+ *   cli/commands/swarm-status.ts, cli/commands/swarm.ts, cli/commands/task.ts, cli/commands/workspace-migrate.ts,
+ *   dashboard/server/routes/agents/shared.ts, dashboard/server/routes/command-deck.ts,
+ *   dashboard/server/routes/issues.ts, dashboard/server/routes/merge-train.ts,
+ *   dashboard/server/routes/specialists/legacy-routes.ts, dashboard/server/routes/specialists/shared.ts,
+ *   dashboard/server/routes/workspaces.ts, dashboard/server/routes/workspaces/uat-stack-actions.ts,
+ *   dashboard/server/services/agent-directory.ts, dashboard/server/services/issue-data-service.ts,
+ *   dashboard/server/services/resource-discovery.ts, dashboard/server/services/resource-refresh-triggers.ts,
+ *   dashboard/server/services/system-health-service.ts, dashboard/server/services/uat-train.ts,
+ *   dashboard/server/services/workspace-service.ts, lib/agent-enrichment.ts, lib/agents/spawn-prep.ts,
+ *   lib/cloister/auto-merge-policy.ts, lib/cloister/autonomous-work-dispatch.ts,
+ *   lib/cloister/ci-failure-feedback.ts, lib/cloister/merge-eligibility.ts, lib/cloister/merge-gate.ts,
+ *   lib/cloister/merge-train-deps.ts, lib/cloister/merge-train.ts, lib/cloister/merge-verification.ts,
+ *   lib/cloister/swarm-foreman.ts, lib/cloister/verification-tests-mode.ts, lib/merge-set.ts,
+ *   lib/overdeck/issue-close-out.ts, lib/overdeck/issue-projects.ts, lib/overdeck/issue-reads.ts,
+ *   lib/overdeck/issue-transitions.ts, lib/overdeck/planning-promotion.ts, lib/overdeck/planning-sessions.ts,
+ *   lib/parked/resolver.ts, lib/prd-draft.ts, lib/project-repos.ts, lib/swarm-policy.ts,
+ *   lib/workspace/ensure-devcontainer.ts, lib/workspace/rebuild-stack.ts, lib/workspace/stack-health.ts.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { existsSync, readFileSync, statSync } from 'fs';
 import { readFile, stat } from 'fs/promises';
 import { join, resolve } from 'path';
@@ -12,17 +66,15 @@ import { Effect } from 'effect';
 import { ConfigParseError, FsError } from './errors.js';
 import { OVERDECK_HOME } from './paths.js';
 import {
-  atomicWriteProjectsConfig,
   atomicWriteProjectsConfigSync,
   updateProjectsConfigText,
   updateProjectsConfigTextSync,
-  withProjectsConfigWrite,
   withProjectsConfigWriteSync,
 } from './projects-config-write.js';
-import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
+import { extractPrefix, parseIssueId } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
-import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
-import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
+import { findContainingProject } from './projects/path-containment.js';
+import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
 
@@ -338,8 +390,6 @@ export interface ProjectConfig {
   rally_project?: string;
   /** Specialist agent configuration */
   specialists?: SpecialistConfig;
-  /** Per-project auto-resume failure tracking and backoff overrides */
-  autoResume?: Partial<AutoResumeConfig>;
   /** Path to the project's OKF knowledge bundle. Relative paths resolve from the project path. */
   knowledge_repo?: string;
   /** Per-project foreman/swarm settings. */
@@ -359,7 +409,7 @@ export interface ProjectConfig {
    */
   merge_train?: 'enabled' | 'disabled';
   /** Merge checks: pre-push quality gates and main-verification fallback requirements. */
-  quality_gates?: Record<string, QualityGateConfig>; main_verify_required_checks?: string[];
+  quality_gates?: Record<string, QualityGateConfig>; main_verify_required_checks?: string[]; verification?: ProjectVerificationConfig;
   /** Version-string propagation performed after a UAT batch merge. */
   version_sync?: VersionSyncConfig;
   /** Release components and rollout checks for coordinated post-merge release. */
@@ -532,7 +582,7 @@ async function updateProjectsConfigAsync<T>(
 /**
  * Save projects configuration
  */
-export function saveProjectsConfigSync(config: ProjectsConfig): void {
+export function saveProjectsConfig(config: ProjectsConfig): void {
   const yaml = stringifyYaml(config, { indent: 2 });
   withProjectsConfigWriteSync(PROJECTS_CONFIG_FILE, () => {
     atomicWriteProjectsConfigSync(PROJECTS_CONFIG_FILE, yaml);
@@ -573,12 +623,7 @@ function resolveProjectKeyForCwdFromProjects(
   return bestMatch?.key ?? null;
 }
 
-/** Resolve the registered project owning a cwd via longest path-prefix match. */
-export function resolveProjectKeyForCwd(cwd: string): string | null {
-  return resolveProjectKeyForCwdFromProjects(cwd, listProjectsSync());
-}
-
-/** Async request-path variant of {@link resolveProjectKeyForCwd}. */
+/** Resolve the registered project that contains `cwd` (request path; reads projects.yaml asynchronously). */
 export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string | null> {
   return resolveProjectKeyForCwdFromProjects(cwd, await listProjectsAsync());
 }
@@ -586,7 +631,7 @@ export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string 
 /**
  * Add or update a project in the registry
  */
-export function registerProjectSync(key: string, projectConfig: ProjectConfig): void {
+export function registerProject(key: string, projectConfig: ProjectConfig): void {
   updateProjectsConfigSync(config => {
     config.projects[key] = projectConfig;
     return { config, result: undefined, changed: true };
@@ -610,10 +655,6 @@ function setProjectAutoMergeDefaultMutation(
   else updated.auto_merge_default = value;
   config.projects[key] = updated;
   return { config, result: undefined, changed: true };
-}
-
-export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hold' | null): void {
-  updateProjectsConfigSync(config => setProjectAutoMergeDefaultMutation(config, key, value));
 }
 
 export async function setProjectAutoMergeDefault(key: string, value: 'auto' | 'hold' | null): Promise<void> {
@@ -666,14 +707,6 @@ function prepareProjectRename(
   };
 }
 
-export function renameProjectSync(key: string, newName: string): void {
-  updateProjectsConfigSync(config => {
-    const plan = prepareProjectRename(config, key, newName);
-    if (plan instanceof ProjectRenameError) throw plan;
-    return { config: plan.config, result: undefined, changed: plan.changed };
-  });
-}
-
 function setProjectSwarmPolicyMutation(
   config: ProjectsConfig,
   key: string,
@@ -687,10 +720,6 @@ function setProjectSwarmPolicyMutation(
   else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
   config.projects[key] = updated;
   return { config, result: undefined, changed: true };
-}
-
-export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
-  updateProjectsConfigSync(config => setProjectSwarmPolicyMutation(config, key, value));
 }
 
 export async function setProjectSwarmPolicy(
@@ -718,10 +747,6 @@ function setProjectMergeTrainMutation(
   return { config, result: undefined, changed: true };
 }
 
-export function setProjectMergeTrainSync(key: string, value: 'enabled' | 'disabled' | null): void {
-  updateProjectsConfigSync(config => setProjectMergeTrainMutation(config, key, value));
-}
-
 export async function setProjectMergeTrain(key: string, value: 'enabled' | 'disabled' | null): Promise<void> {
   await updateProjectsConfigAsync(config => setProjectMergeTrainMutation(config, key, value));
 }
@@ -729,7 +754,7 @@ export async function setProjectMergeTrain(key: string, value: 'enabled' | 'disa
 /**
  * Remove a project from the registry
  */
-export function unregisterProjectSync(key: string): boolean {
+export function unregisterProject(key: string): boolean {
   return updateProjectsConfigSync(config => {
     if (!config.projects[key]) return { config, result: false, changed: false };
     delete config.projects[key];
@@ -743,13 +768,13 @@ export function unregisterProjectSync(key: string): boolean {
  * @deprecated Use extractPrefix from issue-id.ts for unified parsing
  */
 export function extractTeamPrefix(issueId: string): string | null {
-  return extractPrefixSync(issueId);
+  return extractPrefix(issueId);
 }
 
 /**
  * Find project by Linear team prefix
  */
-export function findProjectByTeamSync(teamPrefix: string): ProjectConfig | null {
+export function findProjectByTeam(teamPrefix: string): ProjectConfig | null {
   if (!teamPrefix) return null;
   const config = loadProjectsConfigSync();
 
@@ -763,22 +788,12 @@ export function findProjectByTeamSync(teamPrefix: string): ProjectConfig | null 
 }
 
 /**
- * Find project by workspace path.
- * Matches any project whose root path is an ancestor of the given path.
+ * Find project by workspace path: the project whose root contains it, deepest
+ * root first. `~` is expanded and symlinks resolved on both sides (PAN-4046).
  * Used to resolve the tracker (GitHub/GitLab) from a workspace directory.
  */
-export function findProjectByPathSync(workspacePath: string): ProjectConfig | null {
-  const config = loadProjectsConfigSync();
-  const normalizedTarget = resolve(workspacePath);
-
-  for (const [, projectConfig] of Object.entries(config.projects)) {
-    const normalizedProject = resolve(projectConfig.path);
-    if (normalizedTarget === normalizedProject || normalizedTarget.startsWith(normalizedProject + '/')) {
-      return projectConfig;
-    }
-  }
-
-  return null;
+export function findProjectByPath(workspacePath: string): ProjectConfig | null {
+  return findContainingProject(loadProjectsConfigSync().projects, workspacePath)?.[1] ?? null;
 }
 
 
@@ -790,13 +805,17 @@ export function findProjectByPathSync(workspacePath: string): ProjectConfig | nu
  * @returns The resolved path (may differ from project.path based on routing rules)
  */
 /**
- * PAN-1908: resolve the infra-repo checkout path and records subdir for a project.
+ * PAN-1908: resolve the plan-home checkout path and `.pan` subdir for a project.
  *
- * - monorepo / missing pan_records: repoPath = project.path, recordsPath = .pan
+ * - monorepo / missing pan_records: repoPath = root, recordsPath = .pan
  * - polyrepo with pan_records.repo: look up named repo in workspace.repos[]
- * - pan_records.repo = ".": repoPath = project.path
+ * - pan_records.repo = ".": repoPath = root
+ *
+ * `root` defaults to the registered project checkout. Callers that work inside
+ * a worktree pass that worktree so the polyrepo sub-repo resolves relative to
+ * it, and the artifacts land on the branch the agent is committing (PAN-3917).
  */
-export function resolveInfraRepo(project: ProjectConfig): {
+export function resolveInfraRepo(project: ProjectConfig, root: string = project.path): {
   repoPath: string;
   recordsPath: string;
 } {
@@ -804,7 +823,7 @@ export function resolveInfraRepo(project: ProjectConfig): {
   const repoName = project.pan_records?.repo;
 
   if (!repoName || repoName === '.') {
-    return { repoPath: project.path, recordsPath };
+    return { repoPath: root, recordsPath };
   }
 
   const repos = project.workspace?.repos ?? [];
@@ -816,7 +835,7 @@ export function resolveInfraRepo(project: ProjectConfig): {
     );
   }
 
-  return { repoPath: resolve(project.path, matching.path), recordsPath };
+  return { repoPath: resolve(root, matching.path), recordsPath };
 }
 
 export function resolveProjectPath(project: ProjectConfig, labels: string[] = []): string {
@@ -860,7 +879,7 @@ export function resolveProjectFromIssueSync(
   issueId: string,
   labels: string[] = []
 ): ResolvedProject | null {
-  const parsed = parseIssueIdSync(issueId);
+  const parsed = parseIssueId(issueId);
   if (!parsed) {
     return null;
   }
@@ -920,28 +939,15 @@ export function getProjectSync(key: string): ProjectConfig | null {
 /**
  * Check if projects.yaml exists and has any projects
  */
-export function hasProjectsSync(): boolean {
+export function hasProjects(): boolean {
   const config = loadProjectsConfigSync();
   return Object.keys(config.projects).length > 0;
 }
 
 /**
- * Create a default projects.yaml with example structure
- */
-export function createDefaultProjectsConfig(): ProjectsConfig {
-  const defaultConfig: ProjectsConfig = {
-    projects: {
-      // Example project - commented out in actual file
-    },
-  };
-
-  return defaultConfig;
-}
-
-/**
  * Initialize projects.yaml with example configuration
  */
-export function initializeProjectsConfigSync(): void {
+export function initializeProjectsConfig(): void {
   if (existsSync(PROJECTS_CONFIG_FILE)) {
     console.log(`Projects config already exists at ${PROJECTS_CONFIG_FILE}`);
     return;
@@ -1020,7 +1026,7 @@ const DEFAULT_SPECIALIST_CONFIG: Required<SpecialistConfig> = {
  * @param projectKey - Project key
  * @returns Specialist config with defaults applied
  */
-export function getSpecialistConfig(projectKey: string): Required<SpecialistConfig> {
+function getSpecialistConfig(projectKey: string): Required<SpecialistConfig> {
   const project = getProjectSync(projectKey);
 
   if (!project || !project.specialists) {
@@ -1060,22 +1066,7 @@ export function findProjectsByRallyProject(): Array<{ key: string; config: Proje
     .map(([key, projectConfig]) => ({ key, config: projectConfig }));
 }
 
-/**
- * Get custom prompt override for a specialist (if configured)
- *
- * @param projectKey - Project key
- * @param specialistType - Specialist type
- * @returns Custom prompt or null if not configured
- */
-export function getSpecialistPromptOverride(
-  projectKey: string,
-  specialistType: string
-): string | null {
-  const config = getSpecialistConfig(projectKey);
-  return (config.prompts as Record<string, string | undefined>)[specialistType] || null;
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 /**
  * Effect variant of {@link loadProjectsConfigSync}.
@@ -1125,121 +1116,42 @@ export const loadProjectsConfig = (): Effect.Effect<ProjectsConfig, ConfigParseE
     return config;
   });
 
-/** Effect variant of {@link saveProjectsConfigSync}. */
-export const saveProjectsConfig = (config: ProjectsConfig): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const out = stringifyYaml(config, { indent: 2 });
-      await withProjectsConfigWrite(PROJECTS_CONFIG_FILE, () => (
-        atomicWriteProjectsConfig(PROJECTS_CONFIG_FILE, out)
-      ));
-      invalidateProjectsConfigCache();
-    },
-    catch: (cause) =>
-      new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'saveProjectsConfig', cause }),
-  });
-
-/** Effect variant of {@link listProjectsSync}. */
-export const listProjects = (): Effect.Effect<Array<{ key: string; config: ProjectConfig }>, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(
-    Effect.map((config) =>
-      Object.entries(config.projects).map(([key, projectConfig]) => ({ key, config: projectConfig })),
-    ),
-  );
-
 /**
- * Promise variant of {@link listProjectsSync}, for server-reachable callers.
+ * Async variant of {@link listProjectsSync}, for server-reachable callers.
  *
  * `listProjectsSync` reads and parses projects.yaml on the calling thread; on
- * the dashboard's single event loop that stalls every other request. This
- * wraps the Effect loader so callers that only need a promise do not have to
- * take an Effect dependency (PAN-3330 review).
+ * the dashboard's single event loop that stalls every other request
+ * (PAN-3330 review).
  */
 export async function listProjectsAsync(): Promise<Array<{ key: string; config: ProjectConfig }>> {
-  return Effect.runPromise(listProjects());
+  const config = await Effect.runPromise(loadProjectsConfig());
+  return Object.entries(config.projects).map(([key, projectConfig]) => ({ key, config: projectConfig }));
 }
 
 /**
  * Rename a project's display name by registration key or exact display name.
  * Loads and persists the registry once so long-lived callers avoid sync I/O.
  */
-export const renameProject = (
+export async function renameProject(
   projectIdentifier: string,
   newName: string,
-): Effect.Effect<
-  { key: string; name: string },
-  ProjectRenameError | ConfigParseError | FsError
-> => Effect.tryPromise({
-  try: () => updateProjectsConfigAsync(config => {
-    const plan = prepareProjectRename(config, projectIdentifier, newName);
-    if (plan instanceof ProjectRenameError) throw plan;
-    return {
-      config: plan.config,
-      result: { key: plan.key, name: plan.name },
-      changed: plan.changed,
-    };
-  }),
-  catch: cause => {
-    if (cause instanceof ProjectRenameError || cause instanceof ConfigParseError) return cause;
-    return new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'renameProject', cause });
-  },
-});
-
-/** Effect variant of {@link registerProjectSync}. */
-export const registerProject = (key: string, projectConfig: ProjectConfig): Effect.Effect<void, ConfigParseError | FsError> =>
-  Effect.tryPromise({
-    try: () => updateProjectsConfigAsync(config => {
-      config.projects[key] = projectConfig;
-      return { config, result: undefined, changed: true };
-    }),
-    catch: cause => cause instanceof ConfigParseError
-      ? cause
-      : new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'registerProject', cause }),
-  });
-
-/** Effect variant of {@link unregisterProjectSync}. */
-export const unregisterProject = (key: string): Effect.Effect<boolean, ConfigParseError | FsError> =>
-  Effect.tryPromise({
-    try: () => updateProjectsConfigAsync(config => {
-      if (!config.projects[key]) return { config, result: false, changed: false };
-      delete config.projects[key];
-      return { config, result: true, changed: true };
-    }),
-    catch: cause => cause instanceof ConfigParseError
-      ? cause
-      : new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'unregisterProject', cause }),
-  });
-
-/** Effect variant of {@link findProjectByTeamSync}. */
-export const findProjectByTeam = (teamPrefix: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(
-    Effect.map((config) => {
-      for (const [, projectConfig] of Object.entries(config.projects)) {
-        if (getIssuePrefix(projectConfig)?.toUpperCase() === teamPrefix.toUpperCase()) {
-          return projectConfig;
-        }
-      }
-      return null;
-    }),
-  );
-
-/** Effect variant of {@link findProjectByPathSync}. */
-export const findProjectByPath = (workspacePath: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(
-    Effect.map((config) => {
-      const normalizedTarget = resolve(workspacePath);
-      for (const [, projectConfig] of Object.entries(config.projects)) {
-        const normalizedProject = resolve(projectConfig.path);
-        if (
-          normalizedTarget === normalizedProject ||
-          normalizedTarget.startsWith(normalizedProject + '/')
-        ) {
-          return projectConfig;
-        }
-      }
-      return null;
-    }),
-  );
+): Promise<{ key: string; name: string }> {
+  try {
+    return await updateProjectsConfigAsync(config => {
+      const plan = prepareProjectRename(config, projectIdentifier, newName);
+      if (plan instanceof ProjectRenameError) throw plan;
+      return {
+        config: plan.config,
+        result: { key: plan.key, name: plan.name },
+        changed: plan.changed,
+      };
+    });
+  } catch (cause) {
+    // Rejects only with ProjectRenameError, ConfigParseError or FsError.
+    if (cause instanceof ProjectRenameError || cause instanceof ConfigParseError) throw cause;
+    throw new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'renameProject', cause });
+  }
+}
 
 /** Effect variant of {@link resolveProjectFromIssueSync}. */
 export const resolveProjectFromIssue = (
@@ -1248,7 +1160,7 @@ export const resolveProjectFromIssue = (
 ): Effect.Effect<ResolvedProject | null, ConfigParseError | FsError> =>
   loadProjectsConfig().pipe(
     Effect.map((config) => {
-      const parsed = parseIssueIdSync(issueId);
+      const parsed = parseIssueId(issueId);
       if (!parsed) return null;
       for (const [key, projectConfig] of Object.entries(config.projects)) {
         const singlePrefix = getIssuePrefix(projectConfig);
@@ -1287,14 +1199,3 @@ export const resolveProjectFromIssue = (
 /** Effect variant of {@link getProjectSync}. */
 export const getProject = (key: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
   loadProjectsConfig().pipe(Effect.map((config) => config.projects[key] || null));
-
-/** Effect variant of {@link hasProjectsSync}. */
-export const hasProjects = (): Effect.Effect<boolean, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(Effect.map((config) => Object.keys(config.projects).length > 0));
-
-/** Effect variant of {@link initializeProjectsConfigSync}. */
-export const initializeProjectsConfig = (): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => initializeProjectsConfigSync(),
-    catch: (cause) => new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'initializeProjectsConfig', cause }),
-  });

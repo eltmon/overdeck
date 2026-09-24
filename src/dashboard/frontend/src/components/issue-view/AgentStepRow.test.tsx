@@ -64,7 +64,6 @@ vi.mock('../shared/ModelPicker/ModelPicker', () => ({
 
 vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useIssueCostsQuery: () => ({ data: { sessions: costSessions } }),
-  useReviewStatusQuery: () => ({ data: null }),
   useWorkspaceQuery: () => ({ data: null }),
 }));
 
@@ -267,8 +266,6 @@ describe('AgentStepRow', () => {
           role: 'correctness',
           presence: 'suspended',
           status: 'stopped',
-          paused: true,
-          pausedReason: 'Waiting for operator',
           roundMetadata: { latestReviewResult: 'APPROVED' },
         })}
         issueId="PAN-821"
@@ -334,20 +331,6 @@ describe('AgentStepRow', () => {
     expect(screen.getByText('Open State Dir')).toBeInTheDocument();
     expect(screen.getByText('View JSONL')).toBeInTheDocument();
     expect(screen.getByText('View Terminal')).toBeInTheDocument();
-  });
-
-  it('renders paused-specific context-menu actions for a paused rail session', () => {
-    render(
-      <AgentStepRow
-        session={makeSession({ presence: 'ended', status: 'stopped', paused: true, hasJsonl: false })}
-        issueId="PAN-821"
-        density="rail"
-        onAction={() => {}}
-      />,
-    );
-
-    expect(screen.getByText('Unpause')).toBeInTheDocument();
-    expect(screen.getByText('Resume session')).toBeInTheDocument();
   });
 
   it('calls onAction with the correct kind when a menu item is selected', () => {

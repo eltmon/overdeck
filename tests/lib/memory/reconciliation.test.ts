@@ -2,7 +2,6 @@ import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js';
 import { claimTranscriptRange, commitTranscriptRange, getTranscriptCheckpoint } from '../../../src/lib/memory/checkpoints.js';
 import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../../../src/lib/memory/reconciliation.js';
 import type { ExtractFromTranscriptDeltaInput } from '../../../src/lib/memory/pipeline.js';
@@ -20,11 +19,9 @@ beforeEach(async () => {
   originalHome = process.env.OVERDECK_HOME;
   tempDir = await mkdtemp(join(tmpdir(), 'pan-memory-reconcile-'));
   process.env.OVERDECK_HOME = tempDir;
-  resetDatabase();
 });
 
 afterEach(async () => {
-  closeDatabase();
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });

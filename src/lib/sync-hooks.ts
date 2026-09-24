@@ -11,7 +11,7 @@
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 
-import { hashFileSync } from './manifest.js';
+import { hashFile } from './manifest.js';
 import { BIN_DIR, SYNC_SOURCES } from './paths.js';
 
 /**
@@ -38,7 +38,7 @@ export interface HooksSyncResult {
 /**
  * Plan hooks sync (checks what would be updated)
  */
-export function planHooksSyncSync(): HookItem[] {
+export function planHooksSync(): HookItem[] {
   const hooks: HookItem[] = [];
 
   if (!existsSync(SYNC_SOURCES.hooks)) {
@@ -58,7 +58,7 @@ export function planHooksSyncSync(): HookItem[] {
     let status: HookItem['status'] = 'new';
 
     if (existsSync(targetPath)) {
-      status = hashFileSync(sourcePath) === hashFileSync(targetPath) ? 'current' : 'updated';
+      status = hashFile(sourcePath) === hashFile(targetPath) ? 'current' : 'updated';
     }
 
     hooks.push({ name: script.name, sourcePath, targetPath, status });
@@ -70,7 +70,7 @@ export function planHooksSyncSync(): HookItem[] {
 /**
  * Sync hooks (copy scripts to ~/.overdeck/bin/)
  */
-export function syncHooksSync(): HooksSyncResult {
+export function syncHooks(): HooksSyncResult {
   const result: HooksSyncResult = {
     synced: [],
     errors: [],
@@ -82,7 +82,7 @@ export function syncHooksSync(): HooksSyncResult {
   // Ensure bin directory exists
   mkdirSync(BIN_DIR, { recursive: true });
 
-  for (const hook of planHooksSyncSync()) {
+  for (const hook of planHooksSync()) {
     try {
       copyFileSync(hook.sourcePath, hook.targetPath);
       chmodSync(hook.targetPath, 0o755); // Make executable

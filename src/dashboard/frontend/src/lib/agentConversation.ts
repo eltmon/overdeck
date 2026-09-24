@@ -33,6 +33,23 @@ export function isEndedAgent(agent: SessionAgent): boolean {
   return ENDED_AGENT_STATUSES.has(agent.status);
 }
 
+function issueAgentOrder(agent: SessionAgent): number {
+  if (agent.role === 'work') return 0;
+  if (agent.role === 'review') return /-review$/i.test(agent.id) ? 1 : 2;
+  if (agent.role === 'test') return 3;
+  if (agent.role === 'plan') return 4;
+  if (agent.role === 'strike') return 5;
+  return 6;
+}
+
+/** Stable lifecycle order for every issue agent, including stopped agents. */
+export function sortIssueAgents<T extends SessionAgent>(agents: readonly T[]): T[] {
+  return [...agents].sort((left, right) =>
+    issueAgentOrder(left) - issueAgentOrder(right)
+    || (left.startedAt ?? '').localeCompare(right.startedAt ?? '')
+    || left.id.localeCompare(right.id));
+}
+
 /** Synthesize a Conversation from an agent so ConversationPanel can render it. */
 export function agentToConversation(agent: SessionAgent): Conversation {
   const ended = isEndedAgent(agent);

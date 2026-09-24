@@ -22,8 +22,11 @@ let fetchControl: ReturnType<typeof installStrictFetchMock>;
 beforeEach(() => {
   queryClients = [];
   fetchControl = installStrictFetchMock(({ method, url }) => {
-    if (method === 'GET' && url === '/api/flywheel/config') {
+    if (method === 'GET' && url === '/api/merge-train/config') {
       return Response.json({ auto_pickup_backlog: false, require_uat_before_merge: false });
+    }
+    if (method === 'GET' && url === '/api/merge-train/auto-merge') {
+      return Response.json({ issues: [] });
     }
     if (method === 'GET' && url === '/api/workspaces/PAN-1686/uat-context') {
       return Response.json({
@@ -200,8 +203,8 @@ describe('AwaitingMergeRow UAT context', () => {
  * PAN-1696 fe-awaiting-merge: the merge gate hosts the multi-project merge
  * train above the per-issue rows, with a global enable toggle. The strict fetch
  * mock is the real assertion for ac1 — it fails on any request the page makes
- * that is not listed here, so a reintroduced flywheel-run dependency shows up
- * as an unexpected request rather than passing silently.
+ * that is not listed here, so a reintroduced /api/flywheel dependency (deleted
+ * by PAN-3917) shows up as an unexpected request rather than passing silently.
  */
 const MERGE_TRAIN_QUEUES = [
   {
@@ -241,15 +244,16 @@ const MERGE_TRAIN_GENERATIONS = [
 function renderPage(config: Record<string, unknown> = { auto_pickup_backlog: false, require_uat_before_merge: false, merge_train_enabled: true }) {
   const configPosts: unknown[] = [];
   fetchControl = installStrictFetchMock(({ method, url, init }) => {
-    if (method === 'GET' && url === '/api/flywheel/config') return Response.json(config);
-    if (method === 'POST' && url === '/api/flywheel/config') {
+    if (method === 'GET' && url === '/api/merge-train/config') return Response.json(config);
+    if (method === 'GET' && url === '/api/merge-train/auto-merge') return Response.json({ issues: [] });
+    if (method === 'POST' && url === '/api/merge-train/config') {
       const patch = JSON.parse(String(init?.body)) as Record<string, unknown>;
       configPosts.push(patch);
       return Response.json({ ...config, ...patch });
     }
     if (method === 'GET' && url === '/api/merge-train/queues') return Response.json(MERGE_TRAIN_QUEUES);
     if (method === 'GET' && url === '/api/merge-train/generations') return Response.json(MERGE_TRAIN_GENERATIONS);
-    if (method === 'GET' && url === '/api/flywheel/merge-backend') return Response.json({ available: true, mode: 'gh-cli', detail: 'ok' });
+    if (method === 'GET' && url === '/api/merge-train/merge-backend') return Response.json({ available: true, mode: 'gh-cli', detail: 'ok' });
     return undefined;
   });
 

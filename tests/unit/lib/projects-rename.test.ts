@@ -21,8 +21,8 @@ vi.mock('../../../src/lib/paths.js', async () => {
 import {
   getProjectSync,
   PROJECTS_CONFIG_FILE,
-  registerProjectSync,
-  renameProjectSync,
+  registerProject,
+  renameProject,
   type ProjectConfig,
 } from '../../../src/lib/projects.js';
 
@@ -40,16 +40,16 @@ const PROJECT: ProjectConfig = {
 beforeEach(() => {
   mkdirSync(TEST_HOME, { recursive: true });
   rmSync(PROJECTS_CONFIG_FILE, { force: true });
-  registerProjectSync('original-key', PROJECT);
+  registerProject('original-key', PROJECT);
 });
 
 afterEach(() => {
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
-describe('renameProjectSync', () => {
-  it('persists the trimmed name and preserves all other project fields', () => {
-    renameProjectSync('original-key', '  Renamed Project  ');
+describe('renameProject', () => {
+  it('persists the trimmed name and preserves all other project fields', async () => {
+    await renameProject('original-key', '  Renamed Project  ');
 
     expect(getProjectSync('original-key')).toEqual({
       ...PROJECT,
@@ -57,46 +57,46 @@ describe('renameProjectSync', () => {
     });
   });
 
-  it('throws for an unknown project without modifying projects.yaml', () => {
+  it('throws for an unknown project without modifying projects.yaml', async () => {
     const before = readFileSync(PROJECTS_CONFIG_FILE, 'utf-8');
 
-    expect(() => renameProjectSync('missing', 'New Name')).toThrow('Unknown project: missing');
+    await expect(renameProject('missing', 'New Name')).rejects.toThrow('Unknown project: missing');
     expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(before);
   });
 
-  it('throws for an empty or whitespace-only name without modifying projects.yaml', () => {
+  it('throws for an empty or whitespace-only name without modifying projects.yaml', async () => {
     const before = readFileSync(PROJECTS_CONFIG_FILE, 'utf-8');
 
-    expect(() => renameProjectSync('original-key', '   ')).toThrow('Project name must not be empty');
+    await expect(renameProject('original-key', '   ')).rejects.toThrow('Project name must not be empty');
     expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(before);
   });
 
-  it("rejects a case-insensitive collision with another project's name", () => {
-    registerProjectSync('other-key', {
+  it("rejects a case-insensitive collision with another project's name", async () => {
+    registerProject('other-key', {
       name: 'Existing Project',
       path: '/projects/other',
     });
 
-    expect(() => renameProjectSync('original-key', 'existing project')).toThrow(
+    await expect(renameProject('original-key', 'existing project')).rejects.toThrow(
       "Project name 'existing project' conflicts with existing project 'other-key'",
     );
   });
 
-  it("rejects a case-insensitive collision with another project's key", () => {
-    registerProjectSync('existing-key', {
+  it("rejects a case-insensitive collision with another project's key", async () => {
+    registerProject('existing-key', {
       name: 'Unrelated Name',
       path: '/projects/other',
     });
 
-    expect(() => renameProjectSync('original-key', 'EXISTING-KEY')).toThrow(
+    await expect(renameProject('original-key', 'EXISTING-KEY')).rejects.toThrow(
       "Project name 'EXISTING-KEY' conflicts with existing project 'existing-key'",
     );
   });
 
-  it('returns without modifying projects.yaml when the name is unchanged', () => {
+  it('returns without modifying projects.yaml when the name is unchanged', async () => {
     const before = readFileSync(PROJECTS_CONFIG_FILE, 'utf-8');
 
-    expect(() => renameProjectSync('original-key', 'Original Name')).not.toThrow();
+    await expect(renameProject('original-key', 'Original Name')).resolves.toBeDefined();
     expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(before);
   });
 });

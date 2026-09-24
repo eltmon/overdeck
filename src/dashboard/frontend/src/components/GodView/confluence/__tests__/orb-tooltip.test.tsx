@@ -33,7 +33,8 @@ function orb(overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb {
     thinkUntil: 0,
     compactT: 0,
     spend: 1.25,
-    mergeStatus: null,
+    issueState: null,
+    attention: null,
     ...overrides,
   };
 }

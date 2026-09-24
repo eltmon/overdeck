@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../tracker-utils.js', () => ({
-  resolveGitHubIssueSync: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -13,11 +13,11 @@ vi.mock('node:util', () => ({
 }));
 
 import { applyIssueParkedLabel, PARKED_LABEL } from '../label-ops.js';
-import { resolveGitHubIssueSync } from '../../tracker-utils.js';
+import { resolveGitHubIssue } from '../../tracker-utils.js';
 import { exec } from 'node:child_process';
 
 const mockExec = vi.mocked(exec) as unknown as ReturnType<typeof vi.fn>;
-const mockResolve = vi.mocked(resolveGitHubIssueSync);
+const mockResolve = vi.mocked(resolveGitHubIssue);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,7 +45,7 @@ describe('applyIssueParkedLabel – FR-15 parked label on gate=blocked', () => {
     expect(mockExec).not.toHaveBeenCalled();
   });
 
-  it('resolves the issueId via resolveGitHubIssueSync', async () => {
+  it('resolves the issueId via resolveGitHubIssue', async () => {
     mockResolve.mockReturnValue({ isGitHub: true, owner: 'acme', repo: 'myproject', prefix: 'ACME', number: 42 });
 
     await applyIssueParkedLabel('ACME-42');

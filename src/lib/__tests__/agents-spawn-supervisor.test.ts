@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState } from '../agents.js';
 import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
-import { closeOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { closeOverdeckDatabase } from '../overdeck/infra.js';
 
 let tmpHome: string;
 let workspace: string;
@@ -17,12 +17,9 @@ let prepareHarnessLaunchMock: ReturnType<typeof vi.fn>;
 let emitAgentEventMock: ReturnType<typeof vi.fn>;
 let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
 let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
+let deliverInitialPromptWithRetryMock: ReturnType<typeof vi.fn>;
 let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
 let stopAgentMock: ReturnType<typeof vi.fn>;
-let shouldPreservePipelineVerdictsMock: ReturnType<typeof vi.fn>;
-let resetPipelineVerdictsForWorkStartMock: ReturnType<typeof vi.fn>;
-let setReviewStatusMock: ReturnType<typeof vi.fn>;
-let resetPostMergeStateMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
@@ -55,15 +52,9 @@ function mockSpawnDependencies(): void {
   emitAgentEventMock = vi.fn(() => Effect.succeed(true));
   ensureLifecycleHooksMock = vi.fn(async () => undefined);
   deliverAgentMessageMock = vi.fn(async () => ({ ok: true, path: 'acp' }));
+  deliverInitialPromptWithRetryMock = vi.fn(async () => ({ ok: true, path: 'supervisor' }));
   waitForPromptReadyMock = vi.fn(async () => true);
   stopAgentMock = vi.fn(() => Effect.void);
-  shouldPreservePipelineVerdictsMock = vi.fn(async () => ({
-    preserve: false,
-    reason: 'no pipeline verdicts are recorded',
-  }));
-  resetPipelineVerdictsForWorkStartMock = vi.fn(() => null);
-  setReviewStatusMock = vi.fn();
-  resetPostMergeStateMock = vi.fn();
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
@@ -90,6 +81,7 @@ function mockSpawnDependencies(): void {
   vi.doMock('../agents/delivery.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../agents/delivery.js')),
     deliverAgentMessage: deliverAgentMessageMock,
+    deliverInitialPromptWithRetry: (...args: unknown[]) => deliverInitialPromptWithRetryMock(...args),
   }));
   vi.doMock('../agents/runtime-command.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../agents/runtime-command.js')),
@@ -113,13 +105,13 @@ function mockSpawnDependencies(): void {
     PiNotReady: class PiNotReady extends Error {
       readonly code = 'PI_NOT_READY';
     },
-    createPiFifo: vi.fn((agentId: string) => Effect.succeed(join(tmpHome, 'agents', agentId, 'rpc.in'))),
+    createPiFifo: vi.fn(async (agentId: string) => join(tmpHome, 'agents', agentId, 'rpc.in')),
     piFifoPaths: vi.fn((agentId: string) => ({
       agentDir: join(tmpHome, 'agents', agentId),
       readyPath: join(tmpHome, 'agents', agentId, 'ready.json'),
       fifoPath: join(tmpHome, 'agents', agentId, 'rpc.in'),
     })),
-    writePiCommandSync: vi.fn(),
+    writePiCommand: vi.fn(),
   }));
 
   vi.doMock('../paths.js', async (importOriginal) => {
@@ -143,9 +135,9 @@ function mockSpawnDependencies(): void {
     getAgentSessionsSync: vi.fn(() => []),
     getAgentSessions: vi.fn(() => Effect.succeed([])),
     capturePaneSync: vi.fn(() => capturePaneText),
-    capturePane: vi.fn(() => Effect.succeed(capturePaneText)),
+    capturePane: vi.fn(async () => capturePaneText),
     listPaneValuesSync: vi.fn(() => []),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: vi.fn(async () => []),
     waitForClaudePrompt: vi.fn(async () => true),
     setOption: vi.fn(() => Effect.void),
     exactPaneTarget: vi.fn((name: string) => `=${name}:`),
@@ -154,24 +146,21 @@ function mockSpawnDependencies(): void {
   vi.doMock('../workspace/stack-health.js', () => ({
     getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: null })),
   }));
+  // PAN-3917 FR-5/W8: launchAgentPane auto-selects Herdr when the dev host has
+  // a live `herdr` binary and `overdeck` session socket, which would make this
+  // test drive the real Herdr session instead of the mocked tmux.js path. Force
+  // tmux selection so createSessionMock stays the single source of truth.
+  vi.doMock('../terminal-backends/select.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../terminal-backends/select.js')),
+    selectTerminalBackend: vi.fn(async () => ({ backend: 'tmux' as const, diagnostic: 'test: forced tmux backend' })),
+  }));
   vi.doMock('../xbrief/io.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../xbrief/io.js')),
     readWorkspacePlanSync: vi.fn(() => ({ plan: { items: [{ id: 'item-1' }] } })),
   }));
   vi.doMock('../activity-logger.js', () => ({
-    emitActivityEntrySync: vi.fn(),
-    emitActivityTtsSync: vi.fn(),
-  }));
-  vi.doMock('../cloister/verdict-preservation.js', () => ({
-    shouldPreservePipelineVerdicts: shouldPreservePipelineVerdictsMock,
-  }));
-  vi.doMock('../cloister/work-start-verdicts.js', () => ({
-    refreshWorkStartReviewedAnchor: (issueId: string, anchor: string) =>
-      setReviewStatusMock(issueId, { reviewedAtCommit: anchor }),
-    resetWorkStartPipelineVerdicts: resetPipelineVerdictsForWorkStartMock,
-  }));
-  vi.doMock('../cloister/post-merge-state.js', () => ({
-    resetPostMergeState: resetPostMergeStateMock,
+    emitActivityEntry: vi.fn(),
+    emitActivityTts: vi.fn(),
   }));
   vi.doMock('../cloister/work-agent-prompt.js', () => ({
     writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -197,30 +186,28 @@ function mockSpawnDependencies(): void {
     getClaudeAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasAnthropicApiKey: true })),
   }));
   vi.doMock('../openai-auth.js', () => ({
-    getOpenAIAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasOpenAIApiKey: false })),
-    getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: true, hasOpenAIApiKey: false })),
+    getOpenAIAuthStatus: vi.fn(async () => ({ loggedIn: true, hasOpenAIApiKey: false })),
   }));
   vi.doMock('../cliproxy.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../cliproxy.js')),
-    bridgeGeminiAuthToCliproxy: vi.fn(() => Effect.succeed(true)),
+    bridgeGeminiAuthToCliproxy: vi.fn(async () => true),
     getCliproxyClientEnv: vi.fn(() => ({ ANTHROPIC_BASE_URL: 'http://127.0.0.1:4141' })),
-    isCliproxyRunning: vi.fn(() => Effect.succeed(true)),
+    isCliproxyRunning: vi.fn(async () => true),
   }));
   vi.doMock('../provider-health.js', () => ({
-    validateProviderHealth: vi.fn(() => Effect.succeed(undefined)),
+    validateProviderHealth: vi.fn(async () => undefined),
   }));
-  // agents.ts now imports getFlywheelActiveRunIdSync from overdeck/control-settings (not database/app-settings)
+  // agents.ts now imports getFlywheelActiveRunId from overdeck/control-settings (not database/app-settings)
   vi.doMock('../overdeck/control-settings.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../overdeck/control-settings.js')>();
     return {
       ...actual,
       getFlywheelActiveRunId: () => activeFlywheelRunId,
-      getFlywheelActiveRunIdSync: () => activeFlywheelRunId,
     };
   });
   vi.doMock('../projects.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../projects.js')),
-    findProjectByPathSync: vi.fn(() => null),
+    findProjectByPath: vi.fn(() => null),
   }));
 }
 
@@ -230,10 +217,13 @@ beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-workspace-'));
   packageRootDir = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-package-'));
   // Seed overdeck.db so saveAgentStateSync can find the migration SQL
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   process.env.OVERDECK_HOME = tmpHome;
+  // fix10: this suite drives the real spawn path. Pin tmux so no selection
+  // can reach a Herdr session and start a live agent in it.
+  process.env.OVERDECK_TERMINAL_BACKEND = 'tmux';
   process.env.OVERDECK_AGENT_STARTED_BY = 'test:agents-spawn-supervisor';
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
@@ -258,9 +248,9 @@ afterEach(() => {
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../workspace/stack-health.js');
+  vi.doUnmock('../terminal-backends/select.js');
   vi.doUnmock('../xbrief/io.js');
   vi.doUnmock('../activity-logger.js');
-  vi.doUnmock('../cloister/verdict-preservation.js');
   vi.doUnmock('../review-status.js');
   vi.doUnmock('../cloister/merge-agent.js');
   vi.doUnmock('../cloister/work-agent-prompt.js');
@@ -271,7 +261,7 @@ afterEach(() => {
   vi.doUnmock('../provider-health.js');
   vi.doUnmock('../overdeck/control-settings.js');
   vi.doUnmock('../projects.js');
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   delete process.env.OVERDECK_AGENT_STARTED_BY;
   delete process.env.PAN_DOCKER;
@@ -342,11 +332,11 @@ describe('spawnAgent PTY supervisor wiring', () => {
   });
 
   it('persists supervisorEnabled through state read/write', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
 
     saveAgentStateSync({ ...baseState(), supervisorEnabled: true });
 
-    expect(getAgentStateSync('agent-pan-1405')?.supervisorEnabled).toBe(true);
+    expect(getAgentState('agent-pan-1405')?.supervisorEnabled).toBe(true);
   });
 
   it('writes pty-token, skips Channels MCP by default, persists supervisorEnabled, and wraps the launcher', async () => {
@@ -425,7 +415,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
   it('spends autonomous consent when runtime setup fails after tmux accepts the session', async () => {
     writeSupervisorArtifact();
-    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlagAsync } = await import('../planning/auto-spawn-consent.js');
     const { spawnAgent } = await import('../agents.js');
     await writeAutoSpawnOnFinalizeFlag('PAN-1405', true);
     emitAgentEventMock.mockReturnValue(Effect.fail(new Error('runtime state persistence failed')));
@@ -440,92 +430,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
     })).rejects.toThrow('runtime state persistence failed');
 
     expect(createSessionMock).toHaveBeenCalledOnce();
-    expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
-  });
-
-  it('preserves pipeline verdicts and post-merge state when the reviewed anchor is current', async () => {
-    writeSupervisorArtifact();
-    shouldPreservePipelineVerdictsMock.mockResolvedValue({
-      preserve: true,
-      reason: 'workspace HEAD matches the reviewed commit anchor',
-    });
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { spawnAgent } = await import('../agents.js');
-
-    try {
-      await spawnAgent({
-        issueId: 'PAN-3110',
-        workspace,
-        role: 'work',
-        model: 'claude-sonnet-4-6',
-      });
-
-      expect(shouldPreservePipelineVerdictsMock).toHaveBeenCalledWith('PAN-3110', workspace);
-      expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
-      expect(setReviewStatusMock).not.toHaveBeenCalled();
-      expect(resetPostMergeStateMock).not.toHaveBeenCalled();
-      expect(logSpy).toHaveBeenCalledWith(
-        '[spawn] Preserved pipeline verdicts for PAN-3110 — workspace HEAD matches the reviewed commit anchor',
-      );
-    } finally {
-      logSpy.mockRestore();
-    }
-  });
-
-  it('refreshes the reviewed anchor while preserving verdicts after benign drift', async () => {
-    writeSupervisorArtifact();
-    const refreshedAnchor = 'b'.repeat(40);
-    shouldPreservePipelineVerdictsMock.mockResolvedValue({
-      preserve: true,
-      reason: 'workspace HEAD moved without changing the reviewed code',
-      refreshedAnchor,
-    });
-    const { spawnAgent } = await import('../agents.js');
-
-    await spawnAgent({
-      issueId: 'PAN-3110',
-      workspace,
-      role: 'work',
-      model: 'claude-sonnet-4-6',
-    });
-
-    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-3110', {
-      reviewedAtCommit: refreshedAnchor,
-    });
-    expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
-    expect(resetPostMergeStateMock).not.toHaveBeenCalled();
-  });
-
-  it('resets pipeline and post-merge state when reviewed code drifted', async () => {
-    writeSupervisorArtifact();
-    shouldPreservePipelineVerdictsMock.mockResolvedValue({
-      preserve: false,
-      reason: 'workspace code changed after review',
-    });
-    resetPipelineVerdictsForWorkStartMock.mockReturnValue({ issueId: 'PAN-3110' });
-    const { spawnAgent } = await import('../agents.js');
-
-    await spawnAgent({
-      issueId: 'PAN-3110',
-      workspace,
-      role: 'work',
-      model: 'claude-sonnet-4-6',
-    });
-
-    expect(resetPipelineVerdictsForWorkStartMock).toHaveBeenCalledWith('PAN-3110');
-    expect(resetPostMergeStateMock).toHaveBeenCalledWith('PAN-3110');
-  });
-
-  it('does not evaluate work-verdict preservation for non-work role spawns', async () => {
-    const { spawnRun } = await import('../agents.js');
-
-    await spawnRun('PAN-3110', 'review', {
-      workspace,
-      model: 'gpt-5.5',
-    });
-
-    expect(shouldPreservePipelineVerdictsMock).not.toHaveBeenCalled();
-    expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1405')).resolves.toBe(false);
   });
 
   it('pins and persists a fresh Claude work-agent session before hooks run', async () => {
@@ -541,18 +446,20 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
     const agentDir = join(tmpHome, 'agents', 'agent-pan-1409');
     const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as AgentState;
-    const sessionId = readFileSync(join(agentDir, 'session.id'), 'utf8').trim();
-    const history = JSON.parse(readFileSync(join(agentDir, 'sessions.json'), 'utf8')) as string[];
+    const history = readFileSync(join(agentDir, 'sessions.json'), 'utf8').trim().split('\n').map(
+      (line) => JSON.parse(line) as { sessionId: string; source: string },
+    );
+    const sessionId = history[0]?.sessionId;
     const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
     const lifecycle = readFileSync(join(agentDir, 'lifecycle.log'), 'utf8');
 
     expect(sessionId).toMatch(/^[0-9a-f-]{36}$/);
     expect(state.sessionId).toBe(sessionId);
     expect(persisted.sessionId).toBe(sessionId);
-    expect(history).toEqual([sessionId]);
+    expect(history).toEqual([expect.objectContaining({ sessionId, source: 'launcher' })]);
     expect(launcher).toContain(`--session-id '${sessionId}'`);
     expect(lifecycle).toContain(`session identity allocated: harness=claude-code sessionId=${sessionId}`);
-    expect(lifecycle).toContain('pointerPersisted=true historyPersisted=true');
+    expect(lifecycle).toContain('indexPersisted=true');
     expect(lifecycle).toContain(`launcher session pinned: sessionId=${sessionId}`);
     expect(emitAgentEventMock).toHaveBeenCalledWith(
       'agent-pan-1409',
@@ -622,7 +529,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
   it('claims planning consent for fresh autonomous spawnRun work launches', async () => {
     writeSupervisorArtifact();
-    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlagAsync } = await import('../planning/auto-spawn-consent.js');
     const { spawnRun } = await import('../agents.js');
     await writeAutoSpawnOnFinalizeFlag('PAN-1405', true);
 
@@ -633,7 +540,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
       autoSpawnConsentRequired: true,
     });
 
-    expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1405')).resolves.toBe(false);
   });
 
   it('does not inspect planning consent for specialist spawnRun launches', async () => {
@@ -705,18 +612,52 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
-  it('stops and rejects a non-flywheel ACP role when its initial prompt fails', async () => {
+  it('PAN-3920: launches a codex worker with its parent, the read-only guard, and a post-launch brief', async () => {
+    const { spawnRun } = await import('../agents.js');
+    const agentId = 'agent-pan-1405-worker-1';
+    mkdirSync(join(tmpHome, 'agents', agentId), { recursive: true });
+
+    await spawnRun('PAN-1405', 'worker', {
+      workspace,
+      agentId,
+      model: 'gpt-5.5',
+      harness: 'codex',
+      prompt: 'Review the diff and report.',
+      parentId: 'conv-orchestrator',
+      gitGuardMode: 'read-only',
+      registerConversation: false,
+      startedBy: 'pan-worker',
+    });
+
+    // Codex reads no prompt file on this path: the brief goes in after launch, sent as the parent.
+    expect(existsSync(join(tmpHome, 'agents', agentId, 'initial-prompt.md'))).toBe(false);
+    expect(deliverAgentMessageMock).toHaveBeenCalledWith(
+      agentId,
+      expect.stringContaining('Review the diff and report.'),
+      'spawnRun:initial-prompt',
+      undefined,
+      { sender: { id: 'conv-orchestrator' } },
+    );
+    const persisted = JSON.parse(readFileSync(join(tmpHome, 'agents', agentId, 'state.json'), 'utf8')) as AgentState;
+    expect(persisted).toMatchObject({ role: 'worker', parentId: 'conv-orchestrator', startedBy: 'pan-worker' });
+    const launcher = readFileSync(join(tmpHome, 'agents', agentId, 'launcher.sh'), 'utf8');
+    expect(launcher).toContain('This worker is read-only');
+    // The pane launches in the worker's own directory.
+    expect(createSessionMock).toHaveBeenCalledWith(agentId, workspace, expect.any(String), expect.anything());
+  });
+
+  it.each(['acp', 'opencode'] as const)('stops and rejects a %s role when its initial prompt fails', async (harness) => {
     deliverAgentMessageMock.mockRejectedValueOnce(new Error('provider rejected prompt'));
     const { spawnRun } = await import('../agents.js');
 
     await expect(spawnRun('PAN-1405', 'review', {
       workspace,
-      model: 'kimi-k2.6',
-      harness: 'acp',
+      model: harness === 'opencode' ? 'opencode/kimi-k3' : 'kimi-k2.6',
+      harness,
       prompt: 'review the change',
     })).rejects.toThrow('Agent agent-pan-1405-review kickoff delivery failed: provider rejected prompt');
 
-    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', 'acp', 30);
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', harness, 30);
     expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-1405-review');
     const persisted = JSON.parse(
       readFileSync(join(tmpHome, 'agents', 'agent-pan-1405-review', 'state.json'), 'utf8'),
@@ -864,5 +805,57 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(createSessionMock).not.toHaveBeenCalled();
     expect(existsSync(join(agentDir, 'launcher.sh'))).toBe(false);
     expect(existsSync(join(agentDir, 'pty-token'))).toBe(false);
+  });
+});
+
+
+describe('Muse lifecycle review regressions', () => {
+  beforeEach(() => {
+    mkdirSync(join(packageRootDir, 'roles'), { recursive: true });
+    for (const role of ['work', 'review']) writeFileSync(join(packageRootDir, 'roles', `${role}.md`), `Act as ${role}.`);
+  });
+  it('rejects a role launch that never reaches the Muse prompt', async () => {
+    writeSupervisorArtifact();
+    waitForPromptReadyMock.mockResolvedValue(false);
+    const { spawnRun } = await import('../agents.js');
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace, model: 'muse-spark-1.3', harness: 'muse', prompt: 'Review this change',
+    })).rejects.toThrow('did not become ready within 60s');
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', 'muse', 60);
+    expect(deliverAgentMessageMock).not.toHaveBeenCalled();
+    const persisted = JSON.parse(readFileSync(join(tmpHome, 'agents', 'agent-pan-1405-review', 'state.json'), 'utf8'));
+    expect(persisted.status).toBe('starting');
+  });
+
+  it.each([true, false])('recovers native Muse without API keys (ready=%s)', async ready => {
+    writeSupervisorArtifact();
+    waitForPromptReadyMock.mockResolvedValue(ready);
+    const { saveAgentStateSync } = await import('../agents/agent-state.js');
+    deliverInitialPromptWithRetryMock.mockResolvedValue({ ok: true, path: 'supervisor' });
+    const kickoff = deliverInitialPromptWithRetryMock;
+    const recMod = await import('../agents/recovery.js');
+    const { recoverAgent } = recMod;
+    const { museDataHome } = await import('../runtimes/storage/muse.js');
+    const state = baseState({ harness: 'muse', model: 'muse-spark-1.3-contributor', status: 'stopped' });
+    saveAgentStateSync(state);
+    const nativeId = '01a081d0-8263-7782-b2ef-0c7f4e1b948c';
+    const nativeDir = join(museDataHome(state.id), 'muse', 'sessions', '2026', '09', '08', nativeId);
+    mkdirSync(nativeDir, { recursive: true });
+    writeFileSync(join(nativeDir, 'session.jsonl'), '{}\n');
+    const recovery = recoverAgent(state.id);
+    if (ready) await expect(recovery).resolves.toMatchObject({ action: 'respawned', state: { status: 'running' } });
+    else await expect(recovery).rejects.toThrow('Muse recovery readiness timed out');
+    const launcher = readFileSync(join(tmpHome, 'agents', state.id, 'launcher.sh'), 'utf8');
+    expect(launcher).toContain(`resume '${nativeId}'`);
+    expect(launcher).toContain('XDG_DATA_HOME=');
+    expect(launcher).toContain(museDataHome(state.id));
+    expect(launcher).toContain('pty-supervisor.js');
+    expect(launcher).not.toContain('--resume');
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith(state.id, 'muse', 60);
+    if (ready) expect(kickoff).toHaveBeenCalledWith(state.id, expect.any(String), 'recoverAgent:muse-recovery-prompt');
+    else {
+      expect(kickoff).not.toHaveBeenCalled();
+      expect(stopAgentMock).toHaveBeenCalledWith(state.id);
+    }
   });
 });

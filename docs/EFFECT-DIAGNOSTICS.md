@@ -80,6 +80,14 @@ missing baseline from the current findings. `scripts/lint-ratchet-audit.sh` requ
 an issue reference in a commit message for any later baseline increase, while
 shrinking the baseline and editing its comment headers are free.
 
+## Related ratchet
+
+`npm run lint:effect-facades` is a separate shrink-only gate for Effect façades
+and sync/async twins in `src/lib` (PAN-3958). Its baseline is
+`scripts/effect-facades-baseline.txt`, one `<shape> <count> <path>` row per module,
+and `bash scripts/lint-effect-facades.sh --update` only lowers it. See
+[EFFECT-BRIDGING.md](EFFECT-BRIDGING.md) "In-repo code: no façades".
+
 ## Local escape hatches
 
 Use an inline suppression only when the diagnosis is intentionally accepted and a

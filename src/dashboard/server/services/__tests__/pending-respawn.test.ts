@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock tmux.sessionExists — pending-respawn polls it. Each test resets
 // the mock's implementation so cases are independent.
 vi.mock('../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
+  listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   sessionExists: vi.fn(),
   sessionExistsSync: vi.fn(),
 }));
@@ -12,6 +18,7 @@ import { sessionExists } from '../../../../lib/tmux.js';
 import {
   isRespawnPending,
   markRespawnPending,
+  respawnStartedAt,
   waitForSessionRespawn,
 } from '../pending-respawn.js';
 
@@ -34,6 +41,27 @@ describe('pending-respawn registry', () => {
     const respawn = markRespawnPending('test-session');
     expect(isRespawnPending('test-session')).toBe(true);
     respawn.done();
+    expect(isRespawnPending('test-session')).toBe(false);
+  });
+
+  it('records when the respawn began, and forgets it on done() (PAN-3962)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse('2026-09-22T10:00:00.000Z'));
+    expect(respawnStartedAt('test-session')).toBeNull();
+    const respawn = markRespawnPending('test-session');
+    expect(respawnStartedAt('test-session')).toBe(Date.parse('2026-09-22T10:00:00.000Z'));
+    respawn.done();
+    expect(respawnStartedAt('test-session')).toBeNull();
+  });
+
+  it('an earlier respawn finishing never clears a later overlapping mark', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse('2026-09-22T10:00:00.000Z'));
+    const first = markRespawnPending('test-session');
+    const second = markRespawnPending('test-session');
+    first.done();
+    expect(isRespawnPending('test-session')).toBe(true);
+    second.done();
     expect(isRespawnPending('test-session')).toBe(false);
   });
 

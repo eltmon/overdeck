@@ -6,7 +6,7 @@ import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { getIssueWorkspacePath } from '../../lib/pan-dir/record.js';
+import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
 import { createWorkspace } from '../../lib/workspace-manager.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
@@ -32,13 +32,12 @@ import {
 } from '../../lib/cloister/deacon-swarm-record.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
-import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
+import { listSlotAgents } from '../../lib/cloister/swarm-slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgent } from '../../lib/agents/removal.js';
-import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
 import { ensureSwarmForeman } from '../../lib/cloister/swarm-foreman.js';
-import { resolveSlotWorkspaceWorktreesSync, type SlotWorkspaceWorktrees } from '../../lib/project-repos.js';
+import { resolveSlotWorkspaceWorktrees, type SlotWorkspaceWorktrees } from '../../lib/project-repos.js';
 import { removeWorkspaceDirectory } from '../../lib/workspace-manager/remove-directory.js';
 import { isRegisteredWorktree } from '../../lib/cloister/deacon-swarm-gc.js';
 import {
@@ -274,7 +273,6 @@ export async function swarmRecoverCommand(
       const retried = actions.some(line => line.includes(`archived failed slot ${slotIndex} `));
       if (retried) {
         const itemId = actions.find(line => line.includes(`archived failed slot ${slotIndex} `))?.match(/\(item ([^)]+)\)/)?.[1];
-        if (itemId) await acknowledgeRecoveryTrip(workspacePath, issue, 'swarm-slot-requeue', itemId).catch(() => undefined);
         for (const line of actions) deps.console.log(line);
         return { ok: true, actions, workspacePath };
       }
@@ -499,7 +497,7 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   getFailedMergeBlocks,
   removeAgent,
   listSlotWorkspaceDirectories: listSlotWorkspaceDirectoriesSync,
-  resolveSlotWorkspaceWorktrees: resolveSlotWorkspaceWorktreesSync,
+  resolveSlotWorkspaceWorktrees: resolveSlotWorkspaceWorktrees,
   removeDirectory: path => removeWorkspaceDirectory(path),
 };
 
@@ -898,11 +896,11 @@ async function ensureFeatureWorkspace(issueId: string, project: ResolvedProjectL
     name: project.projectName,
     path: project.projectPath,
   };
-  const result = await Effect.runPromise(createWorkspace({
+  const result = await createWorkspace({
     projectConfig,
     featureName,
     startDocker: false,
-  }));
+  });
   if (!result.success) {
     throw new Error(`Failed to create workspace for ${issueId}: ${result.errors.join('; ') || 'unknown error'}`);
   }

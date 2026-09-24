@@ -6,11 +6,10 @@
  */
 
 import { Data, Effect } from 'effect';
-import { setReviewStatusSync } from '../review-status.js';
 import { spawnRun } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
+import { getPrFacts } from './pr-facts.js';
 import { clearTestVerdictArtifact } from './test-verdict.js';
-import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 
 export function buildTestRolePrompt(options: {
   issueId: string;
@@ -29,8 +28,8 @@ Run the role-based verification flow for this already-reviewed branch.
 Required steps:
 1. Before every repository command, verify you are in the workspace above with \`pwd\`. If not, stop and switch back to that workspace before continuing.
 2. Work only in the workspace above. Never run build, test, git, or dashboard commands from the main checkout or another worktree.
-3. Read .pan/records/${options.issueId.toLowerCase()}.json, the canonical xBRIEF under .pan/specs/ for ${options.issueId}, issue notes, and project instructions to determine required verification. Do not require retired workspace-local .pan/continue.json or .pan/spec.vbrief.json files to exist.
-4. Run the configured project gates (at minimum typecheck, lint, and tests when present/applicable).
+3. Read the canonical xBRIEF under .pan/specs/ for ${options.issueId}, its checklist state in .pan/continues/${options.issueId.toUpperCase()}.xbrief.json, the pull request, issue notes, and project instructions to determine required verification.
+4. Before running any gate, record the commit under test with \`git rev-parse HEAD\` and keep that SHA as TESTED_SHA for step 9. Then run the configured project gates (at minimum typecheck, lint, and tests when present/applicable).
 5. Decide whether browser UAT is required from acceptance criteria, issue notes, PR notes, or UI/dashboard wording.
 6. If UAT is required, build and run the dashboard from the workspace above, not from main. If a dashboard from another checkout is already running, stop it and start the workspace-built dashboard.
 7. If UAT is required, use the Playwright MCP tools available to the test role. Do not spawn or wake a separate UAT agent.
@@ -39,11 +38,11 @@ Required steps:
    Allowed values for status and uatStatus are "passed" or "failed". A required UAT that cannot run or leaves any criterion unproven is uatStatus "failed", even when status is "passed". Create .pan/test/ if needed and write this artifact BEFORE signaling the verdict.
 9. Signal the same separate verdicts through the local trusted CLI, never by an unauthenticated HTTP request. Examples:
    Automated gates pass and required UAT passes:
-   pan admin specialists done test ${options.issueId} --status passed --notes "<automated gate evidence>" --uat-status passed --uat-notes "<browser evidence>"
+   pan admin specialists done test ${options.issueId} --tested-sha <TESTED_SHA> --status passed --notes "<automated gate evidence>" --uat-status passed --uat-notes "<browser evidence>"
    Automated gates pass but required UAT fails or cannot run:
-   pan admin specialists done test ${options.issueId} --status passed --notes "<automated gate evidence>" --uat-status failed --uat-notes "<blocking condition and exact unmet criteria>"
+   pan admin specialists done test ${options.issueId} --tested-sha <TESTED_SHA> --status passed --notes "<automated gate evidence>" --uat-status failed --uat-notes "<blocking condition and exact unmet criteria>"
    Automated gates fail (include UAT flags too if UAT was attempted):
-   pan admin specialists done test ${options.issueId} --status failed --notes "<failing commands and output>"
+   pan admin specialists done test ${options.issueId} --tested-sha <TESTED_SHA> --status failed --notes "<failing commands and output>"
 10. Make exactly ONE CLI signal attempt. If it fails, the .pan/test/result.json artifact from step 8 is the durable verdict and the deacon recovers from it — do NOT retry the signal in a loop. Report the failure in your summary and stop.
 11. Report TESTS PASSED only when automated gates and required UAT passed. Otherwise report TESTS FAILED with commands run, UAT paths exercised, and concise evidence.
 
@@ -51,84 +50,12 @@ Boundaries:
 - Do NOT edit code, tests, fixtures, snapshots, or configuration.
 - Do NOT commit, push, merge, close issues, or call any merge endpoint.
 - Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists.`;
-}async function dispatchTestAgentAndNotifyPromise(
-  issueId: string,
-  workspace?: string,
-  branch?: string,
-  notifyAgent?: (agentId: string, msg: string) => Promise<void>,
-): Promise<void> {
-  let testTaskDelivered = false;
-
-  try {
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) {
-      console.error(`[test-dispatch] No project configured for ${issueId} — cannot spawn test role`);
-      setReviewStatusSync(issueId, {
-        testStatus: 'dispatch_failed',
-        testNotes: `No project configured for ${issueId}. Add it to projects.yaml.`,
-      });
-      return;
-    }
-
-    // Clear any stale verdict artifact so a previous cycle's result.json can
-    // never be misread by the deacon failsafe as this dispatch's verdict (H3).
-    if (workspace) clearTestVerdictArtifact(workspace);
-
-    const prompt = buildTestRolePrompt({ issueId, workspace, branch });
-
-    const mergedGuard = await shouldSkipDispatchAsMerged(issueId);
-    if (mergedGuard.skip) {
-      console.log(`[test-dispatch] Skipping test dispatch for ${issueId} — ${mergedGuard.reason}`);
-      return;
-    }
-
-    const run = await spawnRun(issueId, 'test', {
-      workspace,
-      prompt,
-      startedBy: 'test-agent-queue',
-    });
-
-    setReviewStatusSync(issueId, { testStatus: 'testing' });
-    testTaskDelivered = true;
-    console.log(`[test-dispatch] Started test role for ${issueId} (${run.id})`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('already running')) {
-      setReviewStatusSync(issueId, { testStatus: 'testing' });
-      testTaskDelivered = true;
-      console.log(`[test-dispatch] Test role already running for ${issueId}`);
-    } else {
-      console.error(`[test-dispatch] Failed to dispatch test role for ${issueId}:`, err);
-      try {
-        setReviewStatusSync(issueId, {
-          testStatus: 'dispatch_failed',
-          testNotes: `Dispatch failed: ${msg}`,
-        });
-      } catch (statusErr) {
-        console.error(`[test-dispatch] Failed to set dispatch_failed status for ${issueId}:`, statusErr);
-      }
-    }
-  }
-
-  // Only notify work agent when test was successfully dispatched
-  if (testTaskDelivered && notifyAgent) {
-    try {
-      await notifyAgent(
-        `agent-${issueId.toLowerCase()}`,
-        `REVIEW PASSED for ${issueId}. The test role has been dispatched automatically. Do NOT poll or check status — you will be notified when tests complete.`,
-      );
-    } catch (err) {
-      console.log(
-        `[test-dispatch] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`,
-      );
-    }
-  }
 }
 
 // ─── Effect variant (PAN-1249) ───────────────────────────────────────────────
 
-/** A test-role dispatch error — wraps spawnRun / setReviewStatus failures. */
-export class TestDispatchError extends Data.TaggedError('TestDispatchError')<{
+/** A test-role dispatch error — wraps spawnRun failures. */
+class TestDispatchError extends Data.TaggedError('TestDispatchError')<{
   readonly issueId: string;
   readonly message: string;
   readonly cause?: unknown;
@@ -138,7 +65,7 @@ export interface DispatchTestAgentResult {
   readonly delivered: boolean;
   readonly notified: boolean;
   readonly runId?: string;
-  readonly reason?: 'no-project' | 'already-running' | 'spawn-failed';
+  readonly reason?: 'no-project' | 'no-open-pr' | 'already-running' | 'spawn-failed';
 }
 
 /**
@@ -156,13 +83,7 @@ export const dispatchTestAgentAndNotify = (
   Effect.gen(function* () {
     const resolved = yield* Effect.sync(() => resolveProjectFromIssueSync(issueId));
     if (!resolved) {
-      yield* Effect.sync(() => {
-        console.error(`[test-dispatch] No project configured for ${issueId} — cannot spawn test role`);
-        setReviewStatusSync(issueId, {
-          testStatus: 'dispatch_failed',
-          testNotes: `No project configured for ${issueId}. Add it to projects.yaml.`,
-        });
-      });
+      console.error(`[test-dispatch] No project configured for ${issueId} — cannot spawn test role. Add it to projects.yaml.`);
       return { delivered: false, notified: false, reason: 'no-project' as const };
     }
 
@@ -172,10 +93,13 @@ export const dispatchTestAgentAndNotify = (
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
 
-    const mergedGuard = yield* Effect.promise(() => shouldSkipDispatchAsMerged(issueId));
-    if (mergedGuard.skip) {
-      console.log(`[test-dispatch] Skipping test dispatch for ${issueId} — ${mergedGuard.reason}`);
-      return { delivered: false, notified: false, reason: 'spawn-failed' };
+    // PAN-3917 (FR-8): the test role runs against a pull request. No open PR —
+    // nothing to test yet; already merged — nothing left to test.
+    const facts = yield* Effect.promise(() => getPrFacts(issueId));
+    if (!facts.open) {
+      const why = facts.merged ? 'its PR already merged' : 'it has no open pull request';
+      console.log(`[test-dispatch] Skipping test dispatch for ${issueId} — ${why}`);
+      return { delivered: false, notified: false, reason: 'no-open-pr' as const };
     }
 
     const spawnProgram: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
@@ -190,7 +114,6 @@ export const dispatchTestAgentAndNotify = (
           // "already running" is non-fatal — treat as delivered.
           if (err.message.includes('already running')) {
             return Effect.sync((): DispatchTestAgentResult => {
-              setReviewStatusSync(issueId, { testStatus: 'testing' });
               console.log(`[test-dispatch] Test role already running for ${issueId}`);
               return {
                 delivered: true,
@@ -201,14 +124,6 @@ export const dispatchTestAgentAndNotify = (
           }
           return Effect.sync((): DispatchTestAgentResult => {
             console.error(`[test-dispatch] Failed to dispatch test role for ${issueId}: ${err.message}`);
-            try {
-              setReviewStatusSync(issueId, {
-                testStatus: 'dispatch_failed',
-                testNotes: `Dispatch failed: ${err.message}`,
-              });
-            } catch (statusErr) {
-              console.error(`[test-dispatch] Failed to set dispatch_failed status for ${issueId}:`, statusErr);
-            }
             return {
               delivered: false,
               notified: false,
@@ -218,7 +133,6 @@ export const dispatchTestAgentAndNotify = (
         },
         onSuccess: (run) =>
           Effect.sync((): DispatchTestAgentResult => {
-            setReviewStatusSync(issueId, { testStatus: 'testing' });
             console.log(`[test-dispatch] Started test role for ${issueId} (${run.id})`);
             return {
               delivered: true,

@@ -6,9 +6,9 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { teardownWorkspace } from '../../../../lib/lifecycle/teardown-workspace.js';
-import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { DEVCONTAINER_DIRNAME } from '../../../../lib/workspace/devcontainer-renderer.js';
 import { composeProjectNameForWorkspace } from '../../../../lib/workspace/rebuild-stack.js';
@@ -79,14 +79,14 @@ async function discoverComposeProjectName(issueId: string): Promise<string | nul
 }
 
 function resolveWorkspaceStackContext(issueId: string): WorkspaceStackContext | { error: string; status: number } {
-  const parsed = parseIssueIdSync(issueId);
+  const parsed = parseIssueId(issueId);
   if (!parsed) return { error: 'Invalid issue ID', status: 400 };
 
   const normalizedIssueId = parsed.raw.toUpperCase();
   const issueLower = normalizedIssueId.toLowerCase();
   const resolvedProject = resolveProjectFromIssueSync(normalizedIssueId);
   const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
-  const issuePrefix = extractPrefixSync(normalizedIssueId) ?? normalizedIssueId.split('-')[0];
+  const issuePrefix = extractPrefix(normalizedIssueId) ?? normalizedIssueId.split('-')[0];
   const projectPath = resolvedProject?.projectPath ?? getProjectPath(undefined, issuePrefix);
   const workspacePath = join(
     projectPath,
@@ -126,7 +126,7 @@ function spawnCommandActivity(
 ): string {
   const activityId = Date.now().toString();
   setPendingOperation(options.issueId, options.pendingOperation);
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'dashboard',
     level: 'info',
     issueId: options.issueId.toUpperCase(),
@@ -159,7 +159,7 @@ function spawnCommandActivity(
     const ok = code === 0;
     updateActivity(activityId, { status: ok ? 'completed' : 'failed' });
     completePendingOperation(options.issueId, ok ? null : `${command} exited ${code ?? 'unknown'}`);
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: ok ? 'success' : 'error',
       issueId: options.issueId.toUpperCase(),
@@ -178,7 +178,7 @@ function spawnEffectActivity(
 ): string {
   const activityId = Date.now().toString();
   setPendingOperation(issueId, pendingOperation);
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'dashboard',
     level: 'info',
     issueId: issueId.toUpperCase(),
@@ -196,7 +196,7 @@ function spawnEffectActivity(
     .then(() => {
       updateActivity(activityId, { status: 'completed' });
       completePendingOperation(issueId, null);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'dashboard',
         level: 'success',
         issueId: issueId.toUpperCase(),
@@ -208,7 +208,7 @@ function spawnEffectActivity(
       appendActivityOutput(activityId, message);
       updateActivity(activityId, { status: 'failed' });
       completePendingOperation(issueId, message);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'dashboard',
         level: 'error',
         issueId: issueId.toUpperCase(),
@@ -380,7 +380,6 @@ const postWorkspaceReapRoute = HttpRouter.add(
           projectName: context.projectName,
         }, {
           deleteBranches: false,
-          clearTasks: false,
         }));
         for (const step of steps) {
           const detail = step.details?.length ? `: ${step.details.join('; ')}` : '';

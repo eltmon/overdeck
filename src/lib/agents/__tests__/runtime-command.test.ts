@@ -115,8 +115,8 @@ describe('waitForPromptReady — kimi-code TUI (PAN-1837)', () => {
     vi.useFakeTimers();
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
     tmuxMocks.capturePane
-      .mockReturnValueOnce(Effect.succeed(BOOTING_PANE))
-      .mockReturnValueOnce(Effect.succeed(READY_PANE));
+      .mockResolvedValueOnce(BOOTING_PANE)
+      .mockResolvedValueOnce(READY_PANE);
 
     const pending = waitForPromptReady('agent-kimi-ready', 'kimi-code', 5);
     await vi.advanceTimersByTimeAsync(500);
@@ -126,7 +126,7 @@ describe('waitForPromptReady — kimi-code TUI (PAN-1837)', () => {
 
   it('resolves false when the session disappears before the TUI ever renders ready', async () => {
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
-    tmuxMocks.capturePane.mockReturnValue(Effect.succeed(BOOTING_PANE));
+    tmuxMocks.capturePane.mockResolvedValue(BOOTING_PANE);
 
     await expect(waitForPromptReady('agent-kimi-gone', 'kimi-code', 1)).resolves.toBe(false);
   });
@@ -134,7 +134,7 @@ describe('waitForPromptReady — kimi-code TUI (PAN-1837)', () => {
   it('resolves false on timeout when the TUI never shows its ready prompt', async () => {
     vi.useFakeTimers();
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
-    tmuxMocks.capturePane.mockReturnValue(Effect.succeed(BOOTING_PANE));
+    tmuxMocks.capturePane.mockResolvedValue(BOOTING_PANE);
 
     const pending = waitForPromptReady('agent-kimi-stuck', 'kimi-code', 1);
     await vi.advanceTimersByTimeAsync(1_500);
@@ -151,5 +151,51 @@ describe('shouldUseSupervisorForConversation', () => {
   it('preserves the existing Codex TUI and Claude Code supervisor behavior', () => {
     expect(shouldUseSupervisorForConversation('codex', { codexTransport: 'tui' })).toBe(true);
     expect(shouldUseSupervisorForConversation('claude-code')).toBe(true);
+  });
+});
+
+
+/**
+ * The Muse waiter probes the pane through the terminal backend (dynamic
+ * imports, async probes) before each sleep, so one timer jump can land before
+ * the sleep is scheduled. Advance fake time in steps with a real
+ * `setImmediate` turn after each, bounded by wall-clock (Date is not faked).
+ */
+async function settleStepwise<T>(promise: Promise<T>): Promise<T> {
+  let settled = false;
+  const tracked = promise.finally(() => { settled = true; });
+  const deadline = Date.now() + 4000;
+  while (!settled && Date.now() < deadline) {
+    await vi.advanceTimersByTimeAsync(50);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  return tracked;
+}
+
+describe('waitForPromptReady — Muse Code', () => {
+  afterEach(() => {
+    tmuxMocks.sessionExists.mockReset();
+    tmuxMocks.capturePane.mockReset();
+  });
+
+  it('waits for the native prompt after startup', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    tmuxMocks.capturePane
+      .mockResolvedValueOnce('Muse Code is starting')
+      .mockResolvedValue('Muse Code\n⟩ \n muse-spark-1.3');
+    await expect(settleStepwise(waitForPromptReady('agent-muse-ready', 'muse', 5))).resolves.toBe(true);
+  });
+
+  it('times out when the native prompt never appears', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    tmuxMocks.capturePane.mockResolvedValue('Muse Code is starting');
+    await expect(settleStepwise(waitForPromptReady('agent-muse-timeout', 'muse', 1))).resolves.toBe(false);
+  });
+
+  it('stops waiting when Muse exits', async () => {
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
+    await expect(waitForPromptReady('agent-muse-exited', 'muse', 1)).resolves.toBe(false);
   });
 });

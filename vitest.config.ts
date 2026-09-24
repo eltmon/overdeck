@@ -29,18 +29,22 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     pool: 'forks',
-    // GitHub Actions runners have limited memory (~7GB). Keep CI parallel but
-    // bounded; tests that OOM under two forks need fixture/timer cleanup, not
-    // suite-wide serialization. Verification runs preserve the normal local
+    // CI runs on GitHub's public-repo `ubuntu-latest` runner (4 vCPU, 16GB), so
+    // it uses all four cores; ci.yml also shards the suite across jobs. Tests
+    // that OOM under parallel forks need fixture/timer cleanup, not suite-wide
+    // serialization. Verification runs preserve the normal local
     // worker count so PAN-2373 only changes retry/quarantine policy there.
     // Local development can use up to 4 workers.
     // Vitest 4 replaced the `forks: { minForks, maxForks }` shape with top-level
     // `maxWorkers`; the old shape is silently ignored and defaults to CPU count.
-    maxWorkers: process.env.CI ? 2 : 4,
+    maxWorkers: 4,
     // Retry once in CI, verification-gate, and flake-lane runs. Local dev stays
     // retry:0 so flakes remain visible during development. A retried-then-passed
     // test is still surfaced by vitest's default reporter.
     retry: retryEnabled ? 1 : 0,
+    // PAN-3847 (FR-12): vitest refuses .only in every gate run — a focused test
+    // must never shrink the suite silently.
+    allowOnly: false,
     experimental: {
       // Persist transformed module cache across runs in node_modules/.experimental-vitest-cache.
       // Vitest v4 introduced this; meaningful on a ~200-file suite where re-running a
@@ -61,7 +65,7 @@ export default defineConfig({
         '**/*.d.ts',
       ],
     },
-    globalSetup: ['tests/global-setup.ts'],
+    globalSetup: ['tests/vitest-cpu-admission.ts', 'tests/global-setup.ts'],
     setupFiles: ['tests/setup/overdeck-home.ts', 'tests/setup/no-real-home-writes.ts', 'tests/setup.ts'],
     // 5s is enough for unit/integration tests; tests that legitimately need
     // more time should opt in via `test('...', { timeout: 20_000 }, ...)`.

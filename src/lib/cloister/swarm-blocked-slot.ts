@@ -3,9 +3,9 @@ import { rename } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
-import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
 import { ensureRegisteredSlotWorktree } from '../agents/registered-slot-spawn.js';
-import type { SlotReconcileResult } from '../agents/slot-reconcile.js';
+import type { SlotReconcileResult } from './swarm-slot-reconcile.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { releaseBlockedSwarmSlot } from './deacon-swarm-record.js';
 import type { ArchivedBlockedSlot, CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
@@ -35,7 +35,7 @@ export async function defaultIsSlotBranchPushed(
 ): Promise<boolean> {
   const slotIndex = branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)?.[1];
   if (!slotIndex) return false;
-  const roots = resolveWorkspaceRepoRootsSync(issueId, `${workspacePath}-slot-${slotIndex}`);
+  const roots = resolveWorkspaceRepoRoots(issueId, `${workspacePath}-slot-${slotIndex}`);
   if (roots.length === 0 || roots.some(root => root.degradedPolyrepo)) return false;
   try {
     const durable = await Promise.all(roots.map(async root => {
@@ -113,8 +113,8 @@ export async function archiveBlockedSwarmSlot(
   const archivedWorktree = `${slotWorkspace}-blocked-${suffix}`;
   const archivedBranch = `${branch}-blocked-${suffix}`;
   const replacementBranch = `feature/${issueId.toLowerCase()}-slot-${slotIndex}-attempt-${suffix}`;
-  const slotRoots = resolveWorkspaceRepoRootsSync(issueId, slotWorkspace);
-  const baseRoots = new Map(resolveWorkspaceRepoRootsSync(issueId, workspacePath)
+  const slotRoots = resolveWorkspaceRepoRoots(issueId, slotWorkspace);
+  const baseRoots = new Map(resolveWorkspaceRepoRoots(issueId, workspacePath)
     .map(root => [root.repoKey, root]));
 
   if (slotRoots.length === 0 || slotRoots.some(root => root.degradedPolyrepo)) {

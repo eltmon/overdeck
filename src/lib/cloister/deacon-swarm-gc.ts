@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { Effect } from 'effect';
-import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
+import type { ReconciledSlotItem } from './swarm-slot-reconcile.js';
+import { getAgentState } from '../agents/agent-state.js';
 import { stopAgent } from '../agents/termination.js';
 import {
-  resolveSlotWorkspaceWorktreesSync,
-  resolveWorkspaceRepoRootsSync,
+  resolveSlotWorkspaceWorktrees,
+  resolveWorkspaceRepoRoots,
   type NestedSlotWorktree,
   type SlotWorkspaceWorktrees,
   type WorkspaceRepoRoot,
@@ -82,7 +82,7 @@ export async function gcMergedSlotsWithStatus(
     let reapAction: string | null = null;
     if (sessionNames.has(agentId)) {
       const completionProven = slot.mergedVia === 'completed-status';
-      const lastActivity = (deps.getAgentLastActivity ?? (id => getAgentStateSync(id)?.lastActivity))(agentId);
+      const lastActivity = (deps.getAgentLastActivity ?? (id => getAgentState(id)?.lastActivity))(agentId);
       const idleFor = lastActivity ? Date.now() - Date.parse(lastActivity) : 0;
       if (!completionProven && (!Number.isFinite(idleFor) || idleFor < MERGED_LIVE_SLOT_IDLE_MS)) {
         actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
@@ -154,7 +154,7 @@ async function slotBranchExists(
   }
 }
 
-type SlotRemovalDeps = Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> & {
+export type SlotRemovalDeps = Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> & {
   listSlotWorkspaceWorktrees?: (issueId: string, slotWorkspace: string) => SlotWorkspaceWorktrees;
   listFeatureWorkspaceRepoRoots?: (issueId: string, workspacePath: string) => WorkspaceRepoRoot[];
   removeDirectory?: (path: string) => Promise<void>;
@@ -200,7 +200,8 @@ async function removeSlotWorkspace(
     return false;
   };
 
-  const { isPolyrepo, nested } = (deps.listSlotWorkspaceWorktrees ?? resolveSlotWorkspaceWorktreesSync)(issueId, slotWorkspace);
+  const layout = (deps.listSlotWorkspaceWorktrees ?? resolveSlotWorkspaceWorktrees)(issueId, slotWorkspace);
+  const { nested } = layout;
 
   // ── Integration (PAN-3695): merge unmerged nested slot branches through the
   // canonical nested merge path before any removal. A merged-status slot whose
@@ -215,12 +216,46 @@ async function removeSlotWorkspace(
     }
   }
 
+  const failure = await detachAndRemoveSlotWorkspace(
+    issueId,
+    workspacePath,
+    slotWorkspace,
+    slotBranch,
+    layout,
+    deps,
+    note => actions.push(`[swarm] gc note slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: ${note}`),
+  );
+  return failure ? defer(failure) : true;
+}
+
+/**
+ * Detach and remove a slot workspace whose nested work is already proven
+ * durable by the caller — the preflight + mutation half of merged-slot GC
+ * (PAN-3686), shared with orphaned-slot GC (PAN-3689) so both route polyrepo
+ * cleanup through the same nested-worktree resolution and preservation
+ * checks. A read-only preflight proves every nested worktree clean and
+ * registered in its owning parent repo, and decides the aggregate root's
+ * removal route, before the first mutation. Returns null once the slot
+ * workspace is gone, or the reason it was left in place; a partial mutation
+ * failure names the nested repos already detached.
+ */
+export async function detachAndRemoveSlotWorkspace(
+  issueId: string,
+  workspacePath: string,
+  slotWorkspace: string,
+  slotBranch: string,
+  layout: SlotWorkspaceWorktrees,
+  deps: SlotRemovalDeps,
+  note: (message: string) => void,
+): Promise<string | null> {
+  const { isPolyrepo, nested } = layout;
+
   // ── Preflight (read-only): no mutations below this line until every check
   // for every nested repo and the aggregate root has passed. ──
 
   for (const worktree of nested) {
     const blocked = await nestedWorktreeDirtyReason(deps.runGitCommand, worktree);
-    if (blocked) return defer(`preserving nested work: ${blocked}`);
+    if (blocked) return `preserving nested work: ${blocked}`;
   }
 
   // Each nested checkout must be a registered worktree of its owning parent
@@ -232,10 +267,10 @@ async function removeSlotWorkspace(
   for (const worktree of nested) {
     const registered = await isRegisteredWorktree(deps.runGitCommand, worktree.parentRepo, worktree.dir);
     if (registered === null) {
-      return defer(`${worktree.repoKey}: worktree registration in parent repo could not be determined`);
+      return `${worktree.repoKey}: worktree registration in parent repo could not be determined`;
     }
     if (!registered) {
-      return defer(`${worktree.repoKey}: nested worktree is not registered in its parent repo (an earlier partial cleanup may have detached it); run pan swarm reset ${issueId}`);
+      return `${worktree.repoKey}: nested worktree is not registered in its parent repo (an earlier partial cleanup may have detached it); run pan swarm reset`;
     }
   }
 
@@ -245,7 +280,7 @@ async function removeSlotWorkspace(
   // earlier partial cleanup) is removed as a directory after nested detach.
   const aggregateRegistered = await isRegisteredWorktree(deps.runGitCommand, workspacePath, slotWorkspace);
   if (aggregateRegistered === null) {
-    return defer('aggregate worktree registration could not be determined');
+    return 'aggregate worktree registration could not be determined';
   }
 
   // ── Mutation: preflight proved every nested worktree safe and removable. ──
@@ -259,28 +294,28 @@ async function removeSlotWorkspace(
       // A failure here escaped preflight (I/O race, lock); report which nested
       // worktrees were already detached so the partial state is on record.
       const partial = detached.length > 0 ? ` (already detached: ${detached.join(', ')})` : '';
-      return defer(`nested worktree remove failed in ${worktree.repoKey}${partial}: ${error instanceof Error ? error.message : String(error)}`);
+      return `nested worktree remove failed in ${worktree.repoKey}${partial}: ${error instanceof Error ? error.message : String(error)}`;
     }
     try {
       await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, worktree.parentRepo);
     } catch (error) {
       // The worktree is already detached; a leftover merged branch is cosmetic.
-      actions.push(`[swarm] gc note slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: nested branch ${slotBranch} delete failed in ${worktree.repoKey}: ${error instanceof Error ? error.message : String(error)}`);
+      note(`nested branch ${slotBranch} delete failed in ${worktree.repoKey}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   if (!aggregateRegistered && isPolyrepo) {
     try {
       await (deps.removeDirectory ?? (path => rm(path, { recursive: true, force: true })))(slotWorkspace);
-      return true;
+      return null;
     } catch (rmError) {
-      return defer(`aggregate directory remove failed: ${rmError instanceof Error ? rmError.message : String(rmError)}`);
+      return `aggregate directory remove failed: ${rmError instanceof Error ? rmError.message : String(rmError)}`;
     }
   }
 
   try {
     await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
-    return true;
+    return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     // The registration vanished between preflight and removal (or preflight
@@ -289,12 +324,12 @@ async function removeSlotWorkspace(
     if (isPolyrepo && /is not a working tree/.test(message)) {
       try {
         await (deps.removeDirectory ?? (path => rm(path, { recursive: true, force: true })))(slotWorkspace);
-        return true;
+        return null;
       } catch (rmError) {
-        return defer(`aggregate directory remove failed: ${rmError instanceof Error ? rmError.message : String(rmError)}`);
+        return `aggregate directory remove failed: ${rmError instanceof Error ? rmError.message : String(rmError)}`;
       }
     }
-    return defer(`worktree remove failed: ${message}`);
+    return `worktree remove failed: ${message}`;
   }
 }
 
@@ -349,7 +384,7 @@ async function mergeNestedSlotBranches(
 ): Promise<string[]> {
   const failures: string[] = [];
   const baseRoots = new Map(
-    (deps.listFeatureWorkspaceRepoRoots ?? resolveWorkspaceRepoRootsSync)(issueId, workspacePath)
+    (deps.listFeatureWorkspaceRepoRoots ?? resolveWorkspaceRepoRoots)(issueId, workspacePath)
       .map(root => [root.repoKey, root]),
   );
   for (const worktree of nested) {

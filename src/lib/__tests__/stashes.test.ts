@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const execMock = vi.hoisted(() => vi.fn());
@@ -9,18 +8,13 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 import {
-  applyStash,
   buildStashMessage,
-  createNamedStash,
   createRecoveryBranchFromStash,
   dropStash,
-  getNextReviewTempSequence,
-  isOlderThanDays,
   isSalvageableStash,
   listStashes,
   parseCanonicalStashMessage,
   parseStashListLine,
-  popStash,
 } from '../stashes.js';
 
 function mockExecImplementation(handler: (cmd: string) => { stdout: string; stderr?: string } | Error) {
@@ -122,32 +116,6 @@ describe('stashes', () => {
     });
   });
 
-  it('computes next review-temp sequence for an issue', () => {
-    expect(getNextReviewTempSequence([
-      { ref: 'stash@{0}', kind: 'review-temp', issueId: 'PAN-879', message: 'review-temp:PAN-879:2', sequence: 2 },
-      { ref: 'stash@{1}', kind: 'review-temp', issueId: 'PAN-879', message: 'review-temp:PAN-879:4', sequence: 4 },
-      { ref: 'stash@{2}', kind: 'review-temp', issueId: 'PAN-880', message: 'review-temp:PAN-880:9', sequence: 9 },
-    ] as any, 'pan-879')).toBe(5);
-  });
-
-  it('returns null when git reports no local changes to save', async () => {
-    mockExecImplementation((cmd) => {
-      if (cmd.startsWith('git stash push')) return { stdout: 'No local changes to save\n' };
-      throw new Error(`unexpected command: ${cmd}`);
-    });
-
-    await expect(Effect.runPromise(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z'))).resolves.toBeNull();
-  });
-
-  it('returns the stable stash sha after successful stash creation', async () => {
-    mockExecImplementation((cmd) => {
-      if (cmd.startsWith('git stash push')) return { stdout: 'Saved working directory and index state WIP\n' };
-      if (cmd === 'git rev-parse --verify stash@{0}') return { stdout: 'abc123def456abc123def456abc123def456abcd\n' };
-      throw new Error(`unexpected command: ${cmd}`);
-    });
-
-    await expect(Effect.runPromise(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z'))).resolves.toBe('abc123def456abc123def456abc123def456abcd');
-  });
 
   it('lists stashes with stable refs and stack refs', async () => {
     mockExecImplementation((cmd) => {
@@ -162,7 +130,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await expect(Effect.runPromise(listStashes('/tmp/workspace'))).resolves.toMatchObject([
+    await expect(listStashes('/tmp/workspace')).resolves.toMatchObject([
       {
         ref: 'abc123def456abc123def456abc123def456abcd',
         stackRef: 'stash@{1}',
@@ -184,7 +152,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await expect(Effect.runPromise(listStashes('/tmp/wrapper-workspace'))).resolves.toEqual([]);
+    await expect(listStashes('/tmp/wrapper-workspace')).resolves.toEqual([]);
   });
 
   it('re-resolves a stable stash sha before destructive operations', async () => {
@@ -196,16 +164,12 @@ describe('stashes', () => {
       }
       if (cmd === 'git rev-parse --verify "stash@{3}"') return { stdout: 'abc123def456abc123def456abc123def456abcd\n' };
       if (cmd === 'git stash drop "stash@{3}"') return { stdout: '' };
-      if (cmd === 'git stash apply "stash@{3}"') return { stdout: '' };
-      if (cmd === 'git stash pop "stash@{3}"') return { stdout: '' };
       if (cmd === 'git branch "recovery/PAN-879-ui-draft-notes" "stash@{3}"') return { stdout: '' };
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await Effect.runPromise(dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd'));
-    await Effect.runPromise(applyStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd'));
-    await Effect.runPromise(popStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd'));
-    await expect(Effect.runPromise(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879', 'UI Draft + notes'))).resolves.toBe('recovery/PAN-879-ui-draft-notes');
+    await dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    await expect(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879', 'UI Draft + notes')).resolves.toBe('recovery/PAN-879-ui-draft-notes');
   });
 
   it('uses the provided stack ref to avoid rescanning the stash list', async () => {
@@ -215,7 +179,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await Effect.runPromise(dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'stash@{7}'));
+    await dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'stash@{7}');
 
     expect(execMock).not.toHaveBeenCalledWith(
       'git stash list --format="%gd%x09%H%x09%cI%x09%gs"',
@@ -230,9 +194,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await expect(Effect.runPromise(
-      createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879; touch /tmp/pwned', 'UI Draft + notes', 'stash@{3}'),
-    )).rejects.toMatchObject({ stderr: expect.stringContaining('Invalid issue ID format') });
+    await expect(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879; touch /tmp/pwned', 'UI Draft + notes', 'stash@{3}')).rejects.toThrow('Invalid issue ID format');
   });
 
   it('identifies salvageable stash entries', () => {
@@ -243,9 +205,4 @@ describe('stashes', () => {
     expect(isSalvageableStash(unknown)).toBe(false);
   });
 
-  it('identifies stale timed stashes by age', () => {
-    const stash = parseCanonicalStashMessage('pre-merge:PAN-879:2026-03-01T00:00:00Z');
-    expect(isOlderThanDays(stash, 28, new Date('2026-04-27T00:00:00Z'))).toBe(true);
-    expect(isOlderThanDays(stash, 80, new Date('2026-04-27T00:00:00Z'))).toBe(false);
-  });
 });

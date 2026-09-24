@@ -1,0 +1,1313 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-18T13:10:00.000Z",
+    "updated": "2026-09-18T19:55:42.420Z",
+    "author": "conv:20260918-7437",
+    "description": "Plan for PAN-3917: remove Overdeck's state layer while keeping every feature; Herdr becomes the default terminal backend with tmux supported."
+  },
+  "plan": {
+    "id": "pan-3917",
+    "title": "The Overdeck Cut: remove the state layer, keep every feature, Herdr as default runtime",
+    "status": "proposed",
+    "uid": "7f3c2b1e-9a4d-4e6b-8c2f-5d1a0b9e3c47",
+    "author": "conv:20260918-7437",
+    "sequence": 2,
+    "created": "2026-09-18T13:10:00.000Z",
+    "updated": "2026-09-18T19:55:42.420Z",
+    "references": [
+      "https://github.com/eltmon/overdeck/issues/3917",
+      "drafts/pan-3917.md",
+      "https://claude.ai/artifact/KJp334EDvqpGFh2cWfUwjT"
+    ],
+    "tags": [
+      "epic",
+      "architecture",
+      "cut",
+      "herdr",
+      "state-layer"
+    ],
+    "narratives": {
+      "Problem": "Overdeck stores copies of facts that git, the tracker, the terminal runtime, and the harness transcript already own. Each copy drifts, a patrol reconciles it, the patrol acts on transient state, and a guard is added. Sixty patrol routines run per cycle; half of all fix commits repair the pipeline itself.",
+      "Proposal": "Delete the state layer (the overdeck-state data plane, per-issue records and their six status fields, claims, recovery trips, mirror tables, the inspection gate, the reconciliation patrols) and re-point every surviving feature at derived state. Introduce a terminal backend contract with Herdr as default and tmux supported. Move planning artifacts back into each project repo under .pan/. Collapse the Deacon to deacon-lite, turn the flywheel into a loop skill, and make the foreman the work protocol. Execute as one day: prepare, dispatch a wave of workers in isolated worktrees with hard file scopes, integrate in dependency order with green gates, reload.",
+      "NonGoals": "No feature is removed: merge train, review convoys, verification gates, UAT, strike, specialists, order books, parked items, backlog sequencer, planning and finalize, container ops and stacks, context injection, costs, conversations, God View, Command Deck all stay. The overdeck-state branch is archived, never deleted. The swarm plumbing stays in the tree, dormant. No new repository."
+    },
+    "autoDecisions": [],
+    "metadata": {
+      "executionModel": "orchestrator-wave",
+      "workerTierLegend": "core = strongest available model (Opus or Fable class); plumbing = Sonnet class with a pattern to copy",
+      "sizeJustification": "One issue because the cut is only coherent as a whole: deleting the record plane without re-pointing its readers breaks every board, and re-pointing readers while the plane exists keeps the drift alive. Thirteen items map one-to-one onto isolated worktrees with disjoint file scopes; two foundations (plan home, terminal contract) gate the rest and are small. The inventories name every file, so items are executable without re-research.",
+      "inventories": "Appendix A and B of drafts/pan-3917.md list every file per item.",
+      "canonicalFilename": "2026-09-18-PAN-3917-the-overdeck-cut-remove-the-state-layer-keep-every-feature-herdr-as-default-runtime.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w0-prepare",
+        "title": "W0: Decide, back up, bring Herdr up headless, tag pre-cut",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "ops",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            "src/lib/terminal-backends/__fixtures__/herdr-v0.9.1/schema.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "systemctl --user is-active overdeck-herdr.service",
+            "test -S ~/.config/herdr/sessions/overdeck/herdr.sock",
+            "git tag --list pre-cut",
+            "for d in ~/.overdeck/state/*/; do git -C \"$d\" tag --list state-final; done"
+          ],
+          "expected_outputs": [
+            "Given the operator has recorded D1 to D14, then the safety export directory contains overdeck.db, panopticon.db, and costs/events.jsonl with matching row counts, and every overdeck-state branch carries a state-final tag.",
+            "Given the Herdr user unit is started, then herdr api schema --json returns the schema and the fixture file exists in the repo, and git tag --list prints pre-cut."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "w1-plan-home",
+            "w2-terminal-contract",
+            "w3-record-plane-delete"
+          ],
+          "parallelSafeReason": "Operator-owned preparation with no source edits beyond one fixture file; nothing else may start before the safety export exists."
+        },
+        "narrative": {
+          "Action": "Operator confirms or overrides D1 to D14 in the PRD. Operator copies overdeck.db, panopticon.db, and costs/events.jsonl to ~/overdeck-backups/<date>/ and verifies row counts. Operator tags state-final on every overdeck-state branch and pre-cut on main. Install Herdr v0.9.1, create the overdeck-herdr.service user unit running `herdr --session overdeck server`, confirm the socket, and commit `herdr api schema --json` as the versioned fixture."
+        },
+        "items": [
+          {
+            "id": "w0-prepare.ac1",
+            "title": "The safety export directory contains overdeck.db, panopticon.db, and costs/events.jsonl and every overdeck-state branch carries a state-final tag.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w0-prepare.ac2",
+            "title": "systemctl reports overdeck-herdr.service active, the overdeck session socket exists, the schema fixture file exists, and git tag --list prints pre-cut.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w1-plan-home",
+        "title": "W1: Plan home in the repo and migration of open-issue artifacts",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            "src/lib/pan-dir/paths.ts",
+            "src/lib/pan-dir/types.ts",
+            "src/lib/pan-dir/specs.ts",
+            "src/lib/pan-dir/drafts.ts",
+            "src/lib/pan-dir/continue.ts",
+            "src/lib/pan-dir/feedback.ts",
+            "src/lib/pan-dir/context.ts",
+            "src/lib/pan-dir/index.ts",
+            "src/lib/state-read-home.ts",
+            "src/lib/state-home.ts",
+            "src/lib/project-key.ts",
+            "src/lib/projects.ts",
+            "src/lib/xbrief/io.ts",
+            "src/lib/xbrief/lifecycle-io.ts",
+            "src/lib/xbrief/continue-state.ts",
+            "src/lib/xbrief/xbrief-index.ts",
+            "src/lib/orders/io.ts",
+            "src/lib/orders/resolver.ts",
+            "src/lib/orders/writer.ts",
+            "src/lib/backlog/sequence-io.ts",
+            "src/lib/parked/resolver.ts",
+            "scripts/migrate-pan-home.ts",
+            "tests/unit/lib/pan-dir/*.test.ts",
+            "tests/unit/lib/xbrief/continue-state.test.ts",
+            "tests/unit/scripts/migrate-pan-home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/pan-dir tests/unit/lib/xbrief/continue-state.test.ts tests/unit/scripts/migrate-pan-home.test.ts"
+          ],
+          "expected_outputs": [
+            "getProjectPanPaths returns <planHome>/.pan for every project regardless of any migration marker, and resolveStateReadHomeSync no longer exists.",
+            "migrate-pan-home copies drafts, specs, continues, orders, notes, and backlog/sequence.md for open issues into <repo>/.pan/, commits on main, removes migration-complete.json, and prints 0 remaining on a second run."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-10",
+            "FR-16",
+            "D8",
+            "D9"
+          ],
+          "foundationFor": [
+            "w3-record-plane-delete",
+            "w5-cloister-repoint",
+            "w6-backend",
+            "w7-frontend",
+            "w9-cli"
+          ],
+          "parallelSafeReason": "Owns the pan-dir read path, the xbrief continue state, and the migration script; no other item edits these files. Runs before the record plane is deleted so MIN-1039's task verbs keep working."
+        },
+        "narrative": {
+          "Action": "Add planHome to the project schema and resolvePlanHome(projectRoot). Make getProjectPanPaths unconditional per the PRD snippet; delete resolveStateReadHomeSync and every migrated branch. Implement continue-state.ts so markItemDone verifies the `Item: <id>` trailer on the feature branch and that the branch is pushed, then writes .pan/continues/<issue>.xbrief.json. Remove the applyStatusOverrides call sites that read records at io.ts:264 and :416. Write scripts/migrate-pan-home.ts (open issues only) and run it for panopticon-cli and mind-your-now with planHome api. Push both repos."
+        },
+        "items": [
+          {
+            "id": "w1-plan-home.ac1",
+            "title": "getProjectPanPaths returns <planHome>/.pan for every project and the unit tests for planHome and the unconditional path pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-plan-home.ac2",
+            "title": "pan task done refuses an item when the Item trailer is missing or the branch is unpushed, and records the item in .pan/continues when both are present; migrate-pan-home prints 0 remaining for both projects on its second run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-terminal-contract",
+        "title": "W2: Terminal backend contract and selection",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            "src/lib/terminal-backends/types.ts",
+            "src/lib/terminal-backends/registry.ts",
+            "src/lib/terminal-backends/select.ts",
+            "packages/contracts/src/terminal-backend.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "tests/unit/lib/terminal-backends/registry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/terminal-backends/registry.test.ts"
+          ],
+          "expected_outputs": [
+            "The contract exports create, startAgent, prompt, wait, observe, control, list, events, reportMetadata, close, resume as Effect-returning methods with typed Unsupported results.",
+            "select returns herdr when the binary is on PATH and the overdeck session socket exists, returns tmux otherwise, and the diagnostic string names the reason."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "D10"
+          ],
+          "foundationFor": [
+            "w5-cloister-repoint",
+            "w6-backend",
+            "w7-frontend",
+            "w8-adapters",
+            "w9-cli"
+          ],
+          "parallelSafeReason": "Types-first commit lands within the first hour so dependents compile against it; the item owns only the new terminal-backends directory and the three config files."
+        },
+        "narrative": {
+          "Action": "Define the FR-3 contract in types.ts with Schema types and Effect-returning methods; Unsupported is a typed result carrying a reason. registry.ts resolves the adapter by name. select.ts implements D10. Add terminal.backend to config schema, defaults (defaults.ts:41 neighborhood), and merge. Commit the types file first, then the rest."
+        },
+        "items": [
+          {
+            "id": "w2-terminal-contract.ac1",
+            "title": "The registry test passes for the selection matrix: herdr with socket, tmux without, and a forced setting wins over detection.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-terminal-contract.ac2",
+            "title": "Calling an unsupported method on the tmux adapter returns an Unsupported result that contains a reason string and never throws.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-record-plane-delete",
+        "title": "W3: Delete the record plane, mirror syncs, legacy tables, and add the CI guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "plumbing",
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/record-update.ts",
+            "src/lib/pan-dir/record-list.ts",
+            "src/lib/pan-dir/record-lock.ts",
+            "src/lib/pan-dir/record-task-types.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/pan-dir/records-backfill.ts",
+            "src/lib/pan-dir/verdict-restore.ts",
+            "src/lib/pan-dir/pipeline-verdict-merge.ts",
+            "src/lib/pan-dir/reset-task-progress.ts",
+            "src/lib/pan-dir/merge-fulfillment.ts",
+            "src/lib/pan-dir/task-door.ts",
+            "src/lib/pan-dir/auto-commit.ts",
+            "src/lib/pan-dir/state-git-lock.ts",
+            "src/lib/pan-dir/push-health.ts",
+            "src/lib/pan-dir/agents.ts",
+            "src/lib/pan-dir/sessions.ts",
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "src/lib/overdeck/review-status-sync.ts",
+            "src/lib/overdeck/agent-state-sync.ts",
+            "src/lib/overdeck/reconstruction.ts",
+            "src/lib/overdeck/legacy-import.ts",
+            "src/lib/overdeck/schema-audit.ts",
+            "src/lib/overdeck/agent-record-sync.ts",
+            "src/lib/overdeck/agent-rollback-state.ts",
+            "src/lib/overdeck/issue-stage-sync.ts",
+            "src/lib/overdeck/backlog.ts",
+            "src/lib/database/agent-backfill.ts",
+            "src/lib/database/agent-mappers.ts",
+            "src/lib/database/agents-db.ts",
+            "src/lib/database/app-settings.ts",
+            "src/lib/database/backlog-sequence-db.ts",
+            "src/lib/database/conversations-db.ts",
+            "src/lib/database/cost-events-db.ts",
+            "src/lib/database/discovered-sessions-db.ts",
+            "src/lib/database/flywheel-substrate-bugs-db.ts",
+            "src/lib/database/git-operations-db.ts",
+            "src/lib/database/health-events-db.ts",
+            "src/lib/database/index.ts",
+            "src/lib/database/merge-queue-db.ts",
+            "src/lib/database/merge-set-db.ts",
+            "src/lib/database/pending-auto-merges-db.ts",
+            "src/lib/database/release-set-db.ts",
+            "src/lib/database/review-status-db.ts",
+            "src/lib/database/schema.ts",
+            "src/lib/database/transcript-checkpoint-db.ts",
+            "src/lib/database/uat-generations-db.ts",
+            "src/lib/database/__tests__/*.test.ts",
+            "src/lib/agents/slot-reconcile.ts",
+            "src/lib/agents/reopen-guard.ts",
+            "src/lib/agents/standing-tiers.ts",
+            "src/lib/lifecycle/residue.ts",
+            "src/lib/shadow-engineering/index.ts",
+            "src/lib/shadow-engineering/monitoring-agent.ts",
+            "src/lib/shadow-engineering/observer-agent.ts",
+            "src/lib/shadow-engineering/__tests__/*.test.ts",
+            "src/cli/commands/admin/state-migrate.ts",
+            "src/cli/commands/admin/xbrief-state-migrate.ts",
+            "src/cli/commands/admin/agent-state-backfill.ts",
+            "src/cli/commands/admin/migrate-legacy-agent-dirs.ts",
+            "src/cli/commands/admin/reconcile-labels.ts",
+            "src/cli/commands/db.ts",
+            "scripts/guard-no-state-layer.sh",
+            "package.json",
+            "tests/unit/lib/pan-dir/record*.test.ts",
+            "tests/unit/lib/overdeck/*sync*.test.ts",
+            "tests/unit/lib/database/*.test.ts",
+            "tests/unit/scripts/guard-no-state-layer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/guard-no-state-layer.sh",
+            "npx vitest run tests/unit/scripts/guard-no-state-layer.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/pan-dir contains only specs, drafts, continue, feedback, context, paths, types, and index; src/lib/database contains only driver and conversation-embeddings-db.",
+            "scripts/guard-no-state-layer.sh exits 0 on the branch and exits 1 when a fixture file references records/, statusOverrides, or any of the six status fields."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-12",
+            "D13"
+          ],
+          "parallelSafeReason": "Pure deletion of files no other item edits, plus a new guard script; call sites that break are owned by W5 to W9 and are stubbed with a typed TODO that the guard forbids on main, so integration order resolves them."
+        },
+        "narrative": {
+          "Action": "Delete the files listed in Appendix A.2 to A.5 and the CLI admin state commands; drop the four admin db subcommands. Add scripts/guard-no-state-layer.sh failing on records/, statusOverrides, recoveryTrips, readyForMerge, the six status fields, overdeck-state, task-door, auto-commit under src/ and wire it into npm run lint. Remove state worktree registration from pan init, doctor, and sync. Add the overdeck.db migration that drops the mirror tables."
+        },
+        "items": [
+          {
+            "id": "w3-record-plane-delete.ac1",
+            "title": "After the deletions, ls src/lib/pan-dir shows only specs, drafts, continue, feedback, context, paths, types, and index files, and npm run typecheck passes on the integrated branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-record-plane-delete.ac2",
+            "title": "guard-no-state-layer.sh exits 0 on main after integration and exits 1 for a fixture that contains statusOverrides.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-cloister-cut",
+        "title": "W4: Cloister cut and deacon-lite",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/deacon-lite.ts",
+            "src/lib/cloister/hygiene-scheduler.ts",
+            "src/lib/cloister/deacon-api-recovery.ts",
+            "src/lib/cloister/closed-issue-reaper.ts",
+            "src/lib/cloister/advancing-selfheal.ts",
+            "src/lib/cloister/auto-resume-config.ts",
+            "src/lib/cloister/boot-reconciliation*.ts",
+            "src/lib/cloister/compaction-continuation.ts",
+            "src/lib/cloister/deacon-auto-merge-reconcile.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/cloister/deacon-canonical-state.ts",
+            "src/lib/cloister/deacon-inspect.ts",
+            "src/lib/cloister/deacon-merge.ts",
+            "src/lib/cloister/deacon-nudge-log.ts",
+            "src/lib/cloister/deacon-review*.ts",
+            "src/lib/cloister/deacon-stuck-merging.ts",
+            "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
+            "src/lib/cloister/dead-end-trip.ts",
+            "src/lib/cloister/durable-review-pipeline.ts",
+            "src/lib/cloister/fpp-violations.ts",
+            "src/lib/cloister/idle-nudge-inspection.ts",
+            "src/lib/cloister/inspect-*.ts",
+            "src/lib/cloister/no-resume-mode.ts",
+            "src/lib/cloister/orchestrated-compaction.ts",
+            "src/lib/cloister/orphan-*.ts",
+            "src/lib/cloister/patrol-*.ts",
+            "src/lib/cloister/pending-lifecycle-claim.ts",
+            "src/lib/cloister/recovery-trip.ts",
+            "src/lib/cloister/redrive-gate.ts",
+            "src/lib/cloister/review-run-recovery.ts",
+            "src/lib/cloister/review-status-source.ts",
+            "src/lib/cloister/review-verdict-writer.ts",
+            "src/lib/cloister/service-completion.ts",
+            "src/lib/cloister/stale-task-claims.ts",
+            "src/lib/cloister/state-plane-patrol.ts",
+            "src/lib/cloister/state-recreation-patrol.ts",
+            "src/lib/cloister/stuck-remediation*.ts",
+            "src/lib/cloister/synthesis-verdict.ts",
+            "src/lib/cloister/verdict-*.ts",
+            "src/lib/cloister/work-start-verdicts.ts",
+            "src/lib/cloister/deploy-patrol.ts",
+            "src/lib/cloister/post-merge-*.ts",
+            "src/lib/cloister/deacon-pending-lifecycle.ts",
+            "src/lib/cloister/ship-record.ts",
+            "src/lib/cloister/ship-status.ts",
+            "src/lib/cloister/pending-promotion-reconciler.ts",
+            "src/dashboard/server/services/deacon-supervisor.ts",
+            "scripts/post-merge-deploy.sh",
+            "tests/unit/lib/cloister/deacon-lite.test.ts",
+            "tests/unit/lib/cloister/hygiene-scheduler.test.ts",
+            "tests/unit/lib/cloister/deacon*.test.ts",
+            "tests/unit/lib/cloister/inspect*.test.ts",
+            "tests/unit/lib/cloister/stuck*.test.ts",
+            "tests/unit/lib/cloister/verdict*.test.ts",
+            "tests/unit/lib/cloister/boot-reconciliation*.test.ts",
+            "tests/unit/lib/cloister/orphan*.test.ts",
+            "tests/unit/dashboard/deacon-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-lite.test.ts tests/unit/lib/cloister/hygiene-scheduler.test.ts"
+          ],
+          "expected_outputs": [
+            "deacon-lite.ts exports checkStuckWorkAgents, checkApiErrorAgents, reconcileAgentLiveness, and reapClosedIssueAgents, and each emits exactly one nudge or notification per attention state under fake timers.",
+            "None of the 48 Appendix A.1 files exists, deploy-patrol and the post-merge lifecycle files are gone, and the hygiene routines run from hygiene-scheduler on their own intervals."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "D1",
+            "D4",
+            "D5",
+            "D6",
+            "D7",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "w5-cloister-repoint"
+          ],
+          "parallelSafeReason": "Owns deacon.ts and every deleted cloister file; W5 waits for it so the two cloister items never edit the same file."
+        },
+        "narrative": {
+          "Action": "Delete Appendix A.1 plus the D1 and D6 files. Write deacon-lite.ts per the PRD snippet and hygiene-scheduler.ts for docker bridge pool, idle stacks, disk pressure, orphan dashboard servers, playwright reaper, transcript retention, strike and swarm worktree GC, memory pressure. Shrink deacon-api-recovery to detect-and-resume-once and deacon-supervisor to start, stop, status, pause. Delete scripts/post-merge-deploy.sh and its systemd re-exec."
+        },
+        "items": [
+          {
+            "id": "w4-cloister-cut.ac1",
+            "title": "deacon-lite.test.ts passes: under fake timers each of the four routines emits one nudge or notification for its condition and none for a healthy fixture.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-cloister-cut.ac2",
+            "title": "ls src/lib/cloister shows none of the Appendix A.1 files, deploy-patrol.ts, or ship-record.ts, and pan reload still exits 0 in a throwaway instance.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-cloister-repoint",
+        "title": "W5: Re-point the 39 surviving cloister modules at PR, check, git, and backend state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            "src/lib/cloister/agent-gc.ts",
+            "src/lib/cloister/auto-merge-eligibility.ts",
+            "src/lib/cloister/concurrency.ts",
+            "src/lib/cloister/deacon-post-review-commits.ts",
+            "src/lib/cloister/deacon-strike-landing.ts",
+            "src/lib/cloister/deacon-swarm*.ts",
+            "src/lib/cloister/feedback-target.ts",
+            "src/lib/cloister/flywheel.ts",
+            "src/lib/cloister/label-reconciler.ts",
+            "src/lib/cloister/merge-agent.ts",
+            "src/lib/cloister/merge-blockers.ts",
+            "src/lib/cloister/merge-completeness.ts",
+            "src/lib/cloister/merge-eligibility.ts",
+            "src/lib/cloister/merge-train-deps.ts",
+            "src/lib/cloister/merge-verification.ts",
+            "src/lib/cloister/merged-docker-cleanup-worker.ts",
+            "src/lib/cloister/parked-residue.ts",
+            "src/lib/cloister/preemption.ts",
+            "src/lib/cloister/reap-terminal-sessions.ts",
+            "src/lib/cloister/review-agent.ts",
+            "src/lib/cloister/review-convoy.ts",
+            "src/lib/cloister/review-verdict-feedback.ts",
+            "src/lib/cloister/service-crash.ts",
+            "src/lib/cloister/service-reactive.ts",
+            "src/lib/cloister/service.ts",
+            "src/lib/cloister/stall-sweeper.ts",
+            "src/lib/cloister/swarm-failed-slot.ts",
+            "src/lib/cloister/swarm-slot-lifecycle.ts",
+            "src/lib/cloister/test-agent-queue.ts",
+            "src/lib/cloister/test-verdict.ts",
+            "src/lib/cloister/transcript-retention.ts",
+            "src/lib/cloister/uat-promote.ts",
+            "src/lib/cloister/uat-promote-verification.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/verification-worker-supervisor.ts",
+            "tests/unit/lib/cloister/merge*.test.ts",
+            "tests/unit/lib/cloister/review*.test.ts",
+            "tests/unit/lib/cloister/verification*.test.ts",
+            "tests/unit/lib/cloister/uat-promote*.test.ts",
+            "tests/unit/lib/cloister/test-agent-queue.test.ts",
+            "tests/unit/lib/cloister/service*.test.ts",
+            "tests/unit/lib/cloister/swarm*.test.ts",
+            "tests/unit/lib/cloister/stall-sweeper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister"
+          ],
+          "expected_outputs": [
+            "No file under src/lib/cloister references a status field, readyForMerge, IssueRecord, or statusOverrides; merge train, review convoy, verification runner, and UAT promote tests pass with PR-state fixtures.",
+            "The reviewer role posts a PR review and review-verdict-feedback delivers feedback when the PR review state is CHANGES_REQUESTED."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ],
+          "parallelSafeReason": "Starts after W4 merges so the cloister directory has one editor at a time; reads only the W2 contract types and the forge clients."
+        },
+        "narrative": {
+          "Action": "Per PRD W5 steps 1 to 5: merge modules read approvals, checks, and mergeability from the GitHub and GitLab clients; review modules post PR reviews and key feedback off PR review state; verification and test modules write verification-latest.json and check runs and trigger off PR open; UAT promote drops claims; strike, dormant swarm, orders, parked, stall sweeper, service loop, concurrency, preemption, reapers, and label reconciler read tracker, git, and backend inventory. Delete every write to a status field."
+        },
+        "items": [
+          {
+            "id": "w5-cloister-repoint.ac1",
+            "title": "grep for reviewStatus, mergeStatus, readyForMerge, IssueRecord, and statusOverrides under src/lib/cloister returns no matches and npx vitest run tests/unit/lib/cloister passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-cloister-repoint.ac2",
+            "title": "Given a PR fixture in CHANGES_REQUESTED state, review-verdict-feedback sends feedback to the work agent, and given an approved, green, mergeable PR the merge train marks it ready.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-backend",
+        "title": "W6: Dashboard routes and services on derived issue state and backend inventory",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            "src/dashboard/server/routes/flywheel.ts",
+            "src/dashboard/server/routes/tiered-callouts.ts",
+            "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+            "src/dashboard/server/routes/boot-reconciliation.ts",
+            "src/dashboard/server/routes/show.ts",
+            "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
+            "src/dashboard/server/routes/workspaces.ts",
+            "src/dashboard/server/routes/command-deck.ts",
+            "src/dashboard/server/routes/projects.ts",
+            "src/dashboard/server/routes/issues.ts",
+            "src/dashboard/server/routes/hooks.ts",
+            "src/dashboard/server/routes/workspace-registry.ts",
+            "src/dashboard/server/routes/reviewer-tree.ts",
+            "src/dashboard/server/routes/merge-train.ts",
+            "src/dashboard/server/routes/metrics.ts",
+            "src/dashboard/server/routes/session-tree-specialists.ts",
+            "src/dashboard/server/routes/velocity.ts",
+            "src/dashboard/server/routes/command-deck-lint-node.ts",
+            "src/dashboard/server/routes/pipeline-membership.ts",
+            "src/dashboard/server/routes/parked.ts",
+            "src/dashboard/server/routes/restart-gate.ts",
+            "src/dashboard/server/routes/agents/*.ts",
+            "src/dashboard/server/routes/workspaces/*.ts",
+            "src/dashboard/server/routes/specialists/*.ts",
+            "src/dashboard/server/routes/misc/*.ts",
+            "src/dashboard/server/routes/resources/*.ts",
+            "src/dashboard/server/services/flywheel-telemetry.ts",
+            "src/dashboard/server/services/flywheel-run-state.ts",
+            "src/dashboard/server/services/flywheel-actions.ts",
+            "src/dashboard/server/services/flywheel-state.ts",
+            "src/dashboard/server/services/substrate-bug-poller.ts",
+            "src/dashboard/server/services/merge-blocker-reconcile-service.ts",
+            "src/dashboard/server/services/review-status-reconcile-service.ts",
+            "src/dashboard/server/services/boot-reconciled-stop-events.ts",
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/server/services/system-health-service.ts",
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/services/conversation-lifecycle.ts",
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/services/pipeline-run-metrics.ts",
+            "src/dashboard/server/services/agent-projection.ts",
+            "src/dashboard/server/services/stale-check-retrigger-service.ts",
+            "src/dashboard/server/services/pipeline-membership.ts",
+            "src/dashboard/server/services/agent-state-service.ts",
+            "src/dashboard/server/services/durable-review-pipeline.ts",
+            "src/dashboard/server/services/merge-queue-service.ts",
+            "src/dashboard/server/services/restart-gate.ts",
+            "src/dashboard/server/services/auto-merge-executor.ts",
+            "src/dashboard/server/services/derived-issue-state.ts",
+            "src/dashboard/server/services/backend-inventory.ts",
+            "src/dashboard/server/routes/__tests__/*.test.ts",
+            "src/dashboard/server/services/__tests__/*.test.ts",
+            "tests/unit/dashboard/routes/*.test.ts",
+            "tests/unit/dashboard/server/*.test.ts",
+            "tests/unit/dashboard/pipeline-membership-service.test.ts",
+            "tests/unit/dashboard/metrics-stuck-count.test.ts",
+            "tests/unit/dashboard/unstick-endpoint.test.ts",
+            "tests/unit/dashboard/command-deck-lint-node.test.ts",
+            "tests/unit/dashboard/domain-services.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server"
+          ],
+          "expected_outputs": [
+            "derived-issue-state.ts implements the nine-state table and its test covers every row; backend-inventory.ts folds Herdr agent.list plus events and tmux sessions into the read model.",
+            "The six Appendix A.6 routes return 404, the moved auto-merge config routes respond under /api/merge-train/, and command-deck, issues, merge-train, and parked routes return derived data."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-9",
+            "FR-12",
+            "D2",
+            "D3"
+          ],
+          "parallelSafeReason": "Owns the listed routes and services plus the route subdirectories; deacon-supervisor.ts belongs to W4 and terminal-service.ts and ws-terminal.ts belong to W8, and none of those appear in this scope."
+        },
+        "narrative": {
+          "Action": "Delete the Appendix A.6 routes and services. Add services/derived-issue-state.ts (FR-6 table) and services/backend-inventory.ts (contract list plus events). Move /api/flywheel/config and /api/flywheel/auto-merge/* under routes/merge-train.ts. Remove GET/POST /api/review/:id/status and /inference-md from routes/workspaces.ts. Re-point the Appendix B.2 routes and services; keep event emission in agent-projection, agent-state-service, and conversation-lifecycle but drop persisted mirrors. Make restart-gate in-memory. Do not edit deacon-supervisor.ts or terminal-service.ts."
+        },
+        "items": [
+          {
+            "id": "w6-backend.ac1",
+            "title": "derived-issue-state.test.ts passes with one case per state: backlog, parked, planned, working, in review, changes requested, ready, merged, closed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-backend.ac2",
+            "title": "GET /api/flywheel/state returns 404, GET /api/merge-train/config returns the auto-merge config, and GET /api/parked returns rows derived from tracker labels without reading review_status.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-frontend",
+        "title": "W7: Frontend on DerivedIssueState and backend panes; the issue tree is the issue workspace",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/*.tsx",
+            "src/dashboard/frontend/src/components/*.ts",
+            "src/dashboard/frontend/src/components/*/*.tsx",
+            "src/dashboard/frontend/src/components/*/*.ts",
+            "src/dashboard/frontend/src/components/*/*/*.tsx",
+            "src/dashboard/frontend/src/components/*/*/*.ts",
+            "src/dashboard/frontend/src/pages/*.tsx",
+            "src/dashboard/frontend/src/lib/*.ts",
+            "src/dashboard/frontend/src/hooks/*.ts",
+            "src/dashboard/frontend/src/types.ts",
+            "src/dashboard/frontend/src/App/*.tsx",
+            "packages/contracts/src/derived-issue-state.ts",
+            "packages/contracts/src/backend-pane.ts",
+            "tests/unit/frontend/*.test.ts",
+            "tests/e2e/issue-tree.spec.ts",
+            "tests/e2e/merge-train.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend",
+            "npx playwright test tests/e2e/issue-tree.spec.ts tests/e2e/merge-train.spec.ts"
+          ],
+          "expected_outputs": [
+            "The machinery views in Appendix A.7 are deleted, MergeQueueCard renders under merge-train, OrderBookModule renders on OrderBookPage, and no component imports the six-field type.",
+            "The issue tree renders one row per backend pane in the issue workspace with role, harness, and model, plus subagent rail entries, and a pane spawned by pan handoff --issue renders as its role row."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "D3",
+            "D12"
+          ],
+          "parallelSafeReason": "Owns the frontend tree and two new contract files; builds against the W6 response shapes described in the brief, with fixtures until W6 merges."
+        },
+        "narrative": {
+          "Action": "Delete Appendix A.7 and relocate the three components. Replace the six-field read model with DerivedIssueState and BackendPane in packages/contracts. Issue tree rows in issue-view, Stage, and CommandDeck are backend panes plus subagent rail entries. Phase rails, kanban columns, pipeline rows, drawer, HomePage counts, God View confluence, AwaitingMergePage, and MergeButton read DerivedIssueState. StoppedAgentsBanner and ResumableSessionDialog read backend panes and drop the troubled and paused branches. Add the two Playwright specs."
+        },
+        "items": [
+          {
+            "id": "w7-frontend.ac1",
+            "title": "The Playwright issue-tree spec shows a reviewer pane spawned in another harness as the Review row of its issue with its model tag, and the merge-train spec renders the train from forge mergeability.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-frontend.ac2",
+            "title": "grep for reviewStatus, mergeStatus, verificationStatus, and readyForMerge under src/dashboard/frontend/src returns no matches and the frontend unit suite passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-adapters",
+        "title": "W8: Herdr and tmux adapters, launcher metadata, observe bridge",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr.ts",
+            "src/lib/terminal-backends/herdr-api.ts",
+            "src/lib/terminal-backends/herdr-stream.ts",
+            "src/lib/terminal-backends/tmux.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/delivery.ts",
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/services/terminal-service.ts",
+            "src/cli/commands/handoff.ts",
+            "src/lib/cloister/specialists-spawn.ts",
+            "src/cli/commands/strike.ts",
+            "src/cli/commands/review-spawn-reviewer.ts",
+            "tests/unit/lib/terminal-backends/herdr-api.test.ts",
+            "tests/unit/lib/terminal-backends/herdr-stream.test.ts",
+            "tests/unit/lib/terminal-backends/herdr.test.ts",
+            "tests/unit/lib/terminal-backends/tmux-adapter.test.ts",
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/terminal-backends",
+            "npx vitest run tests/unit/lib/terminal-backends/prompt-guard.test.ts"
+          ],
+          "expected_outputs": [
+            "herdr-api.test.ts passes for split frames, unknown optional fields, reconnect snapshot, and no duplicate mutation retry; herdr-stream.test.ts passes for two observers, one controller, and EOF without a close record.",
+            "The live verification record in docs/TERMINAL-BACKENDS.md shows start, prompt-and-wait to idle, blocked on a permission prompt, resume after server restart, and observe streaming; pan tell sends a message on both backends.",
+            "prompt-guard.test.ts passes on both adapters: the same message id sent twice to one target is delivered once and the second returns dropped; a reviewer pane prompting a worker pane returns refused with a reason; the issue work pane and an operator conversation are delivered."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-5",
+            "NFR-3",
+            "FR-17"
+          ],
+          "parallelSafeReason": "Owns the adapter files and the launcher call sites; W6 explicitly excludes ws-terminal.ts and terminal-service.ts. Live verification uses the throwaway overdeck Herdr session from W0."
+        },
+        "narrative": {
+          "Action": "herdr-api.ts: NDJSON client with correlated ids, bounded frames, typed errors, protocol probe against the W0 fixture. herdr.ts: workspaceFor via workspace.create; startAgent via pane.split then agent.start then pane.report_metadata; prompt via agent.prompt with wait; wait via agent.wait; list via agent.list plus session.snapshot; events via events.subscribe after a snapshot; observe and control via the CLI NDJSON streams bridged to the terminal WebSocket frames. tmux.ts wraps today's createSession, sendKeysAsync, sessionExists, and liveness and returns Unsupported for wait, blocked, and metadata. Every launcher stamps issue, role, harness, model; pan handoff --issue places its pane in the issue workspace; pan tell uses backend.prompt with the PTY supervisor kept on the tmux path. Record the live verification."
+        },
+        "items": [
+          {
+            "id": "w8-adapters.ac1",
+            "title": "npx vitest run tests/unit/lib/terminal-backends passes under fake timers, including a reconnect case that replays a snapshot and a mutation that is not retried after an ambiguous disconnect.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-adapters.ac2",
+            "title": "Given the overdeck Herdr session, pan spawn creates a pane whose agent.list entry contains issue, role, harness, and model tokens, and pan tell sends a prompt that the pane receives on both backends.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-adapters.ac3",
+            "title": "Given the same message id sent twice to one target pane, the second prompt returns dropped and the pane receives the text once; given a reviewer pane prompting a worker pane of the same issue, the prompt returns refused with a reason string and the pane receives nothing; given the issue work pane or an operator conversation prompting that worker, the pane receives the text — on both the Herdr and tmux adapters.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-cli",
+        "title": "W9: CLI verbs on the plan home, the tracker, and the backend; pan spawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "cli",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "plumbing",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/inspect.ts",
+            "src/cli/commands/reset-to-planned.ts",
+            "src/cli/commands/unstick.ts",
+            "src/cli/commands/untroubled.ts",
+            "src/cli/commands/approve.ts",
+            "src/cli/commands/pending.ts",
+            "src/cli/commands/resync-review.ts",
+            "src/cli/commands/reset-review.ts",
+            "src/cli/commands/doctor-state-divergence.ts",
+            "src/cli/commands/doctor-state-worktree.ts",
+            "src/cli/commands/shadow.ts",
+            "src/cli/commands/copy-config.ts",
+            "src/cli/commands/refresh.ts",
+            "src/cli/commands/spawn.ts",
+            "src/cli/commands/task.ts",
+            "src/cli/commands/done.ts",
+            "src/cli/commands/done-review-intent.ts",
+            "src/cli/commands/done-dashboard-client.ts",
+            "src/cli/commands/strike-merge-verification.ts",
+            "src/cli/commands/close.ts",
+            "src/cli/commands/reopen.ts",
+            "src/cli/commands/wipe.ts",
+            "src/cli/commands/reset-session.ts",
+            "src/cli/commands/plan.ts",
+            "src/cli/commands/plan-finalize.ts",
+            "src/cli/commands/plan-done.ts",
+            "src/cli/commands/planning-mode.ts",
+            "src/cli/commands/planning-stream.ts",
+            "src/cli/commands/show.ts",
+            "src/cli/commands/cv.ts",
+            "src/cli/commands/context.ts",
+            "src/cli/commands/health.ts",
+            "src/cli/commands/status.ts",
+            "src/cli/commands/agent-status.ts",
+            "src/cli/commands/issues.ts",
+            "src/cli/commands/triage.ts",
+            "src/cli/commands/orders.ts",
+            "src/cli/commands/parked.ts",
+            "src/cli/commands/flywheel.ts",
+            "src/cli/commands/flywheel-complete.ts",
+            "src/cli/commands/flywheel-orders.ts",
+            "src/cli/commands/flywheel-surfaces.ts",
+            "src/cli/commands/flywheel-merge-backend.ts",
+            "src/cli/commands/merge.ts",
+            "src/cli/commands/release.ts",
+            "src/cli/commands/rollout.ts",
+            "src/cli/commands/scope.ts",
+            "src/cli/commands/recover.ts",
+            "src/cli/commands/staffing.ts",
+            "src/cli/commands/review-subcommands.ts",
+            "src/cli/commands/request-review.ts",
+            "src/cli/commands/abort-review.ts",
+            "src/cli/commands/review-mode.ts",
+            "src/cli/commands/review-restart.ts",
+            "src/cli/commands/reload.ts",
+            "src/cli/commands/cloister/*.ts",
+            "src/cli/commands/specialists/*.ts",
+            "src/cli/commands/admin/agents-exited.ts",
+            "src/lib/deploy/*.ts",
+            "tests/unit/cli/*.test.ts",
+            "tests/unit/cli/commands/*.test.ts",
+            "tests/unit/lib/deploy/*.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli"
+          ],
+          "expected_outputs": [
+            "The twelve Appendix A.8 verbs exit with unknown command; pan spawn creates a pane in the issue workspace; pan done opens or updates the PR and requests review with no other writes.",
+            "pan reload keeps working after the D1 deletions and imports only the src/lib/deploy files it uses."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-13",
+            "FR-14",
+            "D1",
+            "D6",
+            "D7"
+          ],
+          "parallelSafeReason": "Owns the listed CLI files and src/lib/deploy; the admin state commands and db.ts belong to W3, and handoff.ts, strike.ts, and review-spawn-reviewer.ts belong to W8, so no file has two editors."
+        },
+        "narrative": {
+          "Action": "Delete inspect, reset-to-planned, unstick, untroubled, approve, review pending/resync/reset, doctor state-divergence/state-worktree, show --shadow, copy-config, refresh, cloister brake and freeze. Add spawn.ts. Re-point task (continue-state), done (PR open and review request only), close and reopen (PR and issue state), plan/finalize/done (.pan/ on the branch), show/status/issues (derived state and backend inventory), orders/parked/backlog (.pan/ files), release/rollout (tags and releases), specialists, scope, recover, staffing. Reduce flywheel.ts to start, stop, status launching the skill conversation. Audit pan reload's deploy imports and delete the rest of src/lib/deploy."
+        },
+        "items": [
+          {
+            "id": "w9-cli.ac1",
+            "title": "pan inspect exits with unknown command, pan spawn --issue PAN-3917 --item w0-prepare --model sonnet creates a pane in the issue workspace, and pan done opens or updates a PR and requests review with no other write.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-cli.ac2",
+            "title": "pan reload exits 0 in a throwaway instance after src/lib/deploy is reduced to the files it imports, and npx vitest run tests/unit/cli passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-context-docs",
+        "title": "W10: Hooks, skills, rules, prompts, CLAUDE.md, and the three new docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "plumbing",
+          "files_scope": [
+            "sync-sources/hooks/*",
+            "sync-sources/skills/*/SKILL.md",
+            "sync-sources/rules/*.md",
+            "sync-sources/agents/*.md",
+            "sync-sources/templates/*",
+            "sync-sources/plugins.json",
+            "src/lib/cloister/work-agent-prompt.ts",
+            "CLAUDE.md",
+            "WAY-FORWARD.MD",
+            "docs/*.md",
+            "tests/unit/sync-sources/*.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/sync-sources",
+            "test $(wc -l < CLAUDE.md) -lt 100"
+          ],
+          "expected_outputs": [
+            "sync-sources contains no work-agent-stop-hook, no pan-inspect skill, and no rule describing records, patrols, the state branch, or the two doors; pan-flywheel v2 and pan-foreman skills exist.",
+            "CLAUDE.md is under 100 lines and lacks the two philosophy lines; docs/TERMINAL-BACKENDS.md, docs/FOREMAN.md, and docs/THE-CUT.md exist and THE-CUT.md contains one line per deleted command, route, and view."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-15"
+          ],
+          "parallelSafeReason": "Owns sync-sources, docs, CLAUDE.md, and the work-agent prompt; docs/TERMINAL-BACKENDS.md belongs to W8, and this item runs after W8 so the docs directory has one editor at a time."
+        },
+        "narrative": {
+          "Action": "Pass over hooks, skills, and rules with the state-layer rule. Delete the work-agent stop hook and every hook that posts to a status endpoint. Delete pan-inspect and flywheel-role skills; add pan-flywheel v2 and pan-foreman. Rewrite pan-work-agent.md and work-agent-prompt.ts as the one-page foreman protocol. Rewrite CLAUDE.md under 100 lines without the two philosophy lines. Replace WAY-FORWARD.MD section 5 with a pointer to the PRD. Delete Appendix C docs and rewrite the six retained ones to the derived model; leave docs/TERMINAL-BACKENDS.md to W8. Write THE-CUT.md as the no-loss map."
+        },
+        "items": [
+          {
+            "id": "w10-context-docs.ac1",
+            "title": "After pan sync, ~/.overdeck/bin contains no work-agent-stop-hook and the skills manifest test passes with pan-flywheel and pan-foreman present and pan-inspect absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-context-docs.ac2",
+            "title": "wc -l CLAUDE.md prints a number under 100, grep for 'Never do agent work' returns nothing, and docs/THE-CUT.md contains a row for every verb in Appendix A.8 and every route in Appendix A.6.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w11-tests-guards",
+        "title": "W11: Test suite reconciled to the cut and CI runs the guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "plumbing",
+          "files_scope": [
+            "vitest.config.ts",
+            ".github/workflows/ci.yml",
+            "tests/fixtures/*",
+            "tests/unit/lib/*.test.ts",
+            "tests/unit/lib/agents/*.test.ts",
+            "tests/unit/lib/overdeck/*.test.ts",
+            "tests/unit/lib/lifecycle/*.test.ts",
+            "tests/unit/lib/orders/*.test.ts",
+            "tests/unit/lib/planning/*.test.ts",
+            "tests/unit/lib/reconstruct/*.test.ts",
+            "tests/unit/lib/backlog/*.test.ts",
+            "tests/unit/lib/workspaces/*.test.ts",
+            "tests/integration/*.test.ts",
+            "tests/cloister/*.test.ts",
+            "tests/lib/*.test.ts",
+            "tests/xbrief/*.test.ts",
+            "tests/unit/*.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "npm test passes on the integrated branch with no new quarantines and no maxForks change; no test file constructs an IssueRecord.",
+            "ci.yml runs scripts/guard-no-state-layer.sh and the run is green."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Runs after W3 to W10 merge; owns tests/, the vitest config, and the CI workflow, which no other item edits except the per-item test files they own."
+        },
+        "narrative": {
+          "Action": "Delete tests and fixtures of deleted modules, including every fixture that builds an IssueRecord. Update re-pointed tests to derived inputs. Add the guard step to ci.yml. Run the full suite; fix real failures, never quarantine to pass."
+        },
+        "items": [
+          {
+            "id": "w11-tests-guards.ac1",
+            "title": "npm test exits 0 on the integrated branch, the quarantine list is unchanged, and grep for IssueRecord under tests returns no matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-tests-guards.ac2",
+            "title": "The CI workflow file contains a step that runs scripts/guard-no-state-layer.sh and the first CI run on main after integration passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w12-integrate-ship",
+        "title": "W12: Integrate in dependency order, review the whole diff, reload, prove the path",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-09-18T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "ops",
+          "issueLabel": "pan-3917",
+          "requiresInspection": false,
+          "workerTier": "core",
+          "files_scope": [
+            ".pan/review/pan-3917-FEEDBACK-*.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm test",
+            "bash scripts/guard-no-state-layer.sh"
+          ],
+          "expected_outputs": [
+            "Items merge to main in the order W2, W1, W3, W4, W5, W6, W9, W7, W8, W10, W11 with typecheck, lint, and tests green after each merge, and a different-family reviewer's feedback file exists with every blocking finding resolved.",
+            "After pan reload, MIN-1039's pan tell and pan task done work, one PAN issue flows from pan start to merged on the new path, Command Deck, Stage, and God View render, the backlog triage is applied, and the flywheel loop logs its first tick."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-1",
+            "D14",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Orchestrator-only item; it edits no source, merges the others, and writes only the review feedback file."
+        },
+        "narrative": {
+          "Action": "Merge in dependency order with gates green after each merge; resolve conflicts by hand, never by force. Hand the integrated diff to a different-family reviewer with Appendix A and B as the checklist; turn blocking findings into fix commits. pan reload. Verify MIN-1039's verbs, run one PAN issue end to end, verify the three boards, close the 115 and re-scope the 122 from the triage file, and start the flywheel loop."
+        },
+        "items": [
+          {
+            "id": "w12-integrate-ship.ac1",
+            "title": "git log on main shows the eleven item merges in order, each followed by green typecheck, lint, and tests, and .pan/review contains a feedback file whose blocking findings are all marked resolved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-integrate-ship.ac2",
+            "title": "After pan reload, one PAN issue reaches merged on the new path, MIN-1039's pan task done records an item, the three boards render without error, and the flywheel loop's first tick is logged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w0-prepare",
+        "to": "w1-plan-home",
+        "type": "blocks"
+      },
+      {
+        "from": "w0-prepare",
+        "to": "w2-terminal-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "w0-prepare",
+        "to": "w3-record-plane-delete",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-plan-home",
+        "to": "w3-record-plane-delete",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-plan-home",
+        "to": "w5-cloister-repoint",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-plan-home",
+        "to": "w6-backend",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-plan-home",
+        "to": "w7-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-plan-home",
+        "to": "w9-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-terminal-contract",
+        "to": "w5-cloister-repoint",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-terminal-contract",
+        "to": "w6-backend",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-terminal-contract",
+        "to": "w7-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-terminal-contract",
+        "to": "w8-adapters",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-terminal-contract",
+        "to": "w9-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-cloister-cut",
+        "to": "w5-cloister-repoint",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-cloister-cut",
+        "to": "w10-context-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w9-cli",
+        "to": "w10-context-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-record-plane-delete",
+        "to": "w11-tests-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-cloister-cut",
+        "to": "w11-tests-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-cloister-repoint",
+        "to": "w11-tests-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-backend",
+        "to": "w11-tests-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-frontend",
+        "to": "w11-tests-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-adapters",
+        "to": "w11-tests-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "w9-cli",
+        "to": "w11-tests-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-context-docs",
+        "to": "w11-tests-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "w11-tests-guards",
+        "to": "w12-integrate-ship",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-adapters",
+        "to": "w10-context-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w0-prepare",
+        "to": "w4-cloister-cut",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
