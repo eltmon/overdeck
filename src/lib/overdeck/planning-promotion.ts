@@ -650,7 +650,7 @@ export async function completePlanningForIssue(options: {
     }
 
     // Git operations: write planning marker, commit, push (complex nested async — kept as async block)
-    const { pushed: gitPushed, taskWarning } = await (async (): Promise<{ pushed: boolean; taskWarning: string | null }> => {
+    const { pushed: gitPushed, taskWarning, specPath } = await (async (): Promise<{ pushed: boolean; taskWarning: string | null; specPath: string }> => {
       if (!projectPath) {
         throw new Error(`Cannot complete planning for ${id}: project path could not be resolved`);
       }
@@ -665,7 +665,8 @@ export async function completePlanningForIssue(options: {
       // PAN-3917: the spec is promoted into the workspace's own `.pan/` and
       // committed on the feature branch below — there is no separate commit on
       // main, and no state branch to flush.
-      return commitCompletePlanningWorkspaceGit(gitRoot, id, taskWarning);
+      const committed = await commitCompletePlanningWorkspaceGit(gitRoot, id, taskWarning);
+      return { ...committed, specPath: proposed.path };
     })();
 
     // Update Linear/GitHub issue state
@@ -698,9 +699,15 @@ export async function completePlanningForIssue(options: {
 
     if (!skipStateUpdate) {
       if (githubCheck.isGitHub) {
-        // GitHub: remove 'planning' label, add 'planned' label
+        // GitHub: remove 'planning' label, add 'planned' label. PAN-3953:
+        // `planned` means a finalized spec exists, so it is applied only here,
+        // after the spec was written and committed, and only if it is on disk.
         await Effect.runPromise(lifecycle.removeLabel(id, 'planning').pipe(Effect.catch(() => Effect.void)));
-        await Effect.runPromise(lifecycle.addLabel(id, 'planned').pipe(Effect.catch(() => Effect.void)));
+        if (existsSync(specPath)) {
+          await Effect.runPromise(lifecycle.addLabel(id, 'planned').pipe(Effect.catch(() => Effect.void)));
+        } else {
+          console.warn(`[complete-planning] Spec ${specPath} not found for ${id.toUpperCase()} — not applying the planned label`);
+        }
       } else {
         // Linear: transition to 'open' (maps to unstarted — Planned/Todo/Ready)
         const updatedIssue = await Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))) as any;

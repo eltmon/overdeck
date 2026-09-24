@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +14,10 @@ const testState = vi.hoisted(() => ({
   agentState: null as null | Record<string, unknown>,
   sessionAlive: false,
   prdGateOk: true,
+  // PAN-3953: how the mocked spec write behaves — 'write' puts the spec on
+  // disk at specPath, 'phantom' reports success without a file, 'fail' throws.
+  specWrite: 'write' as 'write' | 'phantom' | 'fail',
+  specPath: '',
 }));
 
 vi.mock('../../../dashboard/server/routes/agents.js', () => ({
@@ -47,10 +51,17 @@ vi.mock('../../pan-dir/index.js', () => ({
   findSpecByIssue: () => Effect.succeed(null),
   promoteWorkspacePrdDraft: () => Effect.succeed({ promoted: false, reason: 'no draft' }),
   writeSpecDocument: () => Effect.void,
-  writeSpecForIssue: () => Effect.succeed({
-    path: '/state/specs/2026-08-01-PAN-3230-test.xbrief.json',
-    filename: '2026-08-01-PAN-3230-test.xbrief.json',
-  }),
+  writeSpecForIssue: () => {
+    if (testState.specWrite === 'fail') return Effect.fail(new Error('simulated spec write failure'));
+    return Effect.sync(() => {
+      const path = testState.specPath || '/state/specs/2026-08-01-PAN-3230-test.xbrief.json';
+      if (testState.specWrite === 'write') {
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, '{}');
+      }
+      return { path, filename: '2026-08-01-PAN-3230-test.xbrief.json' };
+    });
+  },
 }));
 vi.mock('../../planning/spawn-planning-session.js', () => ({
   resolveAutoSpawnOnFinalize: async (requested: unknown) => requested === true,
@@ -93,6 +104,7 @@ function createWorkspace(): { workspacePath: string } {
   roots.push(root);
   testState.projectPath = root;
   const workspacePath = join(root, 'workspaces', 'feature-pan-3230');
+  testState.specPath = join(workspacePath, '.pan', 'specs', '2026-08-01-PAN-3230-test.xbrief.json');
   const runtimeDir = join(workspacePath, '.overdeck');
   mkdirSync(runtimeDir, { recursive: true });
   writeFileSync(join(runtimeDir, 'spec.vbrief.json'), JSON.stringify({
@@ -163,6 +175,8 @@ beforeEach(() => {
   };
   testState.sessionAlive = false;
   testState.prdGateOk = true;
+  testState.specWrite = 'write';
+  testState.specPath = '';
 });
 
 afterEach(() => {
@@ -316,5 +330,54 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
 
     expect(response.status).toBe(200);
     expect(saveAgentStateAndEmitEvent).toHaveBeenCalledTimes(1);
+  });
+});
+
+// PAN-3953: `planned` means a finalized spec exists. Finalize applies the
+// label only after the spec is written, and never when the spec is missing.
+describe('completePlanningForIssue planned label (PAN-3953)', () => {
+  it('applies the planned label once the spec is written to disk', async () => {
+    createWorkspace();
+    const deps = serviceDependencies();
+
+    const response = await completePlanningForIssue(deps);
+
+    expect(response.status).toBe(200);
+    expect(existsSync(testState.specPath)).toBe(true);
+    expect(deps.lifecycle.removeLabel).toHaveBeenCalledWith('PAN-3230', 'planning');
+    expect(deps.lifecycle.addLabel).toHaveBeenCalledWith('PAN-3230', 'planned');
+  });
+
+  it('does not apply the planned label when the spec write fails', async () => {
+    createWorkspace();
+    testState.specWrite = 'fail';
+    const deps = serviceDependencies();
+
+    await expect(completePlanningForIssue(deps)).rejects.toThrow('simulated spec write failure');
+
+    expect(deps.lifecycle.addLabel).not.toHaveBeenCalled();
+  });
+
+  it('does not apply the planned label when the reported spec is not on disk', async () => {
+    createWorkspace();
+    testState.specWrite = 'phantom';
+    const deps = serviceDependencies();
+
+    const response = await completePlanningForIssue(deps);
+
+    expect(response.status).toBe(200);
+    expect(existsSync(testState.specPath)).toBe(false);
+    expect(deps.lifecycle.addLabel).not.toHaveBeenCalledWith('PAN-3230', 'planned');
+  });
+
+  it('does not apply the planned label when the PRD gate rejects the finalize', async () => {
+    createWorkspace();
+    testState.prdGateOk = false;
+    const deps = serviceDependencies();
+
+    const response = await completePlanningForIssue(deps);
+
+    expect(response.status).toBe(422);
+    expect(deps.lifecycle.addLabel).not.toHaveBeenCalled();
   });
 });
