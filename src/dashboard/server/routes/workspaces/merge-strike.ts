@@ -26,7 +26,12 @@ const execAsync = promisify(exec);
 export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
 }
-export type TriggerMergeRequest = { kind: 'normal' } | StrikeMergeRequest;
+/**
+ * `expectedHeadSha` (#3983): the auto-merge executor's scheduled head. The
+ * merge is refused unless the PR is still at it and its approval names it, and
+ * the forge merge is pinned to the commit the server verified.
+ */
+export type TriggerMergeRequest = { kind: 'normal'; expectedHeadSha?: string } | StrikeMergeRequest;
 
 export function mergeVerificationOptions(
   request: TriggerMergeRequest,
@@ -120,7 +125,7 @@ export interface MergeQueueAdvanceDeps {
 
 /** What `evaluateIssueMergeGate` answers, narrowed to what the merge doors read. */
 export interface MergeGateVerdict extends MergeReadiness {
-  facts?: { headBranch: string | null };
+  facts?: { headBranch: string | null; headSha?: string | null };
 }
 
 /**
@@ -178,12 +183,43 @@ export async function advanceMergeQueue(
  */
 export async function forgeMergeGateRefusal(
   issueId: string,
-  expectedBranch?: string,
-  gate: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateVerdict>
+  request: TriggerMergeRequest = { kind: 'normal' },
+  gate: (issueId: string, options?: { preferBranch?: string; requireApprovalAtHead?: boolean }) => Promise<MergeGateVerdict>
     = (id, options) => evaluateIssueMergeGate(id, {}, options),
 ): Promise<MergeEligibilityResult | null> {
-  const verdict = expectedBranch ? await gate(issueId, { preferBranch: expectedBranch }) : await gate(issueId);
-  return mergeGateRefusal(verdict, expectedBranch);
+  const expectedBranch = request.kind === 'strike' ? request.branchName : undefined;
+  const expectedHeadSha = request.kind === 'normal' ? request.expectedHeadSha : undefined;
+  const options = {
+    ...(expectedBranch ? { preferBranch: expectedBranch } : {}),
+    // #3983: an automatic merge needs an approval that names the head.
+    ...(expectedHeadSha ? { requireApprovalAtHead: true } : {}),
+  };
+  const verdict = Object.keys(options).length > 0 ? await gate(issueId, options) : await gate(issueId);
+  return mergeGateRefusal(verdict, expectedBranch, expectedHeadSha);
+}
+
+/**
+ * #3983: the forge-merge pin for an automatic merge — `{}` for a manual one.
+ * With a workspace, the pin is the commit the server just verified there (the
+ * scheduled head, or the server's own rebase of it); without one (a remote
+ * workspace, which the server does not rebase) it is the scheduled head. A
+ * push after that fails the merge instead of landing unseen code.
+ */
+export async function automaticMergePin(
+  request: TriggerMergeRequest,
+  workspacePath?: string,
+): Promise<{ matchHeadCommit?: string }> {
+  if (request.kind !== 'normal' || !request.expectedHeadSha) return {};
+  if (!workspacePath) return { matchHeadCommit: request.expectedHeadSha };
+  const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 });
+  return { matchHeadCommit: stdout.trim() };
+}
+
+/** True when two SHAs (full or abbreviated) name the same commit. */
+function sameCommit(a: string, b: string): boolean {
+  const x = a.toLowerCase();
+  const y = b.toLowerCase();
+  return x.startsWith(y) || y.startsWith(x);
 }
 
 /**
@@ -195,6 +231,7 @@ export async function forgeMergeGateRefusal(
 export function mergeGateRefusal(
   gate: MergeGateVerdict,
   expectedBranch?: string,
+  expectedHeadSha?: string,
 ): MergeEligibilityResult | null {
   if (!gate.ready) {
     return { success: false, statusCode: 400, error: `Cannot merge: ${gate.reason ?? 'the merge gate refused'}` };
@@ -204,6 +241,14 @@ export function mergeGateRefusal(
       success: false,
       statusCode: 400,
       error: `Cannot merge: the open pull request is on ${gate.facts?.headBranch ?? 'no branch'}, not ${expectedBranch}`,
+    };
+  }
+  const liveHead = gate.facts?.headSha ?? null;
+  if (expectedHeadSha && (!liveHead || !sameCommit(liveHead, expectedHeadSha))) {
+    return {
+      success: false,
+      statusCode: 409,
+      error: `Cannot merge: the PR head is ${liveHead?.slice(0, 12) ?? 'unknown'}, not ${expectedHeadSha.slice(0, 12)} as scheduled`,
     };
   }
   return null;

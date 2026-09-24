@@ -42,7 +42,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { postInternalPipelineNotifyRoute } from './internal-pipeline-notify.js';
-import { activeStrikeMerge, advanceMergeQueue, forgeMergeGateRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, advanceMergeQueue, automaticMergePin, forgeMergeGateRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
@@ -359,7 +359,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     const ineligible = normalMergeEligibility(derived, pendingOp?.type === 'merge' && pendingOp?.status === 'running', run);
     if (ineligible) return ineligible;
   }
-  const gateRefusal = await forgeMergeGateRefusal(issueId, request.kind === 'strike' ? request.branchName : undefined);
+  const gateRefusal = await forgeMergeGateRefusal(issueId, request);
   if (gateRefusal) return { ...gateRefusal, state: derived.state };
 
   if (run?.phase === 'merging') {
@@ -463,6 +463,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           url: artifactUrl,
           id: artifactId,
           method: 'squash',
+          ...(await automaticMergePin(request)),
         });
 
         setStatus(issueId, { phase: 'merged', notes: null });
@@ -1133,6 +1134,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         id: artifactId,
         cwd: workspacePath,
         method: 'squash',
+        ...(await automaticMergePin(request, workspacePath)),
       });
       artifactMerged = true;
     } catch (prMergeErr: any) {

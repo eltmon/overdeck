@@ -25,7 +25,7 @@ vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleStateSync: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
 }));
 
-const { advanceMergeQueue, mergeGateRefusal } = await import('../merge-strike.js');
+const { advanceMergeQueue, automaticMergePin, forgeMergeGateRefusal, mergeGateRefusal } = await import('../merge-strike.js');
 type MergeQueueAdvanceDeps = Parameters<typeof advanceMergeQueue>[0];
 type MergeGateVerdict = Awaited<ReturnType<MergeQueueAdvanceDeps['checkMergeGate']>>;
 
@@ -207,5 +207,44 @@ describe('mergeGateRefusal', () => {
       'strike/pan-400',
     );
     expect(refusal?.error).toBe('Cannot merge: CI checks failing on PR HEAD def5678');
+  });
+
+  it('refuses an automatic merge whose PR head moved off the scheduled one (#3983)', () => {
+    const verdict = { ready: true, facts: { headBranch: 'feature/pan-1', headSha: 'bbbbbbbbbbbbbbbb' } };
+    expect(mergeGateRefusal(verdict, undefined, 'aaaaaaaaaaaaaaaa')).toEqual({
+      success: false,
+      statusCode: 409,
+      error: 'Cannot merge: the PR head is bbbbbbbbbbbb, not aaaaaaaaaaaa as scheduled',
+    });
+    expect(mergeGateRefusal(verdict, undefined, 'bbbbbbbbbbbbbbbb')).toBeNull();
+  });
+});
+
+describe('forgeMergeGateRefusal (#3983)', () => {
+  it('asks the gate for a head-bound approval when a head is expected', async () => {
+    const gate = vi.fn(async () => ({ ready: true, facts: { headBranch: 'feature/pan-1', headSha: 'aaaaaaaa' } }));
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal', expectedHeadSha: 'aaaaaaaa' }, gate)).resolves.toBeNull();
+    expect(gate).toHaveBeenCalledWith('PAN-1', { requireApprovalAtHead: true });
+  });
+
+  it('leaves the manual merge gate as it was', async () => {
+    const gate = vi.fn(async () => ({ ready: true, facts: { headBranch: 'feature/pan-1' } }));
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal' }, gate)).resolves.toBeNull();
+    expect(gate).toHaveBeenCalledWith('PAN-1');
+  });
+});
+
+describe('automaticMergePin (#3983)', () => {
+  it('pins nothing for a manual merge', async () => {
+    await expect(automaticMergePin({ kind: 'normal' }, process.cwd())).resolves.toEqual({});
+  });
+
+  it('pins a remote merge to the scheduled head', async () => {
+    await expect(automaticMergePin({ kind: 'normal', expectedHeadSha: 'abc1234' })).resolves.toEqual({ matchHeadCommit: 'abc1234' });
+  });
+
+  it('pins a local merge to the commit the workspace holds after the server rebase', async () => {
+    const pin = await automaticMergePin({ kind: 'normal', expectedHeadSha: 'abc1234' }, process.cwd());
+    expect(pin.matchHeadCommit).toMatch(/^[0-9a-f]{40}$/);
   });
 });

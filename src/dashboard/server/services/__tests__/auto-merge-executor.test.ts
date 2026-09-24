@@ -219,7 +219,7 @@ describe('auto-merge executor', () => {
       markFailed,
     });
 
-    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486');
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', undefined);
     expect(markMerged).toHaveBeenCalledWith(1);
     expect(markFailed).not.toHaveBeenCalled();
   });
@@ -489,7 +489,7 @@ describe('auto-merge executor', () => {
     expect(mergeIssue).not.toHaveBeenCalled();
   });
 
-  it('merges when the gate passes on the scheduled head (#3983)', async () => {
+  it('merges when the gate passes on the scheduled head, pinned to it (#3983)', async () => {
     const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
     const markMerged = vi.fn(() => true);
 
@@ -505,7 +505,7 @@ describe('auto-merge executor', () => {
       markMerged,
     });
 
-    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486');
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
     expect(markMerged).toHaveBeenCalledWith(1);
   });
 

@@ -72,7 +72,7 @@ export interface AutoMergeExecutorDeps {
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
-  mergeIssue?: (issueId: string) => Promise<MergeResult>;
+  mergeIssue?: (issueId: string, headSha?: string) => Promise<MergeResult>;
   getMergeRetryCount?: (issueId: string) => number;
   setMergeRetryCount?: (issueId: string, count: number) => void;
   announceFailure?: (issueId: string, reason: string) => void;
@@ -100,9 +100,10 @@ function failureReason(result: MergeResult): string {
   return result.error ?? result.message ?? `merge returned status ${result.statusCode ?? 'unknown'}`;
 }
 
-async function defaultMergeIssue(issueId: string): Promise<MergeResult> {
+async function defaultMergeIssue(issueId: string, headSha?: string): Promise<MergeResult> {
   const { triggerMerge } = await import('../routes/workspaces/merge-ops.js');
-  return triggerMerge(issueId);
+  // #3983: pin the merge to the head this row was scheduled for.
+  return triggerMerge(issueId, headSha ? { kind: 'normal', expectedHeadSha: headSha } : { kind: 'normal' });
 }
 
 function defaultAnnounceFailure(issueId: string, reason: string): void {
@@ -178,7 +179,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     }
 
     try {
-      const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId);
+      const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId, entry.headSha);
       if (result.success) {
         if (result.outcome === 'merged') {
           (deps.markMerged ?? markMerged)(entry.id);

@@ -142,6 +142,10 @@ vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
   advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: mocks.ensureAgentReadyForMerge,
+  // The pin as merge-strike computes it; the workspace HEAD is HEAD_SHA here.
+  automaticMergePin: vi.fn(async (request: { kind: string; expectedHeadSha?: string }) => (
+    request.kind === 'normal' && request.expectedHeadSha ? { matchHeadCommit: request.expectedHeadSha } : {}
+  )),
   forgeMergeGateRefusal: vi.fn(async () => null),
   mergeVerificationOptions: vi.fn(() => ({})),
   normalMergeEligibility: vi.fn(() => null),
@@ -220,6 +224,18 @@ describe('triggerMerge clean PR direct merge', () => {
     expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({
       url: PR_URL,
       method: 'squash',
+    }));
+    // A manual merge is not pinned.
+    expect(mocks.mergeReviewArtifact.mock.calls[0]?.[0]).not.toHaveProperty('matchHeadCommit');
+  });
+
+  it('pins an automatic merge to the verified head commit (#3983)', async () => {
+    const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+    expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({
+      url: PR_URL,
+      matchHeadCommit: HEAD_SHA,
     }));
   });
 

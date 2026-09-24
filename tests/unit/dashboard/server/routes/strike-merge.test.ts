@@ -111,13 +111,13 @@ describe('strike readiness is its own PR through the merge gate (#4016)', () => 
 
   it('lands a strike whose own PR is approved and green', async () => {
     const gate = strikePr(true);
-    await expect(forgeMergeGateRefusal('PAN-2702', request.branchName, gate)).resolves.toBeNull();
+    await expect(forgeMergeGateRefusal('PAN-2702', request, gate)).resolves.toBeNull();
     expect(gate).toHaveBeenCalledWith('PAN-2702', { preferBranch: 'strike/pan-2702' });
   });
 
   it('refuses a strike whose own PR has red checks', async () => {
     const gate = strikePr(false, `CI checks failing on PR HEAD ${markerHead}`);
-    await expect(forgeMergeGateRefusal('PAN-2702', request.branchName, gate)).resolves.toEqual({
+    await expect(forgeMergeGateRefusal('PAN-2702', request, gate)).resolves.toEqual({
       success: false,
       statusCode: 400,
       error: `Cannot merge: CI checks failing on PR HEAD ${markerHead}`,
@@ -126,13 +126,13 @@ describe('strike readiness is its own PR through the merge gate (#4016)', () => 
 
   it('refuses a strike whose own PR is not approved', async () => {
     const gate = strikePr(false, 'PR is not approved');
-    await expect(forgeMergeGateRefusal('PAN-2702', request.branchName, gate))
+    await expect(forgeMergeGateRefusal('PAN-2702', request, gate))
       .resolves.toEqual(expect.objectContaining({ error: 'Cannot merge: PR is not approved' }));
   });
 
   it('refuses when the ready PR the forge reports is the feature PR, not the strike PR', async () => {
     const gate = strikePr(true, undefined, 'feature/pan-2702');
-    await expect(forgeMergeGateRefusal('PAN-2702', request.branchName, gate)).resolves.toEqual(expect.objectContaining({
+    await expect(forgeMergeGateRefusal('PAN-2702', request, gate)).resolves.toEqual(expect.objectContaining({
       error: 'Cannot merge: the open pull request is on feature/pan-2702, not strike/pan-2702',
     }));
   });
