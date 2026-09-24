@@ -289,6 +289,59 @@ describe('POST /api/review/:issueId/trigger — derived guards', () => {
   });
 });
 
+// #3853: the review parent's `reviewOperatorRequested` lets a run's reviewer
+// block an approved head. Only an operator's explicit request may set it.
+describe('POST /api/review/:issueId/request — operator standing (#3853)', () => {
+  it('marks a forced re-review of an approved PR as operator-requested', async () => {
+    routeMocks.getDerivedIssueState.mockResolvedValue(derived({
+      state: 'ready',
+      pr: { url: 'https://gh/pr/7', number: 7, reviewState: 'approved', checks: 'green', mergeable: true },
+    }));
+    routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
+    routeMocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'spawned' }));
+
+    const result = await post('/api/review/PAN-3340/request?force=true', {
+      method: 'POST',
+      headers: authHeaders,
+      body: '{}',
+    });
+
+    expect(result.body).toMatchObject({ success: true, rerun: true });
+    await vi.waitFor(() => {
+      expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ issueId: 'PAN-3340', force: true, operatorRequested: true }),
+      );
+    });
+  });
+
+  // `pan done` requests review through this route with source=pan-done; the
+  // automatic dispatch behind it must not carry operator standing, so it
+  // clears any flag an earlier operator request left on the review parent.
+  it("dispatches pan done's review with no operator flag", async () => {
+    routeMocks.getDerivedIssueState.mockResolvedValue(derived({ issueId: 'PAN-3341' }));
+    routeMocks.getWorkspaceInfoForIssue.mockReturnValue({
+      exists: true,
+      isRemote: false,
+      localPath: '/repo/workspaces/feature-pan-3341',
+    });
+    routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
+    routeMocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
+    routeMocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'spawned' }));
+
+    const result = await post('/api/review/PAN-3341/request', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ source: 'pan-done' }),
+    });
+
+    expect(result.status).toBe(202);
+    await vi.waitFor(() => {
+      expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledOnce();
+    });
+    expect(routeMocks.spawnReviewRoleForIssue.mock.calls[0][0]).not.toHaveProperty('operatorRequested');
+  });
+});
+
 describe('POST /api/review/:issueId/trigger — verification (FR-8)', () => {
   it('reports a verification failure through the pending operation and stops', async () => {
     routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
