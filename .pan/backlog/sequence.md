@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T21:50:50.214Z · model: claude-opus-5 · open: 814_
+_Last sequenced: 2026-09-24T21:55:49.337Z · model: claude-opus-5 · open: 813_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -139,7 +139,6 @@ _Last sequenced: 2026-09-24T21:50:50.214Z · model: claude-opus-5 · open: 814_
 | 164 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
 | 165 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
 | 166 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
-| 167 | PAN-3881 | S | high | ok |  |  | pan sync distributes from a stale primary checkout and never removes deleted sources — resurrects deleted subagent defs |
 | 168 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
@@ -1129,10 +1128,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T21:50:50.214Z",
+  "generatedAt": "2026-09-24T21:55:49.337Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 814,
+  "openCount": 813,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -2804,19 +2803,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "condition": "ok",
       "dependsOn": [],
       "why": "Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3881",
-      "rank": 167,
-      "size": "S",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan sync distributes from a stale primary checkout and never removes deleted sources — resurrects deleted subagent defs",
-      "rationale": "resolveSyncSourcesRoot prefers the primary checkout; when that checkout is behind origin/main every sync reverts merged deletions and rule changes into every workspace. Needs a behind-main warning and deletion propagation.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11858,13 +11844,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 0.5
     },
     {
-      "from": "PAN-3881",
-      "to": "PAN-3823",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-3909",
       "to": "PAN-3864",
       "type": "informs",
@@ -12318,6 +12297,13 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-3822",
+      "to": "PAN-4151",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
