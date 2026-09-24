@@ -73,7 +73,7 @@ import {
 } from './projects-config-write.js';
 import { extractPrefix, parseIssueId } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
-import { findContainingProject } from './projects/path-containment.js';
+import { findContainingProject, findContainingProjectAsync } from './projects/path-containment.js';
 import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
@@ -601,31 +601,10 @@ export function listProjectsSync(): Array<{ key: string; config: ProjectConfig }
   }));
 }
 
-function resolveProjectKeyForCwdFromProjects(
-  cwd: string,
-  projects: ReadonlyArray<{ key: string; config: ProjectConfig }>,
-): string | null {
-  const normalizedCwd = resolve(cwd);
-  let bestMatch: { key: string; pathLength: number } | null = null;
-
-  for (const { key, config } of projects) {
-    if (!config.path) continue;
-    const projectPath = resolve(config.path);
-    const pathPrefix = projectPath.endsWith('/') ? projectPath : `${projectPath}/`;
-    if (
-      (normalizedCwd === projectPath || normalizedCwd.startsWith(pathPrefix))
-      && projectPath.length > (bestMatch?.pathLength ?? -1)
-    ) {
-      bestMatch = { key, pathLength: projectPath.length };
-    }
-  }
-
-  return bestMatch?.key ?? null;
-}
-
 /** Resolve the registered project that contains `cwd` (request path; reads projects.yaml asynchronously). */
 export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string | null> {
-  return resolveProjectKeyForCwdFromProjects(cwd, await listProjectsAsync());
+  const projects = Object.fromEntries((await listProjectsAsync()).map(({ key, config }) => [key, config]));
+  return (await findContainingProjectAsync(projects, cwd))?.[0] ?? null;
 }
 
 /**
