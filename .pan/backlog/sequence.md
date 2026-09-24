@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:49:42.145Z · model: claude-opus-5 · open: 803_
+_Last sequenced: 2026-09-24T22:54:34.002Z · model: claude-opus-5 · open: 804_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,7 @@ _Last sequenced: 2026-09-24T22:49:42.145Z · model: claude-opus-5 · open: 803_
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
+| 22 | PAN-4182 | S | critical | ok |  |  | pan down's review sweep and failed-spawn teardown still speak tmux, so on Herdr they close no reviewer pane and write no stopped row |
 | 23 | PAN-4134 | S | critical | ok |  |  | All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -823,6 +824,10 @@ In pipeline — rank pinned.
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
 
+### PAN-4182 (rank 22)
+
+New since the prior pass and the second half of the work PR #4180 (PAN-3939) landed, so it takes the rank that issue vacated and nothing renumbers. #4180 made the synthesis dispatch guard and the per-issue killAllReviewerSessions ask the host's terminal backend, but two teardown paths in src/lib/cloister/review-agent.ts were left on the tmux door: killAllReviewSessions (~L734-772, called only by pan down at src/cli/index.ts:1155) builds its candidate list from listSessionNames() and kills through killSession, and the PAN-3674 failed-spawn catch block (~L641-644) checks listSessionNames().includes(reviewSessionName) before calling killSession and swallows every error. Herdr is the default backend, so on a normal host neither path finds anything: pan down prints 'No review sessions running' while reviewer panes and their idle harnesses survive the shutdown, and because #4180 made the dispatch guard isAlive-based, the next boot reads those survivors as live reviewers and refuses to dispatch review. That is the same wedge PAN-3674 was written to prevent, reintroduced from the close side, which is why this is critical rather than cleanup: a wedged review never reaches the merge gate, and the operator's only signal is a shutdown message that claims success. It is small and fully specified: route both paths through closeAgentPaneDetailed and stopAgent as killAllReviewerSessions already does, surface a failed close in the returned failed list or the dispatch error instead of swallowing it, leave that reviewer's row alone when the close fails, and scope the sweep to review agents only (agent-<issue>-review[-<lane>] rows with role review, legacy review tmux names, and Herdr panes whose agentId matches that pattern) so it can never touch a work agent or a conv-* pane. It shares the backend-abstraction door with PAN-3921 (rank 1) and the liveness read with PAN-4134 (rank 23), so landing it alongside them keeps one guard instead of three.
+
 ### PAN-4134 (rank 23)
 
 New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where "unknown" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two. PAN-3914 closed this pass when PR #4133 merged, so its informs edge drops and the false review.redispatched journaling it caused is gone; the synthesis-recovery gap described here is untouched, so rank, score and condition hold.
@@ -1107,10 +1112,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 
 New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
 
-### PAN-2639 (rank 115)
-
-codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1118,10 +1119,10 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:49:42.145Z",
+  "generatedAt": "2026-09-24T22:54:34.002Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 803,
+  "openCount": 804,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11048,6 +11049,19 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4182",
+      "rank": 22,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan down's review sweep and failed-spawn teardown still speak tmux, so on Herdr they close no reviewer pane and write no stopped row",
+      "rationale": "New since the prior pass and the second half of the work PR #4180 (PAN-3939) landed, so it takes the rank that issue vacated and nothing renumbers. #4180 made the synthesis dispatch guard and the per-issue killAllReviewerSessions ask the host's terminal backend, but two teardown paths in src/lib/cloister/review-agent.ts were left on the tmux door: killAllReviewSessions (~L734-772, called only by pan down at src/cli/index.ts:1155) builds its candidate list from listSessionNames() and kills through killSession, and the PAN-3674 failed-spawn catch block (~L641-644) checks listSessionNames().includes(reviewSessionName) before calling killSession and swallows every error. Herdr is the default backend, so on a normal host neither path finds anything: pan down prints 'No review sessions running' while reviewer panes and their idle harnesses survive the shutdown, and because #4180 made the dispatch guard isAlive-based, the next boot reads those survivors as live reviewers and refuses to dispatch review. That is the same wedge PAN-3674 was written to prevent, reintroduced from the close side, which is why this is critical rather than cleanup: a wedged review never reaches the merge gate, and the operator's only signal is a shutdown message that claims success. It is small and fully specified: route both paths through closeAgentPaneDetailed and stopAgent as killAllReviewerSessions already does, surface a failed close in the returned failed list or the dispatch error instead of swallowing it, leave that reviewer's row alone when the close fails, and scope the sweep to review agents only (agent-<issue>-review[-<lane>] rows with role review, legacy review tmux names, and Herdr panes whose agentId matches that pattern) so it can never touch a work agent or a conv-* pane. It shares the backend-abstraction door with PAN-3921 (rank 1) and the liveness read with PAN-4134 (rank 23), so landing it alongside them keeps one guard instead of three.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12072,6 +12086,13 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4182",
+      "to": "PAN-4134",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
