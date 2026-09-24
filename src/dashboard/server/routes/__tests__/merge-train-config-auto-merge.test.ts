@@ -101,6 +101,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
       issueId: 'PAN-3917',
       prNumber: 42,
       prUrl: 'https://github.com/eltmon/overdeck/pull/42',
+      headSha: 'abc123',
       forge: 'github',
       projectKey: 'overdeck',
     }));

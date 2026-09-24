@@ -9,7 +9,11 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectConfig } from '../../../../lib/projects.js';
-import type { PendingAutoMerge } from '../../../../lib/overdeck/merge-sync.js';
+import type {
+  PendingAutoMerge,
+  ScheduleAutoMergeInput,
+  ScheduleAutoMergeResult,
+} from '../../../../lib/overdeck/merge-sync.js';
 import type { PrFacts } from '../../../../lib/cloister/pr-facts.js';
 import type { IssuePullRequestData } from '../../../../lib/overdeck/pull-requests.js';
 import type { listRepoPullRequests } from '../derived-issue-state.js';
@@ -23,6 +27,7 @@ vi.mock('../../../../lib/cloister/merge-blockers.js', () => ({ getMergeBlockersP
 
 const {
   issueIdFromGateBranch,
+  latestAutoMergeAllowsSchedule,
   listScheduleCandidates,
   runAutoMergeSchedulerTick,
   scheduleReadyAutoMerges,
@@ -74,6 +79,8 @@ interface WorldOptions {
   projectDefault?: 'auto' | 'hold';
   trainEnabled?: boolean;
   latest?: PendingAutoMerge | null;
+  /** The latest row as the insert transaction sees it; `latest` by default. */
+  latestAtInsert?: PendingAutoMerge | null;
 }
 
 /**
@@ -84,8 +91,15 @@ interface WorldOptions {
 function world(options: WorldOptions = {}) {
   const getFacts = options.getFacts ?? (async () => facts());
   const factsReads = vi.fn(getFacts);
-  const insert = vi.fn(() => ({ created: true, entry: row('pending') }));
-  const listCandidates = vi.fn(async () => ['pan-42']);
+  const latestAtInsert = options.latestAtInsert !== undefined ? options.latestAtInsert : (options.latest ?? null);
+  // The database write, including the in-transaction re-check of the latest row.
+  const insert = vi.fn((input: ScheduleAutoMergeInput): ScheduleAutoMergeResult => {
+    if (latestAtInsert && input.canSchedule && !input.canSchedule(latestAtInsert)) {
+      return { created: false, entry: latestAtInsert };
+    }
+    return { created: true, entry: row('pending', input.headSha ? { headSha: input.headSha } : {}) };
+  });
+  const listCandidates = vi.fn(async (_projectPath: string): Promise<readonly string[]> => ['pan-42']);
   const globalRequireUat = options.globalRequireUat ?? true;
   const trainEnabled = options.trainEnabled ?? true;
   const labels = options.labels ?? [];
@@ -106,7 +120,7 @@ function world(options: WorldOptions = {}) {
     policyRefusal: (issueId: string) => autoMergePolicyRefusal(issueId, policy),
     latestAutoMerge: () => options.latest ?? null,
     mergeGate,
-    schedule: (issueId: string) => postAutoMergeSchedulePayload({ issueId }, {
+    schedule: (issueId: string, canSchedule: (latest: PendingAutoMerge) => boolean) => postAutoMergeSchedulePayload({ issueId }, {
       ...policy,
       now: () => new Date('2026-09-24T12:00:00Z'),
       mergeGate,
@@ -118,7 +132,7 @@ function world(options: WorldOptions = {}) {
         ciTestsRequired: () => false,
       }),
       resolveProject: () => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/repos/overdeck' }),
-      schedule: insert,
+      schedule: (input) => insert({ ...input, canSchedule }),
       announce: vi.fn(),
     }),
     log: vi.fn(),
@@ -205,6 +219,7 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
       prNumber: 42,
       projectKey: 'overdeck',
       scheduledMergeAt: '2026-09-24T12:05:00.000Z',
+      headSha: 'abc123',
     }));
   });
 
@@ -303,15 +318,55 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     expect(deps.log).toHaveBeenCalledWith(expect.stringContaining('gitlab-only is a GitLab project'));
   });
 
-  it.each(['pending', 'merging', 'blocked', 'failed', 'cancelled'] as const)(
-    'leaves an issue alone whose latest auto-merge is %s',
-    async (status) => {
-      const { deps, insert } = world({ labels: ['auto-merge'], latest: row(status) });
-      const outcomes = await scheduleReadyAutoMerges(deps);
-      expect(insert).not.toHaveBeenCalled();
-      expect(outcomes[0]).toMatchObject({ scheduled: false, reason: `auto-merge already ${status}` });
-    },
-  );
+  it.each(['pending', 'merging'] as const)('leaves an issue alone whose auto-merge is already %s', async (status) => {
+    const { deps, insert, factsReads } = world({ labels: ['auto-merge'], latest: row(status, { headSha: 'abc123' }) });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
+    expect(factsReads).not.toHaveBeenCalled();
+    expect(outcomes[0]).toMatchObject({ scheduled: false, reason: `auto-merge already ${status}` });
+  });
+
+  it.each(['cancelled', 'failed'] as const)('keeps a %s auto-merge for the same PR head', async (status) => {
+    const { deps, insert } = world({ labels: ['auto-merge'], latest: row(status, { headSha: 'abc123' }) });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
+    expect(outcomes[0]).toMatchObject({ scheduled: false, reason: `auto-merge ${status} for this PR head` });
+  });
+
+  it.each(['cancelled', 'failed', 'blocked'] as const)('re-arms a %s auto-merge once the PR has a new head', async (status) => {
+    const { deps, insert } = world({ labels: ['auto-merge'], latest: row(status, { headSha: 'old999' }) });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ headSha: 'abc123' }));
+  });
+
+  it('re-arms a blocked auto-merge at the same head once the gate passes again', async () => {
+    const { deps, insert } = world({ labels: ['auto-merge'], latest: row('blocked', { headSha: 'abc123' }) });
+    await scheduleReadyAutoMerges(deps);
+    expect(insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a blocked auto-merge while the gate still refuses the PR', async () => {
+    const { deps, insert } = world({
+      labels: ['auto-merge'],
+      latest: row('blocked', { headSha: 'abc123' }),
+      getFacts: async () => facts({ checks: 'pending' }),
+    });
+    await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('does not overwrite a cancel that lands while the pass reads the forge', async () => {
+    const { deps, insert } = world({
+      labels: ['auto-merge'],
+      latest: row('blocked', { headSha: 'abc123' }),
+      latestAtInsert: row('cancelled', { headSha: 'abc123' }),
+    });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert.mock.results[0]?.value).toMatchObject({ created: false });
+    expect(outcomes[0]).toMatchObject({ scheduled: false, reason: 'auto-merge became cancelled during the pass' });
+  });
 
   it('schedules again after an earlier auto-merge of the issue merged', async () => {
     const { deps, insert } = world({ labels: ['auto-merge'], latest: row('merged') });
@@ -322,13 +377,30 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
   it('keeps going when one project fails to list its candidates', async () => {
     const { deps, insert } = world({ labels: ['auto-merge'] });
     deps.listProjects = () => [{ key: 'broken', config: { name: 'Broken', path: '/repos/broken' } }, OVERDECK];
-    deps.listCandidates = vi.fn(async (projectPath: string) => {
+    deps.listCandidates = vi.fn(async (projectPath: string): Promise<readonly string[]> => {
       if (projectPath === '/repos/broken') throw new Error('gh failed');
       return ['PAN-42'];
     });
     const outcomes = await scheduleReadyAutoMerges(deps);
     expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
     expect(insert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('latestAutoMergeAllowsSchedule (#3983)', () => {
+  const pr = { url: PR_URL, headSha: 'abc123' };
+
+  it('allows a first schedule, and one after a merge', () => {
+    expect(latestAutoMergeAllowsSchedule(null, pr)).toBe(true);
+    expect(latestAutoMergeAllowsSchedule(row('merged', { headSha: 'abc123' }), pr)).toBe(true);
+  });
+
+  it('holds a cancel for its own PR and head only', () => {
+    expect(latestAutoMergeAllowsSchedule(row('cancelled', { headSha: 'abc123' }), pr)).toBe(false);
+    expect(latestAutoMergeAllowsSchedule(row('cancelled'), pr)).toBe(false);
+    expect(latestAutoMergeAllowsSchedule(row('cancelled', { headSha: 'abc' }), pr)).toBe(false);
+    expect(latestAutoMergeAllowsSchedule(row('cancelled', { headSha: 'def456' }), pr)).toBe(true);
+    expect(latestAutoMergeAllowsSchedule(row('cancelled', { prUrl: `${PR_URL}0`, headSha: 'abc123' }), pr)).toBe(true);
   });
 });
 

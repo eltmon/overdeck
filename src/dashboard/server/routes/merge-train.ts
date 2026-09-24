@@ -613,6 +613,7 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
     forge: artifactRef.forge,
     scheduledMergeAt: scheduledMergeAt.toISOString(),
     scheduledAt: scheduledAt.toISOString(),
+    ...(gate.facts.headSha ? { headSha: gate.facts.headSha } : {}),
   });
   if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
   return { status: 200, body: result.entry };

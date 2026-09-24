@@ -107,6 +107,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-1577: explicit project assignment override for moving a conversation
   // between projects without relying on cwd-derived grouping.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `project_key` text');
+  // #3983: the PR head an auto-merge was scheduled for, so a cancel or a
+  // failure holds only for that head and a new push re-arms the scheduler.
+  runSchemaTopUp(db, 'ALTER TABLE `pending_auto_merges` ADD COLUMN `head_sha` text');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

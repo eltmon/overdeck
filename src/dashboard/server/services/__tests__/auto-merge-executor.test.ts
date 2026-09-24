@@ -8,7 +8,7 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', () => ({
   markBlocked: vi.fn(() => true),
   markFailed: vi.fn(() => true),
   markMerged: vi.fn(() => true),
-  markMergingBlocked: vi.fn(() => true),
+  markMergeRetriesExhausted: vi.fn(() => true),
   requeueToPending: vi.fn(() => true),
   transitionToMerging: vi.fn(() => true),
 }));
@@ -270,7 +270,7 @@ describe('auto-merge executor', () => {
   });
 
   it('requeues retryable failures below the circuit-breaker ceiling', async () => {
-    const markMergingBlocked = vi.fn();
+    const markMergeRetriesExhausted = vi.fn();
     const markFailed = vi.fn();
     const announceFailure = vi.fn();
     const requeueToPending = vi.fn().mockReturnValue(true);
@@ -287,7 +287,7 @@ describe('auto-merge executor', () => {
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
       getMergeRetryCount: () => 1,
       setMergeRetryCount,
-      markMergingBlocked,
+      markMergeRetriesExhausted,
       markFailed,
       announceFailure,
       requeueToPending,
@@ -295,13 +295,13 @@ describe('auto-merge executor', () => {
 
     expect(setMergeRetryCount).toHaveBeenCalledWith('PAN-1486', 2);
     expect(requeueToPending).toHaveBeenCalledWith(1, new Date(NOW.getTime() + 60_000).toISOString());
-    expect(markMergingBlocked).not.toHaveBeenCalled();
+    expect(markMergeRetriesExhausted).not.toHaveBeenCalled();
     expect(markFailed).not.toHaveBeenCalled();
     expect(announceFailure).not.toHaveBeenCalled();
   });
 
   it('blocks retryable failures at the circuit-breaker ceiling', async () => {
-    const markMergingBlocked = vi.fn().mockReturnValue(true);
+    const markMergeRetriesExhausted = vi.fn().mockReturnValue(true);
     const markFailed = vi.fn();
     const announceFailure = vi.fn();
     const requeueToPending = vi.fn();
@@ -318,14 +318,14 @@ describe('auto-merge executor', () => {
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
       getMergeRetryCount: () => 3,
       setMergeRetryCount,
-      markMergingBlocked,
+      markMergeRetriesExhausted,
       markFailed,
       announceFailure,
       requeueToPending,
     });
 
     const reason = 'Auto-merge for PAN-1486 blocked: agent stopped (retried 3 times — fix the underlying cause and re-schedule)';
-    expect(markMergingBlocked).toHaveBeenCalledWith(1, reason);
+    expect(markMergeRetriesExhausted).toHaveBeenCalledWith(1, reason);
     expect(announceFailure).toHaveBeenCalledWith('PAN-1486', reason);
     expect(setMergeRetryCount).not.toHaveBeenCalled();
     expect(requeueToPending).not.toHaveBeenCalled();
@@ -346,7 +346,7 @@ describe('auto-merge executor', () => {
       transition: () => true,
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
       getMergeRetryCount: () => 3,
-      markMergingBlocked: () => false,
+      markMergeRetriesExhausted: () => false,
       announceFailure,
       log,
     });
@@ -441,9 +441,51 @@ describe('auto-merge executor', () => {
     expect(mergeIssue).not.toHaveBeenCalled();
   });
 
+  it('blocks a scheduled merge whose PR head moved since scheduling, even when the gate passes (#3983)', async () => {
+    const markBlocked = vi.fn(() => true);
+    const transition = vi.fn(() => true);
+    const mergeIssue = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      mergeGate: async () => ({ ready: true, facts: { headSha: 'bbbbbbbbbbbbbbbb' } }),
+      markBlocked,
+      transition,
+      mergeIssue,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 PR head moved from aaaaaaaaaaaa to bbbbbbbbbbbb since the auto-merge was scheduled');
+    expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('merges when the gate passes on the scheduled head (#3983)', async () => {
+    const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
+    const markMerged = vi.fn(() => true);
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      mergeGate: async () => ({ ready: true, facts: { headSha: 'aaaaaaaaaaaaaaaa' } }),
+      transition: () => true,
+      mergeIssue,
+      markMerged,
+    });
+
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486');
+    expect(markMerged).toHaveBeenCalledWith(1);
+  });
+
   it('starts the retry budget over per process rather than persisting it', async () => {
     const requeueToPending = vi.fn(() => true);
-    const markMergingBlocked = vi.fn(() => true);
+    const markMergeRetriesExhausted = vi.fn(() => true);
     const base = {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
@@ -454,22 +496,22 @@ describe('auto-merge executor', () => {
       transition: () => true,
       mergeIssue: async () => ({ success: false, retryable: true, error: 'transient' }),
       requeueToPending,
-      markMergingBlocked,
+      markMergeRetriesExhausted,
     };
 
     _resetMergeRetryCountsForTests();
     for (let i = 0; i < FAILED_MERGE_MAX_RETRIES; i += 1) await tickAutoMergeExecutor(base);
     expect(requeueToPending).toHaveBeenCalledTimes(FAILED_MERGE_MAX_RETRIES);
-    expect(markMergingBlocked).not.toHaveBeenCalled();
+    expect(markMergeRetriesExhausted).not.toHaveBeenCalled();
 
     await tickAutoMergeExecutor(base);
-    expect(markMergingBlocked).toHaveBeenCalledOnce();
+    expect(markMergeRetriesExhausted).toHaveBeenCalledOnce();
 
     // A restart forgets the budget: the circuit breaker exists to stop a hot
     // loop in THIS process, not to permanently condemn the issue.
-    markMergingBlocked.mockClear();
+    markMergeRetriesExhausted.mockClear();
     _resetMergeRetryCountsForTests();
     await tickAutoMergeExecutor(base);
-    expect(markMergingBlocked).not.toHaveBeenCalled();
+    expect(markMergeRetriesExhausted).not.toHaveBeenCalled();
   });
 });

@@ -4,7 +4,7 @@ import {
   markBlocked,
   markFailed,
   markMerged,
-  markMergingBlocked,
+  markMergeRetriesExhausted,
   requeueToPending,
   transitionToMerging,
   type PendingAutoMerge,
@@ -64,11 +64,11 @@ export interface AutoMergeExecutorDeps {
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
   /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
-  mergeGate?: (issueId: string) => Promise<MergeReadiness>;
+  mergeGate?: (issueId: string) => Promise<MergeReadiness & { facts?: { headSha: string | null } }>;
   hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
-  markMergingBlocked?: (id: number, reason: string) => boolean;
+  markMergeRetriesExhausted?: (id: number, reason: string) => boolean;
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
@@ -83,6 +83,13 @@ const REQUEUE_BACKOFF_MS = 60_000;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let activeTick: Promise<void> | null = null;
+
+/** True when two SHAs (full or abbreviated) name the same commit. */
+function sameCommit(a: string, b: string): boolean {
+  const x = a.toLowerCase();
+  const y = b.toLowerCase();
+  return x.startsWith(y) || y.startsWith(x);
+}
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -151,8 +158,14 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     // Re-read on every tick, because a push or a failing check between
     // scheduling and the cooldown expiring must stop the merge.
     const gate = await (deps.mergeGate ?? evaluateIssueMergeGate)(entry.issueId);
-    if (!gate.ready) {
-      const reason = `${entry.issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}`;
+    // #3983: the cooldown covered the head that was scheduled. A new head gets
+    // its own cooldown: blocking this row lets the scheduler re-arm it.
+    const liveHead = gate.facts?.headSha ?? null;
+    const headMoved = Boolean(entry.headSha && liveHead && !sameCommit(entry.headSha, liveHead));
+    if (!gate.ready || headMoved) {
+      const reason = headMoved
+        ? `${entry.issueId} PR head moved from ${entry.headSha!.slice(0, 12)} to ${liveHead!.slice(0, 12)} since the auto-merge was scheduled`
+        : `${entry.issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}`;
       if (!(deps.markBlocked ?? markBlocked)(entry.id, reason)) {
         log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
       }
@@ -199,7 +212,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
         const retryCount = (deps.getMergeRetryCount ?? readMergeRetryCount)(entry.issueId);
         if (retryCount >= FAILED_MERGE_MAX_RETRIES) {
           const blockedReason = `Auto-merge for ${entry.issueId} blocked: ${reason} (retried ${retryCount} times — fix the underlying cause and re-schedule)`;
-          const blocked = (deps.markMergingBlocked ?? markMergingBlocked)(entry.id, blockedReason);
+          const blocked = (deps.markMergeRetriesExhausted ?? markMergeRetriesExhausted)(entry.id, blockedReason);
           if (blocked) {
             (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, blockedReason);
           } else {

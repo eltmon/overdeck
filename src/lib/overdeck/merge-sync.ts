@@ -105,6 +105,8 @@ interface OverdeckPendingAutoMergeRow {
   failure_reason: string | null;
   cancelled_at: number | null;
   cancelled_by: string | null;
+  /** #3983: added by a schema top-up; absent on rows written before it. */
+  head_sha?: string | null;
 }
 
 import type { PendingAutoMerge } from './merge-types.js';
@@ -125,6 +127,7 @@ function rowToPendingAutoMerge(row: OverdeckPendingAutoMergeRow): PendingAutoMer
     failureReason: row.failure_reason ?? undefined,
     cancelledAt: isoFromMillis(row.cancelled_at),
     cancelledBy: row.cancelled_by ?? undefined,
+    headSha: row.head_sha ?? undefined,
   };
 }
 
@@ -200,11 +203,17 @@ export function markBlocked(id: number, reason: string): boolean {
   return result.changes === 1;
 }
 
-/** Atomically stop an in-progress auto-merge after its retry circuit breaker opens. */
-export function markMergingBlocked(id: number, reason: string): boolean {
+/**
+ * Atomically stop an in-progress auto-merge after its retry circuit breaker
+ * opens. `failed`, not `blocked` (#3983): the merge was attempted and failed at
+ * this head, so the scheduler must not re-arm it until the head changes;
+ * `blocked` is kept for the executor's pre-merge refusals, which re-arm once
+ * the gate passes again.
+ */
+export function markMergeRetriesExhausted(id: number, reason: string): boolean {
   const db = getOverdeckDatabase();
   const result = db.prepare(
-    "UPDATE pending_auto_merges SET status = 'blocked', failure_reason = ? WHERE id = ? AND status = 'merging'",
+    "UPDATE pending_auto_merges SET status = 'failed', failure_reason = ? WHERE id = ? AND status = 'merging'",
   ).run(truncateReason(reason), id);
   return result.changes === 1;
 }
@@ -283,6 +292,14 @@ export interface ScheduleAutoMergeInput {
   forge?: import('../forge.js').ForgeType;
   scheduledMergeAt: string;
   scheduledAt?: string;
+  /** #3983: the PR head the merge gate judged ready. */
+  headSha?: string;
+  /**
+   * #3983: asked with the issue's latest row inside the insert transaction.
+   * `false` inserts nothing, so a cancel that lands while the scheduler reads
+   * the forge is never overwritten by a fresh row.
+   */
+  canSchedule?: (latest: PendingAutoMerge) => boolean;
 }
 
 export interface ScheduleAutoMergeResult {
@@ -293,18 +310,26 @@ export interface ScheduleAutoMergeResult {
 /** Drop-in for scheduleAutoMergeWithResult() from pending-auto-merges-db.ts. */
 export function scheduleAutoMergeWithResult(input: ScheduleAutoMergeInput): ScheduleAutoMergeResult {
   const db = getOverdeckDatabase();
-  // Check for active entry first
-  const existing = db.prepare(
-    "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging') ORDER BY id DESC LIMIT 1",
-  ).get(input.issueId) as OverdeckPendingAutoMergeRow | undefined;
-  if (existing) return { entry: rowToPendingAutoMerge(existing), created: false };
-
   const scheduledAtMs = millisFromIso(input.scheduledAt ?? new Date().toISOString()) ?? nowMillis();
   const scheduledMergeAtMs = millisFromIso(input.scheduledMergeAt) ?? nowMillis();
-  try {
+  const activeRow = () => db.prepare(
+    "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging') ORDER BY id DESC LIMIT 1",
+  ).get(input.issueId) as OverdeckPendingAutoMergeRow | undefined;
+
+  const insert = db.transaction((): ScheduleAutoMergeResult => {
+    if (input.canSchedule) {
+      const latest = db.prepare(
+        'SELECT * FROM pending_auto_merges WHERE issue_id = ? ORDER BY id DESC LIMIT 1',
+      ).get(input.issueId) as OverdeckPendingAutoMergeRow | undefined;
+      const latestEntry = latest ? rowToPendingAutoMerge(latest) : null;
+      if (latestEntry && !input.canSchedule(latestEntry)) return { entry: latestEntry, created: false };
+    }
+    const existing = activeRow();
+    if (existing) return { entry: rowToPendingAutoMerge(existing), created: false };
+
     const result = db.prepare(`
-      INSERT INTO pending_auto_merges (issue_id, pr_url, project_key, forge, status, scheduled_merge_at, scheduled_at)
-      VALUES (?, ?, ?, ?, 'pending', ?, ?)
+      INSERT INTO pending_auto_merges (issue_id, pr_url, project_key, forge, status, scheduled_merge_at, scheduled_at, head_sha)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
     `).run(
       input.issueId,
       input.prUrl,
@@ -312,14 +337,17 @@ export function scheduleAutoMergeWithResult(input: ScheduleAutoMergeInput): Sche
       input.forge ?? 'github',
       scheduledMergeAtMs,
       scheduledAtMs,
+      input.headSha ?? null,
     );
     const newRow = db.prepare('SELECT * FROM pending_auto_merges WHERE id = ?').get(Number(result.lastInsertRowid)) as OverdeckPendingAutoMergeRow;
     return { entry: rowToPendingAutoMerge(newRow), created: true };
+  });
+
+  try {
+    return insert();
   } catch {
     // Race: another insert beat us
-    const raced = db.prepare(
-      "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging') ORDER BY id DESC LIMIT 1",
-    ).get(input.issueId) as OverdeckPendingAutoMergeRow | undefined;
+    const raced = activeRow();
     if (raced) return { entry: rowToPendingAutoMerge(raced), created: false };
     throw new Error(`[merge-sync] scheduleAutoMergeWithResult failed for ${input.issueId}`);
   }
