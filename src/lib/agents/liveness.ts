@@ -26,20 +26,15 @@
  * (`ps`/`pgrep` on actual pids rooted at `#{pane_pid}`), never by substring
  * matching on `pgrep -f` — a substring pattern self-matches the probing
  * process and reports a dead agent alive.
- */
-
-/**
- * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
- * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
- * as sync) and cannot await:
- * - `isAliveSync` (async: `isAlive`): src/lib/parked/resolver.ts:258, src/lib/work-agent-lifecycle.ts:104. Owned
- *   by the PAN-3845 liveness seam work; its semantics are not changed here.
- * Do not add new synchronous callers; server-reachable code uses the async variants.
+ *
+ * There is no synchronous liveness door (PAN-3926): Herdr is reached over an
+ * async socket, so a sync probe could only ever ask tmux and would read every
+ * healthy Herdr agent as `no-session`. Every caller awaits `isAlive`.
  */
 
 import { Effect } from 'effect';
 
-import { listPaneValues, listPaneValuesSync, sessionExists, sessionExistsSync } from '../tmux.js';
+import { listPaneValues, listPaneValuesSync, sessionExists } from '../tmux.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { hostTerminalBackendName } from '../terminal-backends/select.js';
 import type { HerdrLivenessProbe } from '../terminal-backends/herdr.js';
@@ -53,7 +48,6 @@ import {
 } from './tmux-session-query.js';
 import {
   findAgentRuntimePidInSubtree,
-  findAgentRuntimePidInSubtreeSync,
   type RuntimePidProbeResult,
 } from './runtime-pid-probe.js';
 
@@ -136,14 +130,6 @@ export interface LivenessAsyncDeps {
   legacyTmuxTimeoutMs?: number;
 }
 
-/** Test seams for the sync probe (the lifecycle classifier's variant). */
-export interface LivenessSyncDeps {
-  sessionExistsSync?: (agentId: string) => boolean;
-  listPaneRowsSync?: (agentId: string) => PaneRow[];
-  findRuntimePidSync?: (rootPid: string, harness: RuntimeName) => RuntimePidProbeResult;
-  readHarness?: (agentId: string) => RuntimeName;
-}
-
 function readHarnessDefault(agentId: string): RuntimeName {
   return getAgentState(agentId)?.harness ?? 'claude-code';
 }
@@ -155,10 +141,6 @@ async function sessionExistsDefault(agentId: string): Promise<boolean> {
 async function listPaneRowsDefault(agentId: string): Promise<PaneRow[]> {
   const values = await listPaneValues(agentId, '#{pane_pid}\t#{pane_dead}').catch(() => [] as string[]);
   return parsePaneRows(values);
-}
-
-function listPaneRowsSyncDefault(agentId: string): PaneRow[] {
-  return parsePaneRows(listPaneValuesSync(agentId, '#{pane_pid}\t#{pane_dead}'));
 }
 
 /**
@@ -278,36 +260,6 @@ export async function isAliveOnTmux(agentId: string, deps: LivenessAsyncDeps = {
   if (probeIndeterminate) return { alive: false, reason: 'runtime-indeterminate' };
   return { alive: false, reason: 'runtime-missing' };
 }
-
-/**
- * Synchronous liveness verdict over the same three checks. Exists for the
- * lifecycle classifier (`getWorkAgentLifecycleStateSync`) and the parked
- * sweeper, which are sync paths. Each call is a handful of sync tmux/ps/pgrep
- * execs — never use it in a hot per-request loop.
- */
-export function isAliveSync(agentId: string, deps: LivenessSyncDeps = {}): LivenessVerdict {
-  const sessionExistsProbe = deps.sessionExistsSync ?? sessionExistsSync;
-  const listPaneRows = deps.listPaneRowsSync ?? listPaneRowsSyncDefault;
-  const findRuntimePid = deps.findRuntimePidSync ?? findAgentRuntimePidInSubtreeSync;
-  const readHarness = deps.readHarness ?? readHarnessDefault;
-
-  if (!sessionExistsProbe(agentId)) return { alive: false, reason: 'no-session' };
-  const panes = listPaneRows(agentId);
-  const livePanes = panes.filter((pane) => !pane.dead);
-  if (livePanes.length === 0) return { alive: false, reason: 'pane-dead' };
-  const harness = readHarness(agentId);
-  let probeIndeterminate = false;
-  for (const pane of livePanes) {
-    const pid = findRuntimePid(pane.pid, harness);
-    if (typeof pid === 'number') return { alive: true, paneAlive: true, runtimePid: pid };
-    if (pid === 'indeterminate') probeIndeterminate = true;
-  }
-  // A failed probe is not a confirmed death — remediators consult
-  // isConfirmedDead, which treats this as "not dead".
-  if (probeIndeterminate) return { alive: false, reason: 'runtime-indeterminate' };
-  return { alive: false, reason: 'runtime-missing' };
-}
-
 
 /**
  * The union of every activity signal, INCLUDING tmux `window_activity`.

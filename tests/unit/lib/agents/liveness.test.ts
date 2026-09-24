@@ -1,7 +1,7 @@
 /**
  * PAN-3849 (W32): the single liveness oracle.
  *
- * isAlive/isAliveSync verdict cases use the modules' dependency seams (no
+ * isAlive verdict cases use the modules' dependency seams (no
  * vi.mock). The idle cases are ported from the retired cloister/agent-idle.ts
  * test files (PAN-1586, PAN-3846) and mock the runtime-state / runtimes /
  * tmux modules the activity signals read.
@@ -26,7 +26,6 @@ import {
   getAgentEffectiveLastActivityMs,
   idleAgeMs,
   isAlive,
-  isAliveSync,
   isConfirmedDead,
   isIdle,
   registerLivenessHeartbeatLookup,
@@ -268,45 +267,6 @@ describe('isAlive on the Herdr backend', () => {
     const deps = aliveDeps({ backend: 'tmux' as const, probeHerdr });
     await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
     expect(probeHerdr).not.toHaveBeenCalled();
-  });
-});
-
-// ─── isAliveSync (lifecycle-classifier variant) ─────────────────────────────
-
-function aliveSyncDeps(overrides: Record<string, unknown> = {}) {
-  return {
-    sessionExistsSync: vi.fn(() => true),
-    listPaneRowsSync: vi.fn(() => [{ pid: '100', dead: false }]),
-    findRuntimePidSync: vi.fn(() => 100 as number | null),
-    readHarness: vi.fn(() => 'claude-code' as const),
-    ...overrides,
-  };
-}
-
-describe('isAliveSync: the lifecycle-classifier variant', () => {
-  it('returns no-session when the tmux session is absent', () => {
-    const deps = aliveSyncDeps({ sessionExistsSync: vi.fn(() => false) });
-    expect(isAliveSync('agent-x', deps)).toEqual({ alive: false, reason: 'no-session' });
-    expect(deps.listPaneRowsSync).not.toHaveBeenCalled();
-  });
-
-  it('returns pane-dead when every pane is dead', () => {
-    const deps = aliveSyncDeps({ listPaneRowsSync: vi.fn(() => [{ pid: '100', dead: true }]) });
-    expect(isAliveSync('agent-x', deps)).toEqual({ alive: false, reason: 'pane-dead' });
-  });
-
-  it('returns runtime-missing when no live pane subtree holds the harness', () => {
-    const deps = aliveSyncDeps({ findRuntimePidSync: vi.fn(() => null) });
-    expect(isAliveSync('agent-x', deps)).toEqual({ alive: false, reason: 'runtime-missing' });
-  });
-
-  it('returns alive when session, pane, and harness process are all present', () => {
-    expect(isAliveSync('agent-x', aliveSyncDeps())).toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
-  });
-
-  it('returns runtime-indeterminate when the probe itself fails (not confirmed death)', () => {
-    const deps = aliveSyncDeps({ findRuntimePidSync: vi.fn(() => 'indeterminate' as const) });
-    expect(isAliveSync('agent-x', deps)).toEqual({ alive: false, reason: 'runtime-indeterminate' });
   });
 });
 
