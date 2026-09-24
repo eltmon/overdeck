@@ -52,6 +52,15 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
   DEFAULT_CLOISTER_CONFIG: { monitoring: { check_interval: 60000 } },
 }));
 
+// Fake liveness oracle: emergencyStop confirms each stop afterwards (#4109).
+vi.mock('../../../src/lib/agents/liveness.js', () => ({
+  isAlive: vi.fn(async () => ({ alive: false, reason: 'no-session' })),
+  isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
+    !verdict.alive && verdict.reason !== 'runtime-indeterminate',
+  getAgentEffectiveLastActivityMs: vi.fn(() => null),
+  isIdle: vi.fn(() => false),
+}));
+
 // Fake terminal backend: the live inventory emergencyStop reads (#4109).
 vi.mock('../../../src/lib/terminal-backends/inventory.js', () => ({
   listLiveAgentIds: vi.fn(async () => new Set<string>()),
@@ -66,6 +75,7 @@ import { ClaudeCodeRuntimeSync } from '../../../src/lib/runtimes/claude-code.js'
 import { sessionExistsSync, killSessionSync } from '../../../src/lib/tmux.js';
 import { saveAgentRuntimeState, getAgentState, saveAgentStateSync, listRunningAgents, stopAgent } from '../../../src/lib/agents.js';
 import { listLiveAgentIds } from '../../../src/lib/terminal-backends/inventory.js';
+import { isAlive } from '../../../src/lib/agents/liveness.js';
 import { CloisterService } from '../../../src/lib/cloister/service.js';
 
 const mockSessionExists = vi.mocked(sessionExistsSync);
@@ -76,6 +86,7 @@ const mockSaveAgentState = vi.mocked(saveAgentStateSync);
 const mockListRunningAgents = vi.mocked(listRunningAgents);
 const mockStopAgent = vi.mocked(stopAgent);
 const mockListLiveAgentIds = vi.mocked(listLiveAgentIds);
+const mockIsAlive = vi.mocked(isAlive);
 
 describe('PAN-330: ClaudeCodeRuntimeSync.killAgent() — resets runtime state', () => {
   let runtime: ClaudeCodeRuntimeSync;
@@ -355,10 +366,11 @@ describe('PAN-330: Merge-agent busy-wait — dead-session detection (merge-agent
 // the terminal backend, Herdr included (#4109)
 // ---------------------------------------------------------------------------
 
-describe('CloisterService.emergencyStop() — stops live agents through the backend (#4109)', () => {
+describe('CloisterService.emergencyStop() — stops every agent through the backend (#4109)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStopAgent.mockImplementation(() => Effect.void);
+    mockIsAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
   });
 
   function rows(...agents: Array<{ id: string; status?: string; tmuxActive?: boolean }>) {
@@ -369,30 +381,42 @@ describe('CloisterService.emergencyStop() — stops live agents through the back
     rows({ id: 'agent-A' }, { id: 'agent-B' });
     mockListLiveAgentIds.mockResolvedValue(new Set(['agent-A', 'agent-B']));
 
-    const killed = await new CloisterService().emergencyStop();
+    const { killedAgents } = await new CloisterService().emergencyStop();
 
     expect(mockStopAgent).toHaveBeenCalledWith('agent-A');
     expect(mockStopAgent).toHaveBeenCalledWith('agent-B');
-    expect(killed).toEqual(['agent-A', 'agent-B']);
+    expect(killedAgents).toEqual(['agent-A', 'agent-B']);
   });
 
-  it('skips agents absent from the backend inventory', async () => {
-    rows({ id: 'agent-A' }, { id: 'agent-B', tmuxActive: true });
-    mockListLiveAgentIds.mockResolvedValue(new Set(['agent-A']));
+  it('also stops running rows the inventory does not list (legacy tmux, failed probe), once each', async () => {
+    rows({ id: 'agent-A' }, { id: 'agent-legacy' }, { id: 'agent-stopped-row-live-pane', status: 'stopped' }, { id: 'agent-done', status: 'stopped' });
+    mockListLiveAgentIds.mockResolvedValue(new Set(['agent-A', 'agent-stopped-row-live-pane']));
 
-    const killed = await new CloisterService().emergencyStop();
+    const { killedAgents } = await new CloisterService().emergencyStop();
 
-    expect(mockStopAgent).toHaveBeenCalledTimes(1);
-    expect(killed).toEqual(['agent-A']);
+    expect(mockStopAgent).toHaveBeenCalledTimes(3);
+    expect(killedAgents).toEqual(['agent-A', 'agent-legacy', 'agent-stopped-row-live-pane']);
   });
 
   it('stops every running row when the inventory is unreadable', async () => {
     rows({ id: 'agent-A' }, { id: 'agent-B', status: 'stopped' });
     mockListLiveAgentIds.mockResolvedValue(null);
 
-    const killed = await new CloisterService().emergencyStop();
+    const { killedAgents } = await new CloisterService().emergencyStop();
 
-    expect(killed).toEqual(['agent-A']);
+    expect(killedAgents).toEqual(['agent-A']);
+  });
+
+  it('reports a stop whose pane is still live as unconfirmed, not killed', async () => {
+    rows({ id: 'agent-A' }, { id: 'agent-B' });
+    mockListLiveAgentIds.mockResolvedValue(new Set(['agent-A', 'agent-B']));
+    mockIsAlive.mockImplementation(async (id: string) => (id === 'agent-B'
+      ? { alive: true, paneAlive: true }
+      : { alive: false, reason: 'no-session' }) as never);
+
+    const result = await new CloisterService().emergencyStop();
+
+    expect(result).toEqual({ killedAgents: ['agent-A'], unconfirmedAgents: ['agent-B'] });
   });
 
   it('continues stopping other agents when one stop fails', async () => {
@@ -402,18 +426,16 @@ describe('CloisterService.emergencyStop() — stops live agents through the back
       .mockImplementationOnce(() => Effect.die(new Error('stop failed')))
       .mockImplementationOnce(() => Effect.void);
 
-    const killed = await new CloisterService().emergencyStop();
+    const { killedAgents } = await new CloisterService().emergencyStop();
 
     expect(mockStopAgent).toHaveBeenCalledTimes(2);
-    expect(killed).toEqual(['agent-B']);
+    expect(killedAgents).toEqual(['agent-B']);
   });
 
-  it('returns empty array when no agents are running', async () => {
+  it('returns empty lists when no agents are running', async () => {
     rows();
     mockListLiveAgentIds.mockResolvedValue(new Set());
 
-    const killed = await new CloisterService().emergencyStop();
-
-    expect(killed).toEqual([]);
+    expect(await new CloisterService().emergencyStop()).toEqual({ killedAgents: [], unconfirmedAgents: [] });
   });
 });
