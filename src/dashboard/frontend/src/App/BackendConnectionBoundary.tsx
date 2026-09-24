@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents';
 import { useBackendOutage } from '../lib/backendOutageState';
+import { useMenuOpen } from '../lib/menuOpenState';
 
 interface BackendConnectionBoundaryProps {
   backendDown: boolean;
@@ -44,8 +45,11 @@ export function BackendConnectionBoundary({ backendDown, restarting, children }:
   }, [outage, queryClient]);
 
   // Hidden pages keep their global keydown listeners; they check this flag.
+  // Menus portaled into <body> escape the hidden wrapper, so close the shared
+  // open menu too (menus with local open state do not use this store yet).
   useEffect(() => {
     useBackendOutage.getState().setOutage(outage);
+    if (outage) useMenuOpen.getState().setOpenMenu(null);
     return () => useBackendOutage.getState().setOutage(false);
   }, [outage]);
 

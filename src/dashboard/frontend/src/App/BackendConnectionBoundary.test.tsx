@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { BackendConnectionBoundary } from './BackendConnectionBoundary';
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents';
+import { useMenuOpen } from '../lib/menuOpenState';
 
 function render(ui: ReactNode, queryClient = new QueryClient()) {
   return rtlRender(ui, {
@@ -93,5 +94,16 @@ describe('BackendConnectionBoundary', () => {
     rerender(<BackendConnectionBoundary backendDown={false} restarting={false}><div /></BackendConnectionBoundary>);
     expect(invalidate).toHaveBeenCalledTimes(1);
     expect(invalidate).toHaveBeenCalledWith();
+  });
+
+  it('closes the open portaled menu when the page is hidden', () => {
+    const { rerender } = render(
+      <BackendConnectionBoundary backendDown={false} restarting={false}><div /></BackendConnectionBoundary>,
+    );
+    act(() => useMenuOpen.getState().setOpenMenu('issue-actions:PAN-1'));
+    expect(useMenuOpen.getState().openMenuKey).toBe('issue-actions:PAN-1');
+
+    rerender(<BackendConnectionBoundary backendDown restarting={false}><div /></BackendConnectionBoundary>);
+    expect(useMenuOpen.getState().openMenuKey).toBeNull();
   });
 });
