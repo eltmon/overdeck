@@ -367,78 +367,40 @@ models:
 
 ---
 
-## Parallel Review Agents
+## Review Mode and Reviewer Models
 
-Overdeck's review specialist runs multiple reviewer agents in parallel before producing a synthesis report. You can customize which agents run, their models, and their focus areas via the `specialists.review_agents` list in `~/.overdeck/cloister.toml`.
+Review is configured under `roles.review` in `~/.overdeck/config.yaml`.
+`roles.review.mode` chooses how an issue is reviewed (`resolveReviewMode` in
+`src/lib/cloister/review-agent.ts`):
 
-### Default Reviewers
-
-When `review_agents` is not configured, Overdeck uses three built-in reviewers:
-
-| Name | Focus |
+| Mode | Behavior |
 |---|---|
-| `correctness` | Logic, edge cases, null handling, type safety |
-| `security` | OWASP Top 10, injection, auth, secrets |
-| `performance` | Algorithms, N+1 queries, memory leaks |
+| `quick` (default) | One review agent does a combined correctness, security, performance, and requirements pass. |
+| `full` | Four parallel reviewer lanes (`correctness`, `security`, `performance`, `requirements`) plus a review parent that writes the synthesis. |
+| `none` | No AI review. The verification quality floor still applies. |
 
-After all reviewers complete, a **synthesis** agent combines the findings.
-
-### Configuration Schema
-
-In `~/.overdeck/cloister.toml`:
-
-```toml
-# Each entry controls one parallel reviewer.
-# Absent = use the three defaults (correctness, security, performance).
-
-[[specialists.review_agents]]
-name = "security"
-model = "claude-opus-4-6"   # Optional: override model for this reviewer
-focus = ["OWASP Top 10", "injection", "auth"]
-enabled = true
-
-[[specialists.review_agents]]
-name = "performance"
-# model not set → resolved via review:performance work-type routing
-focus = ["algorithms", "N+1 queries", "memory leaks"]
-enabled = true
-
-[[specialists.review_agents]]
-name = "correctness"
-enabled = true
-
-[[specialists.review_agents]]
-name = "requirements"
-enabled = true
-
-[[specialists.review_agents]]
-name = "docs-coverage"     # Custom reviewer — uses code-review-docs-coverage.md agent
-focus = ["missing JSDoc", "README coverage"]
-enabled = false            # Disabled by default; set to true to activate
-```
-
-### Fields
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `name` | string | yes | Reviewer name — maps to `agents/code-review-<name>.md` template |
-| `model` | string | no | Model override (e.g. `claude-opus-4-6`). Falls back to `review:<name>` work-type routing |
-| `focus` | string[] | no | Focus areas passed as context to the reviewer prompt |
-| `enabled` | boolean | no | Set to `false` to skip this reviewer. Defaults to `true` |
-
-### Per-Reviewer Model Overrides
-
-You can also override reviewer models via the standard `models.overrides` map in `config.yaml`:
+Each lane's model is `roles.review.sub.<lane>.model`, falling back to
+`roles.review.model` and then the built-in default (`resolveModel` in
+`src/lib/config-yaml/roles.ts`). The review parent, which writes the synthesis
+in `full` mode and does the whole review in `quick` mode, uses
+`roles.review.model`. See [MODEL-CALLS.md](MODEL-CALLS.md) for the defaults.
 
 ```yaml
-models:
-  overrides:
-    review:security: claude-opus-4-6    # Security reviewer always uses Opus
-    review:correctness: claude-sonnet-4-6
-    review:performance: claude-sonnet-4-6
-    review:requirements: claude-sonnet-4-6
-    review:synthesis: claude-sonnet-4-6
+roles:
+  review:
+    mode: full
+    sub:
+      security:
+        model: claude-opus-4-8
+      correctness:
+        model: claude-sonnet-4-6
 ```
+
+**Removed:** the `[[specialists.review_agents]]` list in `cloister.toml`
+(`name`, `model`, `focus`, `enabled`) and the `review:<lane>` keys in
+`models.overrides`. Reviewer dispatch reads neither one. The reviewer lanes are fixed; a
+lane's model comes from `roles.review.sub.<lane>.model`, and whether the lanes
+run at all comes from `roles.review.mode`.
 
 ---
 
