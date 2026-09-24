@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T19:40:38.007Z · model: claude-opus-5 · open: 823_
+_Last sequenced: 2026-09-24T19:49:04.169Z · model: claude-opus-5 · open: 821_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,6 @@ _Last sequenced: 2026-09-24T19:40:38.007Z · model: claude-opus-5 · open: 823_
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
 | 9 | PAN-4109 | M | critical | ok |  |  | Nine readers still filter on tmuxActive: on Herdr the health loop, emergencyStop and the memory governor's shed all see zero agents |
-| 10 | PAN-4116 | M | critical | ok |  |  | Every runtime's isRunning asks tmux only, so on the default Herdr backend live agents read stuck, pokes never fire and crashes miscount |
 | 11 | PAN-4121 | S | critical | ok |  |  | Poke escalation fingerprints panes with a hard-coded tmux capture-pane, so on Herdr an uncommitted working agent pauses as idle-alive |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
@@ -42,7 +41,6 @@ _Last sequenced: 2026-09-24T19:40:38.007Z · model: claude-opus-5 · open: 823_
 | 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
 | 60 | PAN-2700 | S | high | needs-refinement |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
 | 61 | PAN-1560 | XS | high | needs-refinement |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
-| 62 | PAN-3936 | S | high | ok |  |  | muse and kimi-code runtimes still call tmuxCreateSession with the supervisor hardcoded; route through launchAgentPane like spawn.ts |
 | 66 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
@@ -843,10 +841,6 @@ In pipeline — rank pinned. The sequencer half landed on main (reap through the
 
 Filed 2026-09-24, placed at rank 9 — freed when PAN-4097 closed — so it inherits its predecessor's slot in the same Herdr-blindness wave and no existing rank moves. PRs #4088, #4103 and #4107 moved the lifecycle guards, the output route and crash detection onto the backend-aware door (isAlive in src/lib/agents/liveness.ts plus the backend inventory), but nine readers still take liveness from the tmuxActive flag on listRunningAgents(), which reports tmux session presence on the overdeck socket alone and is therefore false for every agent on Herdr, the default backend. This is critical rather than high because two of those sites are protections, not reports: memory-governor.ts shed() never pauses a Herdr agent under HARD pressure and cannot protect a live agent's stack from the merged-stack shed, and service.ts emergencyStop() kills nothing — so the OOM defences the host relies on are inert on the default backend, while service-health.ts silently skips crash detection, pokes and stuck handling for the whole fleet. The body enumerates every site with the grep that finds them, states the safety rule (an unreachable backend must never read as dead where that drives a kill, restart, pause or stack stop), keeps tmuxActive where it is part of an API shape, and asks for scripts/lint-liveness.sh to be extended so the sites cannot regress. M rather than S because it is nine modules across CLI, Cloister and the dashboard server plus a lint ratchet.
 
-### PAN-4116 (rank 10)
-
-New since the prior pass and the direct sibling of PAN-4109 — the same tmux-only liveness blindness, one layer down in the runtimes. Herdr is the default backend, so isRunning returns false for every live agent: pokeAgentWithEscalation bails before it can unstick anything, getAgentHealth reports a working agent as stuck (feeding kill_on_stuck), and handleAgentCrash counts crashes without consulting the liveness oracle. The fix pattern is already landed in #4088/#4103/#4107 — route through isAlive in liveness.ts and require confirmed-dead before any crash action — so this is a small, well-specified change guarding the pipeline against killing healthy agents. Ranked at 10, immediately after PAN-4109.
-
 ### PAN-4121 (rank 11)
 
 New since the prior pass and the third member of the Herdr-blindness wave that PAN-4109 (rank 9) and PAN-4116 (rank 10) open, so it takes rank 11 and nothing renumbers. progressFingerprint in src/lib/cloister/service-crash.ts reads the agent's pane tail with execFileAsync('tmux', ['-L', managedSocket, 'capture-pane', …]) instead of the backend-aware readAgentPaneText in src/lib/terminal-backends/agent-pane-io.ts that #4103 already routed /api/agents/:id/output through. A Herdr agent has no tmux session, the catch swallows the failure, and the pane half hashes the empty string forever — an unreadable pane is indistinguishable from an unchanged one — leaving the workspace HEAD as the only live input. An agent that is working but has not committed therefore holds one fingerprint across every poke, the third poke accuses it of making no observable progress and the fifth pauses it with needs-you: idle-alive. It is critical rather than high because the damage is inflicted on healthy work on the default backend: the pipeline stops agents that are doing their job. It also must land with or right after PAN-4116, because isRunning is currently false on Herdr and pokeAgentWithEscalation bails before the fingerprint is ever consulted — the moment that gate becomes backend-aware the pokes start firing and this constant fingerprint begins pausing live agents. The body names the file, the exact call, the safety rule (a failed or empty read makes the fingerprint unknown, an unknown fingerprint sends no poke and never advances the ineffective counter) and a backend-independent third input, transcript growth from the runtime heartbeat, so the change is small and fully specified.
@@ -978,10 +972,6 @@ Triage: the stored reviewStatus flip is gone; the stale-artifact freshness conce
 ### PAN-1560 (rank 61)
 
 Triage: review_status is gone but verification still writes a check run to the PR; the re-post-on-head-move concern may still apply to that flow (PAN-3946 covers the approval-on-old-commit side). Rank held.
-
-### PAN-3936 (rank 62)
-
-Split out of PAN-3921 at planning time. On a Herdr host these specialist-rotation and crash-respawn paths land on tmux, where isAliveOnHerdr reads them as dead. Do after PAN-3921 lands so the pattern is settled.
 
 ### PAN-2806 (rank 66)
 
@@ -1135,6 +1125,10 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
 
 Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.
 
+### PAN-1618 (rank 111)
+
+Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1142,10 +1136,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T19:40:38.007Z",
+  "generatedAt": "2026-09-24T19:49:04.169Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 823,
+  "openCount": 821,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1586,19 +1580,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED",
       "rationale": "Triage: review_status is gone but verification still writes a check run to the PR; the re-post-on-head-move concern may still apply to that flow (PAN-3946 covers the approval-on-old-commit side). Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3936",
-      "rank": 62,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "muse and kimi-code runtimes still call tmuxCreateSession with the supervisor hardcoded; route through launchAgentPane like spawn.ts",
-      "rationale": "Split out of PAN-3921 at planning time. On a Herdr host these specialist-rotation and crash-respawn paths land on tmux, where isAliveOnHerdr reads them as dead. Do after PAN-3921 lands so the pattern is settled.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11279,19 +11260,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-4116",
-      "rank": 10,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Every runtime's isRunning asks tmux only, so on the default Herdr backend live agents read stuck, pokes never fire and crashes miscount",
-      "rationale": "New since the prior pass and the direct sibling of PAN-4109 — the same tmux-only liveness blindness, one layer down in the runtimes. Herdr is the default backend, so isRunning returns false for every live agent: pokeAgentWithEscalation bails before it can unstick anything, getAgentHealth reports a working agent as stuck (feeding kill_on_stuck), and handleAgentCrash counts crashes without consulting the liveness oracle. The fix pattern is already landed in #4088/#4103/#4107 — route through isAlive in liveness.ts and require confirmed-dead before any crash action — so this is a small, well-specified change guarding the pipeline against killing healthy agents. Ranked at 10, immediately after PAN-4109.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4118",
       "rank": 349,
       "size": "S",
@@ -12280,20 +12248,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 1
     },
     {
-      "from": "PAN-3936",
-      "to": "PAN-3921",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3921",
-      "to": "PAN-3936",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-3946",
       "to": "PAN-1560",
       "type": "informs",
@@ -12462,25 +12416,18 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 0.5
     },
     {
-      "from": "PAN-4109",
-      "to": "PAN-4116",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4116",
-      "to": "PAN-4121",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-4118",
       "to": "PAN-4123",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4109",
+      "to": "PAN-4121",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
