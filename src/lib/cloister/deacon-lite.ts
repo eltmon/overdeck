@@ -245,6 +245,9 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
 
     const lastRedispatch = lastReviewRedispatchAt.get(issueId);
     if (lastRedispatch !== undefined && now - lastRedispatch < STALLED_REVIEW_COOLDOWN_MS) continue;
+    // The in-memory map dies with the deacon child; our own journal entry is
+    // the cooldown that survives a restart (PAN-3914).
+    if (last.type === 'review.redispatched' && now - at < STALLED_REVIEW_COOLDOWN_MS) continue;
 
     // Cheapest first: relaunching missing lanes against the existing run reuses
     // the parent's own state.json, which survives a server restart, so nothing
@@ -269,6 +272,12 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
       } else if (!recovery.success) {
         // Nothing was launched: do not journal a re-dispatch that never happened.
         console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);
+        continue;
+      } else if (!recovery.launched) {
+        // Every lane already reported: nothing to relaunch, so no re-dispatch
+        // to journal or report (PAN-3914). Cool down so the next tick does not
+        // re-probe the same convoy.
+        lastReviewRedispatchAt.set(issueId, now);
         continue;
       }
     } catch (err) {

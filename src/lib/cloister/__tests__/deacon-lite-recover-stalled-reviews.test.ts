@@ -151,6 +151,36 @@ describe('recoverStalledReviews', () => {
     expect(await recoverStalledReviews(NOW + 61 * MINUTE)).toHaveLength(1);
   });
 
+  // PAN-3914: the old checkOrphanedCompletions "recovered" one issue nine times
+  // in 45 minutes. A recovery that launched nothing must not journal a
+  // re-dispatch or report one, or the routine repeats that shape hourly.
+  it('does not journal or report a convoy recovery that launched nothing', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    // Every lane already wrote its report; the synthesis parent never posted a verdict.
+    mocks.recoverMissingConvoyReviewers.mockResolvedValue({
+      success: true, message: 'Convoy already launched for PAN-3705 run r1 — no-op',
+    });
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(readPipelineJournal(workspace).map((entry) => entry.type)).toEqual(['review.dispatched']);
+
+    // Nor does it re-probe the convoy on every tick.
+    expect(await recoverStalledReviews(NOW + 30 * MINUTE)).toEqual([]);
+    expect(mocks.recoverMissingConvoyReviewers).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the hourly cooldown across a deacon restart, from the journal', async () => {
+    vi.setSystemTime(NOW - 30 * MINUTE);
+    appendPipelineEntry(workspace, { type: 'review.redispatched', issueId: 'PAN-3705', source: 'deacon-lite' });
+    vi.setSystemTime(NOW);
+    // A restarted deacon child has an empty in-memory cooldown map.
+    __resetStalledReviewCooldownForTests();
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+    expect(await recoverStalledReviews(NOW + 31 * MINUTE)).toHaveLength(1);
+  });
+
   it('falls back to the full review door when the parent has no run state', async () => {
     journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
     mocks.recoverMissingConvoyReviewers.mockResolvedValue({
