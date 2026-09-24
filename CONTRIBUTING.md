@@ -595,6 +595,7 @@ These properties must be preserved across all changes. A change that would viola
 | `mergeStatus: 'merging'` is cleared on server restart | Pending merges are in-memory only. Stale `merging` permanently disables the Merge button. |
 | `.overdeck/continue.json` is never committed | It is mutable workspace runtime state; committing it creates false authoritative state and merge conflicts. |
 | Workspace creation and project registration call `preTrustDirectory()`; spawns do not | An untrusted directory makes Claude Code hang asking "Do you trust this folder?". Pre-trusting on every spawn would race on the shared `~/.claude.json`. |
+| An existing workspace directory counts as ready only when `workspaceNeedsSetup()` says so | `createWorkspace` leaves `.overdeck/setup-incomplete` in a worktree whose setup aborted and resumes the setup on the next call. A caller that checks `existsSync` alone starts an agent in a worktree with no dependencies, hooks or skills (PAN-4171). |
 | `maxForks: 4` in all Vitest configs | 24 cores × 3.5 GB = OOM. Non-negotiable. |
 | Node 22 is the production runtime | The production server path must explicitly use the Node 22 binary, not the system default. |
 | `execSync` is never used in server-reachable modules | Blocks the event loop, stalls all concurrent requests. |
