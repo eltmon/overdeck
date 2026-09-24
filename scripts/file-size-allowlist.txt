@@ -108,7 +108,7 @@
 1158 src/lib/overdeck/conversation-runtime.ts # PAN-3920
 1162 src/lib/tmux.ts # PAN-4012
 1210 src/lib/projects.ts # PAN-4012
-1176 src/lib/overdeck/conversation-runtime.ts # PAN-3921
+1189 src/lib/overdeck/conversation-runtime.ts # PAN-3921
 1380 src/cli/index.ts # PAN-3921
 1124 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3982
 # Two registration lines; implementation is in the extracted child input route module.

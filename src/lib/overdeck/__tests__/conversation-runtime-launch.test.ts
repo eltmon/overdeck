@@ -67,7 +67,7 @@ vi.mock('../conversation-liveness.js', async (importOriginal) => ({
   closeConversationPane,
 }));
 
-const { spawnConversationSession } = await import('../conversation-runtime.js');
+const { conversationUsesSupervisor, spawnConversationSession } = await import('../conversation-runtime.js');
 const { toPaneRole } = await import('../../terminal-backends/prompt-guard.js');
 
 let overdeckHome: string;
@@ -193,5 +193,22 @@ describe('spawnConversationSession through the launch door (PAN-3921)', () => {
 
   it('passes the conversation role through the prompt guard unchanged', () => {
     expect(toPaneRole('conversation')).toBe('conversation');
+  });
+});
+
+describe('conversationUsesSupervisor per harness (PAN-3921, review of #4104 F3)', () => {
+  it.each([
+    // harness, codex transport, tmux, herdr
+    ['claude-code', undefined, true, false],
+    ['kimi-code', undefined, true, true],
+    ['muse', undefined, true, true],
+    ['codex', 'tui', true, true],
+    ['codex', 'app-server', false, false],
+    ['ohmypi', undefined, false, false],
+    ['acp', undefined, false, false],
+  ] as const)('%s (%s): tmux %s, herdr %s', (harness, codexTransport, onTmux, onHerdr) => {
+    const options = codexTransport ? { codexTransport } : {};
+    expect(conversationUsesSupervisor(harness, 'tmux', options)).toBe(onTmux);
+    expect(conversationUsesSupervisor(harness, 'herdr', options)).toBe(onHerdr);
   });
 });

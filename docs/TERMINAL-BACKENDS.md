@@ -218,8 +218,10 @@ recognizes an operator sender. Overdeck's own `ship` role maps to the `uat` toke
 handoff renders as X's Review row. The role is persisted in
 `~/.overdeck/conversations/conv-<name>/pane-role` and re-stamped on every respawn, resume and
 restart-all of that conversation. With `--issue` and no `--cwd`, the handoff starts in
-`workspaces/feature-<issue>` when it exists. The PTY supervisor wraps a conversation on tmux only,
-the launcher exports `OVERDECK_AGENT_ID` on Herdr (the hooks have no `$TMUX` to read the name
+`workspaces/feature-<issue>` when it exists. On Herdr the PTY supervisor is refused only for
+Claude Code, the one conversation harness Herdr must detect; kimi-code, muse and the codex TUI are
+pane-bound (no Herdr agent record, so `agent.prompt` cannot reach them) and keep the supervisor as
+their delivery path (`conversationUsesSupervisor`). The launcher exports `OVERDECK_AGENT_ID` on Herdr (the hooks have no `$TMUX` to read the name
 from), and the keep-alive sleep loop is tmux-only, as for planners. On Herdr the launcher `exec`s
 Claude Code, so the pane's foreground process is `claude` and Herdr's detection sees it (see
 "supervisor vs direct exec" below); on tmux Claude Code still runs as the launcher's child.

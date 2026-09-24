@@ -32,8 +32,8 @@ import {
 } from './conversations.js';
 import { capturePane, findManagedServerPid } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
-import { keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
-import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
+import { detectionPolicyFor, keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../terminal-backends/types.js';
 import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, listLiveConversationSessions, waitForConversationSession } from './conversation-liveness.js';
@@ -307,6 +307,21 @@ export function shouldUseSupervisorForConversation(
 ): boolean {
   if (harness === 'codex' && options.codexTransport === 'app-server') return false;
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
+}
+/**
+ * PTY supervisor for a conversation (PAN-3921). On Herdr it is refused only
+ * around a harness Herdr must detect (claude-code): node-pty would hide it
+ * from the foreground-process detector (PAN-3917 W12). A pane-bound harness
+ * (kimi-code, muse, codex TUI) has no Herdr agent record, so `agent.prompt`
+ * cannot reach it and the supervisor socket stays its delivery path.
+ */
+export function conversationUsesSupervisor(
+  harness: RuntimeName,
+  backend: TerminalBackendName,
+  options: { codexTransport?: 'app-server' | 'tui' } = {},
+): boolean {
+  if (!shouldUseSupervisorForConversation(harness, options)) return false;
+  return backend === 'tmux' || detectionPolicyFor(harness) !== 'required';
 }
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
   if (harness === 'muse') {
@@ -702,9 +717,7 @@ export async function spawnConversationSession(
     throw new Error('Invalid effort level');
   }
   const backend = launch.backend ?? await resolveLaunchBackend();
-  // The PTY supervisor is tmux-only: node-pty hides the harness from Herdr's
-  // foreground-process detector (PAN-3917 W12, docs/TERMINAL-BACKENDS.md).
-  const useSupervisor = backend.name === 'tmux' && shouldUseSupervisorForConversation(harness, { codexTransport });
+  const useSupervisor = conversationUsesSupervisor(harness, backend.name, { codexTransport });
   let supervisorScriptPath: string | undefined;
   if (useSupervisor) {
     supervisorScriptPath = resolvePtySupervisorScriptPath();
