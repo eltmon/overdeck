@@ -23,12 +23,10 @@ import {
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
-import { loadIssueStatesForProject } from '../services/derived-issue-state.js';
 import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
 import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
 import { resolvePiSessionPath } from './jsonl-resolver.js';
 import {
-  clearFinishedSequencerRun,
   getSequencerRunStatus,
   spawnSequencerAgent,
 } from '../../../lib/backlog/sequencer-agent.js';
@@ -103,7 +101,6 @@ const getBacklogSequenceRoute = HttpRouter.add(
         }
 
         // issuesWithTasks precomputed above in generator scope.
-        const workspacesDir = join(projectRoot, 'workspaces');
 
         // Join issue titles from the in-memory read-model issue service so the
         // detail panel can show the title (the sequence cache stores only the id).
@@ -125,20 +122,12 @@ const getBacklogSequenceRoute = HttpRouter.add(
         // event loop with per-workspace process calls.
         const lookups = buildClassifyLookups(projectRoot);
 
-        // PAN-3917 FR-6: "the pipeline owns this issue" is derived — one batched
-        // forge + inventory read for the whole sequence, never a stored status.
-        const derivedStates = await loadIssueStatesForProject(
-          projectRoot,
-          cachedNodes.map((r) => r.issueId),
-        );
-        const PIPELINE_OWNED = new Set(['working', 'in-review', 'changes-requested', 'ready', 'merged']);
-
+        // PAN-3969: `inPipeline` comes from the classifier's workspace-exists
+        // lookup — the same oracle the forecast route uses. Deriving the full
+        // FR-6 state here spawned one serial git process per issue (11–21 s for
+        // ~850 nodes) for a `pipelineState` field nothing reads.
         const nodes = cachedNodes.map((r) => {
           const issueUpper = r.issueId.toUpperCase();
-          const derived = derivedStates.get(issueUpper);
-          const inPipeline =
-            (derived !== undefined && PIPELINE_OWNED.has(derived.state)) ||
-            existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
           const ready = specIssues.has(issueUpper);
           const state = classifyIssue({ issue: r.issueId, gate: r.gate } as unknown as Parameters<typeof classifyIssue>[0], lookups);
@@ -155,11 +144,10 @@ const getBacklogSequenceRoute = HttpRouter.add(
             why: r.why,
             gate: r.gate,
             planning: r.planning,
-            inPipeline,
+            inPipeline: state.inPipeline,
             hasPrd,
             ready,
             state,
-            pipelineState: derived?.state ?? null,
           };
         });
 
@@ -196,23 +184,24 @@ const postBacklogRegenerateRoute = HttpRouter.add(
       // into tracker `Issue` objects (their human ref is `identifier`, not `ref`).
       const issues = getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
       try {
-        await clearFinishedSequencerRun(projectRoot);
+        // spawnSequencerAgent reaps a finished lingering pass itself before
+        // spawning, so a 409 below means a pass is genuinely still working.
         const agent = await spawnSequencerAgent(pass, { projectRoot, issues });
         return jsonResponse({ status: 'spawned', agentId: agent.id, pass });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        // The sequencer is a singleton: spawnRun refuses if a tmux session named
-        // `sequencer-runner` already exists (running OR stuck/errored). Surface
-        // that as an actionable 409 instead of letting it bubble up as an
-        // unhandled 500 with a raw stack — the operator must stop the existing
-        // pass first. (PAN-1866: a stuck Haiku pass that overflowed its context
-        // blocked every retry with an opaque "HTTP 500".)
+        // The sequencer is a singleton: spawnRun refuses if a pane named
+        // `sequencer-runner` is still live. A finished pass was already reaped
+        // above, so this is an active (or stuck) one. Surface it as an
+        // actionable 409 instead of an unhandled 500 with a raw stack.
+        // (PAN-1866: a stuck Haiku pass that overflowed its context blocked
+        // every retry with an opaque "HTTP 500".)
         if (/already running/i.test(message)) {
           return jsonResponse(
             {
               error:
-                'A sequencer pass is already running (or stuck). Stop it first — use Stop on the ' +
-                'sequencer in the dashboard, or run `pan kill sequencer-runner` — then start a new pass.',
+                'A sequencer pass is still running. Wait for it to finish, or stop it from the ' +
+                'sequencer-runner agent in the dashboard, then start a new pass.',
               code: 'sequencer_already_running',
             },
             { status: 409 },
@@ -264,7 +253,7 @@ const postBacklogGateRoute = HttpRouter.add(
       writeSequenceMd(projectRoot, doc, { operatorEdit: true });
 
       // Mirror the hard veto to the `vetoed` GitHub label so it's visible + queryable
-      // and honored by pickFromSequence; clear it when the gate is relaxed.
+      // and honored by the Flywheel's pickup; clear it when the gate is relaxed.
       if (gate === 'vetoed') await applyIssueVetoedLabel(issueId);
       else await removeIssueVetoedLabel(issueId);
 
@@ -497,7 +486,7 @@ const getSequencerStatusRoute = HttpRouter.add(
       // The one-shot sequencer session lingers after it finishes, so "alive" alone
       // would falsely read as running. A pass is done once it writes a fresh
       // sequence.md (mtime >= startedAt) or its runtime is idle.
-      const { running, startedAt } = getSequencerRunStatus(projectRoot);
+      const { running, startedAt } = await getSequencerRunStatus(projectRoot);
 
       let total = 0;
       const manifestPath = join(projectRoot, '.pan', 'backlog', 'manifest.json');

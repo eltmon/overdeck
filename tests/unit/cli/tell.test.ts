@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  resolveAgentTargetSync: vi.fn(),
-  getAgentStateSync: vi.fn(),
+  resolveAgentTarget: vi.fn(),
+  getAgentState: vi.fn(),
   messageAgent: vi.fn(),
   issueOwesRework: vi.fn(),
   loadRemoteAgentState: vi.fn(),
@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  resolveAgentTargetSync: mocks.resolveAgentTargetSync,
-  getAgentStateSync: mocks.getAgentStateSync,
+  resolveAgentTarget: mocks.resolveAgentTarget,
+  getAgentState: mocks.getAgentState,
   messageAgent: mocks.messageAgent,
 }));
 
@@ -36,9 +36,9 @@ describe('pan tell', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    mocks.resolveAgentTargetSync.mockReturnValue('agent-pan-3846');
+    mocks.resolveAgentTarget.mockReturnValue('agent-pan-3846');
     mocks.loadRemoteAgentState.mockReturnValue(null);
-    mocks.getAgentStateSync.mockReturnValue({ id: 'agent-pan-3846', issueId: 'PAN-3846' });
+    mocks.getAgentState.mockReturnValue({ id: 'agent-pan-3846', issueId: 'PAN-3846' });
     mocks.issueOwesRework.mockResolvedValue(false);
     mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: true, confirmed: true });
   });

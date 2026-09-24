@@ -1,0 +1,358 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-20T23:05:13.326Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3968: pan close still deletes state.json/sessions.json — close-out.ts step 5 never moved to pruneAgentStateDir (PAN-3950 AC-1 unmet)",
+    "updated": "2026-09-21T00:11:24.512Z"
+  },
+  "plan": {
+    "id": "pan-3968",
+    "title": "pan close still deletes state.json/sessions.json — the live deleter is the close-out:prune-agent-rows step in lifecycle/workflows.ts (PAN-3950 AC-1 unmet)",
+    "status": "running",
+    "uid": "b8c234a0-633a-407c-9dab-9d4bd1368f53",
+    "author": "agent:claude-opus-5",
+    "sequence": 3,
+    "created": "2026-09-20T23:05:13.326Z",
+    "updated": "2026-09-21T00:11:24.512Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3968",
+        "label": "PAN-3968",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3950",
+        "label": "PAN-3950",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/3951",
+        "label": "PR #3951",
+        "type": "pull_request"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3968.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "agent-state",
+      "transcripts",
+      "lifecycle",
+      "dead-code"
+    ],
+    "narratives": {
+      "Problem": "After `pan close`, `~/.overdeck/agents/agent-<id>/` loses `state.json` and `sessions.json`, so the agent transcript route returns `No transcript found` even though the Claude JSONL still exists. The issue blames `src/lib/close-out.ts` step 5, but that function (`executeCloseOut`) has no production caller. The live ceremony is `closeOut()` in `src/lib/lifecycle/workflows.ts`: its teardown step already prunes correctly with `pruneAgentStateDir` and prints 'transcripts and state kept', and then the later `close-out:prune-agent-rows` step (`workflows.ts:384-389`) calls `pruneStoppedAgentsForIssue` → `pruneAgentRowsAfterTranscriptCleanup` → `removeAgentStateDir`, which unlinks every non-.jsonl file and writes the `.retained-transcripts` marker found on `agent-pan-3950` at the close-out timestamp. PR #3951 never touched `workflows.ts` or `agent-gc.ts`.",
+      "Proposal": "Delete the `close-out:prune-agent-rows` block and its `agent-gc` import from `workflows.ts` (teardown already ran the correct prune on the same directories), with a regression test that runs the real `closeOut()` against a fixture under `getOverdeckHome()/agents/` and asserts `state.json`/`sessions.json` survive. Delete the now-callerless `pruneStoppedAgentsForIssue` and its test. Delete the dead `executeCloseOut` ceremony from `close-out.ts` (keeping `isBranchMerged`) together with its test file, which satisfies the issue's literal `grep removeAgentStateDir src/lib/close-out.ts` acceptance line and removes the second-ceremony trap. Add one docs sentence to `docs/MERGE-WORKFLOW.md` naming the only paths that still delete `state.json`. Full detail with before/after snippets in `.pan/drafts/PAN-3968.md`.",
+      "NonGoals": "- No change to `pan admin db gc-agents` / `pruneTerminalStoppedAgents`: it stays destructive (docs already say GC is a destructive path); hazard H-3 in the PRD.\n- No change to deep-wipe (`agents/agent-state.ts:86`), legacy-row drop (`agents/queries.ts:131`), or `removeAgent` (`agents/removal.ts:22`) — intentional wipes.\n- No change to `state-dir-removal.ts` or `teardown-workspace.ts`; they are already correct after PR #3951.\n- No backfill code or command for the already-pruned `agent-pan-3705` / `agent-pan-3950` directories; PRD Appendix A gives the operator-only recipe and the work agent must not run it.\n- No migration of `executeCloseOut` step 5 to `pruneAgentStateDir` — the function is deleted instead (fallback only if a production importer is found, PRD D-2).\n- No new module, store, flag, config, or polling."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Corrected the root cause: the live deleter is `close-out:prune-agent-rows` in `src/lib/lifecycle/workflows.ts:384-389`, not `close-out.ts` step 5, which is dead code.",
+        "rationale": "`executeCloseOut` is imported only by its own test; `pan close` and the dashboard route both call `lifecycle/workflows.ts closeOut()`. The `.retained-transcripts` marker on `agent-pan-3950` at the close-out timestamp is written only by `pruneAgentRowsAfterTranscriptCleanup`/`removeAgent`, and PR #3951's stat shows it never touched `workflows.ts` or `agent-gc.ts`. Both the issue and the PAN-3950 PRD want state kept, so this is a correction, not a contradiction."
+      },
+      {
+        "summary": "Fix by deleting the GC step rather than re-pointing it at `pruneAgentStateDir`.",
+        "rationale": "Teardown already ran `pruneAgentStateDir` on the same directories two steps earlier; a second prune is a no-op that keeps a second cleanup path alive, which is the exact shape of bug this issue reports."
+      },
+      {
+        "summary": "Delete the dead `executeCloseOut` ceremony and its test instead of migrating its step 5.",
+        "rationale": "Migrating dead code satisfies the grep AC while preserving the trap; deletion satisfies the same AC, removes ~440 lines, and honours PAN-3950 NFR-1 (net negative). Fallback recorded in PRD D-2 if a production importer turns up."
+      },
+      {
+        "summary": "Already-pruned directories (`agent-pan-3705`, `agent-pan-3950`) are an operator one-off, not code in this issue or PAN-3959.",
+        "rationale": "Recovery needs a hand-written `state.json` (for the workspace slug, since the worktree is gone) plus `sessions.json`; two directories do not justify a tool. PRD Appendix A holds the exact recipe."
+      },
+      {
+        "summary": "`pan admin db gc-agents` keeps its destructive `removeAgentStateDir` behaviour.",
+        "rationale": "docs/MERGE-WORKFLOW.md already names garbage collection as a destructive path; changing it is a separate decision (hazard H-3)."
+      },
+      {
+        "summary": "Regression test seeds the fixture under `getOverdeckHome()/agents/`, not the mocked `AGENTS_DIR`.",
+        "rationale": "`workflows.test.ts` mocks `paths.js` `AGENTS_DIR` to one temp root while `listAgentStatesSync`/`saveAgentStateSync` resolve `getOverdeckHome()`; the deleted GC step deleted under the latter, so a fixture under the mocked root would pass before the fix and prove nothing."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-3968.md",
+      "canonicalFilename": "2026-09-20-PAN-3968-pan-close-still-deletes-state-json-sessions-json-the-live-deleter-is-the-close-out-prune-agent-rows-step-in-lifecycle-workflows-ts-pan-3950-ac-1-unmet.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "remove-close-out-row-gc",
+        "title": "Remove the close-out:prune-agent-rows step from closeOut() with a regression test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T23:05:13.326Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3968",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck",
+            "grep -n \"pruneStoppedAgentsForIssue\\|cloister/agent-gc\\|prune-agent-rows\" src/lib/lifecycle/workflows.ts"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/lifecycle/workflows.test.ts passes including the new test 'keeps state.json and sessions.json of the issue's agents (PAN-3968)'",
+            "typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In `src/lib/lifecycle/workflows.ts` delete line 35 (`import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';`) and the block at lines 384-389 (grep anchor `close-out:prune-agent-rows`: `const pruned = yield* Effect.promise(() => pruneStoppedAgentsForIssue(ctx.issueId));` through the `stepOk('close-out:prune-agent-rows', ...)` push). Keep the `close-out:ack-parked-residue` step that follows so it still runs after `close-out:mark-pipeline-terminal`. Then add to `tests/unit/lib/lifecycle/workflows.test.ts` inside `describe('closeOut', ...)` a test named `keeps state.json and sessions.json of the issue's agents (PAN-3968)`: seed `join(getOverdeckHome(), 'agents', 'agent-pan-100')` (import `getOverdeckHome` from `../../../../src/lib/paths.js`; NOT the mocked `AGENTS_DIR`, see PRD D-5) with `state.json` (`{ id: 'agent-pan-100', issueId: 'PAN-100', role: 'work', status: 'running', workspace: '/repo/workspaces/feature-pan-100', harness: 'claude-code', model: 'claude', startedAt: '2026-09-20T00:00:00.000Z' }`), `sessions.json` (one JSON line `{\"sessionId\":\"session-1\",\"at\":\"2026-09-20T00:00:00.000Z\",\"source\":\"hook\",\"harness\":\"claude-code\",\"model\":\"claude\"}`), `activity.jsonl`, and `pending.lock`; call `writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active')` then `closeOut({ issueId: 'PAN-100', projectPath: testDir }, { tracker: successfulTracker() })` exactly like the neighbouring 'should complete xBRIEF status and prune checkpoint refs during close-out' test; assert success, that `state.json`, `sessions.json`, `activity.jsonl` still exist, that `.retained-transcripts` does not exist, that `state.json.status === 'stopped'`, and that no step is named `close-out:prune-agent-rows`; remove the fixture dir in a `finally`. Implementation checkpoint: run the new test before deleting the workflows.ts block and confirm it fails on the `state.json` assertion; if it passes unfixed, the fixture is under the wrong root — fix the path before proceeding. Do not assert `pending.lock` removal here (teardown prunes under the mocked `AGENTS_DIR`; `state-dir-removal.test.ts` covers it). Commit scope `cloister`, trailer `Item: remove-close-out-row-gc`."
+        },
+        "items": [
+          {
+            "id": "remove-close-out-row-gc.ac1",
+            "title": "Given state.json, sessions.json and activity.jsonl under getOverdeckHome()/agents/agent-pan-100/, when closeOut({ issueId: 'PAN-100' }) succeeds, then all three files still exist and no .retained-transcripts marker exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-close-out-row-gc.ac2",
+            "title": "After closeOut, state.json.status reads 'stopped' (teardown's persistIssueAgentsStopped still runs) and result.steps contains no step named close-out:prune-agent-rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-close-out-row-gc.ac3",
+            "title": "grep -n \"pruneStoppedAgentsForIssue\\|cloister/agent-gc\\|prune-agent-rows\" src/lib/lifecycle/workflows.ts prints nothing, and closeOut still emits close-out:mark-pipeline-terminal followed by close-out:ack-parked-residue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-close-out-row-gc.ac4",
+            "title": "The new test fails on unfixed workflows.ts (state.json missing) and passes after the block is deleted — the implementation checkpoint result is stated in the commit body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-prune-stopped-agents-for-issue",
+        "title": "Delete the callerless pruneStoppedAgentsForIssue from agent-gc.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-20T23:05:13.326Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-3968",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/agent-gc.ts",
+            "tests/unit/lib/cloister/agent-gc.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/agent-gc.test.ts",
+            "npm run typecheck",
+            "grep -rn pruneStoppedAgentsForIssue src tests --include=*.ts"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/agent-gc.test.ts passes",
+            "typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. In `src/lib/cloister/agent-gc.ts` delete the exported function `pruneStoppedAgentsForIssue` (lines 278-289, from `export async function pruneStoppedAgentsForIssue(` through its closing `}`). Keep `listAgentStatesSync` imported (still used at lines 122 and 292), and leave `pruneAgentRowsAfterTranscriptCleanup`, `pruneTerminalStoppedAgents`, `preverifiedCloseOutPredicate`, and `defaultAgentGcDeps` untouched — `pan admin db gc-agents` (`src/cli/commands/db.ts:46`) still uses them. In `tests/unit/lib/cloister/agent-gc.test.ts` remove `pruneStoppedAgentsForIssue` from the import list at line 4 and delete only the test `it('prunes stopped rows only after their transcript-preserving cleanup is complete', ...)` (lines 49-63); keep `it('excludes already-retired agents before terminal issue resolution', ...)` and every other test. Commit scope `cloister`, trailer `Item: delete-prune-stopped-agents-for-issue`."
+        },
+        "items": [
+          {
+            "id": "delete-prune-stopped-agents-for-issue.ac1",
+            "title": "grep -rn pruneStoppedAgentsForIssue src tests --include=*.ts prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-prune-stopped-agents-for-issue.ac2",
+            "title": "tests/unit/lib/cloister/agent-gc.test.ts passes and still contains the 'excludes already-retired agents before terminal issue resolution' test and the PAN-3513 terminality tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-prune-stopped-agents-for-issue.ac3",
+            "title": "pruneTerminalStoppedAgents stays exported: `pan admin db gc-agents --help` prints the command, and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-dead-execute-close-out",
+        "title": "Delete the dead executeCloseOut ceremony from close-out.ts and its test file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-20T23:05:13.326Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3968",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/close-out.ts",
+            "src/lib/__tests__/close-out.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/lib/cloister/__tests__/reap-issue-residue.test.ts",
+            "grep -n \"removeAgentStateDir\\|executeCloseOut\" src/lib/close-out.ts",
+            "grep -rn executeCloseOut src tests --include=*.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes (no unused-import findings in src/lib/close-out.ts)",
+            "reap-issue-residue.test.ts passes",
+            "both greps print nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3 (decision D-2). First re-confirm the function is dead: `grep -rn executeCloseOut src --include=*.ts` must hit only `src/lib/close-out.ts` and `src/lib/__tests__/close-out.test.ts`. If a production importer exists, STOP and apply the D-2 fallback instead (replace the two `removeAgentStateDir(...)` calls at `close-out.ts:432,437` with `pruneAgentStateDir(...)`, drop the `preservedTranscripts` count, set the step message to `Agent state directories pruned (transcripts and state kept)`, and name the importer in the PR body). Otherwise: in `src/lib/close-out.ts` delete lines 201 through 628 (from `export interface CloseOutStep {` to the end of file — note line 224 fuses `const CLOSED_OUT_COLOR = '1d4ed8';` and `async function executeCloseOutPromise(` on one line, so delete the whole line), replace the file header comment (lines 1-6) with one describing `isBranchMerged` as merge detection for close-out and residue reaping and pointing at `lifecycle/workflows.ts closeOut()` for the ceremony, and reduce the imports (lines 8-28) to `import { exec } from 'child_process';` and `import { promisify } from 'util';` (nothing in lines 30-199 uses fs, path, os, effect, ./paths.js, ./prd-locations.js, ./tmux.js, ./lifecycle/types.js, ./lifecycle/close-issue.js, ./lifecycle/archive-planning.js, ./workspace-manager/docker.js, ./issue-id.js, or ./agents/state-dir-removal.js). Keep `execAsync`, `ARTIFACT_PATH_PREFIXES`, `ARTIFACT_EXCLUSIONS`, `isSquashMergedViaPr`, and `isBranchMerged` byte-for-byte. Delete `src/lib/__tests__/close-out.test.ts` (it imports only `executeCloseOut`). `src/lib/cloister/__tests__/reap-issue-residue.test.ts` mocks `isBranchMerged` and needs no change. The PAN-3906 deleted-subject exemption covers removing the test with its subject; do not add tests to balance the diff. Leave any now-callerless exports in other modules alone (PRD H-4). Commit scope `infra`, trailer `Item: delete-dead-execute-close-out`."
+        },
+        "items": [
+          {
+            "id": "delete-dead-execute-close-out.ac1",
+            "title": "grep -n \"removeAgentStateDir\\|executeCloseOut\" src/lib/close-out.ts prints nothing and src/lib/__tests__/close-out.test.ts no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-dead-execute-close-out.ac2",
+            "title": "src/lib/close-out.ts still exports isBranchMerged with unchanged behaviour: npx vitest run src/lib/cloister/__tests__/reap-issue-residue.test.ts passes and pan workspace list --stale --help still prints",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-dead-execute-close-out.ac3",
+            "title": "`npm run typecheck` and `npm run lint` both exit 0, and lint prints no unused-import finding for src/lib/close-out.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-dead-execute-close-out.ac4",
+            "title": "git diff --stat main...HEAD -- src shows more deletions than insertions for the branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-close-out-no-row-gc",
+        "title": "docs/MERGE-WORKFLOW.md names the only paths that still delete state.json",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-09-20T23:05:13.326Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3968",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"close-out:prune-agent-rows\" docs/MERGE-WORKFLOW.md",
+            "grep -n \"pan admin db gc-agents\" docs/MERGE-WORKFLOW.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the first grep prints exactly one line",
+            "the second grep prints at least one line",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In `docs/MERGE-WORKFLOW.md`, in the paragraph at lines 153-157 that begins `Close-out prunes only regenerable agent-directory weight:` and ends `garbage collection, and retention remain the destructive cleanup paths.`, append: `The ceremony runs no agent-row garbage collection of its own (PAN-3968 removed the \\`close-out:prune-agent-rows\\` step); the only paths that delete \\`state.json\\` are deep-wipe, \\`pan admin db gc-agents\\`, and transcript retention.` Keep the wrap width of the surrounding text. No other doc changes: `CLAUDE.md` Key Invariants already says close-out prunes caches, never state or transcripts, and no Mintlify page under configuration/ or reference/ documents the ceremony's step list. Commit scope `docs`, trailer `Item: docs-close-out-no-row-gc`."
+        },
+        "items": [
+          {
+            "id": "docs-close-out-no-row-gc.ac1",
+            "title": "`grep -n \"close-out:prune-agent-rows\" docs/MERGE-WORKFLOW.md` prints exactly one line, inside the close-out paragraph, stating that the ceremony runs no agent-row garbage collection of its own",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-close-out-no-row-gc.ac2",
+            "title": "`grep -n \"pan admin db gc-agents\" docs/MERGE-WORKFLOW.md` prints a line that names deep-wipe, pan admin db gc-agents, and transcript retention as the only paths that delete state.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "remove-close-out-row-gc",
+        "to": "delete-prune-stopped-agents-for-issue",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

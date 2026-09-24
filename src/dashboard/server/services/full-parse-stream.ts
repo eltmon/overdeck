@@ -93,7 +93,7 @@ export function streamResolvedFullParseSnapshots(
               mtimeMs: before.mtimeMs, generation: result.transcriptGeneration };
             if (stopped) return;
             latestWorkLog = result.workLog;
-            if (result.messages.length > 0 && !hasContent) {
+            if ((result.messages.length > 0 || result.workLog.length > 0) && !hasContent) {
               // Real content arrived — lock onto this file and stop polling.
               hasContent = true;
               stopDiscovery();

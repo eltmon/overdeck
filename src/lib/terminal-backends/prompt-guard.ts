@@ -10,9 +10,10 @@
  *     id for the same target inside a bounded window is dropped, not delivered.
  *  2. **Authority.** A pane whose tokens say issue X and role `worker` accepts
  *     prompts only from the pane whose tokens say issue X and role `work`
- *     (its foreman), or from an operator conversation — a sender id starting
- *     `conv-` that carries no `issue` token. Any other sender is refused with
- *     a reason.
+ *     (its foreman), from the sender whose id equals the pane's `parent` token
+ *     (the agent or conversation that ran `pan worker run`, PAN-3920), or from
+ *     an operator conversation — a sender id starting `conv-` that carries no
+ *     `issue` token. Any other sender is refused with a reason.
  *
  * The ring is in memory and per process: it de-duplicates inside the long-lived
  * dashboard server, which is where the repeated deliveries came from. Two
@@ -45,11 +46,11 @@ export function toPaneRole(role: string | undefined): AgentRole {
 }
 
 /**
- * The four pane tokens derived from an agent's launch metadata. This is where a
+ * The pane tokens derived from an agent's launch metadata. This is where a
  * tmux target's tokens come from — a tmux pane carries none of its own.
  */
 export function tokensFromLaunchMetadata(
-  state: { issueId?: string; role?: string; harness?: string; model?: string } | null | undefined,
+  state: { issueId?: string; role?: string; harness?: string; model?: string; parentId?: string } | null | undefined,
 ): Partial<PaneTokens> {
   if (!state) return {};
   return {
@@ -57,11 +58,12 @@ export function tokensFromLaunchMetadata(
     role: toPaneRole(state.role),
     harness: state.harness ?? 'claude-code',
     model: state.model ?? 'unknown',
+    ...(state.parentId ? { parent: state.parentId } : {}),
   };
 }
 
 /** How many recent message ids are remembered per target. */
-export const PROMPT_RING_SIZE = 64;
+const PROMPT_RING_SIZE = 64;
 
 /** How long a remembered id suppresses a repeat. */
 export const PROMPT_DEDUPE_WINDOW_MS = 10 * 60 * 1000;
@@ -139,7 +141,7 @@ function sameIssue(a: string | undefined, b: string | undefined): boolean {
  * everyone but an operator — a human at a conversation always keeps the ability
  * to steer, and an agent never gains one it could not be granted.
  */
-export function checkPromptAuthority(
+function checkPromptAuthority(
   targetTokens: Partial<PaneTokens>,
   sender: PromptSender,
   tokensAvailable = true,
@@ -157,6 +159,8 @@ export function checkPromptAuthority(
 
   const issue = targetTokens.issue;
   if (sender.role === 'work' && sameIssue(sender.issue, issue)) return { allow: true };
+  // PAN-3920: the agent or conversation that spawned this worker may steer it.
+  if (targetTokens.parent && sender.id.toLowerCase() === targetTokens.parent.toLowerCase()) return { allow: true };
 
   const senderRole: AgentRole | 'unknown' = sender.role ?? 'unknown';
   const senderIssue = sender.issue ?? 'no issue';
@@ -164,7 +168,7 @@ export function checkPromptAuthority(
     refused: true,
     reason:
       `${sender.id} (role ${senderRole}, ${senderIssue}) may not prompt a worker pane of ` +
-      `${issue ?? 'an unknown issue'}: only that issue's work pane or an operator conversation may.`,
+      `${issue ?? 'an unknown issue'}: only that issue's work pane, the worker's parent, or an operator conversation may.`,
   };
 }
 

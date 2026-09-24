@@ -45,8 +45,8 @@ const spawnCalls: string[] = [];
 const waitCalls: string[] = [];
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 async function createForkPair(options: { forkStatus?: string; forkMode?: 'summary' | 'handoff' | 'plain'; title?: string } = {}) {

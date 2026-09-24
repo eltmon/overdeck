@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { archiveFailedSwarmSlot, nextSwarmSlotIndex, SWARM_SUPERSEDED_RETENTION } from '../../../../src/lib/cloister/swarm-failed-slot.js';
+import { archiveFailedSwarmSlot } from '../../../../src/lib/cloister/swarm-failed-slot.js';
 import { readSwarmSlotState } from '../../../../src/lib/cloister/swarm-slot-store.js';
 
 let projectRoot = '';
@@ -28,37 +28,6 @@ afterEach(() => {
   workspace = '';
 });
 
-describe('PAN-2543 failed swarm slot supersession', () => {
-  it('retains superseded attempts until issue close-out, never time-based GC', () => {
-    expect(SWARM_SUPERSEDED_RETENTION).toBe('issue-close-out');
-  });
-
-  it('archives occupied branch/worktree metadata and preserves a monotonic next index', async () => {
-    makeWorkspace('pan-2543-swarm-', 'pan-2543');
-    mkdirSync(`${workspace}-slot-2`);
-    const runGitCommand = vi.fn(async () => undefined);
-    const clearSlotAssignment = vi.fn();
-    const reconciled = {
-      issueId: 'PAN-2543', merged: [], pending: [], agents: [],
-      inFlight: [{ itemId: 'wi-8', slotIndex: 2, status: 'in_flight' as const }],
-      branches: [{ slotIndex: 2, branch: 'feature/pan-2543-slot-2', merged: false }],
-    };
-
-    await archiveFailedSwarmSlot('PAN-2543', workspace, {
-      ...reconciled.inFlight[0], branch: 'feature/pan-2543-slot-2', agentId: 'agent-pan-2543-slot-2', reason: 'auth-death',
-    }, { runGitCommand, clearSlotAssignment }, new Date('2026-07-10T01:02:03.000Z'));
-
-    const state = readSwarmSlotState(workspace, 'PAN-2543');
-    expect(state?.supersededAttempts).toEqual([expect.objectContaining({
-      slotIndex: 2, itemId: 'wi-8', reason: 'auth-death',
-      archivedBranch: 'feature/pan-2543-slot-2-failed-20260710010203000',
-    })]);
-    expect(nextSwarmSlotIndex(state, reconciled)).toBe(3);
-    expect(runGitCommand).toHaveBeenNthCalledWith(1, expect.stringContaining('git worktree move'), workspace);
-    expect(runGitCommand).toHaveBeenNthCalledWith(2, expect.stringContaining('git branch -m'), workspace);
-    expect(clearSlotAssignment).toHaveBeenCalledWith(workspace, 'PAN-2543', 2, 'wi-8');
-  });
-});
 
 describe('PAN-2372 WI-4 supersession clears the durable slot-completion marker (FR-6, AC4)', () => {
   it('removes slotCompletions[slotIndex] when a slot is archived/superseded, preserving siblings', async () => {

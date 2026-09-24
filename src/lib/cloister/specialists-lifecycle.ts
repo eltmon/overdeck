@@ -244,8 +244,8 @@ export async function signalSpecialistCompletion(
   // Finalize log if there's a current run
   if (metadata.currentRun) {
     try {
-      const { finalizeRunLogSync } = await import('./specialist-logs.js');
-      finalizeRunLogSync(projectKey, specialistType, metadata.currentRun, {
+      const { finalizeRunLog } = await import('./specialist-logs.js');
+      finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
         status: result.status,
         notes: result.notes,
       });
@@ -307,10 +307,10 @@ export async function terminateSpecialist(
 
   // Finalize log if there's a current run
   if (metadata.currentRun) {
-    const { finalizeRunLogSync } = await import('./specialist-logs.js');
+    const { finalizeRunLog } = await import('./specialist-logs.js');
 
     try {
-      finalizeRunLogSync(projectKey, specialistType, metadata.currentRun, {
+      finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
         status: metadata.lastRunStatus || 'incomplete',
         notes: 'Specialist terminated',
       });
@@ -353,11 +353,11 @@ function scheduleLogCleanup(projectKey: string, specialistType: SpecialistAgentN
   // Run async without awaiting
   Promise.resolve().then(async () => {
     try {
-      const { cleanupOldLogsSync } = await import('./specialist-logs.js');
+      const { cleanupOldLogs } = await import('./specialist-logs.js');
       const { getSpecialistRetention } = await import('../projects.js');
 
       const retention = getSpecialistRetention(projectKey);
-      const deleted = cleanupOldLogsSync(projectKey, specialistType, { maxDays: retention.max_days, maxRuns: retention.max_runs });
+      const deleted = cleanupOldLogs(projectKey, specialistType, { maxDays: retention.max_days, maxRuns: retention.max_runs });
 
       if (deleted > 0) {
         console.log(`[specialist] Cleaned up ${deleted} old logs for ${projectKey}/${specialistType}`);

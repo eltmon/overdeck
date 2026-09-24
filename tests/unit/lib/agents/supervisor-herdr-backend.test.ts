@@ -14,7 +14,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { decideSupervisorForWorkAgent, prepareSupervisorForFreshLaunch } from '../../../../src/lib/agents/supervisor-channels.js';
-import { generateLauncherScriptSync } from '../../../../src/lib/launcher-generator.js';
+import { generateLauncherScript } from '../../../../src/lib/launcher-generator.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 
 function workState(overrides: Partial<AgentState> = {}): AgentState {
@@ -113,7 +113,7 @@ describe('launcher shape without the supervisor', () => {
   };
 
   it('execs the harness directly, so the pane\'s foreground process is the harness', () => {
-    const script = generateLauncherScriptSync({ ...launcherConfig, useSupervisor: false });
+    const script = generateLauncherScript({ ...launcherConfig, useSupervisor: false });
 
     const execLine = script.trimEnd().split('\n').at(-1) ?? '';
     expect(execLine.startsWith('exec claude ')).toBe(true);
@@ -121,7 +121,7 @@ describe('launcher shape without the supervisor', () => {
   });
 
   it('still wraps when the supervisor is asked for (the tmux path is unchanged)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...launcherConfig,
       useSupervisor: true,
       supervisorScriptPath: '/repo/dist/pty-supervisor.js',

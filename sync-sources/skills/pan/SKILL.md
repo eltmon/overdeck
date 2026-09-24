@@ -27,6 +27,8 @@ Dispatch to any `pan` command, or show the full command taxonomy.
 LIFECYCLE VERBS (top-level)
   pan start <id>           Spawn work agent for an issue
   pan tell <id> <msg>      Send message to running agent
+  pan worker run --issue <id> --prompt <text>  Delegate a brief to a registered worker; prints its report
+  pan worker wait|report|list  Wait for, record, or list worker reports
   pan kill <id>            Stop a running agent
   pan resume <id>          Resume a paused agent
   pan recover <id>         Recover a crashed agent

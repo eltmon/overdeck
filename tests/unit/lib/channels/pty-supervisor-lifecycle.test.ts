@@ -46,6 +46,23 @@ describe('postAgentLifecycleEvent (PAN-3849)', () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it('falls back to the loopback API port, never the public DASHBOARD_URL', async () => {
+    vi.stubEnv('OVERDECK_DASHBOARD_URL', '');
+    vi.stubEnv('DASHBOARD_URL', 'https://overdeck.localhost');
+    vi.stubEnv('API_PORT', '4555');
+    try {
+      const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      const { dashboardUrl: _omit, ...deps } = depsWith(fetchImpl);
+
+      await expect(postAgentLifecycleEvent(AGENT, 'session-started', {}, deps)).resolves.toBe(true);
+
+      const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+      expect(url).toBe(`http://127.0.0.1:4555/api/agents/${AGENT}/lifecycle`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('includes exitCode for the exited event', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200 });
 
@@ -53,6 +70,18 @@ describe('postAgentLifecycleEvent (PAN-3849)', () => {
 
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, { body: string }];
     expect(JSON.parse(init.body)['exitCode']).toBe(1);
+  });
+
+  it('stamps every event with the same launch generation (PAN-3962)', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+
+    await postAgentLifecycleEvent(AGENT, 'session-started', {}, depsWith(fetchImpl));
+    await postAgentLifecycleEvent(AGENT, 'exited', { exitCode: 0 }, depsWith(fetchImpl));
+
+    const launches = fetchImpl.mock.calls.map(([, init]) => JSON.parse((init as { body: string }).body)['launchedAt']);
+    expect(typeof launches[0]).toBe('string');
+    expect(Number.isNaN(Date.parse(launches[0] as string))).toBe(false);
+    expect(launches[1]).toBe(launches[0]);
   });
 
   it('retries with backoff and posts once the dashboard recovers', async () => {

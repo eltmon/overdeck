@@ -12,8 +12,8 @@
  * unit-tested without spinning up an Effect HTTP server.
  */
 
-import { getProviderForModelSync } from './providers.js';
-import { canUseHarnessSync } from './harness-policy.js';
+import { getProviderForModel } from './providers.js';
+import { canUseHarness } from './harness-policy.js';
 import type { AuthMode } from './subscription-types.js';
 
 export type HarnessPolicyDecisionMap = Record<
@@ -68,20 +68,20 @@ export async function buildHarnessPolicyDecisions(
   const decisions: HarnessPolicyDecisionMap = {};
   const authModeByProvider = new Map<string, AuthMode | undefined>();
   for (const model of Array.from(new Set(models))) {
-    const providerName = getProviderForModelSync(model).name;
+    const providerName = getProviderForModel(model).name;
     let authMode = authModeByProvider.get(providerName);
     if (!authModeByProvider.has(providerName)) {
       authMode = await resolveAuthMode(model);
       authModeByProvider.set(providerName, authMode);
     }
     decisions[model] = {
-      'claude-code': canUseHarnessSync('claude-code', model, authMode),
-      ohmypi: canUseHarnessSync('ohmypi', model, authMode),
-      codex: canUseHarnessSync('codex', model, authMode),
-      acp: canUseHarnessSync('acp', model, authMode),
-      opencode: canUseHarnessSync('opencode', model, authMode),
-      'kimi-code': canUseHarnessSync('kimi-code', model, authMode),
-      muse: canUseHarnessSync('muse', model, authMode),
+      'claude-code': canUseHarness('claude-code', model, authMode),
+      ohmypi: canUseHarness('ohmypi', model, authMode),
+      codex: canUseHarness('codex', model, authMode),
+      acp: canUseHarness('acp', model, authMode),
+      opencode: canUseHarness('opencode', model, authMode),
+      'kimi-code': canUseHarness('kimi-code', model, authMode),
+      muse: canUseHarness('muse', model, authMode),
     };
   }
   return decisions;

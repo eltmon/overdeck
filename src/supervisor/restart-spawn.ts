@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -71,7 +70,7 @@ export function createSupervisorRestartSpawner(options: SupervisorRestartSpawner
   const spawnImpl = options.spawnFn ?? spawn;
 
   const heldRestartMessage = async (): Promise<string> => {
-    const holder = await Effect.runPromise(readRestartLockHolderImpl());
+    const holder = await readRestartLockHolderImpl();
     const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
     return `restart in progress (${heldBy})`;
   };
@@ -79,7 +78,7 @@ export function createSupervisorRestartSpawner(options: SupervisorRestartSpawner
   return async function spawnRestart(spawnOptions: SpawnSupervisorRestartOptions = {}): Promise<SpawnRestartResult> {
     let lock: RestartLockHandle | null = null;
     if (!spawnOptions.restartLockHeld) {
-      lock = await Effect.runPromise(acquireRestartLockImpl('supervisor restart'));
+      lock = await acquireRestartLockImpl('supervisor restart');
       if (!lock) return { pid: null, error: await heldRestartMessage() };
     }
 

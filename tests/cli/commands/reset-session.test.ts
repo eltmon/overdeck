@@ -2,19 +2,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   clearAgentSessionPointers: vi.fn(async () => ({ cleared: [] })),
-  listAgentIdsByPrefixSync: vi.fn(() => [
+  listAgentIdsByPrefix: vi.fn(() => [
     'agent-pan-2895-review',
     'agent-pan-2895-review-security',
   ]),
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentStateSync: (agentId: string) => ({
+  getAgentState: (agentId: string) => ({
     id: agentId,
     workspace: '/tmp/feature-pan-2895',
   }),
   getAgentDir: (agentId: string) => `/tmp/overdeck-agents/${agentId}`,
-  getLatestSessionIdSync: (agentId: string) => `${agentId}-session`,
+  getLatestSessionId: (agentId: string) => `${agentId}-session`,
 }));
 
 vi.mock('../../../src/lib/agents/session-pointers.js', () => ({
@@ -22,7 +22,7 @@ vi.mock('../../../src/lib/agents/session-pointers.js', () => ({
 }));
 
 vi.mock('../../../src/lib/overdeck/agents.js', () => ({
-  listAgentIdsByPrefixSync: mocks.listAgentIdsByPrefixSync,
+  listAgentIdsByPrefix: mocks.listAgentIdsByPrefix,
 }));
 
 vi.mock('../../../src/lib/work-agent-lifecycle.js', () => ({
@@ -30,7 +30,7 @@ vi.mock('../../../src/lib/work-agent-lifecycle.js', () => ({
 }));
 
 vi.mock('../../../src/lib/issue-id.js', () => ({
-  resolveIssueIdSync: (id: string) => id.toUpperCase(),
+  resolveIssueId: (id: string) => id.toUpperCase(),
 }));
 
 import { resetReviewSessionsCommand, resetSessionCommand } from '../../../src/cli/commands/reset-session.js';
@@ -71,7 +71,7 @@ describe('resetReviewSessionsCommand', () => {
 
     await resetReviewSessionsCommand('pan-2895');
 
-    expect(mocks.listAgentIdsByPrefixSync).toHaveBeenCalledWith('agent-pan-2895-review');
+    expect(mocks.listAgentIdsByPrefix).toHaveBeenCalledWith('agent-pan-2895-review');
     expect(mocks.clearAgentSessionPointers).toHaveBeenCalledTimes(2);
     expect(mocks.clearAgentSessionPointers).toHaveBeenCalledWith('agent-pan-2895-review');
     expect(mocks.clearAgentSessionPointers).toHaveBeenCalledWith('agent-pan-2895-review-security');

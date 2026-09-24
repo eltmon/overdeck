@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { readFileSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -353,7 +352,7 @@ export class SupervisorWatchdog {
         this.state.restartBlockedUntil = null;
         await this.persistState();
         await this.log(error);
-        await Effect.runPromise(writeRestartStatus({
+        await writeRestartStatus({
           ts: new Date(startedAt).toISOString(),
           trigger: 'watchdog',
           success: false,
@@ -363,7 +362,7 @@ export class SupervisorWatchdog {
           gaveUp: true,
           reason: restartReason ?? 'foreign dashboard eviction failed',
           pid: process.pid,
-        }));
+        });
         return;
       }
       await this.log(`watchdog evicted foreign dashboard PID(s) ${eviction.pids.join(', ')} from port ${this.config.dashboardApiPort} with SIGTERM`);
@@ -398,7 +397,7 @@ export class SupervisorWatchdog {
       this.state.restartBlockedUntil = null;
       await this.persistState();
       await this.log(error);
-      await Effect.runPromise(writeRestartStatus({
+      await writeRestartStatus({
         ts: new Date(startedAt).toISOString(),
         trigger: 'watchdog',
         success: false,
@@ -408,11 +407,11 @@ export class SupervisorWatchdog {
         gaveUp: true,
         reason: restartReason ?? restartLogReason ?? 'dashboard health check failed',
         pid: process.pid,
-      }));
+      });
       return;
     }
 
-    const lock = await Effect.runPromise(acquireRestartLock('supervisor watchdog'));
+    const lock = await acquireRestartLock('supervisor watchdog');
     if (!lock) {
       if (foreignDashboard) {
         const error = 'NEEDS YOU: watchdog evicted a foreign dashboard but could not restart the primary because the restart lock is held';
@@ -422,7 +421,7 @@ export class SupervisorWatchdog {
         this.state.restartBlockedUntil = null;
         await this.persistState();
         await this.log(error);
-        await Effect.runPromise(writeRestartStatus({
+        await writeRestartStatus({
           ts: new Date(startedAt).toISOString(),
           trigger: 'watchdog',
           success: false,
@@ -432,10 +431,10 @@ export class SupervisorWatchdog {
           gaveUp: true,
           reason: restartReason ?? 'foreign dashboard restart lock held',
           pid: process.pid,
-        }));
+        });
         return;
       }
-      const holder = await Effect.runPromise(readRestartLockHolder());
+      const holder = await readRestartLockHolder();
       const heldBy = holder ? `PID ${holder.pid} (${holder.caller})` : 'another process';
       this.state.restartBlockedReason = `restart lock held by ${heldBy}`;
       this.state.restartBlockedUntil = null;
@@ -483,7 +482,7 @@ export class SupervisorWatchdog {
       this.state.bootGraceStartedAt = this.now();
     }
 
-    await Effect.runPromise(writeRestartStatus({
+    await writeRestartStatus({
       ts: new Date(startedAt).toISOString(),
       trigger: 'watchdog',
       success: restartError === null,
@@ -492,7 +491,7 @@ export class SupervisorWatchdog {
       attempts: this.state.restartAttempts.length,
       reason: restartReason ?? 'dashboard health check failed',
       pid: process.pid,
-    }));
+    });
     if (restartError) {
       this.state.restartBlockedReason = `previous restart failed: ${restartError}`;
       await this.log(`watchdog restart failed: ${restartError}`);

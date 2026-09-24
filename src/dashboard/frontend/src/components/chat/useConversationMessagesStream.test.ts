@@ -75,14 +75,19 @@ describe('shouldStreamConversationMessages (PAN-1908 agent streaming)', () => {
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-2', harness: 'codex' }))).toBe(true);
   });
 
-  it('does NOT stream a synthetic claude agent session (stays on poll)', () => {
-    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: 'claude-code' }))).toBe(false);
-    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: null }))).toBe(false);
+  it('streams a synthetic claude agent session instead of polling', () => {
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: 'claude-code' }))).toBe(true);
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: null }))).toBe(true);
   });
 
   it('streams planning/specialist ohmypi sessions too', () => {
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'planning-pan-1908', harness: 'ohmypi' }))).toBe(true);
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'specialist-x-merge', harness: 'codex' }))).toBe(true);
+  });
+
+  it('streams strike and inspect agent panels through the shared identity predicate', () => {
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'strike-pan-3950', harness: 'claude-code' }))).toBe(true);
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'inspect-pan-3950-security', harness: 'codex' }))).toBe(true);
   });
 
   it('does not stream a non-agent synthetic name', () => {

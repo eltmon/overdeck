@@ -19,6 +19,7 @@
  * are unaffected — this is a structural split, not an API change.
  */
 import { existsSync, readFileSync, readdirSync } from 'fs';
+import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
@@ -189,6 +190,8 @@ export interface AgentState {
   slotIndex?: number;
   /** xBRIEF item id explicitly assigned to this registered swarm slot. */
   slotItemId?: string;
+  /** Conversation or agent that spawned this worker (PAN-3920). */
+  parentId?: string;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -251,6 +254,7 @@ export function cleanAgentState(raw: AgentState): AgentState {
     inspectSubRole: raw.inspectSubRole,
     slotIndex: raw.slotIndex,
     slotItemId: raw.slotItemId,
+    parentId: raw.parentId,
   };
 }
 
@@ -258,7 +262,7 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   try {
     const state = JSON.parse(content) as Partial<AgentState>;
     if (!isRole(state.role)) {
-      // Roleless states are invisible to getAgentState; cleanup is handled
+      // Roleless states are invisible to getAgentStateSync; cleanup is handled
       // by warnOnBareNumericIssueIds / dropLegacyAgentStatesMissingRoleAsync.
       return null;
     }
@@ -269,7 +273,11 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   }
 }
 
-export function getAgentStateSync(agentId: string): AgentState | null {
+/**
+ * Read one agent's `state.json`. Returns null when the file is absent, unparsable, or
+ * roleless; throws only when reading an existing file fails (e.g. EACCES).
+ */
+export function getAgentState(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
   const stateFile = getAgentStateFilePath(normalizedId);
   if (!existsSync(stateFile)) return null;
@@ -295,8 +303,33 @@ export function listAgentStatesSync(): AgentState[] {
   }
   const states: AgentState[] = [];
   for (const name of entries) {
-    const state = getAgentStateSync(name);
+    const state = getAgentState(name);
     if (state) states.push(state);
   }
   return states;
+}
+
+/**
+ * Async form of {@link listAgentStatesSync} for request paths (PAN-3920).
+ * `skip` drops directory names before any read (e.g. `conv-*`), and a
+ * `state.json` removed mid-scan (agent GC) is skipped rather than thrown.
+ */
+export async function listAgentStatesAsync(options: { skip?: (name: string) => boolean } = {}): Promise<AgentState[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(join(getOverdeckHome(), 'agents'));
+  } catch {
+    return [];
+  }
+  const states = await Promise.all(entries
+    .filter((name) => !options.skip?.(name))
+    .map(async (name) => {
+      const normalizedId = normalizeAgentId(name);
+      try {
+        return parseAgentState(await readFile(getAgentStateFilePath(normalizedId), 'utf8'), normalizedId);
+      } catch {
+        return null;
+      }
+    }));
+  return states.filter((state): state is AgentState => state !== null);
 }

@@ -213,7 +213,6 @@ That's the complete set. Three labels.
 ### Classification Labels (all trackers)
 
 Describe the type of work. User-assignable. Used for:
-- Complexity estimation (feeds into `COMPLEXITY_LABELS` in cloister)
 - Grouping in the "All" list view (PAN-273)
 - Filtering and reporting
 

@@ -47,7 +47,7 @@ export {
 
 export { clearFeedback, readFeedback, writeFeedback } from './feedback.js'
 export {
-  checkPrdGateSync,
+  checkPrdGate,
   deleteIssueDraft,
   getDraftPath,
   getDraftsDir,

@@ -7,7 +7,7 @@ import type {
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { backlogCandidates, computeBookProgress, getBook, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../../lib/orders/resolver.js';
+import { backlogCandidates, computeBookProgress, getBookAsync, listBooks, liveOrderIssueLookup, normalizeOrderIssueId } from '../../../lib/orders/resolver.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/types.js';
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
@@ -21,7 +21,7 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../../lib/orders/writer.js';
-import { findProjectByPathSync, getProjectSync, listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../../lib/projects.js';
+import { findProjectByPath, getProjectSync, listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../../lib/projects.js';
 import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
@@ -85,7 +85,7 @@ function resolveOrdersStateRoot(deps: OrdersRouteDeps, projectKey?: string): Ord
       projectConfig: project,
     };
   }
-  const project = findProjectByPathSync(process.cwd());
+  const project = findProjectByPath(process.cwd());
   if (!project) throw new Error(`No configured project contains ${process.cwd()}`);
   const key = projectKeyForConfig(project);
   return {
@@ -119,8 +119,8 @@ function resultResponse(result: RouteResult) {
   return jsonResponse(result.body, { status: result.status });
 }
 
-function requireBook(stateRoot: string, bookId: string): OrderBook {
-  const book = getBook(stateRoot, bookId);
+async function requireBook(stateRoot: string, bookId: string): Promise<OrderBook> {
+  const book = await getBookAsync(stateRoot, bookId);
   if (!book) throw new Error(`Order book not found: ${bookId}`);
   return book;
 }
@@ -197,11 +197,11 @@ function slugify(value: string): string {
   return slug || 'order-book';
 }
 
-function nextBookId(stateRoot: string, name: string, now: Date): string {
+async function nextBookId(stateRoot: string, name: string, now: Date): Promise<string> {
   const base = `${now.toISOString().slice(0, 10)}-${slugify(name)}`;
-  if (!getBook(stateRoot, base)) return base;
+  if (!await getBookAsync(stateRoot, base)) return base;
   let suffix = 2;
-  while (getBook(stateRoot, `${base}-${suffix}`)) suffix += 1;
+  while (await getBookAsync(stateRoot, `${base}-${suffix}`)) suffix += 1;
   return `${base}-${suffix}`;
 }
 
@@ -327,7 +327,7 @@ export async function postOrderPayload(
     const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
     const name = requireString(body['name'], 'name');
     const id = body['id'] === undefined
-      ? nextBookId(stateRoot, name, (deps.now ?? (() => new Date()))())
+      ? await nextBookId(stateRoot, name, (deps.now ?? (() => new Date()))())
       : requireString(body['id'], 'id');
     const settings = body['settings'] === undefined ? undefined : settingsPatch(body['settings']);
     return enrichedBook(await createBook(stateRoot, { id, name, settings }), deps, undefined, projectKey);
@@ -341,7 +341,7 @@ export async function getOrderPayload(
 ): Promise<RouteResult> {
   return routeResult(async () => {
     const primary = resolveOrdersStateRoot(deps, projectKey);
-    const book = getBook(primary.stateRoot, bookId);
+    const book = await getBookAsync(primary.stateRoot, bookId);
     if (book) return enrichedBook(book, deps, undefined, projectKey);
     if (deps.stateRoot || projectKey !== undefined) {
       throw new Error(`Order book not found: ${bookId}`);
@@ -375,7 +375,7 @@ export async function patchOrderPayload(
     if (body['status'] !== undefined) {
       if (body['status'] !== 'ready') throw new Error('status may only transition to ready through this route');
       if (body['runId'] !== undefined) throw new Error('runId is server-controlled');
-      const book = requireBook(stateRoot, bookId);
+      const book = await requireBook(stateRoot, bookId);
       if (book.status !== 'draft') throw new Error(`Order book ${bookId} must be draft before it can be queued`);
     }
 
@@ -393,7 +393,7 @@ export async function patchOrderPayload(
       changed = true;
     }
     if (!changed) throw new Error('name, settings, or status is required');
-    return enrichedBook(requireBook(stateRoot, bookId), deps, undefined, projectKey);
+    return enrichedBook(await requireBook(stateRoot, bookId), deps, undefined, projectKey);
   });
 }
 
@@ -405,7 +405,7 @@ export async function postOrderItemsPayload(
 ): Promise<RouteResult> {
   return routeResult(async () => {
     const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
-    const book = requireBook(stateRoot, bookId);
+    const book = await requireBook(stateRoot, bookId);
     const input = body['items'] ?? body['item'];
     if (input === undefined) throw new Error('items is required');
     const actor = (deps.actor ?? (() => 'dashboard'))();
@@ -437,7 +437,7 @@ export async function patchOrderItemPayload(
   return routeResult(async () => {
     const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
     const canonicalIssue = normalizeOrderIssueId(stateRoot, issueId).toUpperCase();
-    const existing = requireBook(stateRoot, bookId).items.find(
+    const existing = (await requireBook(stateRoot, bookId)).items.find(
       (item) => item.issue.toUpperCase() === canonicalIssue,
     );
     if (!existing) throw new Error(`Issue ${canonicalIssue} is not in order book ${bookId}`);
@@ -462,7 +462,7 @@ export async function patchOrderItemPayload(
       changed = true;
     }
     if (!changed) throw new Error('lane, order, prereqs, reVerify, or planAtPickup is required');
-    return enrichedBook(requireBook(stateRoot, bookId), deps, undefined, projectKey);
+    return enrichedBook(await requireBook(stateRoot, bookId), deps, undefined, projectKey);
   });
 }
 
@@ -483,7 +483,7 @@ export async function postOrderStartPayload(
 ): Promise<RouteResult> {
   return routeResult(async () => {
     const resolved = resolveOrdersStateRoot(deps, projectKey);
-    const book = requireBook(resolved.stateRoot, bookId);
+    const book = await requireBook(resolved.stateRoot, bookId);
     const validation = validateBookForStart(resolved.stateRoot, book, {
       issueLookup: deps.issueLookup,
       hasPrd: deps.hasPrd,
@@ -524,7 +524,7 @@ export async function getPreviewBriefPayload(
   projectKey?: string,
 ): Promise<RouteResult> {
   return routeResult(async () => {
-    const book = requireBook(resolveOrdersStateRoot(deps, projectKey).stateRoot, bookId);
+    const book = await requireBook(resolveOrdersStateRoot(deps, projectKey).stateRoot, bookId);
     return { bookId: book.id, brief: previewBrief(book) };
   });
 }

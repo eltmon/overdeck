@@ -438,7 +438,7 @@ describe('applyEvent — agent.created', () => {
 })
 
 describe('applyEvent — agent.stopped', () => {
-  it('removes agent from agentsById', () => {
+  it('retains agent in agentsById with stopped status', () => {
     const state = makeState({ agentsById: { 'agent-1': baseAgent } })
     const next = applyEvent(state, {
       type: 'agent.stopped',
@@ -446,8 +446,8 @@ describe('applyEvent — agent.stopped', () => {
       timestamp: ts(),
       payload: { agentId: 'agent-1', issueId: 'PAN-1' },
     })
-    expect(next.agentsById['agent-1']).toBeUndefined()
-    expect(Object.keys(next.agentsById)).toHaveLength(0)
+    expect(next.agentsById['agent-1']).toMatchObject({ status: 'stopped', hasLiveTmuxSession: false })
+    expect(Object.keys(next.agentsById)).toHaveLength(1)
   })
 
   it('does not error when agent not found', () => {
@@ -471,7 +471,8 @@ describe('applyEvent — agent.stopped', () => {
       payload: { agentId: 'agent-1', issueId: 'PAN-1' },
     })
     expect(next.agentsById['agent-2']).toEqual(agent2)
-    expect(Object.keys(next.agentsById)).toHaveLength(1)
+    expect(next.agentsById['agent-1']?.status).toBe('stopped')
+    expect(Object.keys(next.agentsById)).toHaveLength(2)
   })
 
   it('drops stored turn diff summaries for the stopped agent', () => {

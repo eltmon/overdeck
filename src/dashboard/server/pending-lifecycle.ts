@@ -14,7 +14,7 @@ import { readFile, rename, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { emitDashboardLifecycleSync } from '../../lib/activity-logger.js';
+import { emitDashboardLifecycle } from '../../lib/activity-logger.js';
 
 /**
  * An exclusive claim on the pending file (PAN-3917).
@@ -110,7 +110,7 @@ async function runClaimedPendingLifecycle(
     }
     await runner(pending);
     succeeded = true;
-    emitDashboardLifecycleSync('completed', {
+    emitDashboardLifecycle('completed', {
       reason: pending.reason ?? 'post-merge',
       issueId: pending.issueId,
       durationMs: Date.now() - startTime,
@@ -118,7 +118,7 @@ async function runClaimedPendingLifecycle(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[overdeck] Post-merge lifecycle failed for ${pending.issueId}: ${message}`);
-    emitDashboardLifecycleSync('failed', {
+    emitDashboardLifecycle('failed', {
       reason: pending.reason ?? 'post-merge',
       issueId: pending.issueId,
       error: message,
@@ -167,7 +167,7 @@ export async function processPendingLifecycle(options?: {
       const age = now - (marker.timestamp ?? 0);
 
       if (age <= staleThresholdMs) {
-        emitDashboardLifecycleSync('started', {
+        emitDashboardLifecycle('started', {
           reason: marker.reason ?? 'post-merge',
           issueId: marker.issueId,
           trigger: marker.trigger ?? 'deploy-script',

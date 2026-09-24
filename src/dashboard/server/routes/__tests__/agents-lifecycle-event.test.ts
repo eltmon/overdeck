@@ -37,7 +37,6 @@ vi.mock('../../services/agent-projection.js', () => ({
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
 }));
 
 vi.mock('../origin-validation.js', () => ({
@@ -96,10 +95,10 @@ function getLastAppendedLogLine(): { event?: string } | null {
 describe('createAgentStopHandler lifecycle events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAgentState.mockReturnValue(Effect.succeed({
+    mockGetAgentState.mockReturnValue({
       issueId: 'PAN-TEST',
       role: 'work',
-    } as any));
+    } as any);
     mockStopAgent.mockReturnValue(Effect.void);
     mockAppendFile.mockResolvedValue(undefined);
     mockMkdir.mockResolvedValue(undefined);

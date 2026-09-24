@@ -39,8 +39,8 @@ function makeWorkspace(devScript?: string): string {
 }
 
 async function loadStopDocker() {
-  const { stopWorkspaceDockerPromise } = await import('../../../../src/lib/workspace-manager/docker.js');
-  return stopWorkspaceDockerPromise;
+  const { stopWorkspaceDocker } = await import('../../../../src/lib/workspace-manager/docker.js');
+  return stopWorkspaceDocker;
 }
 
 // Normalizes both invocation shapes this module uses: execAsync(shellString,
@@ -53,7 +53,7 @@ function commandsOf(): string[] {
   });
 }
 
-describe('stopWorkspaceDockerPromise — canonical resolver (PAN-3049)', () => {
+describe('stopWorkspaceDocker — canonical resolver (PAN-3049)', () => {
   beforeEach(() => {
     mockExecAsync.mockReset();
     mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });

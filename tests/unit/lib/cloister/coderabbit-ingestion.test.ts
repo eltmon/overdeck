@@ -5,9 +5,6 @@ import { exec } from 'node:child_process';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   fetchCodeRabbitFindings,
-  postCodeRabbitReply,
-  CODERABBIT_REPLY_ADDRESSED,
-  CODERABBIT_REPLY_REJECTED,
   type CodeRabbitFinding,
 } from '../../../../src/lib/cloister/coderabbit-ingestion.js';
 import { lookupPullRequestNumberForBranch } from '../../../../src/lib/github-pr-lookup.js';
@@ -132,42 +129,3 @@ describe('fetchCodeRabbitFindings', () => {
   });
 });
 
-describe('postCodeRabbitReply', () => {
-  it('calls postPrComment with the addressed template', async () => {
-    const prUrl = 'https://github.com/eltmon/overdeck/pull/42';
-    const finding = 'Consider extracting this.';
-
-    const result = await postCodeRabbitReply(prUrl, 'addressed', finding);
-
-    expect(result).toBe(true);
-    expect(mockPostPrComment).toHaveBeenCalledWith(prUrl, CODERABBIT_REPLY_ADDRESSED(finding));
-    expect(mockPostPrComment).toHaveBeenCalledWith(prUrl, expect.stringContaining('addressed: Consider extracting this.'));
-  });
-
-  it('calls postPrComment with the rejected template including rationale', async () => {
-    const prUrl = 'https://github.com/eltmon/overdeck/pull/42';
-    const finding = 'Unused import.';
-    const rationale = 'This import is used by the test harness.';
-
-    const result = await postCodeRabbitReply(prUrl, 'rejected', finding, rationale);
-
-    expect(result).toBe(true);
-    expect(mockPostPrComment).toHaveBeenCalledWith(prUrl, CODERABBIT_REPLY_REJECTED(finding, rationale));
-    expect(mockPostPrComment).toHaveBeenCalledWith(
-      prUrl,
-      expect.stringContaining("we're not applying this: Unused import.. Rationale: This import is used by the test harness."),
-    );
-  });
-
-  it('returns false without throwing when postPrComment rejects', async () => {
-    mockPostPrComment.mockRejectedValue(new Error('gh api failed'));
-
-    const result = await postCodeRabbitReply(
-      'https://github.com/eltmon/overdeck/pull/42',
-      'addressed',
-      'finding',
-    );
-
-    expect(result).toBe(false);
-  });
-});

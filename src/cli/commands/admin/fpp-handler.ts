@@ -1,12 +1,12 @@
 import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import {
-  checkHookSync,
-  pushToHookSync,
-  popFromHookSync,
-  clearHookSync,
-  sendMailSync,
-  generateFixedPointPromptSync,
+  checkHook,
+  pushToHook,
+  popFromHook,
+  clearHook,
+  sendMail,
+  generateFixedPointPrompt,
   HookItem,
 } from '../../../lib/hooks.js';
 import { normalizeAgentId } from '../../../lib/agents.js';
@@ -25,7 +25,7 @@ export async function hookCommand(
 
   switch (action) {
     case 'check': {
-      const result = checkHookSync(idOrMessage || agentId);
+      const result = checkHook(idOrMessage || agentId);
 
       if (options.json) {
         console.log(JSON.stringify(result, null, 2));
@@ -76,7 +76,7 @@ export async function hookCommand(
         return exitCli(1);
       }
 
-      const item = pushToHookSync(normalizeAgentId(targetAgent), {
+      const item = pushToHook(normalizeAgentId(targetAgent), {
         type: 'task',
         priority: 'normal',
         source: 'cli',
@@ -93,7 +93,7 @@ export async function hookCommand(
         return exitCli(1);
       }
 
-      const success = popFromHookSync(agentId, idOrMessage);
+      const success = popFromHook(agentId, idOrMessage);
       if (success) {
         console.log(chalk.green(`✓ Popped: ${idOrMessage}`));
       } else {
@@ -103,7 +103,7 @@ export async function hookCommand(
     }
 
     case 'clear': {
-      clearHookSync(idOrMessage || agentId);
+      clearHook(idOrMessage || agentId);
       console.log(chalk.green('✓ Hook cleared'));
       break;
     }
@@ -122,7 +122,7 @@ export async function hookCommand(
         return exitCli(1);
       }
 
-      sendMailSync(
+      sendMail(
         normalizeAgentId(targetAgent),
         'cli',
         message
@@ -133,7 +133,7 @@ export async function hookCommand(
     }
 
     case 'fpp': {
-      const prompt = generateFixedPointPromptSync(idOrMessage || agentId);
+      const prompt = generateFixedPointPrompt(idOrMessage || agentId);
 
       if (!prompt) {
         console.log(chalk.green('No fixed point work found'));

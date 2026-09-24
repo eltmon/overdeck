@@ -104,6 +104,36 @@ docker --version
 git --version
 ```
 
+### 6. Herdr
+
+Herdr is the default terminal backend and is strict: when it is selected but its binary or this home's
+session socket is missing, agent launches fail and `pan doctor` exits 1. Doctor prints these rows:
+
+| Row | Fix when it fails |
+| --- | --- |
+| `Terminal backend` | `pan install` (or set `terminal.backend: tmux` in `~/.overdeck/config.yaml`) |
+| `Herdr binary` | `pan install` |
+| `Herdr server` | `pan sync` (restarting a stale server is manual: `systemctl --user restart overdeck-herdr.service` closes every agent pane) |
+| `Herdr config` | `pan sync` (sets `resume_agents_on_restore = false`) |
+| `Herdr integration: <target>` | `pan sync` (pilot set `pi`, `omp`, `kimi`, `opencode`; `claude`, `codex`, `hermes` are not managed) |
+
+Under an explicit tmux backend only the `Terminal backend` row appears.
+
+### 7. Plan home `.pan/` tracking
+
+Planning artifacts are committed under `.pan/` in each project's plan home. Before the Cut, Overdeck
+wrote `.pan/` into project `.gitignore` files, and that rule makes every planning commit fail
+(`The following paths are ignored by one of your .gitignore files: .pan`). The
+`Plan home .pan/ tracking` row WARNs for each registered plan home where `git check-ignore` matches
+`.pan/`, naming the rule's `file:line`:
+
+| Rule source | Fix |
+| --- | --- |
+| Exact `.pan/` or `.pan` line in the repo's top-level `.gitignore` (Overdeck's legacy line) | `pan admin migrate-plan-home <key> --repair-ignore` removes that line and commits `.gitignore` alone (no migration, no tracker lookup), or delete the line and commit it yourself |
+| Anything else (nested `.gitignore`, `.git/info/exclude`, `core.excludesFile`, a broader pattern) | Not Overdeck's rule: doctor never edits it. Remove or narrow it yourself |
+
+Doctor only reports; it has no `--fix`.
+
 ## Health Checklist
 
 | Component | Check Command | Expected |

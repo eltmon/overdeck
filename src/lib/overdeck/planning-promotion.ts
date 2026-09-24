@@ -13,23 +13,24 @@ import { validateOrigin } from '../../dashboard/server/routes/origin-validation.
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
-import { getAgentStateSync } from '../agents.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { getAgentState } from '../agents.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
-import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { checkPrdGate, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
 import { PENDING_PROMOTION_FILENAME } from '../pan-dir/types.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
-import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
+import { extractTeamPrefix, findProjectByPath, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
 import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-commit.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { killSession, sessionExists } from '../tmux.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
+import { sessionExists } from '../tmux.js';
+import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../xbrief/quality-lint.js';
 import { isPreWorktreeMetadataOnlyDir } from '../workspace-manager/worktree-ops.js';
-import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { resolveIssueProjectPath } from './issue-reads.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -37,7 +38,7 @@ function getIssueDataService() {
   return getSharedIssueService();
 }
 
-export async function removePendingPromotionMarker(
+async function removePendingPromotionMarker(
   workspacePath: string,
   log: (message: string) => void = console.log,
 ): Promise<boolean> {
@@ -54,7 +55,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -144,7 +145,7 @@ function emitCompletePlanningPhase(
   details: Record<string, unknown> = {},
 ): void {
   const timestamp = new Date().toISOString();
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'complete-planning',
     level: status === 'failure' ? 'error' : status === 'skipped' ? 'warn' : 'info',
     message: `complete-planning.phase=${phase}`,
@@ -202,16 +203,6 @@ export async function completePlanningArtifacts(options: {
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
   if (planItemCount === 0) throw new Error(`The xBRIEF for ${upperIssueId} contains no implementation items.`);
   return { proposed, taskCount: planItemCount, taskWarning: null };
-}
-
-export function completePlanningFilesToStage(root: string, proposedFilename: string): string[] {
-  const filesToStage = [`.pan/specs/${proposedFilename}`];
-  if (existsSync(join(root, '.overdeck', 'context', 'codebase'))) {
-    filesToStage.push('.overdeck/context/codebase/');
-  } else if (existsSync(join(root, '.pan', 'context', 'codebase'))) {
-    filesToStage.push('.pan/context/codebase/');
-  }
-  return filesToStage;
 }
 
 export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string[][] {
@@ -287,7 +278,7 @@ export async function commitCompletePlanningWorkspaceGit(
  * workspace's own `.pan/`, so the tree handed to auto-start would otherwise be
  * dirty and the start-agent guard would refuse to spawn.
  */
-export async function commitWorkspacePlanArtifacts(gitRoot: string, issueId: string): Promise<void> {
+async function commitWorkspacePlanArtifacts(gitRoot: string, issueId: string): Promise<void> {
   if (!existsSync(join(gitRoot, '.git'))) return;
   const outcome = await commitPlanArtifacts({
     cwd: gitRoot,
@@ -328,7 +319,7 @@ export async function recordPlanningAutoHandoffFailure(options: {
   result: CompletePlanningAutoSpawnResult;
   eventStore: any;
   now?: () => string;
-  emitActivity?: typeof emitActivityEntrySync;
+  emitActivity?: typeof emitActivityEntry;
 }): Promise<string> {
   const skipReason = options.result.workAgentSkipReason ?? 'spawn-failed';
   const error = options.result.workAgentError ?? `Work agent startup failed: ${skipReason}`;
@@ -347,7 +338,7 @@ export async function recordPlanningAutoHandoffFailure(options: {
       ...details,
     },
   }));
-  (options.emitActivity ?? emitActivityEntrySync)({
+  (options.emitActivity ?? emitActivityEntry)({
     source: 'plan',
     level: 'error',
     message: `${options.issueId} planning complete, but work-agent startup failed: ${error}`,
@@ -370,7 +361,7 @@ export async function completePlanningAutoSpawn(options: {
   }
 
   const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
-  const internalToken = getInternalTokenSync();
+  const internalToken = getInternalToken();
   const internalTokenHeaders: Record<string, string> = internalToken
     ? { [INTERNAL_TOKEN_HEADER]: internalToken }
     : {};
@@ -484,7 +475,10 @@ export async function completePlanningAutoSpawnAndKill(options: {
 
   if (options.skipKill) return autoSpawnResult;
 
-  const killSessionImpl = options.killSessionImpl ?? ((target: string) => Effect.runPromise(killSession(target)));
+  // PAN-3960: planners launch through the host's terminal backend, so the
+  // planner is closed through it too — a Herdr pane has no tmux session.
+  const killSessionImpl = options.killSessionImpl
+    ?? (async (target: string) => { await closeAgentPane(target); });
   const logError = options.logError ?? console.error;
   const runKill = async (): Promise<void> => {
     try {
@@ -570,7 +564,7 @@ export async function completePlanningForIssue(options: {
     // in a non-active file, and the active-file lookup can transiently fail with
     // ENOENT as files are renamed. Scanning only the active file is exactly how
     // TIN-1 completed planning while the operator's question was still open.
-    const pendingAuq = await Effect.runPromise(countPendingAskUserQuestionsForAgent(sessionName));
+    const pendingAuq = await countPendingAskUserQuestionsForAgent(sessionName);
     if (pendingAuq > 0) {
       console.log(`[complete-planning] ${id} has ${pendingAuq} pending AskUserQuestion(s) — agent is waiting for the operator, not done. No-op.`);
       return jsonResponse({ ok: true, skipped: 'pending-ask-user-question' });
@@ -598,7 +592,7 @@ export async function completePlanningForIssue(options: {
 
     // Determine project path
     const githubCheck = isGitHubIssue(id);
-    const projectPath = resolveIssueProjectPathSync(id);
+    const projectPath = resolveIssueProjectPath(id);
 
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
     if (workspacePath) {
@@ -608,7 +602,7 @@ export async function completePlanningForIssue(options: {
       if (noPrd) {
         emitCompletePlanningPhase(id, 'prdGate', 'skipped', 'noPrd bypass requested');
       } else {
-        const prdGate = checkPrdGateSync({ projectRoot: projectPath || null, workspacePath, issueId: id });
+        const prdGate = checkPrdGate({ projectRoot: projectPath || null, workspacePath, issueId: id });
         if (!prdGate.ok) {
           emitCompletePlanningPhase(id, 'prdGate', 'failure', prdGate.reason ?? 'missing', { prdGate });
           return jsonResponse({ error: `PRD-first gate: no PRD draft for ${id.toUpperCase()}`, prdGate }, { status: 422 });
@@ -744,10 +738,10 @@ export async function completePlanningForIssue(options: {
     // hasLiveTmuxSession:true after the session died would never self-heal).
     const projectPlanningAgentStopped = async (): Promise<void> => {
       try {
-        const planningState = getAgentStateSync(sessionName);
+        const planningState = getAgentState(sessionName);
         if (!planningState) return;
         const previousStatus = planningState.status;
-        const hasLiveTmuxSession = await Effect.runPromise(sessionExists(sessionName));
+        const hasLiveTmuxSession = await agentPaneExists(sessionName).catch(() => false);
         saveAgentStateAndEmitEvent(
           { ...planningState, status: 'stopped', stoppedAt: planningState.stoppedAt ?? new Date().toISOString() },
           {
@@ -811,7 +805,7 @@ export async function completePlanningForIssue(options: {
         eventStore,
       });
     } else {
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'plan',
         level: 'info',
         message: autoSpawnResult?.workAgentSpawned
@@ -819,7 +813,7 @@ export async function completePlanningForIssue(options: {
           : `${id} planning complete — ready for work`,
         issueId: id,
       });
-      emitActivityTtsSync({
+      emitActivityTts({
         utterance: autoSpawnResult?.workAgentSpawned
           ? `${id} planning complete, work agent starting`
           : `${id} planning complete, ready for work`,

@@ -72,7 +72,7 @@ describe('workspace tables top-up (PAN-1990)', () => {
 
   it('re-running the top-up against an already-migrated db is a no-op (idempotent)', () => {
     const db = odb.raw();
-    // getOverdeckDatabaseSync() already ran the top-up once when odb.raw() first
+    // getOverdeckDatabase() already ran the top-up once when odb.raw() first
     // opened the db; calling it again for the same path must not throw.
     expect(() => odb.raw()).not.toThrow();
     const tables = db.prepare(`

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { buildCorrelationMapSync } from '../correlator.js';
-import { sessionFilePath } from '../../paths.js';
+import { buildCorrelationMap } from '../correlator.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 import {
   setupOverdeckTestDb,
   teardownOverdeckTestDb,
@@ -18,12 +18,12 @@ afterEach(() => {
   teardownOverdeckTestDb(odb);
 });
 
-describe('buildCorrelationMapSync', () => {
+describe('buildCorrelationMap', () => {
   it('keeps Claude path correlation unchanged', () => {
     seedConversation('conv-claude', 'conv-claude', '/home/user/Projects/app', 'PAN-457', 'claude-sess');
     const path = sessionFilePath('/home/user/Projects/app', 'claude-sess');
 
-    const map = buildCorrelationMapSync([path]);
+    const map = buildCorrelationMap([path]);
 
     expect(map.get(path)).toMatchObject({
       overdeckManaged: true,
@@ -36,7 +36,7 @@ describe('buildCorrelationMapSync', () => {
     seedConversation('conv-omp', 'conv-omp', '/home/user/Projects/app', 'PAN-2224', 'omp-session-1', 'ohmypi');
     const path = '/tmp/20260702_omp-session-1.jsonl';
 
-    const map = buildCorrelationMapSync([path], new Map([[path, 'omp-session-1']]));
+    const map = buildCorrelationMap([path], new Map([[path, 'omp-session-1']]));
 
     expect(map.get(path)).toMatchObject({
       overdeckManaged: true,

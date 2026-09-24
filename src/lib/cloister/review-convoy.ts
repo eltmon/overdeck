@@ -15,13 +15,13 @@
 import { mkdir, readFile, rm } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
-import { listSessionNames } from '../tmux.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { appendPipelineEntry } from './pipeline-journal.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -57,9 +57,17 @@ function isReviewerStateWriteContention(error: unknown, agentId: string): boolea
     && /database is locked|SQLITE_BUSY/i.test(message);
 }
 
+/**
+ * Is this reviewer's pane still there?
+ *
+ * This used to ask tmux for session names, which is always empty under Herdr —
+ * so on the default backend every reviewer read as dead. `agentPaneExists`
+ * asks the SELECTED backend.
+ */
 async function reviewerSessionIsLive(agentId: string): Promise<boolean> {
   try {
-    return (await Effect.runPromise(listSessionNames())).includes(agentId);
+    const { agentPaneExists } = await import('../terminal-backends/launch.js');
+    return await agentPaneExists(agentId);
   } catch {
     return false;
   }
@@ -69,9 +77,8 @@ function reviewerAgentOutputPath(workspace: string, runId: string, subRole: Revi
   return join(workspace, PAN_DIRNAME, 'review', runId, `${subRole}.md`);
 }
 
-
-
-async function buildConvoyPromptPromise(opts: {
+/** Render the prompt for one convoy sub-reviewer. Template read failures reject. */
+export async function buildConvoyPrompt(opts: {
   issueId: string;
   subRole: string;
   outputPath: string;
@@ -129,9 +136,11 @@ async function buildConvoyPromptPromise(opts: {
   return prompt;
 }
 
-
-
-async function spawnReviewSubRoleForIssuePromise(opts: {
+/**
+ * Spawn (or resume) one convoy sub-reviewer. Errors are aggregated into the
+ * structured result instead of rejecting.
+ */
+export async function spawnReviewSubRoleForIssue(opts: {
   issueId: string;
   workspace: string;
   subRole: ReviewSubRole;
@@ -144,7 +153,7 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
   allowHost?: boolean;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { saveAgentState, spawnRun, getAgentStateSync, getLatestSessionIdSync, resumeAgent, stopAgent } = await import('../agents.js');
+    const { saveAgentState, spawnRun, getAgentState, getLatestSessionId, resumeAgent, stopAgent } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
@@ -169,34 +178,34 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
       }
     }
 
-    const prompt = await Effect.runPromise(buildConvoyPrompt({
+    const prompt = await buildConvoyPrompt({
       issueId: opts.issueId,
       subRole: opts.subRole,
       outputPath,
       synthesisAgentId,
       contextManifestPath: opts.contextManifestPath,
       tier1Summary,
-    }));
+    });
 
     // PAN-1862: convoy sub-reviewers RESUME by default too — same rule as quick review. Each
     // lane keeps its prior round's context so a re-review checks the fix instead of re-reading
     // the whole diff. Fresh-spawn only on a harness/model change or when no session exists.
     const reviewerAgent = reviewerAgentId(opts.issueId, opts.subRole);
-    const savedReviewer = getAgentStateSync(reviewerAgent);
+    const savedReviewer = getAgentState(reviewerAgent);
     const canResumeReviewer = reviewResumeDecision({
       requestedModel: opts.model ?? model,
       requestedHarness: opts.harness,
       savedModel: savedReviewer?.model,
       savedHarness: savedReviewer?.harness,
       hasSavedState: !!savedReviewer,
-      hasSavedSession: !!getLatestSessionIdSync(reviewerAgent),
+      hasSavedSession: !!getLatestSessionId(reviewerAgent),
     });
     if (canResumeReviewer) {
       console.log(`[review-agent] Resuming convoy sub-reviewer ${opts.subRole} for ${opts.issueId} — preserving context (PAN-1862)`);
       const resumeResult = await resumeAgent(reviewerAgent, prompt);
       if (resumeResult.success && resumeResult.messageDelivered !== false) {
         try {
-          const resumed = getAgentStateSync(reviewerAgent);
+          const resumed = getAgentState(reviewerAgent);
           if (resumed) {
             resumed.reviewSubRole = opts.subRole;
             resumed.reviewRunId = opts.runId;
@@ -268,8 +277,8 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
       }
     }
     try {
-      const { notifyPipelineSync } = await import('../pipeline-notifier.js');
-      notifyPipelineSync({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
+      const { notifyPipeline } = await import('../pipeline-notifier.js');
+      notifyPipeline({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
     } catch {
       // Non-fatal
     }
@@ -298,11 +307,11 @@ export interface ConvoyLaunchParams {
 }
 
 /** Launch all four independent reviewers for one review run. */
-export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): Promise<Array<{ success: boolean; message: string }>> {
+export async function launchConvoyReviewers(params: ConvoyLaunchParams): Promise<Array<{ success: boolean; message: string }>> {
   const reviewerResults = await Promise.all((params.subRoles ?? REVIEW_SUB_ROLES).map(async (subRole) => {
     const outputPath = reviewerAgentOutputPath(params.workspace, params.runId, subRole);
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: params.issueId,
       workspace: params.workspace,
       subRole,
@@ -313,7 +322,7 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
       ...(params.model ? { model: params.model } : {}),
       ...(params.harness ? { harness: params.harness } : {}),
       allowHost: params.allowHost ?? false,
-    }));
+    });
     if (!result.success) {
       try {
         const { messageAgent } = await import('../agents.js');
@@ -329,45 +338,22 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
   if (failedReviewers.length > 0) {
     console.warn(`[review-agent] Convoy launched for ${params.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
   }
+
+  // The moment reviewers exist. `reviewers` carries the agent ids so a later
+  // reader can tell which lanes this run dispatched without re-deriving them.
+  const launchedSubRoles = params.subRoles ?? REVIEW_SUB_ROLES;
+  appendPipelineEntry(params.workspace, {
+    type: 'review.dispatched',
+    issueId: params.issueId.toUpperCase(),
+    source: 'review-convoy',
+    data: {
+      runId: params.runId,
+      reviewers: launchedSubRoles.map((subRole) => reviewerAgentId(params.issueId, subRole)),
+      launched: reviewerResults.filter(r => r.success).length,
+    },
+  });
   return reviewerResults;
 }
-
-
-
-export const buildConvoyPrompt = (opts: {
-  issueId: string;
-  subRole: string;
-  outputPath: string;
-  synthesisAgentId: string;
-  contextManifestPath?: string;
-  tier1Summary?: string;
-}): Effect.Effect<string> => Effect.promise(() => buildConvoyPromptPromise(opts));
-
-/**
- * Effect variant of {@link spawnReviewSubRoleForIssue}. The Promise version
- * already aggregates errors into the structured result shape, so the Effect
- * form lifts via `Effect.promise`.
- */
-export const spawnReviewSubRoleForIssue = (opts: {
-  issueId: string;
-  workspace: string;
-  subRole: ReviewSubRole;
-  runId: string;
-  outputPath?: string;
-  contextManifestPath?: string;
-  synthesisAgentId?: string;
-  model?: string;
-  harness?: RuntimeName;
-  allowHost?: boolean;
-}): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
-  Effect.promise(() => spawnReviewSubRoleForIssuePromise(opts));
-
-/**
- * Effect variant of {@link spawnReviewRoleForIssue}. The Promise version
- * returns a structured result instead of throwing, so the Effect form lifts
- * via `Effect.promise`.
- */
-
 
 /**
  * Re-launch only convoy lanes whose report and session are both absent for the
@@ -379,8 +365,8 @@ export async function recoverMissingConvoyReviewers(
 ): Promise<{ success: boolean; message: string; launched?: number }> {
   const normalized = issueId.toUpperCase();
   const parentId = `agent-${normalized.toLowerCase()}-review`;
-  const { saveAgentState, getAgentStateSync } = await import('../agents.js');
-  const parentState = getAgentStateSync(parentId);
+  const { saveAgentState, getAgentState } = await import('../agents.js');
+  const parentState = getAgentState(parentId);
   if (!parentState) {
     return { success: false, message: `No review parent state for ${normalized} — cannot recover reviewers` };
   }
@@ -401,15 +387,21 @@ export async function recoverMissingConvoyReviewers(
   const workspace = parent.workspace;
   const runId = parent.reviewRunId;
 
-  // Reviewer evidence is per lane: one completed report or live session never
-  // proves that a sibling reviewer launched.
-  let sessions = new Set<string>();
+  // Reviewer evidence is per lane: one completed report or live pane never
+  // proves that a sibling reviewer launched. The probe asks the SELECTED
+  // backend per reviewer — the old tmux session-name list is always empty on
+  // Herdr, which made every reviewer read as dead and relaunched live ones.
   let livenessProbeOk = true;
+  const liveReviewers = new Set<string>();
   try {
-    sessions = new Set(await Effect.runPromise(listSessionNames()));
+    const { agentPaneExists } = await import('../terminal-backends/launch.js');
+    for (const subRole of REVIEW_SUB_ROLES) {
+      const reviewerId = reviewerAgentId(normalized, subRole);
+      if (await agentPaneExists(reviewerId)) liveReviewers.add(reviewerId);
+    }
   } catch {
-    // Liveness probe failed — tmux cannot answer, so the state row's live claim
-    // is the only signal left and keeps its conservative vote below.
+    // The backend could not answer, so the state row's live claim is the only
+    // signal left and keeps its conservative vote below.
     livenessProbeOk = false;
   }
 
@@ -417,12 +409,12 @@ export async function recoverMissingConvoyReviewers(
   const reviewersToLaunch: ReviewSubRole[] = [];
   for (const subRole of REVIEW_SUB_ROLES) {
     const reviewerId = reviewerAgentId(normalized, subRole);
-    const reviewer = getAgentStateSync(reviewerId);
+    const reviewer = getAgentState(reviewerId);
     const stateClaimsLive = reviewer?.status === 'running' || reviewer?.status === 'starting';
     if (existsSync(reviewerAgentOutputPath(workspace, runId, subRole))) continue;
-    if (sessions.has(reviewerId)) continue;
-    // tmux is the liveness oracle (docs/AGENT-STATE-PLANES.md): a probe that
-    // answered "no session" outranks a state.json row still claiming
+    if (liveReviewers.has(reviewerId)) continue;
+    // The backend is the liveness oracle (docs/AGENT-STATE-PLANES.md): a probe
+    // that answered "no pane" outranks a state.json row still claiming
     // running/starting. Rows go stale whenever liveness reconciliation cannot
     // run (deacon freeze, boot --no-resume) or a reviewer exits without a
     // stopped event; trusting the claim no-oped the convoy launch and stranded
@@ -448,7 +440,7 @@ export async function recoverMissingConvoyReviewers(
   // configured model — deliberately not `parent.model`, which is the parent's
   // resolved model and would override every sub-role.
   const reviewModel = opts.model;
-  const results = await launchConvoyReviewersPromise({
+  const results = await launchConvoyReviewers({
     issueId: normalized,
     workspace,
     runId,
@@ -463,6 +455,6 @@ export async function recoverMissingConvoyReviewers(
   const launched = results.filter(r => r.success).length;
   const message = `Convoy recovery for ${normalized}${opts.source ? ` (${opts.source})` : ''}: launched ${launched}/${reviewersToLaunch.length} missing reviewer(s)`;
   console.log(`[review-agent] ${message}`);
-  emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: normalized });
+  emitActivityEntry({ source: 'review', level: 'info', message, issueId: normalized });
   return { success: launched === reviewersToLaunch.length, message, launched };
 }

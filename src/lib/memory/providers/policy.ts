@@ -1,5 +1,5 @@
 import type { MemoryIdentity } from '@overdeck/contracts';
-import { queryMemoryExtractionCostUsdSync } from '../../overdeck/cost-sync.js';
+import { queryMemoryExtractionCostUsd } from '../../overdeck/cost-sync.js';
 import { updateMemoryHealth } from '../health.js';
 import {
   getExtractionProvider,
@@ -80,7 +80,7 @@ function describeExtractionError(error: unknown, selection: ExtractionProviderSe
 }
 
 export async function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId' | 'workspaceId'>): Promise<number> {
-  return queryMemoryExtractionCostUsdSync({
+  return queryMemoryExtractionCostUsd({
     // Cost query is issue-keyed; a null issueId (main/scratch workspace turn,
     // PRD D-6) falls back to workspaceId, matching recordExtractionCost.
     issueId: identity.issueId ?? identity.workspaceId,

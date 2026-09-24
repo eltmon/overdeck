@@ -19,7 +19,7 @@
 
 import { Effect } from 'effect';
 
-import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { createTracker } from '../../../lib/tracker/factory.js';
 import type { Issue, IssueTracker } from '../../../lib/tracker/interface.js';
 
@@ -40,10 +40,10 @@ const inFlight = new Map<string, Promise<Issue | null>>();
  * every GitHub-tracked issue (PAN-3659).
  */
 function trackerForIssue(issueId: string): IssueTracker | null {
-  const trackerType = resolveTrackerTypeSync(issueId);
+  const trackerType = resolveTrackerType(issueId);
   if (!trackerType) return null;
   if (trackerType === 'github') {
-    const resolution = resolveGitHubIssueSync(issueId);
+    const resolution = resolveGitHubIssue(issueId);
     if (!resolution.isGitHub) return null;
     return createTracker({ type: 'github', owner: resolution.owner, repo: resolution.repo });
   }

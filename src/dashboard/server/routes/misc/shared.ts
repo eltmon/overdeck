@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { HttpServerRequest } from 'effect/unstable/http';
 
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
+import { resolveGitHubIssue } from '../../../../lib/tracker-utils.js';
 import { getGitHubConfig } from '../../services/tracker-config.js';
 
 // ─── Package version ──────────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ export function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueShared(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }

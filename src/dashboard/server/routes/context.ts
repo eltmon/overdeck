@@ -38,7 +38,7 @@ import {
 } from '../../../lib/context-layers/layers.js';
 import { configDisabledRuleNames } from '../../../lib/context-layers/render.js';
 import { getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
-import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
+import { listProjectsAsync, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
@@ -625,9 +625,10 @@ function readJsonBody() {
 }
 
 function loadProjectsForRoute() {
-  return listProjects().pipe(
-    Effect.mapError((error) => new Error(error instanceof Error ? error.message : String(error))),
-  );
+  return Effect.tryPromise({
+    try: () => listProjectsAsync(),
+    catch: (error) => new Error(error instanceof Error ? error.message : String(error)),
+  });
 }
 
 const getContextLayersRoute = HttpRouter.add(

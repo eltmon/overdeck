@@ -5,7 +5,7 @@ import {
   teardownOverdeckTestDb,
   type OverdeckTestDb,
 } from '../../../../tests/helpers/overdeck-test-db.js';
-import { reclassifyUnknownCostEventsSync } from '../attribution.js';
+import { reclassifyUnknownCostEvents } from '../attribution.js';
 
 interface CostEventRow {
   id: number;
@@ -24,7 +24,7 @@ interface CostEventRow {
   source_file: string | null;
 }
 
-describe('reclassifyUnknownCostEventsSync', () => {
+describe('reclassifyUnknownCostEvents', () => {
   let odb: OverdeckTestDb;
 
   beforeEach(() => {
@@ -63,7 +63,7 @@ describe('reclassifyUnknownCostEventsSync', () => {
     seedCostEvent(odb, { issueId: 'sequencer-runner', requestId: 'req-sequencer', sessionId: 'session-none', agentId: 'agent-pan-5' });
     const beforeSentinels = readRows(odb).filter((row) => row.issue_id !== 'UNKNOWN');
 
-    expect(reclassifyUnknownCostEventsSync()).toEqual({ updated: 5 });
+    expect(reclassifyUnknownCostEvents()).toEqual({ updated: 5 });
 
     const rows = readRows(odb);
     expect(rows.filter((row) => row.issue_id === 'UNKNOWN')).toEqual([]);
@@ -74,7 +74,7 @@ describe('reclassifyUnknownCostEventsSync', () => {
     expect(issueByRequest(rows, 'req-null-session-two')).toBe('CONVERSATIONS');
     expect(rows.filter((row) => row.issue_id === 'PAN-1' || row.issue_id === 'sequencer-runner')).toEqual(beforeSentinels);
 
-    expect(reclassifyUnknownCostEventsSync()).toEqual({ updated: 0 });
+    expect(reclassifyUnknownCostEvents()).toEqual({ updated: 0 });
     expect(readRows(odb)).toEqual(rows);
   });
 });

@@ -27,23 +27,24 @@
 import { exec } from 'node:child_process';
 import { getManagedTmuxSocketName } from '../tmux.js';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { mkdir as mkdirAsync, readdir as readdirAsync, readFile as readFileAsync, rename as renameAsync, rm as rmAsync, stat as statAsync, writeFile as writeFileAsync } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { AgentState } from '../agents/agent-state.js';
-import { getAgentStateSync, saveAgentStateSync } from '../agents/agent-state.js';
+import { getAgentState, saveAgentStateSync } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents/queries.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { writePtyToken } from '../pty-token.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { claudeSystemPromptFiles } from '../agents/runtime-command.js';
 import { markKimiContextDelivered, prepareKimiMessage } from './kimi-context-envelope.js';
-import { parseKimiSessionSync } from '../cost-parsers/kimi-parser.js';
+import { findKimiWirePath, kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from './storage/kimi-code.js';
+import { parseKimiSession } from '../cost-parsers/kimi-parser.js';
+import { appendSessionIdToHistory } from '../session-history.js';
 import { getOverdeckHome } from '../paths.js';
 import { isPidDead } from '../pan-dir/fs-lock.js';
 import { getRuntimeBehavior } from './behavior.js';
@@ -72,106 +73,6 @@ export class KimiCodeSpawnTimeout extends Error {
 }
 
 /**
- * Compute Kimi's on-disk workDirKey bucket name for a working directory.
- * Verified against `wd_kimi-fixture-scratch_ef33f89ad7cf` (workDir
- * `/tmp/kimi-fixture-scratch`) and several pre-existing real sessions on the
- * machine that produced the wi-fixture capture (e.g.
- * `wd_overdeck_b289e7acb782`, `wd_feature-pan-2858_1dc66dc5021d`).
- */
-export function kimiWorkDirKey(workDir: string): string {
-  const hash = createHash('sha256').update(workDir).digest('hex').slice(0, 12);
-  return `wd_${basename(workDir)}_${hash}`;
-}
-
-/** Absolute path to the session bucket Kimi writes for a working directory. */
-export function kimiSessionsRoot(kimiHome: string, workDir: string): string {
-  return join(kimiHome, 'sessions', kimiWorkDirKey(workDir));
-}
-
-/**
- * Locate wire.jsonl for a specific captured session id under the workspace's
- * bucket. Falls back to the newest session directory when the captured id's
- * wire.jsonl is missing (e.g. never captured, or the id file is stale).
- */
-export function findKimiWirePath(kimiHome: string, workspace: string, sessionId: string | null): string | null {
-  if (sessionId) {
-    const candidate = join(kimiSessionsRoot(kimiHome, workspace), sessionId, 'agents', 'main', 'wire.jsonl');
-    if (existsSync(candidate)) return candidate;
-  }
-  return findLatestKimiSession(kimiHome, workspace);
-}
-
-/** Fallback: the newest session directory by wire.jsonl mtime under the workspace's bucket. */
-export function findLatestKimiSession(kimiHome: string, workspace: string): string | null {
-  const bucketDir = kimiSessionsRoot(kimiHome, workspace);
-  let entries: string[];
-  try {
-    entries = readdirSync(bucketDir);
-  } catch {
-    return null;
-  }
-  let newest: { path: string; mtimeMs: number } | null = null;
-  for (const entry of entries) {
-    const wirePath = join(bucketDir, entry, 'agents', 'main', 'wire.jsonl');
-    let mtimeMs: number;
-    try {
-      mtimeMs = statSync(wirePath).mtimeMs;
-    } catch {
-      continue;
-    }
-    if (!newest || mtimeMs > newest.mtimeMs) newest = { path: wirePath, mtimeMs };
-  }
-  return newest?.path ?? null;
-}
-
-/**
- * Async twin of {@link findKimiWirePath} (PAN-1837 review fix, P2). The
- * dashboard's transcript resolver runs on the event loop and Command Deck
- * polling re-resolves the same session repeatedly, so the sync
- * readdirSync/statSync walk here would block the loop on every poll as a
- * session's history grows. Runtime-side sync callers (kill/spawn lifecycle)
- * keep using the sync versions above — this pair exists only for dashboard
- * routes, per the runtime's own documented sync contract.
- */
-export async function findKimiWirePathAsync(kimiHome: string, workspace: string, sessionId: string | null): Promise<string | null> {
-  if (sessionId) {
-    const candidate = join(kimiSessionsRoot(kimiHome, workspace), sessionId, 'agents', 'main', 'wire.jsonl');
-    try {
-      await statAsync(candidate);
-      return candidate;
-    } catch { /* fall through to newest-session fallback */ }
-  }
-  return findLatestKimiSessionAsync(kimiHome, workspace);
-}
-
-/** Async twin of {@link findLatestKimiSession} — see {@link findKimiWirePathAsync}. */
-export async function findLatestKimiSessionAsync(kimiHome: string, workspace: string): Promise<string | null> {
-  const bucketDir = kimiSessionsRoot(kimiHome, workspace);
-  let entries: string[];
-  try {
-    entries = await readdirAsync(bucketDir);
-  } catch {
-    return null;
-  }
-  let newest: { path: string; mtimeMs: number } | null = null;
-  for (const entry of entries) {
-    const wirePath = join(bucketDir, entry, 'agents', 'main', 'wire.jsonl');
-    let mtimeMs: number;
-    try {
-      mtimeMs = (await statAsync(wirePath)).mtimeMs;
-    } catch {
-      continue;
-    }
-    if (!newest || mtimeMs > newest.mtimeMs) newest = { path: wirePath, mtimeMs };
-  }
-  return newest?.path ?? null;
-}
-
-function kimiHomeDefault(): string {
-  return join(homedir(), '.kimi-code');
-}
-
-/**
  * Poll a workspace's Kimi session bucket for a directory that did not exist
  * in `existingBefore`, returning the newest such directory's name (the
  * session id) once one appears. Standalone so both KimiCodeRuntimeSync.spawnAgent
@@ -180,7 +81,7 @@ function kimiHomeDefault(): string {
  * the session id the same way — mirroring codex's standalone
  * waitForCodexRollout/extractThreadIdFromRollout pair.
  */
-export async function waitForNewKimiSession(
+async function waitForNewKimiSession(
   kimiHome: string,
   workspace: string,
   existingBefore: Set<string>,
@@ -259,6 +160,21 @@ export function writeKimiSessionId(agentId: string, sessionId: string, overdeckH
   writeFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), sessionId, 'utf-8');
 }
 
+/** Persist the captured session id and record its wire.jsonl path in the session index. */
+export function recordKimiSessionCapture(
+  agentId: string,
+  sessionId: string,
+  workspace: string,
+  opts: { kimiHome?: string; overdeckHome?: string } = {},
+): void {
+  const kimiHome = opts.kimiHome ?? kimiHomeDefault();
+  writeKimiSessionId(agentId, sessionId, opts.overdeckHome);
+  appendSessionIdToHistory(agentId, sessionId, 'capture', {
+    harness: 'kimi-code',
+    path: kimiWirePath(kimiHome, workspace, sessionId),
+  });
+}
+
 /**
  * Cross-process per-bucket mutex (PAN-1837 review fix, cycle 7). Two Kimi
  * launches sharing a cwd both snapshot the same "existing sessions" set,
@@ -306,7 +222,7 @@ interface KimiCaptureLockOwner {
   acquiredAt: string;
 }
 
-export class KimiCaptureLockTimeoutError extends Error {
+class KimiCaptureLockTimeoutError extends Error {
   constructor(lockPath: string, waitedMs: number) {
     super(`Timed out after ${waitedMs}ms waiting for the Kimi session-capture lock at ${lockPath} — another process is still holding it.`);
     this.name = 'KimiCaptureLockTimeoutError';
@@ -437,11 +353,11 @@ export async function launchAndCaptureManagedKimiSession(options: {
   overdeckHome?: string;
   timeoutMs?: number;
 }): Promise<string> {
-  const kimiHome = options.kimiHome ?? join(homedir(), '.kimi-code');
+  const kimiHome = options.kimiHome ?? kimiHomeDefault();
   return withKimiSessionCaptureLock(kimiHome, options.workspace, async () => {
     if (options.resumeSessionId) {
       await options.launch();
-      writeKimiSessionId(options.agentId, options.resumeSessionId, options.overdeckHome);
+      recordKimiSessionCapture(options.agentId, options.resumeSessionId, options.workspace, options);
       return options.resumeSessionId;
     }
 
@@ -458,7 +374,7 @@ export async function launchAndCaptureManagedKimiSession(options: {
       options.timeoutMs,
     );
     if (!sessionId) throw new KimiCodeSpawnTimeout(options.agentId);
-    writeKimiSessionId(options.agentId, sessionId, options.overdeckHome);
+    recordKimiSessionCapture(options.agentId, sessionId, options.workspace, options);
     return sessionId;
   }, options.overdeckHome);
 }
@@ -559,13 +475,13 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   getTokenUsage(agentId: string): TokenUsage | null {
     const path = this.getSessionPath(agentId);
     if (!path) return null;
-    return parseKimiSessionSync(path)?.usage ?? null;
+    return parseKimiSession(path)?.usage ?? null;
   }
 
   getSessionCost(agentId: string): CostBreakdown | null {
     const path = this.getSessionPath(agentId);
     if (!path) return null;
-    const parsed = parseKimiSessionSync(path);
+    const parsed = parseKimiSession(path);
     if (!parsed) return null;
     return {
       inputCost: 0,
@@ -641,7 +557,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     const supervisorScriptPath = this.resolveSupervisorScriptPath();
     await this.writePtyTokenFor(config.agentId);
 
-    const launcherContent = generateLauncherScriptSync({
+    const launcherContent = generateLauncherScript({
       role: 'work',
       workingDir: config.workspace,
       harness: 'kimi-code',
@@ -744,7 +660,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 
   private workspaceFor(agentId: string): string | null {
-    return getAgentStateSync(agentId)?.workspace ?? null;
+    return getAgentState(agentId)?.workspace ?? null;
   }
 
   private readSessionId(agentId: string): string | null {
@@ -756,7 +672,12 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 
   private writeSessionId(agentId: string, sessionId: string): void {
-    writeKimiSessionId(agentId, sessionId, this.home());
+    const workspace = this.workspaceFor(agentId);
+    if (!workspace) {
+      writeKimiSessionId(agentId, sessionId, this.home());
+      return;
+    }
+    recordKimiSessionCapture(agentId, sessionId, workspace, { kimiHome: this.kimiHome(), overdeckHome: this.home() });
   }
 
   /**
@@ -767,7 +688,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
    * this adapter's spawnAgent create state afterward).
    */
   private markSupervisorEnabled(agentId: string): void {
-    const state = getAgentStateSync(agentId);
+    const state = getAgentState(agentId);
     if (!state) return;
     state.supervisorEnabled = true;
     saveAgentStateSync(state);
@@ -778,6 +699,6 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 }
 
-export function createKimiCodeRuntimeSync(options: KimiCodeRuntimeOptions = {}): KimiCodeRuntimeSync {
+export function createKimiCodeRuntime(options: KimiCodeRuntimeOptions = {}): KimiCodeRuntimeSync {
   return new KimiCodeRuntimeSync(options);
 }

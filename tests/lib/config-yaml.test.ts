@@ -8,7 +8,6 @@ import {
   getGlobalConfigPath,
   getProjectConfigPath,
   mergeConfigs,
-  mergeRtkConfigs,
 } from '../../src/lib/config-yaml.js';
 
 describe('config-yaml', () => {
@@ -205,26 +204,6 @@ api_keys:
       expect(config.enabledProviders.has('dashscope')).toBe(false);
     });
 
-    it('normalizes RTK agent config with default-off precedence', () => {
-      expect(mergeRtkConfigs().enabled).toBe(false);
-
-      const { config } = mergeConfigs({
-        agents: {
-          rtk: { enabled: true },
-        },
-      });
-
-      expect(config.rtk.enabled).toBe(true);
-      expect(
-        mergeRtkConfigs({ agents: { rtk: { enabled: true } } }).enabled,
-      ).toBe(true);
-      expect(
-        mergeRtkConfigs(
-          { agents: { rtk: { enabled: true } } },
-          { agents: { rtk: { enabled: false } } },
-        ).enabled,
-      ).toBe(false);
-    });
 
     it('defaults memory governor swap runway and PSI thresholds', () => {
       expect(mergeConfigs().config.resources).toMatchObject({

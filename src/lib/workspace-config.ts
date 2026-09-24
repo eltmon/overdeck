@@ -102,6 +102,18 @@ export interface TestConfig {
   env?: Record<string, string>;
 }
 
+/**
+ * PAN-3965: `projects.yaml` `verification:` block. `tests` says where the
+ * verification gate's `test` gate runs: `ci` skips the local `test` quality
+ * gate and treats the CI test job on the PR head (a check named `test`/`tests`,
+ * with or without a matrix suffix) as the test gate; `local` runs it on the
+ * host. Unset = `ci` when the project has a `github_repo` and a
+ * `.github/workflows/` directory, else `local`.
+ */
+export interface ProjectVerificationConfig {
+  tests?: 'ci' | 'local';
+}
+
 export interface QualityGateConfig {
   /** Command to run (e.g., 'pnpm lint', 'pnpm typecheck') */
   command: string;
@@ -301,7 +313,7 @@ export interface TemplatePlaceholders {
 /**
  * Replace template placeholders in a string
  */
-export function replacePlaceholdersSync(template: string, placeholders: TemplatePlaceholders): string {
+export function replacePlaceholders(template: string, placeholders: TemplatePlaceholders): string {
   let result = template;
   for (const [key, value] of Object.entries(placeholders)) {
     if (value == null) continue; // skip unset optional placeholders (e.g. CHANGED_BASE)
@@ -313,129 +325,9 @@ export function replacePlaceholdersSync(template: string, placeholders: Template
 /**
  * Get default workspace config for a monorepo project
  */
-export function getDefaultWorkspaceConfigSync(): WorkspaceConfig {
+export function getDefaultWorkspaceConfig(): WorkspaceConfig {
   return {
     type: 'monorepo',
     workspaces_dir: 'workspaces',
   };
 }
-
-/**
- * Service templates for common project types
- * These provide sensible defaults that can be overridden
- */
-export const SERVICE_TEMPLATES: Record<string, Partial<ServiceConfig>> = {
-  // Frontend frameworks
-  'react': {
-    start_command: 'npm start',
-    docker_command: 'npm start',
-    port: 3000,
-  },
-  'react-vite': {
-    start_command: 'npm run dev',
-    docker_command: 'npm run dev',
-    port: 5173,
-  },
-  'react-pnpm': {
-    start_command: 'pnpm start',
-    docker_command: 'pnpm start',
-    port: 3000,
-  },
-  'nextjs': {
-    start_command: 'npm run dev',
-    docker_command: 'npm run dev',
-    port: 3000,
-  },
-  'vue': {
-    start_command: 'npm run dev',
-    docker_command: 'npm run dev',
-    port: 5173,
-  },
-  'angular': {
-    start_command: 'ng serve',
-    docker_command: 'ng serve',
-    port: 4200,
-  },
-
-  // Backend frameworks
-  'spring-boot-maven': {
-    start_command: './mvnw spring-boot:run',
-    docker_command: './mvnw spring-boot:run',
-    port: 8080,
-  },
-  'spring-boot-gradle': {
-    start_command: './gradlew bootRun',
-    docker_command: './gradlew bootRun',
-    port: 8080,
-  },
-  'express': {
-    start_command: 'npm start',
-    docker_command: 'npm start',
-    port: 3000,
-  },
-  'fastapi': {
-    start_command: 'uvicorn main:app --reload',
-    docker_command: 'uvicorn main:app --host 0.0.0.0 --reload',
-    port: 8000,
-  },
-  'django': {
-    start_command: 'python manage.py runserver',
-    docker_command: 'python manage.py runserver 0.0.0.0:8000',
-    port: 8000,
-  },
-  'rails': {
-    start_command: 'rails server',
-    docker_command: 'rails server -b 0.0.0.0',
-    port: 3000,
-  },
-  'go': {
-    start_command: 'go run .',
-    docker_command: 'go run .',
-    port: 8080,
-  },
-  'rust-cargo': {
-    start_command: 'cargo run',
-    docker_command: 'cargo run',
-    port: 8080,
-  },
-};
-
-/**
- * Get service config from template with overrides
- */
-export function getServiceFromTemplateSync(
-  templateName: string,
-  overrides: Partial<ServiceConfig>
-): ServiceConfig {
-  const template = SERVICE_TEMPLATES[templateName] || {};
-  return {
-    name: overrides.name || templateName,
-    path: overrides.path || '.',
-    start_command: overrides.start_command || template.start_command || 'npm start',
-    docker_command: overrides.docker_command || template.docker_command,
-    health_url: overrides.health_url,
-    port: overrides.port || template.port,
-  };
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure helpers; Effect wrappers exist solely so consumers can stay in Effect.
-
-import { Effect } from 'effect';
-
-/** Substitute {{KEY}} placeholders. Pure. */
-export const replacePlaceholders = (
-  template: string,
-  placeholders: TemplatePlaceholders,
-): Effect.Effect<string> => Effect.sync(() => replacePlaceholdersSync(template, placeholders));
-
-/** Workspace defaults (ports, services, DNS). Pure. */
-export const getDefaultWorkspaceConfig = (): Effect.Effect<WorkspaceConfig> =>
-  Effect.sync(() => getDefaultWorkspaceConfigSync());
-
-/** Merge a service template with overrides. Pure. */
-export const getServiceFromTemplate = (
-  templateName: string,
-  overrides: Partial<ServiceConfig>,
-): Effect.Effect<ServiceConfig> =>
-  Effect.sync(() => getServiceFromTemplateSync(templateName, overrides));

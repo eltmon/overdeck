@@ -34,10 +34,10 @@ vi.mock('../tmux.js', () => ({
   sessionExistsSync: vi.fn(() => true),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
   getAgentSessionsSync: vi.fn(() => []),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   capturePaneSync: vi.fn(() => ''),
   // PAN-3849: one live pane row ('<pid>\t<dead>') so the liveness oracle reads alive.
-  listPaneValues: vi.fn(() => Effect.succeed(['4242\t0'])),
+  listPaneValues: vi.fn(async () => ['4242\t0']),
   listPaneValuesSync: vi.fn(() => []),
   setOption: vi.fn(() => Effect.void),
 }));
@@ -77,7 +77,6 @@ vi.mock('../agents/delivery.js', async (importOriginal) => {
 
 // PAN-3015 monitor tier is mocked so tests can flip liveness per case.
 vi.mock('../agents/monitor-transport.js', () => ({
-  isMonitorLive: vi.fn(() => false),
   formatMailFileContent: vi.fn(
     (body: string, source: string, date: Date) =>
       `# Message\n\nsource: ${source}\ndate: ${date.toISOString()}\n\n${body}\n`,
@@ -184,9 +183,7 @@ describe('messageAgent monitor tier vs keyed deliveries (PAN-2997 cycle 7)', () 
   });
 
   it('BYPASSES the live monitor tier for a keyed delivery and uses the keyed door', async () => {
-    const { isMonitorLive } = await import('../agents/monitor-transport.js');
     const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
-    vi.mocked(isMonitorLive).mockReturnValue(true);
     vi.mocked(sendKeysDedup).mockClear();
     vi.mocked(completeKeyedSubmit).mockClear();
     writeAgentState('agent-pan-2997');
@@ -209,9 +206,7 @@ describe('messageAgent monitor tier vs keyed deliveries (PAN-2997 cycle 7)', () 
   });
 
   it('ignores a live monitor for UNKEYED mid-session tells (PAN-3846)', async () => {
-    const { isMonitorLive } = await import('../agents/monitor-transport.js');
     const { sendKeysDedup } = await import('../tmux-dedup.js');
-    vi.mocked(isMonitorLive).mockReturnValue(true);
     vi.mocked(sendKeysDedup).mockClear();
     writeAgentState('agent-pan-3015');
 

@@ -120,8 +120,11 @@ function deriveAgentLabel(session: SessionNode): string {
       return 'Review';
     case 'reviewer':
       return session.role ? session.role[0]!.toUpperCase() + session.role.slice(1) : 'Reviewer';
-    case 'work':
-      return 'Work';
+    case 'work': {
+      // PAN-3920: registered workers (`pan worker run`) show as "Worker <n>".
+      const worker = /-worker-(\d+)$/.exec(session.sessionId);
+      return worker ? `Worker ${worker[1]}` : 'Work';
+    }
     case 'knowledge':
       return 'Knowledge';
     case 'strike':

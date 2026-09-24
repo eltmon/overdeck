@@ -30,9 +30,9 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { renderWorkspaceGitShowPromise } from '../git-utils.js';
+import { renderWorkspaceGitShow } from '../git-utils.js';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
-import type { XBriefDocument, XBriefEdge, XBriefItem, XBriefSubItem } from '../xbrief/types.js';
+import type { XBriefItem, XBriefSubItem } from '../xbrief/types.js';
 import type { AgentState } from './agent-state.js';
 import { deliverAgentMessage } from './delivery.js';
 import type { DeliveryResult } from './delivery.js';
@@ -140,7 +140,7 @@ export async function spawnTierSupervisor(
   });
 }
 
-export function buildSupervisorPrompt(
+function buildSupervisorPrompt(
   issueId: string,
   subscribe: TieredExecutionSubscription,
 ): string {
@@ -230,60 +230,6 @@ function resolveApiUrl(): string {
   );
 }
 
-/**
- * Does the next bead depend on a bead with an unresolved supervisor block?
- *
- * Verdicts are interpreted chronologically: the latest verdict for each bead is
- * authoritative. A failed/blocked verdict halts dependents until a later
- * passed/ack verdict for that same bead records the fix commit's approval.
- */
-export function shouldHaltDispatch(
-  verdicts: readonly SupervisorVerdict[],
-  nextBead: Pick<XBriefItem, 'id'>,
-  dag: Pick<XBriefDocument, 'plan'>,
-): boolean {
-  const latestByBead = new Map<string, SupervisorVerdict>();
-  for (const verdict of verdicts) {
-    latestByBead.set(verdict.itemId, verdict);
-  }
-
-  const unresolvedBlockedBeads = new Set<string>();
-  for (const [itemId, verdict] of latestByBead) {
-    if (verdict.status === 'failed' || verdict.status === 'blocked') {
-      unresolvedBlockedBeads.add(itemId);
-    }
-  }
-
-  if (unresolvedBlockedBeads.size === 0) return false;
-
-  for (const dependencyId of dependencyClosure(nextBead.id, dag.plan.edges ?? [])) {
-    if (unresolvedBlockedBeads.has(dependencyId)) return true;
-  }
-
-  return false;
-}
-
-function dependencyClosure(itemId: string, edges: readonly XBriefEdge[]): Set<string> {
-  const incoming = new Map<string, string[]>();
-  for (const edge of edges) {
-    if (edge.type !== 'blocks') continue;
-    const parents = incoming.get(edge.to) ?? [];
-    parents.push(edge.from);
-    incoming.set(edge.to, parents);
-  }
-
-  const dependencies = new Set<string>();
-  const stack = [...(incoming.get(itemId) ?? [])];
-  while (stack.length > 0) {
-    const dependencyId = stack.pop()!;
-    if (dependencies.has(dependencyId)) continue;
-    dependencies.add(dependencyId);
-    stack.push(...(incoming.get(dependencyId) ?? []));
-  }
-
-  return dependencies;
-}
-
 function childItems(item: XBriefItem): XBriefSubItem[] {
   // xBRIEF v0.6 uses `items`; v0.5 documents used `subItems` for the same
   // structure and are still read as a compatibility alias.
@@ -309,7 +255,7 @@ export function extractAcceptanceCriteria(item: XBriefItem): string[] {
  * indented continuation lines, up to the next bullet or heading. Returns
  * undefined when no trace resolves to a requirement in the document.
  */
-export function extractTracedFrText(prdMarkdown: string, traces: readonly string[]): string | undefined {
+function extractTracedFrText(prdMarkdown: string, traces: readonly string[]): string | undefined {
   if (traces.length === 0) return undefined;
   const lines = prdMarkdown.split('\n');
   const sections: string[] = [];
@@ -408,7 +354,7 @@ Rules:
 }
 
 async function getCommitDiff(issueId: string, workspacePath: string, sha: string): Promise<string> {
-  return renderWorkspaceGitShowPromise(issueId, workspacePath, sha, [], async (repoPath, repoSha, args) => {
+  return renderWorkspaceGitShow(issueId, workspacePath, sha, [], async (repoPath, repoSha, args) => {
     const { stdout } = await execFileAsync('git', ['show', repoSha, ...args], {
       cwd: repoPath,
       encoding: 'utf-8',

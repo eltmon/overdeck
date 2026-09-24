@@ -21,7 +21,7 @@ import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState } from '../agents.js';
 import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
-import { closeOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { closeOverdeckDatabase } from '../overdeck/infra.js';
 
 let tmpHome: string;
 let workspace: string;
@@ -159,13 +159,13 @@ function mockSpawnDependencies(): void {
     PiNotReady: class PiNotReady extends Error {
       readonly code = 'PI_NOT_READY';
     },
-    createPiFifo: vi.fn((agentId: string) => Effect.succeed(join(tmpHome, 'agents', agentId, 'rpc.in'))),
+    createPiFifo: vi.fn(async (agentId: string) => join(tmpHome, 'agents', agentId, 'rpc.in')),
     piFifoPaths: vi.fn((agentId: string) => ({
       agentDir: join(tmpHome, 'agents', agentId),
       readyPath: join(tmpHome, 'agents', agentId, 'ready.json'),
       fifoPath: join(tmpHome, 'agents', agentId, 'rpc.in'),
     })),
-    writePiCommandSync: vi.fn(),
+    writePiCommand: vi.fn(),
   }));
 
   vi.doMock('../paths.js', async (importOriginal) => {
@@ -189,9 +189,9 @@ function mockSpawnDependencies(): void {
     getAgentSessionsSync: vi.fn(() => []),
     getAgentSessions: vi.fn(() => Effect.succeed([])),
     capturePaneSync: vi.fn(() => capturePaneText),
-    capturePane: vi.fn(() => Effect.succeed(capturePaneText)),
+    capturePane: vi.fn(async () => capturePaneText),
     listPaneValuesSync: vi.fn(() => []),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: vi.fn(async () => []),
     waitForClaudePrompt: vi.fn(async () => true),
     setOption: vi.fn(() => Effect.void),
     exactPaneTarget: vi.fn((name: string) => `=${name}:`),
@@ -221,8 +221,8 @@ function mockSpawnDependencies(): void {
     readWorkspacePlanSync: vi.fn(() => planFixture),
   }));
   vi.doMock('../activity-logger.js', () => ({
-    emitActivityEntrySync: vi.fn(),
-    emitActivityTtsSync: vi.fn(),
+    emitActivityEntry: vi.fn(),
+    emitActivityTts: vi.fn(),
   }));
   vi.doMock('../cloister/work-agent-prompt.js', () => ({
     writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -250,30 +250,28 @@ function mockSpawnDependencies(): void {
     getClaudeAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasAnthropicApiKey: true })),
   }));
   vi.doMock('../openai-auth.js', () => ({
-    getOpenAIAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasOpenAIApiKey: false })),
-    getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: true, hasOpenAIApiKey: false })),
+    getOpenAIAuthStatus: vi.fn(async () => ({ loggedIn: true, hasOpenAIApiKey: false })),
   }));
   vi.doMock('../cliproxy.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../cliproxy.js')),
-    bridgeGeminiAuthToCliproxy: vi.fn(() => Effect.succeed(true)),
+    bridgeGeminiAuthToCliproxy: vi.fn(async () => true),
     getCliproxyClientEnv: vi.fn(() => ({ ANTHROPIC_BASE_URL: 'http://127.0.0.1:4141' })),
-    isCliproxyRunning: vi.fn(() => Effect.succeed(true)),
+    isCliproxyRunning: vi.fn(async () => true),
   }));
   vi.doMock('../provider-health.js', () => ({
-    validateProviderHealth: vi.fn(() => Effect.succeed(undefined)),
+    validateProviderHealth: vi.fn(async () => undefined),
   }));
-  // agents.ts now imports getFlywheelActiveRunIdSync from overdeck/control-settings (not database/app-settings)
+  // agents.ts now imports getFlywheelActiveRunId from overdeck/control-settings (not database/app-settings)
   vi.doMock('../overdeck/control-settings.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../overdeck/control-settings.js')>();
     return {
       ...actual,
       getFlywheelActiveRunId: () => activeFlywheelRunId,
-      getFlywheelActiveRunIdSync: () => activeFlywheelRunId,
     };
   });
   vi.doMock('../projects.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../projects.js')),
-    findProjectByPathSync: vi.fn(() => null),
+    findProjectByPath: vi.fn(() => null),
   }));
 }
 
@@ -283,9 +281,9 @@ beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'pan-spawn-fitness-workspace-'));
   packageRootDir = mkdtempSync(join(tmpdir(), 'pan-spawn-fitness-package-'));
   // Seed overdeck.db so saveAgentStateSync can find the migration SQL
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   process.env.OVERDECK_HOME = tmpHome;
   process.env.OVERDECK_AGENT_STARTED_BY = 'test:agents-spawn-fitness';
   capturePaneText = 'Claude Code';
@@ -332,7 +330,7 @@ afterEach(() => {
   vi.doUnmock('../provider-health.js');
   vi.doUnmock('../overdeck/control-settings.js');
   vi.doUnmock('../projects.js');
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   delete process.env.OVERDECK_AGENT_STARTED_BY;
   delete process.env.PAN_DOCKER;

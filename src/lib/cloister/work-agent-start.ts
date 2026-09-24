@@ -1,4 +1,4 @@
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 
 export interface SpawnWorkAgentResult {
   spawned: boolean;
@@ -31,7 +31,7 @@ export async function spawnWorkAgentThroughAgentsEndpoint(
   autoSpawnConsentRequired = false,
   startedBy = 'orphan-proposed-reconciler',
 ): Promise<SpawnWorkAgentResult> {
-  const internalToken = getInternalTokenSync();
+  const internalToken = getInternalToken();
   const response = await fetch(new URL('/api/agents', dashboardOrigin), {
     method: 'POST',
     headers: {

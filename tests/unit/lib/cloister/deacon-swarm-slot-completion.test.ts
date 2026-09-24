@@ -29,7 +29,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: () => [],
   resolveProjectFromIssueSync: () => null,
   getProjectSync: () => null,
-  findProjectByPathSync: () => null,
+  findProjectByPath: () => null,
   getProjectSwarmHotspots: () => [],
 }));
 
@@ -38,7 +38,6 @@ import {
   clearSwarmSlotCompletion,
   clearSupersededSwarmAttempts,
   clearSwarmSlotOwnership,
-  persistAndVerifySwarmSlotCompletion,
   readSwarmSlotState,
 } from '../../../../src/lib/cloister/deacon-swarm-record.js';
 import { clearAllSlotAssignments, recordSlotAssignment } from '../../../../src/lib/cloister/deacon-swarm.js';
@@ -261,22 +260,3 @@ describe('PAN-3690 slot ownership replacement', () => {
   });
 });
 
-describe('persistAndVerifySwarmSlotCompletion (FR-4, FR-5)', () => {
-  beforeEach(() => makeWorkspace('pan-slot-completion-verify-', 'pan-2372'));
-
-  it('returns true and the marker is observable on the slot ledger', async () => {
-    const ok = await persistAndVerifySwarmSlotCompletion(workspacePath, 'PAN-2372', {
-      slotIndex: 1,
-      itemId: 'wi-1',
-      agentId: 'agent-pan-2372-slot-1',
-      completedAt: '2026-07-10T12:00:00.000Z',
-    });
-    expect(ok).toBe(true);
-    expect(slots('PAN-2372')?.slotCompletions?.['1']).toBeDefined();
-  });
-
-  // The false branch (marker not observable after write) cannot occur against the
-  // real door — the write and read resolve to the same path, so read-back always
-  // reflects the write. It is driven via the mock in done-slot-completion.test.ts,
-  // which asserts completeSlotWork exits non-zero and writes no runtime state.
-});

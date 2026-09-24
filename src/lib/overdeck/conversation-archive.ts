@@ -1,4 +1,4 @@
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { parseRelativeTime } from '../conversations/search.js';
 import {
   archiveConversation,
@@ -52,7 +52,7 @@ function result(body: unknown, status?: number): ConversationArchiveResult {
   return status === undefined ? { body } : { body, status };
 }
 
-export function parseStringArrayColumn(value: string | null): string[] {
+function parseStringArrayColumn(value: string | null): string[] {
   if (!value) return [];
   try {
     const parsed = JSON.parse(value) as unknown;
@@ -62,7 +62,7 @@ export function parseStringArrayColumn(value: string | null): string[] {
   }
 }
 
-export function mapArchivedConversation(row: ArchivedConversationWithEnrichment): ArchivedConversationResponse {
+function mapArchivedConversation(row: ArchivedConversationWithEnrichment): ArchivedConversationResponse {
   const canUseClaudePathFallback = row.harness === null || row.harness === 'claude-code';
   return {
     id: row.id,
@@ -90,7 +90,7 @@ export function mapArchivedConversation(row: ArchivedConversationWithEnrichment)
   };
 }
 
-export function parseOptionalNumberParam(params: URLSearchParams, name: string): number | undefined {
+function parseOptionalNumberParam(params: URLSearchParams, name: string): number | undefined {
   const value = params.get(name);
   if (value === null) return undefined;
   const parsed = Number(value);

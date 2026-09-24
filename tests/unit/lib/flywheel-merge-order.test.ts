@@ -1,14 +1,18 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   computePredictedConflictSignals,
-  declaredIssueFootprint,
   orderMergeCandidates,
-  pickFromSequence,
-  planMergeTrain,
-  planUatCandidate,
 } from '../../../src/lib/flywheel-merge-order.js';
-import type { SequenceNode } from '../../../src/lib/backlog/types.js';
 import type { XBriefDocument } from '../../../src/lib/xbrief/types.js';
+import type { IssueFileFootprint } from '../../../src/lib/flywheel-merge-order.js';
+
+// A declared footprint: the sorted union of every item's files_scope. (Built here since
+// PAN-3958 CH-8 deleted the test-only declaredIssueFootprint/computeIssueFootprint helpers.)
+function declaredIssueFootprint(issueId: string, doc: XBriefDocument): IssueFileFootprint {
+  const files = new Set<string>();
+  for (const item of doc.plan.items) for (const file of item.metadata?.files_scope ?? []) files.add(file);
+  return { issueId, files: Array.from(files).sort(), source: 'declared' };
+}
 
 const c = (issueId: string, footprint: number, conflictCount: number) => ({
   issueId,
@@ -31,21 +35,6 @@ function spec(issueId: string, filesScope: string[]): XBriefDocument {
       }],
       edges: [],
     },
-  };
-}
-
-function node(issue: string, rank: number): SequenceNode {
-  return {
-    issue,
-    rank,
-    size: 'S',
-    importance: 'medium',
-    score: 50,
-    condition: 'ok',
-    dependsOn: [],
-    why: `Why for ${issue}`,
-    gate: 'auto',
-    planning: 'auto',
   };
 }
 
@@ -81,25 +70,6 @@ describe('orderMergeCandidates (PAN-1691 conflict-aware order)', () => {
   });
 });
 
-describe('planMergeTrain (PAN-1691 batch/serialize plan)', () => {
-  it('batches all disjoint candidates with an empty serialize list', () => {
-    const plan = planMergeTrain([c('PAN-2', 4, 0), c('PAN-1', 9, 0)]);
-    expect(plan.batch).toEqual(['PAN-1', 'PAN-2']);
-    expect(plan.serialize).toEqual([]);
-    expect(plan.order).toEqual(['PAN-1', 'PAN-2']);
-  });
-
-  it('splits disjoint into batch and conflicting into serialize (broadest first)', () => {
-    const plan = planMergeTrain([c('PAN-10', 5, 0), c('PAN-20', 3, 1), c('PAN-30', 50, 2)]);
-    expect(plan.batch).toEqual(['PAN-10']);
-    expect(plan.serialize).toEqual(['PAN-30', 'PAN-20']);
-    expect(plan.order).toEqual(['PAN-10', 'PAN-30', 'PAN-20']);
-  });
-
-  it('returns empty plan for no candidates', () => {
-    expect(planMergeTrain([])).toEqual({ batch: [], serialize: [], order: [] });
-  });
-});
 
 describe('computePredictedConflictSignals (declared-footprint conflict signal)', () => {
   it('counts overlapping declared footprints before branches exist', () => {
@@ -145,133 +115,11 @@ describe('computePredictedConflictSignals (declared-footprint conflict signal)',
       declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts'])),
     ]);
 
-    expect(planMergeTrain(signals).order).toEqual(['PAN-10', 'PAN-20']);
-    expect(planMergeTrain(signals).serialize).toEqual(['PAN-10', 'PAN-20']);
+    const ordered = orderMergeCandidates(signals);
+    expect(ordered.map((candidate) => candidate.issueId)).toEqual(['PAN-10', 'PAN-20']);
+    expect(ordered.every((candidate) => candidate.conflictCount > 0)).toBe(true);
   });
 });
 
-describe('pickFromSequence predicted-conflict signal', () => {
-  it('treats active order-book membership as operator release while off-book work stays held', () => {
-    const nodes = [node('PAN-10', 1), node('PAN-20', 2)];
-    const options = {
-      issueLabels: () => ['ready'],
-      isReadyOrHasPrd: () => true,
-      requireReady: true,
-      autoPickupBacklog: false,
-    };
 
-    expect(pickFromSequence(nodes, options)).toBeNull();
-    expect(pickFromSequence(nodes, { ...options, activeBookMembership: new Set(['PAN-20']) })).toMatchObject({ issueId: 'PAN-20' });
-  });
 
-  it('uses predicted conflicts as an advisory launch-order preference', () => {
-    const signals = computePredictedConflictSignals([
-      declaredIssueFootprint('PAN-10', spec('PAN-10', ['src/shared.ts'])),
-      declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts'])),
-      declaredIssueFootprint('PAN-30', spec('PAN-30', ['src/isolated.ts'])),
-    ]);
-
-    const result = pickFromSequence([node('PAN-10', 1), node('PAN-30', 2), node('PAN-20', 3)], {
-      issueLabels: () => ['ready', 'released'],
-      isReadyOrHasPrd: () => true,
-      requireReady: true,
-      predictedConflictSignals: signals,
-    });
-
-    expect(result).toMatchObject({
-      issueId: 'PAN-30',
-      predictedConflictCount: 0,
-      predictedConflictsWith: [],
-    });
-  });
-
-  it('never gates out a pickable issue solely because it has predicted conflicts', () => {
-    const signals = computePredictedConflictSignals([
-      declaredIssueFootprint('PAN-10', spec('PAN-10', ['src/shared.ts'])),
-      declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts'])),
-    ]);
-
-    const result = pickFromSequence([node('PAN-10', 1)], {
-      issueLabels: () => ['ready', 'released'],
-      isReadyOrHasPrd: () => true,
-      requireReady: true,
-      predictedConflictSignals: signals,
-    });
-
-    expect(result).toMatchObject({
-      issueId: 'PAN-10',
-      predictedConflictCount: 1,
-      predictedConflictsWith: ['PAN-20'],
-    });
-  });
-});
-
-describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
-  const qi = (issueId: string, batchGroup: 'batch' | 'serialize') => ({
-    issueId,
-    title: issueId,
-    branchName: `feature/${issueId.toLowerCase()}`,
-    mergeOrder: 1,
-    conflictsWith: [] as string[],
-    batchGroup,
-  });
-
-  it('bundles only the batch items and dates the branch name', () => {
-    const plan = planUatCandidate(
-      [qi('PAN-1', 'batch'), qi('PAN-2', 'serialize'), qi('PAN-3', 'batch')],
-      { dateIso: '2026-06-09T12:00:00.000Z' },
-    );
-    expect(plan.bundled).toEqual(['PAN-1', 'PAN-3']);
-    expect(plan.branchName).toBe('uat/candidate-2026-06-09');
-  });
-
-  it('uses the label in the branch name', () => {
-    const plan = planUatCandidate([qi('PAN-1', 'batch')], { dateIso: '2026-06-09T00:00:00Z', label: 'pan' });
-    expect(plan.branchName).toBe('uat/pan-2026-06-09');
-  });
-
-  it('returns an empty bundle when nothing is batchable', () => {
-    expect(planUatCandidate([qi('PAN-1', 'serialize')], { dateIso: '2026-06-09T00:00:00Z' }).bundled).toEqual([]);
-  });
-});
-
-describe('listEligibleCandidatesByProject ready set (PAN-1759, moved by PAN-1696)', () => {
-  // PAN-3917: the ready set is the forge's answer — approved, checks green,
-  // mergeable — restricted to the project. Nothing consults a status row.
-  it('includes only the forge-ready issues that belong to the project', async () => {
-    vi.resetModules();
-    vi.doMock('../../../src/lib/projects.js', () => ({
-      findProjectByPathSync: () => ({ path: '/repo/overdeck', name: 'Overdeck' }),
-      resolveProjectFromIssueSync: (issueId: string) =>
-        issueId.startsWith('MIN-') ? { projectPath: '/repo/myn' } : { projectPath: '/repo/overdeck' },
-      getProjectSwarmHotspots: () => [],
-    }));
-    vi.doMock('../../../src/lib/cloister/merge-ready-set.js', () => ({
-      getMergeReadyIssues: async () => ['PAN-3', 'MIN-9'],
-    }));
-    vi.doMock('../../../src/lib/cloister/pr-facts.js', () => ({
-      getPrFacts: async (issueId: string) => ({ issueId, number: issueId === 'PAN-3' ? 3 : 9 }),
-    }));
-
-    const { listEligibleCandidatesByProject } = await import('../../../src/lib/flywheel-merge-order.js');
-    const candidates = await listEligibleCandidatesByProject('/repo/overdeck');
-
-    // MIN-9 belongs to another project even though the forge calls it ready.
-    expect(candidates.map((candidate) => candidate.issueId)).toEqual(['PAN-3']);
-    expect(candidates[0]).toMatchObject({ issueId: 'PAN-3', pr: 3 });
-    vi.resetModules();
-  });
-
-  it('returns nothing for an unregistered project root', async () => {
-    vi.resetModules();
-    vi.doMock('../../../src/lib/projects.js', () => ({
-      findProjectByPathSync: () => null,
-      resolveProjectFromIssueSync: () => null,
-      getProjectSwarmHotspots: () => [],
-    }));
-
-    const { listEligibleCandidatesByProject } = await import('../../../src/lib/flywheel-merge-order.js');
-    await expect(listEligibleCandidatesByProject('/repo/unknown')).resolves.toEqual([]);
-    vi.resetModules();
-  });
-});

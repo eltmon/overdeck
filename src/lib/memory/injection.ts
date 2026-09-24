@@ -8,7 +8,7 @@ import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult }
 import { readVerifiedPinFile } from './pin-path.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
-import { findProjectByPathSync, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
+import { findProjectByPath, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
 import { getProjectByKey, listPinnedDocs } from '../workspaces/resolver.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
@@ -548,7 +548,7 @@ export async function resolveKnowledgeBundleRoot(
     projectPath = resolveProjectPath(project);
     knowledgeRepo = project.knowledge_repo;
   } else {
-    const project = findProjectByPathSync(identity.projectPath);
+    const project = findProjectByPath(identity.projectPath);
     projectPath = project?.path ?? identity.projectPath;
     knowledgeRepo = project?.knowledge_repo;
   }

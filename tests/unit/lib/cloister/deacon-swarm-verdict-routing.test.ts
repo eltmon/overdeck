@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -39,7 +38,7 @@ vi.mock('../../../../src/lib/agents/messaging.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -60,7 +59,6 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/swarm-slot-reconcile.js', () => ({
-  listSlotOwnership: mockListSlotOwnership,
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
@@ -124,11 +122,11 @@ describe('swarm verdict feedback routing', () => {
     mockWriteFeedbackFile.mockReset();
     mockListSlotOwnership.mockReset();
     mockGetReviewStatus.mockReturnValue({});
-    mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
+    mockWriteFeedbackFile.mockResolvedValue({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
-    }));
+    });
     mockListSlotOwnership.mockReturnValue([]);
     mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-2203' });
     mockSurfaceIssueFeedbackNeedsYou.mockReset();
@@ -142,14 +140,14 @@ describe('swarm verdict feedback routing', () => {
     mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-2203-slot-2' });
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-2203',
       verdict: 'blocked',
       notes: 'fix wi-b',
       workspacePath,
       slotItemId: 'wi-b',
       runId: 'agent-pan-2203-review-abcdef12',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2203', expect.objectContaining({ itemId: 'wi-b' }));
@@ -177,14 +175,14 @@ describe('swarm verdict feedback routing', () => {
     });
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-2203',
       verdict: 'failed',
       notes: 'fix wi-b',
       workspacePath,
       slotItemId: 'wi-b',
       runId: 'agent-pan-2203-review-abcdef12',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
@@ -213,14 +211,14 @@ describe('swarm verdict feedback routing', () => {
     mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-2203-slot-1' });
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-2203',
       verdict: 'blocked',
       notes: 'fix wi-c',
       workspacePath,
       slotItemId: 'wi-c',
       runId: 'agent-pan-2203-review-abcdef12',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2203', expect.objectContaining({ itemId: 'wi-c' }));
@@ -252,13 +250,13 @@ describe('swarm verdict feedback routing', () => {
     });
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-2203',
       verdict: 'blocked',
       notes: 'fix wi-c',
       workspacePath,
       slotItemId: 'wi-c',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(false);
     expect(mockMessageAgent).not.toHaveBeenCalled();

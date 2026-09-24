@@ -68,9 +68,9 @@ import { isUnsupported } from '../terminal-backends/types.js';
 import type { BackendAgentSnapshot, TerminalBackend } from '../terminal-backends/types.js';
 import { createSettledTtlPromiseCache } from '../concurrency.js';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
-import { findSpecByIssueSync } from '../xbrief/io.js';
-import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
-import { inferProjectForgeSync } from '../project-repos.js';
+import { findSpecByIssue } from '../xbrief/io.js';
+import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
+import { inferProjectForge } from '../project-repos.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -376,9 +376,9 @@ async function readMrWithGlab(_issueId: string, projectPath: string, branch: str
  * forever. `inferProjectForgeSync` is the canonical resolver.
  */
 export function forgeForProject(projectPath: string): 'github' | 'gitlab' {
-  const project = findProjectByPathSync(projectPath);
+  const project = findProjectByPath(projectPath);
   if (!project) return 'github';
-  return inferProjectForgeSync(project) ?? 'github';
+  return inferProjectForge(project) ?? 'github';
 }
 
 function forgeReader(projectPath: string) {
@@ -406,6 +406,62 @@ async function readBranchWithGit(projectPath: string, branch: string): Promise<D
 }
 
 /**
+ * Every local `feature/*` branch at once, for the batch door: two
+ * `git for-each-ref` invocations total instead of up to three git spawns per
+ * issue (PAN-3969).
+ *
+ * `aheadOfMain` is only ever tested as `> 0` (`deriveState`, `deriveAttention`),
+ * so membership in `--no-merged=origin/main` is enough — a branch whose tip is
+ * reachable from `origin/main` has zero commits ahead, and one whose tip is
+ * not has at least one. Members report 1, non-members 0.
+ *
+ * A branch absent from the map yields `null` from the caller, exactly as
+ * `readBranchWithGit` returns `null` when its `rev-list` fails. A failed
+ * listing (not a git repo, no `origin/main`) degrades the same way: the empty
+ * map, so every issue reads as branch-less rather than crashing the batch.
+ */
+async function readFeatureBranchesWithGit(projectPath: string): Promise<Map<string, DerivedBranchState>> {
+  const run = async (args: string[]): Promise<string | null> => {
+    try {
+      const { stdout } = await execFileAsync('git', args, { cwd: projectPath, encoding: 'utf-8', timeout: 15_000 });
+      return stdout;
+    } catch {
+      return null;
+    }
+  };
+  const [refsOut, aheadOut] = await Promise.all([
+    run(['for-each-ref', '--format=%(objectname) %(refname:short)', 'refs/heads/feature/', 'refs/remotes/origin/feature/']),
+    run(['for-each-ref', '--format=%(refname:short)', '--no-merged=origin/main', 'refs/heads/feature/']),
+  ]);
+  const branches = new Map<string, DerivedBranchState>();
+  // `rev-list origin/main..<branch>` fails per issue when `origin/main` is
+  // missing, so the per-issue reader reports null for every branch; mirror
+  // that here by treating a failed listing as "no branches".
+  if (refsOut === null || aheadOut === null) return branches;
+  const localSha = new Map<string, string>();
+  const remoteSha = new Map<string, string>();
+  for (const line of refsOut.split('\n')) {
+    const match = /^([0-9a-f]{40}) (\S+)$/.exec(line.trim());
+    if (!match) continue;
+    const [, sha, ref] = match as unknown as [string, string, string];
+    if (ref.startsWith('origin/')) remoteSha.set(ref.slice('origin/'.length), sha);
+    else localSha.set(ref, sha);
+  }
+  const ahead = new Set(
+    aheadOut.split('\n').map((line) => line.trim()).filter((line) => line.length > 0),
+  );
+  for (const [name, local] of localSha) {
+    const remote = remoteSha.get(name) ?? null;
+    branches.set(name, {
+      name,
+      aheadOfMain: ahead.has(name) ? 1 : 0,
+      pushed: remote !== null && remote === local,
+    });
+  }
+  return branches;
+}
+
+/**
  * `<planHome>/.pan/specs/` holds the issue's spec once it is planned. The
  * filename is whatever planning wrote — `PAN-1.xbrief.json`, or the dated
  * `2026-07-28-PAN-1-title.xbrief.json` — so the shared resolver reads the
@@ -416,7 +472,7 @@ async function readBranchWithGit(projectPath: string, branch: string): Promise<D
 export function specExistsFor(issueId: string, projectPath: string): boolean {
   const workspace = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
   return [projectPath, workspace].some((root) => {
-    if (findSpecByIssueSync(root, issueId) !== null) return true;
+    if (findSpecByIssue(root, issueId) !== null) return true;
     const { specsDir } = getProjectPanPaths(root);
     return existsSync(join(specsDir, `${issueId.toLowerCase()}.xbrief.json`))
       || existsSync(join(specsDir, `${issueId.toUpperCase()}.xbrief.json`));
@@ -453,8 +509,8 @@ async function readTmuxPaneText(pane: BackendPane): Promise<string> {
   // adapter happened to reuse a session-like name.
   if (pane.terminalId !== pane.id) return '';
   try {
-    const { capturePaneText } = await import('../tmux.js');
-    return await capturePaneText(pane.id, 40);
+    const { capturePane } = await import('../tmux.js');
+    return await capturePane(pane.id, 40);
   } catch {
     return '';
   }
@@ -483,6 +539,7 @@ export function paneFromBackendSnapshot(
     terminalId: snapshot.terminalId,
   };
   if (tokens.issue) pane.issue = tokens.issue;
+  if (snapshot.agentId) pane.agentId = snapshot.agentId;
   if (snapshot.cwd) pane.workspace = snapshot.cwd;
   return pane;
 }
@@ -494,7 +551,6 @@ export function paneFromBackendSnapshot(
 async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]> {
   const { Effect } = await import('effect');
   const { resolveLaunchBackend } = await import('../terminal-backends/launch.js');
-  const { resolveTerminalBackend } = await import('../terminal-backends/registry.js');
 
   const read = async (backend: TerminalBackend): Promise<readonly BackendPane[] | null> => {
     const snapshots = await Effect.runPromise(
@@ -508,10 +564,9 @@ async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]
     const backend = await resolveLaunchBackend();
     const panes = await read(backend);
     if (panes) return panes;
-    // The selected backend could not answer — tmux still owns whatever sessions
-    // are running, so its inventory is the fallback (`launch.js` registered it).
-    if (backend.name === 'tmux') return [];
-    return (await read(resolveTerminalBackend('tmux'))) ?? [];
+    // PAN-3956 D8: a Herdr host never reads tmux as a fallback inventory —
+    // an unreadable Herdr is "no panes known", not whatever tmux happens to hold.
+    return [];
   } catch {
     return [];
   }
@@ -525,7 +580,7 @@ async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]
 export async function readIssueFromTracker(issueId: string): Promise<TrackerIssueFacts | null> {
   const { loadConfigSync } = await import('../config.js');
   const { createTracker, createTrackerFromConfig } = await import('../tracker/factory.js');
-  const { resolveGitHubIssueSync } = await import('../tracker-utils.js');
+  const { resolveGitHubIssue } = await import('../tracker-utils.js');
   const { Effect } = await import('effect');
 
   let trackers;
@@ -539,7 +594,7 @@ export async function readIssueFromTracker(issueId: string): Promise<TrackerIssu
   // A GitHub tracker is configured with ONE owner/repo, but an issue id names
   // its repo through its prefix (PAN-, TIN-, …). Reading `PAN-1` against the
   // configured repo would answer about a different issue entirely.
-  const gh = resolveGitHubIssueSync(issueId);
+  const gh = resolveGitHubIssue(issueId);
 
   const order = [trackers.primary, ...(trackers.secondary ? [trackers.secondary] : [])];
   for (const type of order) {
@@ -685,13 +740,23 @@ export async function loadIssueStatesForProject(
   const panes = deps.panes ?? await listPanesWithBackend(now);
   const out = new Map<string, DerivedIssueState>();
 
+  // PAN-3969: the default branch read is one batched `for-each-ref` pair for
+  // the whole project, kicked off on the first branch-less issue (a batch
+  // where every issue has a PR never touches git). The `deps.readBranch` seam
+  // keeps its per-issue behavior for the tests that inject it.
+  let branchMapPromise: Promise<Map<string, DerivedBranchState>> | null = null;
+  const readBranchBatched = (_projectPath: string, branch: string): Promise<DerivedBranchState | null> => {
+    branchMapPromise ??= readFeatureBranchesWithGit(projectPath);
+    return branchMapPromise.then((branches) => branches.get(branch) ?? null);
+  };
+
   for (const raw of issueIds) {
     const issueId = raw.toUpperCase();
     const pr = prByIssue.get(issueId)
       ?? (gitlab ? await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, featureBranchFor(issueId)) : null);
     const branch = pr
       ? null
-      : await (deps.readBranch ?? readBranchWithGit)(projectPath, featureBranchFor(issueId));
+      : await (deps.readBranch ?? readBranchBatched)(projectPath, featureBranchFor(issueId));
 
     const issue = deps.issues?.[issueId] ?? null;
     const facts: IssueStateFacts = {

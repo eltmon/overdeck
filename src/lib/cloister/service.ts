@@ -7,10 +7,10 @@ import { loadCloisterConfigSync } from './config.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgentsSync, getAgentStateSync, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
+import { listRunningAgentsSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import {
-  isCloisterSpawnsPausedSync,
-  setCloisterSpawnsPausedSync,
+  isCloisterSpawnsPaused,
+  setCloisterSpawnsPaused,
   setDeaconGloballyPaused,
   setFlywheelGloballyPaused,
 } from '../overdeck/control-settings.js';
@@ -38,7 +38,7 @@ import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { sessionExists } from '../tmux.js';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { handleCloisterDomainEvent, parseSpecialistAgentSession } from './service-reactive.js';
 import {
   checkHandoffTriggers,
@@ -50,7 +50,7 @@ import {
   type HealthEvent, type HealthHost,
 } from './service-health.js';
 import { checkForMassDeaths as checkForMassDeathsWithHost, handleAgentCrash as handleAgentCrashWithHost, killAgent as killAgentWithHost, pauseSpawns as pauseSpawnsWithHost, pokeAgent as pokeAgentWithHost, pokeAgentWithEscalation as pokeAgentWithEscalationWithHost, progressFingerprint as progressFingerprintWithHost, restartAgent as restartAgentWithHost, type CrashEvent, type CrashHost } from './service-crash.js';
-import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, getStatus as getStatusWithHost, type CloisterStatus, type StatusHost } from './service-status.js';
+import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, type CloisterStatus, type StatusHost } from './service-status.js';
 export {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -188,13 +188,6 @@ export class CloisterService {
   private domainEventUnsubscribe: (() => void) | null = null;
   private eventStore: CloisterEventStore | null = null;
 
-  // ─── Status cache ────────────────────────────────────────────────────────────
-  // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
-  // to eliminate blocking on high-frequency dashboard polls.
-  private _statusCache: CloisterStatus | null = null;
-  private _statusCacheAt = 0;
-  private readonly STATUS_CACHE_TTL_MS = 3_000;
-
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfigSync();
   }
@@ -247,11 +240,6 @@ export class CloisterService {
   private statusHost(): StatusHost {
     const service = this;
     return {
-      get statusCache() { return service._statusCache; },
-      set statusCache(value: CloisterStatus | null) { service._statusCache = value; },
-      get statusCacheAt() { return service._statusCacheAt; },
-      set statusCacheAt(value: number) { service._statusCacheAt = value; },
-      get statusCacheTtlMs() { return service.STATUS_CACHE_TTL_MS; },
       get lastCheck() { return service.lastCheck; },
       get config() { return service.config; },
       isRunning: () => service.isRunning(),
@@ -339,7 +327,7 @@ export class CloisterService {
         }
       }
       if (clearedSpecialistCount > 0) {
-        emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Cleared ${clearedSpecialistCount} stale specialist state(s) on startup` });
+        emitActivityEntry({ source: 'cloister', level: 'warn', message: `Cleared ${clearedSpecialistCount} stale specialist state(s) on startup` });
       }
     } catch (error) {
       console.error('  ✗ Failed to clear stale specialist states:', error);
@@ -356,18 +344,17 @@ export class CloisterService {
       startDeaconLite();
       startHygieneScheduler();
       console.log('  ✓ Deacon-lite started');
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Deacon-lite and hygiene scheduler started' });
+      emitActivityEntry({ source: 'cloister', level: 'info', message: 'Deacon-lite and hygiene scheduler started' });
     } catch (error) {
       console.error('  ✗ Failed to start deacon-lite:', error);
-      emitActivityEntrySync({ source: 'cloister', level: 'error', message: `Failed to start deacon-lite: ${error instanceof Error ? error.message : String(error)}` });
+      emitActivityEntry({ source: 'cloister', level: 'error', message: `Failed to start deacon-lite: ${error instanceof Error ? error.message : String(error)}` });
     }
 
     this.running = true;
     this.starting = false;
-    this._statusCache = null;
     writeStateFile(true);
     this.emit({ type: 'started' });
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
+    emitActivityEntry({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
 
     await this.subscribeToDomainEvents();
 
@@ -392,9 +379,9 @@ export class CloisterService {
         this.eventStore = injected;
         if (injected.subscribe) {
           this.domainEventUnsubscribe = injected.subscribe((event) => {
-            void Effect.runPromise(handleCloisterDomainEvent(event)).catch((error) => {
+            void handleCloisterDomainEvent(event).catch((error) => {
               console.error('[cloister] Reactive lifecycle event handling failed:', error);
-              emitActivityEntrySync({
+              emitActivityEntry({
                 source: 'cloister',
                 level: 'error',
                 message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -410,9 +397,9 @@ export class CloisterService {
       const store = await initEventStore();
       this.eventStore = store;
       this.domainEventUnsubscribe = store.subscribe((event) => {
-        void Effect.runPromise(handleCloisterDomainEvent(event)).catch((error) => {
+        void handleCloisterDomainEvent(event).catch((error) => {
           console.error('[cloister] Reactive lifecycle event handling failed:', error);
-          emitActivityEntrySync({
+          emitActivityEntry({
             source: 'cloister',
             level: 'error',
             message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -422,7 +409,7 @@ export class CloisterService {
       console.log('  ✓ Cloister reactive lifecycle scheduler subscribed to domain events');
     } catch (error) {
       console.error('  ✗ Failed to subscribe Cloister reactive lifecycle scheduler:', error);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'cloister',
         level: 'error',
         message: `Failed to subscribe reactive lifecycle scheduler: ${error instanceof Error ? error.message : String(error)}`,
@@ -444,7 +431,6 @@ export class CloisterService {
 
     console.log('🔔 Stopping Cloister agent watchdog...');
     this.running = false;
-    this._statusCache = null;
     writeStateFile(false);
 
     if (this.checkInterval) {
@@ -540,8 +526,8 @@ export class CloisterService {
   /**
    * Poke an agent (send "are you stuck?" message).
    *
-   * NOTE: runtime.sendMessage() is async — both ClaudeCodeRuntime and PiRuntime
-   * are declared `async sendMessage(): Promise<void>`. A `throw` inside an
+   * NOTE: runtime.sendMessage() is async — ClaudeCodeRuntimeSync.sendMessage()
+   * is declared `async sendMessage(): Promise<void>`. A `throw` inside an
    * async function before any await still returns a rejected Promise, so the
    * surrounding try/catch CANNOT catch it. Without explicit `.catch()`, the
    * rejection becomes an UnhandledPromiseRejection and crashes the dashboard
@@ -610,7 +596,7 @@ export class CloisterService {
    */
   resumeSpawns(): void {
     this.spawnsPaused = false;
-    setCloisterSpawnsPausedSync(false);
+    setCloisterSpawnsPaused(false);
     this.deathTimestamps = []; // Clear death window
     this.emit({ type: 'spawn_resumed' });
     console.log(`🔔 Agent spawns resumed`);
@@ -620,7 +606,7 @@ export class CloisterService {
    * Check if spawns are currently paused
    */
   isSpawnPaused(): boolean {
-    return this.spawnsPaused || isCloisterSpawnsPausedSync();
+    return this.spawnsPaused || isCloisterSpawnsPaused();
   }
 
   /**
@@ -670,17 +656,6 @@ export class CloisterService {
   }
 
   /**
-   * Get current status
-   *
-   * Uses a 3-second TTL cache to avoid blocking the event loop on repeated
-   * dashboard polls. The underlying computation does sync file I/O and tmux
-   * calls for every agent, which scales poorly with agent count.
-   */
-  getStatus(): CloisterStatus {
-    return getStatusWithHost(this.statusHost());
-  }
-
-  /**
    * Get health for a specific agent
    */
   getAgentHealth(agentId: string): AgentHealth | null {
@@ -690,7 +665,7 @@ export class CloisterService {
   /**
    * Get health for all running agents
    */
-  getAllAgentHealth(): AgentHealth[] {
+  getAllAgentHealth(): Promise<AgentHealth[]> {
     return getAllAgentHealthWithHost(this.statusHost());
   }
 

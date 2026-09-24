@@ -25,12 +25,12 @@ describe('cv', () => {
     }
   });
 
-  it('readAgentCVSync returns null without creating a missing agents directory', async () => {
+  it('readAgentCV returns null without creating a missing agents directory', async () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'pan-2208-cv-'));
     const agentsDir = join(tempRoot, 'home', 'agents');
-    const { readAgentCVSync } = await importCvWithAgentsDir(agentsDir);
+    const { readAgentCV } = await importCvWithAgentsDir(agentsDir);
 
-    expect(readAgentCVSync('agent-min-846')).toBeNull();
+    expect(readAgentCV('agent-min-846')).toBeNull();
     expect(existsSync(agentsDir)).toBe(false);
   });
 });

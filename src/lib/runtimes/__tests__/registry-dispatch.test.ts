@@ -25,7 +25,6 @@ vi.mock('../../paths.js', async (importOriginal) => ({
   COSTS_DIR: '/tmp/pan-test-runtime-dispatch/costs',
   HEARTBEATS_DIR: '/tmp/pan-test-runtime-dispatch/heartbeats',
   ARCHIVES_DIR: '/tmp/pan-test-runtime-dispatch/archives',
-  encodeClaudeProjectDir: (p: string) => p,
 }))
 
 import {
@@ -36,7 +35,7 @@ import {
   getGlobalRegistry,
   getHarnessBehavior,
 } from '../index.js'
-import { closeOverdeckDatabaseSync } from '../../overdeck/infra.js'
+import { closeOverdeckDatabase } from '../../overdeck/infra.js'
 import type { AgentRuntimeSync, HarnessBehavior } from '../types.js'
 
 function stubRuntime(name: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'): AgentRuntimeSync {
@@ -89,7 +88,7 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
   let savedRegistry: ReturnType<typeof getGlobalRegistry> | null = null
 
   beforeEach(() => {
-    closeOverdeckDatabaseSync()
+    closeOverdeckDatabase()
     rmSync(TEST_OVERDECK_HOME, { recursive: true, force: true })
     savedRegistry = getGlobalRegistry()
     const fresh = new RuntimeRegistry()
@@ -262,6 +261,6 @@ describe('getHarnessBehavior', () => {
 
 afterEach(() => {
   // Per-test cleanup so state.json and overdeck.db fixtures don't bleed.
-  closeOverdeckDatabaseSync()
+  closeOverdeckDatabase()
   rmSync(TEST_OVERDECK_HOME, { recursive: true, force: true })
 })

@@ -19,7 +19,6 @@ import { AUDITED_MODEL_ADDITIONS } from './model-capability-additions.js';
  * - Official provider pricing pages
  */
 
-import { Effect } from 'effect';
 import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW } from './model-context-windows.js';
 import { ModelId } from './settings.js';
 
@@ -44,7 +43,7 @@ export { MODEL_DEPRECATIONS } from './model-deprecations.js';
  * @param modelId - Model ID to resolve (may be deprecated)
  * @returns Current model ID
  */
-export function resolveModelIdSync(modelId: string): ModelId {
+export function resolveModelId(modelId: string): ModelId {
   return (MODEL_DEPRECATIONS[modelId] as ModelId) || (modelId as ModelId);
 }
 
@@ -54,7 +53,7 @@ type CapabilityModelId = ModelId;
 
 // CLIProxy context ceilings live in their own module so this table stays a table;
 // re-exported here because they are part of the capability contract.
-export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, apiLaunchModelIdSync, isGpt56LongContextVariantSync } from './model-context-windows.js';
+export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, apiLaunchModelId, isGpt56LongContextVariant } from './model-context-windows.js';
 
 /**
  * Master capability database
@@ -93,6 +92,30 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     notes: 'Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding.',
+  },
+
+  'claude-opus-5-5': {
+    model: 'claude-opus-5-5',
+    provider: 'anthropic',
+    displayName: 'Claude Opus 5.5',
+    costPer1MTokens: 12, // Equal input/output blend of published API prices.
+    contextWindow: 1000000,
+    maxOutputTokens: 128000,
+    skills: {
+      'code-generation': 99,
+      'code-review': 99,
+      debugging: 99,
+      planning: 99,
+      documentation: 97,
+      testing: 96,
+      security: 99,
+      performance: 94,
+      synthesis: 99,
+      speed: 45,
+      'context-length': 100,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Released 2026-09-22 for long-running agentic coding and knowledge work. Native 1M context, 128K max output, always-on adaptive thinking, Medium default effort, and $4/$20 per MTok API pricing. Skill scores inherit the Opus 5 baseline until benchmarked.',
   },
 
   'claude-opus-5': {
@@ -1348,7 +1371,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
 /**
  * Get capability profile for a model
  */
-export function getModelCapabilitySync(model: ModelId): ModelCapability {
+export function getModelCapability(model: ModelId): ModelCapability {
   const capability = MODEL_CAPABILITIES[model as CapabilityModelId];
   if (!capability) {
     throw new Error(`No capability profile registered for model: ${model}`);
@@ -1356,7 +1379,7 @@ export function getModelCapabilitySync(model: ModelId): ModelCapability {
   return capability;
 }
 
-export function hasModelCapabilitySync(model: ModelId | string): boolean {
+export function hasModelCapability(model: ModelId | string): boolean {
   return model in MODEL_CAPABILITIES;
 }
 
@@ -1365,18 +1388,9 @@ export function hasModelCapabilitySync(model: ModelId | string): boolean {
  * model (treat undefined as "no model-specific restriction"). Resolves
  * deprecated IDs first so callers can pass raw config refs.
  */
-export function getModelEffortLevelsSync(model: ModelId | string): readonly EffortLevel[] | undefined {
-  const resolved = resolveModelIdSync(String(model));
+export function getModelEffortLevels(model: ModelId | string): readonly EffortLevel[] | undefined {
+  const resolved = resolveModelId(String(model));
   return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.effortLevels;
-}
-
-/**
- * Whether a model accepts the given effort level. Returns true when the model
- * has no enumerated effort levels (permissive fallback — see {@link getModelEffortLevelsSync}).
- */
-export function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
-  const levels = getModelEffortLevelsSync(model);
-  return levels === undefined || levels.length === 0 || levels.includes(effort);
 }
 
 /**
@@ -1386,100 +1400,7 @@ export function modelSupportsEffortSync(model: ModelId | string, effort: EffortL
  * the final authority for unaudited models. Resolves deprecated IDs first.
  * See {@link ModelCapability.supportsImages} and PAN-1685.
  */
-export function modelSupportsImagesSync(model: ModelId | string): boolean {
-  const resolved = resolveModelIdSync(String(model));
+export function modelSupportsImages(model: ModelId | string): boolean {
+  const resolved = resolveModelId(String(model));
   return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.supportsImages !== false;
 }
-
-/**
- * Get all models sorted by a specific skill (descending)
- */
-export function getModelsBySkillSync(skill: SkillDimension): ModelId[] {
-  return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).sort(
-    (a, b) => MODEL_CAPABILITIES[b].skills[skill] - MODEL_CAPABILITIES[a].skills[skill]
-  );
-}
-
-/**
- * Get all models for a provider
- */
-export function getModelsForProviderSync(
-  provider: ModelCapability['provider']
-): ModelId[] {
-  return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).filter(
-    (model) => MODEL_CAPABILITIES[model].provider === provider
-  );
-}
-
-/**
- * Get cheapest models (sorted by cost ascending)
- */
-export function getCheapestModelsSync(): ModelId[] {
-  return (Object.keys(MODEL_CAPABILITIES) as CapabilityModelId[]).sort(
-    (a, b) => MODEL_CAPABILITIES[a].costPer1MTokens - MODEL_CAPABILITIES[b].costPer1MTokens
-  );
-}
-
-/**
- * Calculate cost efficiency score for a skill
- * Higher = better value (skill score / cost)
- */
-export function getValueScoreSync(model: ModelId, skill: SkillDimension): number {
-  const cap = getModelCapabilitySync(model);
-  return cap.skills[skill] / Math.log10(cap.costPer1MTokens + 1);
-}
-
-/**
- * Get all skill dimensions
- */
-export function getAllSkillDimensionsSync(): SkillDimension[] {
-  return [
-    'code-generation',
-    'code-review',
-    'debugging',
-    'planning',
-    'documentation',
-    'testing',
-    'security',
-    'performance',
-    'synthesis',
-    'speed',
-    'context-length',
-  ];
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// All capability queries are pure lookups — additive Effect.sync wrappers.
-
-/** Resolve a (possibly-deprecated) model id to its canonical id. Pure. */
-export const resolveModelId = (modelId: string): Effect.Effect<ModelId> =>
-  Effect.sync(() => resolveModelIdSync(modelId));
-
-/** Look up a model's capability matrix. Pure. */
-export const getModelCapability = (
-  model: ModelId,
-): Effect.Effect<ModelCapability> => Effect.sync(() => getModelCapabilitySync(model));
-
-/** List models ranked best-first for a given skill. Pure. */
-export const getModelsBySkill = (
-  skill: SkillDimension,
-): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsBySkillSync(skill));
-
-/** List models for a specific provider. Pure. */
-export const getModelsForProvider = (
-  provider: ModelCapability['provider'],
-): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsForProviderSync(provider));
-
-/** List the cheapest models ranked best-first. Pure. */
-export const getCheapestModels = (): Effect.Effect<ModelId[]> =>
-  Effect.sync(() => getCheapestModelsSync());
-
-/** Compute the cost-adjusted value score for a model + skill. Pure. */
-export const getValueScore = (
-  model: ModelId,
-  skill: SkillDimension,
-): Effect.Effect<number> => Effect.sync(() => getValueScoreSync(model, skill));
-
-/** Enumerate all known skill dimensions. Pure. */
-export const getAllSkillDimensions = (): Effect.Effect<SkillDimension[]> =>
-  Effect.sync(() => getAllSkillDimensionsSync());

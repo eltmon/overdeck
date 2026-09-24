@@ -1,12 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { XBriefDocument, XBriefItem } from '../../xbrief/types.js';
-import {
-  assignDispatchTier,
-  chooseDispatchTier,
-  chooseTierAssignment,
-  type TierAssignmentConfig,
-} from '../dispatch-tier.js';
-import { ResolveTierError } from '../resolve-tier.js';
+import { type TierAssignmentConfig   } from '../dispatch-tier.js';
 
 vi.mock('../../config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../config-yaml.js')>();
@@ -22,7 +16,9 @@ vi.mock('../../xbrief/io.js', () => ({
 
 import { loadConfigSync } from '../../config-yaml.js';
 import { readTierOverrides, readWorkspacePlanSync } from '../../xbrief/io.js';
-import { applyTierAssignment, logTierFitnessAtSpawn, resolveSingleWorkTierSpawnParams, resolveSlotSpawnFitness, resolveSlotTierSpawnParams } from '../spawn-prep.js';
+import { logTierFitnessAtSpawn, resolveSingleWorkTierSpawnParams, resolveSlotSpawnFitness, resolveSlotTierSpawnParams  } from '../spawn-prep.js';
+
+// Moved here from src/lib/agents/dispatch-tier.ts, which no production code called (PAN-3958 CH-8).
 
 const TIER_CONFIG: TierAssignmentConfig = {
   enabled: true,
@@ -40,92 +36,11 @@ const TIER_CONFIG: TierAssignmentConfig = {
   },
 };
 
-const TIERING: TierAssignmentConfig = {
-  enabled: true,
-  tiers: {
-    cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
-    standard: { model: 'claude-sonnet-4-6', harness: 'claude-code', difficulties: ['medium'] },
-    frontier: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['complex', 'expert'] },
-  },
-  difficultyToTier: {
-    trivial: 'cheap',
-    simple: 'cheap',
-    medium: 'standard',
-    complex: 'frontier',
-    expert: 'frontier',
-  },
-};
-
 function item(metadata: XBriefItem['metadata'], id = 'item-1'): Pick<XBriefItem, 'id' | 'title' | 'metadata'> {
   return { id, title: 'test item', metadata };
 }
 
-describe('assignDispatchTier', () => {
-  it('resolves an expert item to the expert tier model and harness when enabled', () => {
-    const assignment = assignDispatchTier(item({ difficulty: 'expert' }), TIER_CONFIG);
-    expect(assignment).toEqual({
-      dispatch: 'registered-slot',
-      tierName: 'frontier',
-      model: 'claude-opus-4-8',
-      harness: 'claude-code',
-    });
-  });
 
-  it('returns exactly the current dispatch lane with no model override when disabled', () => {
-    const candidates: Array<Pick<XBriefItem, 'id' | 'title' | 'metadata'>> = [
-      item({ difficulty: 'expert' }),
-      item({ difficulty: 'simple', files_scope: ['a.ts'], files_scope_confidence: 'high' }),
-      item({ difficulty: 'medium', files_scope: ['a.ts'], files_scope_confidence: 'high', readiness: 'ready' }),
-    ];
-    for (const candidate of candidates) {
-      const disabled = assignDispatchTier(candidate, { ...TIER_CONFIG, enabled: false });
-      expect(disabled).toEqual({ dispatch: chooseDispatchTier(candidate) });
-      expect(assignDispatchTier(candidate, undefined)).toEqual({ dispatch: chooseDispatchTier(candidate) });
-    }
-  });
-
-  it('honors the per-plan tiered_execution override in both directions', () => {
-    const expert = item({ difficulty: 'expert' });
-    const onWhileGloballyOff = assignDispatchTier(expert, { ...TIER_CONFIG, enabled: false }, { tiered_execution: 'on' });
-    expect(onWhileGloballyOff.model).toBe('claude-opus-4-8');
-
-    const offWhileGloballyOn = assignDispatchTier(expert, TIER_CONFIG, { tiered_execution: 'off' });
-    expect(offWhileGloballyOn).toEqual({ dispatch: 'registered-slot' });
-  });
-
-  it('propagates a named ResolveTierError when enabled and nothing resolves', () => {
-    expect(() => assignDispatchTier(item({}), TIER_CONFIG)).toThrow(ResolveTierError);
-  });
-});
-
-describe('chooseTierAssignment', () => {
-  it('returns the expert tier model+harness when tiered execution is enabled', () => {
-    const assignment = chooseTierAssignment(item({ difficulty: 'expert' }), TIERING);
-    expect(assignment).toEqual({
-      dispatch: 'registered-slot',
-      tierName: 'frontier',
-      model: 'claude-opus-4-8',
-      harness: 'claude-code',
-    });
-  });
-
-  it('returns exactly chooseDispatchTier with no model override when tiering is disabled', () => {
-    const items = [
-      item({ difficulty: 'expert' }),
-      item({ difficulty: 'trivial', files_scope: ['a.ts'], files_scope_confidence: 'high' }),
-      item({ readiness: 'ready', files_scope: ['a.ts'], files_scope_confidence: 'high' }),
-      item({}),
-    ];
-    for (const testItem of items) {
-      for (const tiering of [undefined, { ...TIERING, enabled: false }]) {
-        const assignment = chooseTierAssignment(testItem, tiering);
-        expect(assignment).toEqual({ dispatch: chooseDispatchTier(testItem) });
-        expect(assignment.model).toBeUndefined();
-        expect(assignment.harness).toBeUndefined();
-      }
-    }
-  });
-});
 
 describe('resolveSlotTierSpawnParams', () => {
   function planDoc(items: XBriefItem[], planMetadata?: Record<string, unknown>): XBriefDocument {
@@ -461,20 +376,6 @@ describe('resolveSingleWorkTierSpawnParams', () => {
   });
 });
 
-describe('applyTierAssignment', () => {
-  it('carries the resolved model and harness into spawn params over the parent default', () => {
-    const assignment = chooseTierAssignment(item({ difficulty: 'expert' }), TIERING);
-    const options = applyTierAssignment({ model: 'gpt-5.5', harness: 'codex' as const }, assignment);
-    expect(options.model).toBe('claude-opus-4-8');
-    expect(options.harness).toBe('claude-code');
-  });
-
-  it('passes spawn params through unchanged when no assignment resolved a tier', () => {
-    const parent = { model: 'gpt-5.5', harness: 'codex' as const };
-    expect(applyTierAssignment(parent, undefined)).toBe(parent);
-    expect(applyTierAssignment(parent, { dispatch: 'in-context' })).toBe(parent);
-  });
-});
 
 describe('spawn-time tier fitness logging (PAN-3842)', () => {
   function planDoc(items: XBriefItem[]): XBriefDocument {

@@ -70,13 +70,6 @@ export interface GitHubPullRequestState extends GitHubPullRequestRef {
   checksFailed: boolean;
 }
 
-export interface GitHubPullRequestHeadState extends GitHubPullRequestRef {
-  url?: string;
-  state: 'OPEN' | 'CLOSED';
-  merged: boolean;
-  headSha: string;
-}
-
 export interface GitHubPullRequestForHead {
   number: number;
   state: 'open' | 'closed';
@@ -282,7 +275,9 @@ function generateJWT(appId: string, privateKey: string): string {
   const signature = signer.sign(privateKey, 'base64url');
 
   return `${header}.${payload}.${signature}`;
-}async function generateInstallationTokenPromise(
+}
+
+async function generateInstallationTokenBody(
   config?: GitHubAppConfig
 ): Promise<InstallationToken> {
   const appConfig = config || loadGitHubAppConfig();
@@ -479,7 +474,11 @@ function summarizeCiCheckRuns(
   };
 }
 
-export async function getCiCheckRunsStatePromise(
+/**
+ * Check-runs-only CI verdict for one commit SHA.
+ * Unlike getPullRequestState(), this intentionally ignores commit statuses.
+ */
+export async function getCiCheckRunsState(
   owner: string,
   repo: string,
   sha: string,
@@ -512,7 +511,10 @@ async function getCommitCheckState(
     pending: pendingStatus || ciState.pendingRuns.length > 0,
     failed: failedStatus || ciState.failed,
   };
-}async function getPullRequestStatePromise(
+}
+
+/** Fetch a pull request's state and aggregate its checks through the GitHub App. */
+export async function getPullRequestState(
   owner: string,
   repo: string,
   number: number,
@@ -549,30 +551,8 @@ async function getCommitCheckState(
   };
 }
 
-async function getPullRequestHeadStatePromise(
-  owner: string,
-  repo: string,
-  number: number,
-): Promise<GitHubPullRequestHeadState> {
-  const pull = await githubApi<{
-    html_url?: string;
-    state: 'open' | 'closed';
-    merged?: boolean;
-    head?: { sha?: string };
-  }>(`/repos/${owner}/${repo}/pulls/${number}`);
-
-  return {
-    owner,
-    repo,
-    number,
-    url: pull.html_url,
-    state: pull.state === 'open' ? 'OPEN' : 'CLOSED',
-    merged: pull.merged === true,
-    headSha: pull.head?.sha || '',
-  };
-}
-
-export async function listPullRequestsForHeadPromise(
+/** List pull requests for a head branch through the GitHub App REST API (no GraphQL). */
+export async function listPullRequestsForHead(
   owner: string,
   repo: string,
   branch: string,
@@ -601,7 +581,8 @@ export async function listPullRequestsForHeadPromise(
   }));
 }
 
-export async function getIssueStatePromise(
+/** Look up an issue's state through the GitHub App REST API (no GraphQL). */
+export async function getIssueState(
   owner: string,
   repo: string,
   number: number,
@@ -610,7 +591,8 @@ export async function getIssueStatePromise(
   return { state: issue.state };
 }
 
-export async function listOpenIssuesWithLabelsPromise(
+/** List open issues with their labels through the GitHub App REST API (paginated). */
+export async function listOpenIssuesWithLabels(
   owner: string,
   repo: string,
 ): Promise<GitHubOpenIssueLabels[]> {
@@ -630,7 +612,7 @@ export async function listOpenIssuesWithLabelsPromise(
     }));
 }
 
-export async function listIssuesWithAnyLabelPromise(
+export async function listIssuesWithAnyLabel(
   owner: string,
   repo: string,
   labels: readonly string[],
@@ -659,7 +641,8 @@ export async function listIssuesWithAnyLabelPromise(
   return [...byNumber.values()];
 }
 
-async function mergePullRequestWithAppPromise(
+/** Merge a pull request through the GitHub App. */
+export async function mergePullRequestWithApp(
   owner: string,
   repo: string,
   number: number,
@@ -836,7 +819,7 @@ export async function postOverdeckTestsStatus(
   }
 }
 
-async function refreshWorkspaceTokenPromise(
+async function refreshWorkspaceTokenBody(
   workspacePath: string,
 ): Promise<void> {
   const config = loadGitHubAppConfig();
@@ -872,7 +855,7 @@ export function getAppStatus(): {
   return { configured: false, mode: 'fallback' };
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 const apiCatch = (operation: string) => (cause: unknown) =>
   new GitHubApiError({
@@ -897,91 +880,9 @@ export const generateInstallationToken = (
       );
     }
     return yield* Effect.tryPromise({
-      try: () => generateInstallationTokenPromise(cfg),
+      try: () => generateInstallationTokenBody(cfg),
       catch: apiCatch('generateInstallationToken'),
     });
-  });
-
-/** Effect-native getPullRequestState — typed-error fetch + check aggregator. */
-export const getPullRequestState = (
-  owner: string,
-  repo: string,
-  number: number,
-): Effect.Effect<GitHubPullRequestState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getPullRequestStatePromise(owner, repo, number),
-    catch: apiCatch('getPullRequestState'),
-  });
-
-/** Effect-native lightweight PR state fetch without commit status/check aggregation. */
-export const getPullRequestHeadState = (
-  owner: string,
-  repo: string,
-  number: number,
-): Effect.Effect<GitHubPullRequestHeadState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getPullRequestHeadStatePromise(owner, repo, number),
-    catch: apiCatch('getPullRequestHeadState'),
-  });
-
-/** Effect-native listPullRequestsForHead — App REST head lookup, no GraphQL. */
-export const listPullRequestsForHead = (
-  owner: string,
-  repo: string,
-  branch: string,
-  state: 'open' | 'closed' | 'all',
-): Effect.Effect<GitHubPullRequestForHead[], GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => listPullRequestsForHeadPromise(owner, repo, branch, state),
-    catch: apiCatch('listPullRequestsForHead'),
-  });
-
-/** Effect-native getIssueState — App REST issue state lookup, no GraphQL. */
-export const getIssueState = (
-  owner: string,
-  repo: string,
-  number: number,
-): Effect.Effect<GitHubIssueState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getIssueStatePromise(owner, repo, number),
-    catch: apiCatch('getIssueState'),
-  });
-
-/** Effect-native listOpenIssuesWithLabels — paginated App REST issue labels. */
-export const listOpenIssuesWithLabels = (
-  owner: string,
-  repo: string,
-): Effect.Effect<GitHubOpenIssueLabels[], GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => listOpenIssuesWithLabelsPromise(owner, repo),
-    catch: apiCatch('listOpenIssuesWithLabels'),
-  });
-
-/**
- * Effect-native check-runs-only CI verdict for one commit SHA.
- * Unlike getPullRequestState(), this intentionally ignores commit statuses.
- */
-export const getCiCheckRunsState = (
-  owner: string,
-  repo: string,
-  sha: string,
-): Effect.Effect<GitHubCiCheckRunsState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getCiCheckRunsStatePromise(owner, repo, sha),
-    catch: apiCatch('getCiCheckRunsState'),
-  });
-
-/** Effect-native mergePullRequestWithApp — typed-error merge call. */
-export const mergePullRequestWithApp = (
-  owner: string,
-  repo: string,
-  number: number,
-  method: 'merge' | 'squash' | 'rebase' = 'squash',
-  sha?: string,
-): Effect.Effect<{ merged: boolean; message?: string }, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => mergePullRequestWithAppPromise(owner, repo, number, method, sha),
-    catch: apiCatch('mergePullRequestWithApp'),
   });
 
 /** Effect-native refreshWorkspaceToken — fails with FsError or GitHubApiError. */
@@ -996,7 +897,7 @@ export const refreshWorkspaceToken = (
       );
     }
     return yield* Effect.tryPromise({
-      try: () => refreshWorkspaceTokenPromise(workspacePath),
+      try: () => refreshWorkspaceTokenBody(workspacePath),
       catch: (cause) =>
         new FsError({
           path: workspacePath,

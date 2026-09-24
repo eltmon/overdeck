@@ -156,7 +156,7 @@ export const AgentSpawnerLive = Layer.effect(
           ) as any;
           const normalizedId = normalizeAgentId(issueId);
 
-          const existing = await Effect.runPromise(getAgentState(normalizedId)) as { status?: string } | null;
+          const existing = getAgentState(normalizedId) as { status?: string } | null;
           if (existing?.status === 'running') {
             throw new AgentAlreadyRunning({ id: issueId });
           }

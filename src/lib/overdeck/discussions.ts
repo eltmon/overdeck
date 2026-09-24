@@ -1,9 +1,9 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { extractPrefixSync, parseIssueIdSync } from '../issue-id.js';
+import { extractPrefix, parseIssueId } from '../issue-id.js';
 import { githubPrLookupSource, lookupPullRequestNumberForBranch } from '../github-pr-lookup.js';
-import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import {
   getCachedIssuePrTabResponse,
@@ -19,7 +19,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -75,7 +75,7 @@ export async function fetchIssueDiscussions(
   const errors: string[] = [];
   let prNumber: number | null = null;
 
-  const trackerType = resolveTrackerTypeSync(issueId);
+  const trackerType = resolveTrackerType(issueId);
   const githubCheck = isGitHubIssue(issueId);
 
   // Steps 1-3 are independent network calls. Fan them out with Promise.all
@@ -157,7 +157,7 @@ export async function fetchIssueDiscussions(
   } else {
     // Try the project-resolved repo (Linear-tracked issues whose project maps
     // to a GitHub repo — common for Overdeck).
-    const issuePrefix = extractPrefixSync(issueId);
+    const issuePrefix = extractPrefix(issueId);
     const projectKey = issuePrefix ?? issueId.split('-')[0] ?? '';
     const ghConfig = getGitHubConfig();
     const repoConfig = ghConfig?.repos.find((r) => {
@@ -173,7 +173,7 @@ export async function fetchIssueDiscussions(
 
   const prNumberTask = (async () => {
     if (prRepoArg) {
-      if (!parseIssueIdSync(issueId)) {
+      if (!parseIssueId(issueId)) {
         throw new Error(`Invalid issue id: ${issueId}`);
       }
       const branchName = `feature/${issueId.toLowerCase()}`;

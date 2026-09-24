@@ -7,7 +7,7 @@
  *   $OVERDECK_HOME/agents/<agentId>/rpc.in
  *
  * The launcher script creates the fifo, then `exec pi --mode rpc ... < <fifo>`.
- * The runtime adapter (PiRuntime.sendMessage) writes JSONL lines to the fifo.
+ * Callers write JSONL command lines to the fifo (writePiCommandSync).
  *
  * Why a fifo and not stdin pipe + tmux paste-buffer:
  *   - tmux paste-buffer is unreliable for JSONL (Enter timing, terminal
@@ -33,7 +33,6 @@ import { existsSync, mkdirSync, openSync, writeSync, closeSync, unlinkSync, cons
 import { join } from 'node:path'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
-import { Data, Effect } from 'effect'
 import { getOverdeckHome } from '../paths.js'
 
 const execAsync = promisify(exec)
@@ -60,7 +59,14 @@ export function piFifoPaths(agentId: string, home?: string): PiFifoPaths {
     readyPath: join(agentDir, 'ready.json'),
     fifoPath: join(agentDir, 'rpc.in'),
   }
-}async function createPiFifoPromise(agentId: string, home?: string): Promise<string> {
+}
+
+/**
+ * Create the Pi RPC FIFO for an agent and return its path.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
+ */
+export async function createPiFifo(agentId: string, home?: string): Promise<string> {
   const paths = piFifoPaths(agentId, home)
   mkdirSync(paths.agentDir, { recursive: true, mode: 0o700 })
   if (existsSync(paths.fifoPath)) {
@@ -75,8 +81,10 @@ export function piFifoPaths(agentId: string, home?: string): PiFifoPaths {
 
 /**
  * Unlink the fifo. Safe to call when the fifo does not exist.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function destroyPiFifoSync(agentId: string, home?: string): void {
+export function destroyPiFifo(agentId: string, home?: string): void {
   const paths = piFifoPaths(agentId, home)
   try {
     unlinkSync(paths.fifoPath)
@@ -100,7 +108,7 @@ export function destroyPiFifoSync(agentId: string, home?: string): void {
  * The command is JSON-stringified and a single trailing newline is added so
  * Pi's JSONL parser sees one record per line.
  */
-export function writePiCommandSync(agentId: string, command: unknown, home?: string): void {
+export function writePiCommand(agentId: string, command: unknown, home?: string): void {
   const paths = piFifoPaths(agentId, home)
   if (!existsSync(paths.readyPath)) {
     throw new PiNotReady(
@@ -134,68 +142,3 @@ function shellQuote(s: string): string {
   if (/^[A-Za-z0-9._/-]+$/.test(s)) return s
   return `'${s.replace(/'/g, `'\\''`)}'`
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel variants of the fifo helpers above. Sync/promise
-// variants are preserved so the existing PiRuntime adapter keeps working.
-
-/** Tagged error for pi-fifo Effect variants. */
-export class PiFifoError extends Data.TaggedError('PiFifoError')<{
-  readonly agentId: string
-  readonly stage: 'create' | 'write' | 'destroy'
-  readonly message: string
-  readonly cause?: unknown
-}> {}
-
-/** Effect variant of `createPiFifo`. */
-export const createPiFifo = (
-  agentId: string,
-  home?: string,
-): Effect.Effect<string, PiFifoError> =>
-  Effect.tryPromise({
-    try: () => createPiFifoPromise(agentId, home),
-    catch: (cause) =>
-      new PiFifoError({
-        agentId,
-        stage: 'create',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  })
-
-/**
- * Effect variant of `writePiCommand`. Lifts the sync FD ops via `Effect.try`.
- * The PiNotReady signal is preserved in the cause field so callers can branch.
- */
-export const writePiCommand = (
-  agentId: string,
-  command: unknown,
-  home?: string,
-): Effect.Effect<void, PiFifoError> =>
-  Effect.try({
-    try: () => writePiCommandSync(agentId, command, home),
-    catch: (cause) =>
-      new PiFifoError({
-        agentId,
-        stage: 'write',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  })
-
-/** Effect variant of `destroyPiFifo`. */
-export const destroyPiFifo = (
-  agentId: string,
-  home?: string,
-): Effect.Effect<void, PiFifoError> =>
-  Effect.try({
-    try: () => destroyPiFifoSync(agentId, home),
-    catch: (cause) =>
-      new PiFifoError({
-        agentId,
-        stage: 'destroy',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  })

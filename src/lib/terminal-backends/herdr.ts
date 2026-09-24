@@ -13,12 +13,27 @@
  * command line itself from Herdr's agent manifest, so it cannot run Overdeck's
  * generated launcher script — the script that carries the provider exports,
  * the system-prompt files, the session id, and every harness-specific launch
- * field. Instead the adapter splits a pane with the launch env, runs the
+ * field. Instead the adapter splits a pane with the launch env and runs the
  * launcher in it with `pane.send_input` (text plus Enter in one ordered
- * submission), waits for Herdr's own agent detection, and binds the agent name
- * with `agent.rename`. Herdr then reports the pane as a first-class agent —
- * `agent.prompt`, `agent.wait` and the `idle|working|blocked|done` states all
- * work — and both backends run the identical launcher.
+ * submission).
+ *
+ * What happens next depends on the launch's DETECTION POLICY
+ * (`detectionPolicyFor`, `./launch.ts`):
+ *
+ *  - `required` (claude-code): wait for Herdr's own agent detection and bind
+ *    the agent name with `agent.rename`. Herdr then reports the pane as a
+ *    first-class agent — `agent.prompt`, `agent.wait` and the
+ *    `idle|working|blocked|done` states all work.
+ *  - `not-required` (every harness Overdeck runs through a host process): the
+ *    pane is stamped with its tokens (including `agentId`), the launcher is
+ *    sent, and the pane reference is returned immediately. Herdr never
+ *    detects an agent there — the foreground process is the host, not the
+ *    harness — so the pane itself is the agent: the token keys the inventory
+ *    and liveness reads, and delivery falls through to the harness's own
+ *    transport. Waiting for a detection that cannot happen is what failed
+ *    `agent-pan-3705-review` on 2026-09-19.
+ *
+ * Both paths run the identical launcher, and both stamp the same tokens.
  */
 
 import { Effect } from 'effect';
@@ -59,6 +74,16 @@ const BACKEND = 'herdr' as const;
 
 /** `pane.report_metadata` requires a source; every Overdeck stamp carries this one. */
 const METADATA_SOURCE = 'overdeck';
+
+/**
+ * The metadata token that carries the Overdeck agent id (PAN-3917 W12).
+ *
+ * A DETECTED agent is addressable by name (`agent.rename`), but a pane-bound
+ * agent has no Herdr agent record at all, and `PaneInfo` carries no name — so
+ * the id has to live in the pane's own tokens. Every launch stamps it, on both
+ * paths, so the inventory keys every agent the same way.
+ */
+export const AGENT_ID_TOKEN = 'agentId';
 
 /** How long to wait for Herdr to recognize the harness in a freshly launched pane. */
 const AGENT_DETECT_TIMEOUT_MS = 60_000;
@@ -177,20 +202,91 @@ export function toBackendEvents(kind: string, data: Record<string, unknown>): Ba
 }
 
 /** A routing probe must never hold up a delivery: give up and let tmux answer. */
-export const HERDR_PROBE_TIMEOUT_MS = 2_000;
+const HERDR_PROBE_TIMEOUT_MS = 2_000;
+
+/**
+ * The pane stamped with this Overdeck agent id, or null when the session holds
+ * none (PAN-3917 W12).
+ *
+ * This is how a PANE-BOUND agent is found: it has no Herdr agent record, so
+ * `agent.get` cannot answer for it and the session snapshot is the only place
+ * its identity lives. Throws on a transport failure — a caller that must not
+ * confuse "no such pane" with "the socket did not answer" has to see it.
+ */
+async function findAgentIdPane(
+  agentName: string,
+  api: HerdrApiClient,
+  timeoutMs: number = HERDR_PROBE_TIMEOUT_MS,
+): Promise<HerdrPaneInfo | null> {
+  const snapshot = await api.call<{ snapshot?: { panes?: HerdrPaneInfo[] } }>(
+    'session.snapshot',
+    {},
+    { timeoutMs },
+  );
+  const wanted = agentName.toLowerCase();
+  return (snapshot.snapshot?.panes ?? []).find(
+    (pane) => pane.tokens?.[AGENT_ID_TOKEN]?.toLowerCase() === wanted,
+  ) ?? null;
+}
+
+/**
+ * Does the pane still run something, or has its shell returned to its prompt?
+ *
+ * A Herdr pane OUTLIVES the process typed into it: the launcher runs as a child
+ * of the pane's shell, so a harness that exits leaves the pane sitting at `$`.
+ * "The pane exists" is therefore not liveness — the pane's foreground process
+ * is, exactly as the tmux oracle walks the pane's process subtree.
+ *
+ * Verified live on 2026-09-19 (herdr 0.9.1): an idle pane reports its own shell
+ * (`foreground_processes = [bash]`, `pid === shell_pid`); a pane running a
+ * command reports that command with a different pid and process group. So the
+ * question is whether any foreground process is NOT the shell.
+ */
+async function paneProcessLiveness(
+  paneId: string,
+  api: HerdrApiClient,
+): Promise<'running' | 'exited' | 'indeterminate'> {
+  try {
+    const info = await api.call<{
+      process_info?: { shell_pid?: number | null; foreground_processes?: { pid: number }[] };
+    }>('pane.process_info', { pane_id: paneId }, { timeoutMs: HERDR_PROBE_TIMEOUT_MS });
+    const process_info = info.process_info;
+    if (!process_info) return 'indeterminate';
+    const shellPid = process_info.shell_pid ?? null;
+    const foreground = process_info.foreground_processes ?? [];
+    return foreground.some((process) => process.pid !== shellPid) ? 'running' : 'exited';
+  } catch (cause) {
+    // The server answering (`pane_not_found`) means the pane is gone; only a
+    // transport failure leaves the question open.
+    if (cause instanceof HerdrApiError && !HERDR_TRANSPORT_ERROR_CODES.has(cause.code)) return 'exited';
+    return 'indeterminate';
+  }
+}
+
+/** One Herdr-hosted agent, detected by Herdr or bound to a token-stamped pane. */
+export interface HerdrAgentRef {
+  readonly paneId: string;
+  readonly terminalId: string;
+  readonly workspaceId: string;
+  readonly state: AgentState;
+  readonly tokens: Partial<PaneTokens>;
+  /** True when Herdr has no agent record for it — the pane itself is the agent. */
+  readonly paneBound: boolean;
+}
 
 /**
  * The live Herdr agent behind an Overdeck agent id, or null when there is none.
  *
- * The adapter binds the Overdeck agent id as Herdr's live agent name
- * (`agent.rename`), so one `agent.get` answers it. A null answer means the
- * target is not a Herdr agent — a tmux session from before the cut, or an id
- * that no longer exists — and the caller keeps its tmux path.
+ * A detected agent carries the Overdeck agent id as Herdr's live agent name
+ * (`agent.rename`), so one `agent.get` answers it. A pane-bound agent has no
+ * agent record, so the fallback is the `agentId` token on its pane. A null
+ * answer means the target is not on Herdr at all — a tmux session from before
+ * the cut, or an id that no longer exists — and the caller keeps its tmux path.
  */
 export async function findHerdrAgent(
   agentName: string,
   api: HerdrApiClient = getHerdrApiClient(),
-): Promise<{ paneId: string; terminalId: string; workspaceId: string; state: AgentState; tokens: Partial<PaneTokens> } | null> {
+): Promise<HerdrAgentRef | null> {
   try {
     const info = await api.call<{ agent?: HerdrPaneInfo }>(
       'agent.get',
@@ -198,14 +294,71 @@ export async function findHerdrAgent(
       { timeoutMs: HERDR_PROBE_TIMEOUT_MS },
     );
     const agent = info.agent;
-    if (!agent) return null;
+    if (agent) {
+      return {
+        paneId: agent.pane_id,
+        terminalId: agent.terminal_id,
+        workspaceId: agent.workspace_id,
+        state: toAgentState(agent.agent_status),
+        tokens: (agent.tokens ?? {}) as Partial<PaneTokens>,
+        paneBound: false,
+      };
+    }
+  } catch {
+    // `agent.get` answers "no such agent" for every pane-bound agent; the token
+    // scan below is the only read that can see one.
+  }
+
+  try {
+    const pane = await findAgentIdPane(agentName, api);
+    if (!pane) return null;
+    // A pane whose shell is back at its prompt is residue, not an agent: a
+    // caller that treated it as live would block a respawn and paste a message
+    // into a dead shell.
+    if (await paneProcessLiveness(pane.pane_id, api) !== 'running') return null;
     return {
-      paneId: agent.pane_id,
-      terminalId: agent.terminal_id,
-      workspaceId: agent.workspace_id,
-      state: toAgentState(agent.agent_status),
-      tokens: (agent.tokens ?? {}) as Partial<PaneTokens>,
+      paneId: pane.pane_id,
+      terminalId: pane.terminal_id,
+      workspaceId: pane.workspace_id,
+      state: toAgentState(pane.agent_status),
+      tokens: (pane.tokens ?? {}) as Partial<PaneTokens>,
+      paneBound: !pane.agent,
     };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The Herdr pane an Overdeck agent id occupies, whether or not anything still
+ * runs in it (PAN-3947).
+ *
+ * `findHerdrAgent` answers "is there a live agent" and so drops a pane whose
+ * shell is back at its prompt. Stopping an agent must close that residue too —
+ * otherwise the pane outlives every stop and blocks the next dispatch — so this
+ * lookup returns the pane by live agent name, then by its `agentId` token, with
+ * no foreground-process check. Null when Herdr holds no such pane or the socket
+ * did not answer.
+ */
+export async function findHerdrAgentPane(
+  agentName: string,
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<{ readonly paneId: string; readonly terminalId: string; readonly workspaceId: string } | null> {
+  try {
+    const info = await api.call<{ agent?: HerdrPaneInfo }>(
+      'agent.get',
+      { target: agentName },
+      { timeoutMs: HERDR_PROBE_TIMEOUT_MS },
+    );
+    if (info.agent) {
+      return { paneId: info.agent.pane_id, terminalId: info.agent.terminal_id, workspaceId: info.agent.workspace_id };
+    }
+  } catch {
+    // Pane-bound agents have no Herdr agent record; the token scan finds them.
+  }
+  try {
+    const pane = await findAgentIdPane(agentName, api);
+    return pane ? { paneId: pane.pane_id, terminalId: pane.terminal_id, workspaceId: pane.workspace_id } : null;
   } catch {
     return null;
   }
@@ -253,54 +406,112 @@ export async function probeHerdrAgentLiveness(
     );
   } catch (cause) {
     if (cause instanceof HerdrApiError && !HERDR_TRANSPORT_ERROR_CODES.has(cause.code)) {
-      // The server answered — it simply does not know this agent.
-      return { kind: 'absent' };
+      // The server answered — it does not know this agent BY NAME. A pane-bound
+      // agent never has a name, so "no such agent" is not yet a death.
+      return await probePaneBoundLiveness(agentName, api);
     }
     const reason = cause instanceof Error ? cause.message : String(cause);
     return { kind: 'indeterminate', reason };
   }
   const agent = info.agent;
-  if (!agent) return { kind: 'absent' };
+  if (!agent) return await probePaneBoundLiveness(agentName, api);
   const state = toAgentState(agent.agent_status);
   if (state === 'exited') return { kind: 'exited', paneId: agent.pane_id };
   return { kind: 'alive', paneId: agent.pane_id, state };
 }
 
-/** One live Herdr agent, keyed by the Overdeck agent id bound with `agent.rename`. */
+/**
+ * Liveness for an agent Herdr holds no record for: the pane stamped with its
+ * `agentId` token, plus that pane's foreground process.
+ *
+ * `absent` once Herdr's snapshot no longer lists the pane, `exited` when the
+ * pane is back at its shell prompt (the harness or its host died and left the
+ * pane behind), `alive` while a process of its own is running, and
+ * `indeterminate` whenever a probe itself failed — a pane-bound agent must
+ * never be reported dead merely because Herdr holds no agent record for it, and
+ * a detected agent that exits must still be confirmed dead.
+ */
+async function probePaneBoundLiveness(
+  agentName: string,
+  api: HerdrApiClient,
+): Promise<HerdrLivenessProbe> {
+  try {
+    const pane = await findAgentIdPane(agentName, api);
+    if (!pane) return { kind: 'absent' };
+    const process = await paneProcessLiveness(pane.pane_id, api);
+    if (process === 'exited') return { kind: 'exited', paneId: pane.pane_id };
+    if (process === 'indeterminate') {
+      return { kind: 'indeterminate', reason: `pane ${pane.pane_id} process probe failed` };
+    }
+    return { kind: 'alive', paneId: pane.pane_id, state: toAgentState(pane.agent_status) };
+  } catch (cause) {
+    // Same rule as the agent probe: only a SERVER answer can mean absence.
+    if (cause instanceof HerdrApiError && !HERDR_TRANSPORT_ERROR_CODES.has(cause.code)) {
+      return { kind: 'absent' };
+    }
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    return { kind: 'indeterminate', reason };
+  }
+}
+
+/** One live Herdr agent, keyed by the Overdeck agent id (its `agentId` token). */
 export interface HerdrLiveAgent {
   readonly agentId: string;
   readonly paneId: string;
   readonly terminalId: string;
   readonly state: AgentState;
   readonly tokens: Partial<PaneTokens>;
+  /** True when Herdr has no agent record for it — the pane itself is the agent. */
+  readonly paneBound: boolean;
 }
 
 /**
  * Every live Herdr agent, as the backend-aware inventory reads it.
  *
  * `BackendAgentSnapshot` carries no agent name, and on Herdr the Overdeck agent
- * id is the *live agent name* (`agent.rename`), not the `w1:p1` pane id — so
- * the inventory needs this narrower read. Agents Herdr detected but Overdeck
- * never named are skipped: nothing can address them by agent id.
+ * id is a *token* on the pane (plus, for a detected agent, the live agent name
+ * bound with `agent.rename`) — so the inventory needs this narrower read. It
+ * takes both halves: every token-stamped pane, then every detected agent on
+ * top, keyed by the same `agentId` token so a pane Herdr later detected does
+ * not appear twice. Panes and agents Overdeck never stamped are skipped —
+ * nothing can address them by agent id.
  */
 export async function listHerdrAgents(
   api: HerdrApiClient = getHerdrApiClient(),
 ): Promise<readonly HerdrLiveAgent[]> {
-  const listed = await api.call<{ agents?: HerdrPaneInfo[] }>('agent.list', {});
-  const agents: HerdrLiveAgent[] = [];
-  for (const agent of listed.agents ?? []) {
-    const agentId = agent.name?.trim();
-    if (!agentId) continue;
-    agents.push({
+  const [listed, snapshot] = await Promise.all([
+    api.call<{ agents?: HerdrPaneInfo[] }>('agent.list', {}),
+    api.call<{ snapshot?: { panes?: HerdrPaneInfo[] } }>('session.snapshot', {}),
+  ]);
+
+  const byAgentId = new Map<string, HerdrLiveAgent>();
+  const record = (info: HerdrPaneInfo, agentId: string, paneBound: boolean): void => {
+    byAgentId.set(agentId, {
       agentId,
-      paneId: agent.pane_id,
-      terminalId: agent.terminal_id,
-      state: toAgentState(agent.agent_status),
-      tokens: (agent.tokens ?? {}) as Partial<PaneTokens>,
+      paneId: info.pane_id,
+      terminalId: info.terminal_id,
+      state: toAgentState(info.agent_status),
+      tokens: (info.tokens ?? {}) as Partial<PaneTokens>,
+      paneBound,
     });
+  };
+
+  for (const pane of snapshot.snapshot?.panes ?? []) {
+    const agentId = pane.tokens?.[AGENT_ID_TOKEN]?.trim();
+    if (!agentId) continue;
+    record(pane, agentId, !pane.agent);
   }
-  return agents;
+  for (const agent of listed.agents ?? []) {
+    const agentId = agent.tokens?.[AGENT_ID_TOKEN]?.trim() ?? agent.name?.trim();
+    if (!agentId) continue;
+    record(agent, agentId, false);
+  }
+  return [...byAgentId.values()];
 }
+
+/** Overdeck agent id: the `agentId` token; Herdr's own agent name only on an Overdeck-tokened pane (PAN-3920). */
+const agentIdOf = (pane: HerdrPaneInfo): string | undefined => pane.tokens?.[AGENT_ID_TOKEN]?.trim()
+  || (pane.tokens?.role || pane.tokens?.issue ? pane.name?.trim() : undefined) || undefined;
 
 /** The recent terminal text of a Herdr pane — the backend's `capture-pane`. */
 export async function readHerdrPaneText(
@@ -380,6 +591,11 @@ export class HerdrBackend implements TerminalBackend {
       });
       const pane = split.pane;
       if (!pane) throw new Error('pane.split returned no pane');
+      const agentName = spec.name ?? `${spec.tokens.role}-${pane.pane_id.replace(':', '-')}`;
+
+      if ((spec.detection ?? 'required') === 'not-required') {
+        return await this.startPaneBoundAgent(workspace, spec, pane, agentName);
+      }
 
       await this.api.call('pane.send_input', {
         pane_id: pane.pane_id,
@@ -387,7 +603,6 @@ export class HerdrBackend implements TerminalBackend {
         keys: ['enter'],
       });
 
-      const agentName = spec.name ?? `${spec.tokens.role}-${pane.pane_id.replace(':', '-')}`;
       // Detection is what makes the pane addressable: only a detected agent can
       // be renamed, and every caller addresses the pane by the Overdeck agent
       // id. A timeout therefore has to be a LAUNCH FAILURE — returning the
@@ -411,11 +626,7 @@ export class HerdrBackend implements TerminalBackend {
       // and `agent.wait` address it the way every caller already names it.
       await this.api.call('agent.rename', { target: pane.pane_id, name: agentName });
 
-      await this.api.call('pane.report_metadata', {
-        pane_id: pane.pane_id,
-        source: METADATA_SOURCE,
-        tokens: tokenPayload(spec.tokens),
-      });
+      await this.stampPaneIdentity(pane.pane_id, agentName, spec.tokens);
 
       return {
         backend: BACKEND,
@@ -424,6 +635,57 @@ export class HerdrBackend implements TerminalBackend {
         terminalId: pane.terminal_id,
         agentName,
       };
+    });
+  }
+
+  /**
+   * Launch a harness Herdr cannot detect (`detection: 'not-required'`).
+   *
+   * The tokens are stamped BEFORE the launcher is sent: a launcher that dies in
+   * the first 100ms must still leave a pane that says what it was. Then the
+   * launcher runs and the reference is returned — no detection wait, no
+   * `agent.rename`, no failure. Herdr's own agent state for the pane stays
+   * `unknown`, which is the truth; `title` and `display_agent` keep the Herdr
+   * UI readable. If Herdr later detects something in the pane anyway, the
+   * `agentId` token still keys it, so nothing double-counts.
+   */
+  private async startPaneBoundAgent(
+    workspace: WorkspaceRef,
+    spec: StartAgentSpec,
+    pane: HerdrPaneInfo,
+    agentName: string,
+  ): Promise<AgentPaneRef> {
+    try {
+      await this.stampPaneIdentity(pane.pane_id, agentName, spec.tokens);
+      await this.api.call('pane.send_input', {
+        pane_id: pane.pane_id,
+        text: spec.argv.map(shellQuote).join(' '),
+        keys: ['enter'],
+      });
+    } catch (error) {
+      // A pane whose launcher never started is residue: close it rather than
+      // hand back a reference to an empty shell.
+      await this.api.call('pane.close', { pane_id: pane.pane_id }).catch(() => {});
+      throw error;
+    }
+
+    return {
+      backend: BACKEND,
+      workspaceId: workspace.workspaceId,
+      paneId: pane.pane_id,
+      terminalId: pane.terminal_id,
+      agentName,
+    };
+  }
+
+  /** Stamp the four pane tokens plus the `agentId` key, and label the pane for the UI. */
+  private async stampPaneIdentity(paneId: string, agentName: string, tokens: PaneTokens): Promise<void> {
+    await this.api.call('pane.report_metadata', {
+      pane_id: paneId,
+      source: METADATA_SOURCE,
+      tokens: { ...tokenPayload(tokens), [AGENT_ID_TOKEN]: agentName },
+      title: agentName,
+      display_agent: tokens.harness,
     });
   }
 
@@ -472,6 +734,21 @@ export class HerdrBackend implements TerminalBackend {
     return ` ${parts.join('\n')}`;
   }
 
+  /**
+   * The pane-bound pane behind a prompt target, or null when the target is not
+   * one. A pane id (`w1:p1`) is read directly; an agent name can only be found
+   * by its `agentId` token. A pane Overdeck never stamped is not ours, and
+   * stays "metadata unavailable" for the guard.
+   */
+  private async findPaneBoundPane(handle: string): Promise<HerdrPaneInfo | null> {
+    if (handle.includes(':')) {
+      const got = await this.api.call<{ pane?: HerdrPaneInfo }>('pane.get', { pane_id: handle })
+        .catch(() => ({ pane: undefined }));
+      return got.pane?.tokens?.[AGENT_ID_TOKEN] ? got.pane : null;
+    }
+    return await findAgentIdPane(handle, this.api).catch(() => null);
+  }
+
   /** Poll until Herdr's detector claims the pane, or give up and leave it a plain pane. */
   private async waitForAgentDetection(paneId: string): Promise<boolean> {
     const deadline = Date.now() + this.detectTimeoutMs;
@@ -498,6 +775,22 @@ export class HerdrBackend implements TerminalBackend {
         .catch(() => { metadataAvailable = false; return { agent: undefined }; });
       if (!info.agent) metadataAvailable = false;
       const tokens = (info.agent?.tokens ?? {}) as Partial<PaneTokens>;
+
+      if (!info.agent) {
+        // A pane-bound agent (PAN-3917 W12) has no Herdr agent record, so
+        // `agent.prompt` cannot reach it — the caller must use the harness's
+        // own transport. This is `unsupported`, not a refusal: the target's
+        // metadata is perfectly well known, and it is answered BEFORE the
+        // guard so the fall-through delivery runs the guard itself.
+        const paneBound = await this.findPaneBoundPane(handle);
+        if (paneBound) {
+          return unsupported(
+            `herdr has no detected agent in pane ${paneBound.pane_id}`
+            + ` (${paneBound.tokens?.harness ?? 'this harness'} runs through a host process);`
+            + ' deliver through the harness transport instead',
+          );
+        }
+      }
 
       const verdict = checkPrompt({
         targetId: info.agent?.pane_id ?? handle,
@@ -591,6 +884,7 @@ export class HerdrBackend implements TerminalBackend {
       return [...byPane.values()].map((pane) => ({
         backend: BACKEND,
         paneId: pane.pane_id,
+        ...(agentIdOf(pane) ? { agentId: agentIdOf(pane) } : {}),
         terminalId: pane.terminal_id,
         workspaceId: pane.workspace_id,
         state: toAgentState(pane.agent_status),

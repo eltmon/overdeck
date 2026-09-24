@@ -12,8 +12,8 @@
  */
 import { existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
 
 const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
@@ -66,7 +66,7 @@ export async function findClaudeSessionFileById(sessionId: string): Promise<stri
   const cached = cachedLookup(sessionId);
   if (cached !== undefined) return cached;
   try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const claudeProjects = claudeProjectsRoot();
     const dirs = await readdir(claudeProjects);
     const candidates = dirs
       .filter((dir) => SAFE_DIR_PATTERN.test(dir))
@@ -80,42 +80,5 @@ export async function findClaudeSessionFileById(sessionId: string): Promise<stri
     /* ~/.claude/projects unreadable */
   }
   sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
-  return null;
-}
-
-/**
- * Find a subagent transcript `<session-dir>/subagents/agent-<id>.jsonl` by its
- * agent id, searching every session dir of every project dir. Same
- * memoization contract as findClaudeSessionFileById: the sweep readdir+stats
- * one level deeper, so a miss is cached for the TTL and a found path is
- * re-verified with one existsSync.
- */
-export async function findSubagentTranscriptById(agentId: string): Promise<string | null> {
-  if (!SAFE_SESSION_ID_PATTERN.test(agentId)) return null;
-  const cached = cachedLookup(agentId);
-  if (cached !== undefined) return cached;
-  try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
-    const projectDirs = (await readdir(claudeProjects)).filter((dir) => SAFE_DIR_PATTERN.test(dir));
-    for (const projectDir of projectDirs) {
-      let sessionDirs: string[];
-      try {
-        sessionDirs = await readdir(join(claudeProjects, projectDir));
-      } catch {
-        continue;
-      }
-      const candidates = sessionDirs
-        .filter((entry) => SAFE_DIR_PATTERN.test(entry) && !entry.endsWith('.jsonl'))
-        .map((entry) => join(claudeProjects, projectDir, entry, 'subagents', `${agentId}.jsonl`));
-      const found = await firstExisting(candidates);
-      if (found) {
-        sessionFileByIdCache.set(agentId, { path: found, ts: Date.now() });
-        return found;
-      }
-    }
-  } catch {
-    /* ~/.claude/projects unreadable */
-  }
-  sessionFileByIdCache.set(agentId, { path: null, ts: Date.now() });
   return null;
 }

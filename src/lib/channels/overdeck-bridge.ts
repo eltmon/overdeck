@@ -46,12 +46,12 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { Effect } from 'effect';
-import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
+import { BRIDGE_TOKEN_HEADER, readBridgeToken } from '../bridge-token.js';
 import {
   normalizeChannelPermissionRequestFields,
   type NormalizedChannelPermissionRequestFields,
 } from './permission-payload.js';
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 
 /**
  * Resolve the per-agent ID from env. Tests import this module to call the
@@ -248,7 +248,7 @@ function constantTimeHeaderMatch(provided: string | null, expected: string): boo
 }
 
 function validateBridgeToken(req: Request, agentId: string): boolean {
-  const expected = readBridgeTokenSync(agentId);
+  const expected = readBridgeToken(agentId);
   if (!expected) {
     return false;
   }
@@ -349,11 +349,11 @@ export async function pushPermissionDecisionNotification(
   return { ok: true, status: 200, body: 'ok' };
 }
 
-export async function forwardPermissionRequestToDashboard(
+async function forwardPermissionRequestToDashboard(
   agentId: string,
   request: ChannelPermissionRequest,
 ): Promise<void> {
-  const token = getInternalTokenSync();
+  const token = getInternalToken();
   if (!token) {
     throw new Error('internal token unavailable; dashboard permission relay not configured');
   }
@@ -498,7 +498,7 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
 
 async function main(): Promise<void> {
   const agentId = resolveAgentIdOrExit();
-  if (!readBridgeTokenSync(agentId)) {
+  if (!readBridgeToken(agentId)) {
     throw new Error(`overdeck-bridge: bridge token missing for ${agentId}`);
   }
   const transport = new StdioServerTransport();

@@ -8,7 +8,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -16,22 +16,13 @@ const execFileAsync = promisify(execFile);
 const autoCloseOutCache = new Map<string, { state: string | null; timestamp: number }>();
 const AUTO_CLOSE_OUT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-export function sweepAutoCloseOutCache(): void {
-  const now = Date.now();
-  for (const [issueId, entry] of autoCloseOutCache.entries()) {
-    if (now - entry.timestamp > AUTO_CLOSE_OUT_CACHE_TTL_MS) {
-      autoCloseOutCache.delete(issueId);
-    }
-  }
-}
-
 export async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | null> {
   const cached = autoCloseOutCache.get(issueId);
   if (cached && Date.now() - cached.timestamp < AUTO_CLOSE_OUT_CACHE_TTL_MS) {
     return cached.state;
   }
 
-  const ghResolved = resolveGitHubIssueSync(issueId);
+  const ghResolved = resolveGitHubIssue(issueId);
   if (!ghResolved.isGitHub) {
     autoCloseOutCache.set(issueId, { state: null, timestamp: Date.now() });
     return null;

@@ -11,7 +11,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { getTldrDaemonServiceSync } from '../../../../../src/lib/tldr-daemon.js';
+import { getTldrDaemonService } from '../../../../../src/lib/tldr-daemon.js';
 
 // ─── Test-scoped temp root ────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ describe('GET /api/admin/tldr/:issueId', () => {
     // With no daemon.json state file on disk, the real service must return
     // running:false, healthy:false — this is the happy path for "venv exists
     // but daemon hasn't been started yet".
-    const service = getTldrDaemonServiceSync(ws, venv);
+    const service = getTldrDaemonService(ws, venv);
     const status = await service.getStatus();
 
     expect(status.running).toBe(false);
@@ -96,7 +96,7 @@ describe('GET /api/admin/tldr/:issueId', () => {
     mkdirSync(ws, { recursive: true });
     mkdirSync(venv, { recursive: true });
 
-    const service = getTldrDaemonServiceSync(ws, venv);
+    const service = getTldrDaemonService(ws, venv);
     // Regression guard: the factory must return an object that actually has
     // the methods the route calls.
     expect(typeof service.getStatus).toBe('function');

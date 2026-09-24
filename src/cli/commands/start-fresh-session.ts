@@ -26,6 +26,7 @@
  * `pan reset-session <id>` directly — it's intentionally non-destructive and is
  * used by the harness-policy subsystem as a building block.
  */
+import { Effect } from 'effect';
 import {
   detectPendingOperatorDecision,
   type PendingOperatorDecision,
@@ -47,6 +48,23 @@ export interface FreshSessionOptions {
 export interface FreshSessionDeps {
   detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
   assertCanStartFresh?: (agentOrIssueId: string, options?: { allowPausedForce?: boolean; allowLiveSessionReplacement?: boolean; explicitFresh?: boolean }) => unknown;
+  /** Whether the agent has a live pane or session on the host's backend (Herdr pane, tmux session, or legacy tmux). */
+  sessionLive?: (agentId: string) => Promise<boolean>;
+  /** Stop the agent through its terminal backend. */
+  stopAgent?: (agentId: string) => Promise<void>;
+}
+
+/**
+ * Backend-aware "is anything still running for this agent": a Herdr pane or a
+ * tmux session on the host's backend, plus a legacy tmux session left from
+ * before the host moved to Herdr. A backend that cannot be reached counts as
+ * nothing found there.
+ */
+async function agentSessionLive(agentId: string): Promise<boolean> {
+  const { agentPaneExists } = await import('../../lib/terminal-backends/launch.js');
+  const { sessionExists } = await import('../../lib/tmux.js');
+  if (await agentPaneExists(agentId).catch(() => false)) return true;
+  return await Effect.runPromise(sessionExists(agentId)).catch(() => false);
 }
 
 export async function prepareFreshWorkAgentSession(
@@ -57,13 +75,14 @@ export async function prepareFreshWorkAgentSession(
   const agentId = `agent-${issueId.toLowerCase()}`;
   const messages: string[] = [];
 
-  const { getAgentStateSync, stopAgentSync, wipeAgentStateDirs } = await import('../../lib/agents.js');
-  const { sessionExistsSync } = await import('../../lib/tmux.js');
-  const { assertCanStartFreshSync } = await import('../../lib/work-agent-lifecycle.js');
+  const { getAgentState, stopAgent, wipeAgentStateDirs } = await import('../../lib/agents.js');
+  const { assertCanStartFresh: assertCanStartFreshImpl } = await import('../../lib/work-agent-lifecycle.js');
   const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
-  const assertCanStartFresh = deps.assertCanStartFresh ?? assertCanStartFreshSync;
+  const assertCanStartFresh = deps.assertCanStartFresh ?? assertCanStartFreshImpl;
+  const sessionLive = deps.sessionLive ?? agentSessionLive;
+  const stop = deps.stopAgent ?? ((id: string) => Effect.runPromise(stopAgent(id)));
 
-  const priorState = getAgentStateSync(agentId);
+  const priorState = getAgentState(agentId);
 
   if (!options.force) {
     const pendingDecision = await detectPendingDecision(agentId);
@@ -94,14 +113,17 @@ export async function prepareFreshWorkAgentSession(
     };
   }
 
-  if (sessionExistsSync(agentId)) {
+  // PAN-4012: the gate and the stop go through the terminal backend. A tmux-only
+  // check missed a Herdr pane, so --fresh skipped the stop and left the old pane
+  // and harness running next to the new one (the #3966 symptom).
+  if (await sessionLive(agentId)) {
     messages.push(`  --fresh: replacing the live session for ${agentId} (workspace, branch, and commits preserved)`);
-    stopAgentSync(agentId);
-    if (sessionExistsSync(agentId)) {
+    await stop(agentId);
+    if (await sessionLive(agentId)) {
       return {
         ok: false,
         messages,
-        error: `Agent ${agentId} still has a live tmux session after stopping it. Inspect it with 'tmux -L overdeck attach -t ${agentId}', then retry --fresh.`,
+        error: `Agent ${agentId} still has a live pane or session after stopping it. Inspect it with 'pan show ${issueId}', then retry --fresh.`,
       };
     }
   }

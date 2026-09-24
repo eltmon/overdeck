@@ -30,7 +30,7 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   return {
     ...actual,
     getProjectSync: mockGetProjectSync,
-    findProjectByPathSync: mockFindProjectByPathSync,
+    findProjectByPath: mockFindProjectByPathSync,
     listProjectsSync: mockListProjectsSync,
   };
 });

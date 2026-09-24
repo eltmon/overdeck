@@ -1,5 +1,5 @@
 /**
- * PAN-2948: buildReviewContextPromise must aggregate per-sub-repo diffs for
+ * PAN-2948: buildReviewContext must aggregate per-sub-repo diffs for
  * polyrepo workspaces instead of diffing the (empty) wrapper repo at the
  * workspace root.
  */
@@ -10,14 +10,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const repoRootsMock = vi.hoisted(() => ({
-  resolveWorkspaceRepoRootsSync: vi.fn(),
+  resolveWorkspaceRepoRoots: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', async () => {
   const actual = await vi.importActual<typeof import('../../../../src/lib/project-repos.js')>('../../../../src/lib/project-repos.js');
   return {
     ...actual,
-    resolveWorkspaceRepoRootsSync: repoRootsMock.resolveWorkspaceRepoRootsSync,
+    resolveWorkspaceRepoRoots: repoRootsMock.resolveWorkspaceRepoRoots,
   };
 });
 
@@ -25,7 +25,7 @@ vi.mock('../../../../src/lib/cloister/coderabbit-ingestion.js', () => ({
   fetchCodeRabbitFindings: vi.fn().mockResolvedValue([]),
 }));
 
-import { buildReviewContextPromise } from '../../../../src/lib/cloister/review-context.js';
+import { buildReviewContext } from '../../../../src/lib/cloister/review-context.js';
 
 const git = (cwd: string, cmd: string) =>
   execSync(`git ${cmd}`, { cwd, encoding: 'utf-8', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } });
@@ -46,7 +46,7 @@ function makeRepo(dir: string, featureFile: string, withFeatureCommit: boolean):
   }
 }
 
-describe('buildReviewContextPromise (polyrepo)', () => {
+describe('buildReviewContext (polyrepo)', () => {
   let workspace: string;
 
   beforeEach(() => {
@@ -64,12 +64,12 @@ describe('buildReviewContextPromise (polyrepo)', () => {
     makeRepo(feDir, 'src/view.tsx', true);
     makeRepo(apiDir, 'src/handler.ts', false); // untouched sub-repo — empty diff
 
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReturnValue([
       { repoKey: 'fe', dir: feDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: true },
       { repoKey: 'api', dir: apiDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: true },
     ]);
 
-    const manifest = await buildReviewContextPromise({
+    const manifest = await buildReviewContext({
       runId: 'agent-min-999-review-test',
       issueId: 'MIN-999',
       workspace,
@@ -98,11 +98,11 @@ describe('buildReviewContextPromise (polyrepo)', () => {
     const repoDir = join(workspace, 'code');
     makeRepo(repoDir, 'src/index.ts', true);
 
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReturnValue([
       { repoKey: 'code', dir: repoDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: false },
     ]);
 
-    const manifest = await buildReviewContextPromise({
+    const manifest = await buildReviewContext({
       runId: 'agent-min-999-review-test',
       issueId: 'MIN-999',
       workspace: repoDir,

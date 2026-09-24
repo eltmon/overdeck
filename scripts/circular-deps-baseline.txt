@@ -7,7 +7,6 @@ src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx > src/dashboar
 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts
 src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx
 src/dashboard/server/routes/conversations.ts
-src/dashboard/server/routes/jsonl-resolver.ts > src/lib/agents.ts > src/lib/agents/resume.ts > src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/summary-fork.ts > src/lib/conversations/transcript-adapter.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/container-ops.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/merge-ops.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/review-control.ts
@@ -23,7 +22,6 @@ src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations
 src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts > src/dashboard/server/services/ohmypi-conversation-parser.ts
 src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts > src/dashboard/server/services/pi-conversation-parser.ts
 src/lib/agent-enrichment.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts > src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/agents/pending-decision-gate.ts
-src/lib/agents.ts > src/lib/agents/activity.ts
 src/lib/agents.ts > src/lib/agents/activity.ts > src/lib/runtimes/ohmypi.ts > src/lib/launcher-generator.ts
 src/lib/agents.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
 src/lib/agents.ts > src/lib/agents/delivery.ts

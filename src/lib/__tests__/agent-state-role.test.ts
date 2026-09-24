@@ -4,6 +4,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import type { AgentState } from '../agents.js';
+import { readSessionIndex } from '../session-history.js';
 
 // Spawn/resume flows preflight the harness binary; CI runners have no claude/omp
 // installed, so stub the filesystem probes while keeping the pure helpers real.
@@ -74,12 +75,6 @@ describe('AgentState role persistence', () => {
       const actual = await importOriginal<typeof import('../config-yaml.js')>();
       return {
         ...actual,
-        loadConfig: () => ({
-          config: {
-            workhorses: actual.DEFAULT_WORKHORSES,
-            roles: actual.DEFAULT_ROLES,
-          },
-        }),
         loadConfigSync: () => ({
           config: {
             workhorses: actual.DEFAULT_WORKHORSES,
@@ -171,7 +166,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('requires role and strips legacy state fields when persisting state.json', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
 
     saveAgentStateSync({
       id: 'agent-pan-role',
@@ -191,7 +186,7 @@ describe('AgentState role persistence', () => {
       type: 'work',
     } as any);
 
-    const state = getAgentStateSync('agent-pan-role');
+    const state = getAgentState('agent-pan-role');
     expect(state?.role).toBe('work');
     expect((state as any).runtime).toBeUndefined();
     expect((state as any).phase).toBeUndefined();
@@ -209,7 +204,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('persists lastResumeAt through normal state save and load', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
     const lastResumeAt = '2026-06-10T00:01:00.000Z';
 
     saveAgentStateSync({
@@ -224,13 +219,13 @@ describe('AgentState role persistence', () => {
       lastResumeAt,
     } as any);
 
-    expect(getAgentStateSync('agent-pan-resume-state')?.lastResumeAt).toBe(lastResumeAt);
+    expect(getAgentState('agent-pan-resume-state')?.lastResumeAt).toBe(lastResumeAt);
     const rawState = JSON.parse(readFileSync(join(tempHome, 'agents', 'agent-pan-resume-state', 'state.json'), 'utf-8'));
     expect(rawState.lastResumeAt).toBe(lastResumeAt);
   });
 
   it('accepts flywheel role in persisted state.json', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
 
     saveAgentStateSync({
       id: 'agent-flywheel-orchestrator',
@@ -243,7 +238,32 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-18T00:00:00.000Z',
     } as any);
 
-    expect(getAgentStateSync('agent-flywheel-orchestrator')?.role).toBe('flywheel');
+    expect(getAgentState('agent-flywheel-orchestrator')?.role).toBe('flywheel');
+  });
+
+  it('PAN-3920: persists a worker parentId through save and read', async () => {
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
+
+    saveAgentStateSync({
+      id: 'agent-pan-9-worker-1',
+      issueId: 'PAN-9',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'worker',
+      model: 'claude-sonnet-5',
+      status: 'running',
+      startedAt: '2026-09-23T00:00:00.000Z',
+      startedBy: 'pan-worker',
+      parentId: 'conv-orchestrator',
+    });
+
+    expect(getAgentState('agent-pan-9-worker-1')).toMatchObject({
+      role: 'worker',
+      parentId: 'conv-orchestrator',
+      startedBy: 'pan-worker',
+    });
+    const raw = JSON.parse(readFileSync(join(tempHome, 'agents', 'agent-pan-9-worker-1', 'state.json'), 'utf-8'));
+    expect(raw.parentId).toBe('conv-orchestrator');
   });
 
   it('defaults Channels MCP eligibility off for new work-agent spawns', async () => {
@@ -334,8 +354,7 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
     const { recordDockerContainerLifecycleSnapshot } = await import('../docker-stats.js');
     recordDockerContainerLifecycleSnapshot([{
@@ -391,8 +410,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
 
     const { spawnAgent } = await import('../agents.js');
@@ -447,7 +465,7 @@ describe('AgentState role persistence', () => {
       sessionExists: vi.fn(() => Effect.succeed(false)),
       sessionExistsSync: vi.fn(() => false),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      capturePane: vi.fn(() => Effect.succeed('Claude Code')),
+      capturePane: vi.fn(async () => 'Claude Code'),
       setOption: vi.fn(() => Effect.void),
     }));
     // PAN-3917 FR-5/W8: launchAgentPane auto-selects Herdr when the dev host has
@@ -461,10 +479,8 @@ describe('AgentState role persistence', () => {
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
       emitActivityTts: vi.fn(),
-      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../xbrief/io.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../xbrief/io.js')),
@@ -530,23 +546,19 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => sessionAlive),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
       killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
-      capturePane: vi.fn(() => Effect.succeed('')),
+      capturePane: vi.fn(async () => ''),
       setOption: vi.fn(() => Effect.void),
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
       emitActivityTts: vi.fn(),
-      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../harness-resolve.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../harness-resolve.js')),
       resolveHarness: vi.fn(async () => 'ohmypi'),
     }));
-    vi.doMock('../workspace-manager.js', () => ({
-      preTrustDirectory: vi.fn(),
-    }));
+    vi.doMock('../workspace-manager.js', () => ({}));
     vi.doMock('../github-app.js', () => ({
       isGitHubAppConfigured: vi.fn(() => false),
     }));
@@ -561,7 +573,7 @@ describe('AgentState role persistence', () => {
     }));
 
     try {
-      const { getAgentStateSync, spawnAgent } = await import('../agents.js');
+      const { getAgentState, spawnAgent } = await import('../agents.js');
       const spawn = spawnAgent({
         issueId: 'PAN-2771',
         workspace,
@@ -577,7 +589,7 @@ describe('AgentState role persistence', () => {
       expect(writeOhmypiCommandSync).toHaveBeenCalled();
       expect(killSessionAsync).toHaveBeenCalled();
       expect(sessionAlive).toBe(false);
-      expect(getAgentStateSync(agentId)).toMatchObject({
+      expect(getAgentState(agentId)).toMatchObject({
         status: 'stopped',
         kickoffDelivered: false,
         lastFailureReason: 'kickoff delivery failed',
@@ -639,8 +651,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
 
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
@@ -668,8 +679,7 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
 
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
@@ -696,8 +706,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntry,
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
 
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
@@ -755,8 +764,8 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       isPaneDead: vi.fn(() => Effect.succeed(true)),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      listPaneValues: vi.fn(() => Effect.succeed([])),
-      capturePane: vi.fn(() => Effect.succeed('')),
+      listPaneValues: vi.fn(async () => []),
+      capturePane: vi.fn(async () => ''),
       setOption: vi.fn(() => Effect.void),
     }));
     vi.doMock('../agent-runtime-mirror.js', () => ({
@@ -783,7 +792,7 @@ describe('AgentState role persistence', () => {
     }));
 
     try {
-      const { getAgentStateSync, resumeAgent, saveAgentStateSync } = await import('../agents.js');
+      const { getAgentState, resumeAgent, saveAgentStateSync } = await import('../agents.js');
       saveAgentStateSync({
         id: agentId,
         issueId: 'PAN-2895',
@@ -797,7 +806,6 @@ describe('AgentState role persistence', () => {
         sessionId: 'missing-session',
       } as any);
       const agentDir = join(tempHome, 'agents', agentId);
-      writeFileSync(join(agentDir, 'session.id'), 'missing-session');
       writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify(['missing-session']));
       writeFileSync(join(agentDir, 'runtime.json'), JSON.stringify({ claudeSessionId: 'missing-session' }));
       writeFileSync(join(agentDir, 'launcher.sh'), "claude --resume 'missing-session'\n");
@@ -816,12 +824,13 @@ describe('AgentState role persistence', () => {
         }),
       );
       expect(deliverInitialPromptWithRetry).toHaveBeenCalled();
-      const freshSessionId = readFileSync(join(agentDir, 'session.id'), 'utf-8').trim();
+      const sessionIndex = readSessionIndex(agentId);
+      const freshSessionId = sessionIndex.at(-1)?.sessionId;
       expect(freshSessionId).not.toBe('missing-session');
       const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf-8');
       expect(launcher).not.toContain("--resume 'missing-session'");
       expect(launcher).toContain(`--session-id '${freshSessionId}'`);
-      expect(getAgentStateSync(agentId)?.sessionId).toBe(freshSessionId);
+      expect(getAgentState(agentId)?.sessionId).toBe(freshSessionId);
       expect(emitAgentEvent).toHaveBeenCalledWith(
         agentId,
         expect.objectContaining({ kind: 'model_set', claudeSessionId: null }),
@@ -867,8 +876,8 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => true),
       killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      listPaneValues: vi.fn(() => Effect.succeed([])),
-      capturePane: vi.fn(() => Effect.succeed('')),
+      listPaneValues: vi.fn(async () => []),
+      capturePane: vi.fn(async () => ''),
       setOption: vi.fn(() => Effect.void),
     }));
     vi.doMock('../agent-runtime-mirror.js', () => ({
@@ -900,7 +909,7 @@ describe('AgentState role persistence', () => {
       status: 'stopped',
       startedAt: '2026-06-23T00:00:00.000Z',
     } as any);
-    writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-pi-session');
+    writeFileSync(join(tempHome, 'agents', agentId, 'sessions.json'), JSON.stringify(['dead-pi-session']));
 
     await expect(resumeAgent(agentId, 'continue review')).resolves.toMatchObject({
       success: true,
@@ -915,7 +924,7 @@ describe('AgentState role persistence', () => {
     );
     const launcher = readFileSync(join(tempHome, 'agents', agentId, 'launcher.sh'), 'utf-8');
     expect(launcher).not.toContain('--resume');
-    expect(existsSync(join(tempHome, 'agents', agentId, 'session.id'))).toBe(false);
+    expect(existsSync(join(tempHome, 'agents', agentId, 'sessions.json'))).toBe(true);
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('prior Pi process was dead'));
 
     consoleSpy.mockRestore();
@@ -960,8 +969,8 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      listPaneValues: vi.fn(() => Effect.succeed([])),
-      capturePane: vi.fn(() => Effect.succeed('')),
+      listPaneValues: vi.fn(async () => []),
+      capturePane: vi.fn(async () => ''),
       setOption: vi.fn(() => Effect.void),
     }));
     vi.doMock('../agent-runtime-mirror.js', () => ({
@@ -993,7 +1002,7 @@ describe('AgentState role persistence', () => {
       status: 'starting', // <-- the stuck state from the bug report
       startedAt: '2026-06-23T00:00:00.000Z',
     } as any);
-    writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-session');
+    writeFileSync(join(tempHome, 'agents', agentId, 'sessions.json'), JSON.stringify(['dead-session']));
 
     const result = await resumeAgent(agentId, 'continue review');
 
@@ -1008,7 +1017,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('treats state.json without a valid role as missing', async () => {
-    const { getAgentStateSync } = await import('../agents.js');
+    const { getAgentState } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'state.json'), JSON.stringify({
@@ -1020,7 +1029,7 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-09T00:00:00.000Z',
     }));
 
-    const state = getAgentStateSync('agent-pan-legacy');
+    const state = getAgentState('agent-pan-legacy');
     expect(state).toBeNull();
   });
 

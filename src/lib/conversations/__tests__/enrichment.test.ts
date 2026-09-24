@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
@@ -127,13 +126,13 @@ describe('enrichSession', () => {
     expect(sessions.length).toBe(1);
     const sessionId = sessions[0].id;
 
-    const result = await Effect.runPromise(enrichSession({
+    const result = await enrichSession({
       sessionId,
       jsonlPath: fakeJsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: mockApiCall,
-    }));
+    });
 
     expect(result.error).toBeUndefined();
     expect(result.tier).toBe(1);
@@ -151,13 +150,13 @@ describe('enrichSession', () => {
     const sessions = findDiscoveredSessions({});
     const sessionId = sessions[0].id;
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId,
       jsonlPath: fakeJsonlPath,
       tier: 2,
       config: { quickModel: null, deepModel: null },
       callApi: mockApiCallL2,
-    }));
+    });
 
     const updated = findDiscoveredSessions({});
     const sess = updated.find((s) => s.id === sessionId);
@@ -168,15 +167,15 @@ describe('enrichSession', () => {
   it('preserves the L1 quick summary when L2 adds detailed summary and tags', async () => {
     seedSession();
     const [session] = findDiscoveredSessions({});
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: fakeJsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: async () => ({ summary: 'Original L1 summary.', tags: ['l1'] }),
-    }));
+    });
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: fakeJsonlPath,
       tier: 2,
@@ -186,7 +185,7 @@ describe('enrichSession', () => {
         summaryDetailed: 'Detailed L2 summary.',
         tags: ['l2'],
       }),
-    }));
+    });
 
     const [updated] = findDiscoveredSessions({});
     expect(updated.summary).toBe('Original L1 summary.');
@@ -209,7 +208,7 @@ describe('enrichSession', () => {
     const prompts: Record<number, string> = {};
 
     for (const tier of [1, 2] as const) {
-      await Effect.runPromise(enrichSession({
+      await enrichSession({
         sessionId: session.id,
         jsonlPath: samplePath,
         tier,
@@ -221,7 +220,7 @@ describe('enrichSession', () => {
             ? { summary: 'Sampled L1.', tags: ['sampled'] }
             : { summary: 'Sampled L2.', summaryDetailed: 'Sampled L2 detail.', tags: ['sampled'] };
         },
-      }));
+      });
     }
 
     expect(prompts[1].split('\n').filter((line) => line.startsWith('['))).toHaveLength(3);
@@ -239,7 +238,7 @@ describe('enrichSession', () => {
     const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
     let capturedPrompt = '';
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: largePath,
       tier: 1,
@@ -248,7 +247,7 @@ describe('enrichSession', () => {
         capturedPrompt = prompt;
         return { summary: 'Bounded sample.', tags: ['bounded'] };
       },
-    }));
+    });
 
     expect(capturedPrompt.length).toBeLessThan(5_000);
   });
@@ -262,7 +261,7 @@ describe('enrichSession', () => {
     const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
     let capturedPrompt = '';
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: largePath,
       tier: 3,
@@ -271,7 +270,7 @@ describe('enrichSession', () => {
         capturedPrompt = prompt;
         return { summary: 'Capped deep sample.', summaryDetailed: 'Capped.', tags: ['capped'] };
       },
-    }));
+    });
 
     expect(capturedPrompt.length).toBeLessThan(2_800_000);
   });
@@ -290,7 +289,7 @@ describe('enrichSession', () => {
     const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
     let capturedPrompt = '';
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: largePath,
       tier: 3,
@@ -300,7 +299,7 @@ describe('enrichSession', () => {
         capturedPrompt = prompt;
         return { summary: 'Full deep sample.', summaryDetailed: 'Full.', tags: ['full'] };
       },
-    }));
+    });
 
     expect(capturedPrompt).toContain('literal full transcript line 0');
     expect(capturedPrompt).toContain('literal full transcript line 4999');
@@ -335,7 +334,7 @@ describe('enrichSession', () => {
     const session = upsertDiscoveredSession({ jsonlPath: secretPath, messageCount: lines.length });
     let capturedPrompt = '';
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: secretPath,
       tier: 1,
@@ -344,7 +343,7 @@ describe('enrichSession', () => {
         capturedPrompt = prompt;
         return { summary: 'Redacted.', tags: ['security'] };
       },
-    }));
+    });
 
     expect(capturedPrompt).toContain('[tool_use:Bash]');
     expect(capturedPrompt).not.toContain('DATABASE_URL=postgres://user:pass@db/app');
@@ -361,13 +360,13 @@ describe('enrichSession', () => {
     const sessionId = sessions[0].id;
 
     const failingApi = async () => { throw new Error('API timeout'); };
-    const result = await Effect.runPromise(enrichSession({
+    const result = await enrichSession({
       sessionId,
       jsonlPath: fakeJsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: failingApi,
-    }));
+    });
 
     expect(result.error).toContain('API timeout');
   });
@@ -377,13 +376,13 @@ describe('enrichSession', () => {
     const sessions = findDiscoveredSessions({});
     const sessionId = sessions[0].id;
 
-    const result = await Effect.runPromise(enrichSession({
+    const result = await enrichSession({
       sessionId,
       jsonlPath: '/nonexistent/path/sess.jsonl',
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: mockApiCall,
-    }));
+    });
 
     expect(result.error).toBeDefined();
   });
@@ -436,7 +435,7 @@ describe('enrichSession', () => {
     });
 
     let capturedPrompt = '';
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: realPath,
       tier: 1,
@@ -445,7 +444,7 @@ describe('enrichSession', () => {
         capturedPrompt = prompt;
         return { summary: 'Memory leak fix.', tags: ['memory', 'bug'] };
       },
-    }));
+    });
 
     // The excerpt must contain text from message.content, not be empty
     expect(capturedPrompt).toContain('memory leak');
@@ -462,7 +461,7 @@ describe('enrichSession', () => {
     });
     let capturedPrompt = '';
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: path,
       tier: 1,
@@ -471,7 +470,7 @@ describe('enrichSession', () => {
         capturedPrompt = prompt;
         return { summary: 'Claude regression.', tags: ['claude'] };
       },
-    }));
+    });
 
     expect(extractConversationExcerpt(capturedPrompt)).toBe([
       '[user]: How do I fix the login bug?',
@@ -520,7 +519,7 @@ describe('enrichSession', () => {
     });
     let capturedPrompt = '';
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: path,
       tier: 1,
@@ -529,7 +528,7 @@ describe('enrichSession', () => {
         capturedPrompt = prompt;
         return { summary: 'Pi excerpt.', tags: ['pi'] };
       },
-    }));
+    });
 
     const excerpt = extractConversationExcerpt(capturedPrompt);
     expect(excerpt).toContain('Please inspect the parser file');
@@ -570,7 +569,7 @@ describe('enrichSession', () => {
     });
     let capturedPrompt = '';
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: path,
       tier: 1,
@@ -579,7 +578,7 @@ describe('enrichSession', () => {
         capturedPrompt = prompt;
         return { summary: 'Codex excerpt.', tags: ['codex'] };
       },
-    }));
+    });
 
     const excerpt = extractConversationExcerpt(capturedPrompt);
     expect(excerpt).toContain('fix the codex parser bug');
@@ -601,13 +600,13 @@ describe('enrichSession', () => {
       messageCount: 1,
     });
 
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: session.id,
       jsonlPath: path,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: async () => ({ summary: 'needleterm summary.', tags: ['pi'] }),
-    }));
+    });
 
     expect(searchFtsSessions('needleterm').map((result) => result.id)).toContain(session.id);
   });
@@ -677,13 +676,13 @@ describe('enrichSessions', () => {
     // Seed a session and enrich it to L1
     seedSession();
     const [sess] = findDiscoveredSessions({});
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: sess.id,
       jsonlPath: fakeJsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: mockApiCall,
-    }));
+    });
 
     // L1 session should be selected for tier-2 bulk enrichment
     const result = await enrichSessions({
@@ -697,13 +696,13 @@ describe('enrichSessions', () => {
   it('tier 1 bulk enrichment skips sessions already at L1', async () => {
     seedSession();
     const [sess] = findDiscoveredSessions({});
-    await Effect.runPromise(enrichSession({
+    await enrichSession({
       sessionId: sess.id,
       jsonlPath: fakeJsonlPath,
       tier: 1,
       config: { quickModel: null, deepModel: null },
       callApi: mockApiCall,
-    }));
+    });
 
     // L1 session should be excluded from tier-1 bulk enrichment (already at tier)
     const result = await enrichSessions({

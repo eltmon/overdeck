@@ -13,8 +13,6 @@ import {
   type OverdeckTestDb,
 } from '../../../helpers/overdeck-test-db.js';
 import {
-  deleteMergeSet,
-  getAllMergeSetsFromDb,
   getMergeSetFromDb,
   upsertMergeSet,
 } from '../../../../src/lib/overdeck/merge-sync.js';
@@ -132,24 +130,5 @@ describe('merge-sync merge sets', () => {
     expect(result?.repos[0].repoMerge).toBe('ready');
   });
 
-  it('lists all merge sets and filters by project', () => {
-    seedIssue(odb.raw(), 'PAN-632');
-    seedIssue(odb.raw(), 'MIN-632');
-    upsertMergeSet(makeMergeSet({ issueId: 'PAN-632' }));
-    upsertMergeSet(makeMergeSet({ issueId: 'MIN-632', projectKey: 'mind-your-now' }));
 
-    expect(getAllMergeSetsFromDb()).toHaveLength(2);
-    expect(getAllMergeSetsFromDb('mind-your-now')).toHaveLength(1);
-    expect(getAllMergeSetsFromDb('mind-your-now')[0].issueId).toBe('MIN-632');
-  });
-
-  it('deletes merge sets and cascades repo rows', () => {
-    seedIssue(odb.raw(), 'PAN-632');
-    upsertMergeSet(makeMergeSet());
-    deleteMergeSet('PAN-632');
-
-    expect(getMergeSetFromDb('PAN-632')).toBeNull();
-    const repos = odb.raw().prepare('SELECT * FROM merge_set_repos WHERE issue_id = ?').all('PAN-632');
-    expect(repos).toHaveLength(0);
-  });
 });

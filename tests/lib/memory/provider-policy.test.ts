@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { insertCostEventSync } from '../../../src/lib/overdeck/cost-sync.js';
+import { insertCostEvent } from '../../../src/lib/overdeck/cost-sync.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 import {
   extractWithProviderPolicy,
@@ -76,7 +76,7 @@ describe('memory extraction provider policy', () => {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
 
-    insertCostEventSync({
+    insertCostEvent({
       ts: today.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,
@@ -93,7 +93,7 @@ describe('memory extraction provider policy', () => {
       requestId: 'memory-extraction-today',
       sessionId: identity.sessionId,
     });
-    insertCostEventSync({
+    insertCostEvent({
       ts: yesterday.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,
@@ -110,7 +110,7 @@ describe('memory extraction provider policy', () => {
       requestId: 'memory-extraction-yesterday',
       sessionId: identity.sessionId,
     });
-    insertCostEventSync({
+    insertCostEvent({
       ts: today.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,

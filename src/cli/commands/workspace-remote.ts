@@ -8,18 +8,18 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { buildClaudeUserSettingsSync } from '../../lib/claude-permissions.js';
+import { buildClaudeUserSettings } from '../../lib/claude-permissions.js';
 import { loadConfigSync } from '../../lib/config.js';
 import {
   extractTeamPrefix,
-  findProjectByTeamSync,
+  findProjectByTeam,
   getIssuePrefix,
 } from '../../lib/projects.js';
 import { createFlyProviderFromConfig, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import {
-  saveWorkspaceMetadataSync,
-  loadWorkspaceMetadataSync,
+  saveWorkspaceMetadata,
+  loadWorkspaceMetadata,
   WORKSPACES_DIR,
 } from '../../lib/remote/workspace-metadata.js';
 
@@ -90,7 +90,7 @@ export async function createRemoteWorkspace(
 
   // Determine project context first (needed for VM naming)
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
   const projectRoot = projectConfig?.path || process.cwd();
 
   // Determine project identifier for VM name
@@ -296,7 +296,7 @@ with open(path, "w") as f:
     // an invocation omits --permission-mode; hardcoding 'bypassPermissions'
     // would silently escalate any unflagged claude invocation on the VM
     // (interactive shells, future helper scripts) even when the user chose Auto.
-    const claudeSettings = JSON.stringify(buildClaudeUserSettingsSync());
+    const claudeSettings = JSON.stringify(buildClaudeUserSettings());
     const settingsBase64 = Buffer.from(claudeSettings).toString('base64');
     await Effect.runPromise(fly.ssh(vmName, `echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`));
 
@@ -320,7 +320,7 @@ with open(path, "w") as f:
       location: 'remote',
     };
 
-    saveWorkspaceMetadataSync(metadata);
+    saveWorkspaceMetadata(metadata);
 
     spinner.succeed('Remote workspace created!');
 
@@ -380,7 +380,7 @@ export async function syncAuthCommand(issueId: string): Promise<void> {
   const spinner = ora('Syncing credentials...').start();
 
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const metadata = loadWorkspaceMetadataSync(normalizedId);
+  const metadata = loadWorkspaceMetadata(normalizedId);
 
   if (!metadata || metadata.location !== 'remote') {
     spinner.fail(`No remote workspace found for ${issueId}`);
@@ -429,7 +429,7 @@ export async function syncAuthCommand(issueId: string): Promise<void> {
  */
 export async function sshCommand(issueId: string): Promise<void> {
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const metadata = loadWorkspaceMetadataSync(normalizedId);
+  const metadata = loadWorkspaceMetadata(normalizedId);
 
   if (!metadata || metadata.location !== 'remote') {
     console.error(chalk.red(`No remote workspace found for ${issueId}`));
@@ -457,7 +457,7 @@ export async function startCommand(issueId: string): Promise<void> {
   const spinner = ora('Starting workspace...').start();
 
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const metadata = loadWorkspaceMetadataSync(normalizedId);
+  const metadata = loadWorkspaceMetadata(normalizedId);
 
   if (!metadata || metadata.location !== 'remote') {
     spinner.fail(`No remote workspace found for ${issueId}`);
@@ -490,7 +490,7 @@ export async function stopCommand(issueId: string): Promise<void> {
   const spinner = ora('Stopping workspace...').start();
 
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const metadata = loadWorkspaceMetadataSync(normalizedId);
+  const metadata = loadWorkspaceMetadata(normalizedId);
 
   if (!metadata || metadata.location !== 'remote') {
     spinner.fail(`No remote workspace found for ${issueId}`);

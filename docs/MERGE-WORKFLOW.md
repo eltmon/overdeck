@@ -13,20 +13,65 @@ verdict, every time it's asked.
 > **promoting a UAT batch** (merging several tested features at once). The
 > per-issue flow below remains the escape hatch (the "Merge one feature to
 > main…" control) and the path for everything outside an active batch-train
-> run.
+> run. Unless the project holds merges for UAT, a batch assembles only when
+> **two or more** features are ready (PAN-3965): a one-member batch is
+> byte-identical to the PR branch and its CI run a duplicate, so a single
+> ready feature merges directly through this flow (Merge button /
+> `gh pr merge`). The Merge train page says so: "1 feature ready — merges
+> directly; batches assemble when 2+ are ready". A ready feature held for
+> UAT (its issue's `hold-for-uat` label; else the project's
+> `auto_merge_default: hold`; else, with no project default, the global
+> `flywheel.require_uat_before_merge` on — the default) still gets a batch
+> when it is the only one: that batch is the UAT stack the operator tests on.
+> An `auto-merge` label releases the feature in a held project.
 
 ## Flow
 
 1. **Work agent calls `pan done`** on a clean tree. The work-agent role
    prompt refuses `pan done` from a dirty worktree. `pan done` runs quality
-   gates, opens or updates the PR, and requests review.
-2. **Review and test.** The four reviewer roles (correctness, security,
+   gates (typecheck and lint on the host; the test suite runs once, on CI, for
+   a `verification.tests: ci` project — see
+   [PIPELINE-GATES.md](PIPELINE-GATES.md#one-full-suite-run-per-push-on-ci-pan-3965)),
+   rebases onto the target branch and pushes, opens or updates the PR
+   and marks it ready, moves the tracker to In Review, and finally POSTs
+   `/api/review/<id>/request` — the same request `pan review request` makes,
+   through the same helper
+   ([`src/cli/commands/request-review.ts`](../src/cli/commands/request-review.ts)).
+   That request is what starts verification and, when it passes, the review
+   convoy. A dashboard that cannot be reached prints
+   `Review not started (dashboard unreachable): run pan review request <id>`
+   and `pan done` still exits 0 — the PR and the tracker are already updated,
+   so re-running `pan done` is never the fix.
+2. **A PR opened or readied by hand gets the same pipeline.** The GitHub
+   webhook handler starts it on `opened` and `ready_for_review` when the PR is
+   not a draft, the repository is tracked and the head branch maps to an issue
+   ([`src/lib/webhook-handlers.ts`](../src/lib/webhook-handlers.ts)). It reaches
+   the dashboard's starter through the registry in
+   [`src/lib/cloister/request-review-pipeline.ts`](../src/lib/cloister/request-review-pipeline.ts),
+   never by importing a route, and `requestReviewPipeline.isInFlight` coalesces
+   it with the request `pan done` just made. The webhook path logs and returns
+   on every failure — it never throws.
+3. **Review and test.** The four reviewer roles (correctness, security,
    performance, requirements) post PR reviews — approve or request changes.
    Verification (typecheck, lint, tests) runs as check runs on the PR.
    "Ready" is derived, not stored: approvals in, checks green, forge reports
-   `mergeable: true`.
-3. **Human clicks the dashboard Merge button** (or `gh pr merge`). The
-   dashboard:
+   `mergeable: true`. Two more conditions come from the forge too
+   (`cloister/merge-gate.ts`, see
+   [PIPELINE-GATES.md](PIPELINE-GATES.md#the-merge-gate-4016-4021-4036)): in a
+   `verification.tests: ci` project the CI `test` job must have concluded
+   `SUCCESS` on the PR head (a missing or skipped test job blocks), and a
+   failed browser UAT at the PR head blocks when UAT is required for the
+   issue (its `hold-for-uat` / `auto-merge` label, else the project's
+   `auto_merge_default`, else the global `require_uat_before_merge`). A
+   passing UAT, at that head or a newer one, restores readiness. Verdict
+   markers in PR comments (review approval, UAT pass or fail) count only
+   from the repository's owners, members and collaborators, or from
+   Overdeck's own posting identity; anyone else's are ignored.
+4. **Human clicks the dashboard Merge button** (or `gh pr merge`). The
+   dashboard re-reads readiness from the forge and refuses with the first
+   failing condition (`Cannot merge: …`); the board enables the button on
+   approvals, checks and mergeability alone, so the CI test job and UAT
+   conditions show up as that refusal. Otherwise it:
    - Merges a GitHub-clean PR directly when its head already contains the
      required base and checks are complete.
    - Otherwise runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)`
@@ -51,6 +96,18 @@ verdict, every time it's asked.
 
 Content failures — red CI, a closed or draft PR, unresolved conflicts — are
 visible directly on the PR; there is no separate failure status to set.
+
+## The per-project merge queue
+
+Merges are serialized per project. A Merge clicked while another merge holds
+the project's slot is queued, and when a merge finishes the queue advances
+(`advanceMergeQueue` in `routes/workspaces/merge-strike.ts`): it drops every
+entry that cannot start and triggers the first one that can. Every entry
+passes the same gate as a direct Merge (every condition in Flow step 3) and
+merges its feature PR (#4016). The queue once landed
+an entry's `strike/<issue>` branch instead whenever one existed, without that
+gate; strikes now open their own PR (PAN-3973), so the queue no longer looks
+for strike branches.
 
 ## Review freshness
 
@@ -112,9 +169,14 @@ for the full rule.
 
 The merge agent's post-merge handoff
 ([`src/lib/cloister/merge-agent.ts`](../src/lib/cloister/merge-agent.ts)) is
-non-destructive: it pauses the work/planning agents, preserves
+non-destructive: it pauses the work/planning/strike agents and closes their
+terminals, closes the review/test/uat specialists' terminals, preserves
 workspace/branches/xBRIEF, and removes the workspace's Docker containers and
-`overdeck-feature-<issue>_devnet` network. This must run **at most once per
+`overdeck-feature-<issue>_devnet` network. Terminals close through the terminal
+backend (`closeAgentPane` / `closeIssuePanes` in
+[`src/lib/terminal-backends/launch.ts`](../src/lib/terminal-backends/launch.ts)):
+`kill-session` on tmux, `pane.close` on Herdr. A tmux-only kill left every Herdr
+pane alive, and close-out's DoD row 5 then failed on "running agents" (PAN-3947). This must run **at most once per
 merge** — a concurrency guard prevents the handoff from re-triggering itself
 (a missing guard caused a 24,626-call tracker API loop, PAN-328).
 
@@ -132,10 +194,29 @@ pressure) also runs from a plain interval scheduler independent of any
 issue's merge — check `pan workspace list --stale [--all]` for merged
 branches still on disk and reclaim with `pan workspace destroy <id>`.
 
+Close-out prunes only regenerable agent-directory weight: `pending.lock`,
+`*.sock`, and each `codex-home*/` entry except `sessions/`. It keeps
+`state.json`, the append-only `sessions.json` index, lifecycle and activity
+logs, context receipts, Codex thread IDs, and every transcript. Explicit wipe,
+garbage collection, and retention remain the destructive cleanup paths.
+The ceremony runs no agent-row garbage collection of its own (PAN-3968 removed
+the `close-out:prune-agent-rows` step); the paths that delete `state.json` are
+deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
+(`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
+— all of them route through `removeAgentStateDir`. Transcript retention
+deletes only `*.jsonl` transcripts and keeps `state.json`.
+
 When the merge-train flag (`flywheel.merge_train_enabled`, default off) is
 ON, a merge-train reconcile pass rebases/re-verifies ready sibling branches
 (PAN-1691); with the flag off, reconcile an affected workspace explicitly
-with `pan sync-main <id>` before it proceeds through review or merge.
+with `pan sync-main <id>` before it proceeds through review or merge. The
+UAT reconciler (`src/lib/cloister/uat-reconciler.ts`) assembles a batch only
+for 2+ ready features; with exactly one it returns `single-feature` and
+builds nothing, even on a forced rebuild — unless that feature is held for
+UAT (`issueHoldsForUat` in `cloister/auto-merge-eligibility.ts`: the issue's
+label, then the project default, then the global flag — the same tiers
+auto-merge eligibility applies), in which case the one-feature batch
+assembles as before.
 
 ## What This Replaces
 

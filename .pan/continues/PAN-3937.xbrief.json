@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "issueId": "PAN-3937",
+  "created": "2026-09-20T20:58:08.484Z",
+  "updated": "2026-09-20T23:01:29.928Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-20T21:12Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-09-20T21:12:24.527Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-20T22:55:20.878Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3",
+      "timestamp": "2026-09-20T22:58:34.958Z"
+    }
+  ],
+  "feedback": [],
+  "agentModel": "k3"
+}

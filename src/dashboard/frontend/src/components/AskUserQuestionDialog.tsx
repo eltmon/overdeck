@@ -71,6 +71,17 @@ export function AskUserQuestionDialog({
   // One selected label per question, initialized empty so we can validate.
   const [selections, setSelections] = useState<string[]>(() => questions.map(() => ''))
   const [customText, setCustomText] = useState('')
+  // App keeps this dialog mounted across questions, so reset the answer state
+  // whenever a different question arrives. Stale selections from an earlier
+  // multi-part question otherwise never match questions.length and Send stays
+  // disabled.
+  const questionKey = pending ? `${pending.toolUseId}:${pending.askedAt}` : ''
+  const [answeredKey, setAnsweredKey] = useState(questionKey)
+  if (answeredKey !== questionKey) {
+    setAnsweredKey(questionKey)
+    setSelections(questions.map(() => ''))
+    setCustomText('')
+  }
 
   if (!isOpen || !agent || !pending || questions.length === 0) return null
 

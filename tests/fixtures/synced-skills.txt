@@ -59,6 +59,7 @@ pan-memory
 pan-merge
 pan-network
 pan-new-project
+pan-open-threads
 pan-orders
 pan-oversee
 pan-pause
@@ -90,6 +91,7 @@ pan-tts
 pan-unpause
 pan-up
 pan-wipe
+pan-worker
 pan-workspace
 pan-workspace-config
 pipeline-list

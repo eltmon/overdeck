@@ -1,5 +1,5 @@
-import { createMuseRuntimeSync } from './muse.js';
-export { MuseRuntimeSync, createMuseRuntimeSync } from './muse.js';
+import { createMuseRuntime } from './muse.js';
+export { MuseRuntimeSync, createMuseRuntime } from './muse.js';
 /**
  * Cloister Runtime Abstraction
  *
@@ -11,15 +11,9 @@ export * from './types.js';
 export * from './behavior.js';
 export {
   ClaudeCodeRuntimeSync,
-  ClaudeCodeRuntime,
-  createClaudeCodeRuntimeSync,
   createClaudeCodeRuntime,
 } from './claude-code.js';
 export {
-  PiRuntimeSync,
-  PiRuntime,
-  createPiRuntimeSync,
-  createPiRuntime,
   PiSpawnTimeout,
 } from './pi.js';
 export {
@@ -31,18 +25,16 @@ export {
 } from './ohmypi.js';
 export {
   CodexRuntimeSync,
-  CodexRuntime,
-  createCodexRuntimeSync,
   createCodexRuntime,
 } from './codex.js';
 export {
   AcpRuntimeSync,
-  createAcpRuntimeSync,
+  createAcpRuntime,
   AcpSpawnTimeout,
 } from './acp.js';
 export {
   KimiCodeRuntimeSync,
-  createKimiCodeRuntimeSync,
+  createKimiCodeRuntime,
   KimiCodeSpawnTimeout,
 } from './kimi-code.js';
 
@@ -51,13 +43,12 @@ import type {
   RuntimeName,
   RuntimeRegistry as RuntimeRegistryInterface,
 } from './types.js';
-import { getAgentStateSync } from '../agents.js';
-import { createClaudeCodeRuntimeSync } from './claude-code.js';
-import { createPiRuntimeSync } from './pi.js';
+import { getAgentState } from '../agents.js';
+import { createClaudeCodeRuntime } from './claude-code.js';
 import { createOhmypiRuntimeSync } from './ohmypi.js';
-import { createCodexRuntimeSync } from './codex.js';
-import { createAcpRuntimeSync } from './acp.js';
-import { createKimiCodeRuntimeSync } from './kimi-code.js';
+import { createCodexRuntime } from './codex.js';
+import { createAcpRuntime } from './acp.js';
+import { createKimiCodeRuntime } from './kimi-code.js';
 
 /**
  * Runtime registry implementation
@@ -97,7 +88,7 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
    * to preserve back-compat (PAN-636 ac2).
    */
   getRuntimeForAgent(agentId: string): AgentRuntimeSync | null {
-    const state = getAgentStateSync(agentId);
+    const state = getAgentState(agentId);
     if (!state) {
       return null;
     }
@@ -141,13 +132,13 @@ export function getGlobalRegistry(): RuntimeRegistry {
     // and native Kimi Code (PAN-1837) runtimes.
     // Pi (PAN-636) is legacy and no longer registered — 'pi' harness is normalized
     // to 'ohmypi' by getRuntimeForAgent (see above) and normalizeHarness() in conversations.ts.
-    globalRegistry.register(createClaudeCodeRuntimeSync());
+    globalRegistry.register(createClaudeCodeRuntime());
     globalRegistry.register(createOhmypiRuntimeSync());
-    globalRegistry.register(createCodexRuntimeSync());
-    globalRegistry.register(createAcpRuntimeSync());
-    globalRegistry.register(createAcpRuntimeSync({ name: 'opencode', provider: 'opencode' }));
-    globalRegistry.register(createKimiCodeRuntimeSync());
-    globalRegistry.register(createMuseRuntimeSync());
+    globalRegistry.register(createCodexRuntime());
+    globalRegistry.register(createAcpRuntime());
+    globalRegistry.register(createAcpRuntime({ name: 'opencode', provider: 'opencode' }));
+    globalRegistry.register(createKimiCodeRuntime());
+    globalRegistry.register(createMuseRuntime());
   }
   return globalRegistry;
 }

@@ -43,8 +43,8 @@ vi.mock('../../../../lib/conversations/enrichment/index.js', () => ({
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 beforeEach(() => {

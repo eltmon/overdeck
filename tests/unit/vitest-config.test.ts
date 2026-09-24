@@ -40,7 +40,7 @@ describe('vitest.config.ts flake policy', () => {
 
     expect(config.test.retry).toBe(1);
     expect(config.test.exclude).toContain('tests/playwright/conversation-supervisor-uat.test.ts');
-    expect(config.test.maxWorkers).toBe(2);
+    expect(config.test.maxWorkers).toBe(4);
   });
 
   it('sets retry:1 in verification mode, excludes quarantined tests, and preserves local fork count', async () => {

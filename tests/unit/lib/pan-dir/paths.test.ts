@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/projects.js')>();
-  return { ...actual, findProjectByPathSync: (path: string) => findProject(path) };
+  return { ...actual, findProjectByPath: (path: string) => findProject(path) };
 });
 
 type ProjectConfig = import('../../../../src/lib/projects.js').ProjectConfig;

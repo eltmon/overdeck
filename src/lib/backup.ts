@@ -1,8 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, cpSync, rmSync, lstatSync } from 'fs';
 import { join, basename } from 'path';
-import { Effect } from 'effect';
 import { BACKUPS_DIR } from './paths.js';
-import { FsError, FsNotFoundError } from './errors.js';
 
 export interface BackupInfo {
   timestamp: string;
@@ -14,7 +12,11 @@ export function createBackupTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
-export function createBackupSync(sourceDirs: string[]): BackupInfo {
+/**
+ * Create a timestamped backup of the supplied source directories. Throws on a
+ * copy failure.
+ */
+export function createBackup(sourceDirs: string[]): BackupInfo {
   const timestamp = createBackupTimestamp();
   const backupPath = join(BACKUPS_DIR, timestamp);
 
@@ -55,7 +57,7 @@ export function createBackupSync(sourceDirs: string[]): BackupInfo {
  * write that touches pre-existing content. Pass a shared `timestamp` to group
  * several files from the same sync run under one backup dir.
  */
-export function backupFileSync(file: string, timestamp = createBackupTimestamp()): string | null {
+export function backupFile(file: string, timestamp = createBackupTimestamp()): string | null {
   if (!existsSync(file)) return null;
   const dir = join(BACKUPS_DIR, timestamp, 'context');
   mkdirSync(dir, { recursive: true });
@@ -65,7 +67,7 @@ export function backupFileSync(file: string, timestamp = createBackupTimestamp()
   return dest;
 }
 
-export function listBackupsSync(): BackupInfo[] {
+export function listBackups(): BackupInfo[] {
   if (!existsSync(BACKUPS_DIR)) return [];
 
   const entries = readdirSync(BACKUPS_DIR, { withFileTypes: true });
@@ -85,7 +87,7 @@ export function listBackupsSync(): BackupInfo[] {
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
-export function restoreBackupSync(timestamp: string, targetDirs: Record<string, string>): void {
+export function restoreBackup(timestamp: string, targetDirs: Record<string, string>): void {
   const backupPath = join(BACKUPS_DIR, timestamp);
 
   if (!existsSync(backupPath)) {
@@ -111,8 +113,8 @@ export function restoreBackupSync(timestamp: string, targetDirs: Record<string, 
   }
 }
 
-export function cleanOldBackupsSync(keepCount: number = 10): number {
-  const backups = listBackupsSync();
+export function cleanOldBackups(keepCount: number = 10): number {
+  const backups = listBackups();
 
   if (backups.length <= keepCount) return 0;
 
@@ -126,62 +128,3 @@ export function cleanOldBackupsSync(keepCount: number = 10): number {
 
   return removed;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Create a timestamped backup of the supplied source directories.
- * Effect-native. Fails with FsError on copy failure.
- */
-export const createBackup = (
-  sourceDirs: readonly string[],
-): Effect.Effect<BackupInfo, FsError> =>
-  Effect.try({
-    try: () => createBackupSync([...sourceDirs]),
-    catch: (cause) =>
-      new FsError({ path: BACKUPS_DIR, operation: 'createBackup', cause }),
-  });
-
-/**
- * Enumerate existing backups, sorted newest-first.
- * Effect-native. Fails with FsError if the backups directory cannot be read.
- */
-export const listBackups = (): Effect.Effect<readonly BackupInfo[], FsError> =>
-  Effect.try({
-    try: () => listBackupsSync(),
-    catch: (cause) =>
-      new FsError({ path: BACKUPS_DIR, operation: 'listBackups', cause }),
-  });
-
-/**
- * Restore a named backup, replacing each target directory. Fails with
- * FsNotFoundError if the backup does not exist, FsError otherwise.
- */
-export const restoreBackup = (
-  timestamp: string,
-  targetDirs: Record<string, string>,
-): Effect.Effect<void, FsError | FsNotFoundError> =>
-  Effect.gen(function* () {
-    const backupPath = join(BACKUPS_DIR, timestamp);
-    if (!existsSync(backupPath)) {
-      return yield* Effect.fail(new FsNotFoundError({ path: backupPath }));
-    }
-    return yield* Effect.try({
-      try: () => restoreBackupSync(timestamp, targetDirs),
-      catch: (cause) =>
-        new FsError({ path: backupPath, operation: 'restoreBackup', cause }),
-    });
-  });
-
-/**
- * Trim the backups directory to the most recent `keepCount` entries.
- * Returns the number of backups removed. Fails with FsError on removal error.
- */
-export const cleanOldBackups = (
-  keepCount: number = 10,
-): Effect.Effect<number, FsError> =>
-  Effect.try({
-    try: () => cleanOldBackupsSync(keepCount),
-    catch: (cause) =>
-      new FsError({ path: BACKUPS_DIR, operation: 'cleanOldBackups', cause }),
-  });

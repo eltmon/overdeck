@@ -3,11 +3,11 @@ import { Effect, Layer } from 'effect';
 
 const mocks = vi.hoisted(() => ({
   reconcile: vi.fn(),
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
 }));
 
 vi.mock('../../agents.js', () => ({
-  getAgentStateSync: mocks.getAgentStateSync,
+  getAgentState: mocks.getAgentState,
 }));
 
 vi.mock('../../overdeck/cost.js', () => ({
@@ -28,7 +28,7 @@ describe('reconcilePiCostEventsForRunningAgents', () => {
   });
 
   it('reconciles codex costs when a running agent has harness codex', async () => {
-    mocks.getAgentStateSync.mockReturnValue({ harness: 'codex' });
+    mocks.getAgentState.mockReturnValue({ harness: 'codex' });
 
     await reconcilePiCostEventsForRunningAgents([
       { id: 'agent-pan-1', tmuxActive: true } as never,
@@ -38,7 +38,7 @@ describe('reconcilePiCostEventsForRunningAgents', () => {
   });
 
   it('reconciles ohmypi costs when a running agent has harness ohmypi', async () => {
-    mocks.getAgentStateSync.mockReturnValue({ harness: 'ohmypi' });
+    mocks.getAgentState.mockReturnValue({ harness: 'ohmypi' });
 
     await reconcilePiCostEventsForRunningAgents([
       { id: 'agent-pan-1', tmuxActive: true } as never,
@@ -48,7 +48,7 @@ describe('reconcilePiCostEventsForRunningAgents', () => {
   });
 
   it('skips reconcile when no running agent uses ohmypi or codex', async () => {
-    mocks.getAgentStateSync.mockReturnValue({ harness: 'claude-code' });
+    mocks.getAgentState.mockReturnValue({ harness: 'claude-code' });
 
     await reconcilePiCostEventsForRunningAgents([
       { id: 'agent-pan-1', tmuxActive: true } as never,

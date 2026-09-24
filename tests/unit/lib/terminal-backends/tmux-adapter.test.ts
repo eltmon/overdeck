@@ -34,7 +34,7 @@ vi.mock('../../../../src/lib/agents/liveness.js', () => ({
 
 // PAN-3917/lint:circular: tmux.ts imports the read-only leaf, not agent-state.ts.
 vi.mock('../../../../src/lib/agents/agent-state-read.js', () => ({
-  getAgentStateSync: () => agentState,
+  getAgentState: () => agentState,
 }));
 
 const { TmuxBackend, toPaneRole, tmuxTargetTokens } = await import('../../../../src/lib/terminal-backends/tmux.js');
@@ -83,6 +83,24 @@ describe('tmux adapter — workspace and start', () => {
       terminalId: 'agent-pan-3917',
       agentName: 'agent-pan-3917',
     });
+  });
+
+  // Review of #3992 (L3): tmux runs the command through `sh -c`; an
+  // OVERDECK_HOME with a space must not split the launcher path.
+  it('quotes a launcher path that contains a space', async () => {
+    const backend = new TmuxBackend();
+    const workspace = await Effect.runPromise(backend.workspaceFor('PAN-3960', '/w'));
+    if (isUnsupported(workspace)) throw new Error('workspaceFor must be supported on tmux');
+
+    await Effect.runPromise(backend.startAgent(workspace, {
+      kind: 'claude-code',
+      argv: ['bash', "/home/x/My Overdeck/agents/planning-pan-3960/it's-launcher.sh"],
+      env: {},
+      tokens: { issue: 'PAN-3960', role: 'plan', harness: 'claude-code', model: 'claude-sonnet-5' },
+      name: 'planning-pan-3960',
+    }));
+
+    expect(created[0]!.command).toBe("bash '/home/x/My Overdeck/agents/planning-pan-3960/it'\\''s-launcher.sh'");
   });
 });
 

@@ -1,6 +1,6 @@
 import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
-import { getTldrDaemonServiceSync, listTldrDaemonServicesSync } from '../../../lib/tldr-daemon.js';
+import { getTldrDaemonService, listTldrDaemonServices } from '../../../lib/tldr-daemon.js';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join, basename } from 'path';
 
@@ -47,7 +47,7 @@ async function statusCommand(options: TldrOptions): Promise<void> {
 
   // Check main daemon
   if (existsSync(venvPath)) {
-    const service = getTldrDaemonServiceSync(projectRoot, venvPath);
+    const service = getTldrDaemonService(projectRoot, venvPath);
     const status = await service.getStatus();
     const tldrPath = join(projectRoot, '.tldr');
 
@@ -113,7 +113,7 @@ async function statusCommand(options: TldrOptions): Promise<void> {
       const wsVenvPath = join(wsPath, '.venv');
 
       if (existsSync(wsVenvPath)) {
-        const service = getTldrDaemonServiceSync(wsPath, wsVenvPath);
+        const service = getTldrDaemonService(wsPath, wsVenvPath);
         const status = await service.getStatus();
         const tldrPath = join(wsPath, '.tldr');
 
@@ -220,7 +220,7 @@ async function startCommand(workspace: string | undefined, options: TldrOptions)
       return exitCli(1);
     }
 
-    const service = getTldrDaemonServiceSync(wsPath, venvPath);
+    const service = getTldrDaemonService(wsPath, venvPath);
     await service.start();
 
     if (!options.json) {
@@ -236,7 +236,7 @@ async function startCommand(workspace: string | undefined, options: TldrOptions)
       return exitCli(1);
     }
 
-    const service = getTldrDaemonServiceSync(projectRoot, venvPath);
+    const service = getTldrDaemonService(projectRoot, venvPath);
     await service.start();
 
     if (!options.json) {
@@ -263,7 +263,7 @@ async function stopCommand(workspace: string | undefined, options: TldrOptions):
       return exitCli(1);
     }
 
-    const service = getTldrDaemonServiceSync(wsPath, venvPath);
+    const service = getTldrDaemonService(wsPath, venvPath);
     await service.stop();
 
     if (!options.json) {
@@ -278,7 +278,7 @@ async function stopCommand(workspace: string | undefined, options: TldrOptions):
       return exitCli(1);
     }
 
-    const service = getTldrDaemonServiceSync(projectRoot, venvPath);
+    const service = getTldrDaemonService(projectRoot, venvPath);
     await service.stop();
 
     if (!options.json) {
@@ -305,7 +305,7 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
       return exitCli(1);
     }
 
-    const service = getTldrDaemonServiceSync(wsPath, venvPath);
+    const service = getTldrDaemonService(wsPath, venvPath);
 
     if (!options.json) {
       console.log(chalk.dim(`Warming TLDR index for ${workspace}...`));
@@ -327,7 +327,7 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
       return exitCli(1);
     }
 
-    const service = getTldrDaemonServiceSync(projectRoot, venvPath);
+    const service = getTldrDaemonService(projectRoot, venvPath);
 
     if (!options.json) {
       console.log(chalk.dim('Warming TLDR index for main...'));

@@ -69,7 +69,7 @@ vi.mock('../../../../lib/config-yaml.js', () => ({
 
 vi.mock('../../../../lib/providers.js', () => ({
   UnknownModelError: class UnknownModelError extends Error {},
-  getProviderForModelSync: vi.fn(() => ({ name: resolvedProviderName })),
+  getProviderForModel: vi.fn(() => ({ name: resolvedProviderName })),
   piProviderForModel: vi.fn(() => 'anthropic'),
   qualifyPiModel: vi.fn((m: string) => m),
   // Real implementation maps a legacy Kimi id to its native alias and passes
@@ -81,9 +81,7 @@ vi.mock('../../../../lib/harness-resolve.js', () => ({
   resolveHarness: vi.fn(async () => resolvedConversationHarness),
 }));
 
-vi.mock('../../../../lib/workspace-manager.js', () => ({
-  preTrustDirectory: vi.fn(),
-}));
+vi.mock('../../../../lib/workspace-manager.js', () => ({}));
 
 vi.mock('../../event-store.js', () => ({
   getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })),
@@ -93,10 +91,12 @@ vi.mock('../../../../lib/tmux.js', () => ({
   // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   sendRawKeystroke: vi.fn(),
   MessageDeliveryFailed: class MessageDeliveryFailed extends Error {},
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   sessionExists: vi.fn(() => Effect.succeed(true)),
   killSession: vi.fn(() => Effect.succeed(undefined)),
   createSession: vi.fn((session: string, _cwd: string, command: string) => Effect.sync(() => {
@@ -124,7 +124,16 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listSessionNames: vi.fn(() => Effect.succeed(listedSessionNames)),
   // Real implementation asks systemd for the managed tmux server's MainPID and
   // returns undefined when there is none — the shape these tests run under.
-  findManagedServerPidSync: vi.fn(() => undefined),
+  findManagedServerPid: vi.fn(() => undefined),
+}));
+
+// PAN-3974: owner teardown must close the companion terminal first. The spy
+// records call order against killSession so the tests can assert "before".
+const companionTeardownCalls = vi.hoisted(() => [] as string[]);
+vi.mock('../../../../lib/overdeck/companion-terminal/index.js', () => ({
+  closeCompanionTerminalForOwner: vi.fn(async (ownerSession: string) => {
+    companionTeardownCalls.push(`companion:${ownerSession}`);
+  }),
 }));
 
 // PAN-1837 review fix (cycle 8): waitForNewKimiSessionAsync defaults to the
@@ -179,8 +188,8 @@ function decodeJsonResponse(response: { body: unknown }): Record<string, unknown
 }
 
 async function resetConversationDb(): Promise<void> {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 describe('spawnConversationSession PTY supervisor wiring', () => {
@@ -230,6 +239,8 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     const launcher = launcherFor('conv-supervisor-test');
     expect(launcher).toContain("export PATH='/home/test/.local/bin':\"$PATH\"");
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-supervisor-test'");
+    // PAN-3920: every conversation launcher names its own conversation.
+    expect(launcher).toContain('export OVERDECK_CONVERSATION="conv-supervisor-test"');
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' claude --model claude-sonnet-4-6");
     expect(existsSync(join(overdeckHome, 'agents', 'conv-supervisor-test', 'pty-token'))).toBe(true);
@@ -280,6 +291,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-codex-supervisor-test');
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-codex-supervisor-test'");
+    expect(launcher).toContain('export OVERDECK_CONVERSATION="conv-codex-supervisor-test"');
     expect(launcher).toContain(`export CODEX_HOME='${join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'codex-home-v2')}'`);
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/codex-app-server-host.js'");
@@ -397,6 +409,9 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-docker-test');
     expect(launcher).not.toContain('pty-supervisor.js');
+    // PAN-3920: a plain Claude conversation has no OVERDECK_AGENT_ID, so this is how `pan worker run` finds its parent.
+    expect(launcher).not.toContain('export OVERDECK_AGENT_ID=');
+    expect(launcher).toContain('export OVERDECK_CONVERSATION="conv-docker-test"');
     expect(existsSync(join(overdeckHome, 'agents', 'conv-docker-test', 'pty-token'))).toBe(false);
   });
 
@@ -450,7 +465,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     process.env.HOME = overdeckHome;
 
     try {
-      const { kimiSessionsRoot } = await import('../../../../lib/runtimes/kimi-code.js');
+      const { kimiSessionsRoot } = await import('../../../../lib/runtimes/storage/kimi-code.js');
       const kimiHome = join(overdeckHome, '.kimi-code');
       const wireDir = join(kimiSessionsRoot(kimiHome, workspace), pinnedSessionId, 'agents', 'main');
       mkdirSync(wireDir, { recursive: true });
@@ -624,5 +639,61 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('companion terminal owner teardown (PAN-3974)', () => {
+  beforeEach(() => {
+    ensurePtySupervisorBuildArtifact();
+    overdeckHome = join(tmpdir(), `pan-conv-companion-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    process.env.OVERDECK_HOME = overdeckHome;
+    createSupervisorSocket = true;
+    createAcpHostArtifacts = false;
+    resolvedHarnessBinary = '/usr/bin/claude';
+    resolvedConversationHarness = 'claude-code';
+    resolvedProviderName = 'anthropic';
+    createSessionCalls = [];
+    companionTeardownCalls.length = 0;
+  });
+
+  afterEach(async () => {
+    await resetConversationDb();
+    for (const call of createSessionCalls) cleanupSession(call.session);
+    rmSync(overdeckHome, { recursive: true, force: true });
+    delete process.env.OVERDECK_HOME;
+  });
+
+  async function recordKillOrder(): Promise<void> {
+    const tmux = await import('../../../../lib/tmux.js');
+    vi.mocked(tmux.killSession).mockClear();
+    vi.mocked(tmux.killSession).mockImplementation((name: string) => Effect.sync(() => {
+      companionTeardownCalls.push(`owner:${name}`);
+    }));
+  }
+
+  it('closes the companion before a respawn kills the owner session', async () => {
+    await recordKillOrder();
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+    await spawnConversationSession(
+      'conv-companion-respawn', tmpdir(), 'session-companion', 'claude-sonnet-4-6', undefined, undefined, false, 'claude-code',
+    );
+
+    expect(companionTeardownCalls.slice(0, 2)).toEqual([
+      'companion:conv-companion-respawn',
+      'owner:conv-companion-respawn',
+    ]);
+  });
+
+  it('closes the companion when the owner is stopped', async () => {
+    await recordKillOrder();
+    const { stopConversationRuntime } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+    await stopConversationRuntime(
+      { name: 'companion-stop', tmuxSession: 'conv-companion-stop', cwd: tmpdir(), claudeSessionId: null } as never,
+      'companion-stop',
+    );
+
+    expect(companionTeardownCalls).toEqual(['companion:conv-companion-stop', 'owner:conv-companion-stop']);
   });
 });

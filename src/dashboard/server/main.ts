@@ -24,6 +24,7 @@ import {
 import { whenDashboardListening } from './dashboard-listening.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
+import { startCodexPluginImporter, stopCodexPluginImporter } from './services/codex-plugin-importer.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
@@ -33,11 +34,11 @@ import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { initRestartGate } from './services/restart-gate.js';
-import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
-import { ensureInternalTokenSync } from '../../lib/internal-token.js';
+import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
+import { ensureInternalToken } from '../../lib/internal-token.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier } from '../../lib/cloister/deacon-lite.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
@@ -45,7 +46,6 @@ import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
-import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdogForDashboard } from './routes/cliproxy.js';
 import { startResourcesSnapshotService } from './routes/resources/snapshot.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
@@ -73,10 +73,10 @@ import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
-import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync } from '../../lib/overdeck/infra.js';
+import { RecordsLive, TmuxLive, dropPipelineStateMirrorTables, dropDeadIssuesForeignKeys } from '../../lib/overdeck/infra.js';
 import { startServerBootTelemetry } from './telemetry.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
-import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
+import { isSmeeConfigured, startSmeeProcess } from '../../lib/smee.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
 import { broadcastServerRestarting } from './ws-terminal.js';
@@ -95,6 +95,21 @@ initDashboardLogFile();
 // spawn→listen window attributable. See server.ts for the matching listen mark.
 console.log(`[boot-timing] module graph loaded at +${Math.round(performance.now())}ms (since process start)`);
 console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
+// PAN-3956: name the terminal backend once, and say loudly when the default
+// cannot serve — a tmux fallback used to happen here in silence.
+void (async () => {
+  try {
+    const { selectTerminalBackend, probeHerdrAvailability, describeTerminalBackendBoot } =
+      await import('../../lib/terminal-backends/select.js');
+    const { loadConfigSync } = await import('../../lib/config-yaml.js');
+    const selection = await selectTerminalBackend(loadConfigSync().config);
+    const probe = selection.backend === 'herdr' ? await probeHerdrAvailability() : null;
+    const { level, line } = describeTerminalBackendBoot(selection, probe);
+    console[level](line);
+  } catch (err) {
+    console.warn('[terminal] backend selection could not be logged:', err instanceof Error ? err.message : String(err));
+  }
+})();
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getOverdeckHome(), { recursive: true });
@@ -102,14 +117,14 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // Ensure the internal token exists before any in-process CLI sender resolves it (PAN-891).
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
-ensureInternalTokenSync();
+ensureInternalToken();
 
-// Prepare the managed tmux context exactly once, before any code path can spawn
-// tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
-// `tmuxExecAsync` are effectively free — no per-call file writes, no per-call
-// `start-server`/`source-file` round-trips. Critical for terminal attach latency
-// and agent message delivery (PAN-785).
-await ensureManagedTmuxContextOnce();
+// PAN-785 prepared the managed tmux context here, before any code path could spawn
+// tmux. Since PAN-1379 made that boot hook an Effect, the `await` here returned
+// the unrun Effect and prepared nothing: the context has been prepared lazily by
+// the first `tmuxExecAsync` call instead. PAN-3958 CH-3 removed the dead call and
+// CH-8 the unused hook. Preparing the context at boot would start a persistent
+// (`exit-empty off`) managed tmux server on Herdr hosts; that is an operator decision.
 // Cache .overdeck.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 await initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .overdeck.env:', err.message);
@@ -133,7 +148,7 @@ try {
 // dashboard's overdeck.db; running it there dropped `agents` out from under the
 // live 0.51.0 server, which then crash-looped. See infra.ts for both gates.
 try {
-  const drop = dropPipelineStateMirrorTablesSync();
+  const drop = dropPipelineStateMirrorTables();
   if (drop.dropped) {
     console.log('[overdeck] Dropped the pipeline-state mirror tables (once; marker written)');
   } else if (drop.skipped === 'peer') {
@@ -141,6 +156,20 @@ try {
   }
 } catch (err) {
   console.warn('[overdeck] Pipeline-state mirror drop failed (non-fatal):', err);
+}
+
+// PAN-3963: rebuild the live tables whose `issue_id → issues(id)` FK rejects
+// every post-cut issue id (nothing writes `issues` since the Cut). Same gates
+// as the mirror drop above: once, and only in a primary dashboard.
+try {
+  const fkDrop = dropDeadIssuesForeignKeys();
+  if (fkDrop.dropped) {
+    console.log(`[overdeck] Dropped the dead issues FKs (once; marker written) — rebuilt: ${fkDrop.tables.join(', ') || 'none (already clean)'}`);
+  } else if (fkDrop.skipped === 'peer') {
+    console.log('[overdeck] Dead-issues-FK rebuild SKIPPED — peer dashboard runs no destructive migration');
+  }
+} catch (err) {
+  console.warn('[overdeck] Dead-issues-FK rebuild failed (non-fatal):', err);
 }
 
 // Bind the HTTP socket before starting any background service or the Deacon.
@@ -181,12 +210,12 @@ if (isPeerDashboard) {
     console.log('[overdeck] IssueDataService background fetch complete');
     // PAN-3917: there are no review-status rows to prune. A manually-closed
     // issue derives to `closed` on the next read, so nothing stale survives it.
-    void Effect.runPromise(cleanupClosedIssueAgentDirectories({
+    void cleanupClosedIssueAgentDirectories({
       issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
       force: true,
-    })).then((result) => {
+    }).then((result) => {
       if (result.removed.length > 0) {
-        console.log(`[overdeck] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
+        console.log(`[overdeck] Pruned ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'} (state and transcripts kept): ${result.removed.join(', ')}`);
       }
       if (result.protected.length > 0) {
         console.warn(`[overdeck] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
@@ -238,7 +267,7 @@ if (process.env.OVERDECK_MODE === 'desktop') {
 // Wire up pipeline notifier → domain events, so the frontend Zustand store
 // updates on review and test outcomes. PAN-3917: there is no `status_changed`
 // variant — nothing stores a status to change.
-setPipelineHandlerSync((event) => {
+setPipelineHandler((event) => {
   switch (event.type) {
     case 'review.approved':
     case 'test.passed': {
@@ -251,6 +280,23 @@ setPipelineHandlerSync((event) => {
         } as any);
       } catch (err) {
         console.error(`[pipeline] Failed to append ${event.type} event:`, err);
+      }
+      return;
+    }
+
+    // The append-only pipeline journal (cloister/pipeline-journal.ts). The
+    // entry is already durable in the workspace; this projects it into the
+    // event stream so a live reader sees the action at the moment it happened.
+    case 'pipeline.entry': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'pipeline.journal',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, entry: event.entry },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append pipeline.journal event:', err);
       }
       return;
     }
@@ -403,7 +449,7 @@ setAgentStoppedNotifier((agentId) => {
   void (async () => {
     try {
       const es = getEventStore();
-      const state = await Effect.runPromise(getAgentState(agentId));
+      const state = getAgentState(agentId);
       if (state) {
         // heartbeat_dead only updates runtime snapshot; emit it directly.
         es.append({
@@ -454,6 +500,13 @@ console.log('[overdeck] Agent stopped/status notifiers → domain events wired')
 // Start background conversation lifecycle polling (10s interval)
 startConversationLifecycleService();
 console.log('[overdeck] ConversationLifecycleService started');
+
+// PAN-3920 W20: register Codex-plugin jobs as external agents the first time
+// they are seen (the plugin deletes its job records when the parent session
+// ends). Read-only over the plugin's files; a peer dashboard registers nothing.
+if (!isPeerDashboard && startCodexPluginImporter()) {
+  console.log('[overdeck] Codex-plugin job importer started');
+}
 
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times. Gated per-tick on the merge-train setting; there is no flywheel run
@@ -584,13 +637,13 @@ if (startCliproxyWatchdogForDashboard(isPeerDashboard)) {
 
 if (isPeerDashboard) {
   console.log('[overdeck] smee-client webhook relay skipped — peer dashboard (OVERDECK_DISABLE_DEACON=1)');
-} else if (isSmeeConfiguredSync()) {
+} else if (isSmeeConfigured()) {
   try {
-    startSmeeProcessSync();
+    startSmeeProcess();
     console.log('[overdeck] smee-client webhook relay ensured');
   } catch (err) {
     console.warn('[overdeck] Failed to ensure smee-client webhook relay:', err instanceof Error ? err.message : String(err));
-    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Failed to ensure smee-client webhook relay: ${err instanceof Error ? err.message : String(err)}` });
+    emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Failed to ensure smee-client webhook relay: ${err instanceof Error ? err.message : String(err)}` });
   }
 } else {
   console.log('[overdeck] smee-client webhook relay not configured');
@@ -599,12 +652,12 @@ if (isPeerDashboard) {
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'info',
       message: 'Dashboard stopping',
     });
-    emitActivityTtsSync({
+    emitActivityTts({
       utterance: 'Dashboard stopping',
       priority: 2,
       source: 'dashboard',
@@ -642,6 +695,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();
+  stopCodexPluginImporter();
   stopUatTrainReconciler();
   stopTtsSummarizer();
   stopTtsPlayback();
@@ -689,12 +743,12 @@ setTimeout(() => {
     .then((n) => {
       if (n > 0) {
         console.log(`[overdeck] Recovered ${n} stuck fork(s)`);
-        emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Recovered ${n} stuck fork(s) on startup` });
+        emitActivityEntry({ source: 'dashboard', level: 'info', message: `Recovered ${n} stuck fork(s) on startup` });
       }
     })
     .catch((err) => {
       console.warn('[overdeck] Failed to recover stuck forks:', err);
-      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
+      emitActivityEntry({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
     });
 }, 1000);
 // PAN-3537: seed the per-project CI chip before the first webhook arrives, and
@@ -720,14 +774,14 @@ if (isPeerDashboard) {
     const resetCount = resetProcessingToQueued();
     if (resetCount > 0) {
       console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
-      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+      emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
     }
     // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
     // problems endpoint and to the deacon reconciler — requeue it so it is retried.
     const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
     if (requeuedAutoMerges > 0) {
       console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
-      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
+      emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
     }
     await resumeQueuedMerges();
   } catch (err: any) {
@@ -772,16 +826,15 @@ if (startAutoMergeExecutor()) {
 
 if (isPeerDashboard) {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
-  emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
+  emitActivityEntry({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
   // PAN-3917: there is no state plane left to migrate, so nothing gates the
   // Deacon's boot any more — deacon-lite reads the forge and the terminal
   // backend and writes no status.
   startDeaconChild().catch((err) => {
     console.error('[overdeck] Cloister auto-start failed:', err);
-    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
+    emitActivityEntry({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
   });
   console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
-  emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }
-

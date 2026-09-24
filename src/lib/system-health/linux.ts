@@ -35,7 +35,7 @@ export interface LinuxCollectorAdapters {
  * heavier than the single-file reads above — so it refreshes on its own
  * slower cadence and the collector serves the cached value in between.
  */
-export const INOTIFY_REFRESH_MS = 60_000;
+const INOTIFY_REFRESH_MS = 60_000;
 
 export interface ParsedMemInfo {
   memTotalBytes?: number;
@@ -75,7 +75,7 @@ export function parseMemInfo(content: string): ParsedMemInfo {
   };
 }
 
-export function parseProcStat(content: string): ParsedProcStat | null {
+function parseProcStat(content: string): ParsedProcStat | null {
   const lines = content.split('\n');
   const cpuLine = lines.find((line) => line.startsWith('cpu '));
   if (!cpuLine) return null;
@@ -107,7 +107,7 @@ export function parseMemoryPressure(content: string): ParsedMemoryPressure {
   return result;
 }
 
-export function parseVmstat(content: string): SwapCounters | null {
+function parseVmstat(content: string): SwapCounters | null {
   let pagesIn: number | null = null;
   let pagesOut: number | null = null;
 
@@ -123,7 +123,7 @@ export function parseVmstat(content: string): SwapCounters | null {
   return pagesIn == null || pagesOut == null ? null : { pagesIn, pagesOut };
 }
 
-export function parseLoadAverage(content: string): number | null {
+function parseLoadAverage(content: string): number | null {
   const value = Number(content.trim().split(/\s+/)[0]);
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
@@ -141,7 +141,7 @@ export function computeCpuPercent(
   return available(Math.round(((totalDelta - idleDelta) / totalDelta) * 1000) / 10);
 }
 
-export function computeSwapActivityBytesPerMinute(
+function computeSwapActivityBytesPerMinute(
   current: SwapCounters,
   previous: SwapCounters | null | undefined,
   elapsedMs: number,

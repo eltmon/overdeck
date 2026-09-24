@@ -4,7 +4,7 @@
  * silently broken (Effect-migration regression, 2026-05-21 → fix date).
  *
  * Reads Claude Code transcripts under ~/.claude/projects, recomputes cost with
- * the project's OWN pricing (getPricingSync/calculateCostSync) so numbers match
+ * the project's OWN pricing (getPricing/calculateCost) so numbers match
  * live events exactly, dedupes by requestId against the existing events.jsonl,
  * and appends reconstructed events (marked `backfilled: true`) to events.jsonl.
  *
@@ -14,7 +14,7 @@
 import { readdirSync, readFileSync, existsSync, statSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { getPricingSync, calculateCostSync, type AIProvider } from '../src/lib/cost.js';
+import { getPricing, calculateCost, type AIProvider } from '../src/lib/cost.js';
 
 const WRITE = process.argv.includes('--write');
 const CUTOFF = '2026-05-21T00:00:00'; // gap start (last good event was 2026-05-21)
@@ -80,9 +80,9 @@ for (const dir of readdirSync(PROJECTS)) {
       const model: string = entry.message.model || 'claude-sonnet-4';
       if (model === '<synthetic>') continue;
       const provider = providerFor(model);
-      const pricing = getPricingSync(provider, model);
+      const pricing = getPricing(provider, model);
       if (!pricing) { noPrice++; skippedModels[model] = (skippedModels[model] || 0) + 1; continue; }
-      const cost = calculateCostSync({ inputTokens: input, outputTokens: output, cacheReadTokens: cacheRead, cacheWriteTokens: cacheWrite, cacheTTL: '5m' }, pricing);
+      const cost = calculateCost({ inputTokens: input, outputTokens: output, cacheReadTokens: cacheRead, cacheWriteTokens: cacheWrite, cacheTTL: '5m' }, pricing);
       const ev = {
         ts, type: 'cost', agentId: 'backfill', issueId, sessionType: 'implementation',
         provider, model, input, output, cacheRead, cacheWrite, cost,

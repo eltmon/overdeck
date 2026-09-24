@@ -4,21 +4,21 @@ import {
   getProjectSync,
   loadProjectsConfigSync,
   PROJECTS_CONFIG_FILE,
-  saveProjectsConfigSync,
+  saveProjectsConfig,
   type ReleaseConfig,
 } from '../../../src/lib/projects.js';
 import { OVERDECK_HOME } from '../../../src/lib/paths.js';
 
 function writeProjectsYaml(yaml: string): void {
   mkdirSync(OVERDECK_HOME, { recursive: true });
-  saveProjectsConfigSync({ projects: {} });
+  saveProjectsConfig({ projects: {} });
   writeFileSync(PROJECTS_CONFIG_FILE, yaml, 'utf-8');
 }
 
 describe('project release config parsing', () => {
   beforeEach(() => {
     mkdirSync(OVERDECK_HOME, { recursive: true });
-    saveProjectsConfigSync({ projects: {} });
+    saveProjectsConfig({ projects: {} });
   });
 
   afterEach(() => {

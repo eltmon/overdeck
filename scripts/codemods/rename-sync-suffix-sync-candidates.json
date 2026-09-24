@@ -1,0 +1,1782 @@
+[
+  {
+    "module": "activity-logger.ts",
+    "name": "emitActivityDetailedSync",
+    "count": 4
+  },
+  {
+    "module": "activity-logger.ts",
+    "name": "emitActivityEntrySync",
+    "count": 156
+  },
+  {
+    "module": "activity-logger.ts",
+    "name": "emitActivityTtsSync",
+    "count": 32
+  },
+  {
+    "module": "activity-logger.ts",
+    "name": "emitDashboardLifecycleSync",
+    "count": 5
+  },
+  {
+    "module": "agent-input-detection.ts",
+    "name": "detectAwaitingInputFromPaneSync",
+    "count": 5
+  },
+  {
+    "module": "agents/activity.ts",
+    "name": "getLatestSessionIdSync",
+    "count": 27
+  },
+  {
+    "module": "agents/activity.ts",
+    "name": "resolveClaudeSessionRecoverySync",
+    "count": 2
+  },
+  {
+    "module": "agents/activity.ts",
+    "name": "resolveLatestSessionIdSync",
+    "count": 10
+  },
+  {
+    "module": "agents/agent-state-read.ts",
+    "name": "getAgentStateSync",
+    "count": 276
+  },
+  {
+    "module": "agents/agent-state.ts",
+    "name": "clearAgentOperatorGatesForIssueSync",
+    "count": 3
+  },
+  {
+    "module": "agents/agent-state.ts",
+    "name": "clearAgentOperatorGatesForIssuesSync",
+    "count": 3
+  },
+  {
+    "module": "agents/agent-state.ts",
+    "name": "clearYieldForResumeSync",
+    "count": 6
+  },
+  {
+    "module": "agents/agent-state.ts",
+    "name": "recordAgentActivitySync",
+    "count": 3
+  },
+  {
+    "module": "agents/agent-state.ts",
+    "name": "setAgentYieldedSync",
+    "count": 2
+  },
+  {
+    "module": "agents/agent-state.ts",
+    "name": "writeAgentStateJsonSync",
+    "count": 4
+  },
+  {
+    "module": "agents/identity.ts",
+    "name": "resolveAgentTargetSync",
+    "count": 16
+  },
+  {
+    "module": "agents/monitor-transport.ts",
+    "name": "listInboxMessagesSync",
+    "count": 3
+  },
+  {
+    "module": "agents/runtime-command.ts",
+    "name": "parseRoleMcpServersSync",
+    "count": 4
+  },
+  {
+    "module": "agents/runtime-command.ts",
+    "name": "roleSystemPromptInjectionSync",
+    "count": 8
+  },
+  {
+    "module": "agents/tier-fitness-context.ts",
+    "name": "buildTierFitnessContextSync",
+    "count": 5
+  },
+  {
+    "module": "backup.ts",
+    "name": "backupFileSync",
+    "count": 3
+  },
+  {
+    "module": "backup.ts",
+    "name": "cleanOldBackupsSync",
+    "count": 3
+  },
+  {
+    "module": "backup.ts",
+    "name": "createBackupSync",
+    "count": 3
+  },
+  {
+    "module": "backup.ts",
+    "name": "listBackupsSync",
+    "count": 6
+  },
+  {
+    "module": "backup.ts",
+    "name": "restoreBackupSync",
+    "count": 3
+  },
+  {
+    "module": "bridge-token.ts",
+    "name": "readBridgeTokenSync",
+    "count": 7
+  },
+  {
+    "module": "bridge-token.ts",
+    "name": "writeBridgeTokenSync",
+    "count": 6
+  },
+  {
+    "module": "child-env.ts",
+    "name": "buildChildEnvSync",
+    "count": 9
+  },
+  {
+    "module": "child-env.ts",
+    "name": "buildChildEnvWithoutTmuxSync",
+    "count": 13
+  },
+  {
+    "module": "claude-mcp.ts",
+    "name": "ensureExcalidrawMcpSync",
+    "count": 3
+  },
+  {
+    "module": "claude-mcp.ts",
+    "name": "ensurePlaywrightIsolationSync",
+    "count": 4
+  },
+  {
+    "module": "claude-mcp.ts",
+    "name": "getIsolatedPlaywrightMcpConfigSync",
+    "count": 3
+  },
+  {
+    "module": "claude-permissions.ts",
+    "name": "buildClaudeUserSettingsSync",
+    "count": 6
+  },
+  {
+    "module": "claude-permissions.ts",
+    "name": "bypassPrefixForAgentFlagSync",
+    "count": 1
+  },
+  {
+    "module": "claude-permissions.ts",
+    "name": "ensureClaudePermissionFlagSync",
+    "count": 3
+  },
+  {
+    "module": "claude-permissions.ts",
+    "name": "getClaudePermissionFlagsStringSync",
+    "count": 17
+  },
+  {
+    "module": "claude-permissions.ts",
+    "name": "getClaudePermissionFlagsSync",
+    "count": 6
+  },
+  {
+    "module": "claude-permissions.ts",
+    "name": "resolvePermissionModeSync",
+    "count": 5
+  },
+  {
+    "module": "claude-settings-file.ts",
+    "name": "atomicWriteJsonSync",
+    "count": 6
+  },
+  {
+    "module": "claude-settings-file.ts",
+    "name": "backupSettingsSync",
+    "count": 6
+  },
+  {
+    "module": "claude-settings-file.ts",
+    "name": "findNewestBackupSync",
+    "count": 3
+  },
+  {
+    "module": "claude-settings-file.ts",
+    "name": "pruneBackupsSync",
+    "count": 6
+  },
+  {
+    "module": "cloister/cost-monitor.ts",
+    "name": "recordCostSync",
+    "count": 1
+  },
+  {
+    "module": "cloister/cost-monitor.ts",
+    "name": "resetCostTrackingSync",
+    "count": 1
+  },
+  {
+    "module": "cloister/handoff-logger.ts",
+    "name": "logHandoffEventSync",
+    "count": 3
+  },
+  {
+    "module": "cloister/merge-agent.ts",
+    "name": "autoCommitWorkspaceChangesBeforeSync",
+    "count": 2
+  },
+  {
+    "module": "cloister/specialist-logs.ts",
+    "name": "appendToRunLogSync",
+    "count": 1
+  },
+  {
+    "module": "cloister/specialist-logs.ts",
+    "name": "cleanupAllLogsSync",
+    "count": 5
+  },
+  {
+    "module": "cloister/specialist-logs.ts",
+    "name": "cleanupOldLogsSync",
+    "count": 8
+  },
+  {
+    "module": "cloister/specialist-logs.ts",
+    "name": "createRunLogSync",
+    "count": 1
+  },
+  {
+    "module": "cloister/specialist-logs.ts",
+    "name": "finalizeRunLogSync",
+    "count": 5
+  },
+  {
+    "module": "cloister/specialist-logs.ts",
+    "name": "getRunLogSync",
+    "count": 6
+  },
+  {
+    "module": "cloister/specialist-logs.ts",
+    "name": "listRunLogsSync",
+    "count": 7
+  },
+  {
+    "module": "cloister/test-skip-waiver.ts",
+    "name": "resolveActiveTestSkipWaiverSync",
+    "count": 3
+  },
+  {
+    "module": "config-migration.ts",
+    "name": "cleanupLegacyRuntimeSymlinksSync",
+    "count": 3
+  },
+  {
+    "module": "config-migration.ts",
+    "name": "convertToYamlConfigSync",
+    "count": 2
+  },
+  {
+    "module": "config-migration.ts",
+    "name": "hasLegacySettingsSync",
+    "count": 3
+  },
+  {
+    "module": "config-migration.ts",
+    "name": "migrateConfigSync",
+    "count": 5
+  },
+  {
+    "module": "config-migration.ts",
+    "name": "migrateSyncTargetsSync",
+    "count": 3
+  },
+  {
+    "module": "config-migration.ts",
+    "name": "needsMigrationSync",
+    "count": 7
+  },
+  {
+    "module": "config-yaml/load.ts",
+    "name": "getConversationSearchConfigSync",
+    "count": 18
+  },
+  {
+    "module": "config-yaml/load.ts",
+    "name": "isTldrEnabledSync",
+    "count": 7
+  },
+  {
+    "module": "config-yaml/load.ts",
+    "name": "loadConfigSync",
+    "count": 218
+  },
+  {
+    "module": "config.ts",
+    "name": "getDashboardApiUrlSync",
+    "count": 40
+  },
+  {
+    "module": "config.ts",
+    "name": "getDashboardLoopbackApiUrlSync",
+    "count": 5
+  },
+  {
+    "module": "config.ts",
+    "name": "getDefaultConfigSync",
+    "count": 5
+  },
+  {
+    "module": "config.ts",
+    "name": "getDevrootPathSync",
+    "count": 3
+  },
+  {
+    "module": "config.ts",
+    "name": "saveConfigSync",
+    "count": 12
+  },
+  {
+    "module": "context-layers/detach.ts",
+    "name": "detachManagedContextSync",
+    "count": 4
+  },
+  {
+    "module": "context.ts",
+    "name": "appendSummarySync",
+    "count": 3
+  },
+  {
+    "module": "context.ts",
+    "name": "estimateTokensSync",
+    "count": 3
+  },
+  {
+    "module": "context.ts",
+    "name": "getRecentHistorySync",
+    "count": 3
+  },
+  {
+    "module": "context.ts",
+    "name": "listMaterializedSync",
+    "count": 3
+  },
+  {
+    "module": "context.ts",
+    "name": "logHistorySync",
+    "count": 4
+  },
+  {
+    "module": "context.ts",
+    "name": "materializeOutputSync",
+    "count": 2
+  },
+  {
+    "module": "context.ts",
+    "name": "readMaterializedSync",
+    "count": 3
+  },
+  {
+    "module": "context.ts",
+    "name": "searchHistorySync",
+    "count": 3
+  },
+  {
+    "module": "conversations/correlator.ts",
+    "name": "buildCorrelationMapSync",
+    "count": 3
+  },
+  {
+    "module": "conversations/correlator.ts",
+    "name": "buildLocatorCorrelationMapSync",
+    "count": 3
+  },
+  {
+    "module": "cost-parsers/codex-parser.ts",
+    "name": "parseCodexSessionCostEventsSync",
+    "count": 3
+  },
+  {
+    "module": "cost-parsers/codex-parser.ts",
+    "name": "parseCodexSessionSync",
+    "count": 6
+  },
+  {
+    "module": "cost-parsers/jsonl-parser.ts",
+    "name": "getActiveSessionModelSync",
+    "count": 4
+  },
+  {
+    "module": "cost-parsers/jsonl-parser.ts",
+    "name": "getAllSessionFilesSync",
+    "count": 3
+  },
+  {
+    "module": "cost-parsers/jsonl-parser.ts",
+    "name": "getProjectDirsSync",
+    "count": 5
+  },
+  {
+    "module": "cost-parsers/jsonl-parser.ts",
+    "name": "getSessionFilesSync",
+    "count": 7
+  },
+  {
+    "module": "cost-parsers/jsonl-parser.ts",
+    "name": "parseClaudeSessionSync",
+    "count": 7
+  },
+  {
+    "module": "cost-parsers/kimi-parser.ts",
+    "name": "parseKimiSessionSync",
+    "count": 7
+  },
+  {
+    "module": "cost-parsers/muse-parser.ts",
+    "name": "parseMuseSessionSync",
+    "count": 4
+  },
+  {
+    "module": "cost-parsers/ohmypi-parser.ts",
+    "name": "parseOhmypiSessionCostResultSync",
+    "count": 3
+  },
+  {
+    "module": "cost.ts",
+    "name": "calculateCostSync",
+    "count": 20
+  },
+  {
+    "module": "cost.ts",
+    "name": "checkBudgetSync",
+    "count": 6
+  },
+  {
+    "module": "cost.ts",
+    "name": "createBudgetSync",
+    "count": 5
+  },
+  {
+    "module": "cost.ts",
+    "name": "deleteBudgetSync",
+    "count": 5
+  },
+  {
+    "module": "cost.ts",
+    "name": "formatCostSync",
+    "count": 26
+  },
+  {
+    "module": "cost.ts",
+    "name": "generateReportSync",
+    "count": 3
+  },
+  {
+    "module": "cost.ts",
+    "name": "getAllBudgetsSync",
+    "count": 5
+  },
+  {
+    "module": "cost.ts",
+    "name": "getDailySummarySync",
+    "count": 3
+  },
+  {
+    "module": "cost.ts",
+    "name": "getMonthlySummarySync",
+    "count": 3
+  },
+  {
+    "module": "cost.ts",
+    "name": "getPricingSync",
+    "count": 33
+  },
+  {
+    "module": "cost.ts",
+    "name": "getWeeklySummarySync",
+    "count": 3
+  },
+  {
+    "module": "cost.ts",
+    "name": "readIssueCostsSync",
+    "count": 3
+  },
+  {
+    "module": "cost.ts",
+    "name": "readTodayCostsSync",
+    "count": 3
+  },
+  {
+    "module": "cost.ts",
+    "name": "summarizeCostsSync",
+    "count": 7
+  },
+  {
+    "module": "costs/aggregator.ts",
+    "name": "getCostsByIssueSync",
+    "count": 5
+  },
+  {
+    "module": "costs/aggregator.ts",
+    "name": "getCostsForIssueSync",
+    "count": 7
+  },
+  {
+    "module": "costs/aggregator.ts",
+    "name": "loadCacheSync",
+    "count": 6
+  },
+  {
+    "module": "costs/aggregator.ts",
+    "name": "rebuildCacheSync",
+    "count": 8
+  },
+  {
+    "module": "costs/aggregator.ts",
+    "name": "saveCacheSync",
+    "count": 5
+  },
+  {
+    "module": "costs/aggregator.ts",
+    "name": "setIssueBudgetSync",
+    "count": 2
+  },
+  {
+    "module": "costs/aggregator.ts",
+    "name": "syncCacheSync",
+    "count": 6
+  },
+  {
+    "module": "costs/aggregator.ts",
+    "name": "updateCacheFromEventsSync",
+    "count": 3
+  },
+  {
+    "module": "costs/attribution.ts",
+    "name": "reclassifyUnknownCostEventsSync",
+    "count": 3
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "appendCostEventSync",
+    "count": 8
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "deduplicateEventsSync",
+    "count": 4
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "forEachCostEventSync",
+    "count": 3
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "getEventsFileSizeSync",
+    "count": 4
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "getLastEventMetadataSync",
+    "count": 5
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "readEventsFromByteOffsetSync",
+    "count": 3
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "readEventsFromLineSync",
+    "count": 2
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "readEventsSync",
+    "count": 11
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "replaceEventsFileSync",
+    "count": 6
+  },
+  {
+    "module": "costs/events.ts",
+    "name": "tailEventsSync",
+    "count": 4
+  },
+  {
+    "module": "costs/migration.ts",
+    "name": "migrateAllSessionsSync",
+    "count": 5
+  },
+  {
+    "module": "costs/migration.ts",
+    "name": "migrateIfNeededSync",
+    "count": 2
+  },
+  {
+    "module": "costs/migration.ts",
+    "name": "needsMigrationSync",
+    "count": 7
+  },
+  {
+    "module": "costs/retention.ts",
+    "name": "getRetentionStatusSync",
+    "count": 2
+  },
+  {
+    "module": "costs/retention.ts",
+    "name": "needsPruningSync",
+    "count": 2
+  },
+  {
+    "module": "costs/retention.ts",
+    "name": "pruneOldEventsSync",
+    "count": 2
+  },
+  {
+    "module": "costs/wal.ts",
+    "name": "appendToWalSync",
+    "count": 4
+  },
+  {
+    "module": "cv.ts",
+    "name": "completeWorkSync",
+    "count": 3
+  },
+  {
+    "module": "cv.ts",
+    "name": "formatCVSync",
+    "count": 3
+  },
+  {
+    "module": "cv.ts",
+    "name": "getAgentCVSync",
+    "count": 6
+  },
+  {
+    "module": "cv.ts",
+    "name": "getAgentRankingsSync",
+    "count": 3
+  },
+  {
+    "module": "cv.ts",
+    "name": "readAgentCVSync",
+    "count": 4
+  },
+  {
+    "module": "cv.ts",
+    "name": "startWorkSync",
+    "count": 5
+  },
+  {
+    "module": "deploy/active-dashboard-bundle.ts",
+    "name": "readActiveDashboardBundleSync",
+    "count": 10
+  },
+  {
+    "module": "env-loader.ts",
+    "name": "loadOverdeckEnvSync",
+    "count": 3
+  },
+  {
+    "module": "harness-policy.ts",
+    "name": "canUseHarnessSync",
+    "count": 29
+  },
+  {
+    "module": "harness-policy.ts",
+    "name": "canUseModelWithAuthSync",
+    "count": 4
+  },
+  {
+    "module": "harness-skill-sync.ts",
+    "name": "executeAgentSkillsSync",
+    "count": 3
+  },
+  {
+    "module": "harness-skill-sync.ts",
+    "name": "planAgentSkillsSync",
+    "count": 3
+  },
+  {
+    "module": "hooks.ts",
+    "name": "checkHookSync",
+    "count": 8
+  },
+  {
+    "module": "hooks.ts",
+    "name": "clearHookSync",
+    "count": 5
+  },
+  {
+    "module": "hooks.ts",
+    "name": "generateFixedPointPromptSync",
+    "count": 7
+  },
+  {
+    "module": "hooks.ts",
+    "name": "initHookSync",
+    "count": 6
+  },
+  {
+    "module": "hooks.ts",
+    "name": "popFromHookSync",
+    "count": 3
+  },
+  {
+    "module": "hooks.ts",
+    "name": "pushToHookSync",
+    "count": 3
+  },
+  {
+    "module": "hooks.ts",
+    "name": "sendMailSync",
+    "count": 3
+  },
+  {
+    "module": "internal-token.ts",
+    "name": "ensureInternalTokenSync",
+    "count": 21
+  },
+  {
+    "module": "internal-token.ts",
+    "name": "getInternalTokenSync",
+    "count": 27
+  },
+  {
+    "module": "issue-id.ts",
+    "name": "extractNumberSync",
+    "count": 21
+  },
+  {
+    "module": "issue-id.ts",
+    "name": "extractPrefixSync",
+    "count": 77
+  },
+  {
+    "module": "issue-id.ts",
+    "name": "normalizeIssueIdSync",
+    "count": 3
+  },
+  {
+    "module": "issue-id.ts",
+    "name": "parseIssueIdSync",
+    "count": 108
+  },
+  {
+    "module": "issue-id.ts",
+    "name": "resolveBareNumericIdSync",
+    "count": 15
+  },
+  {
+    "module": "issue-id.ts",
+    "name": "resolveIssueIdSync",
+    "count": 27
+  },
+  {
+    "module": "kimi-claude-routing.ts",
+    "name": "getClaudeCodeLaunchModelSync",
+    "count": 6
+  },
+  {
+    "module": "launcher-generator.ts",
+    "name": "generateLauncherScriptSync",
+    "count": 29
+  },
+  {
+    "module": "manifest.ts",
+    "name": "collectSourceFilesSync",
+    "count": 18
+  },
+  {
+    "module": "manifest.ts",
+    "name": "hashFileSync",
+    "count": 23
+  },
+  {
+    "module": "manifest.ts",
+    "name": "pruneStaleManifestEntriesSync",
+    "count": 8
+  },
+  {
+    "module": "manifest.ts",
+    "name": "readManifestSync",
+    "count": 12
+  },
+  {
+    "module": "manifest.ts",
+    "name": "writeManifestSync",
+    "count": 10
+  },
+  {
+    "module": "memory/fts-operations.ts",
+    "name": "getMemoryFtsDatabaseSync",
+    "count": 7
+  },
+  {
+    "module": "memory/fts-operations.ts",
+    "name": "runMemoryFtsStatementSync",
+    "count": 5
+  },
+  {
+    "module": "memory/fts-operations.ts",
+    "name": "runMemoryFtsTransactionSync",
+    "count": 5
+  },
+  {
+    "module": "merge-set.ts",
+    "name": "buildMergeSetForIssueSync",
+    "count": 4
+  },
+  {
+    "module": "merge-set.ts",
+    "name": "ensureMergeSetForIssueSync",
+    "count": 11
+  },
+  {
+    "module": "merge-set.ts",
+    "name": "getMergeSetSync",
+    "count": 17
+  },
+  {
+    "module": "merge-set.ts",
+    "name": "upsertMergeSetSync",
+    "count": 27
+  },
+  {
+    "module": "merge-set.ts",
+    "name": "withRepoArtifactUrlSync",
+    "count": 7
+  },
+  {
+    "module": "merge-set.ts",
+    "name": "withRepoStateSync",
+    "count": 24
+  },
+  {
+    "module": "model-capabilities.ts",
+    "name": "getModelCapabilitySync",
+    "count": 10
+  },
+  {
+    "module": "model-capabilities.ts",
+    "name": "getModelEffortLevelsSync",
+    "count": 8
+  },
+  {
+    "module": "model-capabilities.ts",
+    "name": "hasModelCapabilitySync",
+    "count": 6
+  },
+  {
+    "module": "model-capabilities.ts",
+    "name": "modelSupportsImagesSync",
+    "count": 4
+  },
+  {
+    "module": "model-capabilities.ts",
+    "name": "resolveModelIdSync",
+    "count": 28
+  },
+  {
+    "module": "model-context-windows.ts",
+    "name": "apiLaunchModelIdSync",
+    "count": 5
+  },
+  {
+    "module": "model-context-windows.ts",
+    "name": "isGpt56LongContextVariantSync",
+    "count": 2
+  },
+  {
+    "module": "model-fallback.ts",
+    "name": "applyFallbackSync",
+    "count": 4
+  },
+  {
+    "module": "model-fallback.ts",
+    "name": "getAvailableModelsSync",
+    "count": 2
+  },
+  {
+    "module": "model-fallback.ts",
+    "name": "getFallbackModelSync",
+    "count": 2
+  },
+  {
+    "module": "model-fallback.ts",
+    "name": "getModelProviderSync",
+    "count": 3
+  },
+  {
+    "module": "model-fallback.ts",
+    "name": "getModelsByProviderSync",
+    "count": 2
+  },
+  {
+    "module": "model-fallback.ts",
+    "name": "isOpenRouterModelSync",
+    "count": 2
+  },
+  {
+    "module": "model-validation.ts",
+    "name": "normalizeModelOverrideSync",
+    "count": 17
+  },
+  {
+    "module": "model-validation.ts",
+    "name": "requireModelOverrideSync",
+    "count": 25
+  },
+  {
+    "module": "model-validation.ts",
+    "name": "shellQuoteModelIdSync",
+    "count": 17
+  },
+  {
+    "module": "multi-tool-sync.ts",
+    "name": "resolveAlsoSyncToolsSync",
+    "count": 4
+  },
+  {
+    "module": "multi-tool-sync.ts",
+    "name": "runMultiToolSyncSync",
+    "count": 3
+  },
+  {
+    "module": "multi-tool-sync.ts",
+    "name": "syncSkillsToToolsSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/agents.ts",
+    "name": "getIssueStageSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/agents.ts",
+    "name": "listAgentIdsByPrefixSync",
+    "count": 6
+  },
+  {
+    "module": "overdeck/control-settings.ts",
+    "name": "getFlywheelActiveRunIdSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/control-settings.ts",
+    "name": "isCloisterSpawnsPausedSync",
+    "count": 6
+  },
+  {
+    "module": "overdeck/control-settings.ts",
+    "name": "setCloisterSpawnsPausedSync",
+    "count": 8
+  },
+  {
+    "module": "overdeck/conversation-cost-session.ts",
+    "name": "findConversationForCostSessionSync",
+    "count": 6
+  },
+  {
+    "module": "overdeck/cost-agent-stats.ts",
+    "name": "getAgentCostStatsSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getAgentDailyCostSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getBackgroundCostBySourceSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getCavemanExperimentDataSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getCostForIssueAggregateSync",
+    "count": 7
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getCostForIssueSync",
+    "count": 2
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getCostsByIssueSync",
+    "count": 5
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getDailyTrendsSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getModelRollupSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "getTodayCostSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "insertCostEventSync",
+    "count": 5
+  },
+  {
+    "module": "overdeck/cost-sync.ts",
+    "name": "queryMemoryExtractionCostUsdSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/event-reads.ts",
+    "name": "readLatestAgentClaudeSessionIdEventSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/git-activity.ts",
+    "name": "appendGitOperationSync",
+    "count": 10
+  },
+  {
+    "module": "overdeck/git-activity.ts",
+    "name": "listGitOperationsSync",
+    "count": 7
+  },
+  {
+    "module": "overdeck/infra.ts",
+    "name": "closeOverdeckDatabaseSync",
+    "count": 1
+  },
+  {
+    "module": "overdeck/infra.ts",
+    "name": "dropDeadIssuesForeignKeysSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/infra.ts",
+    "name": "dropPipelineStateMirrorTablesSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/infra.ts",
+    "name": "getOverdeckDatabaseSync",
+    "count": 136
+  },
+  {
+    "module": "overdeck/infra.ts",
+    "name": "readPipelineMirrorMarkerSync",
+    "count": 2
+  },
+  {
+    "module": "overdeck/issue-reads.ts",
+    "name": "resolveIssueProjectPathSync",
+    "count": 16
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "getUatGenerationSync",
+    "count": 13
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "hasUncleanedTerminalUatGenerationSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "insertUatGenerationSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "listUatGenerationNamesSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "listUatGenerationsSync",
+    "count": 10
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "listUatGenerationsWithStacksSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "markUatGenerationRepoPromotedSync",
+    "count": 3
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "setUatGenerationStackStartedAtSync",
+    "count": 4
+  },
+  {
+    "module": "overdeck/merge-sync-uat.ts",
+    "name": "updateUatGenerationSync",
+    "count": 4
+  },
+  {
+    "module": "pan-dir/drafts.ts",
+    "name": "checkPrdGateSync",
+    "count": 7
+  },
+  {
+    "module": "persistent-logger.ts",
+    "name": "logAgentLifecycleSync",
+    "count": 69
+  },
+  {
+    "module": "persistent-logger.ts",
+    "name": "logDeaconEventSync",
+    "count": 16
+  },
+  {
+    "module": "pipeline-notifier.ts",
+    "name": "notifyPipelineSync",
+    "count": 23
+  },
+  {
+    "module": "pipeline-notifier.ts",
+    "name": "setPipelineHandlerSync",
+    "count": 3
+  },
+  {
+    "module": "platform-lifecycle.ts",
+    "name": "readPlatformConfigSync",
+    "count": 13
+  },
+  {
+    "module": "prd-draft.ts",
+    "name": "getPRDDraftPathSync",
+    "count": 3
+  },
+  {
+    "module": "prd-locations.ts",
+    "name": "canonicalPrdSubdirSync",
+    "count": 4
+  },
+  {
+    "module": "prd-locations.ts",
+    "name": "findPrdAnywhereSync",
+    "count": 8
+  },
+  {
+    "module": "prd-locations.ts",
+    "name": "findPrdAtStatusSync",
+    "count": 6
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "computeWorkspaceRepoRootsSync",
+    "count": 7
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "forgeFromRemoteUrlSync",
+    "count": 3
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "inferProjectForgeSync",
+    "count": 10
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "normalizeForgeSync",
+    "count": 3
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "resolveConfiguredReposSync",
+    "count": 6
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "resolvePrimaryWorkspaceRepoDirSync",
+    "count": 7
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "resolveProjectReposForIssueSync",
+    "count": 19
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "resolveProjectReposFromResolvedIssueSync",
+    "count": 6
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "resolveSlotWorkspaceWorktreesSync",
+    "count": 5
+  },
+  {
+    "module": "project-repos.ts",
+    "name": "resolveWorkspaceRepoRootsSync",
+    "count": 34
+  },
+  {
+    "module": "projects-writer.ts",
+    "name": "setProjectVersionSync",
+    "count": 4
+  },
+  {
+    "module": "projects.ts",
+    "name": "findProjectByPathSync",
+    "count": 62
+  },
+  {
+    "module": "projects.ts",
+    "name": "findProjectByTeamSync",
+    "count": 51
+  },
+  {
+    "module": "projects.ts",
+    "name": "hasProjectsSync",
+    "count": 4
+  },
+  {
+    "module": "projects.ts",
+    "name": "initializeProjectsConfigSync",
+    "count": 3
+  },
+  {
+    "module": "projects.ts",
+    "name": "registerProjectSync",
+    "count": 14
+  },
+  {
+    "module": "projects.ts",
+    "name": "saveProjectsConfigSync",
+    "count": 1
+  },
+  {
+    "module": "projects.ts",
+    "name": "unregisterProjectSync",
+    "count": 4
+  },
+  {
+    "module": "projects/project-key.ts",
+    "name": "findProjectKeyByPathSync",
+    "count": 3
+  },
+  {
+    "module": "provider-health.ts",
+    "name": "invalidateProbeCacheSync",
+    "count": 1
+  },
+  {
+    "module": "providers.ts",
+    "name": "clearCredentialFileAuthSync",
+    "count": 9
+  },
+  {
+    "module": "providers.ts",
+    "name": "getProviderEnvSync",
+    "count": 13
+  },
+  {
+    "module": "providers.ts",
+    "name": "getProviderForModelSync",
+    "count": 53
+  },
+  {
+    "module": "providers.ts",
+    "name": "setupCredentialFileAuthSync",
+    "count": 9
+  },
+  {
+    "module": "release-set.ts",
+    "name": "getReleaseSetSync",
+    "count": 5
+  },
+  {
+    "module": "release-set.ts",
+    "name": "upsertReleaseSetSync",
+    "count": 6
+  },
+  {
+    "module": "release-set.ts",
+    "name": "withComponentStateSync",
+    "count": 4
+  },
+  {
+    "module": "remote/fly-api.ts",
+    "name": "createFlyApiClientSync",
+    "count": 3
+  },
+  {
+    "module": "remote/workspace-metadata.ts",
+    "name": "deleteWorkspaceMetadataSync",
+    "count": 7
+  },
+  {
+    "module": "remote/workspace-metadata.ts",
+    "name": "findRemoteWorkspaceMetadataSync",
+    "count": 7
+  },
+  {
+    "module": "remote/workspace-metadata.ts",
+    "name": "listWorkspaceMetadataSync",
+    "count": 4
+  },
+  {
+    "module": "remote/workspace-metadata.ts",
+    "name": "loadWorkspaceMetadataSync",
+    "count": 23
+  },
+  {
+    "module": "remote/workspace-metadata.ts",
+    "name": "saveWorkspaceMetadataSync",
+    "count": 7
+  },
+  {
+    "module": "resource-utils.ts",
+    "name": "parseIssueIdFromTextSync",
+    "count": 10
+  },
+  {
+    "module": "runtimes/acp.ts",
+    "name": "createAcpRuntimeSync",
+    "count": 5
+  },
+  {
+    "module": "runtimes/claude-code.ts",
+    "name": "createClaudeCodeRuntimeSync",
+    "count": 4
+  },
+  {
+    "module": "runtimes/codex.ts",
+    "name": "createCodexRuntimeSync",
+    "count": 4
+  },
+  {
+    "module": "runtimes/kimi-code.ts",
+    "name": "createKimiCodeRuntimeSync",
+    "count": 4
+  },
+  {
+    "module": "runtimes/muse.ts",
+    "name": "createMuseRuntimeSync",
+    "count": 4
+  },
+  {
+    "module": "runtimes/pi-fifo.ts",
+    "name": "destroyPiFifoSync",
+    "count": 1
+  },
+  {
+    "module": "runtimes/pi-fifo.ts",
+    "name": "writePiCommandSync",
+    "count": 4
+  },
+  {
+    "module": "session-history.ts",
+    "name": "readLatestIndexedSessionIdSync",
+    "count": 11
+  },
+  {
+    "module": "session-history.ts",
+    "name": "readSessionIndexSync",
+    "count": 2
+  },
+  {
+    "module": "session-history.ts",
+    "name": "readSessionIndexWithLegacySync",
+    "count": 4
+  },
+  {
+    "module": "settings.ts",
+    "name": "getAgentCommandSync",
+    "count": 6
+  },
+  {
+    "module": "settings.ts",
+    "name": "getAvailableModelsSync",
+    "count": 2
+  },
+  {
+    "module": "settings.ts",
+    "name": "getClaudeModelFlagSync",
+    "count": 2
+  },
+  {
+    "module": "settings.ts",
+    "name": "getDefaultSettingsSync",
+    "count": 3
+  },
+  {
+    "module": "settings.ts",
+    "name": "loadSettingsSync",
+    "count": 3
+  },
+  {
+    "module": "shadow-state.ts",
+    "name": "needsSync",
+    "count": 3
+  },
+  {
+    "module": "shell.ts",
+    "name": "addAliasSync",
+    "count": 3
+  },
+  {
+    "module": "shell.ts",
+    "name": "detectShellSync",
+    "count": 3
+  },
+  {
+    "module": "shell.ts",
+    "name": "getAliasInstructionsSync",
+    "count": 3
+  },
+  {
+    "module": "shell.ts",
+    "name": "getShellRcFileSync",
+    "count": 4
+  },
+  {
+    "module": "skills-merge.ts",
+    "name": "applyProjectTemplateOverlaySync",
+    "count": 3
+  },
+  {
+    "module": "skills-merge.ts",
+    "name": "mergePanSkillsIntoWorkspaceSync",
+    "count": 3
+  },
+  {
+    "module": "skills-merge.ts",
+    "name": "mergeSkillsIntoWorkspaceSync",
+    "count": 9
+  },
+  {
+    "module": "smart-model-selector.ts",
+    "name": "selectAllModelsSync",
+    "count": 6
+  },
+  {
+    "module": "smart-model-selector.ts",
+    "name": "selectModelSync",
+    "count": 4
+  },
+  {
+    "module": "smee.ts",
+    "name": "isSmeeConfiguredSync",
+    "count": 5
+  },
+  {
+    "module": "smee.ts",
+    "name": "isSmeeProcessRunningSync",
+    "count": 8
+  },
+  {
+    "module": "smee.ts",
+    "name": "startSmeeProcessSync",
+    "count": 8
+  },
+  {
+    "module": "smee.ts",
+    "name": "stopSmeeProcessSync",
+    "count": 6
+  },
+  {
+    "module": "supervisor.ts",
+    "name": "getSupervisorPortSync",
+    "count": 9
+  },
+  {
+    "module": "supervisor.ts",
+    "name": "getSupervisorUrlSync",
+    "count": 3
+  },
+  {
+    "module": "supervisor.ts",
+    "name": "isSupervisorRunningSync",
+    "count": 4
+  },
+  {
+    "module": "supervisor.ts",
+    "name": "startSupervisorProcessSync",
+    "count": 10
+  },
+  {
+    "module": "supervisor.ts",
+    "name": "stopSupervisorProcessSync",
+    "count": 9
+  },
+  {
+    "module": "sync-hooks.ts",
+    "name": "planHooksSyncSync",
+    "count": 8
+  },
+  {
+    "module": "sync-hooks.ts",
+    "name": "syncHooksSync",
+    "count": 6
+  },
+  {
+    "module": "sync-startup-gate.ts",
+    "name": "isStartupSyncNeededSync",
+    "count": 6
+  },
+  {
+    "module": "sync-startup-gate.ts",
+    "name": "writeSyncManifestSync",
+    "count": 4
+  },
+  {
+    "module": "sync.ts",
+    "name": "executeSyncSync",
+    "count": 4
+  },
+  {
+    "module": "sync.ts",
+    "name": "migrateStalePersonalContentSync",
+    "count": 3
+  },
+  {
+    "module": "sync.ts",
+    "name": "mirrorProjectSkillsSync",
+    "count": 4
+  },
+  {
+    "module": "sync.ts",
+    "name": "planSyncSync",
+    "count": 4
+  },
+  {
+    "module": "sync.ts",
+    "name": "refreshCacheSync",
+    "count": 5
+  },
+  {
+    "module": "sync.ts",
+    "name": "removeLegacySkills070Sync",
+    "count": 3
+  },
+  {
+    "module": "sync.ts",
+    "name": "syncContextLayersSync",
+    "count": 5
+  },
+  {
+    "module": "sync.ts",
+    "name": "syncPiSettingsSync",
+    "count": 3
+  },
+  {
+    "module": "sync.ts",
+    "name": "syncStatuslineSync",
+    "count": 5
+  },
+  {
+    "module": "tldr-daemon.ts",
+    "name": "captureTldrMetricsSync",
+    "count": 1
+  },
+  {
+    "module": "tldr-daemon.ts",
+    "name": "getTldrDaemonServiceSync",
+    "count": 47
+  },
+  {
+    "module": "tldr-daemon.ts",
+    "name": "getTldrMetricsSync",
+    "count": 4
+  },
+  {
+    "module": "tldr-daemon.ts",
+    "name": "listTldrDaemonServicesSync",
+    "count": 2
+  },
+  {
+    "module": "tmux.ts",
+    "name": "findManagedServerPidSync",
+    "count": 6
+  },
+  {
+    "module": "tmux.ts",
+    "name": "querySessionSync",
+    "count": 3
+  },
+  {
+    "module": "tmux.ts",
+    "name": "sanitizeManagedServerGlobalEnvSync",
+    "count": 2
+  },
+  {
+    "module": "tracker-utils.ts",
+    "name": "isGitHubIssueSync",
+    "count": 4
+  },
+  {
+    "module": "tracker-utils.ts",
+    "name": "parseGitHubReposSync",
+    "count": 2
+  },
+  {
+    "module": "tracker-utils.ts",
+    "name": "resolveGitHubIssueSync",
+    "count": 70
+  },
+  {
+    "module": "tracker-utils.ts",
+    "name": "resolveTrackerTypeSync",
+    "count": 18
+  },
+  {
+    "module": "traefik.ts",
+    "name": "cleanupStaleTlsSectionsSync",
+    "count": 5
+  },
+  {
+    "module": "traefik.ts",
+    "name": "cleanupTemplateFilesSync",
+    "count": 3
+  },
+  {
+    "module": "traefik.ts",
+    "name": "ensureProjectCertsSync",
+    "count": 7
+  },
+  {
+    "module": "traefik.ts",
+    "name": "generateOverdeckTraefikConfigSync",
+    "count": 8
+  },
+  {
+    "module": "traefik.ts",
+    "name": "generateTlsConfigSync",
+    "count": 8
+  },
+  {
+    "module": "tts-speak.ts",
+    "name": "buildTtsSpeakPayloadSync",
+    "count": 2
+  },
+  {
+    "module": "webhook-handlers.ts",
+    "name": "isTrackedRepositorySync",
+    "count": 11
+  },
+  {
+    "module": "work-agent-lifecycle.ts",
+    "name": "assertCanResumeSessionSync",
+    "count": 3
+  },
+  {
+    "module": "work-agent-lifecycle.ts",
+    "name": "assertCanStartFreshSync",
+    "count": 8
+  },
+  {
+    "module": "workspace-config.ts",
+    "name": "getDefaultWorkspaceConfigSync",
+    "count": 7
+  },
+  {
+    "module": "workspace-config.ts",
+    "name": "replacePlaceholdersSync",
+    "count": 24
+  },
+  {
+    "module": "workspace-manager/create.ts",
+    "name": "ensurePolyrepoWorkspaceGitignoreSync",
+    "count": 2
+  },
+  {
+    "module": "workspace-manager/migration.ts",
+    "name": "copyOverdeckSettingsToWorkspaceSync",
+    "count": 9
+  },
+  {
+    "module": "workspace-manager/migration.ts",
+    "name": "ensurePanGitignoreSync",
+    "count": 4
+  },
+  {
+    "module": "workspace-manager/migration.ts",
+    "name": "migrateOverdeckToPanSync",
+    "count": 4
+  },
+  {
+    "module": "workspace-manager/worktree-ops.ts",
+    "name": "preTrustDirectorySync",
+    "count": 8
+  },
+  {
+    "module": "workspace-manager/worktree-ops.ts",
+    "name": "restorePreWorktreeMetadataSync",
+    "count": 4
+  },
+  {
+    "module": "workspace-manager/worktree-ops.ts",
+    "name": "stagePreWorktreeMetadataSync",
+    "count": 3
+  },
+  {
+    "module": "workspace/devcontainer-renderer.ts",
+    "name": "createWorkspacePlaceholdersSync",
+    "count": 4
+  },
+  {
+    "module": "workspace/devcontainer-renderer.ts",
+    "name": "processTemplatesSync",
+    "count": 6
+  },
+  {
+    "module": "workspace/devcontainer-renderer.ts",
+    "name": "renderDevcontainerSync",
+    "count": 10
+  },
+  {
+    "module": "workspace/devcontainer-renderer.ts",
+    "name": "sanitizeComposeFileSync",
+    "count": 4
+  },
+  {
+    "module": "workspace/ensure-devcontainer.ts",
+    "name": "ensureDevcontainerSync",
+    "count": 11
+  },
+  {
+    "module": "xbrief/acceptance-criteria.ts",
+    "name": "getXBriefACStatusSync",
+    "count": 4
+  },
+  {
+    "module": "xbrief/io.ts",
+    "name": "findSpecByIssueSync",
+    "count": 9
+  },
+  {
+    "module": "xbrief/lifecycle-io.ts",
+    "name": "findXBriefByIssueSync",
+    "count": 7
+  },
+  {
+    "module": "xbrief/lifecycle.ts",
+    "name": "ensureXBriefDirsSync",
+    "count": 3
+  }
+]

@@ -43,6 +43,7 @@ describe('test role dispatch', () => {
     expect(prompt).toContain('pan admin specialists done test PAN-503');
     expect(prompt).toContain('--status passed');
     expect(prompt).toContain('--uat-status failed');
+    expect(prompt).toContain('--tested-sha <TESTED_SHA>');
     expect(prompt).toContain('A required UAT that cannot run or leaves any criterion unproven is uatStatus "failed"');
     expect(prompt).toContain('Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists');
   });

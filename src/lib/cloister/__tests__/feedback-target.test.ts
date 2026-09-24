@@ -36,7 +36,7 @@ vi.mock('../../projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'test', projectPath: '/repo' })),
   getProjectSync: vi.fn(() => null),
   // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByPath: vi.fn(() => null),
   resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
 }));
 
@@ -44,11 +44,31 @@ const agentState = vi.hoisted(() => ({
   states: new Map<string, Record<string, unknown>>(),
   clearPaused: vi.fn(),
   clearTroubled: vi.fn(),
+  /** Runs after each state read: lets a test change the pause under the ladder. */
+  afterRead: undefined as undefined | ((id: string) => void),
+}));
+const swarm = vi.hoisted(() => ({
+  slots: [] as Array<{ itemId: string; slotIndex: number; agentId?: string }>,
+}));
+vi.mock('../deacon-swarm-record.js', () => ({
+  readSwarmSlotAssignments: () => swarm.slots,
 }));
 vi.mock('../../agents/agent-state.js', () => ({
-  getAgentStateSync: (id: string) => agentState.states.get(id) ?? null,
-  clearAgentPausedSync: agentState.clearPaused,
-  clearAgentTroubledSync: agentState.clearTroubled,
+  getAgentState: (id: string) => {
+    const state = agentState.states.get(id) ?? null;
+    agentState.afterRead?.(id);
+    return state;
+  },
+  // Compare-and-clear, like the real one: the predicate sees the state read inside the clear.
+  clearAgentPausedSync: (id: string, onlyIf?: (state: Record<string, unknown>) => boolean) => {
+    const state = agentState.states.get(id);
+    if (!state) return false;
+    if (onlyIf && !onlyIf(state)) return false;
+    agentState.clearPaused(id);
+    agentState.states.set(id, { ...state, paused: false, pausedReason: undefined });
+    return true;
+  },
+  clearAgentTroubled: (id: string) => Effect.sync(() => { agentState.clearTroubled(id); return null; }),
 }));
 
 const resume = vi.hoisted(() => ({
@@ -63,9 +83,9 @@ vi.mock('../work-agent-start.js', () => ({
 
 // PAN-3917: surfaceIssueFeedbackNeedsYou announces on the activity stream —
 // there is no stuck flag and no verdict to restore.
-const activity = vi.hoisted(() => ({ emitActivityEntrySync: vi.fn() }));
+const activity = vi.hoisted(() => ({ emitActivityEntry: vi.fn() }));
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: activity.emitActivityEntrySync,
+  emitActivityEntry: activity.emitActivityEntry,
 }));
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -85,6 +105,8 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
     tmux.liveSessions.clear();
     filesystem.existingPaths.clear();
     agentState.states.clear();
+    agentState.afterRead = undefined;
+    swarm.slots = [];
     // Default: a successful resume brings the session up.
     resume.resumeAgent.mockImplementation(async (id: string) => {
       tmux.liveSessions.add(id);
@@ -149,6 +171,95 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
     expect(target).toMatchObject({ needsYou: true });
   });
 
+  it('keeps a pipeline pause the caller names, read at resurrection time (CodeRabbit on #4039)', async () => {
+    // The verification door read "not stuck" before a concurrent escalation
+    // paused the agent; the pause it finds when resurrecting is the stuck one.
+    agentState.states.set(AGENT, {
+      id: AGENT, status: 'stopped', paused: true,
+      pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
+    });
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999', {
+      keepPause: (reason) => reason.startsWith('needs-you: verification stuck'),
+    });
+
+    expect(agentState.clearPaused).not.toHaveBeenCalled();
+    expect(resume.resumeAgent).not.toHaveBeenCalled();
+    expect(spawn.workAgent).not.toHaveBeenCalled();
+    expect(target).toMatchObject({ needsYou: true });
+  });
+
+  it('revives no swarm slot once keepPause holds the whole-issue agent', async () => {
+    agentState.states.set(AGENT, {
+      id: AGENT, status: 'stopped', paused: true,
+      pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
+    });
+    const SLOT = 'agent-pan-9999-slot-1';
+    swarm.slots = [{ itemId: 'item-1', slotIndex: 1, agentId: SLOT }];
+    agentState.states.set(SLOT, { id: SLOT, status: 'stopped' });
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999', {
+      keepPause: (reason) => reason.startsWith('needs-you: verification stuck'),
+    });
+
+    expect(resume.resumeAgent).not.toHaveBeenCalled();
+    expect(target).toMatchObject({ needsYou: true });
+  });
+
+  it('control: a slot is still revived when the whole-issue agent cannot be', async () => {
+    const SLOT = 'agent-pan-9999-slot-1';
+    swarm.slots = [{ itemId: 'item-1', slotIndex: 1, agentId: SLOT }];
+    agentState.states.set(SLOT, { id: SLOT, status: 'stopped' });
+    resume.resumeAgent.mockImplementation(async (id: string) => {
+      if (id !== SLOT) return { success: false, error: 'no session' };
+      tmux.liveSessions.add(id);
+      return { success: true };
+    });
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999', {
+      keepPause: (reason) => reason.startsWith('needs-you: verification stuck'),
+    });
+
+    expect(target).toEqual({ agentId: SLOT });
+  });
+
+  it('compare-and-clear: a pause that turns into a kept one before the clear is not lifted', async () => {
+    // Another process escalates between the ladder's read and its clear.
+    agentState.states.set(AGENT, {
+      id: AGENT, status: 'stopped', paused: true, pausedReason: 'needs-you: verification failed 3x',
+    });
+    agentState.afterRead = (id) => {
+      if (id !== AGENT) return;
+      agentState.afterRead = undefined;
+      agentState.states.set(AGENT, {
+        id: AGENT, status: 'stopped', paused: true,
+        pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
+      });
+    };
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999', {
+      keepPause: (reason) => reason.startsWith('needs-you: verification stuck'),
+    });
+
+    expect(agentState.clearPaused).not.toHaveBeenCalled();
+    expect(resume.resumeAgent).not.toHaveBeenCalled();
+    expect(agentState.states.get(AGENT)).toMatchObject({ paused: true });
+    expect(target).toMatchObject({ needsYou: true });
+  });
+
+  it('still lifts a pipeline pause that keepPause does not name', async () => {
+    agentState.states.set(AGENT, {
+      id: AGENT, status: 'stopped', paused: true, pausedReason: 'needs-you: verification failed 3x',
+    });
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999', {
+      keepPause: (reason) => reason.startsWith('needs-you: verification stuck'),
+    });
+
+    expect(agentState.clearPaused).toHaveBeenCalledWith(AGENT);
+    expect(target).toEqual({ agentId: AGENT });
+  });
+
   it('clears a troubled gate for one resurrection attempt', async () => {
     agentState.states.set(AGENT, { id: AGENT, status: 'stopped', troubled: true, consecutiveFailures: 3 });
 
@@ -208,8 +319,8 @@ describe('surfaceIssueFeedbackNeedsYou (PAN-3917: an announcement, not a flag)',
   it('announces the reason and the issue on the activity stream', async () => {
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', { agentId: 'agent-pan-9999' });
 
-    expect(activity.emitActivityEntrySync).toHaveBeenCalledTimes(1);
-    expect(activity.emitActivityEntrySync).toHaveBeenCalledWith({
+    expect(activity.emitActivityEntry).toHaveBeenCalledTimes(1);
+    expect(activity.emitActivityEntry).toHaveBeenCalledWith({
       source: 'cloister',
       level: 'warn',
       issueId: ISSUE,
@@ -221,13 +332,13 @@ describe('surfaceIssueFeedbackNeedsYou (PAN-3917: an announcement, not a flag)',
   it('omits the details payload when there is nothing to attach', async () => {
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target');
 
-    expect(activity.emitActivityEntrySync).toHaveBeenCalledWith(
+    expect(activity.emitActivityEntry).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: ISSUE, details: undefined }),
     );
   });
 
   it('never throws when the announcement itself fails', async () => {
-    activity.emitActivityEntrySync.mockImplementationOnce(() => { throw new Error('feed unavailable'); });
+    activity.emitActivityEntry.mockImplementationOnce(() => { throw new Error('feed unavailable'); });
 
     await expect(
       surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', {}),

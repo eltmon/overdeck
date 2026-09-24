@@ -15,7 +15,7 @@ import { runWithPool } from '../work-pool.js';
 import { createConfiguredClaudeApi, enrichSession, resolveEnrichmentModel } from './enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
 import type { EnrichSessionOptions } from './enrich-session.js';
-import { getConversationsConfigSync } from '../../config-yaml.js';
+import { getConversationsConfig } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EnrichmentTier } from './model-fallback.js';
 import { isBackgroundFeatureEnabled } from '../../background-ai/features.js';
@@ -131,7 +131,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   // Cost is still recorded per enriched session for the Background AI cost view.
 
   const tier = opts.tier ?? 1;
-  const config = opts.config ?? getConversationsConfigSync();
+  const config = opts.config ?? await Effect.runPromise(getConversationsConfig());
   const tierConfig = {
     quickModel: config.enrichment.quickModel,
     deepModel: config.enrichment.deepModel,
@@ -181,8 +181,9 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       });
       return;
     }
-    const sessionResult = await Effect.runPromise(enrichSession({
-      sessionId: session.id,
+    const { id: sessionId } = session;
+    const sessionResult = await enrichSession({
+      sessionId,
       jsonlPath: session.jsonlPath,
       tier,
       modelOverride: opts.modelOverride,
@@ -191,7 +192,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       config: tierConfig,
       callApi,
       resolveModel,
-    }));
+    });
 
     processed++;
     state.accounted = true;
@@ -199,7 +200,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       result.errors++;
     } else {
       result.enriched++;
-      enrichedIds.push(session.id);
+      enrichedIds.push(sessionId);
       if (sessionResult.cost !== undefined) {
         actualCost += sessionResult.cost;
         actualCostCount++;
@@ -213,7 +214,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
         errors: result.errors,
         elapsedMs: Date.now() - startTs,
         session: {
-          sessionId: session.id,
+          sessionId,
           tier,
           model: sessionResult.model,
           cost: sessionResult.error ? undefined : sessionResult.cost ?? estimateEnrichmentCost(1, tier),

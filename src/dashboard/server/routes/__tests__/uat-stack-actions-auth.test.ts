@@ -23,7 +23,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
 }));
 
 interface RouteResult {

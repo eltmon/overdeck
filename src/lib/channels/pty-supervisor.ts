@@ -32,7 +32,6 @@ import { pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { getOverdeckHome } from '../paths.js';
-import { getDashboardLoopbackApiUrlSync } from '../config.js';
 import {
   activeComposerPayloadPresence,
   type ComposerPayloadPresence,
@@ -83,7 +82,7 @@ export function getPtySupervisorSocketPath(agentId: string): string {
   return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
 }
 
-export function getPtySupervisorLogPath(agentId: string): string {
+function getPtySupervisorLogPath(agentId: string): string {
   return join(getOverdeckHome(), 'logs', `pty-supervisor-${agentId}.log`);
 }
 
@@ -265,15 +264,32 @@ function sleep(ms: number): Promise<void> {
 // spawns the child, accepts injections (a message that starts a turn), and
 // reaps the exit. It posts those facts to POST /api/agents/:id/lifecycle so
 // the projection writes running/stopped from observed truth instead of a
-// patrol inferring exit from a missing tmux session (FR-21, FR-24).
+// patrol inferring exit from a missing tmux session (FR-21, FR-24). `:id` is
+// the supervised session id (OVERDECK_AGENT_ID): an agent id, or a
+// conversation's `conv-<name>` tmux session — the same route records both
+// (PAN-3962).
 //
 // Posts are retried with backoff and never block the child: session-started
 // and turn-started are fire-and-forget; `exited` is awaited before the
 // supervisor exits (the child is already dead by then) but bounded by the
 // same retry budget, so an unreachable dashboard costs a few seconds once,
 // never a hung agent.
+//
+// The supervisor emits `session-started`, `turn-started` (on a confirmed
+// injection) and `exited`. It does NOT emit `turn-ended`: it sees only the
+// PTY byte stream, and "the turn is over" would need a per-harness
+// prompt-ready heuristic. The route still accepts `turn-ended`; idle comes
+// from the harness's own hook (claude-code's Stop hook) where one exists.
+//
+// Every post carries `launchedAt`, this supervisor process's start time. It
+// names the launch generation, so the dashboard can tell an exit of the
+// harness a respawn replaced from an exit of the harness it just started
+// under the same session name (PAN-3962).
 
 export type AgentLifecycleEventName = 'session-started' | 'turn-started' | 'turn-ended' | 'exited';
+
+/** This supervisor's launch generation: when the process started. */
+const SUPERVISOR_LAUNCHED_AT = new Date().toISOString();
 
 const LIFECYCLE_RETRY_DELAYS_MS = [500, 1500] as const;
 
@@ -306,14 +322,17 @@ export interface PostAgentLifecycleDeps {
 export async function postAgentLifecycleEvent(
   agentId: string,
   event: AgentLifecycleEventName,
-  details: { at?: string; exitCode?: number } = {},
+  details: { at?: string; exitCode?: number; launchedAt?: string } = {},
   deps: PostAgentLifecycleDeps = {},
 ): Promise<boolean> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const sleepImpl = deps.sleepImpl ?? sleepUnref;
+  // No config.js here: the supervisor ships vendored with @lydell/node-pty as
+  // its only package. Loopback only: DASHBOARD_URL is the public (TLS) URL and
+  // a lifecycle POST to it fails on the local certificate.
   const dashboardUrl = deps.dashboardUrl
-    ?? process.env.OVERDECK_DASHBOARD_URL
-    ?? getDashboardLoopbackApiUrlSync();
+    ?? (process.env.OVERDECK_DASHBOARD_URL
+      || `http://127.0.0.1:${process.env.API_PORT || process.env.PORT || '3011'}`);
   const readToken = deps.readToken ?? readPtyToken;
   const postTimeoutMs = deps.postTimeoutMs ?? LIFECYCLE_POST_TIMEOUT_MS;
 
@@ -327,6 +346,7 @@ export async function postAgentLifecycleEvent(
   const body = JSON.stringify({
     event,
     at: details.at ?? new Date().toISOString(),
+    launchedAt: details.launchedAt ?? SUPERVISOR_LAUNCHED_AT,
     ...(details.exitCode !== undefined ? { exitCode: details.exitCode } : {}),
   });
 

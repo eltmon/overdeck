@@ -24,7 +24,6 @@ function autonomousSpawnSuppressed(mode: 'incremental' | 'review'): boolean {
 }
 
 let _incrementalTimer: ReturnType<typeof setTimeout> | null = null;
-let _reviewTimer: ReturnType<typeof setInterval> | null = null;
 
 const DEBOUNCE_MS = 30_000;
 
@@ -42,29 +41,4 @@ export function triggerDebouncedIncrementalPass(projectRoot: string): void {
       console.warn('[backlog-auto-trigger] incremental pass failed:', err),
     );
   }, DEBOUNCE_MS);
-}
-
-/**
- * PAN-1866: Start a periodic review-pass cadence. Safe to call multiple times
- * (clears the previous interval first). Pass 0 to disable.
- */
-export function startPeriodicReviewPass(projectRoot: string, intervalMs: number): void {
-  if (_reviewTimer !== null) {
-    clearInterval(_reviewTimer);
-    _reviewTimer = null;
-  }
-  if (intervalMs <= 0) return;
-  _reviewTimer = setInterval(() => {
-    if (autonomousSpawnSuppressed('review')) return;
-    spawnSequencerAgent('review', { projectRoot }).catch((err: unknown) =>
-      console.warn('[backlog-auto-trigger] periodic review pass failed:', err),
-    );
-  }, intervalMs);
-}
-
-export function stopPeriodicReviewPass(): void {
-  if (_reviewTimer !== null) {
-    clearInterval(_reviewTimer);
-    _reviewTimer = null;
-  }
 }

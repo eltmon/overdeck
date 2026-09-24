@@ -8,7 +8,7 @@ import { parse } from '@iarna/toml';
 import chalk from 'chalk';
 import { isNoResumeCliOptionEnabled } from '../../lib/boot-no-resume.js';
 import { writeDevSupervisorMarker, clearDevSupervisorMarker } from '../../lib/dev-supervisor.js';
-import { getInternalTokenSync } from '../../lib/internal-token.js';
+import { getInternalToken } from '../../lib/internal-token.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -171,9 +171,9 @@ function waitForPortFree(port: number, timeoutMs = 5000): Promise<void> {
 async function startSidecars(): Promise<void> {
   // CLIProxy
   try {
-    const { startCliproxySync, CLIPROXY_PORT } = await import('../../lib/cliproxy.js');
+    const { startCliproxy, CLIPROXY_PORT } = await import('../../lib/cliproxy.js');
     console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
-    startCliproxySync();
+    await startCliproxy();
     console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
   } catch (error: any) {
     console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
@@ -181,21 +181,21 @@ async function startSidecars(): Promise<void> {
 
   // smee
   try {
-    const { startSmeeProcessSync } = await import('../../lib/smee.js');
+    const { startSmeeProcess } = await import('../../lib/smee.js');
     console.log(chalk.dim('\nStarting smee-client webhook relay...'));
-    startSmeeProcessSync();
+    startSmeeProcess();
   } catch (error: any) {
     console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
   }
 
   // TLDR
   try {
-    const { getTldrDaemonServiceSync } = await import('../../lib/tldr-daemon.js');
+    const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
     const projectRoot = process.cwd();
     const venvPath = join(projectRoot, '.venv');
     if (existsSync(venvPath)) {
       console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-      const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
+      const tldrService = getTldrDaemonService(projectRoot, venvPath);
       await tldrService.start(true);
       console.log(chalk.green('✓ TLDR daemon started'));
     } else {
@@ -207,9 +207,9 @@ async function startSidecars(): Promise<void> {
 
   // Supervisor
   try {
-    const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../../lib/supervisor.js');
-    startSupervisorProcessSync();
-    console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPortSync()}`));
+    const { startSupervisorProcess, getSupervisorPort } = await import('../../lib/supervisor.js');
+    startSupervisorProcess();
+    console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPort()}`));
   } catch (error: any) {
     console.log(chalk.yellow('⚠ Failed to start supervisor:'), error?.message || String(error));
   }
@@ -272,18 +272,18 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   // ── Traefik ────────────────────────────────────────────────────────────────
   if (config.traefikEnabled && !options.skipTraefik) {
     try {
-      const { generateOverdeckTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } =
+      const { generateOverdeckTraefikConfig, ensureProjectCerts, generateTlsConfig, cleanupStaleTlsSections } =
         await import('../../lib/traefik.js');
 
-      cleanupStaleTlsSectionsSync();
-      if (generateOverdeckTraefikConfigSync('dev')) {
+      cleanupStaleTlsSections();
+      if (generateOverdeckTraefikConfig('dev')) {
         console.log(chalk.dim('  Regenerated Traefik config for dev mode'));
       }
-      const generatedDomains = ensureProjectCertsSync();
+      const generatedDomains = ensureProjectCerts();
       for (const domain of generatedDomains) {
         console.log(chalk.dim(`  Generated wildcard cert for *.${domain}`));
       }
-      if (generateTlsConfigSync()) {
+      if (generateTlsConfig()) {
         console.log(chalk.dim('  Generated TLS config (tls.yml)'));
       }
     } catch {
@@ -624,7 +624,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   // token> in the URL hash (consumeDashboardBootstrapToken). Without it the
   // browser can't authenticate and every gated API call 401s, so surface the
   // Frontend URL WITH the token (PAN-1607).
-  const internalToken = getInternalTokenSync();
+  const internalToken = getInternalToken();
   const authFragment = internalToken ? `#overdeck_token=${encodeURIComponent(internalToken)}` : '';
   const frontendBase = config.traefikEnabled
     ? `https://${config.traefikDomain}`
@@ -659,20 +659,20 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
 
     // Stop sidecars
     try {
-      const { stopSmeeProcessSync } = await import('../../lib/smee.js');
-      stopSmeeProcessSync();
+      const { stopSmeeProcess } = await import('../../lib/smee.js');
+      stopSmeeProcess();
     } catch {
       // ignore
     }
     try {
-      const { stopSupervisorProcessSync } = await import('../../lib/supervisor.js');
-      stopSupervisorProcessSync();
+      const { stopSupervisorProcess } = await import('../../lib/supervisor.js');
+      stopSupervisorProcess();
     } catch {
       // ignore
     }
     try {
-      const { stopCliproxySync } = await import('../../lib/cliproxy.js');
-      stopCliproxySync();
+      const { stopCliproxy } = await import('../../lib/cliproxy.js');
+      await stopCliproxy();
     } catch {
       // ignore
     }

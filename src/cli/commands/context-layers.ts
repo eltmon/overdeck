@@ -26,11 +26,11 @@ import {
   renderForHarness,
   validateTemplate,
   migrateDevroot,
-  detachManagedContextSync,
+  detachManagedContext,
 } from '../../lib/context-layers/index.js';
-import { syncContextLayersSync } from '../../lib/sync.js';
+import { syncContextLayers } from '../../lib/sync.js';
 import { isDevMode } from '../../lib/paths.js';
-import { findProjectByPathSync, registerProjectSync } from '../../lib/projects.js';
+import { findProjectByPath, registerProject } from '../../lib/projects.js';
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 
 type LayerName = 'global' | 'project' | 'workspace';
@@ -66,7 +66,7 @@ function contextDiffHarnesses(rawHarness: string | undefined): Harness[] {
 
 /** Resolve the registered project whose tree contains `cwd`, or null. */
 function resolveProjectRoot(cwd: string): string | null {
-  const project = findProjectByPathSync(cwd);
+  const project = findProjectByPath(cwd);
   return project ? project.path : null;
 }
 
@@ -159,7 +159,7 @@ export async function contextEditCommand(options: ContextOptions = {}): Promise<
 // ─── pan context sync ─────────────────────────────────────────────────────
 
 export async function contextSyncCommand(): Promise<void> {
-  const result = syncContextLayersSync();
+  const result = syncContextLayers();
   if (result.globalStubCreated) {
     console.log(chalk.cyan('Seeded ~/.overdeck/context/global.md with a starter template.'));
   }
@@ -247,7 +247,7 @@ export async function contextMigrateCommand(options: ContextOptions = {}): Promi
     const interactive = Boolean(process.stdin.isTTY) && !options.yes;
     for (const path of result.discoveredProjects) {
       const key = path.split('/').filter(Boolean).pop()!.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-      if (findProjectByPathSync(path)) {
+      if (findProjectByPath(path)) {
         console.log(chalk.dim(`  • ${path} (already registered)`));
         continue;
       }
@@ -259,7 +259,7 @@ export async function contextMigrateCommand(options: ContextOptions = {}): Promi
         register = ans.register;
       }
       if (register) {
-        registerProjectSync(key, { name: key, path });
+        registerProject(key, { name: key, path });
         ensureProjectLayer(path);
         console.log(chalk.green(`  ✓ registered ${key} → ${path}`));
       } else if (!interactive) {
@@ -294,7 +294,7 @@ export async function contextDetachCommand(options: ContextOptions = {}): Promis
     return;
   }
 
-  const results = detachManagedContextSync(options.apply === true);
+  const results = detachManagedContext(options.apply === true);
   const actionable = results.filter((item) => item.status !== 'manual-only');
   if (actionable.length === 0) console.log(chalk.dim('No recognized managed regions found.'));
   for (const item of results) {

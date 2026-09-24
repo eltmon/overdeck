@@ -140,6 +140,7 @@ export function invalidateXBriefIndex(projectRoot: string): void {
   projectIndexCache.delete(projectRoot);
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function resetXBriefIndex(): void {
   projectIndexCache.clear();
 }

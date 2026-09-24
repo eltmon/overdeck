@@ -139,7 +139,7 @@ pan flywheel start --orders 2026-07-18-refactor-p3-remainder
 
 `queue` is the CLI form of the dashboard's **Queue book** action — it moves a draft to `ready` so the Flywheel can pick the book up from the ready queue. It refuses a book that is not a draft rather than re-queueing a running or completed campaign.
 
-Both start commands use the same validator and singleton Flywheel run gate. If validation or gate acquisition fails, the book remains ready.
+`pan orders start <id>` and `pan flywheel start --orders <id>` both open the one `conv-flywheel` conversation with the book named in its `/pan-flywheel` prompt. They differ when a flywheel is already running: `pan orders start` leaves it running and returns without naming the new book to it, while `pan flywheel start --orders` refuses with "already running" (`pan flywheel stop` first). A paused flywheel makes both refuse; resume it (`pan flywheel resume`) or replace it (`pan flywheel start --fresh --orders <id>`).
 
 ### Work on another project's books
 
@@ -161,50 +161,17 @@ A book is drained only when every item is terminal. For order-book progress, ter
 
 The server derives this result from canonical issue state. The orchestrator cannot declare a book drained through prose or a status message.
 
-When the Progress view reports drained, complete the run:
+A book completes when its items are terminal — there is no completion verb. Check it with:
 
 ```bash
-pan flywheel complete
+pan orders show 2026-07-18-refactor-p3-remainder
 ```
 
-The command refuses a non-drained book and names every remaining issue. `--force` exists for an intentional operator override:
+## Reports and what comes next
 
-```bash
-pan flywheel complete --force
-```
+The flywheel loop writes its run report to `.pan/flywheel/report.md` when it stops (`pan flywheel stop`) or when asked (`pan flywheel report`), and records substrate fixes and learnings in `.pan/flywheel/state.md`. Both are committed; git history is the archive. See [docs/FLYWHEEL.md](https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md).
 
-## Retrospectives
-
-If the run exposed a concrete improvement, write it to:
-
-```text
-${OVERDECK_HOME}/flywheel/runs/<runId>/retro.md
-```
-
-Useful findings include a doctrine correction, a substrate bug to file, or a brief-template change. `pan flywheel complete` adds the file under `## Retrospective` in the run report.
-
-When there is no finding, do not invent a ceremony. The report records:
-
-```text
-Retrospective: no findings recognized.
-```
-
-## What happens after completion
-
-`pan flywheel complete` writes the report, clears the active-run gate, marks the current book complete, and chooses the next action mechanically:
-
-| State after completion | Next action |
-| --- | --- |
-| Another book is ready in this project | Start the first ready book in queue order. |
-| No ready book here, but one is ready in another project | Start that book in its own project. |
-| No ready book anywhere and auto-pickup is on | Start a normal bookless backlog run. |
-| No ready book anywhere and auto-pickup is off | Stay stopped and surface a needs-you message. |
-
-This continuation happens in the existing persistent Flywheel path; it does not create a one-shot agent.
-
-Continuation looks across projects, not only the one that just finished: when the completing project's queue is empty, Overdeck checks every registered project in registry order and starts the first ready book it finds, in that project's own repo and with that project's flywheel brief. `pan flywheel complete` names the project when this happens, so the output reads `started RUN-42 with order book 2026-08-01-frontend-sweep (project: mind-your-now)`.
-
-This scan is not limited by the finished run's scope. Marking a book ready is your explicit release of that work, so a ready book anywhere is already authorized; scope only governs whether the Flywheel may pull unlisted issues from the backlog. If you do not want a queued book to start automatically, leave it as a draft until you do.
+After a book drains, the loop's Orient step reads the next `running` or ready book on its next tick. Marking a book ready is your explicit release of that work; if you do not want a queued book picked up, leave it as a draft.
 
 ## Intentional off-book work
 

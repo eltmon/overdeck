@@ -17,7 +17,7 @@ import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '
 
 vi.mock('../../src/lib/projects.js', () => ({
   listProjectsSync: vi.fn(() => []),
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByPath: vi.fn(() => null),
   resolveProjectFromIssueSync: vi.fn(() => null),
 }));
 

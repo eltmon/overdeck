@@ -397,10 +397,6 @@ export function lintPlanQuality(doc: XBriefDocument, options: QualityLintOptions
   ];
 }
 
-export function qualityLintErrors(doc: XBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
-  return lintPlanQuality(doc, options).filter(issue => issue.severity === 'error');
-}
-
 export function formatQualityIssues(issues: QualityIssue[]): string[] {
   const grouped = new Map<string, QualityIssue[]>();
   for (const issue of issues) {

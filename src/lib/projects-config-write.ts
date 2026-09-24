@@ -1,3 +1,15 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `atomicWriteProjectsConfigSync` (async: `atomicWriteProjectsConfig`): src/lib/projects-config-write.ts:162,
+ *   src/lib/projects.ts:589,1015.
+ * - `updateProjectsConfigTextSync` (async: `updateProjectsConfigText`): src/lib/projects.ts:558.
+ * - `withProjectsConfigWriteSync` (async: `withProjectsConfigWrite`): src/lib/projects-config-write.ts:153,
+ *   src/lib/projects.ts:588,1013.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import {
   closeSync,
   constants,
@@ -74,7 +86,7 @@ export function atomicWriteProjectsConfigSync(path: string, content: string): vo
   }
 }
 
-export async function atomicWriteProjectsConfig(path: string, content: string): Promise<void> {
+async function atomicWriteProjectsConfig(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temporary = tempPath(path);
   let file: Awaited<ReturnType<typeof open>> | null = null;
@@ -110,7 +122,7 @@ export function withProjectsConfigWriteSync<T>(path: string, write: () => T): T 
   }
 }
 
-export async function withProjectsConfigWrite<T>(path: string, write: () => Promise<T>): Promise<T> {
+async function withProjectsConfigWrite<T>(path: string, write: () => Promise<T>): Promise<T> {
   const previous = asyncWriteTail;
   let releaseQueue!: () => void;
   const current = new Promise<void>(resolve => {

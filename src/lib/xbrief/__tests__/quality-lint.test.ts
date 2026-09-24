@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { lintPlanQuality, OBSERVABLE_TERMS, PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS, qualityLintErrors, PROJECTED_SURFACE_MAX_FILES, PROJECTED_SURFACE_MAX_SUBSYSTEMS } from '../quality-lint.js';
+import { lintPlanQuality, OBSERVABLE_TERMS, PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS, PROJECTED_SURFACE_MAX_FILES, PROJECTED_SURFACE_MAX_SUBSYSTEMS } from '../quality-lint.js';
 import type { XBriefDocument, XBriefItem } from '../types.js';
+import type { QualityIssue, QualityLintOptions } from '../quality-lint.js';
+
+// Moved here from src/lib/xbrief/quality-lint.ts, which no production code called (PAN-3958 CH-8).
+function qualityLintErrors(doc: XBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
+  return lintPlanQuality(doc, options).filter(issue => issue.severity === 'error');
+}
 
 function ac(id: string, title: string) {
   return {

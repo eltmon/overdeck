@@ -1,0 +1,2694 @@
+[
+  {
+    "kind": "sync",
+    "file": "src/lib/activity-logger.ts",
+    "oldName": "emitActivityDetailedSync",
+    "newName": "emitActivityDetailed",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/activity-logger.ts",
+    "oldName": "emitActivityEntrySync",
+    "newName": "emitActivityEntry",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/activity-logger.ts",
+    "oldName": "emitActivityTtsSync",
+    "newName": "emitActivityTts",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/activity-logger.ts",
+    "oldName": "emitDashboardLifecycleSync",
+    "newName": "emitDashboardLifecycle",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agent-input-detection.ts",
+    "oldName": "detectAwaitingInputFromPaneSync",
+    "newName": "detectAwaitingInputFromPane",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/activity.ts",
+    "oldName": "getLatestSessionIdSync",
+    "newName": "getLatestSessionId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/activity.ts",
+    "oldName": "resolveClaudeSessionRecoverySync",
+    "newName": "resolveClaudeSessionRecovery",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/activity.ts",
+    "oldName": "resolveLatestSessionIdSync",
+    "newName": "resolveLatestSessionId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/agent-state-read.ts",
+    "oldName": "getAgentStateSync",
+    "newName": "getAgentState",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/agent-state.ts",
+    "oldName": "clearAgentOperatorGatesForIssueSync",
+    "newName": "clearAgentOperatorGatesForIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/agent-state.ts",
+    "oldName": "clearAgentOperatorGatesForIssuesSync",
+    "newName": "clearAgentOperatorGatesForIssues",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/agent-state.ts",
+    "oldName": "clearYieldForResumeSync",
+    "newName": "clearYieldForResume",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/agent-state.ts",
+    "oldName": "recordAgentActivitySync",
+    "newName": "recordAgentActivity",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/agent-state.ts",
+    "oldName": "setAgentYieldedSync",
+    "newName": "setAgentYielded",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/agent-state.ts",
+    "oldName": "writeAgentStateJsonSync",
+    "newName": "writeAgentStateJson",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/identity.ts",
+    "oldName": "resolveAgentTargetSync",
+    "newName": "resolveAgentTarget",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/monitor-transport.ts",
+    "oldName": "listInboxMessagesSync",
+    "newName": "listInboxMessages",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/runtime-command.ts",
+    "oldName": "parseRoleMcpServersSync",
+    "newName": "parseRoleMcpServers",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/runtime-command.ts",
+    "oldName": "roleSystemPromptInjectionSync",
+    "newName": "roleSystemPromptInjection",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/agents/tier-fitness-context.ts",
+    "oldName": "buildTierFitnessContextSync",
+    "newName": "buildTierFitnessContext",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/backup.ts",
+    "oldName": "backupFileSync",
+    "newName": "backupFile",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/backup.ts",
+    "oldName": "cleanOldBackupsSync",
+    "newName": "cleanOldBackups",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/backup.ts",
+    "oldName": "createBackupSync",
+    "newName": "createBackup",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/backup.ts",
+    "oldName": "listBackupsSync",
+    "newName": "listBackups",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/backup.ts",
+    "oldName": "restoreBackupSync",
+    "newName": "restoreBackup",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/bridge-token.ts",
+    "oldName": "readBridgeTokenSync",
+    "newName": "readBridgeToken",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/bridge-token.ts",
+    "oldName": "writeBridgeTokenSync",
+    "newName": "writeBridgeToken",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/child-env.ts",
+    "oldName": "buildChildEnvSync",
+    "newName": "buildChildEnv",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/child-env.ts",
+    "oldName": "buildChildEnvWithoutTmuxSync",
+    "newName": "buildChildEnvWithoutTmux",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-mcp.ts",
+    "oldName": "ensureExcalidrawMcpSync",
+    "newName": "ensureExcalidrawMcp",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-mcp.ts",
+    "oldName": "ensurePlaywrightIsolationSync",
+    "newName": "ensurePlaywrightIsolation",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-mcp.ts",
+    "oldName": "getIsolatedPlaywrightMcpConfigSync",
+    "newName": "getIsolatedPlaywrightMcpConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-permissions.ts",
+    "oldName": "buildClaudeUserSettingsSync",
+    "newName": "buildClaudeUserSettings",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-permissions.ts",
+    "oldName": "bypassPrefixForAgentFlagSync",
+    "newName": "bypassPrefixForAgentFlag",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-permissions.ts",
+    "oldName": "ensureClaudePermissionFlagSync",
+    "newName": "ensureClaudePermissionFlag",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-permissions.ts",
+    "oldName": "getClaudePermissionFlagsStringSync",
+    "newName": "getClaudePermissionFlagsString",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-permissions.ts",
+    "oldName": "getClaudePermissionFlagsSync",
+    "newName": "getClaudePermissionFlags",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-permissions.ts",
+    "oldName": "resolvePermissionModeSync",
+    "newName": "resolvePermissionMode",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-settings-file.ts",
+    "oldName": "atomicWriteJsonSync",
+    "newName": "atomicWriteJson",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-settings-file.ts",
+    "oldName": "backupSettingsSync",
+    "newName": "backupSettings",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-settings-file.ts",
+    "oldName": "findNewestBackupSync",
+    "newName": "findNewestBackup",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/claude-settings-file.ts",
+    "oldName": "pruneBackupsSync",
+    "newName": "pruneBackups",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/cost-monitor.ts",
+    "oldName": "recordCostSync",
+    "newName": "recordCost",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/cost-monitor.ts",
+    "oldName": "resetCostTrackingSync",
+    "newName": "resetCostTracking",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/handoff-logger.ts",
+    "oldName": "logHandoffEventSync",
+    "newName": "logHandoffEvent",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/merge-agent.ts",
+    "oldName": "autoCommitWorkspaceChangesBeforeSync",
+    "newName": "autoCommitWorkspaceChangesBefore",
+    "skip": true,
+    "skipReason": "semantic false positive: \"Sync\" is a domain noun on an async function, not the twin suffix"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/specialist-logs.ts",
+    "oldName": "appendToRunLogSync",
+    "newName": "appendToRunLog",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/specialist-logs.ts",
+    "oldName": "cleanupAllLogsSync",
+    "newName": "cleanupAllLogs",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/specialist-logs.ts",
+    "oldName": "cleanupOldLogsSync",
+    "newName": "cleanupOldLogs",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/specialist-logs.ts",
+    "oldName": "createRunLogSync",
+    "newName": "createRunLog",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/specialist-logs.ts",
+    "oldName": "finalizeRunLogSync",
+    "newName": "finalizeRunLog",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/specialist-logs.ts",
+    "oldName": "getRunLogSync",
+    "newName": "getRunLog",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/specialist-logs.ts",
+    "oldName": "listRunLogsSync",
+    "newName": "listRunLogs",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cloister/test-skip-waiver.ts",
+    "oldName": "resolveActiveTestSkipWaiverSync",
+    "newName": "resolveActiveTestSkipWaiver",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-migration.ts",
+    "oldName": "cleanupLegacyRuntimeSymlinksSync",
+    "newName": "cleanupLegacyRuntimeSymlinks",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-migration.ts",
+    "oldName": "convertToYamlConfigSync",
+    "newName": "convertToYamlConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-migration.ts",
+    "oldName": "hasLegacySettingsSync",
+    "newName": "hasLegacySettings",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-migration.ts",
+    "oldName": "migrateConfigSync",
+    "newName": "migrateConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-migration.ts",
+    "oldName": "migrateSyncTargetsSync",
+    "newName": "migrateSyncTargets",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-migration.ts",
+    "oldName": "needsMigrationSync",
+    "newName": "needsMigration",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-yaml/load.ts",
+    "oldName": "getConversationSearchConfigSync",
+    "newName": "getConversationSearchConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-yaml/load.ts",
+    "oldName": "isTldrEnabledSync",
+    "newName": "isTldrEnabled",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config-yaml/load.ts",
+    "oldName": "loadConfigSync",
+    "newName": "loadConfig",
+    "skip": true,
+    "skipReason": "collision: would collide with an existing `loadConfig` in /home/eltmon/Projects/overdeck/.claude/worktrees/agent-a12ac8a1d36fb5b25/src/lib/config.ts"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config.ts",
+    "oldName": "getDashboardApiUrlSync",
+    "newName": "getDashboardApiUrl",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config.ts",
+    "oldName": "getDashboardLoopbackApiUrlSync",
+    "newName": "getDashboardLoopbackApiUrl",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config.ts",
+    "oldName": "getDefaultConfigSync",
+    "newName": "getDefaultConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config.ts",
+    "oldName": "getDevrootPathSync",
+    "newName": "getDevrootPath",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/config.ts",
+    "oldName": "saveConfigSync",
+    "newName": "saveConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context-layers/detach.ts",
+    "oldName": "detachManagedContextSync",
+    "newName": "detachManagedContext",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context.ts",
+    "oldName": "appendSummarySync",
+    "newName": "appendSummary",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context.ts",
+    "oldName": "estimateTokensSync",
+    "newName": "estimateTokens",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context.ts",
+    "oldName": "getRecentHistorySync",
+    "newName": "getRecentHistory",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context.ts",
+    "oldName": "listMaterializedSync",
+    "newName": "listMaterialized",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context.ts",
+    "oldName": "logHistorySync",
+    "newName": "logHistory",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context.ts",
+    "oldName": "materializeOutputSync",
+    "newName": "materializeOutput",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context.ts",
+    "oldName": "readMaterializedSync",
+    "newName": "readMaterialized",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/context.ts",
+    "oldName": "searchHistorySync",
+    "newName": "searchHistory",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/conversations/correlator.ts",
+    "oldName": "buildCorrelationMapSync",
+    "newName": "buildCorrelationMap",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/conversations/correlator.ts",
+    "oldName": "buildLocatorCorrelationMapSync",
+    "newName": "buildLocatorCorrelationMap",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/codex-parser.ts",
+    "oldName": "parseCodexSessionCostEventsSync",
+    "newName": "parseCodexSessionCostEvents",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/codex-parser.ts",
+    "oldName": "parseCodexSessionSync",
+    "newName": "parseCodexSession",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/jsonl-parser.ts",
+    "oldName": "getActiveSessionModelSync",
+    "newName": "getActiveSessionModel",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/jsonl-parser.ts",
+    "oldName": "getAllSessionFilesSync",
+    "newName": "getAllSessionFiles",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/jsonl-parser.ts",
+    "oldName": "getProjectDirsSync",
+    "newName": "getProjectDirs",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/jsonl-parser.ts",
+    "oldName": "getSessionFilesSync",
+    "newName": "getSessionFiles",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/jsonl-parser.ts",
+    "oldName": "parseClaudeSessionSync",
+    "newName": "parseClaudeSession",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/kimi-parser.ts",
+    "oldName": "parseKimiSessionSync",
+    "newName": "parseKimiSession",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/muse-parser.ts",
+    "oldName": "parseMuseSessionSync",
+    "newName": "parseMuseSession",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost-parsers/ohmypi-parser.ts",
+    "oldName": "parseOhmypiSessionCostResultSync",
+    "newName": "parseOhmypiSessionCostResult",
+    "skip": true,
+    "skipReason": "Oh My Pi (#4003)"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "calculateCostSync",
+    "newName": "calculateCost",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "checkBudgetSync",
+    "newName": "checkBudget",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "createBudgetSync",
+    "newName": "createBudget",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "deleteBudgetSync",
+    "newName": "deleteBudget",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "formatCostSync",
+    "newName": "formatCost",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "generateReportSync",
+    "newName": "generateReport",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "getAllBudgetsSync",
+    "newName": "getAllBudgets",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "getDailySummarySync",
+    "newName": "getDailySummary",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "getMonthlySummarySync",
+    "newName": "getMonthlySummary",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "getPricingSync",
+    "newName": "getPricing",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "getWeeklySummarySync",
+    "newName": "getWeeklySummary",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "readIssueCostsSync",
+    "newName": "readIssueCosts",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "readTodayCostsSync",
+    "newName": "readTodayCosts",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cost.ts",
+    "oldName": "summarizeCostsSync",
+    "newName": "summarizeCosts",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/aggregator.ts",
+    "oldName": "getCostsByIssueSync",
+    "newName": "getCostsByIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/aggregator.ts",
+    "oldName": "getCostsForIssueSync",
+    "newName": "getCostsForIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/aggregator.ts",
+    "oldName": "loadCacheSync",
+    "newName": "loadCache",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/aggregator.ts",
+    "oldName": "rebuildCacheSync",
+    "newName": "rebuildCache",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/aggregator.ts",
+    "oldName": "saveCacheSync",
+    "newName": "saveCache",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/aggregator.ts",
+    "oldName": "setIssueBudgetSync",
+    "newName": "setIssueBudget",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/aggregator.ts",
+    "oldName": "syncCacheSync",
+    "newName": "syncCache",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/aggregator.ts",
+    "oldName": "updateCacheFromEventsSync",
+    "newName": "updateCacheFromEvents",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/attribution.ts",
+    "oldName": "reclassifyUnknownCostEventsSync",
+    "newName": "reclassifyUnknownCostEvents",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "appendCostEventSync",
+    "newName": "appendCostEvent",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "deduplicateEventsSync",
+    "newName": "deduplicateEvents",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "forEachCostEventSync",
+    "newName": "forEachCostEvent",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "getEventsFileSizeSync",
+    "newName": "getEventsFileSize",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "getLastEventMetadataSync",
+    "newName": "getLastEventMetadata",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "readEventsFromByteOffsetSync",
+    "newName": "readEventsFromByteOffset",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "readEventsFromLineSync",
+    "newName": "readEventsFromLine",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "readEventsSync",
+    "newName": "readEvents",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "replaceEventsFileSync",
+    "newName": "replaceEventsFile",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/events.ts",
+    "oldName": "tailEventsSync",
+    "newName": "tailEvents",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/migration.ts",
+    "oldName": "migrateAllSessionsSync",
+    "newName": "migrateAllSessions",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/migration.ts",
+    "oldName": "migrateIfNeededSync",
+    "newName": "migrateIfNeeded",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/migration.ts",
+    "oldName": "needsMigrationSync",
+    "newName": "needsMigration",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/retention.ts",
+    "oldName": "getRetentionStatusSync",
+    "newName": "getRetentionStatus",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/retention.ts",
+    "oldName": "needsPruningSync",
+    "newName": "needsPruning",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/retention.ts",
+    "oldName": "pruneOldEventsSync",
+    "newName": "pruneOldEvents",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/costs/wal.ts",
+    "oldName": "appendToWalSync",
+    "newName": "appendToWal",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cv.ts",
+    "oldName": "completeWorkSync",
+    "newName": "completeWork",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cv.ts",
+    "oldName": "formatCVSync",
+    "newName": "formatCV",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cv.ts",
+    "oldName": "getAgentCVSync",
+    "newName": "getAgentCV",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cv.ts",
+    "oldName": "getAgentRankingsSync",
+    "newName": "getAgentRankings",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cv.ts",
+    "oldName": "readAgentCVSync",
+    "newName": "readAgentCV",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/cv.ts",
+    "oldName": "startWorkSync",
+    "newName": "startWork",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/deploy/active-dashboard-bundle.ts",
+    "oldName": "readActiveDashboardBundleSync",
+    "newName": "readActiveDashboardBundle",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/env-loader.ts",
+    "oldName": "loadOverdeckEnvSync",
+    "newName": "loadOverdeckEnv",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/harness-policy.ts",
+    "oldName": "canUseHarnessSync",
+    "newName": "canUseHarness",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/harness-policy.ts",
+    "oldName": "canUseModelWithAuthSync",
+    "newName": "canUseModelWithAuth",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/harness-skill-sync.ts",
+    "oldName": "executeAgentSkillsSync",
+    "newName": "executeAgentSkills",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/harness-skill-sync.ts",
+    "oldName": "planAgentSkillsSync",
+    "newName": "planAgentSkills",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/hooks.ts",
+    "oldName": "checkHookSync",
+    "newName": "checkHook",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/hooks.ts",
+    "oldName": "clearHookSync",
+    "newName": "clearHook",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/hooks.ts",
+    "oldName": "generateFixedPointPromptSync",
+    "newName": "generateFixedPointPrompt",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/hooks.ts",
+    "oldName": "initHookSync",
+    "newName": "initHook",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/hooks.ts",
+    "oldName": "popFromHookSync",
+    "newName": "popFromHook",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/hooks.ts",
+    "oldName": "pushToHookSync",
+    "newName": "pushToHook",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/hooks.ts",
+    "oldName": "sendMailSync",
+    "newName": "sendMail",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/internal-token.ts",
+    "oldName": "ensureInternalTokenSync",
+    "newName": "ensureInternalToken",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/internal-token.ts",
+    "oldName": "getInternalTokenSync",
+    "newName": "getInternalToken",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/issue-id.ts",
+    "oldName": "extractNumberSync",
+    "newName": "extractNumber",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/issue-id.ts",
+    "oldName": "extractPrefixSync",
+    "newName": "extractPrefix",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/issue-id.ts",
+    "oldName": "normalizeIssueIdSync",
+    "newName": "normalizeIssueId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/issue-id.ts",
+    "oldName": "parseIssueIdSync",
+    "newName": "parseIssueId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/issue-id.ts",
+    "oldName": "resolveBareNumericIdSync",
+    "newName": "resolveBareNumericId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/issue-id.ts",
+    "oldName": "resolveIssueIdSync",
+    "newName": "resolveIssueId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/kimi-claude-routing.ts",
+    "oldName": "getClaudeCodeLaunchModelSync",
+    "newName": "getClaudeCodeLaunchModel",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/launcher-generator.ts",
+    "oldName": "generateLauncherScriptSync",
+    "newName": "generateLauncherScript",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/manifest.ts",
+    "oldName": "collectSourceFilesSync",
+    "newName": "collectSourceFiles",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/manifest.ts",
+    "oldName": "hashFileSync",
+    "newName": "hashFile",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/manifest.ts",
+    "oldName": "pruneStaleManifestEntriesSync",
+    "newName": "pruneStaleManifestEntries",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/manifest.ts",
+    "oldName": "readManifestSync",
+    "newName": "readManifest",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/manifest.ts",
+    "oldName": "writeManifestSync",
+    "newName": "writeManifest",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/memory/fts-operations.ts",
+    "oldName": "getMemoryFtsDatabaseSync",
+    "newName": "getMemoryFtsDatabase",
+    "skip": true,
+    "skipReason": "collision: would collide with an existing `getMemoryFtsDatabase` in /home/eltmon/Projects/overdeck/.claude/worktrees/agent-a12ac8a1d36fb5b25/src/lib/memory/fts-db.ts"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/memory/fts-operations.ts",
+    "oldName": "runMemoryFtsStatementSync",
+    "newName": "runMemoryFtsStatement",
+    "skip": true,
+    "skipReason": "collision: would collide with an existing `runMemoryFtsStatement` in /home/eltmon/Projects/overdeck/.claude/worktrees/agent-a12ac8a1d36fb5b25/src/lib/memory/fts-db.ts"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/memory/fts-operations.ts",
+    "oldName": "runMemoryFtsTransactionSync",
+    "newName": "runMemoryFtsTransaction",
+    "skip": true,
+    "skipReason": "collision: would collide with an existing `runMemoryFtsTransaction` in /home/eltmon/Projects/overdeck/.claude/worktrees/agent-a12ac8a1d36fb5b25/src/lib/memory/fts-db.ts"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/merge-set.ts",
+    "oldName": "buildMergeSetForIssueSync",
+    "newName": "buildMergeSetForIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/merge-set.ts",
+    "oldName": "ensureMergeSetForIssueSync",
+    "newName": "ensureMergeSetForIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/merge-set.ts",
+    "oldName": "getMergeSetSync",
+    "newName": "getMergeSet",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/merge-set.ts",
+    "oldName": "upsertMergeSetSync",
+    "newName": "upsertMergeSet",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/merge-set.ts",
+    "oldName": "withRepoArtifactUrlSync",
+    "newName": "withRepoArtifactUrl",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/merge-set.ts",
+    "oldName": "withRepoStateSync",
+    "newName": "withRepoState",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-capabilities.ts",
+    "oldName": "getModelCapabilitySync",
+    "newName": "getModelCapability",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-capabilities.ts",
+    "oldName": "getModelEffortLevelsSync",
+    "newName": "getModelEffortLevels",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-capabilities.ts",
+    "oldName": "hasModelCapabilitySync",
+    "newName": "hasModelCapability",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-capabilities.ts",
+    "oldName": "modelSupportsImagesSync",
+    "newName": "modelSupportsImages",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-capabilities.ts",
+    "oldName": "resolveModelIdSync",
+    "newName": "resolveModelId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-context-windows.ts",
+    "oldName": "apiLaunchModelIdSync",
+    "newName": "apiLaunchModelId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-context-windows.ts",
+    "oldName": "isGpt56LongContextVariantSync",
+    "newName": "isGpt56LongContextVariant",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-fallback.ts",
+    "oldName": "applyFallbackSync",
+    "newName": "applyFallback",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-fallback.ts",
+    "oldName": "getAvailableModelsSync",
+    "newName": "getAvailableModels",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-fallback.ts",
+    "oldName": "getFallbackModelSync",
+    "newName": "getFallbackModel",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-fallback.ts",
+    "oldName": "getModelProviderSync",
+    "newName": "getModelProvider",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-fallback.ts",
+    "oldName": "getModelsByProviderSync",
+    "newName": "getModelsByProvider",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-fallback.ts",
+    "oldName": "isOpenRouterModelSync",
+    "newName": "isOpenRouterModel",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-validation.ts",
+    "oldName": "normalizeModelOverrideSync",
+    "newName": "normalizeModelOverride",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-validation.ts",
+    "oldName": "requireModelOverrideSync",
+    "newName": "requireModelOverride",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/model-validation.ts",
+    "oldName": "shellQuoteModelIdSync",
+    "newName": "shellQuoteModelId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/multi-tool-sync.ts",
+    "oldName": "resolveAlsoSyncToolsSync",
+    "newName": "resolveAlsoSyncTools",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/multi-tool-sync.ts",
+    "oldName": "runMultiToolSyncSync",
+    "newName": "runMultiToolSync",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/multi-tool-sync.ts",
+    "oldName": "syncSkillsToToolsSync",
+    "newName": "syncSkillsToTools",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/agents.ts",
+    "oldName": "getIssueStageSync",
+    "newName": "getIssueStage",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/agents.ts",
+    "oldName": "listAgentIdsByPrefixSync",
+    "newName": "listAgentIdsByPrefix",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/control-settings.ts",
+    "oldName": "getFlywheelActiveRunIdSync",
+    "newName": "getFlywheelActiveRunId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/control-settings.ts",
+    "oldName": "isCloisterSpawnsPausedSync",
+    "newName": "isCloisterSpawnsPaused",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/control-settings.ts",
+    "oldName": "setCloisterSpawnsPausedSync",
+    "newName": "setCloisterSpawnsPaused",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/conversation-cost-session.ts",
+    "oldName": "findConversationForCostSessionSync",
+    "newName": "findConversationForCostSession",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-agent-stats.ts",
+    "oldName": "getAgentCostStatsSync",
+    "newName": "getAgentCostStats",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getAgentDailyCostSync",
+    "newName": "getAgentDailyCost",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getBackgroundCostBySourceSync",
+    "newName": "getBackgroundCostBySource",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getCavemanExperimentDataSync",
+    "newName": "getCavemanExperimentData",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getCostForIssueAggregateSync",
+    "newName": "getCostForIssueAggregate",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getCostForIssueSync",
+    "newName": "getCostForIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getCostsByIssueSync",
+    "newName": "getCostsByIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getDailyTrendsSync",
+    "newName": "getDailyTrends",
+    "skip": true,
+    "skipReason": "collision: would collide with an existing `getDailyTrends` in /home/eltmon/Projects/overdeck/.claude/worktrees/agent-a12ac8a1d36fb5b25/src/lib/cloister/cost-monitor.ts"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getModelRollupSync",
+    "newName": "getModelRollup",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "getTodayCostSync",
+    "newName": "getTodayCost",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "insertCostEventSync",
+    "newName": "insertCostEvent",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/cost-sync.ts",
+    "oldName": "queryMemoryExtractionCostUsdSync",
+    "newName": "queryMemoryExtractionCostUsd",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/event-reads.ts",
+    "oldName": "readLatestAgentClaudeSessionIdEventSync",
+    "newName": "readLatestAgentClaudeSessionIdEvent",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/git-activity.ts",
+    "oldName": "appendGitOperationSync",
+    "newName": "appendGitOperation",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/git-activity.ts",
+    "oldName": "listGitOperationsSync",
+    "newName": "listGitOperations",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/infra.ts",
+    "oldName": "closeOverdeckDatabaseSync",
+    "newName": "closeOverdeckDatabase",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/infra.ts",
+    "oldName": "dropDeadIssuesForeignKeysSync",
+    "newName": "dropDeadIssuesForeignKeys",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/infra.ts",
+    "oldName": "dropPipelineStateMirrorTablesSync",
+    "newName": "dropPipelineStateMirrorTables",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/infra.ts",
+    "oldName": "getOverdeckDatabaseSync",
+    "newName": "getOverdeckDatabase",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/infra.ts",
+    "oldName": "readPipelineMirrorMarkerSync",
+    "newName": "readPipelineMirrorMarker",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/issue-reads.ts",
+    "oldName": "resolveIssueProjectPathSync",
+    "newName": "resolveIssueProjectPath",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "getUatGenerationSync",
+    "newName": "getUatGeneration",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "hasUncleanedTerminalUatGenerationSync",
+    "newName": "hasUncleanedTerminalUatGeneration",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "insertUatGenerationSync",
+    "newName": "insertUatGeneration",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "listUatGenerationNamesSync",
+    "newName": "listUatGenerationNames",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "listUatGenerationsSync",
+    "newName": "listUatGenerations",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "listUatGenerationsWithStacksSync",
+    "newName": "listUatGenerationsWithStacks",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "markUatGenerationRepoPromotedSync",
+    "newName": "markUatGenerationRepoPromoted",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "setUatGenerationStackStartedAtSync",
+    "newName": "setUatGenerationStackStartedAt",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/overdeck/merge-sync-uat.ts",
+    "oldName": "updateUatGenerationSync",
+    "newName": "updateUatGeneration",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/pan-dir/drafts.ts",
+    "oldName": "checkPrdGateSync",
+    "newName": "checkPrdGate",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/persistent-logger.ts",
+    "oldName": "logAgentLifecycleSync",
+    "newName": "logAgentLifecycle",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/persistent-logger.ts",
+    "oldName": "logDeaconEventSync",
+    "newName": "logDeaconEvent",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/pipeline-notifier.ts",
+    "oldName": "notifyPipelineSync",
+    "newName": "notifyPipeline",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/pipeline-notifier.ts",
+    "oldName": "setPipelineHandlerSync",
+    "newName": "setPipelineHandler",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/platform-lifecycle.ts",
+    "oldName": "readPlatformConfigSync",
+    "newName": "readPlatformConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/prd-draft.ts",
+    "oldName": "getPRDDraftPathSync",
+    "newName": "getPRDDraftPath",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/prd-locations.ts",
+    "oldName": "canonicalPrdSubdirSync",
+    "newName": "canonicalPrdSubdir",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/prd-locations.ts",
+    "oldName": "findPrdAnywhereSync",
+    "newName": "findPrdAnywhere",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/prd-locations.ts",
+    "oldName": "findPrdAtStatusSync",
+    "newName": "findPrdAtStatus",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "computeWorkspaceRepoRootsSync",
+    "newName": "computeWorkspaceRepoRoots",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "forgeFromRemoteUrlSync",
+    "newName": "forgeFromRemoteUrl",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "inferProjectForgeSync",
+    "newName": "inferProjectForge",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "normalizeForgeSync",
+    "newName": "normalizeForge",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "resolveConfiguredReposSync",
+    "newName": "resolveConfiguredRepos",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "resolvePrimaryWorkspaceRepoDirSync",
+    "newName": "resolvePrimaryWorkspaceRepoDir",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "resolveProjectReposForIssueSync",
+    "newName": "resolveProjectReposForIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "resolveProjectReposFromResolvedIssueSync",
+    "newName": "resolveProjectReposFromResolvedIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "resolveSlotWorkspaceWorktreesSync",
+    "newName": "resolveSlotWorkspaceWorktrees",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/project-repos.ts",
+    "oldName": "resolveWorkspaceRepoRootsSync",
+    "newName": "resolveWorkspaceRepoRoots",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects-writer.ts",
+    "oldName": "setProjectVersionSync",
+    "newName": "setProjectVersion",
+    "skip": true,
+    "skipReason": "semantic false positive: \"Sync\" is a domain noun on an async function, not the twin suffix"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects.ts",
+    "oldName": "findProjectByPathSync",
+    "newName": "findProjectByPath",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects.ts",
+    "oldName": "findProjectByTeamSync",
+    "newName": "findProjectByTeam",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects.ts",
+    "oldName": "hasProjectsSync",
+    "newName": "hasProjects",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects.ts",
+    "oldName": "initializeProjectsConfigSync",
+    "newName": "initializeProjectsConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects.ts",
+    "oldName": "registerProjectSync",
+    "newName": "registerProject",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects.ts",
+    "oldName": "saveProjectsConfigSync",
+    "newName": "saveProjectsConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects.ts",
+    "oldName": "unregisterProjectSync",
+    "newName": "unregisterProject",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/projects/project-key.ts",
+    "oldName": "findProjectKeyByPathSync",
+    "newName": "findProjectKeyByPath",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/provider-health.ts",
+    "oldName": "invalidateProbeCacheSync",
+    "newName": "invalidateProbeCache",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/providers.ts",
+    "oldName": "clearCredentialFileAuthSync",
+    "newName": "clearCredentialFileAuth",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/providers.ts",
+    "oldName": "getProviderEnvSync",
+    "newName": "getProviderEnv",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/providers.ts",
+    "oldName": "getProviderForModelSync",
+    "newName": "getProviderForModel",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/providers.ts",
+    "oldName": "setupCredentialFileAuthSync",
+    "newName": "setupCredentialFileAuth",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/release-set.ts",
+    "oldName": "getReleaseSetSync",
+    "newName": "getReleaseSet",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/release-set.ts",
+    "oldName": "upsertReleaseSetSync",
+    "newName": "upsertReleaseSet",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/release-set.ts",
+    "oldName": "withComponentStateSync",
+    "newName": "withComponentState",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/remote/fly-api.ts",
+    "oldName": "createFlyApiClientSync",
+    "newName": "createFlyApiClient",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/remote/workspace-metadata.ts",
+    "oldName": "deleteWorkspaceMetadataSync",
+    "newName": "deleteWorkspaceMetadata",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/remote/workspace-metadata.ts",
+    "oldName": "findRemoteWorkspaceMetadataSync",
+    "newName": "findRemoteWorkspaceMetadata",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/remote/workspace-metadata.ts",
+    "oldName": "listWorkspaceMetadataSync",
+    "newName": "listWorkspaceMetadata",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/remote/workspace-metadata.ts",
+    "oldName": "loadWorkspaceMetadataSync",
+    "newName": "loadWorkspaceMetadata",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/remote/workspace-metadata.ts",
+    "oldName": "saveWorkspaceMetadataSync",
+    "newName": "saveWorkspaceMetadata",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/resource-utils.ts",
+    "oldName": "parseIssueIdFromTextSync",
+    "newName": "parseIssueIdFromText",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/runtimes/acp.ts",
+    "oldName": "createAcpRuntimeSync",
+    "newName": "createAcpRuntime",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/runtimes/claude-code.ts",
+    "oldName": "createClaudeCodeRuntimeSync",
+    "newName": "createClaudeCodeRuntime",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/runtimes/codex.ts",
+    "oldName": "createCodexRuntimeSync",
+    "newName": "createCodexRuntime",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/runtimes/kimi-code.ts",
+    "oldName": "createKimiCodeRuntimeSync",
+    "newName": "createKimiCodeRuntime",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/runtimes/muse.ts",
+    "oldName": "createMuseRuntimeSync",
+    "newName": "createMuseRuntime",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/runtimes/pi-fifo.ts",
+    "oldName": "destroyPiFifoSync",
+    "newName": "destroyPiFifo",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/runtimes/pi-fifo.ts",
+    "oldName": "writePiCommandSync",
+    "newName": "writePiCommand",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/session-history.ts",
+    "oldName": "readLatestIndexedSessionIdSync",
+    "newName": "readLatestIndexedSessionId",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/session-history.ts",
+    "oldName": "readSessionIndexSync",
+    "newName": "readSessionIndex",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/session-history.ts",
+    "oldName": "readSessionIndexWithLegacySync",
+    "newName": "readSessionIndexWithLegacy",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/settings.ts",
+    "oldName": "getAgentCommandSync",
+    "newName": "getAgentCommand",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/settings.ts",
+    "oldName": "getAvailableModelsSync",
+    "newName": "getAvailableModels",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/settings.ts",
+    "oldName": "getClaudeModelFlagSync",
+    "newName": "getClaudeModelFlag",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/settings.ts",
+    "oldName": "getDefaultSettingsSync",
+    "newName": "getDefaultSettings",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/settings.ts",
+    "oldName": "loadSettingsSync",
+    "newName": "loadSettings",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/shadow-state.ts",
+    "oldName": "needsSync",
+    "newName": "needs",
+    "skip": true,
+    "skipReason": "semantic false positive: \"Sync\" is a domain noun on an async function, not the twin suffix"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/shell.ts",
+    "oldName": "addAliasSync",
+    "newName": "addAlias",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/shell.ts",
+    "oldName": "detectShellSync",
+    "newName": "detectShell",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/shell.ts",
+    "oldName": "getAliasInstructionsSync",
+    "newName": "getAliasInstructions",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/shell.ts",
+    "oldName": "getShellRcFileSync",
+    "newName": "getShellRcFile",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/skills-merge.ts",
+    "oldName": "applyProjectTemplateOverlaySync",
+    "newName": "applyProjectTemplateOverlay",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/skills-merge.ts",
+    "oldName": "mergePanSkillsIntoWorkspaceSync",
+    "newName": "mergePanSkillsIntoWorkspace",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/skills-merge.ts",
+    "oldName": "mergeSkillsIntoWorkspaceSync",
+    "newName": "mergeSkillsIntoWorkspace",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/smart-model-selector.ts",
+    "oldName": "selectAllModelsSync",
+    "newName": "selectAllModels",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/smart-model-selector.ts",
+    "oldName": "selectModelSync",
+    "newName": "selectModel",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/smee.ts",
+    "oldName": "isSmeeConfiguredSync",
+    "newName": "isSmeeConfigured",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/smee.ts",
+    "oldName": "isSmeeProcessRunningSync",
+    "newName": "isSmeeProcessRunning",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/smee.ts",
+    "oldName": "startSmeeProcessSync",
+    "newName": "startSmeeProcess",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/smee.ts",
+    "oldName": "stopSmeeProcessSync",
+    "newName": "stopSmeeProcess",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/supervisor.ts",
+    "oldName": "getSupervisorPortSync",
+    "newName": "getSupervisorPort",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/supervisor.ts",
+    "oldName": "getSupervisorUrlSync",
+    "newName": "getSupervisorUrl",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/supervisor.ts",
+    "oldName": "isSupervisorRunningSync",
+    "newName": "isSupervisorRunning",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/supervisor.ts",
+    "oldName": "startSupervisorProcessSync",
+    "newName": "startSupervisorProcess",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/supervisor.ts",
+    "oldName": "stopSupervisorProcessSync",
+    "newName": "stopSupervisorProcess",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync-hooks.ts",
+    "oldName": "planHooksSyncSync",
+    "newName": "planHooksSync",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync-hooks.ts",
+    "oldName": "syncHooksSync",
+    "newName": "syncHooks",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync-startup-gate.ts",
+    "oldName": "isStartupSyncNeededSync",
+    "newName": "isStartupSyncNeeded",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync-startup-gate.ts",
+    "oldName": "writeSyncManifestSync",
+    "newName": "writeSyncManifest",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "executeSyncSync",
+    "newName": "executeSync",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "migrateStalePersonalContentSync",
+    "newName": "migrateStalePersonalContent",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "mirrorProjectSkillsSync",
+    "newName": "mirrorProjectSkills",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "planSyncSync",
+    "newName": "planSync",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "refreshCacheSync",
+    "newName": "refreshCache",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "removeLegacySkills070Sync",
+    "newName": "removeLegacySkills070",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "syncContextLayersSync",
+    "newName": "syncContextLayers",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "syncPiSettingsSync",
+    "newName": "syncPiSettings",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/sync.ts",
+    "oldName": "syncStatuslineSync",
+    "newName": "syncStatusline",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tldr-daemon.ts",
+    "oldName": "captureTldrMetricsSync",
+    "newName": "captureTldrMetrics",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tldr-daemon.ts",
+    "oldName": "getTldrDaemonServiceSync",
+    "newName": "getTldrDaemonService",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tldr-daemon.ts",
+    "oldName": "getTldrMetricsSync",
+    "newName": "getTldrMetrics",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tldr-daemon.ts",
+    "oldName": "listTldrDaemonServicesSync",
+    "newName": "listTldrDaemonServices",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tmux.ts",
+    "oldName": "findManagedServerPidSync",
+    "newName": "findManagedServerPid",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tmux.ts",
+    "oldName": "querySessionSync",
+    "newName": "querySession",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tmux.ts",
+    "oldName": "sanitizeManagedServerGlobalEnvSync",
+    "newName": "sanitizeManagedServerGlobalEnv",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tracker-utils.ts",
+    "oldName": "isGitHubIssueSync",
+    "newName": "isGitHubIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tracker-utils.ts",
+    "oldName": "parseGitHubReposSync",
+    "newName": "parseGitHubRepos",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tracker-utils.ts",
+    "oldName": "resolveGitHubIssueSync",
+    "newName": "resolveGitHubIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tracker-utils.ts",
+    "oldName": "resolveTrackerTypeSync",
+    "newName": "resolveTrackerType",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/traefik.ts",
+    "oldName": "cleanupStaleTlsSectionsSync",
+    "newName": "cleanupStaleTlsSections",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/traefik.ts",
+    "oldName": "cleanupTemplateFilesSync",
+    "newName": "cleanupTemplateFiles",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/traefik.ts",
+    "oldName": "ensureProjectCertsSync",
+    "newName": "ensureProjectCerts",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/traefik.ts",
+    "oldName": "generateOverdeckTraefikConfigSync",
+    "newName": "generateOverdeckTraefikConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/traefik.ts",
+    "oldName": "generateTlsConfigSync",
+    "newName": "generateTlsConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/tts-speak.ts",
+    "oldName": "buildTtsSpeakPayloadSync",
+    "newName": "buildTtsSpeakPayload",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/webhook-handlers.ts",
+    "oldName": "isTrackedRepositorySync",
+    "newName": "isTrackedRepository",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/work-agent-lifecycle.ts",
+    "oldName": "assertCanResumeSessionSync",
+    "newName": "assertCanResumeSession",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/work-agent-lifecycle.ts",
+    "oldName": "assertCanStartFreshSync",
+    "newName": "assertCanStartFresh",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-config.ts",
+    "oldName": "getDefaultWorkspaceConfigSync",
+    "newName": "getDefaultWorkspaceConfig",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-config.ts",
+    "oldName": "replacePlaceholdersSync",
+    "newName": "replacePlaceholders",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-manager/create.ts",
+    "oldName": "ensurePolyrepoWorkspaceGitignoreSync",
+    "newName": "ensurePolyrepoWorkspaceGitignore",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-manager/migration.ts",
+    "oldName": "copyOverdeckSettingsToWorkspaceSync",
+    "newName": "copyOverdeckSettingsToWorkspace",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-manager/migration.ts",
+    "oldName": "ensurePanGitignoreSync",
+    "newName": "ensurePanGitignore",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-manager/migration.ts",
+    "oldName": "migrateOverdeckToPanSync",
+    "newName": "migrateOverdeckToPan",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-manager/worktree-ops.ts",
+    "oldName": "preTrustDirectorySync",
+    "newName": "preTrustDirectory",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-manager/worktree-ops.ts",
+    "oldName": "restorePreWorktreeMetadataSync",
+    "newName": "restorePreWorktreeMetadata",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace-manager/worktree-ops.ts",
+    "oldName": "stagePreWorktreeMetadataSync",
+    "newName": "stagePreWorktreeMetadata",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace/devcontainer-renderer.ts",
+    "oldName": "createWorkspacePlaceholdersSync",
+    "newName": "createWorkspacePlaceholders",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace/devcontainer-renderer.ts",
+    "oldName": "processTemplatesSync",
+    "newName": "processTemplates",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace/devcontainer-renderer.ts",
+    "oldName": "renderDevcontainerSync",
+    "newName": "renderDevcontainer",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace/devcontainer-renderer.ts",
+    "oldName": "sanitizeComposeFileSync",
+    "newName": "sanitizeComposeFile",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/workspace/ensure-devcontainer.ts",
+    "oldName": "ensureDevcontainerSync",
+    "newName": "ensureDevcontainer",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/xbrief/acceptance-criteria.ts",
+    "oldName": "getXBriefACStatusSync",
+    "newName": "getXBriefACStatus",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/xbrief/io.ts",
+    "oldName": "findSpecByIssueSync",
+    "newName": "findSpecByIssue",
+    "skip": false
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/xbrief/lifecycle-io.ts",
+    "oldName": "findXBriefByIssueSync",
+    "newName": "findXBriefByIssue",
+    "skip": true,
+    "skipReason": "collision: would collide with an existing `findXBriefByIssue` in /home/eltmon/Projects/overdeck/.claude/worktrees/agent-a12ac8a1d36fb5b25/src/lib/xbrief/__tests__/xbrief-index.test.ts"
+  },
+  {
+    "kind": "sync",
+    "file": "src/lib/xbrief/lifecycle.ts",
+    "oldName": "ensureXBriefDirsSync",
+    "newName": "ensureXBriefDirs",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/agent-enrichment.ts",
+    "oldName": "scanPendingInputsPromise",
+    "newName": "scanPendingInputs",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/checkpoint/checkpoint-manager.ts",
+    "oldName": "captureCheckpointPromise",
+    "newName": "captureCheckpointBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/checkpoint/checkpoint-manager.ts",
+    "oldName": "deleteCheckpointPromise",
+    "newName": "deleteCheckpointBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/checkpoint/checkpoint-manager.ts",
+    "oldName": "diffCheckpointsPromise",
+    "newName": "diffCheckpointsBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/checkpoint/checkpoint-manager.ts",
+    "oldName": "diffCheckpointFilesPromise",
+    "newName": "diffCheckpointFilesBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/checkpoint/checkpoint-manager.ts",
+    "oldName": "getCheckpointTimestampPromise",
+    "newName": "getCheckpointTimestampBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/checkpoint/checkpoint-manager.ts",
+    "oldName": "listCheckpointsPromise",
+    "newName": "listCheckpointsBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/cloister/merge-rebase.ts",
+    "oldName": "rebaseFeatureBranchPromise",
+    "newName": "rebaseFeatureBranchBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/cloister/review-agent.ts",
+    "oldName": "spawnReviewRoleForIssuePromise",
+    "newName": "spawnReviewRoleForIssueBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/cloister/review-convoy.ts",
+    "oldName": "launchConvoyReviewersPromise",
+    "newName": "launchConvoyReviewers",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/cloister/review-monitor.ts",
+    "oldName": "waitForReviewerOutputsPromise",
+    "newName": "waitForReviewerOutputs",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/cloister/validation.ts",
+    "oldName": "autoRevertMergePromise",
+    "newName": "autoRevertMergeBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/codex-auth.ts",
+    "oldName": "checkCliproxyCodexAuthStatusPromise",
+    "newName": "checkCliproxyCodexAuthStatus",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/git-utils.ts",
+    "oldName": "isValidBranchNamePromise",
+    "newName": "isValidBranchName",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/git-utils.ts",
+    "oldName": "assertValidBranchNamePromise",
+    "newName": "assertValidBranchName",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/git-utils.ts",
+    "oldName": "renderWorkspaceGitShowPromise",
+    "newName": "renderWorkspaceGitShow",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/git-utils.ts",
+    "oldName": "snapshotWorkspaceHeadsPromise",
+    "newName": "snapshotWorkspaceHeads",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/github-app.ts",
+    "oldName": "generateInstallationTokenPromise",
+    "newName": "generateInstallationTokenBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/github-app.ts",
+    "oldName": "listIssuesWithAnyLabelPromise",
+    "newName": "listIssuesWithAnyLabel",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/github-app.ts",
+    "oldName": "refreshWorkspaceTokenPromise",
+    "newName": "refreshWorkspaceTokenBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/health.ts",
+    "oldName": "pingAgentPromise",
+    "newName": "pingAgentBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/health.ts",
+    "oldName": "handleStuckAgentPromise",
+    "newName": "handleStuckAgentBody",
+    "skip": false
+  },
+  {
+    "kind": "promise-body",
+    "file": "src/lib/health.ts",
+    "oldName": "runHealthCheckPromise",
+    "newName": "runHealthCheckBody",
+    "skip": false
+  },
+  {
+    "kind": "promise",
+    "file": "src/lib/runtimes/ohmypi-fifo.ts",
+    "oldName": "createOhmypiFifoPromise",
+    "newName": "createOhmypiFifo",
+    "skip": true,
+    "skipReason": "Oh My Pi (#4003)"
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/work/done-preflight.ts",
+    "oldName": "checkIncompletePlanItemsPromise",
+    "newName": "checkIncompletePlanItems",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/work/done-preflight.ts",
+    "oldName": "checkUncommittedChangesPromise",
+    "newName": "checkUncommittedChanges",
+    "skip": false
+  },
+  {
+    "kind": "promise-bare",
+    "file": "src/lib/workspace-manager/docker.ts",
+    "oldName": "teardownWorkspaceDockerByNamePromise",
+    "newName": "teardownWorkspaceDockerByName",
+    "skip": false
+  }
+]

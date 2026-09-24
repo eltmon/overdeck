@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { writeFile, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
@@ -111,16 +110,16 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
 
   let summary: string;
   try {
-    const result = await Effect.runPromise(generateSmartSummary({
+    const result = await generateSmartSummary({
       jsonlPath: sessionFile,
       model: settings.model,
       richMode: settings.richCompaction,
       mode: 'fork',
-    }));
+    });
     summary = result.summary;
   } catch (error) {
     console.warn(`[conversation-compaction] Smart summary failed, falling back to heuristic:`, error);
-    summary = await Effect.runPromise(generateFallbackSummary(sessionFile));
+    summary = await generateFallbackSummary(sessionFile);
   }
 
   const continuation = buildContinuationSummary(summary, settings.model);

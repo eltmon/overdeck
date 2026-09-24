@@ -6,7 +6,7 @@ Picker context labels describe the configured session budget. They are not a cla
 | --- | ---: | --- |
 | GPT-6 Astra; GPT-5.6 Sol, Terra, Luna | 272,000 | Installed Codex catalog default; explicit managed `model_context_window` pin. |
 | GPT-5.6 `[372k]` choices | 372,000 | Explicit opt-in; launch strips the Overdeck suffix while retaining the larger configuration. |
-| Fable 5.1, Fable 5, Opus 5/4.8/4.7, Sonnet 5 | 1,000,000 | Native 1M models. Claude account restrictions or a disabled-1M setting can reduce this. |
+| Fable 5.1, Fable 5, Opus 5.5/5/4.8/4.7, Sonnet 5 | 1,000,000 | Native 1M models. Claude account restrictions or a disabled-1M setting can reduce this. |
 | Opus 4.6, Sonnet 4.6, Haiku 4.5 | 200,000 | Conservative managed budget; older extended-context entitlements vary by plan. |
 | Gemini 3.8 Flash, 3.5 Flash Lite | 1,048,576 | Google input limit; 65,536 max output. New models provisioned into the omp registry. |
 | GLM 5.3 / 5.2 | 1,000,000 | 128K max output. GLM 5.3 accepts Low/High/Max and always reasons. |
@@ -30,7 +30,7 @@ API long-input pricing and subscription allowance consumption are distinct. Do n
 
 ## Price labels
 
-Anthropic badges now use the published equal input/output average: Fable $30/M, Opus $15/M, and Haiku $3/M. Earlier Fable/Opus values were inflated ranking heuristics displayed as dollar prices. Sonnet 5 remains $2/M input and $10/M output; the planned September increase was cancelled. See [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing). These API estimates are not subscription charges. Unverified DashScope zero-price placeholders say “See pricing” rather than claiming free usage.
+Anthropic badges use the published equal input/output average: Fable $30/M, Opus 5.5 $12/M, Opus 5 and earlier $15/M, and Haiku $3/M. Earlier Fable/Opus values were inflated ranking heuristics displayed as dollar prices. Sonnet 5 remains $2/M input and $10/M output; the planned September increase was cancelled. See [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing). These API estimates are not subscription charges. Unverified DashScope zero-price placeholders say “See pricing” rather than claiming free usage.
 
 ## Effort
 
@@ -45,6 +45,7 @@ Kimi's bare Overdeck `k3` historically denotes the smaller window. It now transl
 - [OpenAI Astra API model](https://developers.openai.com/api/docs/models/gpt-6-astra)
 - [Codex configuration reference](https://developers.openai.com/codex/config-reference)
 - [Claude Code model, effort, and context configuration](https://code.claude.com/docs/en/model-config): Fable 5.1 requires Claude Code 2.1.255 or newer. Availability depends on the account.
+- [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview): `claude-opus-5-5`, 1M context, 128K maximum output, $4/M input, $20/M output, and $0.20/M cache reads.
 - [Fable 5.1](https://platform.claude.com/docs/en/models/fable-5-1/overview) and [pricing changes](https://platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1): $10/M input, $50/M output, $0.25/M cache reads.
 - [Gemini model catalog](https://ai.google.dev/gemini-api/docs/models), [3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [3.5 Flash Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
 - [GLM 5.3](https://docs.z.ai/guides/llm/glm-5.3): some accounts with a Coding Plan history currently require the OpenAI-compatible endpoint; the Anthropic route is not universally available.

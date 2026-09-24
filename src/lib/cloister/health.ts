@@ -133,22 +133,6 @@ export function getAgentHealth(
 }
 
 /**
- * Get health status for multiple agents
- *
- * @param agentIds - Array of agent identifiers
- * @param runtime - Runtime to query for heartbeats
- * @param thresholds - Health thresholds (optional, uses config if not provided)
- * @returns Array of agent health statuses
- */
-export function getMultipleAgentHealth(
-  agentIds: string[],
-  runtime: AgentRuntimeSync,
-  thresholds?: { stale: number; warning: number; stuck: number }
-): AgentHealth[] {
-  return agentIds.map((agentId) => getAgentHealth(agentId, runtime, thresholds));
-}
-
-/**
  * Generate health summary from agent health statuses
  *
  * @param agentHealths - Array of agent health statuses
@@ -182,26 +166,6 @@ export function needsAttention(health: AgentHealth): boolean {
 }
 
 /**
- * Check if an agent should be poked (warning state)
- *
- * @param health - Agent health status
- * @returns True if agent should be poked
- */
-export function shouldPoke(health: AgentHealth): boolean {
-  return health.state === 'warning';
-}
-
-/**
- * Check if an agent should be killed (stuck state)
- *
- * @param health - Agent health status
- * @returns True if agent should be killed
- */
-export function shouldKill(health: AgentHealth): boolean {
-  return health.state === 'stuck';
-}
-
-/**
  * Get agents that need attention
  *
  * @param agentHealths - Array of agent health statuses
@@ -209,26 +173,6 @@ export function shouldKill(health: AgentHealth): boolean {
  */
 export function getAgentsNeedingAttention(agentHealths: AgentHealth[]): AgentHealth[] {
   return agentHealths.filter(needsAttention);
-}
-
-/**
- * Get agents that should be poked
- *
- * @param agentHealths - Array of agent health statuses
- * @returns Array of agents to poke
- */
-export function getAgentsToPoke(agentHealths: AgentHealth[]): AgentHealth[] {
-  return agentHealths.filter(shouldPoke);
-}
-
-/**
- * Get agents that should be killed
- *
- * @param agentHealths - Array of agent health statuses
- * @returns Array of agents to kill
- */
-export function getAgentsToKill(agentHealths: AgentHealth[]): AgentHealth[] {
-  return agentHealths.filter(shouldKill);
 }
 
 /**
@@ -255,47 +199,5 @@ export function formatDuration(ms: number | null): string {
     return `${minutes}m`;
   } else {
     return `${seconds}s`;
-  }
-}
-
-/**
- * Get health emoji for a health state
- *
- * @param state - Health state
- * @returns Emoji representing the state
- */
-export function getHealthEmoji(state: HealthState): string {
-  switch (state) {
-    case 'active':
-      return '🟢';
-    case 'stale':
-      return '🟡';
-    case 'warning':
-      return '🟠';
-    case 'stuck':
-      return '🔴';
-    case 'wedged':
-      return '🧱';
-  }
-}
-
-/**
- * Get health label for a health state
- *
- * @param state - Health state
- * @returns Human-readable label
- */
-export function getHealthLabel(state: HealthState): string {
-  switch (state) {
-    case 'active':
-      return 'Active';
-    case 'stale':
-      return 'Stale';
-    case 'warning':
-      return 'Warning';
-    case 'stuck':
-      return 'Stuck';
-    case 'wedged':
-      return 'Wedged';
   }
 }

@@ -108,75 +108,6 @@ export function shouldSkipCheckpointReconciliation(agent: Pick<AgentSnapshot, 's
   return !agent.workspace || isTerminalTurnDiffSummaryStatus(agent.status)
 }
 
-type IssueReadSourceState = {
-  identifier?: unknown;
-  id?: unknown;
-  status?: unknown;
-  state?: unknown;
-  canonicalStatus?: unknown;
-  rawTrackerState?: unknown;
-  completedAt?: unknown;
-}
-
-function normalizeIssueId(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed ? trimmed.toUpperCase() : null;
-}
-
-export function getClosedIssueIdsForReadSource(issues: unknown[]): Set<string> {
-  const closed = new Set<string>();
-  for (const issue of issues) {
-    if (!issue || typeof issue !== 'object') continue;
-    const item = issue as IssueReadSourceState;
-    const issueId = normalizeIssueId(item.identifier) ?? normalizeIssueId(item.id);
-    if (!issueId) continue;
-    const state = String(item.state ?? '').toLowerCase();
-    const status = String(item.status ?? '').toLowerCase();
-    const canonicalStatus = String(item.canonicalStatus ?? '').toLowerCase();
-    const rawTrackerState = String(item.rawTrackerState ?? '').toLowerCase();
-    if (
-      item.completedAt ||
-      state === 'closed' ||
-      status === 'done' ||
-      status === 'closed' ||
-      status === 'cancelled' ||
-      status === 'canceled' ||
-      status === 'completed' ||
-      canonicalStatus === 'done' ||
-      canonicalStatus === 'closed' ||
-      canonicalStatus === 'cancelled' ||
-      canonicalStatus === 'canceled' ||
-      canonicalStatus === 'completed' ||
-      rawTrackerState === 'closed' ||
-      rawTrackerState === 'done' ||
-      rawTrackerState === 'completed'
-    ) {
-      closed.add(issueId);
-    }
-  }
-  return closed;
-}
-
-export function pruneAgentsForReadSource(
-  agentsById: Record<string, AgentSnapshot>,
-  issues: unknown[],
-): { agentsById: Record<string, AgentSnapshot>; prunedCount: number } {
-  const closedIssueIds = getClosedIssueIdsForReadSource(issues);
-  const nextAgentsById: Record<string, AgentSnapshot> = {};
-  let prunedCount = 0;
-
-  for (const agent of Object.values(agentsById)) {
-    if (closedIssueIds.has(agent.issueId.toUpperCase())) {
-      prunedCount++;
-      continue;
-    }
-    nextAgentsById[agent.id] = agent;
-  }
-
-  return { agentsById: nextAgentsById, prunedCount };
-}
-
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
 let _cachedEventStore: any = null;
 
@@ -239,7 +170,7 @@ function cleanIssues(issues: unknown[]): unknown[] {
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer", "knowledge"]);
+const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer", "knowledge", "worker"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"]);
 type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent';
 type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
@@ -302,7 +233,7 @@ function overdeckStatusToLegacy(
   return status; // 'starting' | 'running' | 'stopped' are 1:1
 }
 
-function agentSnapshotFromOverdeck(agent: OverdeckAgent): AgentSnapshot {
+export function agentSnapshotFromOverdeck(agent: OverdeckAgent): AgentSnapshot {
   return {
     id: agent.id,
     issueId: agent.issueId,
@@ -426,12 +357,6 @@ export const ReadModelServiceLive = Layer.effect(
         console.error('[ReadModel] Failed to refresh issues for snapshot:', err);
       }
 
-      const pruned = pruneAgentsForReadSource(state.agentsById, state.issuesRaw);
-      if (pruned.prunedCount > 0) {
-        state = { ...state, agentsById: pruned.agentsById };
-        console.log(`[ReadModel] Pruned ${pruned.prunedCount} stale agent${pruned.prunedCount === 1 ? '' : 's'} from read source`);
-      }
-
       // PAN-3917: the derived read models are recomputed, never replayed. Seed
       // both maps from their owners so a fresh connect sees current facts even
       // before the next change event.
@@ -525,7 +450,7 @@ export const ReadModelServiceLive = Layer.effect(
           // Run against the first agent's workspace (all worktrees share the same parent .git).
           const firstAgentWithWorkspace = agents.find(a => a.workspace);
           if (firstAgentWithWorkspace?.workspace) {
-            const deleted = await Effect.runPromise(deleteLegacyCheckpointRefs(firstAgentWithWorkspace.workspace));
+            const deleted = await deleteLegacyCheckpointRefs(firstAgentWithWorkspace.workspace);
             if (deleted > 0) {
               console.log(`[ReadModel] Deleted ${deleted} legacy unscoped checkpoint refs`);
             }

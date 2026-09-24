@@ -4,7 +4,7 @@ import { mkdir, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ComposerCommandResult } from '@overdeck/contracts';
 import { emitActivityEntryOncePortable } from '../activity-logger.js';
-import { getDashboardLoopbackApiUrlSync } from '../config.js';
+import { getDashboardLoopbackApiUrl } from '../config.js';
 import { spawnPanCli } from '../pan-cli-invocation.js';
 import { getOverdeckHome } from '../paths.js';
 
@@ -27,7 +27,7 @@ export async function runComposerReload(
   delete env.OVERDECK_AGENT_ID;
   delete env.OVERDECK_ISSUE_ID;
   delete env.DASHBOARD_URL;
-  env.OVERDECK_DASHBOARD_URL = getDashboardLoopbackApiUrlSync();
+  env.OVERDECK_DASHBOARD_URL = getDashboardLoopbackApiUrl();
   env.OVERDECK_RESTART_INITIATOR = 'operator:composer';
   env.OVERDECK_COMPOSER_RELOAD_ACTIVITY = activityId;
   env.OVERDECK_COMPOSER_RELOAD_LOG = logPath;

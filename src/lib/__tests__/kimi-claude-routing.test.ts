@@ -14,8 +14,8 @@ vi.mock('../config-yaml.js', async (importOriginal) => {
 });
 
 import { getAgentRuntimeBaseCommand, getRoleRuntimeBaseCommand } from '../agents/runtime-command.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, PROVIDERS, getProviderEnvSync, resolveKimiModelForEndpoint } from '../providers.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, PROVIDERS, getProviderEnv, resolveKimiModelForEndpoint } from '../providers.js';
 
 describe('Claude Code K2.7 endpoint routing', () => {
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe('Claude Code K2.7 endpoint routing', () => {
     ['sk-platform-test', 'kimi-k2.7-code', KIMI_PLATFORM_BASE_URL],
   ])('uses the correct main and tier IDs for %s', async (apiKey, wireModel, endpoint) => {
     routing.apiKey = apiKey;
-    const env = getProviderEnvSync(PROVIDERS.kimi, apiKey, 'claude-code');
+    const env = getProviderEnv(PROVIDERS.kimi, apiKey, 'claude-code');
     expect(env.ANTHROPIC_BASE_URL).toBe(endpoint);
     expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe(endpoint === KIMI_CODING_BASE_URL ? 'k3-256k' : 'k3');
     expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('k3[1m]');
@@ -39,7 +39,7 @@ describe('Claude Code K2.7 endpoint routing', () => {
     const roleCommand = await getRoleRuntimeBaseCommand('kimi-k2.7-code', 'agent-test', 'review', 'claude-code', 'supervisor');
     expect(roleCommand).toContain(`--model '${wireModel}'`);
     for (const spawnMode of [undefined, 'conversation'] as const) {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         role: 'work', workingDir: '/workspace', harness: 'claude-code',
         model: 'kimi-k2.7-code', baseCommand, spawnMode,
       });
@@ -59,7 +59,7 @@ describe('Claude Code K2.7 endpoint routing', () => {
     routing.apiKey = 'sk-kimi-test';
     expect(await getAgentRuntimeBaseCommand('kimi-k2.7-code', undefined, undefined, 'ohmypi'))
       .toContain("--model 'kimi-k2.7-code'");
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       role: 'work', workingDir: '/workspace', harness: 'kimi-code',
       kimiCodeModel: 'kimi-k2.7-code',
     });

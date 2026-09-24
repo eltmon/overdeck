@@ -71,14 +71,20 @@ cd "$D" && vercel deploy --prod --yes
 The Mintlify docs are currently published at `panopticon-cli.com` (Mintlify-hosted on
 Vercel). Move them to `docs.overdeck.ai`.
 
-1. **Add the custom domain in Mintlify.** In the Mintlify dashboard (dashboard.mintlify.com)
-   → your project → Settings → Domains → add `docs.overdeck.ai`. Mintlify provides a
-   CNAME target (e.g. `host.mintlify.com` or a Vercel-managed endpoint).
+1. **Add the custom domain in Mintlify.** https://app.mintlify.com/settings/deployment/custom-domain
+   → **Add domain** `docs.overdeck.ai` (or `npx mint login && npx mint add-domain docs.overdeck.ai`).
+   The dashboard then shows two verification `TXT` values; the `CNAME` target is fixed
+   (verified 2026-09-19 against Mintlify's custom-domain doc).
 
-2. **Configure DNS in Cloudflare.** Add the CNAME Mintlify specifies:
-   - `CNAME docs.overdeck.ai → <mintlify-provided-target>`.
-   - Cloudflare proxy: Mintlify generally requires DNS-only (grey cloud) so their edge
-     serves the SSL cert; enable proxying only if Mintlify documents it's supported.
+2. **Configure DNS in Cloudflare** — all three records **DNS only (grey cloud)**, add-only,
+   leave the apex/`www` records and zone-level SSL settings untouched. Do NOT copy
+   `panopticon-cli.com`'s `A 76.76.21.21`; that is the legacy Vercel-hosted flow.
+   - `TXT   _acme-challenge.docs       → <value from Mintlify dashboard>`
+   - `TXT   _cf-custom-hostname.docs   → <value from Mintlify dashboard>`
+   - `CNAME docs                       → cname.mintlify.builders`
+   Nothing is live on the hostname yet, so all three can go in at once; HTTPS lags until
+   Let's Encrypt provisioning finishes. If the TXT checks stall, click **Retry validation**
+   in the Mintlify dashboard.
 
 3. **Verify.** `curl -sI https://docs.overdeck.ai` should return 308 → `/introduction`
    (Mintlify's entry redirect), matching the current `panopticon-cli.com` behavior.

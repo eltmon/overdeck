@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   mergeRun: null as { phase: string } | null,
 }));
 
-vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(),
   messageAgent: vi.fn(),
@@ -68,7 +68,7 @@ vi.mock('../../../../../lib/cloister/verification-runner.js', () => ({
 }));
 
 vi.mock('../../../../../lib/github-app.js', () => ({
-  getCiCheckRunsStatePromise: vi.fn(async () => ({
+  getCiCheckRunsState: vi.fn(async () => ({
     green: true,
     total: 2,
     successCount: 2,
@@ -83,10 +83,10 @@ vi.mock('../../../../../lib/github-app.js', () => ({
 }));
 
 vi.mock('../../../../../lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: vi.fn(() => ({
+  ensureMergeSetForIssue: vi.fn(() => ({
     repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }],
   })),
-  getMergeSetSync: vi.fn(() => ({
+  getMergeSet: vi.fn(() => ({
     repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }],
   })),
 }));
@@ -100,7 +100,7 @@ vi.mock('../../../../../lib/overdeck/merge.js', () => ({
 }));
 
 vi.mock('../../../../../lib/projects.js', () => ({
-  findProjectByTeamSync: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
+  findProjectByTeam: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
 }));
 
 // PAN-3917: readiness is derived from the forge, not read off a record.
@@ -116,7 +116,9 @@ vi.mock('../../../../../lib/tmux.js', () => ({
   // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   sessionExists: vi.fn(() => Effect.succeed(false)),
 }));
 
@@ -140,9 +142,9 @@ vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
   advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: mocks.ensureAgentReadyForMerge,
+  forgeMergeGateRefusal: vi.fn(async () => null),
   mergeVerificationOptions: vi.fn(() => ({})),
   normalMergeEligibility: vi.fn(() => null),
-  readStrikeHead: vi.fn(async () => null),
   rebaseWithAgentFallback: vi.fn(async () => {
     try {
       await mocks.ensureAgentReadyForMerge();
@@ -189,7 +191,7 @@ describe('triggerMerge clean PR direct merge', () => {
     mocks.derivedState = 'ready';
     mocks.mergeRun = null;
     mocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState());
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
     mocks.ensureAgentReadyForMerge.mockRejectedValue(new Error('rebase flow reached'));
     mocks.exec.mockImplementation(async (command) => ({
@@ -222,7 +224,7 @@ describe('triggerMerge clean PR direct merge', () => {
   });
 
   it('uses the rebase flow when GitHub reports the PR behind', async () => {
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState({ mergeableState: 'behind' })));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ mergeableState: 'behind' }));
 
     const result = await triggerMerge('PAN-3110');
 
@@ -232,7 +234,7 @@ describe('triggerMerge clean PR direct merge', () => {
   });
 
   it('uses the rebase flow while clean PR checks are pending', async () => {
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState({ checksPending: true })));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ checksPending: true }));
 
     const result = await triggerMerge('PAN-3110');
 
@@ -242,7 +244,7 @@ describe('triggerMerge clean PR direct merge', () => {
   });
 
   it('falls back to the rebase flow when the PR-state fetch fails', async () => {
-    mocks.getPullRequestState.mockReturnValue(Effect.fail(new Error('GitHub unavailable')));
+    mocks.getPullRequestState.mockRejectedValue(new Error('GitHub unavailable'));
 
     const result = await triggerMerge('PAN-3110');
 

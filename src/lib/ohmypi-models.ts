@@ -19,7 +19,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 import { getDashScopeUpstreamBaseUrl } from './openai-compatible-proxy.js';
-import { getProviderForModelSync } from './providers.js';
+import { getProviderForModel } from './providers.js';
 
 interface OmpModelDef {
   id: string;
@@ -88,7 +88,7 @@ const PROVISIONED_PROVIDERS = new Set(['dashscope', 'google']);
  */
 export function provisionOhmypiProviderForModel(modelId: string, agentDir?: string): void {
   const prefix = modelId.split('/')[0];
-  const providerName = PROVISIONED_PROVIDERS.has(prefix) ? prefix : getProviderForModelSync(modelId).name;
+  const providerName = PROVISIONED_PROVIDERS.has(prefix) ? prefix : getProviderForModel(modelId).name;
   const def = ompProviderDef(providerName);
   if (!def) return;
 

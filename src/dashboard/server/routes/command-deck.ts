@@ -1,5 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
-import { buildChildEnvSync } from '../../../lib/child-env.js';
+import { buildChildEnv } from '../../../lib/child-env.js';
 /**
  * Command Deck route module — Effect HttpRouter.Layer (PAN-428 B13)
  *
@@ -33,25 +33,24 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 
-import { getAgentRuntimeState, getAgentStateSync, listRunningAgents } from '../../../lib/agents.js';
+import { getAgentRuntimeState, getAgentState, listRunningAgents } from '../../../lib/agents.js';
 import type { ModelOriginData } from '../../../lib/config-yaml.js';
 import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
-import { detectAwaitingInputForAgent, detectAwaitingInputFromPaneSync, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
-import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
+import { detectAwaitingInputForAgent, detectAwaitingInputFromPane, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
+import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePane, listSessionNames } from '../../../lib/tmux.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { getBackendPanesForIssue } from '../services/backend-inventory.js';
 import { getDerivedIssueState } from '../services/derived-issue-state.js';
-import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { AgentSnapshot, BackendPane, SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPrdAnywhereSync, readPrdContent } from '../../../lib/prd-locations.js';
+import { findPrdAnywhere, readPrdContent } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
-import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
-import { getAgentCommandSync } from '../../../lib/settings.js';
+import { getAgentCommand } from '../../../lib/settings.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
@@ -237,7 +236,7 @@ export async function fetchActivityDataWithContext(
   context: ActivityContext = {},
 ): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const includeTranscripts = context.includeTranscripts ?? true;
 
   // Use shared tmux session names if provided, else fetch once (PAN-821)
@@ -295,7 +294,7 @@ export async function fetchActivityDataWithContext(
     const agentDir = join(agentsDir, checkId);
     // PAN-1908: the agents registry decides whether a session exists — never
     // the ~/.overdeck/agents/<id>/ dir, which janitors remove after sessions end.
-    const state = getAgentStateSync(checkId);
+    const state = getAgentState(checkId);
     if (!state) continue;
 
     try {
@@ -309,7 +308,7 @@ export async function fetchActivityDataWithContext(
       let transcriptFromPane = false;
       if (includeTranscripts) {
         try {
-          transcript = (await Effect.runPromise(capturePane(checkId, 500))).trim();
+          transcript = (await capturePane(checkId, 500)).trim();
           transcriptFromPane = transcript.length > 0;
         } catch { /* agent may not be running */ }
 
@@ -334,9 +333,9 @@ export async function fetchActivityDataWithContext(
       const awaitingInput = projectedAwaitingInput !== undefined
         ? projectedAwaitingInput
         : transcriptFromPane
-          ? detectAwaitingInputFromPaneSync(transcript, { isPlanning })
+          ? detectAwaitingInputFromPane(transcript, { isPlanning })
           : tmuxSessionNames.has(checkId)
-            ? await Effect.runPromise(detectAwaitingInputForAgent(checkId, { isPlanning }))
+            ? await detectAwaitingInputForAgent(checkId, { isPlanning })
             : null;
       const agentSnapshot = context.agentSnapshotsById?.get(checkId);
 
@@ -509,7 +508,7 @@ export async function fetchActivityDataWithContext(
     // left state behind. Without that check the synthetic `agent-<issue>-ship`
     // id is probed for a transcript on every read and API-driven merges grow a
     // phantom conversation row.
-    if (nodeType === 'ship' && !pane && !getAgentStateSync(sessionId)) continue;
+    if (nodeType === 'ship' && !pane && !getAgentState(sessionId)) continue;
     const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
     if (!pane && !jsonlPath) continue;
     const { status, presence } = nodeStatusFor(pane);
@@ -519,7 +518,7 @@ export async function fetchActivityDataWithContext(
     const transcriptParts: string[] = [`${nodeType.toUpperCase()} ${status === 'running' ? 'IN PROGRESS...' : 'PASSED'}`];
     if (includeTranscripts && status === 'running') {
       try {
-        const output = (await Effect.runPromise(capturePane(sessionId, 100))).trim();
+        const output = (await capturePane(sessionId, 100)).trim();
         if (output) transcriptParts.push(`\n--- Live Output ---\n${output}`);
       } catch { /* pane may not be a tmux session */ }
     }
@@ -565,8 +564,8 @@ export async function fetchActivityDataWithContext(
       aggregateCost = cached.data.totalCost;
       costByStage = cached.data.costByStage;
     } else {
-      syncCacheSync();
-      const issueData = getCostsForIssueSync(cacheKey);
+      syncCache();
+      const issueData = getCostsForIssue(cacheKey);
       if (issueData) {
         aggregateCost = issueData.totalCost;
         costByStage = Object.fromEntries(
@@ -624,7 +623,7 @@ async function fetchPlanningData(
   options: { summaryOnly?: boolean } = {},
 ): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const summaryOnly = options.summaryOnly ?? false;
 
   const projectPath = getProjectPath(issuePrefix);
@@ -670,7 +669,7 @@ async function fetchPlanningData(
   } catch { /* no xBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
-    const prdLocation = findPrdAnywhereSync(projectPath, issueId);
+    const prdLocation = findPrdAnywhere(projectPath, issueId);
     const prd = prdLocation ? await readPrdContent(prdLocation) : null;
     if (prd) {
       result.prd = prd;
@@ -706,10 +705,10 @@ async function fetchPlanningData(
   }
 
   if (!result.prd) {
-    // findPrdAnywhereSync covers legacy docs/prds roots and canonical
+    // findPrdAnywhere covers legacy docs/prds roots and canonical
     // drafts/<issue>.md on the state branch, which the status-only loop missed,
     // so promoted PRDs were invisible here.
-    const prdLocation = findPrdAnywhereSync(projectPath, issueId);
+    const prdLocation = findPrdAnywhere(projectPath, issueId);
     const content = prdLocation ? await readPrdContent(prdLocation) : null;
     if (content) {
       result.prd = content;
@@ -819,7 +818,7 @@ async function generateStatusReview(issueId: string): Promise<
   | { type: 'err'; response: unknown; status: number }
 > {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -970,20 +969,20 @@ Be specific: reference actual file names, function names, requirement text, disc
   const apiSettings = loadSettingsApi();
   const statusModelId = (apiSettings.models?.overrides as Record<string, string>)?.['status-review']
     || 'claude-sonnet-5';
-  const { command: cliCmd, args: cliArgs } = getAgentCommandSync(statusModelId);
+  const { command: cliCmd, args: cliArgs } = getAgentCommand(statusModelId);
   const modelFlag = cliArgs.length > 0 ? ` ${cliArgs.join(' ')}` : '';
   const promptFile = join(planningDir, '.status-review-prompt.tmp');
 
   // Build provider env vars for non-Anthropic models
-  const { getProviderForModelSync, getProviderEnvSync } = await import('../../../lib/providers.js');
+  const { getProviderForModel, getProviderEnv } = await import('../../../lib/providers.js');
   let providerEnvStr = '';
   let providerEnv: Record<string, string> = {};
-  const statusProvider = getProviderForModelSync(statusModelId);
+  const statusProvider = getProviderForModel(statusModelId);
   if (statusProvider.name !== 'anthropic') {
     const { config } = loadYamlConfig();
     const apiKey = config.apiKeys[statusProvider.name as keyof typeof config.apiKeys];
     if (apiKey) {
-      providerEnv = getProviderEnvSync(statusProvider, apiKey);
+      providerEnv = getProviderEnv(statusProvider, apiKey);
       providerEnvStr = Object.entries(providerEnv).map(([k, v]) => `${k}="${v}"`).join(' ') + ' ';
     }
   }
@@ -992,7 +991,7 @@ Be specific: reference actual file names, function names, requirement text, disc
   console.log(`[status-review] ${issueId}: generating with ${providerEnvStr}${cliCmd}${modelFlag}`);
 
   try {
-    const env = buildChildEnvSync(process.env, providerEnv);
+    const env = buildChildEnv(process.env, providerEnv);
     const promptContent = await readFile(promptFile, 'utf-8');
     const { stdout: aiReview } = await execAsync(
       `${cliCmd} -p${modelFlag} --no-session-persistence`,
@@ -1061,7 +1060,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
 
     const { type, filename, content } = body as { type?: string; filename?: string; content?: string };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     if (!type || !filename || !content) {
       return jsonResponse({ error: 'type, filename, and content are required' }, { status: 400 });
@@ -1105,7 +1104,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: 'Invalid issue id: ' + issueId }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -1113,7 +1112,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     const { tracker } = body as { tracker?: string };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     if (!tracker || !['github', 'linear', 'rally'].includes(tracker)) {
       return jsonResponse({ error: 'tracker must be github, linear, or rally' }, { status: 400 });
@@ -1270,7 +1269,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
 
     const { shadow } = body as { shadow?: boolean };
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);

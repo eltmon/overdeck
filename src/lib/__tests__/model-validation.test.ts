@@ -9,7 +9,7 @@ import {
   resumeAgent,
   spawnRun,
 } from '../agents.js';
-import { normalizeModelOverrideSync, requireModelOverrideSync, shellQuoteModelIdSync } from '../model-validation.js';
+import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from '../model-validation.js';
 
 const MALICIOUS_MODEL = 'claude-sonnet-4-6; touch /tmp/pan-model-pwned #';
 
@@ -19,19 +19,19 @@ function expectModelRejection(fn: () => unknown | Promise<unknown>) {
 
 describe('model override validation', () => {
   it('normalizes safe provider model identifiers and rejects shell metacharacters', () => {
-    expect(normalizeModelOverrideSync(' qwen/qwen3.6-plus:free ')).toBe('qwen/qwen3.6-plus:free');
-    expect(normalizeModelOverrideSync(' oai@gpt-5.5 ')).toBe('oai@gpt-5.5');
-    expect(normalizeModelOverrideSync(' k3[1m] ')).toBe('k3[1m]');
-    expect(normalizeModelOverrideSync('')).toBeUndefined();
-    expect(() => normalizeModelOverrideSync(MALICIOUS_MODEL)).toThrow(/model must match/);
-    expect(() => normalizeModelOverrideSync('claude-sonnet-4-6 && whoami')).toThrow(/model must match/);
-    expect(() => normalizeModelOverrideSync('claude-sonnet-4-6\nwhoami')).toThrow(/model must match/);
+    expect(normalizeModelOverride(' qwen/qwen3.6-plus:free ')).toBe('qwen/qwen3.6-plus:free');
+    expect(normalizeModelOverride(' oai@gpt-5.5 ')).toBe('oai@gpt-5.5');
+    expect(normalizeModelOverride(' k3[1m] ')).toBe('k3[1m]');
+    expect(normalizeModelOverride('')).toBeUndefined();
+    expect(() => normalizeModelOverride(MALICIOUS_MODEL)).toThrow(/model must match/);
+    expect(() => normalizeModelOverride('claude-sonnet-4-6 && whoami')).toThrow(/model must match/);
+    expect(() => normalizeModelOverride('claude-sonnet-4-6\nwhoami')).toThrow(/model must match/);
   });
 
   it('quotes validated model ids before launcher command interpolation', () => {
-    expect(requireModelOverrideSync('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
-    expect(shellQuoteModelIdSync('qwen/qwen3.6-plus:free')).toBe("'qwen/qwen3.6-plus:free'");
-    expect(shellQuoteModelIdSync('k3[1m]')).toBe("'k3[1m]'");
+    expect(requireModelOverride('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
+    expect(shellQuoteModelId('qwen/qwen3.6-plus:free')).toBe("'qwen/qwen3.6-plus:free'");
+    expect(shellQuoteModelId('k3[1m]')).toBe("'k3[1m]'");
   });
 
   it('rejects malicious model overrides in agent model resolution', () => {

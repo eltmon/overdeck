@@ -77,43 +77,43 @@ describe('hook sync reports what it actually changed (PAN-3327)', () => {
   });
 
   it('marks a byte-identical deployed hook as current, not updated', async () => {
-    const { planHooksSyncSync } = await loadSync();
+    const { planHooksSync } = await loadSync();
     hookSource('stop-hook', '#!/bin/bash\necho same\n');
     deployedHook('stop-hook', '#!/bin/bash\necho same\n');
 
-    expect(planHooksSyncSync()).toEqual([
+    expect(planHooksSync()).toEqual([
       expect.objectContaining({ name: 'stop-hook', status: 'current' }),
     ]);
   });
 
   it('marks a diverged deployed hook as updated', async () => {
-    const { planHooksSyncSync } = await loadSync();
+    const { planHooksSync } = await loadSync();
     hookSource('stop-hook', '#!/bin/bash\necho fixed\n');
     deployedHook('stop-hook', '#!/bin/bash\necho stale\n');
 
-    expect(planHooksSyncSync()).toEqual([
+    expect(planHooksSync()).toEqual([
       expect.objectContaining({ name: 'stop-hook', status: 'updated' }),
     ]);
   });
 
   it('marks a hook with no deployed copy as new', async () => {
-    const { planHooksSyncSync } = await loadSync();
+    const { planHooksSync } = await loadSync();
     hookSource('stop-hook', '#!/bin/bash\necho new\n');
 
-    expect(planHooksSyncSync()).toEqual([
+    expect(planHooksSync()).toEqual([
       expect.objectContaining({ name: 'stop-hook', status: 'new' }),
     ]);
   });
 
   it('separates changed from unchanged hooks and names the source tree', async () => {
-    const { syncHooksSync } = await loadSync();
+    const { syncHooks } = await loadSync();
     hookSource('changed-hook', '#!/bin/bash\necho fixed\n');
     deployedHook('changed-hook', '#!/bin/bash\necho stale\n');
     hookSource('same-hook', '#!/bin/bash\necho same\n');
     deployedHook('same-hook', '#!/bin/bash\necho same\n');
     hookSource('new-hook', '#!/bin/bash\necho new\n');
 
-    const result = syncHooksSync();
+    const result = syncHooks();
 
     expect(result.errors).toEqual([]);
     expect(result.synced.sort()).toEqual(['changed-hook', 'new-hook', 'same-hook']);

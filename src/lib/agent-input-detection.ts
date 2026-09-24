@@ -1,6 +1,4 @@
-import { Effect } from 'effect'
 import { capturePane } from './tmux.js'
-import { TmuxError } from './errors.js'
 
 export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'session_resume' | 'rate_limit' | 'other'
 
@@ -228,7 +226,7 @@ function looksLikeCodexApprovalHeader(line: string): boolean {
   return /Would you like to (?:run the following command|grant these permissions?|make the following edits|allow|apply)\b/i.test(line)
 }
 
-export function detectAwaitingInputFromPaneSync(
+export function detectAwaitingInputFromPane(
   pane: string,
   options: { isPlanning?: boolean } = {},
 ): AwaitingInputDetection | null {
@@ -324,7 +322,14 @@ export function detectAwaitingInputFromPaneSync(
   }
 
   return null
-}async function detectAwaitingInputForAgentPromise(
+}
+
+/**
+ * Detect whether an agent's pane is waiting for input (question, menu, rate
+ * limit, …). Concurrent calls for the same pane share one detection unless
+ * `cache: false`. Rejects when the pane capture fails outside the cache path.
+ */
+export async function detectAwaitingInputForAgent(
   agentId: string,
   options: { isPlanning?: boolean; lines?: number; cache?: boolean } = {},
 ): Promise<AwaitingInputDetection | null> {
@@ -347,8 +352,8 @@ export function detectAwaitingInputFromPaneSync(
   }
 
   const detectionPromise = withPaneDetectionSlot(async () => {
-    const pane = await Effect.runPromise(capturePane(agentId, options.lines ?? 90))
-    const detection = detectAwaitingInputFromPaneSync(pane, options)
+    const pane = await capturePane(agentId, options.lines ?? 90)
+    const detection = detectAwaitingInputFromPane(pane, options)
     if (cacheEnabled) {
       paneDetectionCache.set(cacheKey, {
         expiresAt: Date.now() + PANE_DETECTION_CACHE_TTL_MS,
@@ -368,37 +373,6 @@ export function detectAwaitingInputFromPaneSync(
     paneDetectionInFlight.delete(cacheKey)
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native variant of detectAwaitingInputForAgent. Fails with TmuxError if
- * the pane capture fails outside the in-cache fast path.
- */
-export const detectAwaitingInputForAgent = (
-  agentId: string,
-  options: { isPlanning?: boolean; lines?: number; cache?: boolean } = {},
-): Effect.Effect<AwaitingInputDetection | null, TmuxError> =>
-  Effect.tryPromise({
-    try: () => detectAwaitingInputForAgentPromise(agentId, options),
-    catch: (cause) =>
-      new TmuxError({
-        command: 'capture-pane',
-        message: `failed to detect awaiting input for ${agentId}`,
-        cause,
-      }),
-  })
-
-/**
- * Capture the pane and return the detection synchronously. This is a pure
- * function over a captured string — exported for symmetry, useful when the
- * caller already has the pane text in hand.
- */
-export const detectAwaitingInputFromPane = (
-  pane: string,
-  options: { isPlanning?: boolean } = {},
-): Effect.Effect<AwaitingInputDetection | null> =>
-  Effect.sync(() => detectAwaitingInputFromPaneSync(pane, options))
 
 export interface CodexApprovalPrompt {
   /** The "Would you like to …?" header line. */

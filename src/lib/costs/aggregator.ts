@@ -7,14 +7,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import {
   CostEvent,
-  forEachCostEventSync,
-  getEventsFileSizeSync,
-  readEventsFromByteOffsetSync,
+  forEachCostEvent,
+  getEventsFileSize,
+  readEventsFromByteOffset,
 } from './events.js';
-import { FsError } from '../errors.js';
 
 // ============== Types ==============
 
@@ -73,7 +71,7 @@ function getCacheFile(): string {
 /**
  * Load the cache from disk
  */
-export function loadCacheSync(): CostCache {
+export function loadCache(): CostCache {
   const cacheFile = getCacheFile();
   if (!existsSync(cacheFile)) {
     return createEmptyCache();
@@ -116,7 +114,7 @@ function createEmptyCache(): CostCache {
 /**
  * Save the cache to disk atomically
  */
-export function saveCacheSync(cache: CostCache): void {
+export function saveCache(cache: CostCache): void {
   const costsDir = getCostsDir();
   const cacheFile = getCacheFile();
   mkdirSync(costsDir, { recursive: true });
@@ -138,12 +136,12 @@ export function saveCacheSync(cache: CostCache): void {
  * @param newLineNumber Optional new line number (for correct tracking with malformed lines)
  * @param newByteOffset Optional byte cursor after the last complete event line
  */
-export function updateCacheFromEventsSync(
+export function updateCacheFromEvents(
   events: CostEvent[],
   newLineNumber?: number,
   newByteOffset?: number,
 ): CostCache {
-  const cache = loadCacheSync();
+  const cache = loadCache();
 
   for (const event of events) {
     addEventToCache(cache, event);
@@ -163,7 +161,7 @@ export function updateCacheFromEventsSync(
 
   cache.status = 'live';
 
-  saveCacheSync(cache);
+  saveCache(cache);
   return cache;
 }
 
@@ -248,7 +246,7 @@ function addEventToCache(cache: CostCache, event: CostEvent): void {
 /**
  * Rebuild the entire cache from all events
  */
-export function rebuildCacheSync(): CostCache {
+export function rebuildCache(): CostCache {
   console.log('Rebuilding cost cache from events...');
 
   const cache = createEmptyCache();
@@ -256,7 +254,7 @@ export function rebuildCacheSync(): CostCache {
 
   // Stream the log once. Rebuilds are rare, but the log can be hundreds of
   // megabytes, so even this cold path must not materialize every event at once.
-  const metadata = forEachCostEventSync((event) => addEventToCache(cache, event));
+  const metadata = forEachCostEvent((event) => addEventToCache(cache, event));
   cache.lastEventTs = metadata.lastEventTs;
   cache.lastEventLine = metadata.lastEventLine;
   cache.lastEventByteOffset = metadata.byteOffset;
@@ -264,7 +262,7 @@ export function rebuildCacheSync(): CostCache {
 
   console.log(`Cache rebuilt: ${Object.keys(cache.issues).length} issues, ${metadata.totalEvents} events`);
 
-  saveCacheSync(cache);
+  saveCache(cache);
   return cache;
 }
 
@@ -272,30 +270,30 @@ export function rebuildCacheSync(): CostCache {
  * Sync cache with latest events
  * Reads events since the last processed event and updates cache
  */
-export function syncCacheSync(): CostCache {
-  const cache = loadCacheSync();
-  const fileSize = getEventsFileSizeSync();
+export function syncCache(): CostCache {
+  const cache = loadCache();
+  const fileSize = getEventsFileSize();
 
   if (fileSize === cache.lastEventByteOffset) return cache;
 
   if (cache.lastEventByteOffset === 0 && cache.lastEventLine === 0 && fileSize > 0) {
-    return rebuildCacheSync();
+    return rebuildCache();
   }
 
   if (fileSize < cache.lastEventByteOffset) {
     // Events file was truncated by retention cleanup.
     console.log('Events file was truncated, rebuilding cache...');
-    return rebuildCacheSync();
+    return rebuildCache();
   }
 
-  const delta = readEventsFromByteOffsetSync(cache.lastEventByteOffset);
+  const delta = readEventsFromByteOffset(cache.lastEventByteOffset);
   const newLine = cache.lastEventLine + delta.linesRead;
 
   if (delta.events.length > 0) {
     console.log(`Syncing cache with ${delta.events.length} new events...`);
   }
   if (delta.newOffset !== cache.lastEventByteOffset) {
-    return updateCacheFromEventsSync(delta.events, newLine, delta.newOffset);
+    return updateCacheFromEvents(delta.events, newLine, delta.newOffset);
   }
 
   // A writer may be between bytes and the terminating newline. Leave the
@@ -308,16 +306,16 @@ export function syncCacheSync(): CostCache {
 /**
  * Get costs for all issues
  */
-export function getCostsByIssueSync(): Record<string, IssueStats> {
-  const cache = syncCacheSync();
+export function getCostsByIssue(): Record<string, IssueStats> {
+  const cache = syncCache();
   return cache.issues;
 }
 
 /**
  * Get costs for a specific issue
  */
-export function getCostsForIssueSync(issueId: string): IssueStats | null {
-  const cache = syncCacheSync();
+export function getCostsForIssue(issueId: string): IssueStats | null {
+  const cache = syncCache();
   const issueKey = issueId.toUpperCase();
   return cache.issues[issueKey] || null;
 }
@@ -325,8 +323,8 @@ export function getCostsForIssueSync(issueId: string): IssueStats | null {
 /**
  * Set budget for an issue
  */
-export function setIssueBudgetSync(issueId: string, budget: number): void {
-  const cache = loadCacheSync();
+export function setIssueBudget(issueId: string, budget: number): void {
+  const cache = loadCache();
   const issueKey = issueId.toUpperCase();
 
   if (!cache.issues[issueKey]) {
@@ -347,7 +345,7 @@ export function setIssueBudgetSync(issueId: string, budget: number): void {
   cache.issues[issueKey].budget = budget;
   cache.issues[issueKey].budgetWarning = cache.issues[issueKey].totalCost >= budget * 0.8;
 
-  saveCacheSync(cache);
+  saveCache(cache);
 }
 
 /**
@@ -360,79 +358,13 @@ export function getCacheStatus(): {
   issueCount: number;
   needsSync: boolean;
 } {
-  const cache = loadCacheSync();
+  const cache = loadCache();
 
   return {
     status: cache.status,
     lastEventTs: cache.lastEventTs,
     eventCount: cache.lastEventLine,
     issueCount: Object.keys(cache.issues).length,
-    needsSync: getEventsFileSizeSync() !== cache.lastEventByteOffset,
+    needsSync: getEventsFileSize() !== cache.lastEventByteOffset,
   };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of loadCache. Failures surface as FsError. */
-export const loadCache = (): Effect.Effect<CostCache, FsError> =>
-  Effect.try({
-    try: () => loadCacheSync(),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'loadCache', cause }),
-  });
-
-/** Effect variant of saveCache. */
-export const saveCache = (cache: CostCache): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveCacheSync(cache),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'saveCache', cause }),
-  });
-
-/** Effect variant of updateCacheFromEvents. */
-export const updateCacheFromEvents = (
-  events: CostEvent[],
-  newLineNumber?: number,
-): Effect.Effect<CostCache, FsError> =>
-  Effect.try({
-    try: () => updateCacheFromEventsSync(events, newLineNumber),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'updateCacheFromEvents', cause }),
-  });
-
-/** Effect variant of rebuildCache. */
-export const rebuildCache = (): Effect.Effect<CostCache, FsError> =>
-  Effect.try({
-    try: () => rebuildCacheSync(),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'rebuildCache', cause }),
-  });
-
-/** Effect variant of syncCache. */
-export const syncCache = (): Effect.Effect<CostCache, FsError> =>
-  Effect.try({
-    try: () => syncCacheSync(),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'syncCache', cause }),
-  });
-
-/** Effect variant of getCostsByIssue. */
-export const getCostsByIssue = (): Effect.Effect<Record<string, IssueStats>, FsError> =>
-  Effect.try({
-    try: () => getCostsByIssueSync(),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'getCostsByIssue', cause }),
-  });
-
-/** Effect variant of getCostsForIssue. */
-export const getCostsForIssue = (
-  issueId: string,
-): Effect.Effect<IssueStats | null, FsError> =>
-  Effect.try({
-    try: () => getCostsForIssueSync(issueId),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'getCostsForIssue', cause }),
-  });
-
-/** Effect variant of setIssueBudget. */
-export const setIssueBudget = (
-  issueId: string,
-  budget: number,
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => setIssueBudgetSync(issueId, budget),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'setIssueBudget', cause }),
-  });

@@ -1,6 +1,6 @@
 import { exec, type ExecOptions } from 'node:child_process';
 import { promisify } from 'node:util';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
 import { getPrFacts, type PrFacts } from './pr-facts.js';
@@ -57,7 +57,7 @@ interface RealConflictGateDepsOverrides {
   spawnRun?: typeof spawnRun;
   messageAgent?: typeof messageAgent;
   getFacts?: (issueId: string) => PrFacts | Promise<PrFacts>;
-  emitActivityEntry?: typeof emitActivityEntrySync;
+  emitActivityEntry?: typeof emitActivityEntry;
   now?: () => Date;
   log?: (message: string) => void;
 }
@@ -146,7 +146,7 @@ export function parseMergeTreeNameOnly(stdout: string): string[] {
 export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrides = {}): ResolveConflictGateDeps {
   const runSpawn = overrides.spawnRun ?? spawnRun;
   const deliverMessage = overrides.messageAgent ?? messageAgent;
-  const emitActivity = overrides.emitActivityEntry ?? emitActivityEntrySync;
+  const emitActivity = overrides.emitActivityEntry ?? emitActivityEntry;
   const now = overrides.now ?? (() => new Date());
 
   return {

@@ -29,17 +29,20 @@
 import { Effect } from 'effect';
 import { sessionExists } from '../../../lib/tmux.js';
 
-const pendingRespawns = new Set<string>();
+/** Session name → the in-flight respawn's mark (when it began, epoch ms). */
+const pendingRespawns = new Map<string, { readonly startedAtMs: number }>();
 
 /**
  * Mark a tmux session as mid-respawn. The returned `done()` must run in
- * a `finally` so the marker is cleared even if the respawn throws.
+ * a `finally` so the marker is cleared even if the respawn throws. A
+ * `done()` only clears its own mark, never a later overlapping respawn's.
  */
 export function markRespawnPending(sessionName: string): { done: () => void } {
-  pendingRespawns.add(sessionName);
+  const mark = { startedAtMs: Date.now() };
+  pendingRespawns.set(sessionName, mark);
   return {
     done: () => {
-      pendingRespawns.delete(sessionName);
+      if (pendingRespawns.get(sessionName) === mark) pendingRespawns.delete(sessionName);
     },
   };
 }
@@ -47,6 +50,15 @@ export function markRespawnPending(sessionName: string): { done: () => void } {
 /** True if a respawn is currently in progress for this session name. */
 export function isRespawnPending(sessionName: string): boolean {
   return pendingRespawns.has(sessionName);
+}
+
+/**
+ * When the in-flight respawn of this session began (epoch ms), or null when
+ * none is in flight. A harness launched before this instant belongs to the
+ * generation the respawn is replacing (PAN-3962).
+ */
+export function respawnStartedAt(sessionName: string): number | null {
+  return pendingRespawns.get(sessionName)?.startedAtMs ?? null;
 }
 
 const POLL_INTERVAL_MS = 200;

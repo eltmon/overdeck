@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -43,12 +42,12 @@ describe('findMergedArtifact', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isGitHubAppConfiguredMock.mockReturnValue(false);
-    listPullRequestsForHeadMock.mockReturnValue(Effect.succeed([]));
+    listPullRequestsForHeadMock.mockResolvedValue([]);
   });
 
   it('returns a merged GitHub artifact through the GitHub App', async () => {
     isGitHubAppConfiguredMock.mockReturnValue(true);
-    listPullRequestsForHeadMock.mockReturnValue(Effect.succeed([
+    listPullRequestsForHeadMock.mockResolvedValue([
       {
         number: 42,
         state: 'closed',
@@ -57,7 +56,7 @@ describe('findMergedArtifact', () => {
         mergeCommit: 'abc123',
         url: 'https://github.com/org/repo/pull/42',
       },
-    ]));
+    ]);
 
     const result = await getForgeAdapter('github').findMergedArtifact({
       sourceBranch: 'feature/pan-2467',
@@ -76,7 +75,7 @@ describe('findMergedArtifact', () => {
 
   it('validates an exact GitHub App artifact against the current target and source head', async () => {
     isGitHubAppConfiguredMock.mockReturnValue(true);
-    getPullRequestStateMock.mockReturnValue(Effect.succeed({
+    getPullRequestStateMock.mockResolvedValue({
       owner: 'org',
       repo: 'repo',
       number: 42,
@@ -90,7 +89,7 @@ describe('findMergedArtifact', () => {
       baseBranch: 'main',
       checksPending: false,
       checksFailed: false,
-    }));
+    });
 
     const result = await getForgeAdapter('github').findMergedArtifact({
       sourceBranch: 'feature/pan-2467',
@@ -108,11 +107,11 @@ describe('findMergedArtifact', () => {
 
   it('rejects an exact GitHub App artifact from an earlier source head', async () => {
     isGitHubAppConfiguredMock.mockReturnValue(true);
-    getPullRequestStateMock.mockReturnValue(Effect.succeed({
+    getPullRequestStateMock.mockResolvedValue({
       owner: 'org', repo: 'repo', number: 42, state: 'CLOSED', merged: true,
       mergeable: true, mergeableState: 'clean', draft: false,
       headSha: 'old-head-sha', baseBranch: 'main', checksPending: false, checksFailed: false,
-    }));
+    });
 
     await expect(getForgeAdapter('github').findMergedArtifact({
       sourceBranch: 'feature/pan-2467',
@@ -125,7 +124,7 @@ describe('findMergedArtifact', () => {
 
   it('returns null for an open GitHub artifact through the GitHub App', async () => {
     isGitHubAppConfiguredMock.mockReturnValue(true);
-    listPullRequestsForHeadMock.mockReturnValue(Effect.succeed([
+    listPullRequestsForHeadMock.mockResolvedValue([
       {
         number: 42,
         state: 'open',
@@ -134,7 +133,7 @@ describe('findMergedArtifact', () => {
         mergeCommit: 'temporary-test-merge-sha',
         url: 'https://github.com/org/repo/pull/42',
       },
-    ]));
+    ]);
 
     await expect(getForgeAdapter('github').findMergedArtifact({
       sourceBranch: 'feature/pan-2467',

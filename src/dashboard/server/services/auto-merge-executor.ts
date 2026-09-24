@@ -1,4 +1,4 @@
-import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { emitActivityTts } from '../../../lib/activity-logger.js';
 import {
   listDuePendingAutoMerges,
   markBlocked,
@@ -97,7 +97,7 @@ async function defaultMergeIssue(issueId: string): Promise<MergeResult> {
 }
 
 function defaultAnnounceFailure(issueId: string, reason: string): void {
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: `${issueId} auto-merge failed: ${reason}`,
     priority: 1,
     issueId,

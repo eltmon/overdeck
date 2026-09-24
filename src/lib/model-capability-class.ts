@@ -13,6 +13,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   // frontier
   'claude-fable-5-1': 'frontier',
   'claude-fable-5': 'frontier',
+  'claude-opus-5-5': 'frontier',
   'claude-opus-5': 'frontier',
   'claude-opus-4-8': 'frontier',
   'claude-opus-4-7': 'frontier',

@@ -1,6 +1,5 @@
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { Data, Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
 
 const MAX_JOURNAL_ENTRIES = 200;
@@ -179,7 +178,8 @@ async function compactRestartEvents(): Promise<void> {
   }
 }
 
-async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
+/** Persist the latest restart status, append it to the restart event log and compact the log. */
+export async function writeRestartStatus(entry: RestartStatus): Promise<void> {
   const path = restartStatusPath();
   await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
@@ -189,7 +189,8 @@ async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
   await compactRestartEvents();
 }
 
-async function readRestartEventsPromise(limit: number = MAX_JOURNAL_ENTRIES): Promise<RestartStatus[]> {
+/** Read the most recent restart events from the event log (up to `limit`). */
+export async function readRestartEvents(limit: number = MAX_JOURNAL_ENTRIES): Promise<RestartStatus[]> {
   try {
     const content = await readFile(restartEventsPath(), 'utf8');
     const events: RestartStatus[] = [];
@@ -207,7 +208,8 @@ async function readRestartEventsPromise(limit: number = MAX_JOURNAL_ENTRIES): Pr
   }
 }
 
-async function readRestartStatusPromise(): Promise<RestartStatus | null> {
+/** Read the latest persisted restart status, or null when none exists. */
+export async function readRestartStatus(): Promise<RestartStatus | null> {
   try {
     const parsed = JSON.parse(await readFile(restartStatusPath(), 'utf8')) as Partial<RestartStatus>;
     if (
@@ -272,53 +274,3 @@ export function detectConcurrentRestartWriters(
   }
   return writers;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Tagged error for restart-status Effect variants. */
-export class RestartStatusError extends Data.TaggedError('RestartStatusError')<{
-  readonly operation: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `writeRestartStatus`. */
-export const writeRestartStatus = (
-  entry: RestartStatus,
-): Effect.Effect<void, RestartStatusError> =>
-  Effect.tryPromise({
-    try: () => writeRestartStatusPromise(entry),
-    catch: (cause) =>
-      new RestartStatusError({
-        operation: 'writeRestartStatus',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `readRestartStatus`. */
-export const readRestartStatus = (): Effect.Effect<RestartStatus | null, RestartStatusError> =>
-  Effect.tryPromise({
-    try: () => readRestartStatusPromise(),
-    catch: (cause) =>
-      new RestartStatusError({
-        operation: 'readRestartStatus',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `readRestartEvents`. */
-export const readRestartEvents = (
-  limit?: number,
-): Effect.Effect<RestartStatus[], RestartStatusError> =>
-  Effect.tryPromise({
-    try: () => readRestartEventsPromise(limit),
-    catch: (cause) =>
-      new RestartStatusError({
-        operation: 'readRestartEvents',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
