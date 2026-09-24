@@ -17,18 +17,19 @@ const SESSION_ENDED_PREFIX = CONVERSATION_SESSION_ENDED_MARKER.slice(0, CONVERSA
  * The launcher's own "session ended" line, wrapped or not, is not part of the
  * reason: everything from its prefix on is dropped.
  */
-function harnessEarlyExitError(paneText: string): Error {
+function harnessEarlyExitError(paneText: string, sessionGone = false): Error {
   const markerAt = paneText.lastIndexOf(SESSION_ENDED_PREFIX);
   const lines = (markerAt === -1 ? paneText : paneText.slice(0, markerAt))
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
   const tail = lines.slice(-5).join(' | ').slice(-500);
-  return new Error(
-    tail
-      ? `Claude Code exited before writing a transcript. Last output: ${tail}`
-      : 'Claude Code exited before writing a transcript, with no output in its pane.',
-  );
+  // Neutral wording: the launcher can exit before Claude Code ever starts (an
+  // unreadable launch-context file), and then the session is gone too.
+  const what = sessionGone
+    ? 'The conversation process exited before it was ready; its tmux session is gone, so the launcher itself exited'
+    : 'The conversation process exited before it was ready';
+  return new Error(tail ? `${what}. Last output: ${tail}` : `${what}, with no output in its pane.`);
 }
 
 /**
@@ -79,17 +80,20 @@ async function probeHarnessExit(tmuxSession: string): Promise<HarnessExitProbe> 
  */
 export async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;
+  // The last non-empty capture: once the session is gone, captures come back
+  // empty, and the launcher's last words are in the capture before that.
   let output = '';
   while (Date.now() < deadline) {
-    output = await capturePane(tmuxSession, 200);
-    if (output.includes(SESSION_ENDED_PREFIX)) throw harnessEarlyExitError(output);
-    if (output.includes('❯')) {
+    const capture = await capturePane(tmuxSession, 200);
+    if (capture.trim()) output = capture;
+    if (capture.includes(SESSION_ENDED_PREFIX)) throw harnessEarlyExitError(capture);
+    if (capture.includes('❯')) {
       console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
       return;
     }
     await new Promise<void>((r) => setTimeout(r, 500));
   }
   const probe = await probeHarnessExit(tmuxSession);
-  if (probe === 'session-gone' || probe === 'harness-gone') throw harnessEarlyExitError(output);
+  if (probe === 'session-gone' || probe === 'harness-gone') throw harnessEarlyExitError(output, probe === 'session-gone');
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession} (harness probe: ${probe})`);
 }

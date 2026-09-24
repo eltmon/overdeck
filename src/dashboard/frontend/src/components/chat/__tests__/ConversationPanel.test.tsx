@@ -756,7 +756,7 @@ describe('ConversationPanel empty-state gating (workLog-only agent sessions)', (
   // launcher keep-alive loop holding the pane, so sessionAlive stays true.
   // The recorded exit reason must win over the greeting.
   it('shows the harness exit reason instead of the greeting when the spawn failed over a live pane', () => {
-    const reason = 'Claude Code exited before writing a transcript. Last output: Error: unknown model';
+    const reason = 'The conversation process exited before it was ready. Last output: Error: unknown model';
     renderPanel(
       { ...mockConversation, sessionAlive: true, status: 'active', endedAt: null, spawnError: reason },
       {},

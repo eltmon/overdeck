@@ -57,7 +57,7 @@ describe('waitForConversationRuntimeReady — Claude Code exits before its promp
 
     const ready = waitForConversationRuntimeReady('conv-early-exit', 'claude-code', 'spawn');
     const settled = expect(ready).rejects.toThrow(
-      'Claude Code exited before writing a transcript. Last output: Error: model claude-fable-5-1 requires Claude Code 2.1.255 or newer',
+      'The conversation process exited before it was ready. Last output: Error: model claude-fable-5-1 requires Claude Code 2.1.255 or newer',
     );
     await vi.advanceTimersByTimeAsync(1_000);
     await settled;
@@ -97,17 +97,24 @@ describe('waitForConversationRuntimeReady — Claude Code exits before its promp
     readProcessTable.mockResolvedValue('100 1 bash\n130 100 sleep\n');
 
     const ready = waitForConversationRuntimeReady('conv-gone', 'claude-code', 'spawn');
-    const settled = expect(ready).rejects.toThrow('Claude Code exited before writing a transcript, with no output in its pane.');
+    const settled = expect(ready).rejects.toThrow('The conversation process exited before it was ready, with no output in its pane.');
     await vi.advanceTimersByTimeAsync(31_000);
     await settled;
   });
 
-  it('throws on timeout when the tmux session is confirmed gone', async () => {
-    capturePane.mockResolvedValue('');
+  // Review of #4137 (finding 4): a launcher that exits on an unreadable
+  // launch-context file never starts Claude Code and takes the session with it.
+  it('reports a launcher exit with its last output once the tmux session is gone', async () => {
+    capturePane
+      .mockResolvedValueOnce('Required launch context is unreadable: /home/u/.overdeck/context.md')
+      .mockResolvedValue('');
     hasSession.mockRejectedValue(tmuxFailure("can't find session: conv-vanished"));
 
     const ready = waitForConversationRuntimeReady('conv-vanished', 'claude-code', 'spawn');
-    const settled = expect(ready).rejects.toThrow(/exited before/);
+    const settled = expect(ready).rejects.toThrow(
+      'The conversation process exited before it was ready; its tmux session is gone, so the launcher itself exited. '
+        + 'Last output: Required launch context is unreadable: /home/u/.overdeck/context.md',
+    );
     await vi.advanceTimersByTimeAsync(31_000);
     await settled;
   });
