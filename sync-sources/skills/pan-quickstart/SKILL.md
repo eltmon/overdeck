@@ -203,8 +203,8 @@ tmux attach -t agent-PAN-3
 
 #### Check Pending Work
 ```bash
-# See completed work awaiting review
-pan review pending
+# See completed work awaiting review (open PRs)
+gh pr list
 ```
 
 #### Review in Dashboard
@@ -215,15 +215,12 @@ pan review pending
 
 #### Approve and Merge
 ```bash
-# Approve work, merge MR, update tracker
-pan approve PAN-3
+# Approval is a PR review
+gh pr review <pr-number> --approve
 ```
 
-**What happens:**
-1. Creates merge request (if configured)
-2. Merges to main branch (if approved)
-3. Updates issue status in tracker
-4. Cleans up workspace (optional)
+Then merge from the dashboard's MERGE button. Merge readiness is derived
+live from the PR: approvals, green checks, and forge mergeability.
 
 ## Complete Quick Start Script
 
@@ -435,6 +432,6 @@ If you encounter issues:
 - [ ] Created first workspace with `pan start`
 - [ ] Agent running in tmux session
 - [ ] Can send messages to agent with `pan tell`
-- [ ] Understand how to approve work with `pan approve`
+- [ ] Understand how to approve work with `gh pr review --approve`
 
 **Congratulations!** You're now ready to use Overdeck for multi-agent development workflows.

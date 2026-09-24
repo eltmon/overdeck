@@ -33,6 +33,7 @@ vi.mock('child_process', () => ({
 }));
 
 vi.mock('../../agents.js', () => ({
+  stopAgent: vi.fn(() => Effect.void),
   spawnRun: mocks.spawnRun,
   saveAgentState: mocks.saveAgentStateProgram,
   saveAgentStateProgram: mocks.saveAgentStateProgram,
@@ -61,6 +62,36 @@ vi.mock('../../tmux.js', () => ({
   isPaneDead: mocks.isPaneDead,
   killSession: mocks.killSession,
   killSessionSync: mocks.killSession,
+}));
+
+// PAN-3939: the dispatch guard asks the liveness oracle and the reviewer kill
+// closes through the terminal backend. Both are modeled on the tmux mocks above
+// so these tests keep their session-list / pane-dead / kill semantics.
+vi.mock('../../agents/liveness.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../agents/liveness.js')>(),
+  isAlive: vi.fn(async (agentId: string) => {
+    let names: readonly string[];
+    try {
+      names = await Effect.runPromise(mocks.listSessionNames() as Effect.Effect<readonly string[], Error>);
+    } catch {
+      return { alive: false, reason: 'runtime-indeterminate' };
+    }
+    if (!names.includes(agentId)) return { alive: false, reason: 'no-session' };
+    return await Effect.runPromise(mocks.isPaneDead(agentId) as Effect.Effect<boolean>)
+      ? { alive: false, reason: 'pane-dead' }
+      : { alive: true, paneAlive: true };
+  }),
+}));
+
+vi.mock('../../terminal-backends/launch.js', () => ({
+  closeAgentPaneDetailed: vi.fn(async (agentId: string) => {
+    try {
+      await Effect.runPromise(mocks.killSession(agentId) as Effect.Effect<void, Error>);
+      return { outcome: 'closed' };
+    } catch (err) {
+      return { outcome: 'failed', reason: String(err) };
+    }
+  }),
 }));
 
 vi.mock('../../activity-logger.js', () => ({

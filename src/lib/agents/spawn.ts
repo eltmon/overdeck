@@ -28,7 +28,7 @@ import { agentPaneExists, closeBackendPane, launchAgentPane, resolveLaunchBacken
 import { toPaneRole } from '../terminal-backends/tmux.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
-  getAgentDir,
+  getAgentDir, getAgentState,
   markAgentRunning,
   markSpawnFailed,
   recordStartupSessionExit,
@@ -177,11 +177,11 @@ async function spawnRunWithoutConsentClaim(
   if (await agentPaneExists(agentId)) {
     // PAN-2579 (warm-by-default lifecycle): a session alive at dispatch time may
     // be a warm-idle leftover from the PREVIOUS cycle rather than an active run.
-    // Reap it here — at the moment its slot is needed — when that is provable:
-    // the pane process has exited. A live pane is a genuinely active run, so
-    // keep throwing and let the operator message it (PAN-3917 removed the
-    // stored phase verdict that used to be the second signal).
-    if (!(await reapWarmIdleRoleRun(agentId))) {
+    // Reap it when the liveness oracle proves it finished: no live harness past
+    // `starting`, or (Herdr, one-shot roles only) a harness idle at its prompt
+    // with stale work activity on two probes (PAN-3923). Anything else is an
+    // active run, so keep throwing and let the operator message it.
+    if (!(await reapWarmIdleRoleRun(agentId, { readRun: (id) => getAgentState(id) ?? undefined }))) {
       throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
     }
     console.log(`[spawn] ${agentId} is warm-idle from the previous cycle — reaped it for the new ${role} dispatch (PAN-2579)`);
@@ -443,7 +443,7 @@ async function spawnRunWithoutConsentClaim(
       model: selectedModel,
       ...(options.parentId ? { parent: options.parentId } : {}),
     },
-  }).then((pane) => { launchedPane = pane; });
+  }).then((pane) => { launchedPane = pane; Object.assign(state, { backend: pane.backend, paneId: pane.paneId, terminalId: pane.terminalId }); });
   if (resolvedHarness === 'kimi-code') {
     try {
       rawSessionId = await launchAndCaptureManagedKimiSession({

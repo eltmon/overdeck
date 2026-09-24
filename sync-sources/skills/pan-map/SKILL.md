@@ -5,7 +5,7 @@ description: "Topical: bootstrap or refresh Overdeck codebase map files for proj
 
 # Overdeck Codebase Map
 
-Use this skill when a project needs durable orientation files before or during planning. There is no `pan map` CLI verb; the deliverable is committed markdown under `.overdeck/context/codebase/`.
+Use this skill when a project needs durable orientation files before or during planning. There is no pan map CLI verb; the deliverable is committed markdown under `.overdeck/context/codebase/`.
 
 ## Goal
 

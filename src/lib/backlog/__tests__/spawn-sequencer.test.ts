@@ -10,6 +10,8 @@ vi.mock('../../../lib/agents.js', () => ({
 
 vi.mock('../../agents/liveness.js', () => ({
   isAlive: vi.fn().mockResolvedValue({ alive: false, reason: 'no-session' }),
+  isConfirmedDead: (v: { alive: boolean; reason?: string }) => !v.alive && v.reason !== 'runtime-indeterminate',
+  idleAgeMs: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../terminal-backends/launch.js', () => ({
@@ -28,6 +30,12 @@ vi.mock('../backlog-input.js', () => ({
 
 vi.mock('node:fs', () => ({ existsSync: vi.fn(), statSync: vi.fn() }));
 
+// #4169: the transcript turn-complete reader for panes Herdr does not track.
+vi.mock('../../agents/warm-idle-reap.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agents/warm-idle-reap.js')>()),
+  roleRunTurnFinished: vi.fn().mockResolvedValue(false),
+}));
+
 import { existsSync, statSync } from 'node:fs';
 import {
   clearFinishedSequencerRun,
@@ -41,14 +49,22 @@ import {
   getAgentState,
   getAgentRuntimeStateSync,
 } from '../../../lib/agents.js';
-import { isAlive } from '../../agents/liveness.js';
+import { idleAgeMs, isAlive } from '../../agents/liveness.js';
+import {
+  FINISHED_IDLE_MIN_AGE_MS,
+  FINISHED_REPROBE_DELAY_MS,
+  roleRunTurnFinished,
+} from '../../agents/warm-idle-reap.js';
 
 const livePane = () => vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true });
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isAlive).mockResolvedValue({ alive: false, reason: 'no-session' });
+  vi.mocked(idleAgeMs).mockReturnValue(null);
 });
+
+const STALE_WORK_MS = FINISHED_IDLE_MIN_AGE_MS + 1_000;
 
 describe('spawnSequencerAgent', () => {
   it('honors the persistent pause before collecting or spawning background work', async () => {
@@ -195,9 +211,27 @@ describe('spawnSequencerAgent', () => {
     expect(stop).not.toHaveBeenCalled();
   });
 
-  it('treats an idle live sequencer as done even without a fresh sequence file', async () => {
+  // PAN-4172: the mirror's idle label is only a hint, judged by the same rule
+  // as Herdr's (isFinishedRoleRun): a one-shot run with stale work activity.
+  it('keeps a live sequencer running when the mirror reads idle but work activity is fresh', async () => {
     livePane();
-    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    vi.mocked(idleAgeMs).mockReturnValue(5_000);
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ role: 'sequencer', status: 'running', startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({
+      alive: true,
+      running: true,
+      done: false,
+      doneReason: null,
+    });
+  });
+
+  it('treats a live sequencer the mirror reads idle, with stale work activity, as done without a fresh sequence file', async () => {
+    livePane();
+    vi.mocked(idleAgeMs).mockReturnValue(STALE_WORK_MS);
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ role: 'sequencer', status: 'running', startedAt: '2026-01-01T00:00:01.000Z' });
     (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
@@ -207,6 +241,16 @@ describe('spawnSequencerAgent', () => {
       done: true,
       doneReason: 'idle',
     });
+  });
+
+  it('lets a Herdr unknown state win over an idle mirror', async () => {
+    vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true, backendState: 'unknown' });
+    vi.mocked(idleAgeMs).mockReturnValue(STALE_WORK_MS);
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ role: 'sequencer', status: 'running', startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ running: true, done: false, doneReason: null });
   });
 
   it('treats a pane whose harness exited as present and done', async () => {
@@ -219,6 +263,144 @@ describe('spawnSequencerAgent', () => {
       running: false,
       done: true,
       doneReason: 'pane-dead',
+    });
+  });
+
+  // PAN-3923: the runtime mirror is in-process (empty after a dashboard
+  // restart) and a failed pass writes no sequence, so the backend's own state
+  // has to be able to say "finished".
+  it('treats a Herdr pane idle at its prompt after delivery, with stale work activity, as done with no mirror or fresh file', async () => {
+    vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true, backendState: 'idle' });
+    vi.mocked(idleAgeMs).mockReturnValue(STALE_WORK_MS);
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ role: 'sequencer', status: 'running', startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({
+      alive: true,
+      running: false,
+      done: true,
+      doneReason: 'pane-finished',
+    });
+  });
+
+  // #4169: a codex/kimi/pi/ACP pane reads `unknown` on Herdr; its transcript's
+  // turn-complete marker stands in for the idle label.
+  it('treats an unknown Herdr pane as done only when its transcript says the turn ended and work activity is stale', async () => {
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const run = { role: 'sequencer', status: 'running', harness: 'codex', startedAt: '2026-01-01T00:00:01.000Z' };
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue(run);
+    vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true, backendState: 'unknown' });
+
+    vi.mocked(idleAgeMs).mockReturnValue(STALE_WORK_MS);
+    vi.mocked(roleRunTurnFinished).mockResolvedValueOnce(true);
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ done: true, doneReason: 'pane-finished' });
+    expect(roleRunTurnFinished).toHaveBeenCalledWith(SEQUENCER_AGENT_ID, run);
+
+    vi.mocked(roleRunTurnFinished).mockResolvedValueOnce(false);
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ running: true, done: false, doneReason: null });
+
+    vi.mocked(idleAgeMs).mockReturnValue(5_000);
+    vi.mocked(roleRunTurnFinished).mockResolvedValueOnce(true);
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ running: true, done: false, doneReason: null });
+  });
+
+  it('keeps a Herdr pane running while it works, before its prompt is delivered, or while its work activity is fresh', async () => {
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const cases = [
+      ['working', 'running', STALE_WORK_MS],
+      ['blocked', 'running', STALE_WORK_MS],
+      ['idle', 'starting', STALE_WORK_MS],
+      ['idle', 'running', 5_000],
+      ['done', 'running', null],
+    ] as const;
+    for (const [backendState, status, idleAge] of cases) {
+      vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true, backendState });
+      vi.mocked(idleAgeMs).mockReturnValue(idleAge);
+      (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ role: 'sequencer', status, startedAt: '2026-01-01T00:00:01.000Z' });
+      expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ alive: true, running: true, done: false, doneReason: null });
+    }
+  });
+
+  describe('clearing a Herdr pane that reads finished (two probes)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue(null);
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ role: 'sequencer', status: 'running', startedAt: '2026-01-01T00:00:01.000Z' });
+      vi.mocked(idleAgeMs).mockReturnValue(STALE_WORK_MS);
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('stops it only after a second probe a few seconds later still reads idle', async () => {
+      vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true, backendState: 'idle' });
+      const stop = vi.fn().mockResolvedValue(undefined);
+
+      const pending = clearFinishedSequencerRun('/tmp/proj', stop);
+      await vi.advanceTimersByTimeAsync(FINISHED_REPROBE_DELAY_MS - 1);
+      expect(stop).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+
+      expect(isAlive).toHaveBeenCalledTimes(2);
+      expect(stop).toHaveBeenCalledOnce();
+    });
+
+    it('keeps it when the second probe reads working', async () => {
+      vi.mocked(isAlive)
+        .mockResolvedValueOnce({ alive: true, paneAlive: true, backendState: 'idle' })
+        .mockResolvedValueOnce({ alive: true, paneAlive: true, backendState: 'working' });
+      const stop = vi.fn().mockResolvedValue(undefined);
+
+      const pending = clearFinishedSequencerRun('/tmp/proj', stop);
+      await vi.advanceTimersByTimeAsync(FINISHED_REPROBE_DELAY_MS);
+      const status = await pending;
+
+      expect(status).toMatchObject({ done: false, running: true });
+      expect(stop).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('clearing a pane the mirror reads idle (two probes)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      livePane();
+      (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
+      (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ role: 'sequencer', status: 'running', startedAt: '2026-01-01T00:00:01.000Z' });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('stops it only after work activity is still stale on a second probe', async () => {
+      vi.mocked(idleAgeMs).mockReturnValue(STALE_WORK_MS);
+      const stop = vi.fn().mockResolvedValue(undefined);
+
+      const pending = clearFinishedSequencerRun('/tmp/proj', stop);
+      await vi.advanceTimersByTimeAsync(FINISHED_REPROBE_DELAY_MS - 1);
+      expect(stop).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+
+      expect(isAlive).toHaveBeenCalledTimes(2);
+      expect(stop).toHaveBeenCalledOnce();
+    });
+
+    it('keeps it when work activity is fresh on the second probe', async () => {
+      vi.mocked(idleAgeMs).mockReturnValueOnce(STALE_WORK_MS).mockReturnValueOnce(5_000);
+      const stop = vi.fn().mockResolvedValue(undefined);
+
+      const pending = clearFinishedSequencerRun('/tmp/proj', stop);
+      await vi.advanceTimersByTimeAsync(FINISHED_REPROBE_DELAY_MS);
+      const status = await pending;
+
+      expect(status).toMatchObject({ done: false, running: true });
+      expect(stop).not.toHaveBeenCalled();
     });
   });
 

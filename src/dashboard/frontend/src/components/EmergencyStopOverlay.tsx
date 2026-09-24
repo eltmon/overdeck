@@ -32,6 +32,32 @@ async function fireEmergencyStop(): Promise<{ killed: string[]; unconfirmed: str
   return { killed: data.killedAgents ?? [], unconfirmed: data.unconfirmedAgents ?? [] };
 }
 
+/**
+ * Fire the emergency stop and report the result as a toast: success when every
+ * agent is confirmed stopped, a warning naming the ones that are not (#4109),
+ * or an error when the request fails. Shared by this overlay and the Cloister
+ * status bar's STOP button. Resolves true when the request succeeded.
+ */
+export async function runEmergencyStop(): Promise<boolean> {
+  try {
+    const { killed, unconfirmed } = await fireEmergencyStop();
+    const frozen = 'Auto-resume frozen — clear the Deacon / flywheel pause when you want agents to run again.';
+    if (unconfirmed.length > 0) {
+      // A stop whose pane is not confirmed gone is not a success (#4109).
+      toast.warning(
+        `Emergency STOP: stopped ${killed.length}; ${unconfirmed.length} could not be confirmed stopped: ` +
+        `${unconfirmed.join(', ')}. ${frozen}`,
+      );
+    } else {
+      toast.success(`Emergency STOP: killed ${killed.length} agent${killed.length === 1 ? '' : 's'}. ${frozen}`);
+    }
+    return true;
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Emergency stop failed');
+    return false;
+  }
+}
+
 export function EmergencyStopOverlay() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -60,20 +86,7 @@ export function EmergencyStopOverlay() {
   const confirm = useCallback(async () => {
     setBusy(true);
     try {
-      const { killed, unconfirmed } = await fireEmergencyStop();
-      const frozen = 'Auto-resume frozen — clear the Deacon / flywheel pause when you want agents to run again.';
-      if (unconfirmed.length > 0) {
-        // A stop whose pane is not confirmed gone is not a success (#4109).
-        toast.warning(
-          `Emergency STOP: stopped ${killed.length}; ${unconfirmed.length} could not be confirmed stopped: ` +
-          `${unconfirmed.join(', ')}. ${frozen}`,
-        );
-      } else {
-        toast.success(`Emergency STOP: killed ${killed.length} agent${killed.length === 1 ? '' : 's'}. ${frozen}`);
-      }
-      setOpen(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Emergency stop failed');
+      if (await runEmergencyStop()) setOpen(false);
     } finally {
       setBusy(false);
     }

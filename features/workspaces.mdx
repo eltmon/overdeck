@@ -325,17 +325,17 @@ Overdeck supports remote workspace execution via Fly.io Machines. Remote workspa
 ### Setup
 
 ```bash
-# Initialize Fly.io provider
-pan remote init
+# Initialize the Fly.io app for workspace machines
+pan admin remote init
 
-# Configure remote environment
-pan remote setup
+# Install flyctl and configure auth
+pan admin remote setup
 
-# Check remote workspace status
-pan remote status
+# Check Fly.io connection and machine status
+pan admin remote status
 
-# View resource allocation
-pan remote resources
+# Show RAM/disk usage across VMs
+pan admin remote resources
 ```
 
 ### Creating Remote Workspaces

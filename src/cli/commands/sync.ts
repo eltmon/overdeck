@@ -37,6 +37,8 @@ import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
 import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
 import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
 import { renderHerdrReport } from '../herdr-report.js';
+import { checkSyncSourceFreshness } from '../../lib/sync-source-freshness.js';
+import { pruneDanglingGitHookLinks } from '../../lib/git-hooks.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -118,6 +120,22 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     if (!gate.needed) {
       console.log(chalk.dim('[sync] skipped — inputs unchanged'));
       return;
+    }
+  }
+
+  // PAN-3881: the sources may come from the primary checkout (PAN-3327). When
+  // that checkout is behind its upstream or on a feature branch, sync would
+  // silently distribute an old tree. Warn only — never pull. A frozen
+  // generation's own copy is already covered by the warning above.
+  const syncingFrozenGeneration = isDeploymentGenerationRoot(packageRoot)
+    && SYNC_SOURCES.root === join(packageRoot, 'sync-sources');
+  if (!syncingFrozenGeneration) {
+    const freshness = await timeAsync('source-freshness', () => checkSyncSourceFreshness(SYNC_SOURCES.root));
+    if (freshness && freshness.warnings.length > 0) {
+      console.log(chalk.yellow.bold(`WARNING: pan sync is distributing from ${SYNC_SOURCES.root}, which may be stale:`));
+      for (const warning of freshness.warnings) console.log(chalk.yellow(`  - ${warning}`));
+      console.log(chalk.dim(`  Update that checkout (e.g. \`git -C ${freshness.checkout} pull --ff-only\` on ${freshness.defaultBranch}) and re-run \`pan sync\`.`));
+      console.log('');
     }
   }
 
@@ -405,6 +423,14 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   } else {
     hooksSpinner.info('No hooks to sync');
   }
+  // PAN-3881: hooks deleted from sync-sources/ are removed from ~/.overdeck/bin/
+  // (only ones sync wrote, per its manifest); edited copies are kept.
+  if (hooksResult.pruned.length > 0) {
+    console.log(chalk.cyan(`  Removed ${hooksResult.pruned.length} hook(s) whose source was deleted: ${hooksResult.pruned.join(', ')}`));
+  }
+  if (hooksResult.keptModified.length > 0) {
+    console.log(chalk.yellow(`  Kept ${hooksResult.keptModified.length} user-modified hook(s) whose source was deleted: ${hooksResult.keptModified.join(', ')}`));
+  }
 
   // Registration is as important as copying the scripts. Repair the complete
   // global hook table on every explicit sync so upgrades cannot leave an old
@@ -547,6 +573,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     const gitHooksSpinner = ora('Installing git hooks in registered projects...').start();
     let totalInstalled = 0;
     let projectsUpdated = 0;
+    const prunedGitHooks: string[] = [];
 
     for (const { config } of projects) {
       if (!existsSync(config.path)) continue;
@@ -578,6 +605,11 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         const hooksTarget = join(gitDir, 'hooks');
         if (!existsSync(hooksTarget)) {
           mkdirSync(hooksTarget, { recursive: true });
+        }
+
+        // PAN-3881: drop symlinks to git hooks deleted from sync-sources/.
+        for (const hook of pruneDanglingGitHookLinks(hooksTarget, BUNDLED_GIT_HOOKS_DIR)) {
+          prunedGitHooks.push(join(hooksTarget, hook));
         }
 
         try {
@@ -616,6 +648,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       gitHooksSpinner.succeed(`Installed git hooks in ${projectsUpdated} project(s)`);
     } else {
       gitHooksSpinner.info('Git hooks already up to date');
+    }
+    if (prunedGitHooks.length > 0) {
+      console.log(chalk.cyan(`  Removed ${prunedGitHooks.length} git hook link(s) whose source was deleted: ${prunedGitHooks.join(', ')}`));
     }
   }
 

@@ -132,3 +132,49 @@ describe('restartAgent graceful pending-decision rechecks', () => {
     }
   })
 })
+
+describe('restartAgent with no recorded model (PAN-4145)', () => {
+  let workspace: string
+
+  beforeEach(() => {
+    workspace = mkdtempSync(join(tmpdir(), 'pan-restart-routed-'))
+  })
+
+  afterEach(() => {
+    rmSync(workspace, { recursive: true, force: true })
+  })
+
+  const baseDeps = () => ({
+    detectPendingOperatorDecision: vi.fn(async () => null),
+    getAgentStateSync: vi.fn(() => ({ ...agentState, model: undefined, workspace }) as any),
+    logAgentLifecycleSync: vi.fn(),
+    assertWorkspaceStackHealthyForSpawn: vi.fn(async () => undefined),
+  })
+
+  it('relaunches on the routed role model, never a hardcoded fallback', async () => {
+    const resolveRoutedSpawnModel = vi.fn(() => 'kimi-code/k3')
+    // Stop right after model resolution: resolveHarness receives the model.
+    const resolveHarness = vi.fn(async () => { throw new Error('stop-after-model') })
+
+    await expect(restartAgent('agent-pan-3228', { graceful: false }, {
+      ...baseDeps(),
+      resolveRoutedSpawnModel,
+      resolveHarness: resolveHarness as any,
+    })).rejects.toThrow('stop-after-model')
+
+    expect(resolveRoutedSpawnModel).toHaveBeenCalledWith({ role: 'work', issueId: 'PAN-3228', workspace })
+    expect(resolveHarness).toHaveBeenCalledWith(expect.objectContaining({ model: 'kimi-code/k3' }))
+  })
+
+  it('fails loudly when no default model is configured', async () => {
+    const resolveHarness = vi.fn()
+    const result = await restartAgent('agent-pan-3228', { graceful: false }, {
+      ...baseDeps(),
+      resolveRoutedSpawnModel: vi.fn(() => { throw new Error('No default model configured for role "work" (PAN-3228): x') }),
+      resolveHarness: resolveHarness as any,
+    })
+
+    expect(result).toEqual({ success: false, error: expect.stringContaining('No default model configured') })
+    expect(resolveHarness).not.toHaveBeenCalled()
+  })
+})

@@ -19,6 +19,7 @@ import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { FsError } from '../../../../lib/errors.js';
 import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
+import { workspaceNeedsSetup } from '../../../../lib/workspace-manager/setup-marker.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
@@ -34,7 +35,7 @@ import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
-import { getSystemHealthSnapshot } from '../../services/system-health-service.js';
+import { getSystemHealthSnapshot, type SystemHealthSnapshot } from '../../services/system-health-service.js';
 import { httpHandler } from '../http-handler.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { sessionExists, killSession } from '../../../../lib/tmux.js';
@@ -46,6 +47,10 @@ import {
   evaluateAgentStartGate,
   evaluateSpawnGuardrails,
   execAsync,
+  parseSpawnGuardrailAcknowledgement,
+  unacknowledgedSpawnGuardrailWarnings,
+  type SpawnGuardrailAcknowledgement,
+  type SpawnGuardrailDecision,
   getIssueDataService,
   getProjectPath,
   invalidateAgentsCache,
@@ -93,6 +98,67 @@ export function isOnlyOverdeckRuntimeWorkspaceChanges(porcelain: string): boolea
 export function spawnGuardrailResourcesHint(hint?: string): string {
   const resourcesHint = 'Open /resources to inspect Machine Room pressure before retrying.';
   return hint ? `${hint} ${resourcesHint}` : resourcesHint;
+}
+
+/**
+ * The guardrail step of POST /api/agents. Returns the guardrail decision and
+ * the refusal response, which is null when the start may proceed. Critical warnings always refuse. A warning
+ * refuses with 409 unless the request acknowledged its kind (PAN-3977).
+ */
+export function resolveSpawnGuardrailRefusal(
+  issueId: string,
+  health: SystemHealthSnapshot,
+  acknowledgement: SpawnGuardrailAcknowledgement,
+): { decision: SpawnGuardrailDecision; refusal: { status: number; body: Record<string, unknown> } | null } {
+  emitStartAgentPhase(issueId, 'guardrails', 'start', 'evaluating spawn guardrails');
+  const spawnGuardrails = evaluateSpawnGuardrails(health);
+  if (spawnGuardrails.blocked) {
+    emitStartAgentPhase(issueId, 'guardrails', 'failure', spawnGuardrails.error ?? 'guardrails blocked', {
+      status: spawnGuardrails.status,
+      hint: spawnGuardrails.hint,
+    });
+    return {
+      decision: spawnGuardrails,
+      refusal: {
+        status: spawnGuardrails.status,
+        body: {
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: spawnGuardrails.error,
+          hint: spawnGuardrails.hint,
+          guardrails: spawnGuardrails,
+        },
+      },
+    };
+  }
+  const unacknowledged = spawnGuardrails.requiresAcknowledgement
+    ? unacknowledgedSpawnGuardrailWarnings(spawnGuardrails, acknowledgement)
+    : [];
+  if (unacknowledged.length > 0) {
+    emitStartAgentPhase(issueId, 'guardrails', 'skipped', 'guardrail acknowledgement required', {
+      status: spawnGuardrails.status,
+      hint: spawnGuardrails.hint,
+    });
+    return {
+      decision: spawnGuardrails,
+      refusal: {
+        status: spawnGuardrails.status,
+        body: {
+          success: false,
+          blocked: false,
+          skipped: true,
+          requiresAcknowledgement: true,
+          error: `Guardrail acknowledgement required: ${unacknowledged.map((warning) => warning.message).join(' ')}`,
+          hint: spawnGuardrailResourcesHint(spawnGuardrails.hint),
+          guardrails: spawnGuardrails,
+          unacknowledgedWarnings: unacknowledged,
+        },
+      },
+    };
+  }
+  emitStartAgentPhase(issueId, 'guardrails', 'success', 'spawn guardrails passed');
+  return { decision: spawnGuardrails, refusal: null };
 }
 
 // ─── Start-agent gate resolution (PAN-2499) ───────────────────────────────────
@@ -212,7 +278,7 @@ export const postAgentsRoute = HttpRouter.add(
     catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
     const autoStart = (body as any).auto === true;
     const autoSpawnConsentRequired = internalRequest && (body as any).autoSpawnConsentRequired === true;
-    const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
+    const guardrailAcknowledgement = parseSpawnGuardrailAcknowledgement(body);
     const offBook = (body as any).offBook === true;
     const requestedHostOverride = (body as any).host === true || (body as any).allowHost === true;
     if (!issueId) {
@@ -311,7 +377,8 @@ export const postAgentsRoute = HttpRouter.add(
     // order books under .pan, so a spawn request is simply honoured.
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    if (!existsSync(workspacePath)) {
+    // PAN-4171: `pan workspace create` also resumes an unfinished setup.
+    if (workspaceNeedsSetup(workspacePath)) {
       try {
         const nodeDir = dirname(process.execPath);
         yield* Effect.promise(() => execAsync(
@@ -387,37 +454,8 @@ export const postAgentsRoute = HttpRouter.add(
     }
 
     const health = yield* Effect.promise(() => getSystemHealthSnapshot());
-    emitStartAgentPhase(issueId, 'guardrails', 'start', 'evaluating spawn guardrails');
-    const spawnGuardrails = evaluateSpawnGuardrails(health);
-    if (spawnGuardrails.blocked) {
-      emitStartAgentPhase(issueId, 'guardrails', 'failure', spawnGuardrails.error ?? 'guardrails blocked', {
-        status: spawnGuardrails.status,
-        hint: spawnGuardrails.hint,
-      });
-      return jsonResponse({
-        success: false,
-        blocked: true,
-        skipped: true,
-        error: spawnGuardrails.error,
-        hint: spawnGuardrails.hint,
-        guardrails: spawnGuardrails,
-      }, { status: spawnGuardrails.status });
-    }
-    if (spawnGuardrails.requiresAcknowledgement && !guardrailAcknowledged) {
-      emitStartAgentPhase(issueId, 'guardrails', 'skipped', 'guardrail acknowledgement required', {
-        status: spawnGuardrails.status,
-        hint: spawnGuardrails.hint,
-      });
-      return jsonResponse({
-        success: false,
-        blocked: false,
-        skipped: true,
-        requiresAcknowledgement: true,
-        hint: spawnGuardrailResourcesHint(spawnGuardrails.hint),
-        guardrails: spawnGuardrails,
-      }, { status: spawnGuardrails.status });
-    }
-    emitStartAgentPhase(issueId, 'guardrails', 'success', 'spawn guardrails passed');
+    const { decision: spawnGuardrails, refusal: guardrailRefusal } = resolveSpawnGuardrailRefusal(issueId, health, guardrailAcknowledgement);
+    if (guardrailRefusal) return jsonResponse(guardrailRefusal.body, { status: guardrailRefusal.status });
 
     let spawnModel: string;
     try {

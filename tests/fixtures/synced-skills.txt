@@ -34,7 +34,6 @@ pan-agent-activity
 pan-close
 pan-code-review
 pan-conversations
-pan-convoy-synthesis
 pan-dev
 pan-diagnose
 pan-docker

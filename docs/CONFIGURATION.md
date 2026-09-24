@@ -9,8 +9,8 @@ Complete guide to configuring Overdeck's multi-model routing system.
 - [Permission Mode](#permission-mode)
 - [Removed: Presets, Work-Type Overrides, Thinking Levels](#removed-presets-work-type-overrides-thinking-levels)
 - [Provider Management](#provider-management)
-- [Model Deprecation & Migration](#model-deprecation--migration)
-- [Fallback Strategy](#fallback-strategy)
+- [Deprecated Model IDs](#deprecated-model-ids)
+- [Provider Fallback](#provider-fallback)
 - [Advanced Configuration](#advanced-configuration)
 - [Using Alternative LLM APIs with Claude Code](#using-alternative-llm-apis-with-claude-code)
 - [Getting Help](#getting-help)
@@ -248,11 +248,11 @@ keys do nothing.
 | `models.overrides` (`issue-agent:*`, `review:*`, `specialist-*`, `subagent:*`, `cli:*` keys) | Pinned a model to one work type | `roles.<role>.model`, and `roles.review.sub.<lane>.model` for review lanes (see [Review Mode and Reviewer Models](#review-mode-and-reviewer-models)) |
 | `models.thinking` | Set a Gemini thinking level per work type | dropped; per-role reasoning effort is `roles.<role>.effort` |
 
-No spawn path reads `models.overrides`. What still touches it changes no
-agent's model: the deprecated-model-ID migration below, a Settings deprecation
-warning, and the Command Deck status review, which looks up a `status-review`
-key in a Settings payload that never carries `overrides` and so always runs on
-its built-in model.
+Nothing reads `models.overrides` (#4131). If your config still carries it,
+config load ignores it and logs one warning per process. Loading never rewrites
+`config.yaml`. Saving from the Settings page drops the key from the file. The
+Command Deck status review runs on `models.status_review_model` (see
+[MODEL-CALLS.md](MODEL-CALLS.md)).
 
 ---
 
@@ -275,6 +275,12 @@ model (`security` on `workhorse:expensive`, the other three on
 lanes. A lane uses `roles.review.model` only when its model is set to `parent`. The review parent, which writes the synthesis
 in `full` mode and does the whole review in `quick` mode, uses
 `roles.review.model`. See [MODEL-CALLS.md](MODEL-CALLS.md) for the defaults.
+
+`roles.review.sub.synthesis` is retired (#4131). No spawn ever read it, because
+synthesis runs on the review parent. Config load drops the key
+(`RETIRED_SUB_ROLES` in `src/lib/config-yaml/roles.ts`), the Settings API
+accepts it without error, and the Roles panel no longer shows it. To change the
+synthesis model, set `roles.review.model`.
 
 ```yaml
 roles:
@@ -313,143 +319,59 @@ models:
 
 ### When Providers are Disabled
 
-If a work type is configured to use a disabled provider:
-1. **Fallback** is applied automatically
-2. **Warning** is logged
-3. **Work continues** with Anthropic equivalent
+Disabling a provider does not reroute role agents. `determineModel`
+(`src/lib/agents/provider-env.ts`) resolves a role's model with `resolveModel`
+(`src/lib/config-yaml/roles.ts`) and never checks `models.providers`. If
+`roles.work.model` names a model whose provider is disabled, the agent still
+launches on that model. Nothing substitutes an Anthropic model. `pan doctor` flags a tiered-execution
+crew model, or `roles.work.model` when tiering is off, whose provider is not
+enabled (`provider-not-enabled` in `src/lib/agents/tier-fitness.ts`).
 
-**Example**:
-```yaml
-roles:
-  work:
-    model: gpt-5.2-codex
-
-models:
-  providers:
-    openai: false  # OpenAI disabled (no API key)
-
-# Result: gpt-5.2-codex → claude-sonnet-4-5 (fallback)
-```
+To move a role off a provider, change its model: `roles.<role>.model`,
+`roles.review.sub.<lane>.model`, or the `workhorses` slot it references.
 
 ---
 
-## Model Deprecation & Migration
+## Deprecated Model IDs
 
-When model IDs change (e.g., `claude-opus-4-5` → `claude-opus-4-6`), Overdeck rewrites deprecated IDs it finds in the retired `models.overrides` map of `~/.overdeck/config.yaml`. That map routes nothing (see [Removed](#removed-presets-work-type-overrides-thinking-levels)), so this migration only tidies a leftover key. Model IDs under `roles` and `workhorses` are not rewritten on disk.
+`src/lib/model-deprecations.ts` maps retired model IDs to their replacements
+(for example `claude-sonnet-4-5` → `claude-sonnet-4-6`). Overdeck resolves a
+deprecated ID to its replacement in memory whenever it reads a model reference
+(`resolveModelId` in `src/lib/model-capabilities.ts`). It never rewrites
+`~/.overdeck/config.yaml` and never writes a `config.yaml.bak`.
 
-### How It Works
+When you save settings with a deprecated ID under `roles` or `workhorses`, the
+Settings API returns a warning naming the replacement. The save still goes
+through. To stop the warning, replace the ID in your config.
 
-1. **Auto-Detection**: When you load settings (via Dashboard or CLI), Overdeck checks your model overrides against a deprecation mapping
-2. **Automatic Backup**: If deprecated models are found, `config.yaml.bak` is created before any changes
-3. **Silent Migration**: Deprecated model IDs are replaced with current equivalents in memory and on disk
-4. **Console Logging**: Migration actions are logged to the console
-5. **Dashboard Warnings**: The Settings page shows amber banners and toast notifications for deprecated models
-
-### Current Deprecations
-
-```yaml
-# Deprecated → Current
-claude-opus-4-5 → claude-opus-4-6
-claude-sonnet-4-5 → claude-sonnet-4-6
-```
-
-### Example Migration
-
-**Before** (`~/.overdeck/config.yaml`):
-```yaml
-models:
-  overrides:
-    issue-agent:planning: claude-opus-4-5      # deprecated
-    issue-agent:implementation: claude-sonnet-4-5  # deprecated
-```
-
-**After auto-migration**:
-```yaml
-models:
-  overrides:
-    issue-agent:planning: claude-opus-4-6
-    issue-agent:implementation: claude-sonnet-4-6
-```
-
-**Backup created**: `~/.overdeck/config.yaml.bak` (your original config, for safety)
-
-**Console output**:
-```
-✓ Backed up config.yaml → config.yaml.bak
-
-🔄 Model ID Migration:
-  issue-agent:planning: claude-opus-4-5 → claude-opus-4-6
-  issue-agent:implementation: claude-sonnet-4-5 → claude-sonnet-4-6
-```
-
-### Dashboard Behavior
-
-When you open the Settings page with deprecated model IDs:
-
-1. **Deprecation Banner**: Amber banner at the top showing all deprecated overrides
-2. **Toast Notification**: Warning toast prompting you to save to complete migration
-3. **Card Highlighting**: Agent cards with deprecated models show amber borders and "DEPRECATED" badge
-4. **Auto-Fix on Save**: Clicking "Save" automatically migrates to current model IDs
-
-### Strategy
-
-- **Single-Hop Only**: Deprecation mappings are updated with each new model version
-- **When 4.7 arrives**: Both `4-5→4-7` and `4-6→4-7` mappings will be added
-- **No Multi-Hop**: We don't chain `4-5→4-6→4-7`; each mapping is direct
-
-### Restoring from Backup
-
-If you need to restore your original configuration:
-
-```bash
-cp ~/.overdeck/config.yaml.bak ~/.overdeck/config.yaml
-```
-
-**Note**: The backup file is overwritten on each migration, so it always contains the most recent pre-migration state.
+Mappings are single-hop: when a model is retired, every older ID that pointed
+at it is re-pointed straight at its replacement.
 
 ---
 
-## Fallback Strategy
+## Provider Fallback
 
-When API keys are missing or providers disabled, Overdeck falls back to Anthropic models.
+Provider fallback applies to one caller: conversation enrichment
+(`resolveEnrichmentModel` in `src/lib/conversations/enrichment/enrich-session.ts`).
+When the enrichment model's provider is disabled, `applyFallback`
+(`src/lib/model-fallback.ts`) substitutes an Anthropic model:
 
-### Fallback Mappings
+1. the model's entry in `FALLBACK_MAP` in `src/lib/model-fallback.ts`, if it
+   has one;
+2. otherwise `models.provider_fallback_model` (default `claude-sonnet-5`, set
+   in `src/lib/config-yaml/defaults.ts`).
 
-| Original Model | Fallback Model | Reason |
-|----------------|----------------|--------|
-| `gpt-5.2-codex` | `claude-sonnet-4-5` | Similar capability tier |
-| `gpt-4o` | `claude-sonnet-4-5` | Similar capability tier |
-| `gpt-4o-mini` | `claude-haiku-4-5` | Budget tier |
-| `o3-deep-research` | `claude-opus-4-6` | Premium tier |
-| `gemini-3-pro-preview` | `claude-sonnet-4-5` | Similar capability tier |
-| `gemini-3-flash-preview` | `claude-haiku-4-5` | Budget tier |
-| `glm-4.7` | `claude-haiku-4-5` | Budget tier |
-| `glm-4.7-flashx` | `claude-haiku-4-5` | Budget tier |
+If Anthropic is also disabled, it keeps the original model. Each substitution
+logs a warning. Role agents never fall back (see
+[When Providers are Disabled](#when-providers-are-disabled)).
 
-### Fallback Behavior
-
-1. **Automatic**: No configuration needed
-2. **Logged**: Warning messages show fallback usage
-3. **Seamless**: Work continues without interruption
-4. **Guaranteed**: Works with only ANTHROPIC_API_KEY configured
-
-### Example Scenario
-
-**Configuration**:
 ```yaml
-roles:
-  work:
-    model: gpt-5.2-codex
+models:
+  provider_fallback_model: claude-sonnet-5
 ```
 
-**Missing API key**: `OPENAI_API_KEY` not configured
-
-**Result**:
-```
-Warning: Model gpt-5.2-codex requires openai API key - falling back to claude-sonnet-4-5
-```
-
-**Outcome**: Implementation phase uses `claude-sonnet-4-5` instead
+See [MODEL-CALLS.md](MODEL-CALLS.md) ("Provider-disabled substitute") for where
+this model is recorded.
 
 ---
 

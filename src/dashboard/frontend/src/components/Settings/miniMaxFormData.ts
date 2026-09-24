@@ -8,7 +8,6 @@ export function buildMiniMaxFormData(
   return {
     models: {
       providers: { ...miniMaxDefaults.models.providers },
-      overrides: { ...miniMaxDefaults.models.overrides },
       gemini_thinking_level: formData?.models.gemini_thinking_level,
     },
     api_keys: { ...(formData?.api_keys || {}) },

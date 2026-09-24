@@ -172,7 +172,7 @@ done
 ```bash
 cd ~/Projects/overdeck
 if [ -d .venv ]; then
-  pan tldr start 2>/dev/null || echo "TLDR unavailable (non-fatal)"
+  pan admin tldr start 2>/dev/null || echo "TLDR unavailable (non-fatal)"
 fi
 ```
 

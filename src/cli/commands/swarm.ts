@@ -39,6 +39,7 @@ import { removeAgent } from '../../lib/agents/removal.js';
 import { ensureSwarmForeman } from '../../lib/cloister/swarm-foreman.js';
 import { resolveSlotWorkspaceWorktrees, type SlotWorkspaceWorktrees } from '../../lib/project-repos.js';
 import { removeWorkspaceDirectory } from '../../lib/workspace-manager/remove-directory.js';
+import { workspaceNeedsSetup } from '../../lib/workspace-manager/setup-marker.js';
 import { isRegisteredWorktree } from '../../lib/cloister/deacon-swarm-gc.js';
 import {
   swarmDispatchCommand,
@@ -890,7 +891,7 @@ export function registerSwarmCommands(program: Command): void {
 async function ensureFeatureWorkspace(issueId: string, project: ResolvedProjectLike): Promise<string> {
   const featureName = issueId.toLowerCase();
   const workspacePath = join(project.projectPath, 'workspaces', `feature-${featureName}`);
-  if (existsSync(workspacePath)) return workspacePath;
+  if (!workspaceNeedsSetup(workspacePath)) return workspacePath;
 
   const projectConfig: ProjectConfig = {
     name: project.projectName,

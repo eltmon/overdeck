@@ -183,7 +183,11 @@ export function useProjectCreateIntent({
             setResolveError('Could not check this with the server. Try again.');
             return;
           }
-          setIntent((await response.json()) as ResolvedProjectIntent);
+          const resolved = (await response.json()) as ResolvedProjectIntent;
+          // The body can land after a newer edit even when the headers did not
+          // (PAN-3867): an empty-form answer must not paint over typed input.
+          if (seq !== resolveSeq.current) return;
+          setIntent(resolved);
           setChecking(false);
         } catch {
           if (seq !== resolveSeq.current) return;
