@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T15:50:32.441Z · model: claude-opus-5 · open: 849_
+_Last sequenced: 2026-09-24T16:09:56.733Z · model: claude-opus-5 · open: 849_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1184,7 +1184,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T15:50:32.441Z",
+  "generatedAt": "2026-09-24T16:09:56.733Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 849,
@@ -12999,6 +12999,13 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.85
+    },
+    {
+      "from": "PAN-1676",
+      "to": "PAN-2424",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
