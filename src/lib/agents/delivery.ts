@@ -941,7 +941,7 @@ export async function deliverInitialPromptWithRetry(
     const ready = await waitForReady(agentId, harness, readyTimeoutSeconds);
     if (!ready) {
       const alive = await sessionExistsForAgent(agentId);
-      lastFailure = alive ? 'ready-signal-timeout' : SESSION_EXITED_BEFORE_KICKOFF;
+      lastFailure = alive ? await (await import('./ready-timeout-failure.js')).readySignalTimeoutFailureFor(normalizedId) : SESSION_EXITED_BEFORE_KICKOFF;
       const displayName = getHarnessBehavior(harness).displayName;
       console.error(`[${agentId}] ${displayName} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
       if (!alive) break;
