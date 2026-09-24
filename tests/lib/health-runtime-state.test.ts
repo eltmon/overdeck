@@ -170,4 +170,26 @@ describe('health runtime-state classification', () => {
     expect(health.status).toBe('dead');
     expect(health.consecutiveFailures).toBe(1);
   });
+
+  it('#4109: an unknown ping neither increments nor resets the dead-ping counter carried across pings', async () => {
+    // Persist health.json across pings in memory.
+    const files = new Map<string, string>();
+    existsSyncMock.mockImplementation((path: string) => files.has(path));
+    readFileSyncMock.mockImplementation((path: string) => files.get(path));
+    writeFileSyncMock.mockImplementation((path: string, data: string) => { files.set(path, data); });
+    getAgentStateMock.mockReturnValue({ status: 'running' });
+
+    const { pingAgent } = await import('../../src/lib/health.js');
+    const ping = async (verdict: { alive: boolean; reason?: string; paneAlive?: boolean }) => {
+      isAliveMock.mockResolvedValue(verdict);
+      return Effect.runPromise(pingAgent('agent-pan-4109'));
+    };
+
+    expect((await ping({ alive: false, reason: 'no-session' })).consecutiveFailures).toBe(1);
+    const unknown = await ping({ alive: false, reason: 'runtime-indeterminate' });
+    expect(unknown.status).toBe('warning');
+    expect(unknown.consecutiveFailures).toBe(1);
+    expect((await ping({ alive: false, reason: 'no-session' })).consecutiveFailures).toBe(2);
+    expect((await ping({ alive: true, paneAlive: true })).consecutiveFailures).toBe(0);
+  });
 });
