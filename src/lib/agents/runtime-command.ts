@@ -303,7 +303,7 @@ async function readTuiPane(agentId: string): Promise<string | null> {
   const presence = await probeAgentPane(agentId);
   if (presence === 'gone') return null;
   if (presence === 'unknown') throw new Error(`could not tell whether ${agentId}'s pane is still there`);
-  return await readAgentPaneText(agentId, 80);
+  return await readAgentPaneText(agentId, 80, undefined, 'visible');
 }
 
 async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {

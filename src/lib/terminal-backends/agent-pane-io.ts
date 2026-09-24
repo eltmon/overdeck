@@ -27,6 +27,8 @@ export async function readAgentPaneText(
   agentId: string,
   lines: number,
   backend?: TerminalBackend,
+  /** Herdr only: `visible` for readiness — `recent` is empty on a full-screen TUI's alternate screen. */
+  source: 'recent' | 'visible' = 'recent',
 ): Promise<string> {
   const { resolveLaunchBackend } = await import('./launch.js');
   const resolved = backend ?? (await resolveLaunchBackend());
@@ -37,7 +39,7 @@ export async function readAgentPaneText(
   const { findHerdrAgentPane, readHerdrPaneText } = await import('./herdr.js');
   const pane = await findHerdrAgentPane(agentId);
   if (!pane) throw new Error(`herdr holds no pane for ${agentId}`);
-  return await readHerdrPaneText(pane.paneId, lines);
+  return await readHerdrPaneText(pane.paneId, lines, source);
 }
 
 /** Is the agent's pane still there: yes, no, or the probe could not tell. */

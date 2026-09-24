@@ -515,13 +515,13 @@ const agentIdOf = (pane: HerdrPaneInfo): string | undefined => pane.tokens?.[AGE
 
 /** The recent terminal text of a Herdr pane — the backend's `capture-pane`. */
 export async function readHerdrPaneText(
-  paneId: string,
-  lines: number,
+  paneId: string, lines: number,
+  source: 'recent' | 'visible' = 'recent', // `visible` includes a full-screen TUI's alternate screen
   api: HerdrApiClient = getHerdrApiClient(),
 ): Promise<string> {
   const result = await api.call<{ text?: string }>('pane.read', {
     pane_id: paneId,
-    source: 'recent',
+    source,
     lines,
     strip_ansi: true,
   });

@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const readAgentPaneText = vi.hoisted(() => vi.fn(async (_agentId: string, _lines: number) => ''));
+const readAgentPaneText = vi.hoisted(() => vi.fn(async (_agentId: string, _lines: number, _backend?: unknown, _source?: string) => ''));
 const capturePane = vi.hoisted(() => vi.fn(async () => ''));
 
 vi.mock('../../terminal-backends/agent-pane-io.js', async (importOriginal) => ({
@@ -30,7 +30,7 @@ describe('conversation readiness on the host backend (PAN-3921)', () => {
   it('reads the ohmypi TUI through the backend pane reader', async () => {
     readAgentPaneText.mockResolvedValue('❯ ');
     await expect(waitForPiTuiReady('conv-x', 5_000)).resolves.toBe(true);
-    expect(readAgentPaneText).toHaveBeenCalledWith('conv-x', 40);
+    expect(readAgentPaneText).toHaveBeenCalledWith('conv-x', 40, undefined, 'visible');
     expect(capturePane).not.toHaveBeenCalled();
   });
 
@@ -45,14 +45,14 @@ describe('conversation readiness on the host backend (PAN-3921)', () => {
   it('waits for the Claude Code prompt through the backend pane reader on spawn', async () => {
     readAgentPaneText.mockResolvedValue('❯ ');
     await waitForConversationRuntimeReady('conv-x', 'claude-code', 'spawn');
-    expect(readAgentPaneText).toHaveBeenCalledWith('conv-x', 200);
+    expect(readAgentPaneText).toHaveBeenCalledWith('conv-x', 200, undefined, 'visible');
     expect(capturePane).not.toHaveBeenCalled();
   });
 
   it('waits for the Kimi Code TUI through the backend pane reader', async () => {
     readAgentPaneText.mockResolvedValue('│ > │\ncontext: 0% (0/262k)');
     await expect(waitForPromptReady('conv-x', 'kimi-code', 5)).resolves.toBe(true);
-    expect(readAgentPaneText).toHaveBeenCalledWith('conv-x', 80);
+    expect(readAgentPaneText).toHaveBeenCalledWith('conv-x', 80, undefined, 'visible');
     expect(capturePane).not.toHaveBeenCalled();
   });
 });

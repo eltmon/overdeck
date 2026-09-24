@@ -230,7 +230,7 @@ async function validateCwdContainment(cwd: string): Promise<boolean> {
  */
 async function readConversationPane(tmuxSession: string, lines: number): Promise<string> {
   const { readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
-  return readAgentPaneText(tmuxSession, lines).catch(() => '');
+  return readAgentPaneText(tmuxSession, lines, undefined, 'visible').catch(() => '');
 }
 async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;

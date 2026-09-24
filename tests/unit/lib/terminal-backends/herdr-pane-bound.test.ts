@@ -17,6 +17,7 @@ import {
   HerdrBackend,
   listHerdrAgents,
   probeHerdrAgentLiveness,
+  readHerdrPaneText,
 } from '../../../../src/lib/terminal-backends/herdr.js';
 import { HerdrApiError } from '../../../../src/lib/terminal-backends/herdr-api.js';
 import { detectionPolicyFor, launchAgentPane } from '../../../../src/lib/terminal-backends/launch.js';
@@ -379,5 +380,14 @@ describe('HerdrBackend.prompt for a pane-bound agent', () => {
       // would drop the real delivery as a duplicate.
       expect(isUnsupported(result)).toBe(true);
     }
+  });
+});
+
+describe('readHerdrPaneText source (PAN-3921)', () => {
+  it('reads recent output by default and the visible screen when asked', async () => {
+    const { api, log } = fakeApi(({ method }) => (method === 'pane.read' ? { text: 'screen' } : {}));
+    await expect(readHerdrPaneText('wE:p2', 40, undefined, api as never)).resolves.toBe('screen');
+    await readHerdrPaneText('wE:p2', 40, 'visible', api as never);
+    expect(log.map((call) => call.params['source'])).toEqual(['recent', 'visible']);
   });
 });

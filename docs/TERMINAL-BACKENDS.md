@@ -342,8 +342,9 @@ stored status, and restart-all refuses rather than restarting nothing.
 The lifecycle poller (`pollConversations`) reads `listHerdrAgents` once per tick on a Herdr host,
 with a 90 s spawn grace (Herdr's 60 s detection window plus the 30 s tmux grace), and consults the
 tmux census only for a conversation Herdr does not hold. When Herdr does not answer it marks
-nothing. Readiness reads the pane through `readAgentPaneText` (Herdr `pane.read` or tmux
-`capture-pane`). The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only.
+nothing. Readiness reads the pane through `readAgentPaneText` (Herdr `pane.read` with
+`source: visible`, or tmux `capture-pane`): `recent` is empty while a full-screen TUI (omp, kimi,
+muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only.
 
 **On a tmux host the door still asks Herdr** when its socket answers, and only a Herdr `alive`
 counts there (an unreachable Herdr is the normal state of a tmux host). The poller does the same
