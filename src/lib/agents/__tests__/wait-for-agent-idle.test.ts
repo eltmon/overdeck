@@ -103,6 +103,8 @@ describe('waitForAgentIdle (PAN-4186)', () => {
     const { result, settledEarly } = await runWait(5000);
     expect(result).toBe(false);
     expect(settledEarly).toBe(false);
+    // One probe, then the mirror alone decides: no backend traffic per tick.
+    expect(mocks.probeHerdrAgentLiveness).toHaveBeenCalledTimes(1);
   });
 
   it('still honors the runtime mirror on Herdr when the backend cannot tell', async () => {

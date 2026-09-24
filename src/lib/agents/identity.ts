@@ -187,11 +187,14 @@ export async function waitForAgentIdle(
   deps: WaitForAgentIdleDeps = {},
 ): Promise<boolean> {
   const backend = deps.backend ?? (await hostTerminalBackendName());
-  const probeBackendState = backend === 'herdr' ? (deps.probeBackendState ?? probeHerdrAgentState) : null;
+  let probeBackendState = backend === 'herdr' ? (deps.probeBackendState ?? probeHerdrAgentState) : null;
   const isIdleNow = async (): Promise<boolean> => {
     if (getAgentRuntimeStateSync(agentId)?.state === 'idle') return true;
     if (!probeBackendState) return false;
     const state = await probeBackendState(agentId).catch(() => undefined);
+    // Herdr cannot tell (pane-bound host pane, socket trouble): stop asking and
+    // let the mirror decide for the rest of the wait, as before PAN-4186.
+    if (state === undefined || state === 'unknown') probeBackendState = null;
     return state === 'idle' || state === 'done';
   };
   const deadline = Date.now() + timeoutMs;
