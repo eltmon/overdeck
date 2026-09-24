@@ -46,6 +46,8 @@ vi.mock('../../tmux.js', async (importOriginal) => ({
   sessionExistsSync: () => false,
 }));
 
+// The registry module registers the backend-aware probe the runtimes ask.
+import '../index.js';
 import { AcpRuntimeSync } from '../acp.js';
 import { ClaudeCodeRuntimeSync } from '../claude-code.js';
 import { CodexRuntimeSync } from '../codex.js';

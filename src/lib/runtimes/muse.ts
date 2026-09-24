@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { listAgentStates } from '../agents/queries.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { waitForPromptReady } from '../agents/runtime-command.js';
-import { isAlive } from '../agents/liveness.js';
+import { isRuntimeAgentAlive } from './runtime-liveness.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
@@ -54,7 +54,7 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
     if (!result.ok) throw new Error(result.failure ?? 'Muse message delivery failed');
   }
   async killAgent(agentId: string): Promise<void> { await tmuxKillSession(agentId); }
-  async isRunning(agentId: string): Promise<boolean> { return (await isAlive(agentId, { readHarness: () => this.name })).alive; }
+  async isRunning(agentId: string): Promise<boolean> { return isRuntimeAgentAlive(agentId, this.name); }
   async spawnAgent(config: SpawnConfig): Promise<Agent> {
     if (!config.model) throw new Error('Muse requires an explicitly configured model');
     if (await this.isRunning(config.agentId)) throw new Error(`Agent ${config.agentId} is already running`);

@@ -19,12 +19,10 @@ vi.mock('../tmux-cli.js', () => ({
 }))
 
 const livenessMocks = vi.hoisted(() => ({
-  isAlive: vi.fn(async (): Promise<unknown> => ({ alive: false, reason: 'no-session' })),
+  isRuntimeAgentAlive: vi.fn(async (): Promise<boolean> => false),
 }))
-
-vi.mock('../../agents/liveness.js', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  isAlive: livenessMocks.isAlive,
+vi.mock('../runtime-liveness.js', () => ({
+  isRuntimeAgentAlive: livenessMocks.isRuntimeAgentAlive,
 }))
 
 import type { AgentState } from '../../agents/agent-state.js'
@@ -155,9 +153,9 @@ describe('AcpRuntimeSync', () => {
       runtime: 'acp',
       workspace: '/tmp/work space',
     })
-    livenessMocks.isAlive.mockResolvedValueOnce({ alive: true, paneAlive: true })
+    livenessMocks.isRuntimeAgentAlive.mockResolvedValueOnce(true)
     await expect(runtime.isRunning('agent-spawn')).resolves.toBe(true)
-    expect(livenessMocks.isAlive).toHaveBeenCalledWith('agent-spawn', expect.anything())
+    expect(livenessMocks.isRuntimeAgentAlive).toHaveBeenCalledWith('agent-spawn', 'acp')
   })
 
   it('surfaces the host launch diagnostic without waiting for readiness timeout', async () => {

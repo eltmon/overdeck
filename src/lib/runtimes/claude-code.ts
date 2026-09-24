@@ -25,7 +25,7 @@ import type {
 import { CLAUDE_CODE_BEHAVIOR } from './behavior.js';
 import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentStateSync, saveAgentRuntimeState, determineModel } from '../agents.js';
 import { sessionExistsSync, killSessionSync, sendKeys, getAgentSessionsSync } from '../tmux.js';
-import { isAlive } from '../agents/liveness.js';
+import { isRuntimeAgentAlive } from './runtime-liveness.js';
 import { parseClaudeSession, getSessionFiles, getProjectDirs } from '../cost-parsers/jsonl-parser.js';
 import { claudeProjectsRoot } from './storage/claude-code.js';
 
@@ -434,7 +434,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
    * Herdr agent (which has no tmux session) reads alive (#4116).
    */
   async isRunning(agentId: string): Promise<boolean> {
-    return (await isAlive(agentId, { readHarness: () => this.name })).alive;
+    return isRuntimeAgentAlive(agentId, this.name);
   }
 }
 

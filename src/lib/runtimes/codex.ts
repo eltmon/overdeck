@@ -40,7 +40,7 @@ import type {
 import { CODEX_BEHAVIOR } from './behavior.js'
 import { syncCodexSkillsIntoHome } from './codex-skills.js'
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
-import { isAlive } from '../agents/liveness.js'
+import { isRuntimeAgentAlive } from './runtime-liveness.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSession } from '../cost-parsers/codex-parser.js'
 import { appendSessionIdToHistory } from '../session-history.js'
@@ -707,7 +707,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return (await isAlive(agentId, { readHarness: () => this.name })).alive
+    return isRuntimeAgentAlive(agentId, this.name)
   }
 }
 
