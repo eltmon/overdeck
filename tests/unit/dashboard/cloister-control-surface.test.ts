@@ -9,12 +9,6 @@ const mocks = vi.hoisted(() => ({
     thresholds: { stale: 5, warning: 10, stuck: 20 },
     auto_actions: { poke_on_warning: true, kill_on_stuck: false },
   })),
-  getDeaconLiteStatus: vi.fn(() => ({
-    running: true,
-    intervalMs: 60_000,
-    lastRunAt: '2026-07-03T00:00:00.000Z',
-    lastRunError: null,
-  })),
   readCloisterStateFile: vi.fn(() => ({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' })),
   isCloisterSpawnsPaused: vi.fn(() => true),
   setCloisterSpawnsPaused: vi.fn(),
@@ -23,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   sendPatrolNow: vi.fn(() => true),
   reloadDeaconConfig: vi.fn(() => true),
   isChildRunning: vi.fn(() => true),
+  lastPatrolReport: vi.fn((): { at: string; error: string | null } | null => ({ at: '2026-07-03T00:00:00.000Z', error: null })),
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
@@ -38,7 +33,7 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
 }));
 
 vi.mock('../../../src/lib/cloister/deacon-lite.js', () => ({
-  getDeaconLiteStatus: mocks.getDeaconLiteStatus,
+  DEACON_LITE_INTERVAL_MS: 60_000,
 }));
 
 vi.mock('../../../src/lib/cloister/service.js', () => ({
@@ -56,6 +51,7 @@ vi.mock('../../../src/dashboard/server/services/deacon-supervisor.js', () => ({
   sendPatrolNow: mocks.sendPatrolNow,
   reloadDeaconConfig: mocks.reloadDeaconConfig,
   isChildRunning: mocks.isChildRunning,
+  lastPatrolReport: mocks.lastPatrolReport,
 }));
 
 // Import once at module scope; vi.mock hoisting ensures mocks are wired.
@@ -76,19 +72,14 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
     vi.clearAllMocks();
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.readCloisterStateFile.mockReturnValue({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' });
-    mocks.getDeaconLiteStatus.mockReturnValue({
-      running: true,
-      intervalMs: 60_000,
-      lastRunAt: '2026-07-03T00:00:00.000Z',
-      lastRunError: null,
-    });
+    mocks.lastPatrolReport.mockReturnValue({ at: '2026-07-03T00:00:00.000Z', error: null });
     mocks.isChildRunning.mockReturnValue(true);
     mocks.sendPatrolNow.mockReturnValue(true);
     mocks.reloadDeaconConfig.mockReturnValue(true);
     mocks.isCloisterSpawnsPaused.mockReturnValue(true);
   });
 
-  it('composes status from the pid file and deacon-lite\'s in-memory status', async () => {
+  it('composes status from the pid file and the deacon child\'s relayed patrol report', async () => {
     const status = await readDurableCloisterStatus();
 
     expect(status.running).toBe(true);
@@ -97,7 +88,7 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
     expect(status.patrol.intervalMs).toBe(60_000);
     expect(areDurableSpawnsPaused()).toBe(true);
     expect(mocks.readCloisterStateFile).toHaveBeenCalled();
-    expect(mocks.getDeaconLiteStatus).toHaveBeenCalled();
+    expect(mocks.lastPatrolReport).toHaveBeenCalled();
     expect(mocks.isCloisterSpawnsPaused).toHaveBeenCalled();
   });
 
@@ -137,5 +128,42 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
       deaconLite: { running: true, intervalMs: 60_000 },
     });
     expect(readDurableDeaconLogs(5)).toEqual([]);
+  });
+
+  describe('relayed deacon-lite status (PAN-3922)', () => {
+    it('composes deaconLite and lastCheck from the report the deacon child relayed', async () => {
+      mocks.lastPatrolReport.mockReturnValue({ at: '2026-07-03T00:05:00.000Z', error: 'tracker down' });
+      const expected = {
+        running: true,
+        intervalMs: 60_000,
+        lastRunAt: '2026-07-03T00:05:00.000Z',
+        lastRunError: 'tracker down',
+      };
+
+      expect(readDurableDeaconStatus().deaconLite).toEqual(expected);
+      const status = await readDurableCloisterStatus();
+      expect(status.patrol).toEqual(expected);
+      expect(status.lastCheck?.toISOString()).toBe('2026-07-03T00:05:00.000Z');
+    });
+
+    it('reports not running with null fields when there is no child and no report', async () => {
+      mocks.isChildRunning.mockReturnValue(false);
+      mocks.lastPatrolReport.mockReturnValue(null);
+      const expected = { running: false, intervalMs: 60_000, lastRunAt: null, lastRunError: null };
+
+      expect(readDurableDeaconStatus().deaconLite).toEqual(expected);
+      const status = await readDurableCloisterStatus();
+      expect(status.patrol).toEqual(expected);
+      expect(status.lastCheck).toBeNull();
+    });
+
+    it('prefers an injected readDeaconLiteStatus and never reads the relayed report', async () => {
+      const injected = { running: true, intervalMs: 5_000, lastRunAt: '2026-01-01T00:00:00.000Z', lastRunError: null };
+      const readDeaconLiteStatus = () => injected;
+
+      expect(readDurableDeaconStatus({ readDeaconLiteStatus }).deaconLite).toEqual(injected);
+      expect((await readDurableCloisterStatus({ readDeaconLiteStatus })).patrol).toEqual(injected);
+      expect(mocks.lastPatrolReport).not.toHaveBeenCalled();
+    });
   });
 });

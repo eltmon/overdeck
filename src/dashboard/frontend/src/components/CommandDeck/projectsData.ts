@@ -6,6 +6,7 @@
  */
 import { compareIssueIds } from '@overdeck/contracts';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
 /** Sentinel deck key for the "No project" bucket — conversations/terminals not
@@ -143,9 +144,12 @@ async function readMembershipError(response: Response): Promise<string> {
 }
 
 export async function fetchProjects(): Promise<ProjectData[]> {
+  // PAN-3527: bounded like every other deck fetch. A request hung against a
+  // restarting server would otherwise pin the query in its first load, and
+  // every later poll or invalidation joins the hung promise.
   const [issuesRes, registeredRes] = await Promise.all([
-    fetch('/api/issues/resource-allocated'),
-    fetch('/api/registered-projects'),
+    fetchWithTimeout('/api/issues/resource-allocated'),
+    fetchWithTimeout('/api/registered-projects'),
   ]);
   if (!issuesRes.ok) throw new Error('Failed to fetch resource-allocated issues');
   if (!registeredRes.ok) throw new Error('Failed to fetch registered projects');

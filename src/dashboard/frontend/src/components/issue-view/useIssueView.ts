@@ -10,7 +10,7 @@ import {
   type IssueCostData,
   type WorkspaceData,
 } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { deriveShip, isAgentRunning, isReadyToMerge, sortOperatorNeeds, stuckReason } from './derivations';
+import { deriveShip, isAgentRunning, isReadyToMerge, isShipped, sortOperatorNeeds, stuckReason } from './derivations';
 import type {
   AgentRowModel,
   IssueActivityModel,
@@ -249,7 +249,7 @@ function derivePhase(derived: DerivedIssueState | undefined, sessions: SessionNo
 function deriveNowText(derived: DerivedIssueState | undefined, activeAgent?: AgentRowModel): string {
   switch (derived?.state) {
     case 'merged': return 'Merged — ready to close out';
-    case 'closed': return 'Closed';
+    case 'closed': return isShipped(derived) ? 'Merged and closed out' : 'Closed';
     case 'ready': return 'Approved and green — ready to merge';
     case 'changes-requested':
       return activeAgent?.type === 'work'
@@ -326,7 +326,7 @@ function derivePipeline(
   derived: DerivedIssueState | undefined,
   sessions: SessionNode[],
 ): IssuePipelineModel {
-  const merged = derived?.state === 'merged';
+  const merged = isShipped(derived);
   const hasPlanSession = sessions.some((s) => s.type === 'planning' || s.type === 'legacy');
   const hasWorkSession = sessions.some((s) => s.type === 'work' || s.type === 'strike');
   const planActive = hasPlanSession && sessions.some((s) => (s.type === 'planning' || s.type === 'legacy') && isAgentRunning(s, undefined));
@@ -430,7 +430,9 @@ function deriveOperator(
   if (
     work &&
     !isAgentRunning(work, findAgentForSession(work, agentsById)) &&
-    derived?.state !== 'merged'
+    // A finished issue's work agent is stopped because the work is done.
+    derived?.state !== 'merged' &&
+    derived?.state !== 'closed'
   ) {
     items.push({ kind: 'stopped', sessionId: work.sessionId });
   }

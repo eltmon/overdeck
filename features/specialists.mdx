@@ -352,9 +352,6 @@ pan specialists reset review-agent
 
 # Clear a stuck queue without touching the session
 pan specialists clear-queue review-agent
-
-# Tail an active run in real-time
-pan specialists logs myproject review-agent --tail
 ```
 
 The dashboard surfaces the same state visually. The **Agents** page rolls up every running specialist and work-agent into cards — model, runtime, and last activity — under a metric strip tracking how many agents are running, how many are stuck, and the 24-hour cost and token spend. It's the at-a-glance answer to "what is every agent doing right now" without tailing a single log.

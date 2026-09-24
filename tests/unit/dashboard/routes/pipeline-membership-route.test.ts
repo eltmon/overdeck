@@ -116,4 +116,21 @@ describe('pipeline membership routes', () => {
     });
     expect(routeMocks.refreshMembershipSnapshotsForProjects).toHaveBeenCalledWith([project]);
   });
+
+  it('PAN-3924: POST refresh returns the last-good array when the re-gather fails', async () => {
+    // The service swallows the failed re-gather and keeps the last-good snapshot.
+    routeMocks.readPipelineMembershipSnapshotsForProjects.mockReturnValue([{
+      project,
+      memberships: [{ issueId: 'PAN-9' }],
+    }]);
+
+    await expect(requestMembershipRoute(
+      '/api/pipeline/membership/refresh?project=route-project',
+      { method: 'POST' },
+    )).resolves.toEqual({
+      status: 200,
+      body: [{ issueId: 'PAN-9' }],
+    });
+    expect(routeMocks.refreshMembershipSnapshotsForProjects).toHaveBeenCalledWith([project]);
+  });
 });

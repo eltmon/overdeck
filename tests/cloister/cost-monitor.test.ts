@@ -19,20 +19,10 @@ import {
   getCostForIssue as getCostForIssueFromDb,
   getAgentDailyCost,
 } from '../../src/lib/overdeck/cost-sync.js';
-import {
-  recordCost,
-  checkCostLimits,
-  getAgentCost,
-  getIssueCost,
-  getDailyTotal,
-  getCostSummary,
-  resetCostTracking,
-} from '../../src/lib/cloister/cost-monitor.js';
+import { checkCostLimits } from '../../src/lib/cloister/cost-monitor.js';
 
 describe('cost-monitor', () => {
   beforeEach(() => {
-    // Reset in-memory tracking before each test
-    resetCostTracking();
     // Reset DB mocks to default (no spend)
     vi.mocked(getAgentRollup).mockReturnValue([]);
     vi.mocked(getDailyTrends).mockReturnValue([]);
@@ -42,39 +32,6 @@ describe('cost-monitor', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe('recordCost', () => {
-    it('should record agent cost', () => {
-      recordCost('agent-1', 1.5);
-      expect(getAgentCost('agent-1')).toBe(1.5);
-    });
-
-    it('should record issue cost', () => {
-      recordCost('agent-1', 2.0, 'issue-1');
-      expect(getIssueCost('issue-1')).toBe(2.0);
-    });
-
-    it('should accumulate costs for same agent', () => {
-      recordCost('agent-1', 1.0);
-      recordCost('agent-1', 0.5);
-      recordCost('agent-1', 0.25);
-      expect(getAgentCost('agent-1')).toBe(1.75);
-    });
-
-    it('should accumulate costs for same issue', () => {
-      recordCost('agent-1', 1.0, 'issue-1');
-      recordCost('agent-2', 2.0, 'issue-1');
-      recordCost('agent-3', 0.5, 'issue-1');
-      expect(getIssueCost('issue-1')).toBe(3.5);
-    });
-
-    it('should update daily total', () => {
-      recordCost('agent-1', 1.0);
-      recordCost('agent-2', 2.0);
-      recordCost('agent-3', 0.5);
-      expect(getDailyTotal()).toBe(3.5);
-    });
   });
 
   describe('checkCostLimits', () => {
@@ -183,48 +140,6 @@ describe('cost-monitor', () => {
       });
 
       expect(alerts).toHaveLength(0);
-    });
-  });
-
-  describe('getCostSummary', () => {
-    it('should return empty summary when no costs recorded', () => {
-      const summary = getCostSummary();
-      expect(summary.dailyTotal).toBe(0);
-      expect(summary.topAgents).toHaveLength(0);
-      expect(summary.topIssues).toHaveLength(0);
-    });
-
-    it('should return sorted top agents', () => {
-      recordCost('agent-1', 5.0);
-      recordCost('agent-2', 10.0);
-      recordCost('agent-3', 2.0);
-
-      const summary = getCostSummary();
-      expect(summary.topAgents).toHaveLength(3);
-      expect(summary.topAgents[0].agentId).toBe('agent-2');
-      expect(summary.topAgents[0].cost).toBe(10.0);
-    });
-
-    it('should limit to top 10 agents', () => {
-      for (let i = 1; i <= 15; i++) {
-        recordCost(`agent-${i}`, i * 1.0);
-      }
-
-      const summary = getCostSummary();
-      expect(summary.topAgents).toHaveLength(10);
-    });
-  });
-
-  describe('resetCostTracking', () => {
-    it('should clear all cost data', () => {
-      recordCost('agent-1', 5.0, 'issue-1');
-      recordCost('agent-2', 3.0, 'issue-2');
-
-      resetCostTracking();
-
-      expect(getAgentCost('agent-1')).toBe(0);
-      expect(getIssueCost('issue-1')).toBe(0);
-      expect(getDailyTotal()).toBe(0);
     });
   });
 

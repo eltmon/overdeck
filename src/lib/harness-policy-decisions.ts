@@ -13,12 +13,17 @@
  */
 
 import { getProviderForModel } from './providers.js';
-import { canUseHarness } from './harness-policy.js';
+import { canUseHarness, type HarnessPolicyDecision } from './harness-policy.js';
+import type { RuntimeName } from './runtimes/types.js';
 import type { AuthMode } from './subscription-types.js';
 
+/**
+ * Per-model decisions, exhaustive over RuntimeName: adding a harness without a
+ * policy entry here is a type error, not a silently-allowed picker option.
+ */
 export type HarnessPolicyDecisionMap = Record<
   string,
-  Record<string, { allowed: boolean; reason?: string }>
+  Record<RuntimeName, HarnessPolicyDecision>
 >;
 
 export type HarnessPolicyAuthModeResolver = (model: string) => Promise<AuthMode | undefined>;
