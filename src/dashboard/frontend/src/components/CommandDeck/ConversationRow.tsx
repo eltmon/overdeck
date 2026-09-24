@@ -14,6 +14,7 @@ import type { RegisteredProject } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
+import { PullRequestBadge } from '../primitives/PullRequestBadge';
 import styles from './styles/command-deck.module.css';
 
 /** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
@@ -233,6 +234,13 @@ export function ConversationRow({
     : `${styles.conversationItem} ${isSelected ? styles.conversationItemSelected : ''}`;
 
   // Fork / spawn status badges — shared by both row variants.
+  const pullRequestBadge = conv.pullRequest ? (
+    <PullRequestBadge
+      link={conv.pullRequest}
+      extraCount={Math.max(0, (conv.pullRequestCount ?? 1) - 1)}
+    />
+  ) : null;
+
   const forkBadges = (
     <>
       {stalledLabel && (
@@ -423,6 +431,7 @@ export function ConversationRow({
               <span className={styles.conversationBranchChipText}>{conv.branch}</span>
             </span>
           )}
+          {pullRequestBadge}
           {forkBadges}
         </>
       ) : (
@@ -440,6 +449,7 @@ export function ConversationRow({
                 <span className={styles.conversationBranchChipText}>{conv.branch}</span>
               </span>
             )}
+            {pullRequestBadge}
             {conv.lastAttachedAt && (
               <>
                 {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}

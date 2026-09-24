@@ -387,7 +387,7 @@ const LEGACY_CONVERSATION_SELECT = `
 
 const AGENT_CONVERSATION_PREFIXES = ['agent-', 'planning-', 'specialist-'];
 
-function isAgentConversationName(name: string): boolean {
+export function isAgentConversationName(name: string): boolean {
   return AGENT_CONVERSATION_PREFIXES.some((p) => name.startsWith(p));
 }
 

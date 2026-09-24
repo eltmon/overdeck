@@ -59,6 +59,7 @@ import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backen
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
+import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
@@ -574,6 +575,13 @@ console.log(conversationSearchWatcher
 startConversationRescanScheduler();
 console.log('[overdeck] Conversation rescan scheduler started (boot pass + 6h interval)');
 
+// PAN-3822: link PRs to conversations by branch and refresh their snapshots.
+// Writes overdeck.db, so a peer dashboard never runs it.
+if (!isPeerDashboard) {
+  startPullRequestSyncService();
+  console.log('[pr-sync] started (boot +30s, 60s sweep)');
+}
+
 let stopResourceRefreshServices = () => undefined;
 
 void (async () => {
@@ -718,6 +726,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   }
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   await stopConversationRescanScheduler();
+  stopPullRequestSyncService();
   closeConversationSearchService();
   closeMemoryFtsDatabases();
   process.exit(0);

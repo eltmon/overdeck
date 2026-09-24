@@ -127,6 +127,26 @@ export const conversationFiles = sqliteTable("conversation_files", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 }, (t) => [index("conv_files_conv_idx").on(t.conversationId)]);
 
+/* conversation_pull_requests — PRs linked to a conversation (PAN-3822). Keyed by
+ * host/repository/number; `source` says why the link exists (manual | agent |
+ * created | branch). `branch` rows are written by the pull-request sync sweep;
+ * `dismissed_at` tombstones an unlinked branch row so the sweep never re-adds
+ * it. `snapshot_json` is the last forge read (display metadata, never authority). */
+export const conversationPullRequests = sqliteTable("conversation_pull_requests", {
+  conversationId: text("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  host: text("host").notNull(),
+  repository: text("repository").notNull(),
+  number: integer("number").notNull(),
+  url: text("url").notNull(),
+  source: text("source").notNull(),
+  linkedAt: integer("linked_at").notNull(),
+  dismissedAt: integer("dismissed_at"),
+  snapshotJson: text("snapshot_json"),
+}, (t) => [
+  primaryKey({ columns: [t.conversationId, t.host, t.repository, t.number] }),
+  index("idx_conversation_pull_requests_key").on(t.host, t.repository, t.number),
+]);
+
 /* favorites — operator stars, the other half of the irreplaceable set.
  * Polymorphic (live schema.ts:532-538): type='conversation'|'project', itemId =
  * conversation NAME (the name-keyed export contract) or project path. No FK —

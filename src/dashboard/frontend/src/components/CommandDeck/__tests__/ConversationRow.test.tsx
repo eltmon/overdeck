@@ -149,3 +149,67 @@ describe('ConversationRow overflow-menu focus return (PAN-3941)', () => {
     expect(row).toHaveFocus();
   });
 });
+
+describe('ConversationRow pull request badge (PAN-3822)', () => {
+  const link = {
+    host: 'github.com',
+    repository: 'eltmon/overdeck',
+    number: 42,
+    url: 'https://github.com/eltmon/overdeck/pull/42',
+    source: 'branch' as const,
+    linkedAt: '2026-09-20T00:00:00.000Z',
+    dismissedAt: null,
+    snapshot: {
+      state: 'merged' as const,
+      isDraft: false,
+      title: 'Ship it',
+      headBranch: 'feature/pan-42',
+      baseBranch: 'main',
+      reviewState: 'approved' as const,
+      checks: 'green' as const,
+      mergeable: null,
+      additions: null,
+      deletions: null,
+      changedFiles: null,
+      author: null,
+      updatedAt: null,
+      mergedAt: '2026-09-20T01:00:00.000Z',
+      closedAt: null,
+      syncedAt: '2026-09-20T02:00:00.000Z',
+    },
+  };
+
+  it('renders the effective PR from its snapshot and opens it without selecting the row', () => {
+    const onSelect = vi.fn();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    render(
+      <ConversationRow
+        conv={{ ...conversation, pullRequest: link, pullRequestCount: 2 }}
+        isSelected={false}
+        onSelect={onSelect}
+        mutations={mutations}
+      />,
+    );
+
+    const badge = screen.getByRole('link', { name: /eltmon\/overdeck #42 · merged/ });
+    expect(badge).toHaveAttribute('data-tone', 'success');
+    expect(badge).toHaveClass('badge-bg-success');
+    expect(badge).toHaveTextContent('#42');
+    expect(badge).toHaveTextContent('+1');
+
+    fireEvent.click(badge);
+    expect(openSpy).toHaveBeenCalledWith('https://github.com/eltmon/overdeck/pull/42', '_blank', 'noopener,noreferrer');
+    expect(onSelect).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('uses the warning tone for an open PR with changes requested', () => {
+    renderRow({ pullRequest: { ...link, snapshot: { ...link.snapshot, state: 'open', reviewState: 'changes-requested' } } });
+    expect(screen.getByRole('link', { name: /#42 · open/ })).toHaveAttribute('data-tone', 'warning');
+  });
+
+  it('renders no badge when the conversation has no linked PR', () => {
+    renderRow({ pullRequest: null });
+    expect(screen.queryByRole('link', { name: /#\d+/ })).not.toBeInTheDocument();
+  });
+});

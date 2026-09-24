@@ -1485,6 +1485,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return { ...state, conversationsListRevision: state.conversationsListRevision + 1 }
     }
 
+    case 'conversation.pull_requests_changed': {
+      return { ...state, conversationsListRevision: state.conversationsListRevision + 1 }
+    }
+
     case 'conversation.permission_changed': {
       const { conversationName, waiting } = event.payload
       if (!waiting) {

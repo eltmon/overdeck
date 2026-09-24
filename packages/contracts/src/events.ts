@@ -18,6 +18,7 @@ import {
   WaitingReason,
 } from "./types"
 import { DerivedIssueState } from "./derived-issue-state"
+import { PullRequestLink } from "./pull-request-links"
 import { BackendPane } from "./backend-pane"
 import {
   MemoryObservation,
@@ -1325,6 +1326,19 @@ export const ConversationTitleChangedEvent = Schema.Struct({
 })
 export type ConversationTitleChangedEvent = typeof ConversationTitleChangedEvent.Type
 
+/** Emitted (in-memory only) when a conversation's pull-request links or their
+ * snapshots change (PAN-3822), so the list and open panel refresh the badge. */
+export const ConversationPullRequestsChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.pull_requests_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    effective: Schema.NullOr(PullRequestLink),
+  }),
+})
+export type ConversationPullRequestsChangedEvent = typeof ConversationPullRequestsChangedEvent.Type
+
 /** Emitted (in-memory only) when a PermissionRequest hook fires or resolves for a conversation. */
 export const ConversationPermissionChangedEvent = Schema.Struct({
   type: Schema.Literal("conversation.permission_changed"),
@@ -1572,6 +1586,7 @@ export const DomainEvent = Schema.Union([
   ConversationCreatedEvent,
   ConversationMovedEvent,
   ConversationTitleChangedEvent,
+  ConversationPullRequestsChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
   ScanProgressEvent,

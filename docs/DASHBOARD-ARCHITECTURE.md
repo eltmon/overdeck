@@ -187,6 +187,20 @@ door that does not exist; a real record read door would be a separate change.
   exist yet) is retried on the next event fired by a surviving watcher — there is no
   timer or poll. If every watch attempt fails, the stream stays in `discovering`
   until an operator or later launch creates one of the watched roots.
+- Pull requests on conversations (PAN-3822): the `conversation_pull_requests` table
+  holds PR links keyed by host/repository/number with a `source`, a `dismissed_at`
+  tombstone, and a `snapshot_json`. The pull-request sync sweep
+  (`services/pull-request-sync-service.ts`, primary dashboard only, boot +30 s then
+  every 60 s) reads each GitHub project's `gh pr list` once per sweep, links every PR
+  whose head branch equals a conversation's branch (`resolveConversationBranch`; never
+  the default branch) as a `branch` link, and refreshes stored snapshots of linked PRs
+  (merged snapshots are final). A change emits the in-memory
+  `conversation.pull_requests_changed` event, which bumps `conversationsListRevision`.
+  `GET /api/conversations` rows carry `pullRequest` (the effective link from
+  `resolveEffectivePullRequest`) and `pullRequestCount`, read with one SQL query per
+  page. The door is `src/lib/overdeck/conversation-pull-requests.ts`. A new table
+  goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
+  and bumps `OVERDECK_TABLE_COUNT`.
 - `GET /api/conversations/:name/messages` serves registered conversations only. It
   never scans agent directories or global session UUIDs to resolve an agent-backed row.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove

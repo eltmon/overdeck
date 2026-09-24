@@ -250,7 +250,7 @@ export function toChecksState(
   return 'green';
 }
 
-interface GhPrRow {
+export interface GhPrRow {
   number?: number;
   url?: string;
   state?: string;
@@ -262,9 +262,13 @@ interface GhPrRow {
   title?: string;
   headRefName?: string;
   isDraft?: boolean;
+  baseRefName?: string;
+  updatedAt?: string | null;
+  closedAt?: string | null;
+  author?: { login?: string } | null;
 }
 
-const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup';
+const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
 /** One `gh pr list` per repo, cached briefly — the batch door's forge read. */
 const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[]>(PR_CACHE_TTL_MS);

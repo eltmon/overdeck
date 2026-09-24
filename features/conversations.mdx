@@ -337,6 +337,31 @@ conversation to try an alternative approach, keep the original intact, compare
 both, and continue with the one you like. Cheaper than restarting from scratch,
 and the original's context is never lost.
 
+## Pull requests on conversations
+
+A conversation shows the pull request its work lives on. A badge next to the
+branch chip on the conversation row shows the PR number, colored by state: blue
+for open, amber when a review needs a human, green for merged, red for closed
+without merging, and muted for drafts. A `×` marks failing checks. Hover it for
+the repository, number, state, and title; click it to open the PR. `+N` means the
+conversation has more than one linked PR.
+
+Links come from **branch detection**. About 30 seconds after the dashboard starts,
+and every 60 seconds after that, Overdeck reads each GitHub project's pull
+requests once and links every PR whose head branch equals the branch a
+conversation's working directory is on. Agent conversations whose workspace
+cannot be read fall back to `feature/<issue>`. A conversation on the project's
+default branch is never linked by branch. The same sweep refreshes the stored
+state of linked PRs, so the badge renders without a live GitHub call. Merged PRs
+are final and are not re-read.
+
+Linking never archives or stops a conversation.
+
+Not yet shipped (tracked in [#3822](https://github.com/eltmon/overdeck/issues/3822)):
+linking or unlinking a PR by hand (dialog, transcript right-click, `pan conv
+link-pr`), pipeline-created links, GitLab merge requests, the Pull requests page,
+and search by PR number.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
