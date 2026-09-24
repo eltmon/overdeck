@@ -30,6 +30,10 @@ check_forbidden_strings() {
     && fail "forbidden-string: roles/plan.md contains 'legacy Done'"
   contains "src/lib/cloister/prompts/work.md" "node -e" \
     && fail "forbidden-string: work.md contains 'node -e'"
+  contains "src/lib/cloister/prompts/work.md" "pan inspect" \
+    && fail "forbidden-string: work.md contains 'pan inspect' (verb deleted by PAN-3917)"
+  contains "roles/work.md" "pan inspect" \
+    && fail "forbidden-string: roles/work.md contains 'pan inspect' (verb deleted by PAN-3917)"
   contains "src/lib/cloister/verification-runner.ts" "plan.xbrief.json subItem" \
     && fail "forbidden-string: verification-runner.ts contains 'plan.xbrief.json subItem'"
   return 0
@@ -259,6 +263,10 @@ expect_self_test_failure() {
 self_test() {
   expect_self_test_failure "forbidden-string" \
     "printf '%s\n' 'click Done' >> \"\$tmp/src/lib/cloister/prompts/planning.md\""
+  expect_self_test_failure "forbidden-string-pan-inspect" \
+    "printf '%s\n' 'pan inspect ISSUE --item item' >> \"\$tmp/roles/work.md\""
+  expect_self_test_failure "forbidden-string-pan-inspect-work-prompt" \
+    "printf '%s\n' 'pan inspect ISSUE --item item' >> \"\$tmp/src/lib/cloister/prompts/work.md\""
   expect_self_test_failure "item-loop-order" \
     "python3 - <<'PY' \"\$tmp/roles/work.md\"
 from pathlib import Path
