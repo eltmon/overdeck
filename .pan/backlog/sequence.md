@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
+_Last sequenced: 2026-09-24T15:45:18.476Z · model: claude-opus-5 · open: 849_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -12,7 +12,6 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 7 | PAN-3925 | S | medium | ok |  |  | /api/parked and /api/merge-train/auto-merge take 10s+ deriving state per request; batch through the issue-data cache |
 | 8 | PAN-3931 | S | medium | ok |  |  | Peer dashboards still mark primary conversations ended, write agent state and durable events; gate on isPeerDashboardProcess per site |
 | 9 | PAN-3924 | S | medium | ok |  |  | pipeline-membership: gh graphql failure drops stderr and toasts; retry once; listProjectTrackerIssues blind to GitHub-tracked projects |
-| 10 | PAN-3937 | M | medium | ok |  |  | OpenCode conversation stops answering forever when a Task subagent hits a permission ask; pre-allow at launch + stuck-turn watchdog |
 | 11 | PAN-3929 | S | medium | ok |  |  | Five SKILL.md files still tell agents to read deleted status fields; rewrite to the derived model and widen the guard's Markdown patterns |
 | 12 | PAN-3927 | S | medium | ok |  |  | lint-prompts.sh still requires the deleted pan inspect verb in the work item loop; rewrite the rule and the three prompts together |
 | 13 | PAN-3941 | M | medium | ok |  |  | Unify dashboard menus, popovers and semantic color styling onto the shared primitives (in review) |
@@ -36,11 +35,9 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 34 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
 | 35 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
 | 36 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
-| 37 | PAN-4021 | S | critical | ok |  |  | CI-mode merge readiness never confirms a test job ran on the head, so a renamed, filtered or skipped test job merges a PR with zero tests |
 | 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
 | 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
 | 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
-| 41 | PAN-4019 | S | critical | ok |  |  | Escalation pauses the agent, then the stuck message resumes it via feedback-target: the verification attempt budget stops nobody |
 | 42 | PAN-3685 | S | high | ok |  |  | Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed |
 | 43 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
 | 44 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
@@ -69,7 +66,7 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 70 | PAN-4016 | S | critical | ok |  |  | advanceMergeQueue skips normalMergeEligibility for strike branches, so a strike merges with no approval check and no green-checks gate |
+| 70 | PAN-4047 | S | critical | ok |  |  | GitHub App API helper has no request timeout; a hung forge call stalled `pan admin specialists done` and any caller waits forever |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -219,15 +216,8 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 220 | PAN-3958 | XL | high | ok | ✓ |  | Unparked epic: the Effect façade + sync-twin cut. PRD landed, ratchet PR #4006 open, children CH-1..CH-8 filed in landing order |
-| 221 | PAN-4007 | L | high | ok |  |  | CH-1 lands first: delete 268 dead sync wrappers, 43 dead façades and the never-constructed runtime classes; needs ratchet PR #4006 in |
-| 222 | PAN-4008 | M | high | ok |  | PAN-4007 | CH-2: convert the 24 live Effect façades in 15 src/lib/cloister modules to plain async and update their callers |
-| 223 | PAN-4009 | L | high | ok |  | PAN-4008 | CH-3: convert 51 façades in 21 agent, runtime, tmux, health, git, checkpoint and workspace modules; drop the routes/agents/shared.ts aliases |
-| 224 | PAN-4010 | L | high | ok |  | PAN-4009 | CH-4: convert 65 façades in 16 TTS, platform, cliproxy, tunnel, auth, GitHub-app and webhook modules to plain async |
-| 225 | PAN-4011 | M | high | ok |  | PAN-4010 | CH-5: convert the last 37 façades (config, projects, settings, shadow, costs, conversations, xbrief, memory); clears every Shape A row |
-| 226 | PAN-4012 | L | high | ok |  | PAN-4011 | CH-6: resolve 33 live sync wrappers and 37 live twin pairs; leave no blocking *Sync child-process call in dashboard or cloister code |
-| 227 | PAN-4013 | L | high | ok |  | PAN-4012 | CH-7: one src/lib/runtimes/storage/<harness>.ts owner for transcript, session and home paths now spread over ~50 files, plus a lint |
-| 228 | PAN-4014 | M | high | ok |  | PAN-4013 | CH-8: delete ~222 unreferenced exports and the alias shims, then unexport file-local symbols; marks src/index.ts internal |
+| 220 | PAN-4046 | S | high | ok |  |  | findProjectByPathSync ignores ~, symlinks and path boundaries, so a path under ~/Projects/overdeck-knowledge matches project overdeck |
+| 221 | PAN-4052 | M | high | ok |  |  | Metrics cost panels, specialist run and handoff logs and the boot stamp have live readers but no writer post-Cut; restore or delete each |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
@@ -348,7 +338,6 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 346 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
 | 347 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 348 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 349 | PAN-3920 | L | medium | needs-refinement |  | PAN-3822 | Agents directory (tree/list/detail) + registration door for plugin-spawned workers + spawn-and-wait primitive; needs PRD |
 | 350 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 351 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
 | 352 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
@@ -428,7 +417,7 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 426 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
 | 427 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
 | 428 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
-| 429 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config |
+| 429 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from resolved config |
 | 430 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
 | 431 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
 | 432 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
@@ -446,7 +435,6 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 444 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 445 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 447 | PAN-3974 | L | medium | ok |  | PAN-3937 | Companion TERMINAL runs `opencode attach` on the live ACP session/port from PAN-3937; establishes the seam PAN-3835 reuses |
 | 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 449 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
 | 450 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
@@ -543,7 +531,6 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 542 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
 | 543 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
 | 544 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 545 | PAN-3835 | M | medium | needs-refinement |  | PAN-3974 | Attach the native Codex terminal UI to a running app-server thread; no native attach endpoint exists — investigate first |
 | 546 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
 | 547 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
 | 548 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
@@ -641,7 +628,6 @@ _Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 | 640 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
 | 641 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
 | 643 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
-| 644 | PAN-4002 | M | low | ok |  | PAN-3958 | Mechanical fooSync -> foo rename deferred out of PAN-3958; blocked until that cut lands, no behavior change |
 | 645 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
 | 646 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
 | 647 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
@@ -899,10 +885,6 @@ In pipeline — rank pinned.
 
 In pipeline — rank pinned.
 
-### PAN-3937 (rank 10)
-
-In pipeline — rank pinned.
-
 ### PAN-3929 (rank 11)
 
 In pipeline — rank pinned.
@@ -995,10 +977,6 @@ The PAN-2858 defect in a new shape: complete-planning promotes to the primary ch
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
 
-### PAN-4021 (rank 37)
-
-New this run, filed 2026-09-23 as a follow-up from the review of #4017 (PAN-3965, recommendation M2a); the referenced issues are closed, so it carries no open dependency. In verification.tests: ci mode the local test gate is dropped and CI is the only place tests run, but merge readiness only asserts that every check PRESENT on the head is green — it never asserts that a recognized test job was one of them. A workflow edit that renames or removes the test job, a path filter, or a job-level if: skip therefore lets a PR through the merge door with no tests run anywhere, and the gate reports green while doing it. Placed at the free rank 37, inside the merge-gate band beside PAN-3554 (red main has no mechanical owner) and PAN-3532 (CI runs only a hand-picked slice of the frontend suite), because it is the same failure shape those two describe: the gate believes it is enforcing tests that did not run. Exposure is higher than PAN-4016 at 70, whose queue bypass is now a legacy path, since CI mode is the live configuration for this project. The fix is small and mechanically testable — require at least one check matching the test-job matcher, concluded success, on the head, surface a clear blocker in merge readiness and on the dashboard Merge button, and cover the three cases (no test check blocked, skipped test check blocked, green test check allowed).
-
 ### PAN-3565 (rank 38)
 
 New this pass. Three review-lifecycle defects, one of them severe: when all four reviewer lanes died at spawn on a record lock, the supervisor wrote a synthesis declaring CHANGES REQUESTED with every lane marked failed — an infrastructure flake recorded as a real code verdict. It was caught only because a human was watching live. Same integrity family as PAN-3283 and PAN-2746.
@@ -1010,10 +988,6 @@ New this pass. Main stayed red for about five hours because nothing owns the sta
 ### PAN-3532 (rank 40)
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
-
-### PAN-4019 (rank 41)
-
-New this run, filed 2026-09-23 out of the PAN-3993 review findings and predating them. The verification attempt budget exists to stop a work agent from grinding the same rework forever and hand it to the operator; escalation calls setAgentPaused and then delivers the "stuck" notice through src/lib/cloister/feedback-target.ts, which resurrects or resumes a paused agent, so the agent walks straight back into the loop. The local verification runner and the CI-failure relay both share the path, so no budget anywhere is enforced. Placed at the free rank 41, in the critical convergence band beside PAN-3580 (UAT relay with no convergence cap) and PAN-3532, because an unenforced budget is the same failure the pipeline keeps paying for in burned tokens and never-converging issues.
 
 ### PAN-3685 (rank 42)
 
@@ -1127,9 +1101,9 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-4016 (rank 70)
+### PAN-4047 (rank 70)
 
-New this run, filed 2026-09-23 out of the PAN-3987 review findings. Any queued issue with an origin/strike/<id> branch bypasses normalMergeEligibility, so the one merge path that is supposed to demand an approved PR and green required checks (including the test and lint aggregates) waves strikes through. Exposure is reduced because since PAN-3987 strikes open a PR the operator merges, which makes the queue path legacy — that is why it sits at 70 rather than the top tier — but an unguarded door onto main is exactly the shape that produced the repeated red-main incidents, and the fix is small: route strikes through the same eligibility checks or drop them from the queue path, with a test that a red-checks strike is not merged.
+New this pass, entering at rank 70 — the slot PAN-4016 vacated, in a band of same-shaped pipeline-hang defects (post-merge label writes with no retry at 71, watchdog restart-churn at 73). Critical because it is an unbounded wait in the one helper every forge call goes through: there is no timeout at all, so a slow or half-open GitHub connection parks the caller indefinitely rather than failing. It is the confirmed root cause of the `pan admin specialists done` stall CodeRabbit flagged on #4033, and #4045 bounded only that single PR-head lookup, leaving every other request in `src/lib/github-app.ts` unprotected. The fix is small and fully specified in the body — an overridable `AbortSignal.timeout` default, an abort mapped to a typed error, and a fake-timer test, which the repo's retry-test rule already requires.
 
 ### PAN-3557 (rank 71)
 
@@ -1191,6 +1165,18 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 
 Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
 
+### PAN-1824 (rank 86)
+
+Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
+
+### PAN-2932 (rank 87)
+
+Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
+
+### PAN-2935 (rank 88)
+
+Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1198,10 +1184,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T14:44:39.134Z",
+  "generatedAt": "2026-09-24T15:45:18.476Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 863,
+  "openCount": 849,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1290,19 +1276,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "condition": "ok",
       "dependsOn": [],
       "why": "pipeline-membership: gh graphql failure drops stderr and toasts; retry once; listProjectTrackerIssues blind to GitHub-tracked projects",
-      "rationale": "In pipeline — rank pinned.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3937",
-      "rank": 10,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "OpenCode conversation stops answering forever when a Task subagent hits a permission ask; pre-allow at launch + stuck-turn watchdog",
       "rationale": "In pipeline — rank pinned.",
       "gate": "auto",
       "planning": "auto"
@@ -1644,19 +1617,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "dependsOn": [],
       "why": "CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green.",
       "rationale": "New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4019",
-      "rank": 41,
-      "size": "S",
-      "importance": "critical",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Escalation pauses the agent, then the stuck message resumes it via feedback-target: the verification attempt budget stops nobody",
-      "rationale": "New this run, filed 2026-09-23 out of the PAN-3993 review findings and predating them. The verification attempt budget exists to stop a work agent from grinding the same rework forever and hand it to the operator; escalation calls setAgentPaused and then delivers the \"stuck\" notice through src/lib/cloister/feedback-target.ts, which resurrects or resumes a paused agent, so the agent walks straight back into the loop. The local verification runner and the CI-failure relay both share the path, so no budget anywhere is enforced. Placed at the free rank 41, in the critical convergence band beside PAN-3580 (UAT relay with no convergence cap) and PAN-3532, because an unenforced budget is the same failure the pipeline keeps paying for in burned tokens and never-converging issues.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2029,15 +1989,15 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "planning": "auto"
     },
     {
-      "issue": "PAN-4016",
+      "issue": "PAN-4047",
       "rank": 70,
       "size": "S",
       "importance": "critical",
       "score": 84,
       "condition": "ok",
       "dependsOn": [],
-      "why": "advanceMergeQueue skips normalMergeEligibility for strike branches, so a strike merges with no approval check and no green-checks gate",
-      "rationale": "New this run, filed 2026-09-23 out of the PAN-3987 review findings. Any queued issue with an origin/strike/<id> branch bypasses normalMergeEligibility, so the one merge path that is supposed to demand an approved PR and green required checks (including the test and lint aggregates) waves strikes through. Exposure is reduced because since PAN-3987 strikes open a PR the operator merges, which makes the queue path legacy — that is why it sits at 70 rather than the top tier — but an unguarded door onto main is exactly the shape that produced the repeated red-main incidents, and the fix is small: route strikes through the same eligibility checks or drop them from the queue path, with a test that a red-checks strike is not merged.",
+      "why": "GitHub App API helper has no request timeout; a hung forge call stalled `pan admin specialists done` and any caller waits forever",
+      "rationale": "New this pass, entering at rank 70 — the slot PAN-4016 vacated, in a band of same-shaped pipeline-hang defects (post-merge label writes with no retry at 71, watchdog restart-churn at 73). Critical because it is an unbounded wait in the one helper every forge call goes through: there is no timeout at all, so a slow or half-open GitHub connection parks the caller indefinitely rather than failing. It is the confirmed root cause of the `pan admin specialists done` stall CodeRabbit flagged on #4033, and #4045 bounded only that single PR-head lookup, leaving every other request in `src/lib/github-app.ts` unprotected. The fix is small and fully specified in the body — an overridable `AbortSignal.timeout` default, an abort mapped to a typed error, and a fake-timer test, which the repo's retry-test rule already requires.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3936,134 +3896,28 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "planning": "auto"
     },
     {
-      "issue": "PAN-3958",
+      "issue": "PAN-4046",
       "rank": 220,
-      "size": "XL",
+      "size": "S",
       "importance": "high",
       "score": 74,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Unparked epic: the Effect façade + sync-twin cut. PRD landed, ratchet PR #4006 open, children CH-1..CH-8 filed in landing order",
-      "rationale": "Rank moves 642 → 220 because the one thing holding it at 642 was the operator `parked` label, and the operator removed it on 2026-09-23: the PRD is written on feature/pan-3958, the five open questions are decided (src/index.ts is internal, the one-version rule is per operation, the Sync rename defers to PAN-4002, the legacy PiRuntime classes get deleted, Oh My Pi is excluded via PAN-4003), and the epic's own landing — the audit tool plus the shrink-only `lint:effect-facades` ratchet — is open as PR #4006. Eight child issues now carry the work in a strict landing order. Ranked with the substrate band at 200-232 rather than with feature work: 49 Effect façades, ~400 sync/async twin pairs and ~50 files that each hardcode where a harness keeps its transcripts are the same class of duplication that produced the PAN-3950 round-4 review blockers and the recurring per-harness boundary gaps. `hasPrd` reads false only because the PRD lives on the feature branch, not main. Epic container — never picked up directly.",
+      "why": "findProjectByPathSync ignores ~, symlinks and path boundaries, so a path under ~/Projects/overdeck-knowledge matches project overdeck",
+      "rationale": "New this pass at rank 220, the slot the closed PAN-3958 epic vacated, among peers of the same size and score. High rather than medium because the sibling-prefix collision it describes is live in this very checkout: the OKF bundle sits at ~/Projects/overdeck-knowledge next to the overdeck project, so a path under it resolves to the wrong project and every project-scoped decision downstream inherits that mistake. The fix carries almost no design risk — #4045 already landed the correct containment helper (~ expansion, realpath with a plain-path fallback, a path.relative boundary check) in src/lib/projects/project-key.ts, and this is that helper applied to the second call site. The only real work is placement: projects.ts is at its file-size cap and importing the helper there risks a cycle, so it likely moves to a leaf module first.",
       "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
+      "planning": "auto"
     },
     {
-      "issue": "PAN-4007",
+      "issue": "PAN-4052",
       "rank": 221,
-      "size": "L",
+      "size": "M",
       "importance": "high",
-      "score": 74,
+      "score": 73,
       "condition": "ok",
       "dependsOn": [],
-      "why": "CH-1 lands first: delete 268 dead sync wrappers, 43 dead façades and the never-constructed runtime classes; needs ratchet PR #4006 in",
-      "rationale": "New this run, filed 2026-09-23 as the first child of PAN-3958 and the only one that is not blocked behind a sibling. Pure deletion in two PRs — 268 dead Shape B wrappers, 43 dead Shape A façades, the AgentRuntime/ClaudeCodeRuntime/CodexRuntime/OhmypiRuntime/PiRuntime(Sync) classes nothing constructs, the dead Shape C twins and the uncalled sendKeysSync — so it carries the largest line-count win at the lowest risk. Its real gate is PR #4006 landing the `lint:effect-facades` ratchet, which is a PR and not a backlog node, so `dependsOn` is empty; CH-2…CH-8 hold until this merges and one `pan reload` runs clean.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4008",
-      "rank": 222,
-      "size": "M",
-      "importance": "high",
-      "score": 73,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4007"
-      ],
-      "why": "CH-2: convert the 24 live Effect façades in 15 src/lib/cloister modules to plain async and update their callers",
-      "rationale": "New this run. Second in PAN-3958's landing order and hard-blocked on CH-1; the cloister modules share dashboard route callers, so the epic says to run the children one at a time rather than in a wave.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4009",
-      "rank": 223,
-      "size": "L",
-      "importance": "high",
-      "score": 73,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4008"
-      ],
-      "why": "CH-3: convert 51 façades in 21 agent, runtime, tmux, health, git, checkpoint and workspace modules; drop the routes/agents/shared.ts aliases",
-      "rationale": "New this run. Third in the landing order, blocked on CH-2. Touches the spawn/liveness core where the Effect→Promise→Effect round trips are densest, so it is the largest single conversion in the chain.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4010",
-      "rank": 224,
-      "size": "L",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4009"
-      ],
-      "why": "CH-4: convert 65 façades in 16 TTS, platform, cliproxy, tunnel, auth, GitHub-app and webhook modules to plain async",
-      "rationale": "New this run. Fourth in the landing order, blocked on CH-3; the biggest façade count of any cluster but confined to sidecar and integration modules.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4011",
-      "rank": 225,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4010"
-      ],
-      "why": "CH-5: convert the last 37 façades (config, projects, settings, shadow, costs, conversations, xbrief, memory); clears every Shape A row",
-      "rationale": "New this run. Fifth in the landing order, blocked on CH-4. Completes the Shape A conversion: after it the `lint:effect-facades` baseline carries no façade rows at all, which is the epic's mechanical finish line for the Effect half.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4012",
-      "rank": 226,
-      "size": "L",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4011"
-      ],
-      "why": "CH-6: resolve 33 live sync wrappers and 37 live twin pairs; leave no blocking *Sync child-process call in dashboard or cloister code",
-      "rationale": "New this run. Sixth in the landing order, blocked on CH-5. Carries real behavior value beyond bloat: the no-blocking-sync-in-server-code rule is the project's standing event-loop invariant, and each sync twin that survives on purpose gets a header note saying why.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4013",
-      "rank": 227,
-      "size": "L",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4012"
-      ],
-      "why": "CH-7: one src/lib/runtimes/storage/<harness>.ts owner for transcript, session and home paths now spread over ~50 files, plus a lint",
-      "rationale": "New this run. Seventh in the landing order, blocked on CH-6. The highest-leverage item for correctness rather than size: per-harness transcript, session-id and home-dir knowledge is duplicated across about 50 files today, which is the direct cause of the recurring non-Claude harness boundary gaps. Scope shrinks if PAN-4003 deletes Oh My Pi first.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4014",
-      "rank": 228,
-      "size": "M",
-      "importance": "high",
-      "score": 71,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4013"
-      ],
-      "why": "CH-8: delete ~222 unreferenced exports and the alias shims, then unexport file-local symbols; marks src/index.ts internal",
-      "rationale": "New this run. Last in PAN-3958's landing order, blocked on CH-7, and deliberately last so the export census runs against the post-cut tree rather than a moving target.",
+      "why": "Metrics cost panels, specialist run and handoff logs and the boot stamp have live readers but no writer post-Cut; restore or delete each",
+      "rationale": "New this pass at rank 221, beside PAN-4046 in the band the closed façade-cut chapters vacated. Post-Cut substrate hygiene with a user-visible edge: nothing on main calls recordCostSync, so the Metrics page's daily total and its top-agents/top-issues panels render stale or empty data while the Costs page — reading cost_events, which does have writers — is correct, which is worse than an outright outage because the two pages disagree. Three smaller gaps sit behind it: finalizeRunLogSync runs in production against run logs createRunLogSync never created, logSpecialistHandoff has readers and no caller, and the missing stampBootReconciliation drops the watchdog back to the OVERDECK_BOOT_ID env var. Condition ok, not needs-refinement: each item carries a stated restore-or-delete rule and the acceptance is mechanically checkable, with the disposition recorded in docs/THE-CUT.md.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5544,21 +5398,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "planning": "auto"
     },
     {
-      "issue": "PAN-3920",
-      "rank": 349,
-      "size": "L",
-      "importance": "medium",
-      "score": 58,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-3822"
-      ],
-      "why": "Agents directory (tree/list/detail) + registration door for plugin-spawned workers + spawn-and-wait primitive; needs PRD",
-      "rationale": "Two operator scope additions on 2026-09-20: externally spawned (Codex plugin) workers must register and appear in the directory, and a \"spawn a registered worker and wait for its report\" primitive. Moved up from the tail: the registration door is now a visibility gap for real work, not only a UI redesign. Still needs a short PRD; PR context pane depends on PAN-3822.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2839",
       "rank": 350,
       "size": "S",
@@ -6528,10 +6367,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "size": "M",
       "importance": "medium",
       "score": 54,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Settings permission-mode can desync from resolved config",
-      "rationale": "Rank unchanged: the 2026-09-23 update is an external comment restating the body — no new cross-references, and resolvePermissionModeSync plus the bypass branch are still live in src/lib/claude-permissions.ts, so condition stays ok.",
+      "rationale": "Rank, size, score and importance unchanged; only the condition moves. The 2026-09-24 touch is metadata (no new comment, no body edit), but verifying the prior pass's claim showed it was wrong: `resolvePermissionModeSync` does not exist and no code emits `--dangerously-skip-permissions` any more — every remaining hit in src/ is a comment or a docstring. The hazard the issue describes is still live in renamed form: `config.claude.permissionMode` still defaults to 'bypass' (settings-api.ts:793) and `getClaudePermissionFlags` (claude-permissions.ts:79) still emits `--permission-mode bypassPermissions` for it, so Settings can still disagree with the resolved mode and all three asks stand. The body needs a rewrite to the current flag and symbol names before anyone works it, which is what needs-refinement records.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6739,21 +6578,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "dependsOn": [],
       "why": "docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch",
       "rationale": "Triage: the archive-planning step this describes is superseded; demoted to stale.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3974",
-      "rank": 447,
-      "size": "L",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-3937"
-      ],
-      "why": "Companion TERMINAL runs `opencode attach` on the live ACP session/port from PAN-3937; establishes the seam PAN-3835 reuses",
-      "rationale": "New this run: medium/52 — well-specified operator feature: the conversation TERMINAL view attaches a native `opencode attach` client to the same running ACP server and session, with the server resolving port/session/cwd and dashboard delivery staying on the ACP socket. It builds on PAN-3937 (which records `opencode-port` and `acp-session-id` for new OpenCode conversations, in pipeline) and is meant to land the shared companion-terminal lifecycle that PAN-3835 (Codex) reuses, so it ranks above that companion. Size L: domain lifecycle, authenticated routes, frontend seam, tests, and three docs pages.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7937,21 +7761,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "planning": "auto"
     },
     {
-      "issue": "PAN-3835",
-      "rank": 545,
-      "size": "M",
-      "importance": "medium",
-      "score": 42,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-3974"
-      ],
-      "why": "Attach the native Codex terminal UI to a running app-server thread; no native attach endpoint exists — investigate first",
-      "rationale": "New this run: medium/42 — Attach the native Codex terminal UI to a running app-server thread; no native attach endpoint exists — investigate first. Rank unchanged this run; PAN-3974 (new) now precedes it as the shared companion-terminal lifecycle it is meant to reuse.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1985",
       "rank": 546,
       "size": "M",
@@ -9124,21 +8933,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "dependsOn": [],
       "why": "Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope",
       "rationale": "New this run (opened 2026-09-23). Operator has already decided OMP is going away, so the 10 open ohmypi: issues are dead weight until this lands; ranked just under PAN-3958 because both are parked on the same scheduling call, and the deletion is smaller and fully decided.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4002",
-      "rank": 644,
-      "size": "M",
-      "importance": "low",
-      "score": 27,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-3958"
-      ],
-      "why": "Mechanical fooSync -> foo rename deferred out of PAN-3958; blocked until that cut lands, no behavior change",
-      "rationale": "New this run (opened 2026-09-23) from PAN-3958 open question 3. Hard-blocked on PAN-3958's children landing and deliberately scheduled for a quiet window with few open feature branches, so it sits immediately below its blocker.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11922,19 +11716,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "rationale": "PAN-4003 (opened 2026-09-23) names this issue as a close-as-won't-do or fold-in candidate under the standing operator decision to drop the Oh My Pi harness, so it must not be picked up on its old rank until PAN-4003 is scheduled and decides its fate. gate and planning preserved verbatim.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4021",
-      "rank": 37,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CI-mode merge readiness never confirms a test job ran on the head, so a renamed, filtered or skipped test job merges a PR with zero tests",
-      "rationale": "New this run, filed 2026-09-23 as a follow-up from the review of #4017 (PAN-3965, recommendation M2a); the referenced issues are closed, so it carries no open dependency. In verification.tests: ci mode the local test gate is dropped and CI is the only place tests run, but merge readiness only asserts that every check PRESENT on the head is green — it never asserts that a recognized test job was one of them. A workflow edit that renames or removes the test job, a path filter, or a job-level if: skip therefore lets a PR through the merge door with no tests run anywhere, and the gate reports green while doing it. Placed at the free rank 37, inside the merge-gate band beside PAN-3554 (red main has no mechanical owner) and PAN-3532 (CI runs only a hand-picked slice of the frontend suite), because it is the same failure shape those two describe: the gate believes it is enforcing tests that did not run. Exposure is higher than PAN-4016 at 70, whose queue bypass is now a legacy path, since CI mode is the live configuration for this project. The fix is small and mechanically testable — require at least one check matching the test-job matcher, concluded success, on the head, surface a clear blocker in merge readiness and on the dashboard Merge button, and cover the three cases (no test check blocked, skipped test check blocked, green test check allowed).",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12695,13 +12476,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "confidence": 0.6
     },
     {
-      "from": "PAN-3822",
-      "to": "PAN-3920",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3942",
       "to": "PAN-3943",
       "type": "unblocks",
@@ -12719,13 +12493,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "from": "PAN-3942",
       "to": "PAN-2444",
       "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-3920",
-      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
@@ -12947,22 +12714,8 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "confidence": 1
     },
     {
-      "from": "PAN-3940",
-      "to": "PAN-3920",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3939",
       "to": "PAN-3921",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3938",
-      "to": "PAN-3937",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
@@ -13057,27 +12810,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-3920",
-      "to": "PAN-3971",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3937",
-      "to": "PAN-3974",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3974",
-      "to": "PAN-3835",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-2828",
@@ -13192,20 +12924,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "confidence": 0.9
     },
     {
-      "from": "PAN-3958",
-      "to": "PAN-4002",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4003",
-      "to": "PAN-3958",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4003",
       "to": "PAN-3536",
       "type": "informs",
@@ -13281,139 +12999,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.85
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-4007",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-4008",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-4009",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-4010",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-4011",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-4012",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-4013",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3958",
-      "to": "PAN-4014",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4007",
-      "to": "PAN-4008",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4008",
-      "to": "PAN-4009",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4009",
-      "to": "PAN-4010",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4010",
-      "to": "PAN-4011",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4011",
-      "to": "PAN-4012",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4012",
-      "to": "PAN-4013",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4013",
-      "to": "PAN-4014",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4003",
-      "to": "PAN-4013",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4012",
-      "to": "PAN-4002",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3532",
-      "to": "PAN-4021",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4016",
-      "to": "PAN-4021",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     }
   ]
 }
