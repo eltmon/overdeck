@@ -479,6 +479,10 @@ export class CloisterService {
       console.error('  ✗ Failed to set global pause flags:', error);
     }
 
+    // Halt the health loop BEFORE stopping anything, so no health tick runs
+    // mid-stop and reports the panes being closed as crashes (#4114 re-check).
+    this.stop();
+
     // Emergency stop stops EVERYTHING (#4109 review): every registered agent the
     // selected backend's inventory lists PLUS every `running` row, deduplicated.
     // The inventory alone would miss legacy tmux agents on a Herdr host and any
@@ -516,9 +520,6 @@ export class CloisterService {
     }
 
     this.emit({ type: 'emergency_stop', killedAgents, unconfirmedAgents });
-
-    // Stop monitoring after emergency stop
-    this.stop();
 
     return { killedAgents, unconfirmedAgents };
   }

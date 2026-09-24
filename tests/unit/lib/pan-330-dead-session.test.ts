@@ -432,6 +432,18 @@ describe('CloisterService.emergencyStop() — stops every agent through the back
     expect(killedAgents).toEqual(['agent-B']);
   });
 
+  it('halts the health loop before stopping any agent', async () => {
+    rows({ id: 'agent-A' });
+    mockListLiveAgentIds.mockResolvedValue(new Set(['agent-A']));
+    const service = new CloisterService();
+    const stopLoop = vi.spyOn(service, 'stop').mockImplementation(() => undefined);
+
+    await service.emergencyStop();
+
+    expect(stopLoop).toHaveBeenCalledTimes(1);
+    expect(stopLoop.mock.invocationCallOrder[0]!).toBeLessThan(mockStopAgent.mock.invocationCallOrder[0]!);
+  });
+
   it('returns empty lists when no agents are running', async () => {
     rows();
     mockListLiveAgentIds.mockResolvedValue(new Set());
