@@ -70,7 +70,12 @@ and there is no marker.
 ## Review modes
 
 `spawnReviewRoleForIssue()` resolves the review mode at the single review entry
-point, so manual requests, automatic dispatch, and recovery use the same mode.
+point, so manual requests, automatic dispatch, and recovery use the same mode:
+`roles.review.mode` from merged project and global config, defaulting to `quick`.
+A caller may pass `reviewMode` for one run. The dashboard's Request review menu
+(Full, Quick, None) sends it through `POST /api/review/:id/trigger`. It takes
+precedence over config for that run only and is never persisted, so the next
+dispatch resolves config again.
 
 | Mode | Behavior |
 | --- | --- |
