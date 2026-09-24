@@ -145,7 +145,6 @@ Rally Features (PortfolioItems) get special treatment in the dashboard:
 
 Overdeck supports multiple AI model providers through direct Anthropic-compatible endpoints (Kimi, GLM, MiniMax, MiMo, OpenRouter) and a built-in CLIProxy sidecar (OpenAI, Gemini). You can also use the [Pi harness](https://github.com/badlogic/pi-mono) for native multi-provider routing.
 
-📖 **[Complete work types guide →](WORK-TYPES.md)**
 📋 **[Configuration file reference →](CONFIGURATION.md)**
 🧠 **[Model recommendations →](MODEL_RECOMMENDATIONS.md)**
 
@@ -679,20 +678,13 @@ pan workspace connect feature-pan-123
 
 📖 **[Remote workspace guide →](PRD-REMOTE-WORKSPACES.md)**
 
-### Custom Work Types
+### Custom Work Types (removed)
 
-Define custom work types for model routing:
-
-```yaml
-# ~/.overdeck/work-types.yaml
-custom_work_types:
-  - name: security-audit
-    complexity: expert
-    model: claude-opus-4-6
-    description: Security vulnerability assessment
-```
-
-📖 **[Work types reference →](WORK-TYPES.md)**
+`~/.overdeck/work-types.yaml` and work-type model routing were removed with the
+work-type router (PAN-1048). Nothing reads that file. Set models per role with
+`roles.<role>.model` and `workhorses`; see
+[CONFIGURATION.md](CONFIGURATION.md#removed-presets-work-type-overrides-thinking-levels).
+[WORK-TYPES.md](WORK-TYPES.md) is kept for history only.
 
 ### Heartbeat Monitoring
 

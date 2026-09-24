@@ -1,5 +1,12 @@
 # Model Routing
 
+> **Removed.** The work-type router this page describes was replaced by roles
+> and workhorse slots in PAN-1048 (`cfd48b80881`). Nothing picks a model from
+> `models.overrides` or a work-type ID any more. Configure models with
+> `roles.<role>.model`, `roles.review.sub.<lane>.model`, and `workhorses`; see
+> [CONFIGURATION.md](CONFIGURATION.md#removed-presets-work-type-overrides-thinking-levels)
+> and [MODEL-CALLS.md](MODEL-CALLS.md). This page is kept for history.
+
 Overdeck routes LLM models by **work type**. A work type is a canonical routing identifier that represents a specific job slot in the Overdeck workflow (e.g., `issue-agent:implementation`, `review:security`). Every time a workflow step needs to call an LLM, Overdeck looks up which model is assigned to that step's work type.
 
 ## Terminology
