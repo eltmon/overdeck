@@ -1,13 +1,19 @@
 ---
 title: Convoys
-description: Multi-agent parallel orchestration system
+description: The review convoy, four parallel reviewers and one synthesis parent
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
-# Convoys: Multi-Agent Orchestration
+# Convoys: Parallel Code Review
 
-Convoys enable Overdeck to run multiple AI agents in parallel for complex tasks like code review. Instead of a single agent doing everything, specialized agents focus on specific concerns and a synthesis agent combines their findings.
+A review convoy is how Overdeck runs a **full** code review. Four reviewers
+each check one concern in parallel, and a review parent combines their
+findings into one verdict that it posts on the pull request.
+
+There is no separate convoy command and no convoy state. A convoy is a set of
+agents that the review pipeline starts for an issue. Its result is the PR
+review itself.
 
 ## Why Convoys?
 
@@ -15,257 +21,205 @@ When reviewing code, a single AI agent must context-switch between:
 - Checking for logic errors
 - Looking for security vulnerabilities
 - Analyzing performance issues
+- Checking the change against the issue's acceptance criteria
 
 This leads to:
-- **Shallow reviews** - Can't go deep on everything
-- **Missed issues** - Focus on one area, miss others
-- **Long sequential execution** - Can't parallelize
+- **Shallow reviews**: it can't go deep on everything
+- **Missed issues**: focus on one area, miss others
+- **Long sequential execution**: nothing runs in parallel
 
 Convoys solve this by **specialization + parallelization**:
-- 3 focused agents review in parallel (10x faster)
-- Each agent goes deep in their domain
-- Synthesis agent combines findings with prioritization
+- Four focused reviewers run at the same time
+- Each one goes deep in its own domain
+- The review parent combines their findings and decides the verdict
 
 ## Quick Start
 
+A review starts automatically when the work agent runs `pan done`. You can
+also start or manage one by hand:
+
 ```bash
-# Run a parallel code review
-pan convoy start code-review --files "src/**/*.ts"
+# Request a (re-)review after fixing feedback
+pan review request PAN-123 -m "Fixed the null check"
 
-# Check status
-pan convoy status
+# See where the issue is: derived state plus recent pipeline journal entries
+pan show PAN-123
 
-# List all convoys (running and completed)
-pan convoy list
+# Stop every running reviewer for the issue
+pan review abort PAN-123
 
-# Stop a convoy
-pan convoy stop <convoy-id>
+# Restart the review, re-running any reviewer that has no report yet
+pan review restart PAN-123
 ```
 
-## How Code Review Convoy Works
+Whether a review runs as a convoy depends on the review mode. See
+[Review modes](#review-modes).
+
+## How the Review Convoy Works
 
 ```
-pan convoy start code-review --files "src/**/*.ts"
+pan done PAN-123   (or pan review request, the dashboard, or a PR webhook)
     │
-    ├─→ Phase 1 (Parallel): 3 specialized reviewers run simultaneously
-    │     ├─→ Correctness (Haiku) → correctness.md
-    │     ├─→ Security (Sonnet)    → security.md
-    │     └─→ Performance (Haiku)  → performance.md
+    ├─→ Phase 1 (Parallel): four reviewers run simultaneously
+    │     ├─→ agent-pan-123-review-security     → security.md
+    │     ├─→ agent-pan-123-review-correctness  → correctness.md
+    │     ├─→ agent-pan-123-review-performance  → performance.md
+    │     └─→ agent-pan-123-review-requirements → requirements.md
     │
-    └─→ Phase 2 (Sequential): Synthesis agent runs after Phase 1 completes
-          └─→ Synthesis reads all 3 reviews → synthesis.md
+    └─→ Phase 2: the review parent (agent-pan-123-review) waits for all four
+          ├─→ reads the reports → synthesis.md
+          └─→ posts one PR review: approve or request changes
 ```
+
+Every review request goes through one entry point, whether it comes from
+`pan done`, `pan review request`, the dashboard or the PR webhook. The parent
+and all four lanes start together against the PR's current head commit.
 
 ### Phase 1: Specialized Reviews (Parallel)
 
-Three specialized agents run simultaneously, each focusing on a specific concern:
+Four reviewers run at the same time, each focused on one concern:
 
-| Agent | Model | Focus Areas |
-|-------|-------|-------------|
-| **Correctness** | Haiku | Logic errors, edge cases, type safety, null handling |
-| **Security** | Sonnet | OWASP Top 10, injection vulnerabilities, XSS, auth issues |
-| **Performance** | Haiku | N+1 queries, blocking operations, memory leaks, algorithm complexity |
+| Agent | Focus Areas |
+|-------|-------------|
+| `agent-<issue>-review-security` | OWASP Top 10, injection, XSS, auth issues |
+| `agent-<issue>-review-correctness` | Logic errors, edge cases, type safety, null handling |
+| `agent-<issue>-review-performance` | N+1 queries, blocking operations, memory leaks, algorithm complexity |
+| `agent-<issue>-review-requirements` | Acceptance criteria and xBRIEF coverage |
 
-Each agent:
-- Reviews the specified files independently
-- Writes findings to `.claude/reviews/<timestamp>-<domain>.md`
-- Can go deep without worrying about other concerns
-- Runs in parallel (total time = slowest agent, not sum of all)
+`<issue>` is the lowercase issue id, for example `agent-pan-123-review-security`.
+Each reviewer's model comes from `roles.review.sub.<lane>.model`, set in the
+dashboard's Roles panel or in `~/.overdeck/config.yaml`.
 
-### Phase 2: Synthesis (Sequential)
+Each reviewer:
+- Reviews the PR's diff independently
+- Writes its report to `.pan/review/<runId>/<lane>.md` in the issue's workspace
+- Goes deep without worrying about the other concerns
+- Runs in parallel, so total time is the slowest reviewer, not the sum
 
-After all specialized reviews complete, a synthesis agent:
-1. **Reads all review files** - Ingests findings from all three agents
-2. **Removes duplicates** - Same issue found by multiple reviewers
-3. **Prioritizes findings** - Orders by severity × impact
-4. **Generates unified report** - Single actionable document
+The lane instructions live in `roles/review-security.md`,
+`roles/review-correctness.md`, `roles/review-performance.md` and
+`roles/review-requirements.md`.
 
-**Output:** `.claude/reviews/<timestamp>-synthesis.md`
+### Phase 2: Synthesis
+
+The review parent, `agent-<issue>-review`, waits for the four reports. Then it:
+1. **Reads all four reports**
+2. **Removes duplicates**: the same issue found by more than one reviewer
+3. **Weighs the findings**: severity, code citations, tests and requirement coverage
+4. **Writes** `.pan/review/<runId>/synthesis.md`
+5. **Posts one PR review**: approve, or request changes with the findings as PR comments
+
+The PR review is the verdict. Overdeck stores no review status of its own.
+When GitHub refuses a review on your own PR (a single-account install), the
+verdict is posted as a PR comment that starts with
+`<!-- overdeck-verdict: APPROVED -->` or `<!-- overdeck-verdict: CHANGES_REQUESTED -->`.
+See [docs/REVIEW-AGENT-ARCHITECTURE.md](https://github.com/eltmon/overdeck/blob/main/docs/REVIEW-AGENT-ARCHITECTURE.md).
 
 ## What is Synthesis?
 
-Synthesis is the process of combining findings from multiple parallel agents into a single, prioritized, actionable report.
+Synthesis combines the findings from the parallel reviewers into a single,
+prioritized verdict.
 
-**Without synthesis**, after 3 parallel reviews you get:
-- 3 separate markdown files to read
-- Duplicate findings (same issue reported differently)
+**Without synthesis**, after four parallel reviews you get:
+- Four separate reports to read
+- Duplicate findings (the same issue reported differently)
 - No prioritization (which to fix first?)
-- Mental overhead to merge them yourself
+- The work of merging them yourself
 
 **With synthesis**, you get:
-- Single unified report
+- One PR review with one decision
 - Deduplicated findings
-- AI-prioritized by severity × impact
-- Clear action items
+- Blockers separated from everything else
+- Clear action items for the work agent
 
-**Example synthesis output:**
+The reports are evidence, not votes. The parent decides the verdict. The
+synthesis report has this shape:
 
 ```markdown
-# Code Review - Complete Analysis
+# Verdict: APPROVED | CHANGES_REQUESTED | FAILED
 
-## Executive Summary
-- 2 blockers (MUST FIX)
-- 3 critical issues
-- 5 high-priority items
+## Summary
 
-## Top Priority
-1. SQL injection in auth.ts:42 (Security, Critical)
-2. execSync blocking event loop in sync.ts:89 (Performance, Blocker)
-3. Null pointer in user fetch in api.ts:156 (Correctness, High)
+## Blockers
 
-## Blocker Issues
-[Detailed findings with code examples and fixes]
+## Evidence
 
-## Critical Issues
-[...]
-
-## Review Statistics
-- Files reviewed: 12
-- Issues found: 10
-- Duplicates removed: 3
+## Convoy Notes
 ```
 
-## Built-in Convoy Templates
+## Review modes
 
-| Template | Agents | Use Case |
-|----------|--------|----------|
-| `code-review` | correctness, security, performance, synthesis | Comprehensive code review |
-| `planning` | planner | Codebase exploration and planning |
-| `triage` | (dynamic) | Parallel issue triage |
-| `health-monitor` | monitor | Check health of running agents |
+The review mode decides whether a review runs as a convoy. Set it with
+`roles.review.mode` in `~/.overdeck/config.yaml`. The dashboard's
+**Request review** action also offers Full, Quick and None, and saves the one
+you pick.
 
-### code-review Template
+| Mode | What runs |
+|------|-----------|
+| `quick` (default) | One review agent, `agent-<issue>-review`, does a combined pass and writes `review.md` |
+| `full` | The convoy: the review parent plus the four lanes |
+| `none` | No AI review. The verification quality gates still apply. |
 
-The most commonly used convoy. Runs three specialized code reviewers in parallel, then synthesizes results.
+## Review Commands
 
 ```bash
-# Review TypeScript files
-pan convoy start code-review --files "src/**/*.ts"
+# Request a re-review after fixing feedback
+pan review request <id> [-m <message>]
 
-# Review specific pull request
-pan convoy start code-review --pr-url https://github.com/org/repo/pull/123
+# Stop every running reviewer session for the issue.
+# The work agent is left idle and is not messaged.
+pan review abort <id>
 
-# Target specific issue
-pan convoy start code-review --issue-id MIN-123 --files "src/auth/*.ts"
+# Restart the review parent and re-run any lane that has no report yet
+pan review restart <id>
+  --role <lane>     # Re-run only this lane (security/correctness/performance/requirements)
+  --model <model>   # Use this model for the restarted reviewers
+
+# Derived issue state and the last pipeline journal entries
+pan show <id>
+pan show <id> --json   # includes pr.reviewState
 ```
 
-**Output files:**
-- `.claude/reviews/<timestamp>-correctness.md`
-- `.claude/reviews/<timestamp>-security.md`
-- `.claude/reviews/<timestamp>-performance.md`
-- `.claude/reviews/<timestamp>-synthesis.md` (prioritized combined report)
-
-## Convoy Commands
-
-```bash
-# Start a convoy
-pan convoy start <template> [options]
-  --files <pattern>       # File pattern (e.g., "src/**/*.ts")
-  --pr-url <url>          # Pull request URL
-  --issue-id <id>         # Issue ID
-  --project-path <path>   # Project path (defaults to cwd)
-
-# Check convoy status
-pan convoy status [convoy-id]  # Show status (defaults to most recent)
-
-# List convoys
-pan convoy list                # All convoys
-pan convoy list --status running  # Filter by status
-
-# Stop a convoy
-pan convoy stop <convoy-id>    # Kill all agents, mark failed
-```
-
-## Custom Convoy Templates
-
-Create custom templates in `~/.overdeck/convoy-templates/`:
-
-```json
-{
-  "name": "lightweight-review",
-  "description": "Quick security-only review",
-  "agents": [
-    {
-      "role": "security",
-      "subagent": "code-review-security",
-      "parallel": false
-    }
-  ],
-  "config": {
-    "outputDir": ".claude/reviews",
-    "timeout": 600000
-  }
-}
-```
-
-Then use with:
-```bash
-pan convoy start lightweight-review --files "src/**/*.ts"
-```
-
-### Template Structure
-
-**agents** - Array of agent configurations:
-```json
-{
-  "role": "security",           // Agent identifier
-  "subagent": "code-review-security",  // Subagent type from Task tool
-  "parallel": true,             // Run in parallel with other parallel agents
-  "model": "sonnet",            // Override default model
-  "config": {                   // Agent-specific config
-    "focus": "OWASP Top 10"
-  }
-}
-```
-
-**config** - Convoy-level configuration:
-```json
-{
-  "outputDir": ".claude/reviews",   // Where to write results
-  "timeout": 600000,                // Max time per agent (ms)
-  "synthesize": true,               // Run synthesis after parallel phase
-  "synthesiAgent": "synthesis"      // Subagent to use for synthesis
-}
-```
-
-## Convoy Lifecycle
+## Review Lifecycle
 
 ```
-1. Start command received
+1. Review requested (pan done, pan review request, dashboard, or PR webhook)
+        │   journal: review.requested
+        ▼
+2. Parent and four lanes start against the PR head
+        │   journal: review.dispatched
+        ├─→ agent-<issue>-review-security
+        ├─→ agent-<issue>-review-correctness
+        ├─→ agent-<issue>-review-performance
+        └─→ agent-<issue>-review-requirements
         │
         ▼
-2. Create convoy directory: ~/.overdeck/convoys/<convoy-id>/
+3. Each lane writes .pan/review/<runId>/<lane>.md and exits
         │
         ▼
-3. Spawn parallel agents (Phase 1)
-        │
-        ├─→ Agent 1 (tmux session)
-        ├─→ Agent 2 (tmux session)
-        └─→ Agent 3 (tmux session)
-        │
+4. Parent writes synthesis.md and posts the PR review
+        │   journal: review.verdict
         ▼
-4. Wait for all parallel agents to complete
-        │
-        ▼
-5. Spawn synthesis agent (Phase 2)
-        │
-        └─→ Synthesis agent (reads all outputs)
-        │
-        ▼
-6. Convoy marked as completed
+5a. Approved: the PR is mergeable once its checks are green
+5b. Changes requested: the work agent gets the PR comments and a pan tell,
+    fixes, pushes, and the next full review starts again at step 1
 ```
+
+The journal entries are appended to the issue's pipeline journal
+(`<workspace>/.overdeck/pipeline.jsonl`), and `pan show` prints the latest
+ones. Merge readiness is computed live from the PR's approvals against its
+current head, so a push after an approval leaves the new head unreviewed until
+the next review runs.
 
 ## Monitoring Convoys
 
-**Dashboard integration:**
+**Dashboard:**
 
-The Overdeck dashboard shows:
-- Active convoys with progress
-- Phase completion (parallel vs synthesis)
-- Individual agent status
-- Output file links
-
-Convoy agents share the same lifecycle surfaces as the rest of the pipeline. The Pipeline page groups every issue and its agents by phase — Ship, Review, Verifying — with a metric strip across the top (Active issues, Work running, Review queue, Ship, Spend) and a live activity feed on the right, so a code-review convoy spawned for an issue shows up alongside the work agents it's reviewing.
+Reviewers appear in the issue view next to the work agent they review, with
+their status, model, cost and verdict. The Pipeline page groups every issue
+and its agents by phase (Ship, Review, Verifying), with a metric strip across
+the top (Active issues, Work running, Review queue, Ship, Spend) and a live
+activity feed on the right.
 
 <ThemedImage
   light="/images/dashboard/pipeline-light.png"
@@ -273,57 +227,33 @@ Convoy agents share the same lifecycle surfaces as the rest of the pipeline. The
   alt="Pipeline page: a metric strip showing Active issues, Work running, Review queue, Ship, and Spend over phase-grouped issue rows, with a live activity feed on the right."
 />
 
-**CLI monitoring:**
+**CLI:**
 
 ```bash
-# Watch convoy progress
-pan convoy status <convoy-id>
+# Where the issue is, and the last pipeline journal entries
+pan show PAN-123
 
-# Tail logs from specific agent
-tmux attach -t convoy-<convoy-id>-security
+# Recent terminal output of one reviewer
+curl -s "http://localhost:3011/api/agents/agent-pan-123-review-security/output?lines=100"
 
-# View all output files
-ls -lh ~/.overdeck/convoys/<convoy-id>/output/
+# The reports for a run
+ls -lh <workspace>/.pan/review/<runId>/
 ```
 
-## Performance Benefits
-
-**Sequential review (single agent):**
-- 10 minutes for correctness
-- 10 minutes for security
-- 10 minutes for performance
-- **Total: 30 minutes**
-
-**Convoy review (parallel):**
-- Phase 1: 10 minutes (all three run simultaneously)
-- Phase 2: 3 minutes (synthesis)
-- **Total: 13 minutes (2.3x faster)**
-
-With more agents, the speedup is even more dramatic.
+To open a reviewer's terminal, use the attach command for your terminal
+backend. See [Reaching an agent from a shell](/configuration/terminal-backend#reaching-an-agent-from-a-shell).
 
 ## Use Cases
 
-**Code Review:**
-- Pre-merge quality checks
-- Security audits
-- Performance optimization reviews
+- Pre-merge quality checks on every PR
+- Security audits of sensitive changes
+- Performance reviews of hot paths
+- Checking a change against its acceptance criteria
 
-**Planning:**
-- Explore multiple architectural approaches simultaneously
-- Research competing libraries in parallel
-- Evaluate different implementation strategies
-
-**Issue Triage:**
-- Categorize backlog items in parallel
-- Estimate complexity across multiple issues
-- Prioritize work queue
-
-**Health Monitoring:**
-- Check status of all running agents
-- Detect stuck or crashed agents
-- Analyze system health across projects
-
-When convoys are running across several projects at once, the God View gives an aggregate cross-project picture of every agent's activity in one place — useful for spotting a convoy whose parallel reviewers have stalled or are burning more than expected.
+When reviews run across several projects at once, the God View gives an
+aggregate cross-project picture of every agent's activity in one place. Review
+convoys orbit their issue, so a convoy whose reviewers have stalled or are
+burning more than expected is easy to spot.
 
 <ThemedImage
   light="/images/dashboard/god-view-light.png"
@@ -333,50 +263,54 @@ When convoys are running across several projects at once, the God View gives an 
 
 ## Best Practices
 
-**When to use convoys:**
-- Task can be split into independent concerns (security, performance, etc.)
-- You need comprehensive coverage (not just surface-level review)
-- Speed matters (parallel execution valuable)
-- Results need synthesis (combining findings)
+**When to use `full` mode:**
+- Changes where security, performance and correctness all matter
+- You want complete coverage, not a surface-level pass
+- The cost of four extra reviewers is worth it
 
-**When NOT to use convoys:**
-- Task is inherently sequential (one step depends on another)
-- Simple, focused review (single-agent is faster to set up)
-- Findings don't benefit from synthesis (independent results)
+**When `quick` is enough:**
+- Small, focused changes
+- Documentation or style-only changes
 
-**Convoy design tips:**
-- **Keep agents focused** - Each should have a clear, narrow responsibility
-- **Balance workload** - Aim for similar execution times across parallel agents
-- **Design for synthesis** - Structure output so synthesis can combine effectively
-- **Monitor costs** - Multiple agents = multiple API calls
+Every full review runs all four lanes against the current head. A prior
+report is never reused for a new commit.
 
 ## Troubleshooting
 
-**Convoy stuck in "running" state:**
+**Review stuck with no verdict:**
 ```bash
-# Check individual agent status
-tmux list-sessions | grep convoy-<convoy-id>
+# What the pipeline last did for the issue
+pan show PAN-123
 
-# View agent output
-tmux attach -t convoy-<convoy-id>-<role>
+# Recent output of a reviewer
+curl -s "http://localhost:3011/api/agents/agent-pan-123-review-security/output?lines=100"
 
-# Force stop if needed
-pan convoy stop <convoy-id>
+# Re-run the lanes that have no report, keeping completed ones
+pan review restart PAN-123
+
+# Or stop every reviewer
+pan review abort PAN-123
 ```
 
-**Synthesis agent fails:**
-- Check that all parallel agents completed successfully
-- Verify output files exist in expected location
-- Review synthesis agent logs in tmux session
+Overdeck also recovers some stalls on its own. When an issue's last journal
+entry is `review.requested`, `review.dispatched` or `review.redispatched`, it
+is at least 15 minutes old, and no `agent-<issue>-review-*` reviewer is alive,
+the deacon re-dispatches the full review, at most once an hour per issue. If
+the parent dies after the lanes finish, the completed reports are still used
+to post the PR review.
 
-**Agents completing too quickly:**
-- Check for permission issues (can they access files?)
-- Verify file patterns match actual files
-- Review agent prompts for clarity
+**Review parent fails:**
+- Check that each lane wrote its report in `.pan/review/<runId>/`
+- Read the parent's output in the dashboard or via `GET /api/agents/agent-<issue>-review/output`
+- Run `pan review restart <id>`
+
+**Reviewers finish too quickly:**
+- Check the lane report for permission or access errors
+- Check that the PR has a diff against its base branch
 
 ## Related Guides
 
-- [Convoy Commands](/cli/convoy-commands) - CLI reference
+- [Terminal backend](/configuration/terminal-backend) - Reaching an agent from a shell
 - [Skills](/features/skills) - Subagents and skill system
 - [Specialists](/features/specialists) - Long-running specialist agents
 - [Cloister](/features/cloister) - AI lifecycle management
