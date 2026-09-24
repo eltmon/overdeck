@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listRunningAgentsMock = vi.fn();
 const listLiveAgentIdsMock = vi.fn();
+const getRuntimeForAgentMock = vi.fn((_agentId: string): unknown => null);
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   getAgentState: () => null,
@@ -10,11 +11,12 @@ vi.mock('../../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/runtimes/index.js', () => ({
-  getRuntimeForAgent: () => null,
+  getRuntimeForAgent: (agentId: string) => getRuntimeForAgentMock(agentId),
 }));
 
 // Fake terminal backend: the live inventory the health loop reads (#4109).
-vi.mock('../../../../src/lib/terminal-backends/inventory.js', () => ({
+vi.mock('../../../../src/lib/terminal-backends/inventory.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../src/lib/terminal-backends/inventory.js')>(),
   listLiveAgentIds: () => listLiveAgentIdsMock(),
 }));
 
@@ -23,6 +25,7 @@ vi.mock('../../../../src/lib/cloister/pi-cost-reconciler.js', () => ({
 }));
 
 import { performHealthCheck, type HealthHost } from '../../../../src/lib/cloister/service-health.js';
+import { getAllAgentHealth } from '../../../../src/lib/cloister/service-status.js';
 
 function makeHost(previous: string[]): HealthHost & { handleAgentCrash: ReturnType<typeof vi.fn> } {
   return {
@@ -84,5 +87,31 @@ describe('performHealthCheck liveness (#4109)', () => {
     expect(host.handleAgentCrash).not.toHaveBeenCalled();
     expect([...host.previousRunningAgents]).toEqual(['agent-pan-1']);
     expect(host.lastCheck).not.toBeNull();
+  });
+});
+
+describe('getAllAgentHealth liveness (#4109)', () => {
+  beforeEach(() => {
+    getRuntimeForAgentMock.mockClear();
+    listRunningAgentsMock.mockReturnValue([
+      { id: 'agent-pan-1', status: 'running', tmuxActive: false },
+      { id: 'agent-pan-2', status: 'stopped', tmuxActive: false },
+    ]);
+  });
+
+  it('reports the agents the backend inventory lists, Herdr included', async () => {
+    listLiveAgentIdsMock.mockResolvedValue(new Set(['agent-pan-1']));
+
+    await getAllAgentHealth({} as never);
+
+    expect(getRuntimeForAgentMock.mock.calls.map(([id]) => id)).toEqual(['agent-pan-1']);
+  });
+
+  it('falls back to the running rows when the backend inventory is unreadable', async () => {
+    listLiveAgentIdsMock.mockResolvedValue(null);
+
+    await getAllAgentHealth({} as never);
+
+    expect(getRuntimeForAgentMock.mock.calls.map(([id]) => id)).toEqual(['agent-pan-1']);
   });
 });
