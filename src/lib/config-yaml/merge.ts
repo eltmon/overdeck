@@ -657,6 +657,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       result.statusReviewModel = resolveModelId(config.models.status_review_model);
     }
 
+    if (config.models?.provider_fallback_model) {
+      result.providerFallbackModel = config.models.provider_fallback_model;
+    }
+
     // Merge tracker keys
     if (config.tracker_keys) {
       if (config.tracker_keys.linear) {

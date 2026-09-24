@@ -379,9 +379,8 @@ Reply ONLY with valid JSON matching this schema:
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 
 export function resolveEnrichmentModel(model: string, enabledProviders?: Set<ModelProvider>): string {
-  if (enabledProviders) return applyFallback(model as ModelId, enabledProviders);
   const { config } = loadYamlConfig();
-  return applyFallback(model as ModelId, config.enabledProviders);
+  return applyFallback(model as ModelId, enabledProviders ?? config.enabledProviders, config.providerFallbackModel);
 }
 
 function getProviderApiKey(providerName: string, configuredKey?: string): string | undefined {

@@ -498,6 +498,9 @@ export interface YamlConfig {
     default_conversation_model?: ModelId;
     /** Model for the Command Deck status review (default: claude-sonnet-5, PAN-4160) */
     status_review_model?: ModelId;
+
+    /** Anthropic substitute for an unmapped model whose provider is disabled (model-fallback.ts) */
+    provider_fallback_model?: ModelId;
   };
 
   /** OpenRouter-specific configuration */
@@ -847,6 +850,9 @@ export interface NormalizedConfig {
   defaultConversationModel?: ModelId;
   /** Command Deck status-review model; documented default in defaults.ts (PAN-4160) */
   statusReviewModel: ModelId;
+
+  /** models.provider_fallback_model: Anthropic substitute for an unmapped model whose provider is disabled */
+  providerFallbackModel: ModelId;
 
   /** Tracker API keys */
   trackerKeys: {
