@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
 
 const realOverdeckHome = resolve(homedir(), '.overdeck');
+// Claude Code transcripts are irreplaceable conversation history (PAN-3915).
+const realClaudeProjects = resolve(homedir(), '.claude', 'projects');
+const blockedRealHomeRoots = [realOverdeckHome, realClaudeProjects];
 const allowedRealHomeWrites = new Set<string>();
 
 function pathString(value: unknown): string | null {
@@ -18,7 +21,7 @@ function blockedRealHomeTarget(value: unknown): string | null {
   if (!rawPath) return null;
   const resolved = resolve(rawPath);
   if (allowedRealHomeWrites.has(resolved)) return null;
-  return resolved === realOverdeckHome || resolved.startsWith(`${realOverdeckHome}${sep}`)
+  return blockedRealHomeRoots.some(root => resolved === root || resolved.startsWith(`${root}${sep}`))
     ? resolved
     : null;
 }
@@ -27,7 +30,7 @@ function assertNotRealOverdeckHome(targets: unknown[]): void {
   for (const target of targets) {
     const blocked = blockedRealHomeTarget(target);
     if (blocked) {
-      throw new Error(`[test-guard] write to REAL ~/.overdeck blocked: ${blocked} — set OVERDECK_HOME to a temp dir`);
+      throw new Error(`[test-guard] write to REAL home blocked: ${blocked} — set OVERDECK_HOME/HOME to a temp dir or inject the root`);
     }
   }
 }

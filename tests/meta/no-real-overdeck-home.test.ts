@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 const OVERDECK_SEGMENT = `.${'overdeck'}`;
 const REAL_HOME_TARGET = join(homedir(), OVERDECK_SEGMENT, 'pan-test-guard');
+const REAL_CLAUDE_PROJECTS_TARGET = join(homedir(), '.claude', 'projects', '-pan-test-guard');
 
 describe('real OVERDECK_HOME test guard', () => {
   it('sets OVERDECK_HOME to a per-worker temp directory', () => {
@@ -27,6 +28,18 @@ describe('real OVERDECK_HOME test guard', () => {
     await expect(writeFile(join(REAL_HOME_TARGET, 'file'), 'nope')).rejects.toThrow('[test-guard]');
     await expect(appendFile(join(REAL_HOME_TARGET, 'file'), 'nope')).rejects.toThrow('[test-guard]');
     await expect(rm(REAL_HOME_TARGET, { recursive: true, force: true })).rejects.toThrow('[test-guard]');
+  });
+
+  // PAN-3915: a test wrote and then deleted a transcript under the real
+  // ~/.claude/projects; those JSONL files are irreplaceable history.
+  it('blocks writes and deletes under the real ~/.claude/projects tree', async () => {
+    const transcript = join(REAL_CLAUDE_PROJECTS_TARGET, 'session.jsonl');
+    expect(() => mkdirSync(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true })).toThrow('[test-guard]');
+    expect(() => writeFileSync(transcript, '{}\n')).toThrow('[test-guard]');
+    expect(() => unlinkSync(transcript)).toThrow('[test-guard]');
+    expect(() => rmSync(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true, force: true })).toThrow('[test-guard]');
+    await expect(appendFile(transcript, '{}\n')).rejects.toThrow('[test-guard]');
+    await expect(rm(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true, force: true })).rejects.toThrow('[test-guard]');
   });
 
   it('has no direct homedir .overdeck write patterns in tests', () => {
