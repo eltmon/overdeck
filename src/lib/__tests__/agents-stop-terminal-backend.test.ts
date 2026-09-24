@@ -459,6 +459,79 @@ describe('closeIssuePanes', () => {
     expect(log.some((call) => call.method === 'pane.close')).toBe(false);
   });
 
+  describe('after a Herdr restore dropped the tokens (#4096)', () => {
+    // Seen live on 2026-09-24: every restored pane had lost its tokens, 16 of
+    // 17 workspaces had lost their `issue` token, and every workspace kept its
+    // label. `wD` is the restored `sequencer-runner`; `w13` is the duplicate the
+    // next launch created beside it.
+    const restoredPanes = [
+      { pane_id: 'wX:p1', terminal_id: 'x1', workspace_id: 'wX' },
+      { pane_id: 'wX:p2', terminal_id: 'x2', workspace_id: 'wX' },
+      { pane_id: 'wD:p1', terminal_id: 'd1', workspace_id: 'wD' },
+      { pane_id: 'w13:p1H', terminal_id: 'h1', workspace_id: 'w13', tokens: { issue: 'sequencer-runner', role: 'work', agentId: 'sequencer-runner' } },
+      { pane_id: 'wY:p1', terminal_id: 'y1', workspace_id: 'wY' },
+    ];
+    const restoredWorkspaces = [
+      { workspace_id: 'wX', label: 'PAN-3950' },
+      { workspace_id: 'wD', label: 'sequencer-runner' },
+      { workspace_id: 'w13', label: 'sequencer-runner', tokens: { issue: 'sequencer-runner' } },
+      { workspace_id: 'wY', label: 'PAN-3951' },
+    ];
+
+    function restoredApi(log: HerdrCall[], panes: unknown[] = restoredPanes) {
+      return {
+        call: async (method: string, params: Record<string, unknown>) => {
+          log.push({ method, params });
+          if (method === 'agent.list') return { agents: [] };
+          if (method === 'session.snapshot') return { snapshot: { panes } };
+          if (method === 'workspace.list') return { workspaces: restoredWorkspaces };
+          return {};
+        },
+      };
+    }
+    const closes = (log: HerdrCall[], method: string, key: string) =>
+      log.filter((call) => call.method === method).map((call) => call.params[key]);
+
+    it('closes the issue workspace found by its label, untagged panes and all', async () => {
+      const log: HerdrCall[] = [];
+      const closed = await closeIssuePanes('pan-3950', {}, new HerdrBackend(restoredApi(log) as never));
+
+      expect(closes(log, 'workspace.close', 'workspace_id')).toEqual(['wX']);
+      expect(closes(log, 'pane.close', 'pane_id')).toEqual([]);
+      expect(closed).toEqual(['wX:p1', 'wX:p2']);
+    });
+
+    it('closes the restored workspace and its duplicate alike', async () => {
+      const log: HerdrCall[] = [];
+      const closed = await closeIssuePanes('sequencer-runner', {}, new HerdrBackend(restoredApi(log) as never));
+
+      expect(closes(log, 'workspace.close', 'workspace_id')).toEqual(['w13', 'wD']);
+      expect(closed).toEqual(['sequencer-runner', 'wD:p1']);
+    });
+
+    it('leaves untagged panes alone under a role filter: nothing says what role they had', async () => {
+      const log: HerdrCall[] = [];
+      const closed = await closeIssuePanes('PAN-3950', { roles: ['review', 'test', 'uat'] }, new HerdrBackend(restoredApi(log) as never));
+
+      expect(closed).toEqual([]);
+      expect(log.some((call) => call.method === 'workspace.close' || call.method === 'pane.close')).toBe(false);
+    });
+
+    it('never closes a workspace whole when a pane in it names another owner', async () => {
+      const log: HerdrCall[] = [];
+      const panes = [
+        ...restoredPanes,
+        { pane_id: 'wX:p3', terminal_id: 'x3', workspace_id: 'wX', tokens: { role: 'work', agentId: 'conv-7' } },
+        { pane_id: 'wX:p4', terminal_id: 'x4', workspace_id: 'wX', tokens: { issue: 'PAN-9999', role: 'work', agentId: 'agent-pan-9999' } },
+      ];
+      const closed = await closeIssuePanes('PAN-3950', {}, new HerdrBackend(restoredApi(log, panes) as never));
+
+      expect(closes(log, 'workspace.close', 'workspace_id')).toEqual([]);
+      expect(closes(log, 'pane.close', 'pane_id')).toEqual(['wX:p1', 'wX:p2']);
+      expect(closed).toEqual(['wX:p1', 'wX:p2']);
+    });
+  });
+
   it('is a no-op on tmux, whose callers scan session names themselves', async () => {
     expect(await closeIssuePanes('PAN-3947', {}, tmuxBackend)).toEqual([]);
     expect(tmux.killed).toEqual([]);

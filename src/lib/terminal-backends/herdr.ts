@@ -44,6 +44,7 @@ import {
   HerdrApiError,
 } from './herdr-api.js';
 import { controlTerminal, observeTerminal } from './herdr-stream.js';
+import { adoptIssueWorkspace, listIssueWorkspaces, type HerdrWorkspaceInfo } from './herdr-workspaces.js';
 import { checkPrompt } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
 import {
@@ -103,12 +104,6 @@ interface HerdrPaneInfo {
   terminal_title?: string | null;
   tokens?: Record<string, string>;
   name?: string | null;
-}
-
-interface HerdrWorkspaceInfo {
-  workspace_id: string;
-  label?: string;
-  tokens?: Record<string, string>;
 }
 
 function fail(operation: string, cause: unknown): TerminalBackendError {
@@ -550,17 +545,13 @@ export class HerdrBackend implements TerminalBackend {
 
   /**
    * The issue's workspace. Looked up by the `issue` token first (a label can be
-   * renamed in the TUI; the token is ours), created and stamped when missing.
+   * renamed in the TUI; the token is ours), then re-adopted by its label when a
+   * Herdr restore dropped the token (#4096), created and stamped when missing.
    */
   workspaceFor(issueId: string, cwd: string): Effect.Effect<BackendResult<WorkspaceRef>, TerminalBackendError> {
     return attempt('workspaceFor', async () => {
-      const listed = await this.api.call<{ workspaces?: HerdrWorkspaceInfo[] }>('workspace.list', {});
-      const existing = (listed.workspaces ?? []).find(
-        (workspace) => workspace.tokens?.issue?.toLowerCase() === issueId.toLowerCase(),
-      );
-      if (existing) {
-        return { backend: BACKEND, workspaceId: existing.workspace_id, issueId, cwd };
-      }
+      const existing = await adoptIssueWorkspace(this.api, issueId, METADATA_SOURCE);
+      if (existing) return { backend: BACKEND, workspaceId: existing, issueId, cwd };
       const created = await this.api.call<{ workspace?: HerdrWorkspaceInfo }>('workspace.create', {
         cwd,
         label: issueId,
@@ -575,6 +566,11 @@ export class HerdrBackend implements TerminalBackend {
       });
       return { backend: BACKEND, workspaceId, issueId, cwd };
     });
+  }
+
+  /** Every workspace of the issue, by `issue` token or, once a restore dropped it, by label (#4096). */
+  async issueWorkspaceIds(issueId: string): Promise<string[]> {
+    return (await listIssueWorkspaces(this.api, issueId)).map((workspace) => workspace.workspace_id);
   }
 
   startAgent(
