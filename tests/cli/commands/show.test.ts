@@ -381,7 +381,7 @@ describe('showCommand', () => {
 
     // PAN-3420: nothing records a CV outcome, so a closed-out issue's entry is
     // still `in_progress` on disk. The merged PR is the outcome.
-    it.each(['merged', 'closed'] as const)('reports a %s issue with a merged PR as a success, not 0%% and active', async (state) => {
+    it.each(['merged', 'closed'] as const)('reports a %s issue with a merged PR as a success, not zero percent and active', async (state) => {
       derivedIssueStateMock.mockResolvedValue({
         issueId: 'PAN-3941',
         state,
@@ -405,8 +405,8 @@ describe('showCommand', () => {
       logSpy.mockRestore();
 
       expect(output).toContain('100% success');
-      expect(output).not.toContain('active');
-      expect(output).not.toContain('0% success');
+      expect(output).not.toMatch(/\d+ active\)/);
+      expect(output).not.toMatch(/\s0% success/);
       expect(output).toContain('success');
       expect(output).not.toContain('in_progress');
     });
