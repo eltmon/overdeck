@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getRuntimeForAgent: vi.fn(),
   listPaneValuesSync: vi.fn(),
   tmuxSessionExists: vi.fn(),
+  tmuxExecAsync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
@@ -23,6 +24,8 @@ vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
 vi.mock('../../../../src/lib/tmux.js', () => ({
   listPaneValuesSync: mocks.listPaneValuesSync,
   sessionExists: mocks.tmuxSessionExists,
+  tmuxExecAsync: mocks.tmuxExecAsync,
+  exactSession: (id: string) => `=${id}`,
 }));
 
 import {
@@ -162,6 +165,41 @@ describe('isAlive on tmux: a has-session error is indeterminate, never no-sessio
     const deps = tmuxDeps('error');
     await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
     expect(deps.queryTmuxSession).not.toHaveBeenCalled();
+  });
+});
+
+// ─── No tmux binary (PAN-3923 review 2) ─────────────────────────────────────
+
+/**
+ * A missing tmux binary (spawn ENOENT) through the real bounded has-session
+ * probe: indeterminate on a tmux host, which requires the binary; no session
+ * on a Herdr host, which does not.
+ */
+describe('isAlive with no tmux binary on PATH', () => {
+  beforeEach(() => {
+    mocks.tmuxSessionExists.mockReset();
+    mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(false));
+    mocks.tmuxExecAsync.mockReset();
+    mocks.tmuxExecAsync.mockRejectedValue(Object.assign(new Error('spawn tmux ENOENT'), { code: 'ENOENT', syscall: 'spawn tmux' }));
+  });
+
+  it('is indeterminate on a tmux host, never a confirmed death', async () => {
+    const { sessionExists: _seam, ...rest } = aliveDeps();
+    const verdict = await isAlive('agent-x', { ...rest, backend: 'tmux' as const });
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    expect(isConfirmedDead(verdict)).toBe(false);
+    expect(mocks.tmuxExecAsync).toHaveBeenCalled();
+  });
+
+  it('keeps the Herdr death on a Herdr host: no tmux means no legacy session', async () => {
+    const { sessionExists: _seam, ...rest } = aliveDeps();
+    const verdict = await isAlive('agent-x', {
+      ...rest,
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+    });
+    expect(verdict).toEqual({ alive: false, reason: 'no-session' });
+    expect(mocks.tmuxExecAsync).toHaveBeenCalled();
   });
 });
 

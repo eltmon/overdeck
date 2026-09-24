@@ -151,7 +151,10 @@ function readHarnessDefault(agentId: string): RuntimeName {
  */
 async function querySessionDefault(agentId: string, deps: LivenessAsyncDeps): Promise<TmuxSessionAnswer> {
   if (await Effect.runPromise(sessionExists(agentId)).catch(() => false)) return 'exists';
-  const query = deps.queryTmuxSession ?? ((id: string) => queryTmuxSession(id));
+  // A tmux host requires the binary: a missing one is indeterminate here, never
+  // a fleet-wide confirmed death (PAN-3923 review 2).
+  const query = deps.queryTmuxSession
+    ?? ((id: string) => queryTmuxSession(id, LEGACY_TMUX_PROBE_TIMEOUT_MS, { noBinary: 'error' }));
   return query(agentId).catch((): TmuxSessionAnswer => 'error');
 }
 
