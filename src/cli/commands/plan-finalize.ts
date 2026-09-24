@@ -103,6 +103,8 @@ interface PromotePlanningResult {
   workAgentMessage: string | null;
   workAgentError: string | null;
   workAgentSkipReason: string | null;
+  /** PAN-4155: a spawn guardrail refused the start and deacon-lite retries it. */
+  workAgentDeferred?: boolean;
 }
 
 type AutoPromotePhase = 'completePlanning' | 'terminal';
@@ -308,6 +310,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let workAgentMessage: string | null = null;
   let workAgentError: string | null = null;
   let workAgentSkipReason: string | null = null;
+  let workAgentDeferred = false;
   let promotionDeferred = false;
   let promotionMarkerError: string | null = null;
 
@@ -323,6 +326,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     workAgentMessage = promotion.workAgentMessage;
     workAgentError = promotion.workAgentError;
     workAgentSkipReason = promotion.workAgentSkipReason;
+    workAgentDeferred = promotion.workAgentDeferred === true;
     emitAutoPromotePhase(issueId, 'completePlanning', promoted ? 'success' : 'failure', promoted ? 'complete-planning returned success' : (promoteError ?? 'complete-planning failed'), {
       workAgentSpawned,
       workAgentSkipReason,
@@ -371,6 +375,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       ...(workAgentMessage ? { workAgentMessage } : {}),
       ...(workAgentError ? { workAgentError } : {}),
       ...(workAgentSkipReason ? { workAgentSkipReason } : {}),
+      ...(workAgentDeferred ? { workAgentDeferred } : {}),
     }));
   } else {
     console.log(chalk.green(`✓ Finalized ${planDoc.plan.items.length} checklist item${planDoc.plan.items.length === 1 ? '' : 's'}`));
@@ -385,6 +390,9 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       if (workAgentSpawned) {
         console.log(chalk.green('✓ Work agent spawned — implementation in progress.'));
         if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
+      } else if (autoSpawnOnFinalize && workAgentDeferred) {
+        console.log(chalk.yellow('⚠ Work agent start deferred by spawn guardrails; it is retried automatically for up to 2 hours.'));
+        if (workAgentError) console.log(chalk.dim('  ' + workAgentError));
       } else if (autoSpawnOnFinalize) {
         console.log(chalk.yellow('⚠ Auto-promoted but work agent spawn was skipped.'));
         if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
@@ -481,6 +489,7 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
         workAgentMessage: workAgentSession ? `Session: ${workAgentSession}` : (workAgentSkipReason ? `Skip reason: ${workAgentSkipReason}` : null),
         workAgentError,
         workAgentSkipReason,
+        ...(parsed?.workAgentDeferred === true ? { workAgentDeferred: true } : {}),
       };
     } catch (err: any) {
       // A thrown fetch is a connection-level failure (dashboard unreachable /
