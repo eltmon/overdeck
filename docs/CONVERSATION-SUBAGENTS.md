@@ -58,10 +58,11 @@ The frontend keeps parent and subagent transcripts in separate React Query cache
 Metadata files do not contain runtime status. While the parent stream is live, Overdeck derives it from the launch shape in the metadata (`requestShape`):
 
 - A foreground subagent is `running` while its `toolUseId` remains in the parser's `pendingToolUse` map, and `done` otherwise.
-- A background subagent (`requestShape: "background"`) gets its `Agent` tool result as soon as it launches, so that map cannot track it. It is `running` until the parent transcript has a `<task-notification>` whose `<tool-use-id>` equals its `toolUseId` exactly. Claude Code writes that notification as a `queue-operation` `enqueue` record when the subagent stops, and again as a `user` record when the parent takes it. Text that only quotes a notification, such as assistant text or a tool result, does not count.
-- A background subagent whose notification never arrives, for example because the parent crashed, becomes `done` once its transcript and metadata files have not changed for `BACKGROUND_SUBAGENT_IDLE_MS` (30 minutes).
+- A background subagent (`requestShape: "background"`) gets its `Agent` tool result as soon as it launches, so that map cannot track it. It is `running` until the parent transcript has a `<task-notification>` naming it. The first notification carries `<tool-use-id>` equal to its `toolUseId`. Notifications after a `SendMessage` resume carry only `<task-id>`, which equals its `agentId`. Both ids are matched exactly. Claude Code writes each notification as a `queue-operation` `enqueue` record when the subagent stops, and again as a `user` record with `origin.kind: "task-notification"` when the parent takes it. Text that only quotes a notification, such as assistant text, a tool result or a pasted message, does not count.
+- A notified background subagent is `running` again when its transcript or metadata changed more than 5 seconds after its latest notification. That means it was resumed. Its last write normally lands within 0.1 s of the notification.
+- A background subagent with no notification after its last write, for example because the parent crashed, becomes `done` once its transcript and metadata files have not changed for `BACKGROUND_SUBAGENT_IDLE_MS` (30 minutes).
 
-The notification scan reads only the parent transcript bytes appended since the previous poll. It rescans from the start when the transcript gets shorter. A subagent resumed with `SendMessage` after its notification still reads as `done`.
+The notification scan reads only the parent transcript bytes appended since the previous poll. It rescans from the start when the transcript gets shorter.
 
 A watcher delta triggers an immediate status refresh. The two-second metadata poll catches new subagent files. REST responses for ended conversations mark every discovered subagent `done`.
 

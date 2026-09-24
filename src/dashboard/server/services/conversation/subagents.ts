@@ -15,9 +15,19 @@ export type SubagentMeta = Omit<SubagentSummary, 'status'>;
  */
 export const BACKGROUND_SUBAGENT_IDLE_MS = 30 * 60_000;
 
+/**
+ * A subagent's last write lands within 0.1 s of its notification. A write later
+ * than this after the latest notification means it was resumed and is running.
+ */
+const RESUME_WRITE_SLACK_MS = 5_000;
+
 const TASK_NOTIFICATION_OPEN = '<task-notification>';
-const TASK_NOTIFICATION_TOOL_USE_ID = /<tool-use-id>([^<]*)<\/tool-use-id>/;
+/** A resumed agent's later notifications carry only `<task-id>` (its agentId). */
+const TASK_NOTIFICATION_IDS = /<(?:tool-use-id|task-id)>([^<]*)<\/(?:tool-use-id|task-id)>/g;
 const SCAN_CHUNK_BYTES = 1024 * 1024;
+
+/** Latest notification time (ms) per tool-use id and per task id (agentId). */
+export type TaskNotifications = ReadonlyMap<string, number>;
 
 const metaCache = new Map<string, DiscoveredSubagent>();
 const SAFE_AGENT_ID = /^[A-Za-z0-9_-]+$/;
@@ -111,8 +121,8 @@ export function subagentTranscriptPath(sessionFile: string, agentId: string): st
   return transcriptPath;
 }
 
-/** Tool-use id named by a task-notification record, or null for any other line. */
-function taskNotificationToolUseId(line: string): string | null {
+/** Ids and time of a task-notification record, or null for any other line. */
+function parseTaskNotification(line: string): { ids: string[]; at: number } | null {
   if (!line.includes(TASK_NOTIFICATION_OPEN)) return null;
   let record: unknown;
   try {
@@ -126,19 +136,30 @@ function taskNotificationToolUseId(line: string): string | null {
   let text: unknown;
   if (record.type === 'queue-operation' && 'operation' in record && record.operation === 'enqueue') {
     text = 'content' in record ? record.content : undefined;
-  } else if (record.type === 'user' && 'message' in record && typeof record.message === 'object' && record.message !== null) {
+  } else if (
+    record.type === 'user'
+    && 'origin' in record && typeof record.origin === 'object' && record.origin !== null
+    && 'kind' in record.origin && record.origin.kind === 'task-notification'
+    && 'message' in record && typeof record.message === 'object' && record.message !== null
+  ) {
     text = 'content' in record.message ? record.message.content : undefined;
   }
   if (typeof text !== 'string' || !text.trimStart().startsWith(TASK_NOTIFICATION_OPEN)) return null;
-  return TASK_NOTIFICATION_TOOL_USE_ID.exec(text)?.[1] ?? null;
+  const at = 'timestamp' in record && typeof record.timestamp === 'string' ? Date.parse(record.timestamp) : Number.NaN;
+  if (Number.isNaN(at)) return null;
+  const ids = [...text.matchAll(TASK_NOTIFICATION_IDS)].map((match) => match[1]).filter((id): id is string => !!id);
+  return ids.length > 0 ? { ids, at } : null;
 }
 
 /**
- * Collects the tool-use ids of background subagents that have stopped, reading
- * only the parent transcript bytes appended since the previous call.
+ * Collects when background subagents last stopped, reading only the parent
+ * transcript bytes appended since the previous call.
  */
-export function createTaskNotificationScanner(sessionFile: string): () => Promise<ReadonlySet<string>> {
-  const notified = new Set<string>();
+export function createTaskNotificationScanner(
+  sessionFile: string,
+  chunkBytes: number = SCAN_CHUNK_BYTES,
+): () => Promise<TaskNotifications> {
+  const notified = new Map<string, number>();
   let offset = 0;
   let remainder = '';
   let decoder = new StringDecoder('utf8');
@@ -160,7 +181,7 @@ export function createTaskNotificationScanner(sessionFile: string): () => Promis
         decoder = new StringDecoder('utf8');
         notified.clear();
       }
-      const buffer = Buffer.alloc(Math.min(SCAN_CHUNK_BYTES, Math.max(size - offset, 0)));
+      const buffer = Buffer.alloc(Math.min(chunkBytes, Math.max(size - offset, 0)));
       while (offset < size) {
         const { bytesRead } = await handle.read(buffer, 0, Math.min(buffer.length, size - offset), offset);
         if (bytesRead === 0) break;
@@ -168,8 +189,10 @@ export function createTaskNotificationScanner(sessionFile: string): () => Promis
         const lines = (remainder + decoder.write(buffer.subarray(0, bytesRead))).split('\n');
         remainder = lines.pop() ?? '';
         for (const line of lines) {
-          const toolUseId = taskNotificationToolUseId(line);
-          if (toolUseId) notified.add(toolUseId);
+          const notification = parseTaskNotification(line);
+          for (const id of notification?.ids ?? []) {
+            notified.set(id, Math.max(notified.get(id) ?? 0, notification!.at));
+          }
         }
       }
     } finally {
@@ -195,21 +218,27 @@ async function lastWriteMs(sessionFile: string, agentId: string): Promise<number
 /**
  * A foreground subagent runs while its `Agent` tool call has no result. A
  * background launch gets its result at once, so it runs until its
- * task-notification arrives, or until its transcript goes idle past
- * `BACKGROUND_SUBAGENT_IDLE_MS` when that notification never comes.
+ * task-notification arrives, and again when it writes after that notification
+ * (a `SendMessage` resume). Without a later notification it reads as done once
+ * its transcript is idle past `BACKGROUND_SUBAGENT_IDLE_MS`.
  */
 export async function listSubagentSummaries(
   sessionFile: string,
   pendingToolUseIds: ReadonlySet<string>,
-  notifiedToolUseIds: ReadonlySet<string>,
+  notifications: TaskNotifications,
   now: number = Date.now(),
 ): Promise<SubagentSummary[]> {
   const subagents: SubagentSummary[] = [];
   for (const { background, ...meta } of await discoverSubagents(sessionFile)) {
     let running: boolean;
-    if (!background) running = pendingToolUseIds.has(meta.toolUseId);
-    else if (notifiedToolUseIds.has(meta.toolUseId)) running = false;
-    else running = now - await lastWriteMs(sessionFile, meta.agentId) < BACKGROUND_SUBAGENT_IDLE_MS;
+    if (!background) {
+      running = pendingToolUseIds.has(meta.toolUseId);
+    } else {
+      const notifiedAt = Math.max(notifications.get(meta.toolUseId) ?? 0, notifications.get(meta.agentId) ?? 0);
+      const lastWrite = await lastWriteMs(sessionFile, meta.agentId);
+      running = (notifiedAt === 0 || lastWrite > notifiedAt + RESUME_WRITE_SLACK_MS)
+        && now - lastWrite < BACKGROUND_SUBAGENT_IDLE_MS;
+    }
     subagents.push({ ...meta, status: running ? 'running' : 'done' });
   }
   return subagents;

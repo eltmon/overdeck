@@ -126,16 +126,24 @@ describe('conversation subagent discovery', () => {
   });
 });
 
-function notificationText(toolUseId: string): string {
-  return `<task-notification>\n<task-id>x</task-id>\n<tool-use-id>${toolUseId}</tool-use-id>\n<status>completed</status>\n</task-notification>`;
+function notificationText(toolUseId: string | null, taskId = 'x'): string {
+  const toolUse = toolUseId ? `\n<tool-use-id>${toolUseId}</tool-use-id>` : '';
+  return `<task-notification>\n<task-id>${taskId}</task-id>${toolUse}\n<status>completed</status>\n</task-notification>`;
 }
 
-function userNotification(toolUseId: string): string {
-  return `${JSON.stringify({ type: 'user', message: { role: 'user', content: notificationText(toolUseId) } })}\n`;
+const notifiedAt = '2026-09-24T11:00:00.000Z';
+
+function userNotification(toolUseId: string | null, taskId = 'x', timestamp = notifiedAt): string {
+  return `${JSON.stringify({
+    type: 'user',
+    origin: { kind: 'task-notification' },
+    timestamp,
+    message: { role: 'user', content: notificationText(toolUseId, taskId) },
+  })}\n`;
 }
 
-function enqueuedNotification(toolUseId: string): string {
-  return `${JSON.stringify({ type: 'queue-operation', operation: 'enqueue', content: notificationText(toolUseId) })}\n`;
+function enqueuedNotification(toolUseId: string, timestamp = notifiedAt): string {
+  return `${JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp, content: notificationText(toolUseId) })}\n`;
 }
 
 describe('conversation subagent status', () => {
@@ -151,7 +159,13 @@ describe('conversation subagent status', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  async function writeSubagent(agentId: string, toolUseId: string, requestShape: string | undefined, lastWriteMs: number) {
+  async function writeSubagent(
+    agentId: string,
+    toolUseId: string,
+    requestShape: string | undefined,
+    lastWriteMs: number,
+    { transcript = true } = {},
+  ) {
     await writeMeta(agentId, {
       agentType: 'general-purpose',
       description: agentId,
@@ -159,67 +173,97 @@ describe('conversation subagent status', () => {
       spawnDepth: 1,
       ...(requestShape ? { requestShape } : {}),
     });
-    const transcript = join(subagentsDirFor(sessionFile), `agent-${agentId}.jsonl`);
-    await writeFile(transcript, '{}\n');
     const seconds = lastWriteMs / 1000;
-    await utimes(transcript, seconds, seconds);
     await utimes(join(subagentsDirFor(sessionFile), `agent-${agentId}.meta.json`), seconds, seconds);
+    if (!transcript) return;
+    const transcriptPath = join(subagentsDirFor(sessionFile), `agent-${agentId}.jsonl`);
+    await writeFile(transcriptPath, '{}\n');
+    await utimes(transcriptPath, seconds, seconds);
   }
 
-  const statuses = async (pending: string[], notified: string[]) =>
-    Object.fromEntries((await listSubagentSummaries(sessionFile, new Set(pending), new Set(notified), now))
+  const statuses = async (pending: string[], notified: Record<string, number>) =>
+    Object.fromEntries((await listSubagentSummaries(sessionFile, new Set(pending), new Map(Object.entries(notified)), now))
       .map((subagent) => [subagent.agentId, subagent.status]));
 
   it('keeps foreground subagents tied to the pending Agent tool call', async () => {
     await writeSubagent('fg-pending', 'toolu_fg1', undefined, now - 2 * BACKGROUND_SUBAGENT_IDLE_MS);
     await writeSubagent('fg-returned', 'toolu_fg2', undefined, now);
+    await writeSubagent('fg-explicit', 'toolu_fg3', 'foreground', now);
 
-    await expect(statuses(['toolu_fg1'], ['toolu_fg2'])).resolves.toEqual({
+    await expect(statuses(['toolu_fg1'], { toolu_fg2: now, toolu_fg3: now - 60_000 })).resolves.toEqual({
+      'fg-explicit': 'done',
       'fg-pending': 'running',
       'fg-returned': 'done',
     });
   });
 
   it('keeps a background subagent running after its launch result until its notification arrives', async () => {
-    await writeSubagent('bg', 'toolu_bg', 'background', now - 1000);
+    await writeSubagent('bg', 'toolu_bg', 'background', now - 60_000);
 
-    await expect(statuses([], [])).resolves.toEqual({ bg: 'running' });
-    await expect(statuses([], ['toolu_bg'])).resolves.toEqual({ bg: 'done' });
+    await expect(statuses([], {})).resolves.toEqual({ bg: 'running' });
+    await expect(statuses([], { toolu_bg: now - 59_900 })).resolves.toEqual({ bg: 'done' });
+  });
+
+  it('shows a resumed background subagent running again until its next notification', async () => {
+    // First notification carried the tool-use id; the resume's carries only the task id.
+    await writeSubagent('resumed', 'toolu_resumed', 'background', now - 1000);
+
+    await expect(statuses([], { toolu_resumed: now - 600_000 })).resolves.toEqual({ resumed: 'running' });
+    await expect(statuses([], { toolu_resumed: now - 600_000, resumed: now - 900 })).resolves.toEqual({ resumed: 'done' });
   });
 
   it('marks an unnotified background subagent done once its transcript is idle past the threshold', async () => {
     await writeSubagent('fresh', 'toolu_fresh', 'background', now - BACKGROUND_SUBAGENT_IDLE_MS + 1000);
     await writeSubagent('stale', 'toolu_stale', 'background', now - BACKGROUND_SUBAGENT_IDLE_MS - 1000);
+    await writeSubagent('meta-only', 'toolu_meta', 'background', now - BACKGROUND_SUBAGENT_IDLE_MS - 1000, { transcript: false });
 
-    await expect(statuses([], [])).resolves.toEqual({ fresh: 'running', stale: 'done' });
+    await expect(statuses([], {})).resolves.toEqual({ fresh: 'running', 'meta-only': 'done', stale: 'done' });
   });
 
-  it('collects notified tool-use ids by exact match and reads only appended bytes', async () => {
+  it('collects ids only from real notification records and reads only appended bytes', async () => {
     const scan = createTaskNotificationScanner(sessionFile);
     await appendFile(sessionFile, userNotification('toolu_one'));
-    // Quoted in assistant text or a tool result: not a notification.
-    await appendFile(sessionFile, `${JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: notificationText('toolu_quoted') }] } })}\n`);
-    await appendFile(sessionFile, `${JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', content: notificationText('toolu_result') }] } })}\n`);
+    // Quoted in assistant text, a tool result, or a pasted human message: not a notification.
+    await appendFile(sessionFile, `${JSON.stringify({ type: 'assistant', timestamp: notifiedAt, message: { content: [{ type: 'text', text: notificationText('toolu_quoted') }] } })}\n`);
+    await appendFile(sessionFile, `${JSON.stringify({ type: 'user', timestamp: notifiedAt, message: { content: [{ type: 'tool_result', content: notificationText('toolu_result') }] } })}\n`);
+    await appendFile(sessionFile, `${JSON.stringify({ type: 'user', timestamp: notifiedAt, message: { content: notificationText('toolu_pasted') } })}\n`);
 
-    expect([...await scan()]).toEqual(['toolu_one']);
+    expect(Object.fromEntries(await scan())).toEqual({ toolu_one: Date.parse(notifiedAt), x: Date.parse(notifiedAt) });
 
     // A record split across two writes is read once it is complete.
-    const enqueued = enqueuedNotification('toolu_two');
+    const enqueued = enqueuedNotification('toolu_two', '2026-09-24T11:30:00.000Z');
     await appendFile(sessionFile, enqueued.slice(0, 40));
     expect((await scan()).has('toolu_two')).toBe(false);
     await appendFile(sessionFile, enqueued.slice(40));
-    const notified = await scan();
-    expect([...notified].sort()).toEqual(['toolu_one', 'toolu_two']);
-    expect(notified.has('toolu_tw')).toBe(false);
+    expect((await scan()).get('toolu_two')).toBe(Date.parse('2026-09-24T11:30:00.000Z'));
+  });
+
+  it('keeps the latest notification time per id, including task-id-only notifications', async () => {
+    await appendFile(sessionFile, userNotification('toolu_a', 'agent-a', '2026-09-24T10:00:00.000Z'));
+    await appendFile(sessionFile, userNotification(null, 'agent-a', '2026-09-24T10:40:00.000Z'));
+
+    const notified = await createTaskNotificationScanner(sessionFile)();
+    expect(notified.get('toolu_a')).toBe(Date.parse('2026-09-24T10:00:00.000Z'));
+    expect(notified.get('agent-a')).toBe(Date.parse('2026-09-24T10:40:00.000Z'));
+  });
+
+  it('decodes multibyte text split across chunk boundaries', async () => {
+    const filler = `${JSON.stringify({ type: 'assistant', message: { content: 'é€😀'.repeat(50) } })}\n`;
+    await writeFile(sessionFile, filler + userNotification('toolu_after_unicode') + filler);
+
+    for (const chunkBytes of [1, 3, 7, 64]) {
+      const notified = await createTaskNotificationScanner(sessionFile, chunkBytes)();
+      expect(notified.has('toolu_after_unicode')).toBe(true);
+    }
   });
 
   it('rescans a transcript that was rewritten shorter', async () => {
     const scan = createTaskNotificationScanner(sessionFile);
-    await appendFile(sessionFile, userNotification('toolu_old_with_long_id'));
+    await appendFile(sessionFile, userNotification('toolu_old_with_long_id', 'old-task-with-a-long-id'));
     expect((await scan()).has('toolu_old_with_long_id')).toBe(true);
 
-    await writeFile(sessionFile, userNotification('toolu_new'));
-    expect([...await scan()]).toEqual(['toolu_new']);
+    await writeFile(sessionFile, userNotification('toolu_new', 'new'));
+    expect([...(await scan()).keys()].sort()).toEqual(['new', 'toolu_new']);
   });
 
   it('returns no ids for a missing transcript', async () => {
