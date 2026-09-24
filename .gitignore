@@ -249,6 +249,7 @@ __pycache__/
 .overdeck/review/
 .overdeck/test/
 .overdeck/kickoff.md
+.overdeck/setup-incomplete
 .overdeck/agent-mcp.json
 # Machine-local runtime config copied into the workspace by the launcher:
 # absolute project paths (/home/... in projects.yaml) and provider api_keys
