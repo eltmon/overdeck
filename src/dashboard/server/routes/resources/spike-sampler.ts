@@ -1,4 +1,4 @@
-import { emitActivityEntrySync, type EmitActivityOptions } from '../../../../lib/activity-logger.js';
+import { emitActivityEntry, type EmitActivityOptions } from '../../../../lib/activity-logger.js';
 
 export interface ResourceProcessGroup {
   label: string;
@@ -51,7 +51,7 @@ const DEFAULT_RECOVERY_TICKS = 2;
 const DEFAULT_TOP_PROCESS_COUNT = 3;
 
 function defaultEmit(entry: Omit<EmitActivityOptions, 'details'> & { details: ResourceSpikeDetails }) {
-  emitActivityEntrySync(entry as unknown as EmitActivityOptions);
+  emitActivityEntry(entry as unknown as EmitActivityOptions);
 }
 
 function topProcessGroups(groups: ResourceProcessGroup[], limit: number): ResourceProcessGroup[] {

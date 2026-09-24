@@ -19,8 +19,8 @@ vi.mock('../../../lib/projects.js', () => ({
 }));
 vi.mock('../../../lib/pan-dir/paths.js', () => ({ resolvePlanHome: (p: string) => p }));
 vi.mock('../../../lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: () => mocks.repos(),
-  computeWorkspaceRepoRootsSync: (_repos: unknown, _issue: string, workspacePath: string) =>
+  resolveProjectReposForIssue: () => mocks.repos(),
+  computeWorkspaceRepoRoots: (_repos: unknown, _issue: string, workspacePath: string) =>
     mocks.repoRoots().map((dir: string) => ({ dir: dir === '.' ? workspacePath : `${workspacePath}/${dir}` })),
 }));
 vi.mock('../../../lib/xbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));

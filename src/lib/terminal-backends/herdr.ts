@@ -202,7 +202,7 @@ export function toBackendEvents(kind: string, data: Record<string, unknown>): Ba
 }
 
 /** A routing probe must never hold up a delivery: give up and let tmux answer. */
-export const HERDR_PROBE_TIMEOUT_MS = 2_000;
+const HERDR_PROBE_TIMEOUT_MS = 2_000;
 
 /**
  * The pane stamped with this Overdeck agent id, or null when the session holds
@@ -324,6 +324,41 @@ export async function findHerdrAgent(
       tokens: (pane.tokens ?? {}) as Partial<PaneTokens>,
       paneBound: !pane.agent,
     };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The Herdr pane an Overdeck agent id occupies, whether or not anything still
+ * runs in it (PAN-3947).
+ *
+ * `findHerdrAgent` answers "is there a live agent" and so drops a pane whose
+ * shell is back at its prompt. Stopping an agent must close that residue too —
+ * otherwise the pane outlives every stop and blocks the next dispatch — so this
+ * lookup returns the pane by live agent name, then by its `agentId` token, with
+ * no foreground-process check. Null when Herdr holds no such pane or the socket
+ * did not answer.
+ */
+export async function findHerdrAgentPane(
+  agentName: string,
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<{ readonly paneId: string; readonly terminalId: string; readonly workspaceId: string } | null> {
+  try {
+    const info = await api.call<{ agent?: HerdrPaneInfo }>(
+      'agent.get',
+      { target: agentName },
+      { timeoutMs: HERDR_PROBE_TIMEOUT_MS },
+    );
+    if (info.agent) {
+      return { paneId: info.agent.pane_id, terminalId: info.agent.terminal_id, workspaceId: info.agent.workspace_id };
+    }
+  } catch {
+    // Pane-bound agents have no Herdr agent record; the token scan finds them.
+  }
+  try {
+    const pane = await findAgentIdPane(agentName, api);
+    return pane ? { paneId: pane.pane_id, terminalId: pane.terminal_id, workspaceId: pane.workspace_id } : null;
   } catch {
     return null;
   }
@@ -473,6 +508,10 @@ export async function listHerdrAgents(
   }
   return [...byAgentId.values()];
 }
+
+/** Overdeck agent id: the `agentId` token; Herdr's own agent name only on an Overdeck-tokened pane (PAN-3920). */
+const agentIdOf = (pane: HerdrPaneInfo): string | undefined => pane.tokens?.[AGENT_ID_TOKEN]?.trim()
+  || (pane.tokens?.role || pane.tokens?.issue ? pane.name?.trim() : undefined) || undefined;
 
 /** The recent terminal text of a Herdr pane — the backend's `capture-pane`. */
 export async function readHerdrPaneText(
@@ -845,6 +884,7 @@ export class HerdrBackend implements TerminalBackend {
       return [...byPane.values()].map((pane) => ({
         backend: BACKEND,
         paneId: pane.pane_id,
+        ...(agentIdOf(pane) ? { agentId: agentIdOf(pane) } : {}),
         terminalId: pane.terminal_id,
         workspaceId: pane.workspace_id,
         state: toAgentState(pane.agent_status),

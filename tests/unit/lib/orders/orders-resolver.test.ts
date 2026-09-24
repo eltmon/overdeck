@@ -124,7 +124,7 @@ describe('orders resolver', () => {
     expect(progress.landed).toBe(1);
   });
 
-  it('returns the first ready book in index.json queue order, skipping non-ready statuses', () => {
+  it('returns the first ready book in index.json queue order, skipping non-ready statuses', async () => {
     const root = fixtureRoot();
     writeBooks(root, [
       book('2026-07-17-draft', 'draft', ['PAN-1']),
@@ -134,19 +134,19 @@ describe('orders resolver', () => {
       book('2026-07-17-complete', 'complete', ['PAN-5']),
     ]);
 
-    expect(firstReadyBookInQueue(root)?.id).toBe('2026-07-17-first-ready');
+    expect((await firstReadyBookInQueue(root))?.id).toBe('2026-07-17-first-ready');
   });
 
-  it('returns null when the queue is empty or no book is ready', () => {
+  it('returns null when the queue is empty or no book is ready', async () => {
     const emptyRoot = fixtureRoot();
-    expect(firstReadyBookInQueue(emptyRoot)).toBeNull();
+    expect(await firstReadyBookInQueue(emptyRoot)).toBeNull();
 
     const noReadyRoot = fixtureRoot();
     writeBooks(noReadyRoot, [
       book('2026-07-17-draft-only', 'draft', ['PAN-1']),
       book('2026-07-17-running-only', 'running', ['PAN-2']),
     ]);
-    expect(firstReadyBookInQueue(noReadyRoot)).toBeNull();
+    expect(await firstReadyBookInQueue(noReadyRoot)).toBeNull();
   });
 
   describe('ensureOrderIssueStore', () => {

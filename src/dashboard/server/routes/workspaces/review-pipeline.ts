@@ -33,11 +33,11 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import type { DerivedIssueState } from '@overdeck/contracts';
 
-import { parseIssueIdSync, extractPrefixSync, resolveIssueIdSync } from '../../../../lib/issue-id.js';
+import { parseIssueId, extractPrefix, resolveIssueId } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { getDerivedIssueState } from '../../services/derived-issue-state.js';
-import { getReleaseSetSync } from '../../../../lib/release-set.js';
+import { getReleaseSet } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { transitionIssueToInReview } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
@@ -45,8 +45,10 @@ import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-
 import {
   registerRequestReviewStarter,
   requestReviewPipeline,
+  type RequestReviewSource,
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
+import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { httpHandler } from '../http-handler.js';
@@ -216,10 +218,10 @@ export async function reReviewGuardError(
  */
 export async function startRequestReviewPipeline(
   issueId: string,
-  options: { note?: string; onReviewSpawned?: () => void } = {},
+  options: { note?: string; source?: RequestReviewSource; onReviewSpawned?: () => void } = {},
 ): Promise<StartRequestReviewOutcome> {
   const canonicalIssueId = issueId.toUpperCase();
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = canonicalIssueId.toLowerCase();
   const branchName = `feature/${issueLower}`;
@@ -247,6 +249,17 @@ export async function startRequestReviewPipeline(
   });
 
   if (options.note) console.log(`[request-review] ${canonicalIssueId}: ${options.note}`);
+
+  // The one door every review request passes through — the HTTP route, the
+  // `pan review request` / `pan done` CLI behind it, and the PR webhook. This
+  // is the moment Overdeck accepts the request, so this is where it is
+  // journalled; nothing downstream re-states it.
+  appendPipelineEntry(workspacePath, {
+    type: 'review.requested',
+    issueId: canonicalIssueId,
+    source: options.source ?? 'api',
+    ...(options.note ? { data: { note: options.note } } : {}),
+  });
 
   const started = requestReviewPipeline.start(canonicalIssueId, {
     verify: () => Effect.runPromise(runVerificationForIssue(
@@ -335,7 +348,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -350,7 +363,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
       (body as { force?: unknown })?.force === true;
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
@@ -463,7 +476,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	            let artifactUrl: string | undefined;
 	            try {
 	              const { createReviewArtifactsForIssue } = await import('../../../../lib/review-artifacts.js');
-	              const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+	              const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
 	              const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
 	              reviewTargetBranch = artifactResult.mergeSet?.repos.find(repo => repo.repoMerge !== 'skipped')?.targetBranch;
 	              if (primaryArtifact?.artifactUrl) {
@@ -586,7 +599,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const parsedIssueId = parseIssueIdSync(issueId);
+    const parsedIssueId = parseIssueId(issueId);
     if (!parsedIssueId) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
@@ -594,6 +607,11 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
+    const rawSource = (body as { source?: unknown }).source;
+    const requestSource: RequestReviewSource =
+      rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'webhook'
+        ? rawSource
+        : 'api';
     const eventStore = yield* EventStoreService;
 
     const urlOpt = HttpServerRequest.toURL(request);
@@ -646,7 +664,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (forceReview && shouldTreatAsRerun(derived)) {
         const issueLowerRerun = canonicalIssueId.toLowerCase();
-        const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
+        const issuePrefixRerun = extractPrefix(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
         const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
         const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
         // Review runs against the local worktree only (PAN-1676) — see the
@@ -810,6 +828,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     const outcome = yield* Effect.promise(() => startRequestReviewPipeline(issueId, {
       note: requestNote,
+      source: requestSource,
       onReviewSpawned: () => autoRequeueCounts.set(canonicalIssueId, newCount),
     }));
 
@@ -859,12 +878,12 @@ const getReleaseSetRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const rawIssueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(rawIssueId)) {
+    if (!parseIssueId(rawIssueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issueId = resolveIssueIdSync(rawIssueId);
+    const issueId = resolveIssueId(rawIssueId);
 
-    const releaseSet = getReleaseSetSync(issueId);
+    const releaseSet = getReleaseSet(issueId);
     if (!releaseSet) {
       return jsonResponse({ error: 'Release set not found' }, { status: 404 });
     }

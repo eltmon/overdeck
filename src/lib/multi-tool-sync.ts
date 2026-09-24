@@ -15,8 +15,6 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
-import { Effect } from 'effect';
-import { FsError } from './errors.js';
 import { OVERDECK_HOME } from './paths.js';
 
 export type AlsoSyncTool = 'cursor' | 'codex' | 'windsurf' | 'cline' | 'copilot' | 'aider';
@@ -42,7 +40,7 @@ const RETIRED_TOOLS = new Set<AlsoSyncTool>(['cursor', 'codex', 'windsurf', 'cli
  * Resolve the merged list of tools to sync.
  * Global config is the base; per-project .pan.yaml adds more (never removes).
  */
-export function resolveAlsoSyncToolsSync(projectPath?: string): AlsoSyncTool[] {
+export function resolveAlsoSyncTools(projectPath?: string): AlsoSyncTool[] {
   const tools = new Set<AlsoSyncTool>();
 
   // Read from global config
@@ -84,7 +82,7 @@ export function resolveAlsoSyncToolsSync(projectPath?: string): AlsoSyncTool[] {
  * @param projectPath  Project root where tool targets live
  * @param tools  Tools to sync to (from resolveAlsoSyncTools)
  */
-export function syncSkillsToToolsSync(
+export function syncSkillsToTools(
   skillsDir: string,
   projectPath: string,
   tools: AlsoSyncTool[],
@@ -100,21 +98,21 @@ export function syncSkillsToToolsSync(
  * Run the full multi-tool sync for a project.
  * Sources: .pan/skills/ (project-local) and/or ~/.overdeck/skills/ (global).
  */
-export function runMultiToolSyncSync(projectPath: string): MultiToolSyncResult[] {
-  const tools = resolveAlsoSyncToolsSync(projectPath);
+export function runMultiToolSync(projectPath: string): MultiToolSyncResult[] {
+  const tools = resolveAlsoSyncTools(projectPath);
   if (tools.length === 0) return [];
 
   const allResults: MultiToolSyncResult[] = [];
 
   // 1. Global skills (from ~/.overdeck/skills/)
   const globalSkillsDir = join(OVERDECK_HOME, 'skills');
-  const globalResults = syncSkillsToToolsSync(globalSkillsDir, projectPath, tools);
+  const globalResults = syncSkillsToTools(globalSkillsDir, projectPath, tools);
   allResults.push(...globalResults);
 
   // 2. Project-local skills (from .pan/skills/) — may overwrite global skill entries
   const projectSkillsDir = join(projectPath, '.pan', 'skills');
   if (existsSync(projectSkillsDir)) {
-    const projectResults = syncSkillsToToolsSync(projectSkillsDir, projectPath, tools);
+    const projectResults = syncSkillsToTools(projectSkillsDir, projectPath, tools);
     // Merge into existing results (project results override counts, don't duplicate tools)
     for (const pr of projectResults) {
       const existing = allResults.find(r => r.tool === pr.tool);
@@ -129,27 +127,3 @@ export function runMultiToolSyncSync(projectPath: string): MultiToolSyncResult[]
 
   return allResults;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of {@link resolveAlsoSyncToolsSync}. Pure config read; cannot fail. */
-export const resolveAlsoSyncTools = (projectPath?: string): Effect.Effect<AlsoSyncTool[], never> =>
-  Effect.sync(() => resolveAlsoSyncToolsSync(projectPath));
-
-/** Effect variant of {@link syncSkillsToToolsSync}. */
-export const syncSkillsToTools = (
-  skillsDir: string,
-  projectPath: string,
-  tools: AlsoSyncTool[],
-): Effect.Effect<MultiToolSyncResult[], FsError> =>
-  Effect.try({
-    try: () => syncSkillsToToolsSync(skillsDir, projectPath, tools),
-    catch: (cause) => new FsError({ path: skillsDir, operation: 'syncSkillsToTools', cause }),
-  });
-
-/** Effect variant of {@link runMultiToolSyncSync}. */
-export const runMultiToolSync = (projectPath: string): Effect.Effect<MultiToolSyncResult[], FsError> =>
-  Effect.try({
-    try: () => runMultiToolSyncSync(projectPath),
-    catch: (cause) => new FsError({ path: projectPath, operation: 'runMultiToolSync', cause }),
-  });

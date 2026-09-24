@@ -12,10 +12,9 @@
  * Shared advisory-check classification keeps CodeRabbit out of merge gates.
  */
 
-import { Effect } from 'effect';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
-import { GitHubApiError } from './errors.js';
-import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
+import { recordCiTestGatePass, relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
+import { isCiTestCheckName } from './cloister/verification-tests-mode.js';
 import { getPrFacts } from './cloister/pr-facts.js';
 import { bumpIssuePrTabCacheGeneration } from '../dashboard/server/services/pr-tab-cache.js';
 import { ADVISORY_CHECK_NAMES, isAdvisoryCheckName } from './advisory-checks.js';
@@ -122,15 +121,16 @@ function getTrackedRepos(): Set<string> {
   return cachedTrackedRepos;
 }
 
-export function isTrackedRepositorySync(fullName: string | undefined): boolean {
+export function isTrackedRepository(fullName: string | undefined): boolean {
   if (!fullName) return false;
   return getTrackedRepos().has(fullName.toLowerCase());
 }
 
 /** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
-export const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
+const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
 
-async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
+/** Handle a `check_suite` GitHub webhook payload. */
+export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   // PAN-3537: a push to the default branch produces a check suite with an empty
   // pull_requests array. Record it for the Command Deck CI chip, then fall
   // through to the existing PR-scoped merge-gate logic.
@@ -166,7 +166,7 @@ async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
     }
   }
 
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
   if (!suite.pull_requests || suite.pull_requests.length === 0) return;
@@ -181,7 +181,7 @@ async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
 
     if (suite.conclusion && FAILING_CHECK_CONCLUSIONS.has(suite.conclusion.toUpperCase())) {
       if (pr.head.sha && pr.number != null) {
-        await Effect.runPromise(relayCiFailureFeedback({
+        await relayCiFailureFeedback({
           issueId,
           repo,
           prNumber: pr.number,
@@ -189,14 +189,15 @@ async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
           headRef: pr.head.ref,
           prUrl: prUrlFor(repo, pr.number),
           source: 'check_suite',
-        }));
+        });
       }
     }
   }
 }
 
-async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+/** Handle a `check_run` GitHub webhook payload. */
+export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
   if (!run.pull_requests || run.pull_requests.length === 0) return;
@@ -214,7 +215,7 @@ async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
 
     if (run.conclusion && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase())) {
       if (pr.head.sha && pr.number != null) {
-        await Effect.runPromise(relayCiFailureFeedback({
+        await relayCiFailureFeedback({
           issueId,
           repo,
           prNumber: pr.number,
@@ -222,14 +223,20 @@ async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
           headRef: pr.head.ref,
           prUrl: prUrlFor(repo, pr.number),
           source: sourceKey,
-        }));
+        });
       }
+    } else if (run.conclusion?.toUpperCase() === 'SUCCESS' && isCiTestCheckName(run.name) && pr.head.sha) {
+      // PAN-3965: a green CI test job resets the verification attempt count
+      // for a `verification.tests: ci` project (a no-op for any other project,
+      // and for a strike or bypass PR, whose head is not the feature branch).
+      await recordCiTestGatePass({ issueId, headSha: pr.head.sha, headRef: pr.head.ref, source: sourceKey });
     }
   }
 }
 
-async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+/** Handle a `pull_request` GitHub webhook payload. */
+export async function handlePullRequest(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
   const issueId = issueIdFromBranch(pr.head.ref);
@@ -279,6 +286,7 @@ async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> 
       } else {
         const outcome = await startReview(issueId, {
           note: `PR ${payload.action} on ${repo}#${pr.number} — starting verification`,
+          source: 'webhook',
         });
         if (!outcome.started) {
           console.log(`[webhook] Review not started for ${issueId}: ${outcome.reason}`);
@@ -313,8 +321,9 @@ async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> 
 
 }
 
-async function handlePullRequestReviewPromise(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+/** Handle a `pull_request_review` GitHub webhook payload. */
+export async function handlePullRequestReview(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const review = payload.review;
   if (!pr || !review) return;
@@ -324,8 +333,9 @@ async function handlePullRequestReviewPromise(payload: WebhookPayload): Promise<
 
 }
 
-async function handlePullRequestReviewCommentPromise(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+/** Handle a `pull_request_review_comment` GitHub webhook payload. */
+export async function handlePullRequestReviewComment(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
   const issueId = issueIdFromBranch(pr.head.ref);
@@ -333,8 +343,9 @@ async function handlePullRequestReviewCommentPromise(payload: WebhookPayload): P
   bumpIssuePrTabCacheGeneration(issueId);
 }
 
-async function handleIssueCommentPromise(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+/** Handle an `issue_comment` GitHub webhook payload for PR tab cache invalidation. */
+export async function handleIssueComment(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const issue = payload.issue;
   if (!issue?.pull_request || issue.number == null) return;
 
@@ -346,8 +357,9 @@ async function handleIssueCommentPromise(payload: WebhookPayload): Promise<void>
   if (issueId) bumpIssuePrTabCacheGeneration(issueId);
 }
 
-async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+/** Handle a `pull_request_review_thread` GitHub webhook payload. */
+export async function handlePullRequestReviewThread(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr || !payload.thread) return;
   const issueId = issueIdFromBranch(pr.head.ref);
@@ -355,8 +367,9 @@ async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Pr
   bumpIssuePrTabCacheGeneration(issueId);
 }
 
-async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+/** Handle a `status` GitHub webhook payload. */
+export async function handleStatus(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const state = payload.state;
   const branches = payload.branches;
   if (!state || !branches || branches.length === 0) return;
@@ -382,7 +395,7 @@ async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
     // A commit status carries no PR identity. The forge does.
     const facts = await getPrFacts(issueId);
     if (!facts.open || facts.number == null || !facts.url) continue;
-    await Effect.runPromise(relayCiFailureFeedback({
+    await relayCiFailureFeedback({
       issueId,
       repo,
       prNumber: facts.number,
@@ -390,94 +403,6 @@ async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
       headRef: branch.name,
       prUrl: facts.url,
       source: sourceKey,
-    }));
+    });
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-const toGhError = (op: string, cause: unknown): GitHubApiError =>
-  new GitHubApiError({
-    operation: op,
-    status: 0,
-    message: cause instanceof Error ? cause.message : String(cause),
-    cause,
-  });
-
-/** Effect: handle a `check_suite` GitHub webhook payload. */
-export const handleCheckSuite = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handleCheckSuitePromise(payload),
-    catch: (cause) => toGhError('handleCheckSuite', cause),
-  });
-
-/** Effect: handle a `check_run` GitHub webhook payload. */
-export const handleCheckRun = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handleCheckRunPromise(payload),
-    catch: (cause) => toGhError('handleCheckRun', cause),
-  });
-
-/** Effect: handle a `pull_request` GitHub webhook payload. */
-export const handlePullRequest = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handlePullRequestPromise(payload),
-    catch: (cause) => toGhError('handlePullRequest', cause),
-  });
-
-/** Effect: handle a `pull_request_review` GitHub webhook payload. */
-export const handlePullRequestReview = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handlePullRequestReviewPromise(payload),
-    catch: (cause) => toGhError('handlePullRequestReview', cause),
-  });
-
-/** Effect: handle a `pull_request_review_comment` GitHub webhook payload. */
-export const handlePullRequestReviewComment = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handlePullRequestReviewCommentPromise(payload),
-    catch: (cause) => toGhError('handlePullRequestReviewComment', cause),
-  });
-
-/** Effect: handle an `issue_comment` GitHub webhook payload for PR tab cache invalidation. */
-export const handleIssueComment = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handleIssueCommentPromise(payload),
-    catch: (cause) => toGhError('handleIssueComment', cause),
-  });
-
-/** Effect: handle a `pull_request_review_thread` GitHub webhook payload. */
-export const handlePullRequestReviewThread = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handlePullRequestReviewThreadPromise(payload),
-    catch: (cause) => toGhError('handlePullRequestReviewThread', cause),
-  });
-
-/** Effect: handle a `status` GitHub webhook payload. */
-export const handleStatus = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handleStatusPromise(payload),
-    catch: (cause) => toGhError('handleStatus', cause),
-  });
-
-/** True if the repo is in the cached tracked-repos allowlist. Pure. */
-export const isTrackedRepository = (
-  fullName: string | undefined,
-): Effect.Effect<boolean> =>
-  Effect.sync(() => isTrackedRepositorySync(fullName));

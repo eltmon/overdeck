@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -51,16 +50,6 @@ function parseConsentRecord(raw: string): AutoSpawnConsentRecord | null {
   return null;
 }
 
-function readConsentRecordSync(issueId: string): AutoSpawnConsentRecord | null {
-  try {
-    const path = autoSpawnOnFinalizeFlagPath(issueId);
-    if (!existsSync(path)) return null;
-    return parseConsentRecord(readFileSync(path, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-
 async function readConsentRecord(issueId: string): Promise<AutoSpawnConsentRecord | null> {
   try {
     return parseConsentRecord(await readFile(autoSpawnOnFinalizeFlagPath(issueId), 'utf8'));
@@ -104,10 +93,6 @@ async function withConsentLock<T>(issueId: string, writerId: string, operation: 
   } finally {
     await releaseRecordLock(lockPath);
   }
-}
-
-export function readAutoSpawnOnFinalizeFlag(issueId: string): boolean {
-  return readConsentRecordSync(issueId)?.status === 'granted';
 }
 
 export async function readAutoSpawnOnFinalizeFlagAsync(issueId: string): Promise<boolean> {

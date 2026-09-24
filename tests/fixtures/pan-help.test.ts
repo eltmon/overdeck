@@ -32,6 +32,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = join(__dirname, 'pan-help.txt');
 const CLI_PATH = join(__dirname, '../../dist/cli/index.js');
 
+/**
+ * Each test starts the `pan` CLI once or twice. A cold start takes seconds on
+ * a loaded 4-vCPU CI runner, so vitest's 5 s default is too tight: one test
+ * took 10.3 s on a retry (PAN-4032). This covers two CLI starts.
+ */
+const CLI_SPAWN_TIMEOUT_MS = 30_000;
+
 function captureHelp(): string {
   return captureCommandHelp('--help');
 }
@@ -55,7 +62,7 @@ describe('pan --help fixture', () => {
 
     const expected = readFileSync(FIXTURE_PATH, 'utf-8');
     expect(actual).toBe(expected);
-  });
+  }, CLI_SPAWN_TIMEOUT_MS);
 
   it('exposes the plural projects command in root help', () => {
     const help = captureHelp();
@@ -64,7 +71,7 @@ describe('pan --help fixture', () => {
     // when other commands have long signatures, so just assert the command appears.
     expect(help).toMatch(/^ {2}projects\s/m);
     expect(help).toMatch(/Project registry for multi-project/);
-  });
+  }, CLI_SPAWN_TIMEOUT_MS);
 
   it('keeps singular and plural project add options in sync', () => {
     const singular = captureCommandHelp('project add --help').replaceAll('overdeck project add', 'overdeck projects add');
@@ -75,5 +82,5 @@ describe('pan --help fixture', () => {
     expect(plural).toContain('--type <type>');
     expect(plural).toContain('--linear-team <team>');
     expect(plural).toContain('--rally-project <oid>');
-  });
+  }, CLI_SPAWN_TIMEOUT_MS);
 });

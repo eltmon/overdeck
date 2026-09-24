@@ -37,7 +37,7 @@ function readReceipt(agentId: string, overdeckHome = getOverdeckHome()): KimiCon
   return { version: 1, sessions: {} };
 }
 
-export function readManagedKimiSessionId(agentId: string, overdeckHome = getOverdeckHome()): string | null {
+function readManagedKimiSessionId(agentId: string, overdeckHome = getOverdeckHome()): string | null {
   try {
     return readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8').trim() || null;
   } catch {
@@ -72,7 +72,7 @@ export async function waitForManagedKimiSessionId(
 }
 
 /** Pure formatter: context first, original task afterward, with hard delimiters. */
-export function buildKimiContextEnvelope(contextFiles: readonly string[], taskMessage: string): {
+function buildKimiContextEnvelope(contextFiles: readonly string[], taskMessage: string): {
   message: string;
   sha256: string;
 } {

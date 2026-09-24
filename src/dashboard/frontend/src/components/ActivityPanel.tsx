@@ -2,7 +2,7 @@
  * ActivityPanel — Live activity log with 3 streams: Normal, Detailed, TTS (PAN-520)
  *
  * Data flow:
- *   emitActivityEntry()     → event store → WebSocket → recentActivity     (Normal)
+ *   emitActivityEntry()         → event store → WebSocket → recentActivity     (Normal)
  *   emitActivityDetailed()  → event store → WebSocket → detailedActivity   (Detailed)
  *   emitActivityTts()       → event store → WebSocket → ttsActivity        (TTS)
  *

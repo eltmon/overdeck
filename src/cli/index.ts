@@ -114,6 +114,7 @@ import { registerResourceCommands } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
 import { registerSpawnCommand } from './commands/spawn.js';
+import { registerWorkerCommands } from './commands/worker.js';
 import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
@@ -534,7 +535,7 @@ program
 
 program
   .command('strike <ids...>')
-  .description('Spawn strike agent(s) — implement and push a strike branch for Deacon to land through the verified merge door. Bypasses plan/review/test/ship.')
+  .description('Spawn strike agent(s) — implement a fix on a strike branch and open a PR against main for the operator to merge. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')
@@ -573,6 +574,7 @@ registerInstallCommand(program);
 registerCavemanCommands(program);
 registerScopeCommands(program);
 registerSpawnCommand(program);
+registerWorkerCommands(program);
 registerFlywheelCommands(program);
 registerMergeCommands(program);
 registerArtifactCommands(program);
@@ -703,23 +705,23 @@ program
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {
-        const { generateOverdeckTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } = await import('../lib/traefik.js');
+        const { generateOverdeckTraefikConfig, ensureProjectCerts, generateTlsConfig, cleanupStaleTlsSections } = await import('../lib/traefik.js');
 
         // Clean stale tls: sections from older config files
-        cleanupStaleTlsSectionsSync();
+        cleanupStaleTlsSections();
 
-        if (generateOverdeckTraefikConfigSync()) {
+        if (generateOverdeckTraefikConfig()) {
           console.log(chalk.dim('  Regenerated Traefik config from template'));
         }
 
         // Generate missing certs for registered projects
-        const generatedDomains = ensureProjectCertsSync();
+        const generatedDomains = ensureProjectCerts();
         for (const domain of generatedDomains) {
           console.log(chalk.dim(`  Generated wildcard cert for *.${domain}`));
         }
 
         // Generate tls.yml from all discovered certs
-        if (generateTlsConfigSync()) {
+        if (generateTlsConfig()) {
           console.log(chalk.dim('  Generated TLS config (tls.yml)'));
         }
       } catch {
@@ -858,8 +860,9 @@ program
       return candidates.find((p) => existsSync(p)) ?? null;
     })();
 
-    const { startPostLaunchSidecars } = await import('./up-sidecars.js');
+    const { startPostLaunchSidecars, ensureHerdrBeforeDashboard } = await import('./up-sidecars.js');
     const startUpSidecars = () => startPostLaunchSidecars({ selfCli: fileURLToPath(import.meta.url), projectRoot: process.cwd() });
+    await ensureHerdrBeforeDashboard(); // PAN-3956: before the dashboard, so its pane feed finds a server
 
     async function openDashboardInBrowser(url: string): Promise<void> {
       if (options.open === false) return;
@@ -912,15 +915,15 @@ program
       }
     }
 
-    const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
-    const platformConfig = readPlatformConfigSync();
-    await Effect.runPromise(stopDashboard({
+    const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+    const platformConfig = readPlatformConfig();
+    await stopDashboard({
       ...platformConfig,
       dashboardPort,
       dashboardApiPort,
       traefikEnabled,
       traefikDomain,
-    }));
+    });
 
     // Start dashboard
     if (isProduction) {
@@ -1100,9 +1103,9 @@ program
 
     // Stop smee-client webhook relay
     try {
-      const { stopSmeeProcessSync } = await import('../lib/smee.js');
+      const { stopSmeeProcess } = await import('../lib/smee.js');
       console.log(chalk.dim('Stopping smee-client webhook relay...'));
-      stopSmeeProcessSync();
+      stopSmeeProcess();
       console.log(chalk.green('✓ smee-client stopped'));
     } catch {
       console.log(chalk.dim('  smee-client not running'));
@@ -1110,14 +1113,14 @@ program
 
     // Stop the supervisor sidecar
     try {
-      const { stopSupervisorProcessSync, isSupervisorRunningSync } = await import('../lib/supervisor.js');
+      const { stopSupervisorProcess, isSupervisorRunning } = await import('../lib/supervisor.js');
       const { stopSupervisorUnitIfActive } = await import('../lib/systemd.js');
       if (await stopSupervisorUnitIfActive()) {
         console.log(chalk.dim('Stopping supervisor sidecar...'));
         console.log(chalk.green('✓ Supervisor unit stopped'));
-      } else if (isSupervisorRunningSync()) {
+      } else if (isSupervisorRunning()) {
         console.log(chalk.dim('Stopping supervisor sidecar...'));
-        stopSupervisorProcessSync();
+        stopSupervisorProcess();
         console.log(chalk.green('✓ Supervisor stopped'));
       }
     } catch {
@@ -1147,10 +1150,10 @@ program
     // have identical teardown semantics.
     console.log(chalk.dim('Stopping dashboard...'));
     try {
-      const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
-      const platformConfig = readPlatformConfigSync();
+      const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+      const platformConfig = readPlatformConfig();
       // Respect whatever ports this block already parsed out of config.toml.
-      await Effect.runPromise(stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort }));
+      await stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort });
       console.log(chalk.green('✓ Dashboard stopped'));
     } catch {
       console.log(chalk.dim('  No dashboard processes found'));
@@ -1161,7 +1164,7 @@ program
     console.log(chalk.dim('Stopping review sessions...'));
     try {
       const { killAllReviewSessions } = await import('../lib/cloister/review-agent.js');
-      const { killed, failed } = await Effect.runPromise(killAllReviewSessions());
+      const { killed, failed } = await killAllReviewSessions();
       if (killed.length > 0) {
         console.log(chalk.green(`✓ Stopped ${killed.length} review session(s)`));
       }
@@ -1194,10 +1197,10 @@ program
 
     // Stop CLIProxyAPI sidecar
     try {
-      const { stopCliproxySync, isCliproxyRunningSync } = await import('../lib/cliproxy.js');
-      if (isCliproxyRunningSync()) {
+      const { stopCliproxy, isCliproxyRunning } = await import('../lib/cliproxy.js');
+      if (await isCliproxyRunning()) {
         console.log(chalk.dim('Stopping CLIProxyAPI sidecar...'));
-        stopCliproxySync();
+        await stopCliproxy();
         console.log(chalk.green('✓ CLIProxyAPI stopped'));
       }
     } catch {
@@ -1206,7 +1209,7 @@ program
 
     // Stop TLDR daemon on project root
     try {
-      const { getTldrDaemonServiceSync } = await import('../lib/tldr-daemon.js');
+      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
       const { exec } = await import('child_process');
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
@@ -1216,7 +1219,7 @@ program
 
       if (existsSync(venvPath)) {
         console.log(chalk.dim('\nStopping TLDR daemon...'));
-        const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
+        const tldrService = getTldrDaemonService(projectRoot, venvPath);
         await tldrService.stop();
         console.log(chalk.green('✓ TLDR daemon stopped'));
       }

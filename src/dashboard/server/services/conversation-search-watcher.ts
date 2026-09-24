@@ -1,12 +1,11 @@
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 
-import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
+import { getConversationSearchConfig, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
 import { ConversationDirectoryWatcher } from './conversation-directory-watcher.js';
+import { claudeProjectsRoot } from '../../../lib/runtimes/storage/claude-code.js';
 
 interface WatcherLike {
   on(event: 'add' | 'change' | 'unlink', callback: (filePath: string) => void): WatcherLike;
@@ -84,7 +83,7 @@ export class ConversationSearchWatcher {
   private readonly rerun = new Set<string>();
 
   constructor(options: ConversationSearchWatcherOptions = {}) {
-    this.config = options.config ?? getConversationSearchConfigSync();
+    this.config = options.config ?? getConversationSearchConfig();
     this.roots = options.roots ?? defaultConversationRoots();
     this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
     this.signature = watcherSignature(this.config, this.roots);
@@ -236,7 +235,7 @@ export class ConversationSearchWatcher {
 }
 
 export function startConversationSearchWatcher(options: ConversationSearchWatcherOptions = {}): ConversationSearchWatcher | null {
-  const config = options.config ?? getConversationSearchConfigSync();
+  const config = options.config ?? getConversationSearchConfig();
   if (!config.enabled) {
     options.log?.log?.('[conversation-search] watcher disabled by config');
     return null;
@@ -259,7 +258,7 @@ export async function stopConversationSearchWatcher(): Promise<void> {
 }
 
 export async function syncConversationSearchWatcher(options: ConversationSearchWatcherOptions = {}): Promise<ConversationSearchWatcher | null> {
-  const config = options.config ?? getConversationSearchConfigSync();
+  const config = options.config ?? getConversationSearchConfig();
   const roots = options.roots ?? defaultConversationRoots();
   if (!config.enabled) {
     await stopConversationSearchWatcher();
@@ -286,7 +285,7 @@ export async function syncConversationSearchWatcher(options: ConversationSearchW
 }
 
 function defaultConversationRoots(): string[] {
-  return [join(homedir(), '.claude', 'projects')];
+  return [claudeProjectsRoot()];
 }
 
 function isAbortError(error: unknown): boolean {

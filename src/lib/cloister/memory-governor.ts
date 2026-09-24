@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
 import { promisify } from 'node:util';
@@ -6,11 +7,10 @@ import { loadConfigSync } from '../config-yaml/load.js';
 import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
-import { listRunningAgentsSync } from '../agents/queries.js';
+import { listRunningAgents } from '../agents/queries.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
-import { setAgentPausedSync, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
-import { stopAgentSync } from '../agents/termination.js';
+import { setAgentPaused, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
+import { stopAgent } from '../agents/termination.js';
 import {
   getCachedMemoryVerdict,
   setCachedMemoryVerdict,
@@ -123,7 +123,7 @@ export function readGovernorWatchReserveBytes(): number {
   return loadConfigSync().config.resources.governorWatchReserveGb * GIB;
 }
 
-export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
+function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
   const resources = loadConfigSync().config.resources;
   return {
     swapSoftFreePercent: resources.governorSwapSoftFreePercent,
@@ -162,7 +162,7 @@ export function nextGovernorMode(
   return 'holding';
 }
 
-export function nextGovernorModeWithRunway(
+function nextGovernorModeWithRunway(
   availableBytes: number,
   reserves: GovernorReserves,
   runway: GovernorRunway,
@@ -307,54 +307,6 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
 
 export type FootprintRole = 'work' | 'review' | 'test';
 
-function coldStartFootprintBytes(role: FootprintRole): number {
-  const resources = loadConfigSync().config.resources;
-  const gb =
-    role === 'work' ? resources.governorFootprintDefaultWorkGb
-    : role === 'review' ? resources.governorFootprintDefaultReviewGb
-    : resources.governorFootprintDefaultTestGb;
-  return gb * GIB;
-}
-
-/**
- * Pure core of estimateFootprint — takes already-fetched stacks so it's
- * testable with a stubbed docker-stats map (no live collector needed).
- * Returns the average live memoryBytes across the project's current stacks,
- * or null when no stack exists yet for that project (cold start).
- */
-export function computeLearnedFootprintBytes(stacks: readonly ResourceStack[], projectKey: string): number | null {
-  const projectStacks = stacks.filter((stack) => {
-    if (!stack.issueId) return false;
-    return resolveProjectFromIssueSync(stack.issueId)?.projectKey === projectKey;
-  });
-  if (projectStacks.length === 0) return null;
-  const total = projectStacks.reduce((sum, stack) => sum + stack.aggregates.memoryBytes, 0);
-  const average = total / projectStacks.length;
-  return average > 0 ? average : null;
-}
-
-/**
- * Estimate the footprint (bytes) of an agent about to be admitted for `role`
- * in `projectKey`: the learned average live stack RSS for that project when
- * any of its stacks are currently running, else the configured per-role
- * cold-start default.
- */
-export async function estimateFootprint(role: FootprintRole, projectKey: string): Promise<number> {
-  const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
-  const stacks = await getResourceStacks(containers);
-  const learned = computeLearnedFootprintBytes(stacks, projectKey);
-  return learned ?? coldStartFootprintBytes(role);
-}
-
-/**
- * Admission predicate (PRD AC-3, pinned public shape — specialist-budget,
- * tiered-eviction, and memory-paced-boot all call this exact signature):
- * fits only if the footprint leaves the SOFT reserve intact.
- */
-export function canAdmit(footprintBytes: number, availableBytes: number): boolean {
-  return footprintBytes <= availableBytes - readGovernorReserves().softBytes;
-}
-
 // --- PAN-2500 tiered-eviction ------------------------------------------------
 //
 // shed() runs under HARD pressure, reclaiming cheapest-value-first: merged/
@@ -446,7 +398,7 @@ export async function shed(): Promise<ShedResult> {
 
   const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
   const stacks = await getResourceStacks(containers);
-  const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
+  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
   const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLiveTmuxSession: a.tmuxActive }));
 
   for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
@@ -499,8 +451,8 @@ export async function shed(): Promise<ShedResult> {
       exemptOperatorStarted ?? true,
     );
     if (!next) break;
-    setAgentPausedSync(next.id, `${GOVERNOR_SLOT_PAUSE_REASON_PREFIX} memory pressure — shed under HARD reserve`, true);
-    stopAgentSync(next.id);
+    await Effect.runPromise(setAgentPaused(next.id, `${GOVERNOR_SLOT_PAUSE_REASON_PREFIX} memory pressure — shed under HARD reserve`, true));
+    await Effect.runPromise(stopAgent(next.id));
     paused.add(next.id);
     result.pausedAgents.push(next.id);
     verdict = await assessMemoryPressure();

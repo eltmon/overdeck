@@ -22,7 +22,7 @@ import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 import { readContinueState } from '../../lib/xbrief/continue-state.js';
 import { listXBriefs, readXBriefDocument } from '../../lib/xbrief/xbrief-index.js';
-import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, listProjectsSync } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam, listProjectsSync } from '../../lib/projects.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 
 function getProjectPath(issueId: string): string {
@@ -31,7 +31,7 @@ function getProjectPath(issueId: string): string {
     return resolved.projectPath;
   }
   const teamPrefix = extractTeamPrefix(issueId);
-  const project = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const project = teamPrefix ? findProjectByTeam(teamPrefix) : null;
   if (project?.path) {
     return project.path;
   }
@@ -389,49 +389,49 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
 
 async function proposeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'proposed',
     'proposed',
     `scope: propose ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 
 async function approveCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'active',
     'approved',
     `scope: approve ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 
 async function completeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'completed',
     'completed',
     `scope: complete ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 
 async function cancelCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'cancelled',
     'cancelled',
     `scope: cancel ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 
@@ -446,13 +446,13 @@ async function restoreCommand(issueId: string, options: { project?: string }): P
     console.log(chalk.yellow(`xBRIEF is in ${found.lifecycleDir} — restore only works from completed/ or cancelled/`));
     return exitCli(1);
   }
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'active',
     'approved',
     `scope: restore ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 

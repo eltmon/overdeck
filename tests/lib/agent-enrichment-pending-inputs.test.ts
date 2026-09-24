@@ -12,7 +12,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { Effect } from 'effect'
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -84,7 +83,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(1)
     expect(result[0].toolId).toBe('t1')
   })
@@ -94,7 +93,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
       { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:05Z', message: { content: [toolResult('t1', { content: 'A' })] } },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(0)
   })
 
@@ -107,7 +106,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
       { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(1)
     expect(result[0].toolId).toBe('t1')
   })
@@ -128,7 +127,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
         },
       },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(1)
   })
 
@@ -138,7 +137,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
       { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', { content: 'A' })] } },
       { timestamp: '2026-05-26T01:00:10Z', message: { content: [askToolUse('t2', ['Yes', 'No'])] } },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result.map((r) => r.toolId)).toEqual(['t2'])
   })
 
@@ -155,7 +154,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
       { timestamp: '2026-05-26T01:00:05Z', type: 'assistant', message: { content: [{ type: 'text', text: 'Please choose A or B.' }] } },
       { timestamp: '2026-05-26T01:00:10Z', type: 'user', message: { role: 'user', content: 'A' } },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(0)
   })
 
@@ -166,7 +165,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
       { timestamp: '2026-05-26T01:00:10Z', type: 'user', message: { role: 'user', content: "Actually let's revisit this — what about option C?" } },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(0)
   })
 
@@ -184,7 +183,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
         message: { role: 'user', content: [{ type: 'text', text: 'Going with A.' }] },
       },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(0)
   })
 
@@ -200,7 +199,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
       { timestamp: '2026-05-26T01:00:05Z', type: 'assistant', message: { content: [{ type: 'tool_use', id: 'bash_x', name: 'Bash', input: { command: 'ls' } }] } },
       { timestamp: '2026-05-26T01:00:06Z', type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'bash_x', content: 'README.md' }] } },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(1)
     expect(result[0].toolId).toBe('t1')
   })
@@ -211,7 +210,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
       { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
     ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(1)
     expect(result[0].toolId).toBe('t1')
   })
@@ -219,7 +218,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
 
 describe('agent-enrichment scan — plan mode + missing files', () => {
   it('returns empty array for a missing JSONL file', async () => {
-    const result = await Effect.runPromise(getPendingQuestions(join(testDir, 'nope.jsonl')))
+    const result = await getPendingQuestions(join(testDir, 'nope.jsonl'))
     expect(result).toEqual([])
   })
 
@@ -230,7 +229,7 @@ describe('agent-enrichment scan — plan mode + missing files', () => {
       JSON.stringify({ timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A'])] } }),
       '}',
     ].join('\n'), 'utf-8')
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(1)
   })
 })

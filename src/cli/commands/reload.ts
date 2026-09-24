@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import chalk from 'chalk';
 import { statSync } from 'fs';
 import { resolve } from 'path';
@@ -16,7 +15,7 @@ import {
   type DashboardDeploymentActivation,
 } from '../../lib/deploy/build-from-origin.js';
 import {
-  readActiveDashboardBundleSync,
+  readActiveDashboardBundle,
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
@@ -26,7 +25,7 @@ import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-loc
 import {
   leavesDashboardRunning,
   parseHealthTimeoutMs,
-  readPlatformConfigSync,
+  readPlatformConfig,
   restartDashboard,
   StageError,
   type DashboardRestartResult,
@@ -107,7 +106,7 @@ async function recordReloadStatus(
   error?: string,
   phase: RestartPhase = success ? 'healthy' : 'failed',
 ): Promise<void> {
-  await Effect.runPromise(writeRestartStatus({
+  await writeRestartStatus({
     ts: new Date().toISOString(),
     trigger: 'pan reload',
     success,
@@ -118,7 +117,7 @@ async function recordReloadStatus(
     pid: process.pid,
     initiator: process.env.OVERDECK_RESTART_INITIATOR ?? process.env.OVERDECK_AGENT_ID,
     issueId: process.env.OVERDECK_ISSUE_ID,
-  }));
+  });
 }
 
 export async function reloadCommand(options: ReloadOptions): Promise<void> {
@@ -163,9 +162,9 @@ async function runReload(
     ));
   }
 
-  const lock = await Effect.runPromise(acquireRestartLock('pan reload'));
+  const lock = await acquireRestartLock('pan reload');
   if (!lock) {
-    const holder = await Effect.runPromise(readRestartLockHolder());
+    const holder = await readRestartLockHolder();
     const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
     const error = `restart in progress (${heldBy})`;
     console.error(chalk.yellow(error));
@@ -208,11 +207,11 @@ async function runReload(
       }
     }
 
-    const config = readPlatformConfigSync();
+    const config = readPlatformConfig();
     let repoRoot = process.cwd();
     let deployment: DashboardDeployment | null = null;
     let activation: DashboardDeploymentActivation | null = null;
-    const previousBundle = readActiveDashboardBundleSync();
+    const previousBundle = readActiveDashboardBundle();
     if (!options.skipBuild) {
       try {
         repoRoot = await resolvePrimaryRepoRoot(process.cwd());
@@ -328,14 +327,14 @@ async function runReload(
       // This durable entry must land before restartDashboard sends SIGTERM. If
       // persistence fails, abort while the old dashboard is still running.
       await recordReloadStatus(startedAt, false, undefined, 'stopping');
-      restartResult = await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
+      restartResult = await restartDashboard(config, () => spawnDashboardDetached(config, {
         deacon: options.deacon,
         serverPath: deployment?.serverPath,
         repoRoot,
       }), {
         healthTimeoutMs,
         expectedIdentity: { repoRoot, mode: 'primary' },
-      }));
+      });
     } catch (error) {
       if (deployment) {
         if (leavesDashboardRunning(error)) {

@@ -8,12 +8,22 @@
  */
 import { join } from 'node:path';
 import { toCodexSandboxValue } from './runtimes/codex.js';
-import { shellQuoteModelIdSync } from './model-validation.js';
+import { shellQuoteModelId } from './model-validation.js';
 import { packageRoot } from './paths.js';
 import { shellQuote } from './shell-quote.js';
 
+/** LauncherConfig extends this so the generator file does not grow (PAN-3835). */
+export interface CodexNativeEndpointOption {
+  /**
+   * App-server hosts expose a private native endpoint so the Codex TUI can
+   * attach to the same thread (`--native-endpoint`). Conversation launches
+   * only; work and review agents never set it.
+   */
+  codexNativeEndpoint?: boolean;
+}
+
 /** The LauncherConfig subset the Codex command shapes read. */
-export interface CodexCommandConfig {
+export interface CodexCommandConfig extends CodexNativeEndpointOption {
   codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
   codexEffort?: string;
   codexSandboxMode?: string;
@@ -100,7 +110,7 @@ function computeCodexCommandTokens(
       tokens.push('resume');
     }
     if (config.model) {
-      tokens.push('-m', shellQuoteModelIdSync(config.model));
+      tokens.push('-m', shellQuoteModelId(config.model));
     }
     addDeveloperInstructions(tokens);
     if (config.resumeSessionId) {
@@ -114,10 +124,13 @@ function computeCodexCommandTokens(
     const hostPath = join(packageRoot, 'dist', 'codex-app-server-host.js');
     const tokens: string[] = ['node', shellQuote(hostPath), '--effort', shellQuote(config.codexEffort ?? 'high')];
     if (config.model) {
-      tokens.push('--model', shellQuoteModelIdSync(config.model));
+      tokens.push('--model', shellQuoteModelId(config.model));
     }
     if (config.resumeSessionId) {
       tokens.push('--resume', shellQuote(config.resumeSessionId));
+    }
+    if (config.codexNativeEndpoint) {
+      tokens.push('--native-endpoint');
     }
     for (const file of developerInstructionFiles) {
       tokens.push('--developer-instructions-file', shellQuote(file));
@@ -138,7 +151,7 @@ function computeCodexCommandTokens(
   }
 
   if (config.model) {
-    tokens.push('-m', shellQuoteModelIdSync(config.model));
+    tokens.push('-m', shellQuoteModelId(config.model));
   }
 
   addDeveloperInstructions(tokens);

@@ -32,7 +32,6 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveGitHubIssue: resolveGitHubIssueMock,
-    resolveGitHubIssueSync: resolveGitHubIssueMock,
   };
 });
 

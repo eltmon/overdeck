@@ -19,18 +19,18 @@ import { makeDbLive, RecordsLive } from './infra.js';
  * Stages that mean "this issue is finished, its worktree is no longer live
  * work". `verifying_on_main` counts because the merge has already landed.
  */
-export const TERMINAL_STAGES: ReadonlySet<Stage> = new Set<Stage>([
+const TERMINAL_STAGES: ReadonlySet<Stage> = new Set<Stage>([
   'verifying_on_main',
   'closed',
   'cancelled',
 ]);
 
-export function isTerminalStage(stage: Stage | string | null | undefined): boolean {
+function isTerminalStage(stage: Stage | string | null | undefined): boolean {
   return stage !== null && stage !== undefined && TERMINAL_STAGES.has(stage as Stage);
 }
 
 /** Every issue whose stage is terminal, read through `IssuesResolver`. */
-export function listTerminalIssues(): Effect.Effect<ReadonlyArray<Issue>, never, IssuesResolver> {
+function listTerminalIssues(): Effect.Effect<ReadonlyArray<Issue>, never, IssuesResolver> {
   return IssuesResolver.use((resolver) => resolver.list({})).pipe(
     Effect.map((issues) => issues.filter((issue) => isTerminalStage(issue.stage))),
   );

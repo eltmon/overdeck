@@ -25,7 +25,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listSessionsSync: () => [],
   listPaneValuesSync: () => [],
   listSessions: () => Effect.succeed(mockListSessions()),
-  listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
+  listPaneValues: async (...args: unknown[]) => mockListPaneValues(...args),
 }));
 
 vi.mock('../../../../lib/runtime-census.js', () => ({

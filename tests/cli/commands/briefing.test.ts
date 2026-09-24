@@ -4,7 +4,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { briefingCommandAction, createBriefingCommand } from '../../../src/cli/commands/briefing.js';
 import { ensureParentDir, resolveStatusFile } from '../../../src/lib/memory/paths.js';
-import { closeOverdeckDatabaseSync } from '../../../src/lib/overdeck/infra.js';
+import { closeOverdeckDatabase } from '../../../src/lib/overdeck/infra.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
 
 let tempDir: string | null = null;
@@ -17,7 +17,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });

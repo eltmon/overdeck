@@ -5,8 +5,8 @@ import { join } from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectConfig } from '../../projects.js';
 import {
-  addNewRepoToWorkspacePromise,
-  addReposToWorkspacePromise,
+  addNewRepoToWorkspace,
+  addReposToWorkspace,
   inferRepoNameFromGitUrl,
 } from '../repos.js';
 
@@ -63,7 +63,7 @@ describe('workspace repo registration', () => {
     const projectRoot = join(root, 'project');
     mkdirSync(join(projectRoot, 'workspaces', 'feature-min-850'), { recursive: true });
 
-    const result = await addReposToWorkspacePromise({
+    const result = await addReposToWorkspace({
       projectConfig: projectConfig(projectRoot),
       featureName: 'min-850',
       repoNames: ['hermes-plugin'],
@@ -85,7 +85,7 @@ describe('workspace repo registration', () => {
     const remote = createRemote(root);
     const persistProject = vi.fn();
 
-    const result = await addNewRepoToWorkspacePromise({
+    const result = await addNewRepoToWorkspace({
       projectKey: 'mind-your-now',
       projectConfig: projectConfig(projectRoot),
       featureName: 'min-850',

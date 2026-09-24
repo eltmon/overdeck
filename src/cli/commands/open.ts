@@ -6,7 +6,7 @@ import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import type { EditorId } from '@overdeck/contracts';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
+import { resolveBareNumericId } from '../../lib/issue-id.js';
 
 type Editor = (typeof import('@overdeck/contracts'))['EDITORS'][number];
 
@@ -45,7 +45,7 @@ function detectFirstAvailableEditor(editors: readonly Editor[]): { id: EditorId;
 }
 
 export async function openCommand(id: string, options: { editor?: string }) {
-  const issueId = resolveBareNumericIdSync(id);
+  const issueId = resolveBareNumericId(id);
   if (!issueId) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(

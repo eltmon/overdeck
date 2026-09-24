@@ -2,7 +2,13 @@ import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createArtifactIndexRepository } from '../index-store.js';
+import { ArtifactIndexRepository } from '../index-store.js';
+import type { ArtifactIndexOptions } from '../index-store.js';
+
+// Moved here from src/lib/artifacts/index-store.ts, which no production code called (PAN-3958 CH-8).
+function createArtifactIndexRepository(options: ArtifactIndexOptions = {}): ArtifactIndexRepository {
+  return new ArtifactIndexRepository(options);
+}
 
 describe('ArtifactIndexRepository', () => {
   it('creates, lists, publishes, and unshares artifacts through the SQLite adapter', () => {

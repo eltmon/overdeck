@@ -9,10 +9,15 @@ const mocks = vi.hoisted(() => ({
   isBranchMerged: vi.fn(),
   killSession: vi.fn(() => Effect.void),
   listSessionNames: vi.fn(() => Effect.succeed([])),
-  teardownWorkspaceDockerByNamePromise: vi.fn(() =>
+  teardownWorkspaceDockerByName: vi.fn(() =>
     Promise.resolve({ networkRemoved: true, steps: ['Stopped Docker stack'] }),
   ),
   agentsDir: '',
+  reapWorkerWorktrees: vi.fn(async () => [] as string[]),
+}));
+
+vi.mock('../../workspaces/worker-worktrees.js', () => ({
+  reapWorkerWorktrees: mocks.reapWorkerWorktrees,
 }));
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -33,7 +38,7 @@ vi.mock('../../tmux.js', () => ({
 }));
 
 vi.mock('../../workspace-manager/docker.js', () => ({
-  teardownWorkspaceDockerByNamePromise: mocks.teardownWorkspaceDockerByNamePromise,
+  teardownWorkspaceDockerByName: mocks.teardownWorkspaceDockerByName,
 }));
 
 vi.mock('../../paths.js', () => ({
@@ -57,7 +62,7 @@ describe('reapIssueResidue', () => {
     vi.clearAllMocks();
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.isBranchMerged.mockResolvedValue({ status: 'merged', message: 'merged' });
-    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+    mocks.teardownWorkspaceDockerByName.mockResolvedValue({
       networkRemoved: true,
       steps: ['Stopped Docker stack'],
     });
@@ -92,7 +97,7 @@ describe('reapIssueResidue', () => {
 
     expect(actions.length).toBeGreaterThan(0);
     expect(existsSync(workspacePath)).toBe(false);
-    expect(existsSync(agentDir)).toBe(false);
+    expect(existsSync(agentDir)).toBe(true);
     expect(mocks.exec.mock.calls.some((call) => String(call[0]) === 'git branch -D "feature/pan-2054"')).toBe(true);
     expect(mocks.exec.mock.calls.some((call) => String(call[0]) === 'git push origin --delete "feature/pan-2054"')).toBe(true);
     expect(mocks.killSession).toHaveBeenCalledTimes(4);
@@ -108,8 +113,8 @@ describe('reapIssueResidue', () => {
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
     expect(existsSync(transcriptPath)).toBe(true);
-    expect(existsSync(join(agentDir, 'state.json'))).toBe(false);
-    expect(actions).toContain('cleaned agent state agent-pan-2054 (1 transcript file preserved)');
+    expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
+    expect(actions).toContain('pruned agent state agent-pan-2054 (0 regenerable entries removed)');
   });
 
   it('skips disk cleanup when the feature branch is unmerged', async () => {
@@ -151,13 +156,13 @@ describe('reapIssueResidue', () => {
 
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-2054');
+    expect(mocks.teardownWorkspaceDockerByName).toHaveBeenCalledWith('pan-2054');
     expect(actions.some((action) => action.includes('removed Docker stack for feature-pan-2054'))).toBe(true);
   });
 
   it('records a warning when the Docker network is still present', async () => {
     mocks.isBranchMerged.mockResolvedValue({ status: 'merged', message: 'merged' });
-    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+    mocks.teardownWorkspaceDockerByName.mockResolvedValue({
       networkRemoved: false,
       steps: ['network still present'],
     });
@@ -175,9 +180,21 @@ describe('reapIssueResidue', () => {
 
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-2054');
+    expect(mocks.teardownWorkspaceDockerByName).toHaveBeenCalledWith('pan-2054');
     expect(actions.some((action) => action.includes('removed Docker stack for feature-pan-2054'))).toBe(true);
     expect(actions.some((action) => action.includes('skipped disk reap') && action.includes('unmerged'))).toBe(true);
+  });
+
+  it('PAN-3920: removes worker worktrees and branches of a merged issue, never of an unmerged one', async () => {
+    mocks.reapWorkerWorktrees.mockResolvedValue(['removed worker worktree /x/.swarm/worker-1']);
+    const actions = await reapIssueResidue(projectPath, 'PAN-2054');
+    expect(mocks.reapWorkerWorktrees).toHaveBeenCalledWith(projectPath, 'PAN-2054', { removeWorktrees: true });
+    expect(actions).toContain('removed worker worktree /x/.swarm/worker-1');
+
+    mocks.reapWorkerWorktrees.mockClear();
+    mocks.isBranchMerged.mockResolvedValue({ status: 'unmerged', message: 'not merged' });
+    await reapIssueResidue(projectPath, 'PAN-2054');
+    expect(mocks.reapWorkerWorktrees).not.toHaveBeenCalled();
   });
 
   it('does not use execSync', () => {

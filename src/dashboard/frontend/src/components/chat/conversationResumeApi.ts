@@ -13,6 +13,9 @@ export async function resumeConversation(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, effort, harness, sendResumeContract }),
   });
-  if (!res.ok) throw new Error('Failed to resume conversation');
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error || `Failed to resume conversation (${res.status})`);
+  }
   return res.json();
 }

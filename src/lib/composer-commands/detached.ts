@@ -4,8 +4,8 @@ import { isAbsolute, join, resolve } from 'node:path';
 
 import type { ComposerCommandResult } from '@overdeck/contracts';
 import { emitActivityEntryDurable, type EmitActivityOptions } from '../activity-logger.js';
-import { getDashboardLoopbackApiUrlSync } from '../config.js';
-import { parseIssueIdSync } from '../issue-id.js';
+import { getDashboardLoopbackApiUrl } from '../config.js';
+import { parseIssueId } from '../issue-id.js';
 import { spawnPanCli } from '../pan-cli-invocation.js';
 import { getOverdeckHome } from '../paths.js';
 import { CAPTURED_COMMAND_MAX_OUTPUT_BYTES } from './executors.js';
@@ -107,7 +107,7 @@ export async function launchPanCommandDetached(
   const childEnv: NodeJS.ProcessEnv = { ...process.env, ...input.env };
   if (!input.env?.OVERDECK_DASHBOARD_URL) {
     delete childEnv.DASHBOARD_URL;
-    childEnv.OVERDECK_DASHBOARD_URL = getDashboardLoopbackApiUrlSync();
+    childEnv.OVERDECK_DASHBOARD_URL = getDashboardLoopbackApiUrl();
   }
   const child = spawnCommand(args, {
     cwd,
@@ -246,7 +246,7 @@ export async function runDetachedCommand(
   dependencies: DetachedPanCommandDependencies = {},
 ): Promise<ComposerCommandResult> {
   const issueId = argv[1] ?? '';
-  const parsedIssueId = parseIssueIdSync(issueId);
+  const parsedIssueId = parseIssueId(issueId);
   if (!parsedIssueId) {
     return {
       kind: 'terminal-only',

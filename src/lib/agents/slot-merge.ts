@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { defaultRunWorkspace } from './spawn-prep.js';
-import { resolveWorkspaceRepoRootsSync, type WorkspaceRepoRoot } from '../project-repos.js';
+import { resolveWorkspaceRepoRoots, type WorkspaceRepoRoot } from '../project-repos.js';
 import type { XBriefItem } from '../xbrief/types.js';
 
 const execAsync = promisify(exec);
@@ -54,7 +54,7 @@ export async function verifyAndMergeSlot(
   const slotBranch = typeof issue === 'string' ? `feature/${issueId.toLowerCase()}-slot-${slotIndex}` : issue.slotBranch ?? `feature/${issueId.toLowerCase()}-slot-${slotIndex}`;
   const deps: SlotMergeDeps = {
     run: async (command, cwd) => execAsync(command, { cwd }),
-    resolveRepoRoots: resolveWorkspaceRepoRootsSync,
+    resolveRepoRoots: resolveWorkspaceRepoRoots,
     ...options.deps,
   };
   const verifyCommands = item.metadata?.verify_commands ?? [];

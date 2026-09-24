@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const mockEmitActivityEntrySync = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
-  emitActivityEntrySync: mockEmitActivityEntrySync,
+  emitActivityEntry: mockEmitActivityEntrySync,
 }));
 
 import {
@@ -79,7 +79,7 @@ describe('emitDirtyWorkspaceRefusalActivity', () => {
     ]);
   });
 
-  it('does not throw when emitActivityEntrySync throws', () => {
+  it('does not throw when emitActivityEntry throws', () => {
     mockEmitActivityEntrySync.mockImplementation(() => {
       throw new Error('event store unavailable');
     });

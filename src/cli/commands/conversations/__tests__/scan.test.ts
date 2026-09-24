@@ -21,7 +21,8 @@ import {
 // reference inside the factory closure.
 const { mockWatchDirs } = vi.hoisted(() => ({ mockWatchDirs: [] as string[] }));
 
-vi.mock('../../../../lib/config-yaml.js', () => {
+vi.mock('../../../../lib/config-yaml.js', async () => {
+  const { Effect } = await import('effect');
   const cfg = () => ({
     watchDirs: mockWatchDirs,
     scanMaxParallel: null,
@@ -31,7 +32,7 @@ vi.mock('../../../../lib/config-yaml.js', () => {
     embeddingAutoOnDeep: false,
     enrichment: { quickModel: null, deepModel: null, maxParallel: 2, costConfirmThreshold: 1 },
   });
-  return { getConversationsConfig: cfg, getConversationsConfigSync: cfg };
+  return { getConversationsConfig: () => Effect.succeed(cfg()) };
 });
 
 // ─── Mock chalk to avoid terminal color codes in assertions ──────────────────

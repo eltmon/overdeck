@@ -5,12 +5,12 @@
  * Uses the hand-maintained overdeck migration as the schema source of truth.
  */
 
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 
 // ─── Schema bootstrap ─────────────────────────────────────────────────────────
 
 function overdeckDb() {
-  return getOverdeckDatabaseSync();
+  return getOverdeckDatabase();
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ export interface GitOperationFilter {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export function appendGitOperationSync(op: Omit<GitOperation, 'id'>): number {
+export function appendGitOperation(op: Omit<GitOperation, 'id'>): number {
   const result = overdeckDb().prepare(`
     INSERT INTO git_operations (
       operation, branch, issue_id,
@@ -77,7 +77,7 @@ export function appendGitOperationSync(op: Omit<GitOperation, 'id'>): number {
   return result.lastInsertRowid as number;
 }
 
-export function listGitOperationsSync(filter: GitOperationFilter = {}): GitOperation[] {
+export function listGitOperations(filter: GitOperationFilter = {}): GitOperation[] {
   const conditions: string[] = [];
   const params: (string | number)[] = [];
 

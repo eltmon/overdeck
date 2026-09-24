@@ -33,6 +33,26 @@ export class TerminalBackendError extends Data.TaggedError('TerminalBackendError
   readonly cause?: unknown;
 }> {}
 
+/**
+ * The selected backend cannot serve at all (PAN-3956 FR-3): Herdr is the
+ * policy but its binary or this home's session socket is missing. A launch
+ * throws this instead of silently falling back to tmux.
+ */
+export class TerminalBackendUnavailableError extends Error {
+  readonly backend: TerminalBackendName;
+  readonly reason: string;
+  constructor(backend: TerminalBackendName, reason: string) {
+    super(
+      `Terminal backend '${backend}' is selected but unavailable: ${reason} `
+      + 'Run `pan install` to install Herdr and start its session server, '
+      + 'or set terminal.backend: tmux in ~/.overdeck/config.yaml to opt into tmux.',
+    );
+    this.name = 'TerminalBackendUnavailableError';
+    this.backend = backend;
+    this.reason = reason;
+  }
+}
+
 /** The adapter cannot perform this operation. A value, never a throw. */
 export interface Unsupported {
   readonly unsupported: true;

@@ -4,7 +4,7 @@ import { Effect } from 'effect';
 
 import { listAgentStatesSync } from '../agents/agent-state.js';
 import { getOverdeckHome } from '../paths.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import {
   hasRetainedTranscriptsMarker,
   listAgentStateFilesForRemoval,
@@ -15,7 +15,7 @@ import {
 import { readLiveTrackerIssueState, type LiveTrackerIssueState } from './issue-closed.js';
 import { sessionExists } from '../tmux.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { resolveProjectReposForIssueSync } from '../project-repos.js';
+import { resolveProjectReposForIssue } from '../project-repos.js';
 import { listOpenPullRequestsSnapshot } from '../pipeline-membership-gather.js';
 import { listOpenGitLabMergeRequests } from '../gitlab-merge-requests.js';
 
@@ -91,7 +91,7 @@ async function hasOpenChangeRequest(agent: AgentGcRow): Promise<boolean> {
   if (!resolved) throw new Error(`No configured project resolves ${agent.issueId}`);
   const project = getProjectSync(resolved.projectKey);
   if (!project) throw new Error(`Project ${resolved.projectKey} is not configured`);
-  const repos = resolveProjectReposForIssueSync(agent.issueId);
+  const repos = resolveProjectReposForIssue(agent.issueId);
   if (!repos?.length) throw new Error(`No configured repositories resolve ${agent.issueId}`);
 
   const githubRepos = repos.filter((repo) => repo.forge === 'github');
@@ -184,18 +184,11 @@ export async function resolveLiveAgentTerminalityEvidence(
   };
 }
 
-export async function confirmLiveAgentTerminality(
-  agent: AgentGcRow,
-  deps: AgentGcTerminalityDeps = defaultTerminalityDeps(),
-): Promise<boolean> {
-  return (await resolveLiveAgentTerminalityEvidence(agent, deps)) !== null;
-}
-
 function emitAgentGcPruneEvent(
   agent: AgentGcRow,
   entry: AgentGcPruneEntry,
 ): void {
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'cloister',
     level: 'info',
     status: 'completed',
@@ -268,24 +261,6 @@ export async function pruneAgentRowsAfterTranscriptCleanup(
     }
   }
   return { removed, preserved };
-}
-
-/**
- * Close-out-only pruning path. The lifecycle workflow has already positively
- * verified tracker terminality before it reaches this handoff, so it does not
- * repeat the periodic sweep's remote checks.
- */
-export async function pruneStoppedAgentsForIssue(
-  issueId: string,
-  agents: AgentGcRow[] = listAgentStatesSync(),
-  deps: AgentGcDeps = defaultAgentGcDeps(),
-): Promise<AgentGcResult> {
-  const issue = issueId.toUpperCase();
-  const scoped = agents.filter(agent => agent.issueId.toUpperCase() === issue);
-  const terminal = scoped.filter(agent => agent.status === 'stopped');
-  const live = scoped.filter(agent => agent.status !== 'stopped').map(agent => agent.id);
-  const result = await pruneAgentRowsAfterTranscriptCleanup(terminal, deps);
-  return { removed: result.removed, preserved: [...live, ...result.preserved] };
 }
 
 export async function pruneTerminalStoppedAgents(

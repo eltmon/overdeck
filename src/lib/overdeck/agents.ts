@@ -5,10 +5,11 @@ import { Context, Effect, Layer, Schema } from 'effect';
 import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-import { Db, Tmux, getOverdeckDatabaseSync } from './infra.js';
+import { Db, Tmux, getOverdeckDatabase } from './infra.js';
 import { IssueId, type Stage } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
 import { listAgentStatesSync, type AgentState } from '../agents/agent-state.js';
+import { resolveLatestSessionId } from '../agents/activity.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
 
@@ -18,8 +19,8 @@ import { listAgentStatesSync, type AgentState } from '../agents/agent-state.js';
  * an FK anchor; its stage column is unwritten going forward but not yet
  * dropped) — inlined here rather than recreated at the deleted path.
  */
-export function getIssueStageSync(issueId: string): string | null {
-  const row = getOverdeckDatabaseSync()
+export function getIssueStage(issueId: string): string | null {
+  const row = getOverdeckDatabase()
     .prepare(`SELECT stage FROM issues WHERE id = ?`)
     .get(issueId) as { stage: string } | undefined;
   return row?.stage ?? null;
@@ -48,7 +49,7 @@ export type AgentId = typeof AgentId.Type;
 // Must match VALID_ROLES_SYNC (and the roles actually written to the agents
 // table). PAN-1979: a too-narrow Role enum crashed the AgentsResolver list
 // decode on real `strike`/`flywheel` rows, taking down dashboard boot.
-export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer', 'knowledge']);
+export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer', 'knowledge', 'worker']);
 export type Role = typeof Role.Type;
 
 // PAN-1979: a too-narrow Role enum crashed the AgentsResolver list decode
@@ -90,7 +91,7 @@ export const Agent = Schema.Struct({
 });
 export type Agent = typeof Agent.Type;
 
-export const AgentFilter = Schema.Struct({
+const AgentFilter = Schema.Struct({
   issueId: Schema.optional(IssueId),
   role: Schema.optional(Role),
   status: Schema.optional(Status),
@@ -161,7 +162,7 @@ function agentStateToEntityInput(state: AgentState): Record<string, unknown> {
     role: state.role,
     status: state.status,
     workspace: state.workspace ?? '',
-    sessionId: state.sessionId ?? null,
+    sessionId: resolveLatestSessionId(state.id, { getAgentState: () => state }).sessionId,
     harness: state.harness ?? '',
     model: state.model ?? '',
     hostOverride: typeof state.hostOverride === 'string' ? state.hostOverride : null,
@@ -270,11 +271,10 @@ export const AgentsResolverLive = Layer.effect(
  * since the overdeck.db mirror was dropped. Used to enumerate an issue's review
  * fleet, e.g. listAgentIdsByPrefixSync('agent-pan-1866-review').
  */
-export function listAgentIdsByPrefixSync(prefix: string): string[] {
+export function listAgentIdsByPrefix(prefix: string): string[] {
   try {
     return readdirSync(join(getOverdeckHome(), 'agents')).filter((name) => name.startsWith(prefix));
   } catch {
     return [];
   }
 }
-

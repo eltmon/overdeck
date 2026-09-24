@@ -25,7 +25,9 @@ import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
-import { removeAgentStateDir } from '../agents/state-dir-removal.js';
+import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
+import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
+import { listAgentStatesSync, saveAgentStateSync } from '../agents/agent-state.js';
 
 const execAsync = promisify(exec);
 
@@ -41,6 +43,19 @@ function killTmuxSessions(issueLower: string): Effect.Effect<StepResult> {
       Effect.succeed(stepFailed('teardown:tmux-sessions', `Failed: ${(err as Error).message}`)),
     ),
   );
+}
+
+export function persistIssueAgentsStopped(issueLower: string): number {
+  let persisted = 0;
+  for (const state of listAgentStatesSync()) {
+    if ((state.issueId ?? '').toLowerCase() !== issueLower) continue;
+    if (state.status === 'stopped') continue;
+    state.status = 'stopped';
+    state.stoppedAt = new Date().toISOString();
+    saveAgentStateSync(state);
+    persisted++;
+  }
+  return persisted;
 }
 
 async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
@@ -100,14 +115,33 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     // Session listing may fail if tmux server is not running
   }
 
+  // PAN-3947: on a Herdr host none of the names above exist — every agent of
+  // the issue lives in a pane stamped with its `issue` token. Close them all
+  // through the terminal backend. No-op on a tmux host.
+  let closedPanes = 0;
+  try {
+    const { closeIssuePanes } = await import('../terminal-backends/launch.js');
+    closedPanes = (await closeIssuePanes(issueLower)).length;
+  } catch {
+    // Backend unavailable — nothing more this step can close.
+  }
+
+  // The state directory is durable after close-out. Persist the terminal
+  // lifecycle fact before pruning so a closed Session tab never projects a
+  // retained agent as writable/live after the terminal has been killed.
+  persistIssueAgentsStopped(issueLower);
+
   // NOTE: Per-project ephemeral specialists (specialist-{project}-{type}) are NOT killed here.
   // They belong to the project, not the issue, and accumulate context across issues via --resume.
   // Their grace period / idle timeout handles cleanup when no new work arrives.
 
-  if (killed > 0) {
-    return stepOk(step, [`Killed ${killed} tmux session(s)`]);
+  if (killed > 0 || closedPanes > 0) {
+    const details: string[] = [];
+    if (killed > 0) details.push(`Killed ${killed} tmux session(s)`);
+    if (closedPanes > 0) details.push(`Closed ${closedPanes} Herdr pane(s)`);
+    return stepOk(step, details);
   }
-  return stepSkipped(step, ['No tmux sessions found']);
+  return stepSkipped(step, ['No tmux sessions or Herdr panes found']);
 }
 
 /**
@@ -131,8 +165,8 @@ async function stopTldrDaemonImpl(workspacePath: string): Promise<StepResult> {
     return stepSkipped(step, ['No .venv found']);
   }
   try {
-    const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
-    const tldrService = getTldrDaemonServiceSync(workspacePath, venvPath);
+    const { getTldrDaemonService } = await import('../tldr-daemon.js');
+    const tldrService = getTldrDaemonService(workspacePath, venvPath);
     await tldrService.stop();
     return stepOk(step, ['Stopped TLDR daemon']);
   } catch {
@@ -164,7 +198,7 @@ async function stopDockerImpl(
   const step = 'teardown:docker';
   try {
     const { stopWorkspaceDocker } = await import('../workspace-manager.js');
-    await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
+    await stopWorkspaceDocker(workspacePath, issueLower);
     return stepOk(step, ['Stopped Docker containers']);
   } catch {
     return stepSkipped(step, ['Docker cleanup skipped (not running or failed)']);
@@ -266,7 +300,7 @@ async function removeWorktreeImpl(
 
   // Guard: never delete workspace (and its `.devcontainer/`) while containers
   // still reference compose paths inside it.
-  const orphanedContainers = await Effect.runPromise(getContainersReferencingWorkspacePath(workspacePath));
+  const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
   if (orphanedContainers.length > 0) {
     return stepFailed(
       step,
@@ -287,6 +321,22 @@ async function removeWorktreeImpl(
       return stepFailed(step, `Failed to remove workspace: ${(err as Error).message}`);
     }
   }
+}
+
+/**
+ * Registered workers' residue (PAN-3920). Their `.swarm/worker-<n>` worktrees
+ * are removed only when the workspace itself is deleted: a kept workspace keeps
+ * them, uncommitted changes included. Worker branches are deleted only when
+ * already contained in the default or feature branch (`reapWorkerWorktrees`).
+ */
+export function removeWorkerWorktrees(projectPath: string, issueId: string, deletingWorkspace: boolean): Effect.Effect<StepResult> {
+  const step = 'teardown:worker-worktrees';
+  // The promise never rejects: a cleanup failure is reported as a skipped step.
+  return Effect.promise(() =>
+    reapWorkerWorktrees(projectPath, issueId, { removeWorktrees: deletingWorkspace }).then(
+      (details) => (details.length > 0 ? stepOk(step, details) : stepSkipped(step, ['No worker worktrees'])),
+      (err: unknown) => stepSkipped(step, [`Worker worktree cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`]),
+    ));
 }
 
 /**
@@ -322,19 +372,17 @@ async function removeAgentStateImpl(issueLower: string): Promise<StepResult> {
     name === work || name === planner || name === strike || name.startsWith(specialistPrefix),
   );
 
-  let removed = 0;
-  let preservedTranscripts = 0;
+  let pruned = 0;
   for (const name of targets) {
     try {
-      const result = await removeAgentStateDir(join(AGENTS_DIR, name));
-      if (result.removedDir || result.preservedTranscripts > 0) removed++;
-      preservedTranscripts += result.preservedTranscripts;
+      await pruneAgentStateDir(join(AGENTS_DIR, name));
+      pruned++;
     } catch { /* non-fatal */ }
   }
 
-  if (removed > 0) {
+  if (pruned > 0) {
     return stepOk(step, [
-      `Cleaned ${removed} agent state director${removed === 1 ? 'y' : 'ies'} (${preservedTranscripts} transcript files preserved)`,
+      `Pruned ${pruned} agent directories (transcripts and state kept)`,
     ]);
   }
   return stepSkipped(step, ['No agent state directories found']);
@@ -638,7 +686,7 @@ function removeTunnelConfig(
   return Effect.tryPromise({
     try: async () => {
       const { removeTunnelIngress } = await import('../tunnel.js');
-      const result = await Effect.runPromise(removeTunnelIngress(tunnelConfig, placeholders as any));
+      const result = await removeTunnelIngress(tunnelConfig, placeholders as any);
       return stepOk('teardown:tunnel', result.steps || ['Removed tunnel ingress']);
     },
     catch: (err) => err,
@@ -659,7 +707,7 @@ function removeHumeEviConfig(
   return Effect.tryPromise({
     try: async () => {
       const { deleteHumeConfig } = await import('../hume.js');
-      const result = await Effect.runPromise(deleteHumeConfig(humeConfig, placeholders as any));
+      const result = await deleteHumeConfig(humeConfig, placeholders as any);
       return stepOk('teardown:hume', result.steps || ['Removed Hume EVI config']);
     },
     catch: (err) => err,
@@ -720,6 +768,9 @@ export function teardownWorkspace(
           results.push(yield* removeHumeEviConfig(opts.workspaceConfig.hume, placeholders));
         }
       }
+
+      // 8b. PAN-3920: registered workers' worktrees go only with the workspace.
+      results.push(yield* removeWorkerWorktrees(ctx.projectPath, ctx.issueId, shouldDeleteWorkspace));
 
       // 9. Remove worktree + workspace directory (only if deleting workspace).
       if (shouldDeleteWorkspace) {
@@ -784,7 +835,7 @@ function pruneCheckpointRefs(projectPath: string, issueLower: string): Effect.Ef
       const step = 'teardown:checkpoint-refs';
       const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
       const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`, `strike-${issueLower}`];
-      const pruned = await Effect.runPromise(pruneCheckpointRefsForAgents(projectPath, agentIds));
+      const pruned = await pruneCheckpointRefsForAgents(projectPath, agentIds);
       return stepOk(step, [`Pruned ${pruned} checkpoint ref(s) for ${agentIds.join(', ')}`]);
     },
     catch: (err) => err,

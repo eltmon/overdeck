@@ -28,6 +28,15 @@
  * process and reports a dead agent alive.
  */
 
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `isAliveSync` (async: `isAlive`): src/lib/parked/resolver.ts:258, src/lib/work-agent-lifecycle.ts:104. Owned
+ *   by the PAN-3845 liveness seam work; its semantics are not changed here.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { Effect } from 'effect';
 
 import { listPaneValues, listPaneValuesSync, sessionExists, sessionExistsSync } from '../tmux.js';
@@ -35,8 +44,13 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { hostTerminalBackendName } from '../terminal-backends/select.js';
 import type { HerdrLivenessProbe } from '../terminal-backends/herdr.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
-import { getAgentStateSync } from './agent-state.js';
+import { getAgentState } from './agent-state.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
+import {
+  LEGACY_TMUX_PROBE_TIMEOUT_MS,
+  queryTmuxSession,
+  type TmuxSessionAnswer,
+} from './tmux-session-query.js';
 import {
   findAgentRuntimePidInSubtree,
   findAgentRuntimePidInSubtreeSync,
@@ -112,6 +126,14 @@ export interface LivenessAsyncDeps {
   backend?: TerminalBackendName;
   /** Herdr probe seam; defaults to the adapter's `probeHerdrAgentLiveness`. */
   probeHerdr?: (agentId: string) => Promise<HerdrLivenessProbe>;
+  /**
+   * Three-part tmux session probe for the legacy check on a Herdr host.
+   * Defaults to a bounded `has-session`; a `sessionExists` seam, when given,
+   * stands in for it (and can only answer exists or missing).
+   */
+  queryTmuxSession?: (agentId: string) => Promise<TmuxSessionAnswer>;
+  /** Bound on the legacy tmux check; defaults to `LEGACY_TMUX_LIVENESS_TIMEOUT_MS`. */
+  legacyTmuxTimeoutMs?: number;
 }
 
 /** Test seams for the sync probe (the lifecycle classifier's variant). */
@@ -123,7 +145,7 @@ export interface LivenessSyncDeps {
 }
 
 function readHarnessDefault(agentId: string): RuntimeName {
-  return getAgentStateSync(agentId)?.harness ?? 'claude-code';
+  return getAgentState(agentId)?.harness ?? 'claude-code';
 }
 
 async function sessionExistsDefault(agentId: string): Promise<boolean> {
@@ -131,7 +153,7 @@ async function sessionExistsDefault(agentId: string): Promise<boolean> {
 }
 
 async function listPaneRowsDefault(agentId: string): Promise<PaneRow[]> {
-  const values = await Effect.runPromise(listPaneValues(agentId, '#{pane_pid}\t#{pane_dead}')).catch(() => [] as string[]);
+  const values = await listPaneValues(agentId, '#{pane_pid}\t#{pane_dead}').catch(() => [] as string[]);
   return parsePaneRows(values);
 }
 
@@ -148,8 +170,50 @@ function listPaneRowsSyncDefault(agentId: string): PaneRow[] {
  */
 export async function isAlive(agentId: string, deps: LivenessAsyncDeps = {}): Promise<LivenessVerdict> {
   const backend = deps.backend ?? (await hostTerminalBackendName());
-  if (backend === 'herdr') return isAliveOnHerdr(agentId, deps);
-  return isAliveOnTmux(agentId, deps);
+  if (backend !== 'herdr') return isAliveOnTmux(agentId, deps);
+  const verdict = await isAliveOnHerdr(agentId, deps);
+  if (verdict.alive || verdict.reason !== 'no-session') return verdict;
+  // Review of #3992 (M3): an agent launched before the host moved to Herdr
+  // still runs in its tmux session, which Herdr knows nothing about. Herdr's
+  // `absent` must not become a death for it — recover and resume would kill a
+  // live agent and relaunch it. A live (or unprobeable) legacy session answers.
+  const legacy = await isAliveOnLegacyTmux(agentId, deps);
+  if (legacy.alive || legacy.reason === 'runtime-indeterminate') return legacy;
+  return verdict;
+}
+
+/** Upper bound on the whole legacy tmux check (has-session, list-panes, ps). */
+const LEGACY_TMUX_LIVENESS_TIMEOUT_MS = LEGACY_TMUX_PROBE_TIMEOUT_MS + 1_000;
+
+const INDETERMINATE: LivenessVerdict = { alive: false, reason: 'runtime-indeterminate' };
+
+/**
+ * The legacy tmux check behind a Herdr `absent` (review of #4018, L2). The
+ * session probe answers in three parts — a tmux error is indeterminate, never
+ * "no session" — and the whole check is bounded, so a hung tmux server cannot
+ * stall `isAlive` on a Herdr host: it answers indeterminate instead.
+ */
+async function isAliveOnLegacyTmux(agentId: string, deps: LivenessAsyncDeps): Promise<LivenessVerdict> {
+  const legacySessionExists = deps.sessionExists;
+  const query = deps.queryTmuxSession
+    ?? (legacySessionExists
+      ? async (id: string): Promise<TmuxSessionAnswer> => ((await legacySessionExists(id)) ? 'exists' : 'missing')
+      : (id: string) => queryTmuxSession(id));
+  const check = (async (): Promise<LivenessVerdict> => {
+    const answer = await query(agentId).catch((): TmuxSessionAnswer => 'error');
+    if (answer === 'missing') return { alive: false, reason: 'no-session' };
+    if (answer === 'error') return INDETERMINATE;
+    return isAliveOnTmux(agentId, { ...deps, sessionExists: async () => true });
+  })();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<LivenessVerdict>((resolve) => {
+    timer = setTimeout(() => resolve(INDETERMINATE), deps.legacyTmuxTimeoutMs ?? LEGACY_TMUX_LIVENESS_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([check.catch(() => INDETERMINATE), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -284,7 +348,7 @@ export function getAgentEffectiveLastActivityMs(agentId: string): number | null 
  * minutes while producing no tool calls, no transcript writes, and no hook
  * events. This signal goes stale exactly when real work stops.
  */
-export function getAgentWorkActivityMs(agentId: string): number | null {
+function getAgentWorkActivityMs(agentId: string): number | null {
   const candidates: number[] = [];
 
   const runtimeState = getAgentRuntimeStateSync(agentId);

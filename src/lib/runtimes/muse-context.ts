@@ -2,17 +2,17 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getOverdeckHome, isDevMode } from '../paths.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPath } from '../projects.js';
 import { renderGlobalLayer, renderProjectLayer } from '../context-layers/render.js';
 import { resolveWorkspaceContextFile } from '../context-layers/layers.js';
 import { renderForHarness } from '../context-layers/harness.js';
 import { workspaceContextWithoutProjectLayer } from '../context-layers/assemble.js';
-import { museDataHome } from './muse-session.js';
+import { museDataHome } from './storage/muse.js';
 
 export async function materializeMuseContext(agentId: string, workspace: string, roleFile?: string): Promise<string> {
   museDataHome(agentId); // Validate identity before forming artifact paths.
   const sections = [renderGlobalLayer('muse', isDevMode())];
-  const project = findProjectByPathSync(workspace);
+  const project = findProjectByPath(workspace);
   if (project) sections.push(renderProjectLayer(project.path, 'muse'));
   const workspaceLayer = await readFile(resolveWorkspaceContextFile(workspace), 'utf8').catch(error => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';

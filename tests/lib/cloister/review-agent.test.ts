@@ -36,6 +36,7 @@ import {
 const {
   mockKillSessionAsync,
   mockListSessionNames,
+  mockAgentPaneExists,
   mockListSessionNamesEffect,
   mockSaveAgentStateAsync,
   mockSpawnRun,
@@ -47,7 +48,7 @@ const {
   mockGetCachedConflictGateMergeability,
   mockSetReviewStatus,
   mockGetReviewStatus,
-  mockArchiveFeedbackFiles,
+  mockClearFeedbackFiles,
   mockLoadConfigSync,
   mockGetLatestSessionIdSync,
   mockResumeAgent,
@@ -59,6 +60,7 @@ const {
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockListSessionNames: vi.fn().mockReturnValue([]),
   mockListSessionNamesEffect: vi.fn(),
+  mockAgentPaneExists: vi.fn(),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
   mockMessageAgent: vi.fn().mockResolvedValue(undefined),
@@ -69,7 +71,7 @@ const {
   mockGetCachedConflictGateMergeability: vi.fn(() => undefined),
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(() => null),
-  mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
+  mockClearFeedbackFiles: vi.fn(async () => undefined),
   mockLoadConfigSync: vi.fn(() => ({ config: {} })),
   mockGetLatestSessionIdSync: vi.fn(() => null),
   mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
@@ -77,6 +79,10 @@ const {
   mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
   mockMarkAgentStoppedState: vi.fn((state: { id?: string; status?: string }) => ({ ...state, status: 'stopped' })),
   mockConvergeRowFromVerdictOfRecord: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -90,19 +96,18 @@ vi.mock('../../../src/lib/tmux.js', async () => {
     killSessionSync: (...args: Parameters<typeof mockKillSessionAsync>) => Effect.promise(() => mockKillSessionAsync(...args)),
     setOption: vi.fn(() => Effect.void),
     isPaneDead: vi.fn(() => Effect.succeed(false)),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: vi.fn(async () => []),
   };
 });
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentState: (...args: Parameters<typeof mockGetAgentState>) => Effect.sync(() => mockGetAgentState(...args)),
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
+  getAgentState: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
   messageAgent: mockMessageAgent,
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateSync: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateProgram: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   spawnRun: mockSpawnRun,
-  getLatestSessionIdSync: mockGetLatestSessionIdSync,
+  getLatestSessionId: mockGetLatestSessionIdSync,
   resumeAgent: mockResumeAgent,
   stopAgent: (...args: Parameters<typeof mockStopAgent>) => Effect.promise(() => mockStopAgent(...args)),
   wipeAgentStateDirs: mockWipeAgentStateDirs,
@@ -110,13 +115,12 @@ vi.mock('../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../src/lib/agents/agent-state.js', () => ({
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
+  getAgentState: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   markAgentStoppedState: (...args: Parameters<typeof mockMarkAgentStoppedState>) => mockMarkAgentStoppedState(...args),
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: mockLoadConfigSync,
   resolveModel: vi.fn(() => 'configured-reviewer-model'),
 }));
@@ -131,7 +135,6 @@ vi.mock('../../../src/lib/paths.js', async (importOriginal) => {
 
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: mockNotifyPipeline,
-  notifyPipelineSync: mockNotifyPipeline,
 }));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
@@ -149,7 +152,7 @@ vi.mock('../../../src/lib/cloister/conflict-gate.js', () => ({
 }));
 
 vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
-  archiveFeedbackFiles: mockArchiveFeedbackFiles,
+  clearFeedbackFiles: mockClearFeedbackFiles,
 }));
 
 vi.mock('../../../src/lib/cloister/verdict-restore.js', () => ({
@@ -162,6 +165,14 @@ beforeEach(() => {
   mockKillSessionAsync.mockResolvedValue(undefined);
   mockListSessionNames.mockReturnValue([]);
   mockListSessionNamesEffect.mockImplementation(() => Effect.sync(() => mockListSessionNames()));
+  // review-convoy asks the SELECTED backend per reviewer (agentPaneExists); by
+  // default answer from the same session list the tmux mock serves, so a probe
+  // failure configured on the tmux mock still surfaces as a thrown probe.
+  mockAgentPaneExists.mockReset();
+  mockAgentPaneExists.mockImplementation(async (agentId: string) => {
+    const names = await Effect.runPromise(mockListSessionNamesEffect() as Effect.Effect<string[], Error>);
+    return names.includes(agentId);
+  });
   mockSaveAgentStateAsync.mockResolvedValue(undefined);
   mockMessageAgent.mockResolvedValue(undefined);
   mockGetAgentState.mockReturnValue(null);
@@ -173,7 +184,7 @@ beforeEach(() => {
   mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
   mockResolveConflictGate.mockResolvedValue({ gated: false });
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
-  mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+  mockClearFeedbackFiles.mockResolvedValue(undefined);
   mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
 });
 
@@ -277,7 +288,7 @@ describe('killAllReviewSessions', () => {
       'agent-pan-999-work',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toEqual(expect.arrayContaining([
       'agent-pan-999-review',
@@ -296,7 +307,7 @@ describe('killAllReviewSessions', () => {
       'agent-pan-999',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toContain('review-coordinator-PAN-999-1234567890000');
     expect(result.killed).toContain('review-coordinator-PAN-888-1234567890001');
@@ -312,7 +323,7 @@ describe('killAllReviewSessions', () => {
       'agent-pan-999',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toContain('specialist-overdeck-PAN-999-review-correctness');
     expect(result.killed).toContain('specialist-overdeck-PAN-999-review-security');
@@ -326,7 +337,7 @@ describe('killAllReviewSessions', () => {
       'review-PAN-999-1713456789000-security',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toContain('review-PAN-999-1713456789000-correctness');
     expect(result.killed).toContain('review-PAN-999-1713456789000-security');
@@ -340,7 +351,7 @@ describe('killAllReviewSessions', () => {
       'overdeck-dashboard',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toHaveLength(0);
     expect(result.failed).toHaveLength(0);
@@ -354,7 +365,7 @@ describe('killAllReviewSessions', () => {
     ]));
     mockKillSessionAsync.mockRejectedValueOnce(new Error('session not found'));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toHaveLength(0);
     expect(result.failed).toContain('review-coordinator-PAN-999-1234567890000');
@@ -377,7 +388,7 @@ describe('killAllReviewerSessions', () => {
       'agent-pan-999-review',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewerSessions('overdeck', 'PAN-1080'));
+    const result = await killAllReviewerSessions('overdeck', 'PAN-1080');
 
     expect(result.killed).toEqual(['agent-pan-1080-review']);
     expect(mockKillSessionAsync).toHaveBeenCalledWith('agent-pan-1080-review');
@@ -395,7 +406,7 @@ describe('killAllReviewerSessions', () => {
       'agent-pan-1080',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewerSessions('overdeck', 'PAN-1080'));
+    const result = await killAllReviewerSessions('overdeck', 'PAN-1080');
 
     expect(result.killed).toEqual(expect.arrayContaining([
       'agent-pan-1080-review',
@@ -471,7 +482,7 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(block).toContain('buildSelfReviewPrompt');
     // The fan-out itself lives in review-convoy.ts and always launches the four
     // independent convoy lanes for a new review run.
-    expect(block).toContain('launchConvoyReviewersPromise');
+    expect(block).toContain('launchConvoyReviewers');
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
     expect(block).not.toContain('discoveryForkMode');
@@ -609,7 +620,7 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     );
 
     const guardMatch = agentSrc.match(
-      /async function spawnReviewRoleForIssuePromise[\s\S]*?archiveFeedbackFiles/,
+      /async function spawnReviewRoleForIssueBody[\s\S]*?clearFeedbackFiles/,
     );
     expect(guardMatch).not.toBeNull();
     const guardBlock = guardMatch![0];
@@ -724,13 +735,13 @@ describe('convoy orchestration', () => {
   });
 
   it('builds a manifest-scoped convoy prompt for one sub-role', async () => {
-    const prompt = await Effect.runPromise(buildConvoyPrompt({
+    const prompt = await buildConvoyPrompt({
       issueId: 'PAN-1059',
       subRole: 'security',
       outputPath: '/home/test/.overdeck/agents/agent-pan-1059-review-security/review-security.md',
       synthesisAgentId: 'agent-pan-1059-review',
       contextManifestPath: '/workspace/.pan/review/run-1/context.json',
-    }));
+    });
 
     expect(prompt).toContain('REVIEW TASK for PAN-1059 — SECURITY REVIEW');
     expect(prompt).toContain('/home/test/.overdeck/agents/agent-pan-1059-review-security/review-security.md');
@@ -747,13 +758,13 @@ describe('convoy orchestration', () => {
   it('uses run-scoped output paths by default', async () => {
     const manifestPath = writeReviewManifest(REVIEW_AGENT_DEFAULT_WORKSPACE);
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_DEFAULT_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       contextManifestPath: manifestPath,
-    }));
+    });
 
     expect(result.success).toBe(true);
     const expectedOutput = `${REVIEW_AGENT_DEFAULT_WORKSPACE}/.pan/review/${REVIEW_AGENT_RUN_ID}/security.md`;
@@ -767,14 +778,14 @@ describe('convoy orchestration', () => {
   it('spawns a reviewer as a review sub-role session with the resolved model', async () => {
     const manifestPath = writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE);
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       outputPath: '/tmp/pan-review-agent-test-security.md',
       contextManifestPath: manifestPath,
-    }));
+    });
 
     expect(result).toMatchObject({
       success: true,
@@ -807,14 +818,14 @@ describe('convoy orchestration', () => {
     );
     mockListSessionNames.mockReturnValue([reviewerId]);
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       outputPath: '/tmp/pan-review-agent-test-security.md',
       contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
-    }));
+    });
 
     expect(result).toEqual({
       success: true,
@@ -838,13 +849,13 @@ describe('convoy orchestration', () => {
         .mockRejectedValueOnce(new Error(`write failed for agents-db:${reviewerId}: SQLITE_BUSY`))
         .mockResolvedValueOnce({ id: reviewerId });
 
-      const resultPromise = Effect.runPromise(spawnReviewSubRoleForIssue({
+      const resultPromise = spawnReviewSubRoleForIssue({
         issueId: 'PAN-1059',
         workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
         subRole: 'security',
         runId: REVIEW_AGENT_RUN_ID,
         outputPath: '/tmp/pan-review-agent-test-security.md',
-      }));
+      });
       while (mockSpawnRun.mock.calls.length === 0) {
         await new Promise<void>((resolve) => { setImmediate(resolve); });
       }
@@ -874,13 +885,13 @@ describe('convoy orchestration', () => {
       error: `Cannot resume ${reviewerId}: it appears healthy (tmux session up, harness process alive) — there is nothing to resume. Stop it first if you intend to restart it.`,
     });
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
-    }));
+    });
 
     expect(result.success).toBe(true);
     expect(mockStopAgent).toHaveBeenCalledWith(reviewerId);
@@ -903,13 +914,13 @@ describe('convoy orchestration', () => {
     mockGetLatestSessionIdSync.mockReturnValue('saved-session');
     mockResumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
-    }));
+    });
 
     expect(result.success).toBe(true);
     expect(mockSpawnRun).not.toHaveBeenCalled();
@@ -931,13 +942,13 @@ describe('convoy orchestration', () => {
     mockGetLatestSessionIdSync.mockReturnValue('saved-session');
     mockResumeAgent.mockResolvedValue({ success: true, messageDelivered: false });
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
-    }));
+    });
 
     expect(result.success).toBe(true);
     expect(mockStopAgent).toHaveBeenCalledWith(reviewerId);
@@ -1125,7 +1136,7 @@ describe('convoy orchestration', () => {
 // dispatch error (e.g., tmux not ready, file-system issue).
 
 describe('dispatch failure reviewStatus regression', () => {
-  it('review-pipeline.ts request-review route blocks dirty worktrees before verification', async () => {
+  it('review-pipeline.ts startRequestReviewPipeline blocks dirty worktrees before verification', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1133,7 +1144,7 @@ describe('dispatch failure reviewStatus regression', () => {
       'utf-8',
     );
     const requestReviewMatch = routeSrc.match(
-      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
+      /export async function startRequestReviewPipeline[\s\S]*?registerRequestReviewStarter\(startRequestReviewPipeline\)/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -1148,7 +1159,7 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
-  it('review-pipeline.ts request-review route starts guarded background verification', async () => {
+  it('review-pipeline.ts startRequestReviewPipeline starts guarded background verification', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1156,7 +1167,7 @@ describe('dispatch failure reviewStatus regression', () => {
       'utf-8',
     );
     const requestReviewMatch = routeSrc.match(
-      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
+      /export async function startRequestReviewPipeline[\s\S]*?registerRequestReviewStarter\(startRequestReviewPipeline\)/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];

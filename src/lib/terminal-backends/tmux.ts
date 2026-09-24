@@ -22,8 +22,9 @@ import { Effect } from 'effect';
 // registry/feature-registry-population.ts back to agents.ts, which imports
 // this backend transitively — import the read-only leaf instead so a terminal
 // backend computing pane tokens cannot close that cycle.
-import { getAgentStateSync } from '../agents/agent-state-read.js';
+import { getAgentState } from '../agents/agent-state-read.js';
 import { isAliveOnTmux, isIdle } from '../agents/liveness.js';
+import { shellQuoteArg } from '../shell-quote.js';
 import { createSession, killSession, listSessions, sendKeys, sessionExists } from '../tmux.js';
 import { checkPrompt, toPaneRole, tokensFromLaunchMetadata } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
@@ -55,8 +56,11 @@ const BACKEND = 'tmux' as const;
  * The target's tokens on tmux. There are no pane tokens, so they come from the
  * agent's launch metadata — the same four values a Herdr pane is stamped with.
  */
+/** Session names Overdeck launches: agents, planners, strikes and conversations. */
+const OVERDECK_SESSION_NAME = /^(agent|planning|strike|conv)-/;
+
 export function tmuxTargetTokens(sessionName: string): Partial<PaneTokens> {
-  return tokensFromLaunchMetadata(getAgentStateSync(sessionName));
+  return tokensFromLaunchMetadata(getAgentState(sessionName));
 }
 
 function sessionNameOf(target: AgentTarget): string {
@@ -109,7 +113,10 @@ export class TmuxBackend implements TerminalBackend {
       const sessionName = spec.name;
       if (!sessionName) throw new Error('the tmux backend needs spec.name — the tmux session is named after the agent');
       const cwd = spec.cwd ?? workspace.cwd;
-      await Effect.runPromise(createSession(sessionName, cwd, spec.argv.join(' '), { env: { ...spec.env } }));
+      // tmux runs the command through `sh -c`, so each argument is quoted — an
+      // OVERDECK_HOME with a space must not split the launcher path.
+      const command = spec.argv.map(shellQuoteArg).join(' ');
+      await Effect.runPromise(createSession(sessionName, cwd, command, { env: { ...spec.env } }));
       return {
         backend: BACKEND,
         workspaceId: workspace.workspaceId,
@@ -185,6 +192,8 @@ export class TmuxBackend implements TerminalBackend {
         snapshots.push({
           backend: BACKEND,
           paneId: session.name,
+          // PAN-3920: only an Overdeck session (agent state or managed name) names an agent.
+          ...(tokens.role || OVERDECK_SESSION_NAME.test(session.name) ? { agentId: session.name } : {}),
           terminalId: session.name,
           workspaceId: tokens.issue ? `agent-${tokens.issue.toLowerCase()}` : session.name,
           state,

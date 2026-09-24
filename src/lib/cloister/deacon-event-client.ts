@@ -1,5 +1,5 @@
 import type { DomainEvent } from '@overdeck/contracts';
-import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 
 export interface DeaconEventClientOptions {
   dashboardUrl?: string;
@@ -94,7 +94,7 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
     inFlight = true;
     const batch = queue.slice(0, batchSize);
     try {
-      const token = options.token ?? ensureInternalTokenSync();
+      const token = options.token ?? ensureInternalToken();
       const response = await fetchImpl(new URL('/api/internal/events', dashboardUrl), {
         method: 'POST',
         headers: {
@@ -118,7 +118,7 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
   }
 
   async function fetchJson<T>(url: URL, signal?: AbortSignal): Promise<T> {
-    const token = options.token ?? ensureInternalTokenSync();
+    const token = options.token ?? ensureInternalToken();
     const response = await fetchImpl(url, {
       signal,
       headers: {
@@ -196,7 +196,7 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
       const controller = new AbortController();
       const deadline = setTimeout(() => controller.abort(), appendOnceTimeoutMs);
       try {
-        const token = options.token ?? ensureInternalTokenSync();
+        const token = options.token ?? ensureInternalToken();
         const response = await fetchImpl(new URL('/api/internal/events/append-once', dashboardUrl), {
           method: 'POST',
           headers: {
@@ -253,7 +253,7 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
           const response = await fetchImpl(url, {
             signal: abortController.signal,
             headers: {
-              [INTERNAL_TOKEN_HEADER]: options.token ?? ensureInternalTokenSync(),
+              [INTERNAL_TOKEN_HEADER]: options.token ?? ensureInternalToken(),
               origin: dashboardUrl,
             },
           });

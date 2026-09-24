@@ -18,10 +18,11 @@ import { TAB_PATHS } from '../../../src/dashboard/frontend/src/App/routes.js';
 
 // Route-table check: every tab that existed on origin/main before PAN-1990
 // keeps its exact path. PAN-1990 only adds `workspace`.
-// PAN-3917 W7: `/flywheel` is deleted, not relocated — the flywheel page is gone
-// and its two survivors live on /awaiting-merge and /orders.
+// PAN-3917 W7 deleted `/flywheel`; PAN-3964 restored it as a derived view, so it
+// is back on the pre-PAN-1990 list with its original path.
 const PRE_PAN_1990_TAB_PATHS: Record<string, string> = {
   home: '/',
+  flywheel: '/flywheel',
   pipeline: '/pipeline',
   kanban: '/board',
   'command-deck': '/command-deck',

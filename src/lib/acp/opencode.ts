@@ -17,18 +17,29 @@ export interface OpenCodeAcpRuntimeInput extends Omit<AcpSessionRuntimeOptions, 
   readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
   readonly binaryPath?: string;
   readonly environment?: NodeJS.ProcessEnv;
+  readonly port?: number;
 }
+
+export const OPENCODE_PRE_ALLOWED_PERMISSION = JSON.stringify({
+  external_directory: "allow",
+  doom_loop: "allow",
+  read: { "*.env": "allow", "*.env.*": "allow" },
+});
 
 export function buildOpenCodeAcpSpawnInput(
   settings: { readonly binaryPath?: string } | null | undefined,
   cwd: string,
+  port: number,
   environment?: NodeJS.ProcessEnv,
 ): AcpSpawnInput {
   return {
     command: settings?.binaryPath || "opencode",
-    args: ["acp"],
+    args: ["acp", "--hostname", "127.0.0.1", "--port", String(port)],
     cwd,
-    ...(environment ? { env: environment } : {}),
+    env: {
+      ...environment,
+      OPENCODE_PERMISSION: OPENCODE_PRE_ALLOWED_PERMISSION,
+    },
   };
 }
 
@@ -50,11 +61,14 @@ export const makeOpenCodeAcpRuntime = (
   input: OpenCodeAcpRuntimeInput,
 ): Effect.Effect<AcpSessionRuntime["Service"], EffectAcpErrors.AcpError, Crypto.Crypto | Scope.Scope> =>
   Effect.gen(function* () {
-    const { childProcessSpawner, binaryPath, environment, ...runtimeOptions } = input;
+    const { childProcessSpawner, binaryPath, environment, port, ...runtimeOptions } = input;
+    if (port === undefined) {
+      throw new Error("OpenCode ACP requires a reserved HTTP server port");
+    }
     const context = yield* Layer.build(
       acpSessionRuntimeLayer({
         ...runtimeOptions,
-        spawn: buildOpenCodeAcpSpawnInput({ binaryPath }, input.cwd, environment),
+        spawn: buildOpenCodeAcpSpawnInput({ binaryPath }, input.cwd, port, environment),
         authMethodId: resolveOpenCodeAuthMethodId,
       }).pipe(Layer.provide(Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, childProcessSpawner))),
     );

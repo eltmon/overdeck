@@ -1,14 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import {
-  extractAcceptanceCriteriaSync,
-  extractACFromDocument,
-  formatAcceptanceCriteria,
-  checkAllCriteriaCompletedSync,
-} from '../acceptance-criteria.js';
+import { extractACFromDocument, formatAcceptanceCriteria } from '../acceptance-criteria.js';
 import type { XBriefDocument } from '../types.js';
+import type { AcceptanceCriterion } from '../acceptance-criteria.js';
+import { readWorkspacePlan } from '../io.js';
+import type { XBriefReadError } from '../io.js';
+
+// Moved here from src/lib/xbrief/acceptance-criteria.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Extract all acceptance criteria from an xBRIEF plan.
+ *
+ * Reads the merged xBRIEF plan and returns all child items
+ * where metadata.kind === 'acceptance_criterion', enriched with parent
+ * task context.
+ *
+ * @returns Array of acceptance criteria, or empty array if no plan exists
+ *          or no AC are found (legacy workspace compatibility).
+ */
+const extractAcceptanceCriteria = (
+  workspacePath: string,
+): Effect.Effect<AcceptanceCriterion[], XBriefReadError> =>
+  Effect.gen(function* () {
+    const doc = yield* readWorkspacePlan(workspacePath);
+    if (!doc) return [];
+    return extractACFromDocument(doc);
+  });
 
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
@@ -62,17 +81,17 @@ afterEach(() => {
 });
 
 describe('extractAcceptanceCriteria', () => {
-  it('returns empty array when no plan exists', () => {
-    expect(extractAcceptanceCriteriaSync(WORKSPACE_PATH)).toEqual([]);
+  it('returns empty array when no plan exists', async () => {
+    expect(await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH))).toEqual([]);
   });
 
-  it('returns empty array when plan has no subItems', () => {
+  it('returns empty array when plan has no subItems', async () => {
     const doc = makePlanWithAC([{ id: 'item-1', title: 'Task 1' }]);
     writePlan(doc);
-    expect(extractAcceptanceCriteriaSync(WORKSPACE_PATH)).toEqual([]);
+    expect(await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH))).toEqual([]);
   });
 
-  it('extracts AC subItems with parent context', () => {
+  it('extracts AC subItems with parent context', async () => {
     const doc = makePlanWithAC([{
       id: 'item-1',
       title: 'Build module',
@@ -83,7 +102,7 @@ describe('extractAcceptanceCriteria', () => {
     }]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
+    const result = await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH));
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({
       itemId: 'item-1',
@@ -94,7 +113,7 @@ describe('extractAcceptanceCriteria', () => {
     });
   });
 
-  it('only extracts subItems with kind=acceptance_criterion', () => {
+  it('only extracts subItems with kind=acceptance_criterion', async () => {
     const doc = makePlanWithAC([{
       id: 'item-1',
       title: 'Task',
@@ -105,12 +124,12 @@ describe('extractAcceptanceCriteria', () => {
     }]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
+    const result = await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH));
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe('AC item');
   });
 
-  it('skips acceptance criteria from deferred items', () => {
+  it('skips acceptance criteria from deferred items', async () => {
     const doc = makePlanWithAC([
       {
         id: 'active-item',
@@ -127,12 +146,12 @@ describe('extractAcceptanceCriteria', () => {
     ]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
+    const result = await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH));
     expect(result).toHaveLength(1);
     expect(result[0].itemId).toBe('active-item');
   });
 
-  it('extracts AC from multiple items', () => {
+  it('extracts AC from multiple items', async () => {
     const doc = makePlanWithAC([
       {
         id: 'item-1',
@@ -147,7 +166,7 @@ describe('extractAcceptanceCriteria', () => {
     ]);
     writePlan(doc);
 
-    const result = extractAcceptanceCriteriaSync(WORKSPACE_PATH);
+    const result = await Effect.runPromise(extractAcceptanceCriteria(WORKSPACE_PATH));
     expect(result).toHaveLength(2);
     expect(result[0].itemTitle).toBe('First task');
     expect(result[1].itemTitle).toBe('Second task');
@@ -201,83 +220,3 @@ describe('formatAcceptanceCriteria', () => {
   });
 });
 
-describe('checkAllCriteriaCompleted', () => {
-  it('returns allCompleted=true when no plan exists (legacy compat)', () => {
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-    expect(result.incomplete).toEqual([]);
-  });
-
-  it('returns allCompleted=true when all AC are completed', () => {
-    const doc = makePlanWithAC([{
-      id: 'item-1',
-      title: 'Task',
-      subItems: [
-        { id: 'item-1.ac1', title: 'Done', status: 'completed' },
-        { id: 'item-1.ac2', title: 'Also done', status: 'completed' },
-      ],
-    }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-    expect(result.incomplete).toEqual([]);
-  });
-
-  it('returns incomplete AC when some are pending', () => {
-    const doc = makePlanWithAC([{
-      id: 'item-1',
-      title: 'Task',
-      subItems: [
-        { id: 'item-1.ac1', title: 'Done', status: 'completed' },
-        { id: 'item-1.ac2', title: 'Not done', status: 'pending' },
-      ],
-    }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(false);
-    expect(result.incomplete).toHaveLength(1);
-    expect(result.incomplete[0].title).toBe('Not done');
-  });
-
-  it('treats cancelled AC as completed (not blocking)', () => {
-    const doc = makePlanWithAC([{
-      id: 'item-1',
-      title: 'Task',
-      subItems: [
-        { id: 'item-1.ac1', title: 'Done', status: 'completed' },
-        { id: 'item-1.ac2', title: 'Cancelled', status: 'cancelled' },
-      ],
-    }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-  });
-
-  it('does not block completion on deferred item acceptance criteria', () => {
-    const doc = makePlanWithAC([{
-      id: 'deferred-item',
-      title: 'Deferred task',
-      status: 'deferred',
-      metadata: { deferred: true },
-      subItems: [
-        { id: 'deferred-item.ac1', title: 'Deferred and not done', status: 'pending' },
-      ],
-    }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-    expect(result.incomplete).toEqual([]);
-  });
-
-  it('returns allCompleted=true when items have no AC subItems', () => {
-    const doc = makePlanWithAC([{ id: 'item-1', title: 'Task' }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-  });
-});

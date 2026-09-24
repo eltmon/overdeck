@@ -8,7 +8,7 @@
  * from listRunningAgents to build agentsById).
  *
  * This test exercises the file → parseAgentState path through
- * getAgentStateSync to prove a persisted strike state is returned, not
+ * getAgentState to prove a persisted strike state is returned, not
  * dropped. The Role type in packages/contracts already includes 'strike'.
  */
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ const tmpHome = mkdtempSync(join(tmpdir(), 'pan-1506-strike-'));
 const previousHome = process.env.OVERDECK_HOME;
 process.env.OVERDECK_HOME = tmpHome;
 
-const { getAgentStateSync } = await import('../../src/lib/agents.js');
+const { getAgentState } = await import('../../src/lib/agents.js');
 
 function writeAgentState(agentId: string, role: string): void {
   const dir = join(tmpHome, 'agents', agentId);
@@ -57,14 +57,14 @@ describe('PAN-1506: parseAgentState accepts strike role', () => {
   });
 
   it('returns the strike state instead of null (regression for invisible strikes)', () => {
-    const state = getAgentStateSync('strike-pan-1506');
+    const state = getAgentState('strike-pan-1506');
     expect(state).not.toBeNull();
     expect(state?.role).toBe('strike');
     expect(state?.id).toBe('strike-pan-1506');
   });
 
   it('also returns work and plan states for parity', () => {
-    expect(getAgentStateSync('agent-pan-1419')?.role).toBe('work');
-    expect(getAgentStateSync('planning-pan-1234')?.role).toBe('plan');
+    expect(getAgentState('agent-pan-1419')?.role).toBe('work');
+    expect(getAgentState('planning-pan-1234')?.role).toBe('plan');
   });
 });

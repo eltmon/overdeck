@@ -1,7 +1,8 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  listRunningAgentsSync: vi.fn(() => []),
+  listRunningAgents: vi.fn(() => Effect.succeed([])),
   getRuntimeForAgent: vi.fn(),
   loadCloisterConfigSync: vi.fn(() => ({
     startup: { auto_start: true },
@@ -15,8 +16,8 @@ const mocks = vi.hoisted(() => ({
     lastRunError: null,
   })),
   readCloisterStateFile: vi.fn(() => ({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' })),
-  isCloisterSpawnsPausedSync: vi.fn(() => true),
-  setCloisterSpawnsPausedSync: vi.fn(),
+  isCloisterSpawnsPaused: vi.fn(() => true),
+  setCloisterSpawnsPaused: vi.fn(),
   startDeaconChild: vi.fn(async () => true),
   stopDeaconChild: vi.fn(async () => undefined),
   sendPatrolNow: vi.fn(() => true),
@@ -25,7 +26,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  listRunningAgentsSync: mocks.listRunningAgentsSync,
+  listRunningAgents: mocks.listRunningAgents,
 }));
 
 vi.mock('../../../src/lib/runtimes/index.js', () => ({
@@ -45,8 +46,8 @@ vi.mock('../../../src/lib/cloister/service.js', () => ({
 }));
 
 vi.mock('../../../src/lib/overdeck/control-settings.js', () => ({
-  isCloisterSpawnsPausedSync: mocks.isCloisterSpawnsPausedSync,
-  setCloisterSpawnsPausedSync: mocks.setCloisterSpawnsPausedSync,
+  isCloisterSpawnsPaused: mocks.isCloisterSpawnsPaused,
+  setCloisterSpawnsPaused: mocks.setCloisterSpawnsPaused,
 }));
 
 vi.mock('../../../src/dashboard/server/services/deacon-supervisor.js', () => ({
@@ -73,7 +74,7 @@ const {
 describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surface)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.listRunningAgentsSync.mockReturnValue([]);
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.readCloisterStateFile.mockReturnValue({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' });
     mocks.getDeaconLiteStatus.mockReturnValue({
       running: true,
@@ -84,11 +85,11 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
     mocks.isChildRunning.mockReturnValue(true);
     mocks.sendPatrolNow.mockReturnValue(true);
     mocks.reloadDeaconConfig.mockReturnValue(true);
-    mocks.isCloisterSpawnsPausedSync.mockReturnValue(true);
+    mocks.isCloisterSpawnsPaused.mockReturnValue(true);
   });
 
   it('composes status from the pid file and deacon-lite\'s in-memory status', async () => {
-    const status = readDurableCloisterStatus();
+    const status = await readDurableCloisterStatus();
 
     expect(status.running).toBe(true);
     expect(status.lastCheck?.toISOString()).toBe('2026-07-03T00:00:00.000Z');
@@ -97,7 +98,7 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
     expect(areDurableSpawnsPaused()).toBe(true);
     expect(mocks.readCloisterStateFile).toHaveBeenCalled();
     expect(mocks.getDeaconLiteStatus).toHaveBeenCalled();
-    expect(mocks.isCloisterSpawnsPausedSync).toHaveBeenCalled();
+    expect(mocks.isCloisterSpawnsPaused).toHaveBeenCalled();
   });
 
   it('uses the supervisor for start, stop, and manual patrol', async () => {

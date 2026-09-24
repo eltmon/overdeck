@@ -1,0 +1,692 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-10T16:13:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2372: bug(swarm): slot finishes (pan done) without writing statusOverrides — empty continue.json breaks durable completion detection",
+    "updated": "2026-07-10T16:31:27.055Z"
+  },
+  "plan": {
+    "id": "pan-2372",
+    "title": "bug(swarm): slot finishes (pan done) without writing statusOverrides — empty continue.json breaks durable completion detection",
+    "status": "running",
+    "uid": "f60d0d6d-b6ea-4a3e-a585-d30deea8eeb7",
+    "author": "agent:claude-fable-5",
+    "sequence": 4,
+    "created": "2026-07-10T16:13:44Z",
+    "updated": "2026-07-10T16:31:27.055Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2372",
+        "label": "PAN-2372",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/STATE-PLANE-COMMIT-POLICY.md",
+        "label": "State-plane commit policy",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "swarm",
+      "deacon",
+      "state-plane",
+      "records",
+      "durability"
+    ],
+    "narratives": {
+      "Problem": "Slot `pan done` persists completion only to the rebuildable runtime plane (agent state.json + runtime resolution) — no durable record write. Record writes themselves are non-atomic (plain writeFileSync) and corrupt records are silently replaced with fresh empty ones, destroying accumulated statusOverrides. Worse, post-migration the deacon's swarm coordinator reads/writes the WORKSPACE record (<workspace>/.pan/records/) while the merge path's statusOverrides mirror writes the CANONICAL record (${OVERDECK_HOME}/state/<project>/records/) — two different files, so merged items never read completed and finalization never fires. Finally, an alive-but-idle clean+ahead slot can never converge because classifyDurableReadySlot is only consulted for missing/vanished sessions and the default infer_completion mode 'nudge' never auto-infers. Net symptom: `[swarm] <issue> slot N running` every patrol forever, no finalize, no PR (PAN-2253 slot-1, PAN-2378 slots 1-2).",
+      "Proposal": "Make slot completion a durable, verified, single-door write and make detection consume durable state: (0) fix the state-home key mismatch (resolveStateReadHomeSync keys by basename(project.path) while the state worktree is keyed by the projects.yaml key, so migrated projects silently resolve legacy — discovered live during this planning session); (1) atomic tmp+rename record writes with read-back verification and corrupt-sidecar preservation; (2) re-home getIssueRecordPathForWorkspace onto canonical migration-aware resolution so every swarm read/write converges on one record; (3) slot pan done writes a swarm.slotCompletions marker and verifies it by read-back, exiting non-zero on persist failure; (4) classifyInFlightSlots treats a matching marker as ready-to-merge in every liveness branch, clears it on merge/requeue, and surfaces unreadable records; (5) default swarm.infer_completion flips nudge→auto; (6) defaultIsSlotWorktreeClean uses the shared isStatePlaneOnlyStatus predicate. Full PRD with verified file:line references: drafts/pan-2372.md on overdeck-state.",
+      "NonGoals": "- No change to 'nudge'/'off' semantics when explicitly configured via config or PAN_SWARM_INFER_COMPLETION\n- No change to verifyAndMergeSlot verification/merge mechanics\n- defaultGetSlotBranchAheadCount unchanged: state-plane-only commits still count as ahead (hazard H4, deferred)\n- No removal of the PAN-1919 legacy fold of workspace continue.json statusOverrides in buildIssueRecord\n- No fix for why gpt-5.5 slot agents idle without running pan done (harness/prompt behavior)\n- No automated cleanup of stray legacy <workspace>/.pan/records/ files (Doctor/Deacon already flag them)\n- No changes to review/test/merge pipeline stages beyond swarm slot completion detection"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Durable marker lives in the per-issue record (swarm.slotCompletions), not workspace continue.json",
+        "rationale": "The per-issue record on overdeck-state is the post-migration durable plane; continue.json is gitignored workspace runtime and is exactly the file that was found empty in the original incident."
+      },
+      {
+        "summary": "Slot pan done does NOT write item statusOverrides 'completed'",
+        "rationale": "Item completion is owned by the merge path (applyTaskOperationToPlanFile type 'done'); pre-merge completion would let finalizeSwarmIssueIfComplete fire before the slot branch is merged."
+      },
+      {
+        "summary": "Fix the split-brain at the getIssueRecordPathForWorkspace chokepoint instead of editing ~10 call sites",
+        "rationale": "One read door / one write door per the single-source-of-truth tenet; a path-resolution fix converges all callers and keeps unmigrated projects on their legacy surface automatically."
+      },
+      {
+        "summary": "Default infer_completion flips to 'auto'",
+        "rationale": "Operator-endorsed as substrate-correct in docs/FLYWHEEL-STATE.md (PAN-2378/RUN-56 diagnosis attached to PAN-2372); nudge-first grace and verifyAndMergeSlot gating remain."
+      },
+      {
+        "summary": "Skipped bootstrapping legacy .pan/context/codebase/",
+        "rationale": "Codebase map already exists at code-owned .overdeck/context/codebase/; recreating legacy .pan/ paths post-migration is stray-writer behavior per STATE-PLANE-COMMIT-POLICY."
+      },
+      {
+        "summary": "Folded the state-home key-mismatch fix into this issue instead of filing a sibling",
+        "rationale": "Discovered live during this planning session (the finalize PRD gate resolved legacy .pan/drafts on a migrated project); it is the same failure class — completion detection silently reading wrong/absent durable state — and rehome-workspace-record-door has no effect on migrated projects without it."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-state-home-key-mismatch",
+        "title": "resolveStateReadHomeSync resolves the registered projects.yaml key, not path basename",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T16:13:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/state-read-home.ts",
+            "src/lib/state-home.ts",
+            "tests/unit/lib/state-read-home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/state-read-home.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "state-read-home tests pass including the key-mismatch case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/state-read-home.ts:21, resolveStateReadHomeSync defaults projectKey = basename(project.path), but the state worktree is keyed by the projects.yaml key (state-home.ts projectKey(), lines 69-74: listProjectsSync().find(p => resolve(p.config.path) === resolve(project.path))?.key ?? basename). Live evidence: this repo's key is 'panopticon-cli', basename is 'overdeck'; ~/.overdeck/state/panopticon-cli/migration-complete.json is valid but the sync resolver probes ~/.overdeck/state/overdeck/ and silently resolves legacy — so records, specs, drafts, auto-commit, and the pan plan finalize PRD gate all treat a MIGRATED project as unmigrated. Fix: export/reuse projectKey() from state-home.ts (do not duplicate the lookup) as the default key in resolveStateReadHomeSync; keep the explicit projectKey parameter winning when passed; keep basename as final fallback for unregistered projects. Verification sweep (hazard H7): after the fix, list files under workspaces/*/.pan/records/ and <projectRoot>/.pan/{records,drafts,specs,continues}/ newer than the migration marker and merge them into the canonical state home, recording what was reconciled. See PRD WI-0 (drafts/pan-2372.md on overdeck-state)."
+        },
+        "items": [
+          {
+            "id": "fix-state-home-key-mismatch.ac1",
+            "title": "Given a project whose registered projects.yaml key differs from its path basename and a valid marker under the registered key, resolveStateReadHomeSync returns migrated: true with root ${OVERDECK_HOME}/state/<registeredKey>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-state-home-key-mismatch.ac2",
+            "title": "Given an unregistered project, resolveStateReadHomeSync falls back to basename(project.path) and preserves current legacy resolution behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-state-home-key-mismatch.ac3",
+            "title": "Given an explicitly passed projectKey argument, resolveStateReadHomeSync returns the root under that explicit key and preserves the override-beats-lookup behavior (proven by test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-state-home-key-mismatch.ac4",
+            "title": "The key lookup is shared with state-home.ts projectKey() (exported and reused, not duplicated) — grep shows one implementation of the registered-key resolution",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "atomic-record-writes",
+        "title": "Atomic + verified record writes with corrupt-sidecar preservation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T16:13:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/__tests__/record-atomic.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/record-atomic.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-atomic.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pan-dir/record.ts, extract a shared writeRecordFileAtomicSync(path, record) used by writeIssueRecordSync (line ~279) and writeIssueRecordForWorkspaceSync (line ~306): write JSON to `${path}.${pid}.${Date.now()}.tmp` in the same directory, renameSync into place, then read back and JSON.parse the renamed file (throw on failure). Model the temp-name pattern on writePlanFileAtomic (src/lib/vbrief/dag-cli.ts:101-106). Add preserveCorruptRecordSync(path): when the existing file is non-empty and fails JSON.parse, renameSync it to `${path}.corrupt-${Date.now()}` and console.warn before the fresh write. Keep the PAN-2466 preserveCloseOutSync guard unchanged. See PRD WI-1 (drafts/pan-2372.md on overdeck-state)."
+        },
+        "items": [
+          {
+            "id": "atomic-record-writes.ac1",
+            "title": "Given an existing record file containing truncated/garbage bytes, when any record write occurs, then the corrupt bytes are preserved at <recordPath>.corrupt-<epochMs>, a warning is logged, and the new write produces a file that JSON.parse accepts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atomic-record-writes.ac2",
+            "title": "writeIssueRecordSync and writeIssueRecordForWorkspaceSync write via temp-file-then-rename and never truncate the destination in place (grep shows no direct writeFileSync(path, ...) on the record path; test asserts no .tmp residue after a successful write)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atomic-record-writes.ac3",
+            "title": "A normal write round-trips: writeIssueRecordSync followed by readIssueRecordSync returns the written statusOverrides unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atomic-record-writes.ac4",
+            "title": "When post-rename read-back verification fails, the writer throws an error naming the record path instead of returning silently",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rehome-workspace-record-door",
+        "title": "Re-home the workspace record door onto canonical migration-aware resolution",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T16:13:44Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2372",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "durable-slot-completion-marker",
+            "deacon-consumes-marker"
+          ],
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/__tests__/records.test.ts",
+            "src/lib/pan-dir/__tests__/record-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/",
+            "npx vitest run tests/unit/lib/cloister/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pan-dir test suite passes",
+            "cloister test suite passes with no new failures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Deliberately serialized after fix-state-home-key-mismatch and atomic-record-writes: all three edit src/lib/pan-dir/record.ts and the re-home is only meaningful once migration resolution is correct.",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pan-dir/record.ts, change getIssueRecordPathForWorkspace (line ~196) to resolve the owning project via resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath) and, when resolved, return getIssueRecordPath(project, issueId) (canonical, migration-aware); keep join(workspacePath, '.pan', 'records', ...) only as the unresolvable-project fallback. In writeIssueRecordForWorkspaceSync, when the project resolved, also call queueIssueRecordCommit(project, issueId, path) so re-homed swarm writes are committed to overdeck-state like canonical writes. This converges all workspace-door callers (deacon-swarm.ts:216/580/587/702/893, deacon-swarm-record.ts, slot-reconcile.ts, recovery-trip.ts, swarm-failed-slot.ts, agent-gc.ts, label-reconciler.ts, src/cli/commands/db.ts) on one record without editing them. Decision rule: a migrated project resolves to ${OVERDECK_HOME}/state/<project>/records/; an unmigrated project resolves exactly where it does today. See PRD WI-2 and hazards H1/H2."
+        },
+        "items": [
+          {
+            "id": "rehome-workspace-record-door.ac1",
+            "title": "Given a migrated project, when writeStatusOverridesSync (canonical door) writes an override, then readIssueRecordForWorkspaceSync (workspace door) returns a record containing that override — both doors resolve to the same file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rehome-workspace-record-door.ac2",
+            "title": "Given an unmigrated project, getIssueRecordPathForWorkspace returns the same <workspace>/.pan/records/<issue>.json path as before the change (proven by unit test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rehome-workspace-record-door.ac3",
+            "title": "When no project can be resolved for the workspace/issue, the workspace door falls back to <workspace>/.pan/records/ and reads/writes succeed as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rehome-workspace-record-door.ac4",
+            "title": "writeIssueRecordForWorkspaceSync on a resolvable project produces a queued auto-commit entry for the written record path (queueIssueRecordCommit call observed via test double)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rehome-workspace-record-door.ac5",
+            "title": "After the re-home, `npx vitest run src/lib/pan-dir tests/unit/lib/cloister` exits with code 0 — the change preserves every existing pan-dir and cloister test expectation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "durable-slot-completion-marker",
+        "title": "Slot pan done writes and verifies a durable swarm.slotCompletions marker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T16:13:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2372",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "deacon-consumes-marker"
+          ],
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "src/lib/cloister/deacon-swarm-record.ts",
+            "src/cli/commands/done.ts",
+            "tests/unit/cli/commands/done-slot-completion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/done-slot-completion.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "done-slot-completion.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add PanIssueSwarmSlotCompletion { slotIndex: number; itemId?: string; agentId: string; completedAt: string } and slotCompletions?: Record<string, PanIssueSwarmSlotCompletion> on PanIssueSwarmRecord (src/lib/pan-dir/record.ts:90-95). Add writeSwarmSlotCompletion(workspacePath, issueId, completion) and clearSwarmSlotCompletion(workspacePath, issueId, slotIndex) to src/lib/cloister/deacon-swarm-record.ts modeled exactly on writeSwarmFinalizedAt (lines 34-45), keying by String(slotIndex). In completeSlotWork (src/cli/commands/done.ts:438-472): FIRST write the marker { slotIndex, itemId: slot.slotItemId, agentId: slot.agentId, completedAt: now }, then read the record back via readIssueRecordForWorkspaceSync and confirm swarm.slotCompletions[String(slotIndex)] exists with matching agentId; on failure print a red error stating completion did NOT persist and process.exit(1) BEFORE any runtime-state writes; on success proceed with the existing agent-state/runtime-state/activity writes unchanged. Do NOT write item statusOverrides here (autoDecision 2). See PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "durable-slot-completion-marker.ac1",
+            "title": "Given a slot-shaped pan done invocation, when completeSlotWork succeeds, then the per-issue record contains swarm.slotCompletions[String(slotIndex)] with the slot's itemId, agentId, and an ISO completedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-slot-completion-marker.ac2",
+            "title": "Given the marker write or read-back verification fails (e.g. stubbed writer throws or record unreadable), when completeSlotWork runs, then it prints an error stating completion did not persist and exits with a non-zero code before touching runtime state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-slot-completion-marker.ac3",
+            "title": "completeSlotWork writes the marker even when the slot agent's state.json is missing (agentState null), using the parsed agentId and slotIndex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-slot-completion-marker.ac4",
+            "title": "completeSlotWork preserves record.statusOverrides byte-for-byte — it creates no item/subItem status entries (asserted by comparing statusOverrides before and after a slot pan done)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-consumes-marker",
+        "title": "classifyInFlightSlots honors the durable marker; coordinator clears it on merge/requeue; unreadable records surfaced",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T16:13:44Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/deacon-swarm-record.ts",
+            "tests/unit/lib/cloister/deacon-swarm-doneness.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-doneness.test.ts tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-swarm-doneness and deacon-swarm-stall suites pass including new durable-completion cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Serialized after durable-slot-completion-marker (consumes its marker API and shares deacon-swarm-record.ts) and after the two completion-predicate beads (shared test files).",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon-swarm.ts classifyInFlightSlots (359-466): add optional dep readSlotCompletion(workspacePath, issueId, slotIndex) (default: read record via the door, return swarm.slotCompletions[String(slotIndex)]). At the top of the per-slot loop — before the !slot.agentId branch and before getAgentRuntimeState — if a completion exists and (completion.itemId is absent or equals slot.itemId), push { ...slot, lifecycle: 'ready-to-merge', exitStatus: 0, signal: 'durable-completion' } and continue. In mergeReadySlots inside the result.merged branch (~511-523), call clearSwarmSlotCompletion(workspacePath, issueId, slot.slotIndex). In the requeue/supersede path (requeueFailedSwarmSlots / superseded-attempt recording), clear the requeued slot's marker. In defaultReadStatusOverrides (216-222), distinguish absent record (silent undefined) from unreadable record (file exists but read returns null/throws): console.warn '[swarm] record unreadable for <issue> — treating as no overrides; see .corrupt sidecar'. Use injected now/stallThresholdMs in tests (existing pattern); no wall-clock waits. See PRD WI-4 and hazard H3."
+        },
+        "items": [
+          {
+            "id": "deacon-consumes-marker.ac1",
+            "title": "Given a durable marker whose itemId matches the slot, when classifyInFlightSlots runs with the session alive and idle, then the slot classifies ready-to-merge with signal 'durable-completion' and exitStatus 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-consumes-marker.ac2",
+            "title": "Given a durable marker whose itemId differs from the slot's current itemId, when classifyInFlightSlots runs, then the marker is ignored and the slot falls through to normal classification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-consumes-marker.ac3",
+            "title": "Given the marker exists and the slot session vanished or the agent is missing, classifyInFlightSlots still returns ready-to-merge signal 'durable-completion' (marker beats failed/vanished classification)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-consumes-marker.ac4",
+            "title": "After mergeReadySlots merges a slot, and after a slot is requeued/superseded, the record's swarm.slotCompletions no longer contains that slotIndex key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-consumes-marker.ac5",
+            "title": "Given a record file that exists but fails to parse, defaultReadStatusOverrides emits a warning naming the issue and returns undefined instead of silently treating it as absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "infer-completion-default-auto",
+        "title": "Default swarm.infer_completion flips nudge → auto",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T16:13:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/config.ts",
+            "src/lib/cloister/deacon-swarm-completion.ts",
+            "tests/unit/lib/cloister/config.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/config.test.ts tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config default test asserts infer_completion === 'auto'",
+            "stall suite proves default-mode convergence to ready-to-merge after nudge + 2 stable observations",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Serialized after state-plane-aware-clean-check (both edit deacon-swarm-completion.ts) and before deacon-consumes-marker (shared stall test file).",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Change the config default at src/lib/cloister/config.ts:391 from infer_completion: 'nudge' to 'auto', and the fallback in swarmInferCompletionMode (src/lib/cloister/deacon-swarm-completion.ts:112) from 'nudge' to 'auto'. Explicitly configured swarm.infer_completion: nudge|off in config.yaml and the PAN_SWARM_INFER_COMPLETION env override keep exact current semantics (the parse at 110-113 already honors them). Extend deacon-swarm-stall.test.ts: with no config/env set, an alive-idle clean+ahead slot receives one nudge, then converges to ready-to-merge signal 'inferred' after 2 consecutive stable observations; with explicit 'nudge' it never converges; with 'off' it neither nudges nor converges. Use injected now/options — no wall-clock delays. See PRD WI-5 and hazard H5."
+        },
+        "items": [
+          {
+            "id": "infer-completion-default-auto.ac1",
+            "title": "With no swarm.infer_completion configured and no env override, swarmInferCompletionMode() returns 'auto' and loadCloisterConfig defaults infer_completion to 'auto'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "infer-completion-default-auto.ac2",
+            "title": "In default mode, classifyDoneWithoutSignal emits exactly one completion nudge for an alive-idle clean+ahead slot and returns lifecycle ready-to-merge with signal 'inferred' after two consecutive stable stalled observations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "infer-completion-default-auto.ac3",
+            "title": "With explicit 'nudge' configured, classifyDoneWithoutSignal returns awaiting-completion-signal on every pass and never returns ready-to-merge; with explicit 'off' it returns null and emits no nudge (existing semantics preserved, proven by test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-plane-aware-clean-check",
+        "title": "Slot worktree clean predicate ignores state-plane-only dirt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T16:13:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm-completion.ts",
+            "tests/unit/lib/cloister/deacon-swarm-doneness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-doneness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "clean-predicate cases pass: state-plane-only porcelain reads clean, source-file porcelain reads dirty",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "In defaultIsSlotWorktreeClean (src/lib/cloister/deacon-swarm-completion.ts:129-132), replace `return stdout.trim().length === 0;` with `return isStatePlaneOnlyStatus(stdout);` imported from '../state-plane.js'. isStatePlaneOnlyStatus (src/lib/state-plane.ts:67) already returns true for empty porcelain (vacuous every()), so one predicate covers both cases — this is the ONE shared state-plane classifier required by docs/STATE-PLANE-COMMIT-POLICY.md rule 3/6 (operator comment on the issue). Do not add any local path list. Tests: porcelain listing only .pan/continue.json or .pan/records/... entries → clean; porcelain containing a src/ file → dirty; empty porcelain → clean. See PRD WI-6."
+        },
+        "items": [
+          {
+            "id": "state-plane-aware-clean-check.ac1",
+            "title": "Given porcelain output listing only state-plane paths (e.g. '?? .pan/continue.json'), defaultIsSlotWorktreeClean returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-aware-clean-check.ac2",
+            "title": "Given porcelain output containing any non-state-plane path (e.g. ' M src/lib/foo.ts'), defaultIsSlotWorktreeClean returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-aware-clean-check.ac3",
+            "title": "Given empty porcelain output, defaultIsSlotWorktreeClean returns true, and the classifier used is isStatePlaneOnlyStatus from src/lib/state-plane.ts (no local path list introduced)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-completion-docs",
+        "title": "Document durable slot completion, auto default, and state-plane clean check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T16:13:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2372",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SWARM.md",
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'slotCompletions' docs/SWARM.md docs/AGENT-STATE-PLANES.md",
+            "grep -n \"infer_completion\" docs/SWARM.md"
+          ],
+          "expected_outputs": [
+            "both docs mention swarm.slotCompletions",
+            "docs/SWARM.md documents the auto default and how to opt back to nudge/off"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/SWARM.md: add a 'Durable slot completion' section covering (a) the swarm.slotCompletions marker — written and read-back-verified by slot pan done, consumed by classifyInFlightSlots as ready-to-merge signal 'durable-completion', cleared on merge and requeue/supersede; (b) the swarm.infer_completion default change to 'auto' with the config.yaml/PAN_SWARM_INFER_COMPLETION opt-out to 'nudge'/'off' and the nudge-first + 2-stable-observations grace; (c) the state-plane-aware clean predicate (isStatePlaneOnlyStatus). docs/AGENT-STATE-PLANES.md: record that swarm durable state (slotCompletions, finalizedAt, failedMergeBlock, slotAssignments, supersededAttempts) lives in the per-issue record on the permanent plane and that the workspace record door now resolves through canonical migration-aware paths (one record, two doors). Match each doc's existing voice and heading style. See PRD WI-7."
+        },
+        "items": [
+          {
+            "id": "swarm-completion-docs.ac1",
+            "title": "docs/SWARM.md contains a section documenting swarm.slotCompletions (write+verify at pan done, consumption, clearing) and the infer_completion 'auto' default with opt-out instructions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-completion-docs.ac2",
+            "title": "docs/AGENT-STATE-PLANES.md documents that swarm durable state lives in the per-issue record on the permanent plane and that the workspace record door resolves through canonical migration-aware paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fix-state-home-key-mismatch",
+        "to": "rehome-workspace-record-door",
+        "type": "blocks"
+      },
+      {
+        "from": "atomic-record-writes",
+        "to": "rehome-workspace-record-door",
+        "type": "blocks"
+      },
+      {
+        "from": "state-plane-aware-clean-check",
+        "to": "infer-completion-default-auto",
+        "type": "blocks"
+      },
+      {
+        "from": "state-plane-aware-clean-check",
+        "to": "deacon-consumes-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "infer-completion-default-auto",
+        "to": "deacon-consumes-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "atomic-record-writes",
+        "to": "durable-slot-completion-marker",
+        "type": "informs"
+      },
+      {
+        "from": "rehome-workspace-record-door",
+        "to": "durable-slot-completion-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "rehome-workspace-record-door",
+        "to": "deacon-consumes-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "durable-slot-completion-marker",
+        "to": "deacon-consumes-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-consumes-marker",
+        "to": "swarm-completion-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "infer-completion-default-auto",
+        "to": "swarm-completion-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "state-plane-aware-clean-check",
+        "to": "swarm-completion-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-10-PAN-2372-bug-swarm-slot-finishes-pan-done-without-writing-statusoverrides-empty-continue-json-breaks-durable-completion-detection.vbrief.json"
+    }
+  },
+  "status": "active"
+}

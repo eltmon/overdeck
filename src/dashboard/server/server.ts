@@ -42,6 +42,8 @@ import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { parkedRouteLayer } from './routes/parked.js'
 import { velocityRouteLayer } from './routes/velocity.js'
 import { agentsRouteLayer } from './routes/agents.js'
+import { agentDirectoryRouteLayer } from './routes/agent-directory.js'
+import { workersRegisterRouteLayer } from './routes/workers-register.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
 import { specialistsRouteLayer } from './routes/specialists.js'
@@ -58,10 +60,12 @@ import { miscRouteLayer } from './routes/misc.js';
 import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
+import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { projectsRouteLayer } from './routes/projects.js';
 import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
 import { mergeTrainRouteLayer } from './routes/merge-train.js';
+import { flywheelRouteLayer } from './routes/flywheel.js';
 import { contextRouteLayer } from './routes/context.js';
 import { commandsRouteLayer } from './routes/commands.js';
 import { adminRouteLayer } from './routes/admin.js';
@@ -84,7 +88,7 @@ import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { retryDashboardBind } from './server-bind.js';
 import { buildDashboardHealthResponse } from './health-response.js';
 
@@ -342,6 +346,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   parkedRouteLayer,
   velocityRouteLayer,
   agentsRouteLayer,
+  agentDirectoryRouteLayer,
+  workersRegisterRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
   specialistsRouteLayer,
@@ -358,10 +364,12 @@ export const makeRoutesLayer = Layer.mergeAll(
   paletteRouteLayer,
   conversationsRouteLayer,
   conversationsRetrospectiveRouteLayer,
+  conversationCompanionTerminalRouteLayer,
   eventsRouteLayer,
   projectsRouteLayer,
   projectsMergeTrainRouteLayer,
   mergeTrainRouteLayer,
+  flywheelRouteLayer,
   contextRouteLayer,
   commandsRouteLayer,
   adminRouteLayer,
@@ -452,12 +460,12 @@ export const makeServerLayer = Layer.unwrap(
           console.log(`[boot-timing] HTTP server listening at +${Math.round(performance.now())}ms (since process start)`);
           console.log(`[overdeck] Dashboard listening on http://${config.host}:${config.port}`);
           const mode = process.env['OVERDECK_MODE'] === 'production' ? 'production mode' : 'development mode';
-          emitActivityEntrySync({
+          emitActivityEntry({
             source: 'dashboard',
             level: 'success',
             message: `Dashboard started in ${mode}`,
           });
-          emitActivityTtsSync({
+          emitActivityTts({
             utterance: `Dashboard started in ${mode}`,
             priority: 2,
             source: 'dashboard',

@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../caveman/workspace.js', () => ({
@@ -24,7 +23,7 @@ const baseConfig = {
 };
 
 beforeEach(() => {
-  mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
+  mockReadVariant.mockResolvedValue('enabled');
 });
 
 afterEach(() => {
@@ -51,20 +50,20 @@ describe('buildSpecialistCavemanExports', () => {
   });
 
   it('returns empty string for unknown specialist type', async () => {
-    mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
+    mockReadVariant.mockResolvedValue('enabled');
     const result = await buildSpecialistCavemanExports('unknown-agent', '/workspace', baseConfig);
     expect(result).toBe('');
   });
 
   it('returns only OVERDECK_CAVEMAN_VARIANT when variant is "disabled"', async () => {
-    mockReadVariant.mockReturnValue(Effect.succeed('disabled'));
+    mockReadVariant.mockResolvedValue('disabled');
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', baseConfig);
     expect(result).toBe('export OVERDECK_CAVEMAN_VARIANT="disabled"\n');
     expect(result).not.toContain('CAVEMAN_DEFAULT_MODE');
   });
 
   it('returns empty string when variant is "off"', async () => {
-    mockReadVariant.mockReturnValue(Effect.succeed('off'));
+    mockReadVariant.mockResolvedValue('off');
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', baseConfig);
     expect(result).toBe('');
   });
@@ -74,7 +73,7 @@ describe('buildSpecialistCavemanExports', () => {
     ['test-agent', 'test', 'full' as const],
     ['merge-agent', 'merge', 'lite' as const],
   ] as const)('%s uses the correct mode key', async (specialistType, modeKey, modeValue) => {
-    mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
+    mockReadVariant.mockResolvedValue('enabled');
     const config = {
       ...baseConfig,
       modes: { ...baseConfig.modes, [modeKey]: modeValue },
@@ -85,14 +84,14 @@ describe('buildSpecialistCavemanExports', () => {
   });
 
   it('returns empty string when mode is "off"', async () => {
-    mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
+    mockReadVariant.mockResolvedValue('enabled');
     const config = { ...baseConfig, modes: { ...baseConfig.modes, review: 'off' as const } };
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', config);
     expect(result).toBe('');
   });
 
   it('returns empty string when mode is "disabled"', async () => {
-    mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
+    mockReadVariant.mockResolvedValue('enabled');
     const config = { ...baseConfig, modes: { ...baseConfig.modes, review: 'disabled' as const } };
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', config);
     expect(result).toBe('');

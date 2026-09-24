@@ -228,6 +228,10 @@ and should be re-checked before any decision.
   supported, and the rest of the GPT model family) instead of CLIProxy-routing GPT
   into Claude Code. Work agents run as live, attachable TUI sessions
   (`codexMode: work-tui`) under the PTY supervisor — never one-shot `codex exec`.
+- **Native terminal:** a conversation's app-server listens on a private Unix
+  socket, and the Terminal view runs `codex resume --remote unix://… <threadId>`
+  as a second client on the same thread (verified on 0.153.4), next to the
+  app-server host's Runtime log.
 - **Implementation files:** `src/lib/runtimes/codex.ts`,
   `src/lib/cost-parsers/codex-parser.ts` (per-agent thread-id pinning at
   `~/.overdeck/agents/<id>/codex-thread-id` for session introspection).
@@ -390,6 +394,9 @@ model discovery, resume behavior, and current transport limitations.
 - **Transport:** persistent `opencode acp`, verified with session creation,
   message delivery, and resume on 1.18.29. Overdeck reuses its ACP transcript and
   message transport while retaining the OpenCode harness identity.
+- **Native terminal:** the conversation Terminal view runs `opencode attach` against
+  the same server and session (verified on 1.18.31), next to the ACP host's
+  Runtime log.
 - **Provider scope:** Go and Zen. Other OpenCode providers are outside this integration.
 
 ### Goose (Block) — Not supported (strongest "bundle" primitive)

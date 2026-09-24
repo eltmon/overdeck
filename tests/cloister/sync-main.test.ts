@@ -2,7 +2,6 @@
  * Tests for syncMainIntoWorkspace and scanForConflictMarkers (PAN-242)
  */
 
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -30,7 +29,7 @@ vi.mock('../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../src/lib/git-utils.js', () => ({
-  cleanupStaleLocks: vi.fn().mockReturnValue(Effect.succeed({ found: [], removed: [], errors: [] })),
+  cleanupStaleLocks: vi.fn().mockResolvedValue({ found: [], removed: [], errors: [] }),
 }));
 
 // Hoist tmux mock so factory can reference it
@@ -43,7 +42,6 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sessionExistsAsync: vi.fn().mockResolvedValue(true),
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
   listSessionNamesAsync: vi.fn().mockResolvedValue(['specialist-merge-agent']),
-  buildTmuxCommandString: vi.fn().mockReturnValue(''),
   createSessionAsync: vi.fn().mockResolvedValue(undefined),
   killSession: vi.fn(),
   killSessionSync: vi.fn(),
@@ -140,7 +138,6 @@ vi.mock('fs', async (importOriginal) => {
 // Import under test (after mocks)
 import {
   isSyncMainMainPreferredPath,
-  scanForConflictMarkers,
   syncMainIntoWorkspace,
 } from '../../src/lib/cloister/merge-agent.js';
 import { cleanupStaleLocks } from '../../src/lib/git-utils.js';
@@ -170,40 +167,6 @@ function mockExecSequence(responses: Record<string, { stdout: string; stderr?: s
 // scanForConflictMarkers tests (unit — uses mocked exec)
 // ---------------------------------------------------------------------------
 
-describe('scanForConflictMarkers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    execMock.mockResolvedValue({ stdout: '', stderr: '' });
-  });
-
-  it('returns empty array when git diff --check reports no conflicts', async () => {
-    execMock.mockResolvedValue({ stdout: '', stderr: '' });
-    const result = await scanForConflictMarkers('/some/path');
-    expect(result).toEqual([]);
-  });
-
-  it('returns files with leftover conflict markers', async () => {
-    execMock.mockResolvedValue({
-      stdout: [
-        'src/foo.ts:12: leftover conflict marker',
-        'src/bar.ts:45: leftover conflict marker',
-        'src/foo.ts:20: leftover conflict marker',
-      ].join('\n'),
-      stderr: '',
-    });
-    const result = await scanForConflictMarkers('/some/path');
-    expect(result).toContain('src/foo.ts');
-    expect(result).toContain('src/bar.ts');
-    // deduplicates
-    expect(result).toHaveLength(2);
-  });
-
-  it('returns empty array when exec throws (non-fatal)', async () => {
-    execMock.mockRejectedValue(new Error('not a git repo'));
-    const result = await scanForConflictMarkers('/some/path');
-    expect(result).toEqual([]);
-  });
-});
 
 describe('isSyncMainMainPreferredPath', () => {
   it('matches only pipeline-owned sync state paths', () => {
@@ -228,7 +191,7 @@ describe('syncMainIntoWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     operationHeads.clear();
-    (cleanupStaleLocks as any).mockReturnValue(Effect.succeed({ found: [], removed: [], errors: [] }));
+    (cleanupStaleLocks as any).mockResolvedValue({ found: [], removed: [], errors: [] });
   });
 
   describe('pre-flight: uncommitted changes', () => {
@@ -437,11 +400,11 @@ describe('syncMainIntoWorkspace', () => {
 
   describe('git lock cleanup', () => {
     it('blocks when git processes are running (detected via lock cleanup)', async () => {
-      (cleanupStaleLocks as any).mockReturnValue(Effect.succeed({
+      (cleanupStaleLocks as any).mockResolvedValue({
         found: ['/fake/.git/index.lock'],
         removed: [],
         errors: [{ file: '/fake/.git/index.lock', error: 'Git processes are running - not safe to remove locks' }],
-      }));
+      });
 
       execMock.mockImplementation(async (cmd: string) => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };

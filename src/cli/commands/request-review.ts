@@ -7,9 +7,9 @@
 
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 
-const DASHBOARD_URL = getDashboardApiUrlSync();
+const DASHBOARD_URL = getDashboardApiUrl();
 
 interface RequestReviewOptions {
   message?: string;
@@ -42,13 +42,15 @@ export async function requestReviewViaDashboard(
   issueId: string,
   message?: string,
   timeoutMs = 120_000,
+  /** Who asked — journalled by the server as the `review.requested` source. */
+  source: 'pan-review-request' | 'pan-done' = 'pan-review-request',
 ): Promise<ReviewRequestResult> {
   let response: Response;
   try {
     response = await fetch(`${DASHBOARD_URL}/api/review/${issueId}/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, source }),
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error: any) {

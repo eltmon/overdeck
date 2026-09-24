@@ -3,7 +3,7 @@ import { promisify } from 'util';
 
 import { Effect } from 'effect';
 
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { listSessionNames } from '../tmux.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
 import { pruneVerificationRunArtifacts } from './verification-artifact.js';
@@ -116,10 +116,6 @@ export function handleAgentLifecycleEventForIdleStack(agentId: string): void {
   if (issueLower) {
     firstIdleAt.delete(issueLower);
   }
-}
-
-export function resetIdleStackGraceClock(issueLower: string): void {
-  firstIdleAt.delete(issueLower);
 }
 
 export interface ComposeContainerRef {
@@ -256,7 +252,7 @@ export async function reconcileIdleWorkspaceStacks(
       const action = `Reaped idle workspace UI stack for ${issueId} — stopped ${names.length} container(s) after ${idleMin}m idle (no agent, no tmux)`;
       actions.push(action);
       console.log(`[deacon] ${action}`);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'cloister',
         level: 'info',
         issueId,
@@ -323,7 +319,7 @@ export async function reconcileIdleWorkspaceStacks(
       const action = `Reaped idle workspace stack for ${issueId} — stopped ${targets.length}/${names.length} container(s) in ${project} after ${idleMin}m idle (no agent, no tmux)`;
       actions.push(action);
       console.log(`[deacon] ${action}`);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'cloister',
         level: 'info',
         issueId,

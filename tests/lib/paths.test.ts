@@ -11,7 +11,6 @@ import {
   COSTS_DIR,
   CONFIG_FILE,
   CLAUDE_DIR,
-  LEGACY_RUNTIME_DIRS,
   SYNC_TARGET,
   TEMPLATES_DIR,
   CLAUDE_MD_TEMPLATES,
@@ -62,14 +61,6 @@ describe('paths', () => {
     });
   });
 
-  describe('LEGACY_RUNTIME_DIRS', () => {
-    it('should have correct paths for legacy runtimes', () => {
-      expect(LEGACY_RUNTIME_DIRS.codex).toBe(join(home, '.codex'));
-      expect(LEGACY_RUNTIME_DIRS.cursor).toBe(join(home, '.cursor'));
-      expect(LEGACY_RUNTIME_DIRS.gemini).toBe(join(home, '.gemini'));
-      expect(LEGACY_RUNTIME_DIRS.opencode).toBe(join(home, '.opencode'));
-    });
-  });
 
   describe('SYNC_TARGET', () => {
     it('should have claude target paths', () => {

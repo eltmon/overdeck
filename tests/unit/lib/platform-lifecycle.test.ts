@@ -2,7 +2,6 @@ import { appendFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
 /**
  * Tests for src/lib/platform-lifecycle.ts.
  *
@@ -105,11 +104,11 @@ describe('stopDashboard pid death verification', () => {
       .mockResolvedValue([]);
     const kill = vi.spyOn(process, 'kill').mockImplementation((() => true) as typeof process.kill);
 
-    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+    await expect(stopDashboard(baseConfig, {
       graceTimeoutMs: 100,
       portOwnerProbe,
       pidSurvivorProbe: async () => '9101 D node dashboard.js',
-    }))).rejects.toMatchObject({
+    })).rejects.toMatchObject({
       failure: {
         stage: 'dashboard',
         reason: expect.stringContaining('PID 9101 (cmd: 9101 D node dashboard.js) survived SIGKILL'),
@@ -125,11 +124,11 @@ describe('stopDashboard pid death verification', () => {
       .mockResolvedValue([]);
     const kill = vi.spyOn(process, 'kill').mockImplementation((() => true) as typeof process.kill);
 
-    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+    await expect(stopDashboard(baseConfig, {
       graceTimeoutMs: 100,
       portOwnerProbe,
       pidSurvivorProbe: async () => null,
-    }))).resolves.toBeUndefined();
+    })).resolves.toBeUndefined();
     expect(kill).toHaveBeenCalledWith(9151, 'SIGKILL');
   });
 
@@ -142,10 +141,10 @@ describe('stopDashboard pid death verification', () => {
       return true;
     }) as typeof process.kill);
 
-    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+    await expect(stopDashboard(baseConfig, {
       graceTimeoutMs: 100,
       portOwnerProbe,
-    }))).resolves.toBeUndefined();
+    })).resolves.toBeUndefined();
     expect(kill).toHaveBeenCalledWith(9202, 'SIGTERM');
     expect(kill).not.toHaveBeenCalledWith(9202, 'SIGKILL');
   });
@@ -154,9 +153,9 @@ describe('stopDashboard pid death verification', () => {
     const portOwnerProbe = vi.fn().mockResolvedValue([]);
     const kill = vi.spyOn(process, 'kill');
 
-    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+    await expect(stopDashboard(baseConfig, {
       portOwnerProbe,
-    }))).resolves.toBeUndefined();
+    })).resolves.toBeUndefined();
     expect(kill).not.toHaveBeenCalled();
   });
 });
@@ -178,7 +177,7 @@ describe('restartDashboard — scope contract', () => {
 
   it('invokes the caller-provided start hook exactly once', async () => {
     const startHook = vi.fn().mockResolvedValue(undefined);
-    await Effect.runPromise(restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 }));
+    await restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 });
     expect(startHook).toHaveBeenCalledTimes(1);
   });
 
@@ -190,11 +189,11 @@ describe('restartDashboard — scope contract', () => {
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const startHook = vi.fn().mockResolvedValue(undefined);
 
-    await expect(Effect.runPromise(restartDashboard(baseConfig, startHook, {
+    await expect(restartDashboard(baseConfig, startHook, {
       healthTimeoutMs: 2000,
       portOwnerProbe,
       pidSurvivorProbe: async () => '9161 D node dashboard.js',
-    }))).resolves.toEqual({ ownershipVerified: false, spawnedPid: null });
+    })).resolves.toEqual({ ownershipVerified: false, spawnedPid: null });
     expect(startHook).toHaveBeenCalledOnce();
     expect(warning).toHaveBeenCalledWith(expect.stringContaining('ports are free, continuing restart'));
   });
@@ -204,13 +203,13 @@ describe('restartDashboard — scope contract', () => {
     // catch it at runtime: we fail the test if any of those symbols get
     // touched. This is the primary scope guard.
     const cliproxySpies = {
-      stopCliproxy: vi.fn(),
-      startCliproxy: vi.fn(),
-      isCliproxyRunning: vi.fn().mockReturnValue(true),
+      stopCliproxy: vi.fn(async () => {}),
+      startCliproxy: vi.fn(async () => {}),
+      isCliproxyRunning: vi.fn().mockResolvedValue(true),
     };
     const startHook = vi.fn().mockResolvedValue(undefined);
 
-    await Effect.runPromise(restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 }));
+    await restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 });
 
     // We never passed cliproxySpies to the function, so none of its methods
     // should have been called. The assertion doubles as documentation: the
@@ -229,9 +228,7 @@ describe('restartDashboard — scope contract', () => {
     const startHook = vi.fn().mockResolvedValue({ stop });
 
     try {
-      const restart = Effect.runPromise(
-        restartDashboard(baseConfig, startHook, { healthTimeoutMs: 300 }),
-      );
+      const restart = restartDashboard(baseConfig, startHook, { healthTimeoutMs: 300 });
       while (fetchMock.mock.calls.length === 0) {
         await new Promise<void>((resolve) => setImmediate(resolve));
       }
@@ -284,12 +281,12 @@ describe('parseHealthTimeoutMs (#3099)', () => {
 describe('restartCliproxy — scope contract', () => {
   it('stops and starts CLIProxy; never dashboard or Traefik', async () => {
     const cliproxy = {
-      stopCliproxy: vi.fn(),
-      startCliproxy: vi.fn(),
-      isCliproxyRunning: vi.fn().mockReturnValue(true),
+      stopCliproxy: vi.fn(async () => {}),
+      startCliproxy: vi.fn(async () => {}),
+      isCliproxyRunning: vi.fn().mockResolvedValue(true),
     };
 
-    await Effect.runPromise(restartCliproxy(cliproxy, { verifyTimeoutMs: 1000 }));
+    await restartCliproxy(cliproxy, { verifyTimeoutMs: 1000 });
 
     expect(cliproxy.stopCliproxy).toHaveBeenCalledTimes(1);
     expect(cliproxy.startCliproxy).toHaveBeenCalledTimes(1);
@@ -303,14 +300,12 @@ describe('restartCliproxy — scope contract', () => {
 
   it('throws StageError if CLIProxy never confirms running', async () => {
     const cliproxy = {
-      stopCliproxy: vi.fn(),
-      startCliproxy: vi.fn(),
-      isCliproxyRunning: vi.fn().mockReturnValue(false),
+      stopCliproxy: vi.fn(async () => {}),
+      startCliproxy: vi.fn(async () => {}),
+      isCliproxyRunning: vi.fn().mockResolvedValue(false),
     };
 
-    await expect(Effect.runPromise(
-      restartCliproxy(cliproxy, { verifyTimeoutMs: 300 }),
-    )).rejects.toBeInstanceOf(StageError);
+    await expect(restartCliproxy(cliproxy, { verifyTimeoutMs: 300 })).rejects.toBeInstanceOf(StageError);
   });
 });
 
@@ -330,9 +325,7 @@ describe('waitForDashboardHealth', () => {
         return { ok: true, status: 200 };
       }),
     );
-    await expect(Effect.runPromise(
-      waitForDashboardHealth(43991, { timeoutMs: 2000, pollIntervalMs: 50 }),
-    )).resolves.toBeUndefined();
+    await expect(waitForDashboardHealth(43991, { timeoutMs: 2000, pollIntervalMs: 50 })).resolves.toBeUndefined();
     expect(calls).toBeGreaterThanOrEqual(2);
   });
 
@@ -350,13 +343,11 @@ describe('waitForDashboardHealth', () => {
       }),
     );
 
-    await expect(Effect.runPromise(
-      waitForDashboardHealth(43991, {
+    await expect(waitForDashboardHealth(43991, {
         timeoutMs: 200,
         pollIntervalMs: 50,
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
-      }),
-    )).rejects.toMatchObject({
+      })).rejects.toMatchObject({
       failure: {
         stage: 'dashboard',
         reason: expect.stringContaining('port held by non-primary server (cwd=/repo/workspaces/feature-pan-2252, mode=peer)'),
@@ -378,13 +369,11 @@ describe('waitForDashboardHealth', () => {
       }),
     );
 
-    await expect(Effect.runPromise(
-      waitForDashboardHealth(43991, {
+    await expect(waitForDashboardHealth(43991, {
         timeoutMs: 200,
         pollIntervalMs: 50,
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
-      }),
-    )).resolves.toBeUndefined();
+      })).resolves.toBeUndefined();
   });
 
   it('StageError reports the dashboard stage on timeout', async () => {
@@ -393,7 +382,7 @@ describe('waitForDashboardHealth', () => {
       vi.fn().mockRejectedValue(new Error('nope')),
     );
     try {
-      await Effect.runPromise(waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 }));
+      await waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 });
       throw new Error('should not reach here');
     } catch (err) {
       expect(err).toBeInstanceOf(StageError);
@@ -421,14 +410,14 @@ describe('dashboard health ownership', () => {
       json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 7101 }),
     });
     vi.stubGlobal('fetch', fetchMock);
-    const restart = Effect.runPromise(restartDashboard(
+    const restart = restartDashboard(
       baseConfig,
       () => ({ stop: vi.fn(), pid: async () => 7202 }),
       {
         healthTimeoutMs: 200,
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
       },
-    ));
+    );
     const rejection = expect(restart).rejects.toMatchObject({
       failure: {
         stage: 'dashboard',
@@ -451,11 +440,11 @@ describe('dashboard health ownership', () => {
       json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 7303 }),
     }));
 
-    await expect(Effect.runPromise(restartDashboard(
+    await expect(restartDashboard(
       baseConfig,
       () => ({ stop: vi.fn(), pid: async () => 7303 }),
       { expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
-    ))).resolves.toEqual({ ownershipVerified: true, spawnedPid: 7303 });
+    )).resolves.toEqual({ ownershipVerified: true, spawnedPid: 7303 });
   });
 
   it('rejects a pre-fix health payload that omits pid when ownership is expected', async () => {
@@ -465,14 +454,14 @@ describe('dashboard health ownership', () => {
       json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary' }),
     });
     vi.stubGlobal('fetch', fetchMock);
-    const restart = Effect.runPromise(restartDashboard(
+    const restart = restartDashboard(
       baseConfig,
       () => ({ stop: vi.fn(), pid: async () => 7404 }),
       {
         healthTimeoutMs: 200,
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
       },
-    ));
+    );
     const rejection = expect(restart).rejects.toMatchObject({
       failure: {
         reason: expect.stringMatching(/pid \(unreported\).*pid 7404.*LEFT RUNNING/s),
@@ -490,9 +479,7 @@ describe('dashboard health ownership', () => {
     const response = { ok: true, status: 200 };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
 
-    await expect(Effect.runPromise(
-      waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 }),
-    )).resolves.toBeUndefined();
+    await expect(waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 })).resolves.toBeUndefined();
   });
 
   it('reports unverified ownership when a spawn handle cannot resolve its pid', async () => {
@@ -502,11 +489,11 @@ describe('dashboard health ownership', () => {
       json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary' }),
     }));
 
-    await expect(Effect.runPromise(restartDashboard(
+    await expect(restartDashboard(
       baseConfig,
       () => ({ stop: vi.fn(), pid: async () => null }),
       { expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
-    ))).resolves.toEqual({ ownershipVerified: false, spawnedPid: null });
+    )).resolves.toEqual({ ownershipVerified: false, spawnedPid: null });
   });
 });
 
@@ -539,7 +526,7 @@ describe('dashboard EADDRINUSE fast failure', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     let caught: StageError | undefined;
-    const restart = Effect.runPromise(restartDashboard(
+    const restart = restartDashboard(
       baseConfig,
       () => ({ stop: vi.fn(), pid: async () => 8202 }),
       {
@@ -552,7 +539,7 @@ describe('dashboard EADDRINUSE fast failure', () => {
           .mockResolvedValue([8101]),
         pidDescriptor: async () => '8101 node old-dashboard.js',
       },
-    )).catch((error) => {
+    ).catch((error) => {
       caught = error as StageError;
       throw error;
     });
@@ -583,13 +570,13 @@ describe('dashboard EADDRINUSE fast failure', () => {
       json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 8303 }),
     }));
 
-    await expect(Effect.runPromise(restartDashboard(
+    await expect(restartDashboard(
       baseConfig,
       () => ({ stop: vi.fn(), pid: async () => 8303 }),
       {
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
         eaddrinuseLogPath: logPath,
       },
-    ))).resolves.toEqual({ ownershipVerified: true, spawnedPid: 8303 });
+    )).resolves.toEqual({ ownershipVerified: true, spawnedPid: 8303 });
   });
 });

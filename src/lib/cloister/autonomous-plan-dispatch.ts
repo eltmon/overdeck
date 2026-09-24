@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { getAgentState } from '../agents.js';
 import {
   LEGACY_PARKED_LABELS,
@@ -65,10 +64,10 @@ export async function gatherAutonomousPlanDispatchInput(
     // The scheduler cannot prove blocker labels are absent without the issue service.
   }
 
-  const currentState = await Effect.runPromise(getAgentState(`agent-${issueLower}-plan`));
+  const currentState = getAgentState(`agent-${issueLower}-plan`);
   const legacyState = currentState?.model
     ? null
-    : await Effect.runPromise(getAgentState(`planning-${issueLower}`));
+    : getAgentState(`planning-${issueLower}`);
   const config = loadConfigSync().config;
 
   return {

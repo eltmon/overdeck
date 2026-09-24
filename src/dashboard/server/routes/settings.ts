@@ -32,7 +32,8 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { setUiTheme } from '../../../lib/ui-theme.js';
-import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
+import { getCodexAuthPath, getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
+import { FsError } from '../../../lib/errors.js';
 import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { getDashScopeUpstreamBaseUrl } from '../../../lib/openai-compatible-proxy.js';
 import { OpenRouterService, includeOpenRouterFavorites } from '../services/openrouter-service.js';
@@ -47,7 +48,7 @@ import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
 import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
-import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
+import { getConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { getConversationSearchStatus } from '../services/conversation-search-status.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
@@ -220,7 +221,10 @@ const getOpenAIAuthRoute = HttpRouter.add(
   'GET',
   '/api/settings/openai-auth',
   httpHandler(Effect.gen(function* () {
-    const status = yield* getOpenAIAuthStatus();
+    const status = yield* Effect.tryPromise({
+      try: () => getOpenAIAuthStatus(),
+      catch: (cause) => new FsError({ path: getCodexAuthPath(), operation: 'getOpenAIAuthStatus', cause }),
+    });
     return jsonResponse(status);
   })),
 );
@@ -760,7 +764,7 @@ const getConversationSearchReindexEstimateRoute = HttpRouter.add(
       try: async () => {
         // Optional ?model= lets the UI price a *prospective* model switch before saving it.
         const modelOverride = new URL(request.url, 'http://localhost').searchParams.get('model')?.trim();
-        const baseConfig = getConversationSearchConfigSync();
+        const baseConfig = getConversationSearchConfig();
         const config = modelOverride ? { ...baseConfig, model: modelOverride } : baseConfig;
         const estimate = await estimateFullReindexConversationSearchCost({ config });
         const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
@@ -863,7 +867,7 @@ const putSettingsRoute = HttpRouter.add(
         if (!validation.valid) {
           return jsonResponse({ error: validation.errors.join('; ') }, { status: 400 });
         }
-        await Effect.runPromise(saveSettingsApi(newSettings));
+        await saveSettingsApi(newSettings);
         await refreshTtsRuntimeConfig();
         await syncTtsPlaybackWithConfig();
         await syncConversationSearchWatcher();
@@ -924,7 +928,7 @@ const putDesignLanguageRoute = HttpRouter.add(
       if (theme !== 'ledger' && theme !== 'broadsheet') {
         return jsonResponse({ error: "theme must be 'ledger' or 'broadsheet'" }, { status: 400 });
       }
-      await Effect.runPromise(saveDesignLanguage(theme));
+      await saveDesignLanguage(theme);
       return jsonResponse({ success: true });
     });
   })),
@@ -959,7 +963,7 @@ const putOpenRouterFavoritesRoute = HttpRouter.add(
     const modelIds = favorites.filter((f): f is string => typeof f === 'string');
     return yield* Effect.promise(async () => {
       try {
-        await Effect.runPromise(saveOpenRouterFavorites(modelIds));
+        await saveOpenRouterFavorites(modelIds);
         return jsonResponse({ success: true, favorites: modelIds });
       } catch (err) {
         throw new Error(err instanceof Error ? err.message : String(err));
@@ -983,7 +987,7 @@ const putOpenRouterApiKeyRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
-        const settings = await Effect.runPromise(updateProviderApiKey('openrouter', apiKey?.trim() || undefined));
+        const settings = await updateProviderApiKey('openrouter', apiKey?.trim() || undefined);
         return jsonResponse({
           success: true,
           apiKey: settings.api_keys.openrouter,

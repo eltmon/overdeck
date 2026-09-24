@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentRuntimeStateSync: vi.fn(),
-  getLatestSessionIdSync: vi.fn(),
+  getLatestSessionId: vi.fn(),
   hasCompletionMarkerForAgent: vi.fn(),
   claudeSessionTranscriptExists: vi.fn(),
   getPrFacts: vi.fn(),
@@ -11,12 +11,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentStateSync: mocks.getAgentStateSync,
+  getAgentState: mocks.getAgentState,
   getAgentRuntimeStateSync: mocks.getAgentRuntimeStateSync,
-  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
-  getAgentState: vi.fn(),
+  getLatestSessionId: mocks.getLatestSessionId,
   getAgentRuntimeState: vi.fn(),
-  getLatestSessionId: vi.fn(),
   normalizeAgentId: (id: string) => id,
 }));
 
@@ -24,8 +22,8 @@ vi.mock('../../../src/lib/agents/supervisor-channels.js', () => ({
   hasCompletionMarkerForAgent: mocks.hasCompletionMarkerForAgent,
 }));
 
-vi.mock('../../../src/lib/paths.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../src/lib/paths.js')>()),
+vi.mock('../../../src/lib/runtimes/storage/claude-code.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/runtimes/storage/claude-code.js')>()),
   claudeSessionTranscriptExists: mocks.claudeSessionTranscriptExists,
 }));
 
@@ -63,7 +61,7 @@ describe('issueOwesRework', () => {
 describe('getWorkAgentLifecycleStateSync after handoff (PAN-3334)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-3846',
       issueId: 'PAN-3846',
       workspace: '/tmp',
@@ -72,19 +70,19 @@ describe('getWorkAgentLifecycleStateSync after handoff (PAN-3334)', () => {
       status: 'stopped',
     });
     mocks.getAgentRuntimeStateSync.mockReturnValue(null);
-    mocks.getLatestSessionIdSync.mockReturnValue('session-3846');
+    mocks.getLatestSessionId.mockReturnValue('session-3846');
     mocks.sessionExistsSync.mockReturnValue(false);
     mocks.claudeSessionTranscriptExists.mockReturnValue(true);
     mocks.hasCompletionMarkerForAgent.mockReturnValue(true);
   });
 
-  it('reports nothing to resume: this synchronous door cannot ask the forge', () => {
+  it('reports the handed-off agent as warm-resumable without asking the forge (supersedes PAN-3334)', () => {
     const state = getWorkAgentLifecycleStateSync('agent-pan-3846');
 
     expect(state.handedOff).toBe(true);
-    expect(state.canResumeSession).toBe(false);
-    expect(state.recommendedAction).toBe('none');
-    expect(state.reason).toContain('nothing to resume');
+    expect(state.canResumeSession).toBe(true);
+    expect(state.recommendedAction).toBe('resume');
+    expect(state.reason).toContain('handed off');
     expect(mocks.getPrFacts).not.toHaveBeenCalled();
   });
 

@@ -1,0 +1,523 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-10T20:44:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2364: swarm: per-slot failure isolation — one failed-merge slot freezes the entire issue's swarm",
+    "updated": "2026-07-10T20:50:59.036Z"
+  },
+  "plan": {
+    "id": "pan-2364",
+    "title": "swarm: per-slot failure isolation — one failed-merge slot freezes the entire issue's swarm",
+    "status": "proposed",
+    "uid": "56e07193-f3d1-4c91-b0bb-d475fed1ba11",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-10T20:44:58Z",
+    "updated": "2026-07-10T20:50:59.036Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2364",
+        "label": "PAN-2364",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2357",
+        "label": "PAN-2357 (landed: finalization + durable readiness)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2214",
+        "label": "PAN-2214 (swarm v2 controls)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "swarm",
+      "deacon",
+      "recovery",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "The failed-merge recovery block is recorded per-ISSUE. In coordinateSwarmSlots (src/lib/cloister/deacon-swarm.ts:328-332) a single block makes the coordinator `continue` past the whole issue every patrol: no merges of other ready slots, no dispatch, no GC, no finalization, until an operator runs `pan swarm recover`. One conflicted slot in a 5-slot swarm strands four healthy slots (live repro: PAN-2229 RUN-62, plus PAN-2528/MIN-867/LEX-1 frozen in the same cycle). Compounding it: (a) `pan swarm recover --action retry` is a de-facto no-op — it clears the block but leaves the conflicted slot branch, worktree, and durable completion marker in place, so the next patrol re-merges the same branch, conflicts, and re-records the block; (b) `pan swarm status` never reads the block, displaying a blocked slot as ready-to-merge; (c) recordStalledSlotRecovery blocks only the first stalled slot and returns early if any block exists.",
+      "Proposal": "Store blocks per-slot: add swarm.failedMergeBlocks (Record keyed by String(slotIndex), like slotCompletions) to PanIssueSwarmRecord with legacy singular-field read-compat and migrate-on-write. Re-key the in-memory Map to `${issueId}:${slotIndex}` and make the API per-slot (getFailedMergeBlocks list + slot-scoped get/clear). Make the coordinator guard per-item: coordinateSwarmSlots no longer skips the issue; mergeReadySlots skips only blocked slots (with an action line every pass); requeueFailedSwarmSlots leaves blocked slots to operator recovery; dispatchNextWave keeps blocked indexes occupied and blocked items non-dispatchable. recordStalledSlotRecovery blocks every stalled slot individually. `pan swarm recover <id> <slot>` keeps its verbs but retry now archives the conflicted attempt via archiveFailedSwarmSlot before requeueing, so the fresh attempt cannot re-assert. `pan swarm status` lists all blocked slots and shows blocked rows as failed-merge instead of ready-to-merge. Update docs/SWARM.md recovery sections.",
+      "NonGoals": "- No changes to dispatch-time file-scope overlap deduplication (conflict PREVENTION layer already exists; this issue is the containment layer)\n- No automatic rebase of a conflicted slot branch onto the feature workspace; retry means a fresh attempt by a new agent, not mechanical rebase\n- No operator-less auto-clearing of failed-merge blocks; `pan swarm recover` remains the only exit from a block\n- No new CLI flags or verbs; recover keeps retry|drop|handoff with the same argument shape\n- No dashboard/frontend UI surfacing of blocked slots (CLI `pan swarm status` only)\n- No changes to stall-detection thresholds or to classifyInFlightSlots lifecycle logic\n- No changes to verifyAndMergeSlot merge strategy (--no-ff stays)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keyed durable storage swarm.failedMergeBlocks: Record<string, block> by String(slotIndex), legacy singular field folded in on read and migrated on first write",
+        "rationale": "The issue body prescribes 'record: swarm.failedMergeBlocks[slotIndex]'; String keys match the existing slotCompletions precedent in record.ts, and live frozen issues carry singular blocks that must survive the upgrade."
+      },
+      {
+        "summary": "recover --action retry archives the conflicted attempt (archiveFailedSwarmSlot) before requeueing, instead of only unblocking and re-dispatching",
+        "rationale": "The 2026-07-10 issue comment reports retry did not clear the freeze: the conflicted branch and its durable completion marker re-classified ready-to-merge and re-recorded the block next patrol. Archiving is the existing, tested failed-slot machinery and guarantees a fresh attempt."
+      },
+      {
+        "summary": "Blocked slots are excluded from BOTH auto-merge retries and requeueFailedSwarmSlots auto-requeue; only operator recover exits a block",
+        "rationale": "The issue states recover semantics stay the same; auto-requeueing a blocked slot would bypass the operator decision the block exists to request."
+      },
+      {
+        "summary": "recoverFailedMergeSlot and clearFailedMergeBlock gain a slotIndex parameter (breaking in-repo API change, no back-compat shim)",
+        "rationale": "Multiple blocks can now coexist per issue; all callers are in-repo (CLI swarm.ts + unit tests), so a shim would be dead weight."
+      },
+      {
+        "summary": "Status discrepancy fixed at display level in swarmStatusCommand, not inside classifyInFlightSlots",
+        "rationale": "classify is shared patrol logic; the block is not a lifecycle but an operator hold on the slot, so status overlays it on the reconciled view."
+      }
+    ],
+    "items": [
+      {
+        "id": "per-slot-block-storage",
+        "title": "Store failed-merge blocks per-slot in the record and in-memory map",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T20:44:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2364",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "coordinator-per-slot-guard",
+            "stalled-slots-block-individually",
+            "recover-retry-fresh-attempt",
+            "status-lists-blocked-slots"
+          ],
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-swarm-recovery.test.ts passes including new per-slot storage and legacy-migration cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pan-dir/record.ts add `failedMergeBlocks?: Record<string, PanIssueSwarmFailedMergeBlock>` (keyed by String(slotIndex), mirroring slotCompletions at record.ts:112) to PanIssueSwarmRecord; mark the existing singular `failedMergeBlock?` field deprecated-but-readable in a comment. In src/lib/cloister/deacon-swarm.ts re-key the module-level `failedMergeBlocks` Map (line 79) to `${issueId}:${slotIndex}`; rewrite writeSwarmFailedMergeBlock (line 755) to set/delete entries in the keyed record map, folding a legacy singular block into the map and clearing the singular field on first write; change the API to recordFailedMergeBlock(block, workspacePath?) (per-slot set), clearFailedMergeBlock(issueId, slotIndex, workspacePath?), getFailedMergeBlock(issueId, slotIndex, workspacePath?), and new getFailedMergeBlocks(issueId, workspacePath?): FailedMergeBlock[] returning durable blocks (including a folded legacy singular one) merged with in-memory blocks, deduped by slotIndex with durable winning. resetSwarmLoopSafetyForTests keeps clearing the Map. Compile-fix all in-repo callers (cli/commands/swarm.ts, tests) mechanically in this bead; their behavior changes land in later beads."
+        },
+        "items": [
+          {
+            "id": "per-slot-block-storage.ac1",
+            "title": "Given two blocks recorded for slots 1 and 3 of the same issue, getFailedMergeBlocks returns both and getFailedMergeBlock(issue, 1) returns only slot 1's block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-slot-block-storage.ac2",
+            "title": "Given a record containing only the legacy singular swarm.failedMergeBlock, getFailedMergeBlocks returns it, and the next recordFailedMergeBlock write persists swarm.failedMergeBlocks and clears the singular field in the written record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-slot-block-storage.ac3",
+            "title": "clearFailedMergeBlock(issue, 1) removes only slot 1's durable and in-memory entries; slot 3's block survives and is still returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-slot-block-storage.ac4",
+            "title": "Blocks recorded with a workspacePath persist through the record write door and are returned by getFailedMergeBlocks after resetSwarmLoopSafetyForTests clears the in-memory map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "coordinator-per-slot-guard",
+        "title": "Coordinator continues merging and dispatching around blocked slots",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T20:44:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2364",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/swarm-failed-slot.ts",
+            "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-hold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-recovery.test.ts tests/unit/lib/cloister/deacon-swarm-hold.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "recovery and hold suites pass, including a new test where one blocked slot coexists with another slot that merges and a new item that dispatches in the same coordinate pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Only ready writer of deacon-swarm.ts in its wave: the overlapping siblings (stalled-slots-block-individually, recover-retry-fresh-attempt) are readiness:sequential, and status-lists-blocked-slots touches disjoint files.",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In coordinateSwarmSlots (src/lib/cloister/deacon-swarm.ts:328-332) delete the early `if (failedMergeBlock) { ...; continue; }` guard. Compute `const blocks = getFailedMergeBlocks(issueId, workspace.workspacePath)` once per issue; when non-empty emit ONE action line naming every blocked slot and item (e.g. `[swarm] blocked slots for PAN-X: slot 1 (item a), slot 3 (item b) — other slots continue; run pan swarm recover`). Thread `blockedSlotIndexes: Set<number>` into: (1) mergeReadySlots — skip a ready-to-merge slot whose slotIndex is blocked, pushing `[swarm] skipped merge slot N (item X): failed-merge block — awaiting pan swarm recover` EVERY pass (never silent, PAN-2469); (2) requeueFailedSwarmSlots (src/lib/cloister/swarm-failed-slot.ts:81) — skip classified-failed slots whose slotIndex is blocked (a block is operator territory; auto-requeue must not bypass recover), with an action line; (3) dispatchNextWave — add blocked slot indexes to occupiedSlotIndexes (deacon-swarm.ts:808-815) and exclude blocked itemIds from dispatch candidates. Also update the conflicts branch of mergeReadySlots (line 585-594) to keep recording per-slot blocks via the new API. Keep all new logic non-throwing: a throw feeds the 60s advance-failure backoff."
+        },
+        "items": [
+          {
+            "id": "coordinator-per-slot-guard.ac1",
+            "title": "Given slot 1 holds a failed-merge block and slot 2 is ready-to-merge, one coordinateSwarmSlots pass merges slot 2 and applies its done task-operation while slot 1 stays unmerged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "coordinator-per-slot-guard.ac2",
+            "title": "Given slot 1 holds a block and a dispatchable slot-eligible item remains, the same pass dispatches the new item to a slot index different from 1 (blocked index counts as occupied)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "coordinator-per-slot-guard.ac3",
+            "title": "A blocked ready-to-merge slot produces a skipped-merge action line on every pass and verifyAndMergeSlot is never invoked for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "coordinator-per-slot-guard.ac4",
+            "title": "A blocked slot classified failed (vanished session) is NOT archived or requeued by requeueFailedSwarmSlots and emits an action line saying it awaits operator recovery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "coordinator-per-slot-guard.ac5",
+            "title": "The per-issue blocked-slots action line lists every blocked slot with its item id, and coordinateSwarmSlots still returns normally (no throw, no advance-failure backoff) when blocks exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stalled-slots-block-individually",
+        "title": "recordStalledSlotRecovery blocks every stalled slot, not just the first",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T20:44:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2364",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stall suite passes including a new two-stalled-slots case producing two distinct per-slot blocks",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite recordStalledSlotRecovery (src/lib/cloister/deacon-swarm.ts:736-753): remove the issue-wide early return `if (getFailedMergeBlock(...)) return actions` and the `.find(...)` single-slot selection. Iterate ALL classified slots with lifecycle 'stalled'; for each one that does not already have a per-slot block (getFailedMergeBlock(issueId, slot.slotIndex, workspacePath)), record a block with the existing stall note text and push the existing recovery-required action line. Slots that already hold a block are skipped without a new write (idempotent across patrols)."
+        },
+        "items": [
+          {
+            "id": "stalled-slots-block-individually.ac1",
+            "title": "Given slots 1 and 2 both classify stalled in one pass, recordStalledSlotRecovery records two blocks (slot 1 and slot 2) and returns two recovery-required action lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stalled-slots-block-individually.ac2",
+            "title": "Given slot 1 already holds a block and slot 2 newly stalls, a second pass records a block only for slot 2 and preserves slot 1's existing block unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stalled-slots-block-individually.ac3",
+            "title": "Repeated passes over the same stalled slot do not rewrite its block (write door invoked once per slot, action line still emitted by the coordinator's blocked-slots summary)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recover-retry-fresh-attempt",
+        "title": "recover retry archives the conflicted attempt so it cannot re-assert; recover is slot-scoped",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-10T20:44:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2364",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/cli/commands/swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+            "tests/unit/cli/commands/swarm.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-recovery.test.ts tests/unit/cli/commands/swarm.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "recovery + CLI suites pass, including a new test proving a retried slot's branch/worktree are archived and a follow-up coordinate pass does not re-record the block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Change recoverFailedMergeSlot (src/lib/cloister/deacon-swarm.ts:665-734) to take slotIndex after workspacePath and look up the per-slot block. retry path: (1) archive the conflicted attempt by calling archiveFailedSwarmSlot from src/lib/cloister/swarm-failed-slot.ts with the block's slot (renames branch and worktree to *-failed-<ts>, appends supersededAttempts, clears the durable completion marker and the slot assignment) — add runGitCommand/clearSlotAssignment to the deps pick, defaulting to the same implementations the patrol uses; (2) clear the per-slot block; (3) apply the existing unblock task-operation and dispatchNextWave with the item reset to pending. drop path: mark item done, clear the per-slot block, clear that slot's assignment (unchanged semantics, slot-scoped lookup). handoff path: update that slot's block note only. In src/cli/commands/swarm.ts:154-204 pass the parsed slotIndex into getFailedMergeBlock/recoverFailedMergeSlot; when no block exists for that slot but other slots are blocked, the error message lists the blocked slots (slot + item + note). WHY: RUN-62 showed retry re-asserting — the conflicted branch and durable completion marker survived, so the next patrol re-merged the same branch and re-recorded the block; archiving guarantees the retry is a fresh attempt on a fresh slot state."
+        },
+        "items": [
+          {
+            "id": "recover-retry-fresh-attempt.ac1",
+            "title": "Given a blocked slot, when recover retry runs it creates the *-failed-<timestamp> archive branch/worktree names via git rename, records a supersededAttempts entry, and clears the slot's durable completion marker and assignment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recover-retry-fresh-attempt.ac2",
+            "title": "Given a slot recovered with retry, the next coordinateSwarmSlots pass records no new block for that slot (the RUN-62 re-assertion loop is gone) and the retried item returns to the dispatchable set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recover-retry-fresh-attempt.ac3",
+            "title": "With slots 1 and 3 both blocked, recover drop on slot 3 marks only item-of-slot-3 done and clears only slot 3's block; slot 1's block survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recover-retry-fresh-attempt.ac4",
+            "title": "recover handoff updates only the targeted slot's block note and leaves the item status and other blocks unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recover-retry-fresh-attempt.ac5",
+            "title": "CLI `pan swarm recover <id> <slot>` against a slot with no block exits non-zero with a message listing the currently blocked slots and their items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-lists-blocked-slots",
+        "title": "pan swarm status lists all blocked slots and stops mislabeling them ready-to-merge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T20:44:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2364",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/swarm.ts",
+            "tests/unit/cli/commands/swarm.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/swarm.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CLI swarm suite passes including new status assertions for blocked-slot rows and the Blocked slots section",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In swarmStatusCommand (src/cli/commands/swarm.ts:555-623): read getFailedMergeBlocks(issue, workspacePath) (add it to SwarmStatusCommandDeps with the real default). (1) For each slot row whose slotIndex has a block, display lifecycle `failed-merge (blocked)` instead of the classify-derived lifecycle — this fixes the RUN-62 discrepancy where status printed ready-to-merge while the deacon held failed-merge. (2) After the Slots section, when blocks exist print a `Blocked slots:` section: one line per block with slot index, item id, note, and the exact recovery hint `pan swarm recover <ISSUE> <slot> --action retry|drop|handoff`. (3) When no blocks exist, print nothing new. classifyInFlightSlots is not modified."
+        },
+        "items": [
+          {
+            "id": "status-lists-blocked-slots.ac1",
+            "title": "Given slot 1 blocked and classify reporting it ready-to-merge, status renders slot 1's row as failed-merge (blocked), never plain ready-to-merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-lists-blocked-slots.ac2",
+            "title": "Given blocks on slots 1 and 3, status prints a Blocked slots section listing both with item id, note, and a pan swarm recover hint naming the issue and slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-lists-blocked-slots.ac3",
+            "title": "Given no blocks, status output contains no Blocked slots section and slot rows keep their classify-derived lifecycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-swarm-per-slot-isolation",
+        "title": "Update docs/SWARM.md recovery sections to per-slot isolation semantics",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-10T20:44:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2364",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SWARM.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"per-slot\" docs/SWARM.md",
+            "grep -c \"pauses automatic advancement for that issue\" docs/SWARM.md || true"
+          ],
+          "expected_outputs": [
+            "grep returns per-slot isolation wording in the recovery sections",
+            "the old issue-wide 'pauses automatic advancement for that issue' phrasing returns 0 matches"
+          ],
+          "readiness": "sequential",
+          "acJustification": "Docs-only item: two criteria fully pin the required wording changes; code behavior is verified by the preceding items' tests.",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/SWARM.md: (1) line ~58 — on merge conflict the coordinator records a failed-merge block FOR THAT SLOT; (2) line ~67 — failed-merge and stalled-slot blocks pause advancement of the blocked SLOT only; other slots keep merging/dispatching; `pan swarm status` lists every blocked slot; (3) line ~97 recovery-verbs section — document that retry archives the conflicted attempt (branch/worktree renamed to *-failed-<ts>, recorded in supersededAttempts) and requeues the item for a fresh slot, and that recover targets one slot while others stay live; (4) line ~135 stall section — every stalled slot records its own block. Keep the existing document voice and structure; no other sections change."
+        },
+        "items": [
+          {
+            "id": "docs-swarm-per-slot-isolation.ac1",
+            "title": "docs/SWARM.md contains per-slot blocking language in the recovery and stall sections (blocked slot pauses; sibling slots continue merging and dispatching), and grep for the old issue-wide phrasing 'pauses automatic advancement for that issue' returns zero matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-swarm-per-slot-isolation.ac2",
+            "title": "The recover section covers retry's archive-then-requeue behavior and shows that pan swarm status lists all blocked slots",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "per-slot-block-storage",
+        "to": "coordinator-per-slot-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "per-slot-block-storage",
+        "to": "stalled-slots-block-individually",
+        "type": "blocks"
+      },
+      {
+        "from": "per-slot-block-storage",
+        "to": "recover-retry-fresh-attempt",
+        "type": "blocks"
+      },
+      {
+        "from": "per-slot-block-storage",
+        "to": "status-lists-blocked-slots",
+        "type": "blocks"
+      },
+      {
+        "from": "coordinator-per-slot-guard",
+        "to": "docs-swarm-per-slot-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "recover-retry-fresh-attempt",
+        "to": "docs-swarm-per-slot-isolation",
+        "type": "blocks"
+      },
+      {
+        "from": "status-lists-blocked-slots",
+        "to": "docs-swarm-per-slot-isolation",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-10-PAN-2364-swarm-per-slot-failure-isolation-one-failed-merge-slot-freezes-the-entire-issue-s-swarm.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

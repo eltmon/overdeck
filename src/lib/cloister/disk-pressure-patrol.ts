@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process';
 import { statfs } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
-import { emitActivityEntrySync, type EmitActivityOptions } from '../activity-logger.js';
+import { emitActivityEntry, type EmitActivityOptions } from '../activity-logger.js';
 import { getOverdeckHome } from '../paths.js';
 
 const execFileAsync = promisify(execFile);
@@ -65,7 +65,7 @@ export async function patrolDiskPressure(
   const d: DiskPressurePatrolDeps = {
     readDiskSpace: deps.readDiskSpace ?? readDiskSpace,
     pruneBuildCache: deps.pruneBuildCache ?? pruneBuildCache,
-    emit: deps.emit ?? emitActivityEntrySync,
+    emit: deps.emit ?? emitActivityEntry,
     now: deps.now ?? Date.now,
   };
   const before = await d.readDiskSpace();

@@ -1,6 +1,6 @@
 import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
-import { INTERNAL_TOKEN_HEADER, ensureInternalTokenSync } from '../../../lib/internal-token.js';
+import { INTERNAL_TOKEN_HEADER, ensureInternalToken } from '../../../lib/internal-token.js';
 
 interface BackfillOptions {
   dryRun?: boolean;
@@ -25,7 +25,7 @@ function dashboardBaseUrl(): string {
 export async function backfillTitlesCommand(options: BackfillOptions = {}): Promise<void> {
   const dryRun = !!options.dryRun;
   const baseUrl = dashboardBaseUrl();
-  const internalToken = ensureInternalTokenSync();
+  const internalToken = ensureInternalToken();
 
   let report: BackfillReport;
   try {

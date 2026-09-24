@@ -26,10 +26,6 @@ export type {
   SwarmSupersededAttempt,
 };
 
-export function readSwarmSupersededAttempts(workspacePath: string, issueId: string): SwarmSupersededAttempt[] {
-  return readSwarmSlotState(workspacePath, issueId)?.supersededAttempts ?? [];
-}
-
 export async function writeSwarmSupersededAttempt(
   workspacePath: string,
   issueId: string,
@@ -338,21 +334,4 @@ export async function clearReleasedBlockedSwarmSlot(
  */
 export async function clearSupersededSwarmAttempts(workspacePath: string, issueId: string): Promise<void> {
   await updateSwarmSlotState(workspacePath, issueId, (state) => ({ ...state, supersededAttempts: [] }));
-}
-
-/**
- * PAN-2372 WI-3 / FR-4, FR-5: write the slot-completion marker and read it
- * straight back. Returns true only when the marker exists on disk with a
- * matching agentId. The slot `pan done` caller MUST refuse to mark the slot
- * done when this returns false — that is the whole point: a slot used to finish
- * without recording completion, so the coordinator could not observe it.
- */
-export async function persistAndVerifySwarmSlotCompletion(
-  workspacePath: string,
-  issueId: string,
-  completion: SwarmSlotCompletion,
-): Promise<boolean> {
-  await writeSwarmSlotCompletion(workspacePath, issueId, completion);
-  const persisted = readSwarmSlotCompletion(workspacePath, issueId, completion.slotIndex);
-  return Boolean(persisted && persisted.agentId === completion.agentId);
 }

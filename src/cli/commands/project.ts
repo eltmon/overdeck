@@ -5,11 +5,11 @@ import { existsSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
 import {
   listProjectsSync,
-  unregisterProjectSync,
+  unregisterProject,
   getProjectSync,
-  initializeProjectsConfigSync,
+  initializeProjectsConfig,
   PROJECTS_CONFIG_FILE,
-  renameProjectSync,
+  renameProject,
   ProjectConfig,
   IssueRoutingRule,
   getIssuePrefix,
@@ -226,11 +226,11 @@ export async function projectAddCommand(
 
   // Apply CLI-only extras (linearTeam, rallyProject) to the already-written entry.
   if (linearTeam || options.rallyProject) {
-    const { registerProjectSync } = await import('../../lib/projects.js');
+    const { registerProject } = await import('../../lib/projects.js');
     const updated: ProjectConfig = { ...regResult.config };
     if (linearTeam) updated.issue_prefix = linearTeam.toUpperCase();
     if (options.rallyProject) updated.rally_project = options.rallyProject;
-    registerProjectSync(regResult.key, updated);
+    registerProject(regResult.key, updated);
     regResult = { ...regResult, config: updated };
   }
 
@@ -511,7 +511,7 @@ export async function projectRenameCommand(key: string, newName: string): Promis
     if (!project) throw new Error(`Unknown project: ${key}`);
 
     const oldName = project.name;
-    renameProjectSync(key, newName);
+    await renameProject(key, newName);
     console.log(chalk.green(`✓ Renamed project: ${oldName} → ${newName.trim()}`));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -525,7 +525,7 @@ export async function projectRemoveCommand(nameOrPath: string): Promise<void> {
   const projects = listProjectsSync();
 
   // Try direct key match
-  if (unregisterProjectSync(nameOrPath)) {
+  if (unregisterProject(nameOrPath)) {
     console.log(chalk.green(`✓ Removed project: ${nameOrPath}`));
     return;
   }
@@ -533,7 +533,7 @@ export async function projectRemoveCommand(nameOrPath: string): Promise<void> {
   // Try to find by name or path
   for (const { key, config } of projects) {
     if (config.name === nameOrPath || config.path === resolve(nameOrPath)) {
-      unregisterProjectSync(key);
+      unregisterProject(key);
       console.log(chalk.green(`✓ Removed project: ${config.name}`));
       return;
     }
@@ -549,7 +549,7 @@ export async function projectInitCommand(): Promise<void> {
     return;
   }
 
-  initializeProjectsConfigSync();
+  initializeProjectsConfig();
 
   console.log(chalk.green('✓ Projects config initialized'));
   console.log('');

@@ -7,15 +7,22 @@
  *   3. docs/prds/<status>/<id-lower>-plan.md — legacy flat file
  *   4. docs/prds/<status>/<ID-UPPER>-plan.md — buggy uppercase flat file
  *
- * All readers MUST go through findPrdAtStatus / findPrdAnywhere so they tolerate
- * every variant. All writers MUST use canonicalPrdSubdir so new artifacts only
+ * All readers MUST go through findPrdAtStatusSync / findPrdAnywhereSync so they tolerate
+ * every variant. All writers MUST use canonicalPrdSubdirSync so new artifacts only
  * land in the canonical lowercase subdirectory format.
+ */
+
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `findDraftPrdSync` (async: `findDraftPrd`): src/lib/prd-locations.ts:153.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
  */
 
 import { existsSync } from 'fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -67,7 +74,7 @@ function statusRoot(projectPath: string, status: Exclude<PrdStatus, 'draft'>): s
  * Canonical lowercase subdirectory path. Always use this for NEW writes.
  * Does not check existence — callers create the directory as needed.
  */
-export function canonicalPrdSubdirSync(
+export function canonicalPrdSubdir(
   projectPath: string,
   issueId: string,
   status: Exclude<PrdStatus, 'draft'>,
@@ -79,7 +86,7 @@ export function canonicalPrdSubdirSync(
  * Find an existing PRD for an issue under a single lifecycle status.
  * Checks all four legacy/buggy formats, preferring canonical.
  */
-export function findPrdAtStatusSync(
+export function findPrdAtStatus(
   projectPath: string,
   issueId: string,
   status: Exclude<PrdStatus, 'draft'>,
@@ -118,7 +125,8 @@ export function findDraftPrdSync(projectPath: string, issueId: string): PrdLocat
   return null;
 }
 
-export async function findDraftPrdAsync(projectPath: string, issueId: string): Promise<PrdLocation | null> {
+/** Find an issue's draft PRD under the project's `.pan/drafts/`, or null. */
+export async function findDraftPrd(projectPath: string, issueId: string): Promise<PrdLocation | null> {
   for (const candidate of draftPrdCandidates(projectPath, issueId)) {
     try {
       await access(candidate.path);
@@ -134,48 +142,13 @@ export async function findDraftPrdAsync(projectPath: string, issueId: string): P
  * Find a PRD across all lifecycle statuses, in priority order:
  * active → completed → planned → draft. Returns the first match or null.
  */
-export function findPrdAnywhereSync(
+export function findPrdAnywhere(
   projectPath: string,
   issueId: string,
 ): PrdLocation | null {
   for (const status of ['active', 'completed', 'planned'] as const) {
-    const loc = findPrdAtStatusSync(projectPath, issueId, status);
+    const loc = findPrdAtStatus(projectPath, issueId, status);
     if (loc) return loc;
   }
   return findDraftPrdSync(projectPath, issueId)
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Path-only helpers stay synchronous. Draft discovery uses the promise-based
-// filesystem door so resource refreshes never block the dashboard event loop.
-
-/** Effect variant of {@link canonicalPrdSubdirSync}. */
-export const canonicalPrdSubdir = (
-  projectPath: string,
-  issueId: string,
-  status: Exclude<PrdStatus, 'draft'>,
-): Effect.Effect<string, never> =>
-  Effect.sync(() => canonicalPrdSubdirSync(projectPath, issueId, status));
-
-/** Effect variant of {@link findPrdAtStatusSync}. */
-export const findPrdAtStatus = (
-  projectPath: string,
-  issueId: string,
-  status: Exclude<PrdStatus, 'draft'>,
-): Effect.Effect<PrdLocation | null, never> =>
-  Effect.sync(() => findPrdAtStatusSync(projectPath, issueId, status));
-
-/** Async Effect variant of {@link findDraftPrdAsync}. */
-export const findDraftPrd = (
-  projectPath: string,
-  issueId: string,
-): Effect.Effect<PrdLocation | null, never> =>
-  Effect.promise(() => findDraftPrdAsync(projectPath, issueId));
-
-/** Effect variant of {@link findPrdAnywhereSync}. */
-export const findPrdAnywhere = (
-  projectPath: string,
-  issueId: string,
-): Effect.Effect<PrdLocation | null, never> =>
-  Effect.sync(() => findPrdAnywhereSync(projectPath, issueId));

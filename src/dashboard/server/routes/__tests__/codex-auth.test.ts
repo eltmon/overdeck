@@ -19,7 +19,7 @@ vi.mock('os', async (importOriginal) => ({
 vi.mock('../../../../lib/cliproxy.js', async () => {
   const { Effect } = await import('effect');
   return {
-    bridgeCodexAuthToCliproxy: () => Effect.succeed(false),
+    bridgeCodexAuthToCliproxy: async () => false,
     decodeJwtPayload: (token: string): Record<string, unknown> | null => {
       const payload = token.split('.')[1];
       if (!payload) return null;

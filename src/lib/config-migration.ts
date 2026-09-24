@@ -5,15 +5,13 @@
  * Legacy presets are no longer supported - all selection is now smart/capability-based.
  */
 
-import { Effect } from 'effect';
 import { readFileSync, writeFileSync, existsSync, renameSync, readdirSync, lstatSync, readlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
-import { loadSettingsSync, type SettingsConfig } from './settings.js';
+import { loadSettings, type SettingsConfig } from './settings.js';
 import { type YamlConfig } from './config-yaml.js';
 import { type ModelId } from './settings.js';
-import { FsError } from './errors.js';
 
 /** Path to legacy settings file */
 const LEGACY_SETTINGS_PATH = join(homedir(), '.overdeck', 'settings.json');
@@ -28,14 +26,14 @@ const BACKUP_SETTINGS_PATH = join(homedir(), '.overdeck', 'settings.json.backup'
  * Check if migration is needed
  * Returns true if settings.json exists and config.yaml doesn't
  */
-export function needsMigrationSync(): boolean {
+export function needsMigration(): boolean {
   return existsSync(LEGACY_SETTINGS_PATH) && !existsSync(NEW_CONFIG_PATH);
 }
 
 /**
  * Check if legacy settings exist (even if already migrated)
  */
-export function hasLegacySettingsSync(): boolean {
+export function hasLegacySettings(): boolean {
   return existsSync(LEGACY_SETTINGS_PATH);
 }
 
@@ -59,7 +57,7 @@ function detectEnabledProviders(settings: SettingsConfig): {
 /**
  * Convert legacy settings.json to new config.yaml format
  */
-export function convertToYamlConfigSync(settings: SettingsConfig): YamlConfig {
+export function convertToYamlConfig(settings: SettingsConfig): YamlConfig {
   const providers = detectEnabledProviders(settings);
 
   const config: YamlConfig = {
@@ -97,12 +95,12 @@ export interface MigrationResult {
   error?: string;
 }
 
-export function migrateConfigSync(options: MigrationOptions = {}): MigrationResult {
+export function migrateConfig(options: MigrationOptions = {}): MigrationResult {
   const { backup = true, deleteLegacy = false, dryRun = false } = options;
 
   try {
     // Check if migration is needed
-    if (!needsMigrationSync()) {
+    if (!needsMigration()) {
       if (existsSync(NEW_CONFIG_PATH)) {
         return {
           success: true,
@@ -120,10 +118,10 @@ export function migrateConfigSync(options: MigrationOptions = {}): MigrationResu
     }
 
     // Load legacy settings
-    const settings = loadSettingsSync();
+    const settings = loadSettings();
 
     // Convert to YAML config
-    const yamlConfig = convertToYamlConfigSync(settings);
+    const yamlConfig = convertToYamlConfig(settings);
 
     // Generate YAML content
     const yamlContent = yaml.dump(yamlConfig, {
@@ -182,21 +180,6 @@ export function migrateConfigSync(options: MigrationOptions = {}): MigrationResu
 }
 
 /**
- * Get migration status
- */
-export function getMigrationStatusSync(): {
-  needsMigration: boolean;
-  hasLegacySettings: boolean;
-  hasNewConfig: boolean;
-} {
-  return {
-    needsMigration: needsMigrationSync(),
-    hasLegacySettings: existsSync(LEGACY_SETTINGS_PATH),
-    hasNewConfig: existsSync(NEW_CONFIG_PATH),
-  };
-}
-
-/**
  * Clean up legacy runtime symlinks from removed runtimes.
  *
  * PAN-142: Overdeck consolidated to Claude Code as the sole runtime.
@@ -209,7 +192,7 @@ export interface LegacyCleanupResult {
   errors: string[];
 }
 
-export function cleanupLegacyRuntimeSymlinksSync(): LegacyCleanupResult {
+export function cleanupLegacyRuntimeSymlinks(): LegacyCleanupResult {
   const legacyDirs = [
     { name: 'codex', base: join(homedir(), '.codex') },
     { name: 'cursor', base: join(homedir(), '.cursor') },
@@ -257,7 +240,7 @@ export function cleanupLegacyRuntimeSymlinksSync(): LegacyCleanupResult {
  * Migrate legacy sync config by stripping the 'targets' field from config.toml.
  * This handles users who had `targets = ["claude", "codex"]` in their config.
  */
-export function migrateSyncTargetsSync(): { migrated: boolean; hadNonClaudeTargets: boolean } {
+export function migrateSyncTargets(): { migrated: boolean; hadNonClaudeTargets: boolean } {
   const configPath = join(homedir(), '.overdeck', 'config.toml');
 
   if (!existsSync(configPath)) {
@@ -286,47 +269,3 @@ export function migrateSyncTargetsSync(): { migrated: boolean; hadNonClaudeTarge
     return { migrated: false, hadNonClaudeTargets: false };
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// One-shot config-migration helpers. Each is run at most once per install at
-// CLI startup. Errors are caught internally (return false / empty result), so
-// Effect.sync is appropriate here.
-
-/** True when legacy settings.json exists and config.yaml doesn't. Pure. */
-export const needsMigration = (): Effect.Effect<boolean> =>
-  Effect.sync(() => needsMigrationSync());
-
-/** True if any legacy settings.json is present (with or without yaml). Pure. */
-export const hasLegacySettings = (): Effect.Effect<boolean> =>
-  Effect.sync(() => hasLegacySettingsSync());
-
-/** Convert a SettingsConfig into a YamlConfig. Pure. */
-export const convertToYamlConfig = (
-  settings: SettingsConfig,
-): Effect.Effect<YamlConfig> => Effect.sync(() => convertToYamlConfigSync(settings));
-
-/** Run the settings.json → config.yaml migration. Surfaces FsError on IO failure. */
-export const migrateConfig = (
-  options: MigrationOptions = {},
-): Effect.Effect<MigrationResult, FsError> =>
-  Effect.try({
-    try: () => migrateConfigSync(options),
-    catch: (cause) =>
-      new FsError({ path: NEW_CONFIG_PATH, operation: 'migrate-config', cause }),
-  });
-
-/** Inspect migration state without modifying anything. Pure. */
-export const getMigrationStatus = (): Effect.Effect<
-  ReturnType<typeof getMigrationStatusSync>
-> => Effect.sync(() => getMigrationStatusSync());
-
-/** Sweep legacy runtime symlinks under ~/.overdeck (idempotent). */
-export const cleanupLegacyRuntimeSymlinks =
-  (): Effect.Effect<LegacyCleanupResult> =>
-    Effect.sync(() => cleanupLegacyRuntimeSymlinksSync());
-
-/** Migrate `targets = [...]` lines out of config.toml. Pure-ish (catches). */
-export const migrateSyncTargets = (): Effect.Effect<{
-  migrated: boolean;
-  hadNonClaudeTargets: boolean;
-}> => Effect.sync(() => migrateSyncTargetsSync());

@@ -12,19 +12,17 @@ import type { PromptResult, PromptSender } from '../terminal-backends/types.js';
 import {
   normalizeAgentId,
   getAgentState,
-  getAgentStateSync,
   saveAgentState,
   getAgentDir,
   waitForPromptReady,
   SESSION_EXITED_BEFORE_KICKOFF,
 } from '../agents.js';
-import { getAgentRuntimeState } from './runtime-state.js';
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
 import { checkPrompt, senderFromEnv, tokensFromLaunchMetadata } from '../terminal-backends/prompt-guard.js';
 import { selectTerminalBackend } from '../terminal-backends/select.js';
 import { isPromptDropped, isPromptRefused, isUnsupported } from '../terminal-backends/types.js';
 import { completeKeyedSubmit, sendKeysDedup } from '../tmux-dedup.js';
-import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
+import { BRIDGE_TOKEN_HEADER, readBridgeToken } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 import {
   SUPERVISOR_CLIENT_MARGIN_MS,
@@ -43,17 +41,34 @@ import {
 async function loadTerminalBackendConfig(): Promise<{ terminal?: { backend?: 'herdr' | 'tmux' } }> {
   try {
     const { loadConfigSync } = await import('../config-yaml.js');
-    return loadConfigSync() as { terminal?: { backend?: 'herdr' | 'tmux' } };
+    return loadConfigSync().config as { terminal?: { backend?: 'herdr' | 'tmux' } };
   } catch {
     return {};
   }
 }
 
 /**
+ * Does this agent run behind a host process with its own delivery socket?
+ * codex app-server (the default codex transport) and ACP/opencode do; codex in
+ * `transport: tui` mode does not.
+ */
+async function isHostBackedTarget(state: AgentState | null): Promise<boolean> {
+  if (!state) return false;
+  if (state.harness === 'acp' || state.harness === 'opencode') return true;
+  if (state.harness !== 'codex') return false;
+  try {
+    const { loadConfigSync } = await import('../config-yaml.js');
+    const loaded = loadConfigSync() as { config?: { codex?: { transport?: string } } };
+    return loaded.config?.codex?.transport !== 'tui';
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Which backend this host delivers through. Resolved once per process: the
- * answer is a property of the host (binary plus socket, or an explicit
- * `terminal.backend`), not of the message, and a probe per delivery would put
- * filesystem work on every message's hot path.
+ * answer is the host's policy (env, `terminal.backend`, default herdr —
+ * PAN-3956), not a property of the message.
  */
 let backendSelection: Promise<'herdr' | 'tmux'> | null = null;
 
@@ -61,7 +76,7 @@ function deliveryBackendName(): Promise<'herdr' | 'tmux'> {
   backendSelection ??= loadTerminalBackendConfig()
     .then((config) => selectTerminalBackend(config))
     .then((selection) => selection.backend)
-    .catch(() => 'tmux' as const);
+    .catch(() => 'herdr' as const);
   return backendSelection;
 }
 
@@ -349,7 +364,7 @@ export async function deliverAgentMessage(
   let resolvedMethod = deliveryMethod;
   let state: AgentState | null = null;
   try {
-    state = await Effect.runPromise(getAgentState(normalizedId));
+    state = getAgentState(normalizedId);
     channelsEnabled = Boolean(state?.channelsEnabled);
     // A persisted deliveryMethod is a launch-time hint, not a per-call
     // transport opt-in: state can project 'supervisor' for an agent with no
@@ -376,8 +391,14 @@ export async function deliverAgentMessage(
   const targetTokens = tokensFromLaunchMetadata(state);
   // The SENDER's own tokens, looked up from ITS agent id — never the target's.
   const sender = opts.sender
-    ?? senderFromEnv(process.env, (senderId) => tokensFromLaunchMetadata(getAgentStateSync(senderId)));
-  const herdrAgent = (await deliveryBackendName()) === 'herdr'
+    ?? senderFromEnv(process.env, (senderId) => tokensFromLaunchMetadata(getAgentState(senderId)));
+  // A harness reached through its own host process (codex app-server, ACP /
+  // opencode) is never prompted through Herdr. Herdr detects the codex process
+  // UNDER the app-server host, and `agent.prompt` then types the message into
+  // the pane, where the host's stdin reader treats every line as its own
+  // message — the PAN-3705 kickoff arrived as 97 one-line threads that way.
+  // Their socket tiers below are the only correct door.
+  const herdrAgent = !(await isHostBackedTarget(state)) && (await deliveryBackendName()) === 'herdr'
     ? await (await import('../terminal-backends/herdr.js')).findHerdrAgent(normalizedId)
     : null;
   if (herdrAgent) {
@@ -558,7 +579,7 @@ export async function deliverAgentMessage(
     } else if (!existsSync(socketPath)) {
       channelFailure = 'socket-missing';
     } else {
-      const bridgeToken = readBridgeTokenSync(normalizedId);
+      const bridgeToken = readBridgeToken(normalizedId);
       if (!bridgeToken) {
         channelFailure = 'bridge-token-missing';
       } else {
@@ -832,7 +853,7 @@ export async function deliverInitialPromptWithRetry(
   const probe = options.probe ?? probeTranscriptSince;
   const getState = options.getState ?? (async (id: string) => {
     try {
-      return await Effect.runPromise(getAgentState(normalizeAgentId(id)));
+      return getAgentState(normalizeAgentId(id));
     } catch {
       return null;
     }
@@ -864,14 +885,8 @@ export async function deliverInitialPromptWithRetry(
       return null;
     }
 
-    let sessionId = state.sessionId;
-    if (!sessionId) {
-      try {
-        sessionId = (await Effect.runPromise(getAgentRuntimeState(normalizedId)))?.claudeSessionId;
-      } catch {
-        sessionId = undefined;
-      }
-    }
+    const { getLatestSessionId } = await import('./activity.js');
+    const sessionId = getLatestSessionId(normalizedId, { getAgentState: () => state }) ?? undefined;
     if (!sessionId) return null;
 
     return {
@@ -984,7 +999,7 @@ export async function deliverAgentPermissionDecision(
 
   let state: AgentState | null = null;
   try {
-    state = await Effect.runPromise(getAgentState(normalizedId));
+    state = getAgentState(normalizedId);
   } catch {
     state = null;
   }
@@ -998,7 +1013,7 @@ export async function deliverAgentPermissionDecision(
     throw new Error(`bridge socket missing for ${normalizedId}`);
   }
 
-  const bridgeToken = readBridgeTokenSync(normalizedId);
+  const bridgeToken = readBridgeToken(normalizedId);
   if (!bridgeToken) {
     throw new Error(`bridge token missing for ${normalizedId}`);
   }
@@ -1025,7 +1040,7 @@ export async function setAgentDeliveryMethod(
   agentId: string,
   deliveryMethod: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<void> {
-  const state = await Effect.runPromise(getAgentState(agentId));
+  const state = getAgentState(agentId);
   if (!state) return;
   state.deliveryMethod = deliveryMethod;
   await Effect.runPromise(saveAgentState(state));

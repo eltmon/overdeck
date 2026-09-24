@@ -4,14 +4,16 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import {
   getAgentDir,
-  getAgentRuntimeState,
   listRunningAgents,
   type AgentState,
 } from '../agents.js';
-import { sessionFilePath } from '../paths.js';
+import { resolveLatestSessionId } from '../agents/activity.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { extractPiTranscript, extractCodexTranscript } from '../session-format-converter.js';
-import { findRolloutPath, writeThreadId as _writeThreadId } from '../runtimes/codex.js';
+import { writeThreadId as _writeThreadId } from '../runtimes/codex.js';
+import { codexAgentHome, findRolloutPath } from '../runtimes/storage/codex.js';
 import { compressJsonlBuffer } from './compress.js';
+import { piSessionsRoot } from '../runtimes/storage/pi.js';
 
 export interface TranscriptEntry {
   agentId: string;
@@ -39,7 +41,7 @@ type RunningAgent = AgentState & { tmuxActive: boolean };
 
 interface ClaudeCodeTranscriptSourceOptions {
   listAgents?: () => Promise<RunningAgent[]>;
-  getRuntimeState?: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
+  resolveSessionId?: (agent: RunningAgent) => string | null;
   resolveTranscriptPath?: (workspace: string, sessionId: string) => string;
   statTranscript?: (path: string) => Promise<{ size: number; mtimeMs: number }>;
   isSubagentSession?: (sessionId: string, agent: RunningAgent, transcriptPath: string) => boolean | Promise<boolean>;
@@ -56,14 +58,15 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   readonly harness = 'claude-code';
 
   private readonly listAgents: () => Promise<RunningAgent[]>;
-  private readonly getRuntimeState: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
+  private readonly resolveSessionId: (agent: RunningAgent) => string | null;
   private readonly resolveTranscriptPath: (workspace: string, sessionId: string) => string;
   private readonly statTranscript: (path: string) => Promise<{ size: number; mtimeMs: number }>;
   private readonly isSubagentSession: (sessionId: string, agent: RunningAgent, transcriptPath: string) => boolean | Promise<boolean>;
 
   constructor(options: ClaudeCodeTranscriptSourceOptions = {}) {
     this.listAgents = options.listAgents ?? listRunningAgentsFromStore;
-    this.getRuntimeState = options.getRuntimeState ?? getAgentRuntimeStateFromStore;
+    this.resolveSessionId = options.resolveSessionId
+      ?? ((agent) => resolveLatestSessionId(agent.id, { getAgentState: () => agent }).sessionId);
     this.resolveTranscriptPath = options.resolveTranscriptPath ?? sessionFilePath;
     this.statTranscript = options.statTranscript ?? stat;
     this.isSubagentSession = options.isSubagentSession ?? isClaudeCodeSubagentSession;
@@ -90,7 +93,7 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   }
 
   private async resolveAgentTranscript(agent: RunningAgent): Promise<TranscriptEntry | null> {
-    const sessionId = agent.sessionId ?? (await this.getRuntimeState(agent.id))?.claudeSessionId;
+    const sessionId = this.resolveSessionId(agent);
     if (!sessionId) return null;
 
     const transcriptPath = this.resolveTranscriptPath(agent.workspace, sessionId);
@@ -230,7 +233,7 @@ export class CodexTranscriptSource implements TranscriptSource {
 
     // Use per-agent CODEX_HOME, not the global ~/.codex; rollouts are written to
     // ~/.overdeck/agents/<id>/codex-home/sessions/ by the per-agent spawn.
-    const rolloutPath = findRolloutPath(join(getAgentDir(agent.id), 'codex-home'), threadId);
+    const rolloutPath = findRolloutPath(codexAgentHome(getAgentDir(agent.id)), threadId);
     if (!rolloutPath) return null;
 
     let fileStat: { size: number; mtimeMs: number };
@@ -273,7 +276,7 @@ export class TranscriptSourceRegistry {
   }
 }
 
-export function createDefaultTranscriptSourceRegistry(): TranscriptSourceRegistry {
+function createDefaultTranscriptSourceRegistry(): TranscriptSourceRegistry {
   const registry = new TranscriptSourceRegistry();
   registry.register(new ClaudeCodeTranscriptSource());
   registry.register(new PiTranscriptSource());
@@ -297,22 +300,12 @@ function listRunningAgentsFromStore(): Promise<RunningAgent[]> {
   return Effect.runPromise(listRunningAgents());
 }
 
-function getAgentRuntimeStateFromStore(agentId: string): Promise<{ claudeSessionId?: string } | null> {
-  return Effect.runPromise(getAgentRuntimeState(agentId));
-}
-
 async function readPiSessionId(agent: RunningAgent): Promise<string | null> {
-  if (agent.sessionId) return agent.sessionId;
-  try {
-    const saved = (await readFile(join(getAgentDir(agent.id), 'session.id'), 'utf8')).trim();
-    return saved || null;
-  } catch {
-    return null;
-  }
+  return resolveLatestSessionId(agent.id, { getAgentState: () => agent }).sessionId;
 }
 
 async function resolvePiTranscriptPath(agent: RunningAgent, sessionId: string): Promise<string | null> {
-  const sessionDir = join(getAgentDir(agent.id), 'sessions');
+  const sessionDir = piSessionsRoot(getAgentDir(agent.id));
   let entries: string[];
   try {
     entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl')).sort();

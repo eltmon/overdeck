@@ -1,28 +1,28 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
  * Tests for PAN-330: Dead-session detection and runtime state reset
  *
  * Covers:
- * 1. ClaudeCodeRuntime.killAgent() resets runtime.json to idle (claude-code.ts:327)
+ * 1. ClaudeCodeRuntimeSync.killAgent() resets runtime.json to idle (claude-code.ts:327)
  * 2. Deacon patrol resets stale active state for stopped specialists (deacon.ts:1741-1752)
  * 3. Merge-agent busy-wait detects dead tmux session and resets to idle (merge-agent.ts:1069-1078)
  * 4. CloisterService.emergencyStop() delegates to runtime.killAgent (service.ts:308)
  */
 
 // ---------------------------------------------------------------------------
-// Section 1: ClaudeCodeRuntime.killAgent() (claude-code.ts:327)
+// Section 1: ClaudeCodeRuntimeSync.killAgent() (claude-code.ts:327)
 // ---------------------------------------------------------------------------
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentState: vi.fn(),
-  getAgentStateSync: vi.fn(),
   getAgentDir: vi.fn(() => '/tmp/agent-dir'),
   spawnAgent: vi.fn(),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
-  listRunningAgents: vi.fn(() => []),
+  listRunningAgents: vi.fn(() => Effect.succeed([])),
   listRunningAgentsSync: vi.fn(() => []),
   getAgentRuntimeState: vi.fn(() => null),
   getAgentRuntimeStateSync: vi.fn(() => null),
@@ -58,19 +58,19 @@ vi.mock('../../../src/lib/runtimes/index.js', () => ({
 
 import { ClaudeCodeRuntimeSync } from '../../../src/lib/runtimes/claude-code.js';
 import { sessionExistsSync, killSessionSync } from '../../../src/lib/tmux.js';
-import { saveAgentRuntimeState, getAgentStateSync, saveAgentStateSync, listRunningAgentsSync } from '../../../src/lib/agents.js';
+import { saveAgentRuntimeState, getAgentState, saveAgentStateSync, listRunningAgentsSync } from '../../../src/lib/agents.js';
 import { getRuntimeForAgent } from '../../../src/lib/runtimes/index.js';
 import { CloisterService } from '../../../src/lib/cloister/service.js';
 
 const mockSessionExists = vi.mocked(sessionExistsSync);
 const mockKillSession = vi.mocked(killSessionSync);
 const mockSaveAgentRuntimeState = vi.mocked(saveAgentRuntimeState);
-const mockGetAgentState = vi.mocked(getAgentStateSync);
+const mockGetAgentState = vi.mocked(getAgentState);
 const mockSaveAgentState = vi.mocked(saveAgentStateSync);
 const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
 const mockGetRuntimeForAgent = vi.mocked(getRuntimeForAgent);
 
-describe('PAN-330: ClaudeCodeRuntime.killAgent() — resets runtime state', () => {
+describe('PAN-330: ClaudeCodeRuntimeSync.killAgent() — resets runtime state', () => {
   let runtime: ClaudeCodeRuntimeSync;
 
   beforeEach(() => {

@@ -47,9 +47,9 @@ describe('sync native instruction no-loss audit', () => {
     }
     const targets = [fixture.home, ...fixture.projects.map(p => p.config.path), join(root, 'link-target')];
     const before = targets.map(snapshot);
-    const { syncContextLayersSync } = await import('../../../src/lib/sync.js');
-    expect(syncContextLayersSync().errors).toEqual([]);
-    expect(syncContextLayersSync().errors).toEqual([]);
+    const { syncContextLayers } = await import('../../../src/lib/sync.js');
+    expect(syncContextLayers().errors).toEqual([]);
+    expect(syncContextLayers().errors).toEqual([]);
     expect(targets.map(snapshot)).toEqual(before);
     expect(readFileSync(join(root, 'managed', 'context', 'claude-global.md'), 'utf8')).toContain('Overdeck managed instructions');
   });

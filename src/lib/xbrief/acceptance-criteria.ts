@@ -47,7 +47,7 @@ export interface XBriefACStatus {
   totalCount: number;
 }
 
-export function getXBriefACStatusSync(workspacePath: string): XBriefACStatus | null {
+export function getXBriefACStatus(workspacePath: string): XBriefACStatus | null {
   const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return null;
   const allCriteria = extractACFromDocument(doc);
@@ -67,22 +67,6 @@ export function getXBriefACStatusSync(workspacePath: string): XBriefACStatus | n
   const totalCompleted = items.reduce((sum, item) => sum + item.completed, 0);
   const totalPending = items.reduce((sum, item) => sum + item.pending, 0);
   return { allCompleted: totalPending === 0, items, totalCompleted, totalPending, totalCount: totalCompleted + totalPending };
-}
-
-/**
- * Extract all acceptance criteria from an xBRIEF plan.
- *
- * Reads the merged xBRIEF plan and returns all child items
- * where metadata.kind === 'acceptance_criterion', enriched with parent
- * task context.
- *
- * @returns Array of acceptance criteria, or empty array if no plan exists
- *          or no AC are found (legacy workspace compatibility).
- */
-export function extractAcceptanceCriteriaSync(workspacePath: string): AcceptanceCriterion[] {
-  const doc = readWorkspacePlanSync(workspacePath);
-  if (!doc) return [];
-  return extractACFromDocument(doc);
 }
 
 /**
@@ -154,50 +138,3 @@ export function formatAcceptanceCriteria(criteria: AcceptanceCriterion[]): strin
 
   return lines.join('\n').trimEnd();
 }
-
-/**
- * Check whether all acceptance criteria in a workspace plan are completed.
- *
- * @returns { allCompleted: true, incomplete: [] } when all AC are done or
- *          no plan/AC exist (legacy workspace compatibility).
- */
-export function checkAllCriteriaCompletedSync(workspacePath: string): ACCompletionResult {
-  const criteria = extractAcceptanceCriteriaSync(workspacePath);
-  if (criteria.length === 0) return { allCompleted: true, incomplete: [] };
-
-  const incomplete = criteria.filter(
-    ac => ac.status !== 'completed' && ac.status !== 'cancelled'
-  );
-
-  return { allCompleted: incomplete.length === 0, incomplete };
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Compose with `readWorkspacePlanProgram` from io.ts so AC extraction and AC
-// completion checks can participate in Effect-native pipelines without
-// blocking the event loop. extractACFromDocument and the AC-completion logic
-// itself are pure-sync — only the plan read is wrapped.
-
-/** Effect variant of `extractAcceptanceCriteria`. */
-export const extractAcceptanceCriteria = (
-  workspacePath: string,
-): Effect.Effect<AcceptanceCriterion[], XBriefReadError> =>
-  Effect.gen(function* () {
-    const doc = yield* readWorkspacePlan(workspacePath);
-    if (!doc) return [];
-    return extractACFromDocument(doc);
-  });
-
-/** Effect variant of `checkAllCriteriaCompleted`. */
-export const checkAllCriteriaCompleted = (
-  workspacePath: string,
-): Effect.Effect<ACCompletionResult, XBriefReadError> =>
-  Effect.gen(function* () {
-    const criteria = yield* extractAcceptanceCriteria(workspacePath);
-    if (criteria.length === 0) return { allCompleted: true, incomplete: [] };
-    const incomplete = criteria.filter(
-      (ac) => ac.status !== 'completed' && ac.status !== 'cancelled',
-    );
-    return { allCompleted: incomplete.length === 0, incomplete };
-  });

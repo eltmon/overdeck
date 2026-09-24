@@ -31,7 +31,7 @@ vi.mock('../../../../src/lib/cloister/deacon-swarm-record.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: mockEmitActivityEntrySync,
+  emitActivityEntry: mockEmitActivityEntrySync,
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state-source.js', () => ({

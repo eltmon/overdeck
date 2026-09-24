@@ -88,7 +88,7 @@ export const OPENROUTER_MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 };
 
 /** True when `modelId` is an Overdeck-side GPT-5.6 long-context variant. */
-export function isGpt56LongContextVariantSync(modelId: string): boolean {
+export function isGpt56LongContextVariant(modelId: string): boolean {
   return modelId in GPT56_LONG_CONTEXT_VARIANTS;
 }
 
@@ -96,6 +96,6 @@ export function isGpt56LongContextVariantSync(modelId: string): boolean {
  * Resolve the model id to launch a harness with: long-context variants map to
  * their base API model id, everything else passes through unchanged.
  */
-export function apiLaunchModelIdSync(modelId: string): string {
+export function apiLaunchModelId(modelId: string): string {
   return modelId === 'k3' ? 'k3-256k' : GPT56_LONG_CONTEXT_VARIANTS[modelId] ?? modelId;
 }

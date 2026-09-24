@@ -9,10 +9,10 @@ import {
   buildDocsIndex,
   bufferToFloat32Array,
   DEFAULT_DOCS_INDEX_PATH,
-  deterministicDocsTestEmbedding,
   float32ArrayToBuffer,
   validateDocsIndex,
 } from '../index-builder.js';
+import { deterministicDocsTestEmbedding } from '../../../../tests/helpers/docs-test-embedding.js';
 
 let rootDir: string;
 let syncSourcesRoot: string;

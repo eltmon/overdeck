@@ -1,5 +1,5 @@
 /**
- * PAN-3766 — scanPendingInputsPromise must recognize ohmypi transcripts. Pi's
+ * PAN-3766 — scanPendingInputs must recognize ohmypi transcripts. Pi's
  * `ask` tool is the AskUserQuestion analogue: an assistant `toolCall` content
  * item opens the question, a `toolResult` message (including pi's synthetic
  * interrupt-skip) resolves it. Detection is per-line, so these fixtures use the
@@ -11,7 +11,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { scanPendingInputsPromise } from '../agent-enrichment.js'
+import { scanPendingInputs } from '../agent-enrichment.js'
 
 const ASK_ID = '5c5bdd4c-1c9d-4a5a-ad52-cf80395bb040|fc_tmp_j1iziob6xvp'
 
@@ -110,7 +110,7 @@ function claudeAskUserQuestion(): string {
   })
 }
 
-describe('scanPendingInputsPromise — ohmypi transcripts (PAN-3766)', () => {
+describe('scanPendingInputs — ohmypi transcripts (PAN-3766)', () => {
   let dir: string
   let file: string
 
@@ -124,7 +124,7 @@ describe('scanPendingInputsPromise — ohmypi transcripts (PAN-3766)', () => {
 
   it('surfaces a pending pi ask with its questions mapped to the AUQ shape', async () => {
     writeFileSync(file, `${piAssistantAsk()}\n`)
-    const scan = await scanPendingInputsPromise(file)
+    const scan = await scanPendingInputs(file)
 
     expect(scan.askUserQuestions).toHaveLength(1)
     const pending = scan.askUserQuestions[0]
@@ -145,13 +145,13 @@ describe('scanPendingInputsPromise — ohmypi transcripts (PAN-3766)', () => {
 
   it('does not report an ask the operator answered', async () => {
     writeFileSync(file, `${piAssistantAsk()}\n${piToolResult()}\n`)
-    const scan = await scanPendingInputsPromise(file)
+    const scan = await scanPendingInputs(file)
     expect(scan.askUserQuestions).toHaveLength(0)
   })
 
   it('treats pi’s synthetic interrupt-skip toolResult as resolved', async () => {
     writeFileSync(file, `${piAssistantAsk()}\n${piSyntheticSkip()}\n`)
-    const scan = await scanPendingInputsPromise(file)
+    const scan = await scanPendingInputs(file)
     expect(scan.askUserQuestions).toHaveLength(0)
   })
 
@@ -161,13 +161,13 @@ describe('scanPendingInputsPromise — ohmypi transcripts (PAN-3766)', () => {
       file,
       `${piAssistantAsk()}\n${piToolResult()}\n${piAssistantAsk(laterId)}\n`,
     )
-    const scan = await scanPendingInputsPromise(file)
+    const scan = await scanPendingInputs(file)
     expect(scan.askUserQuestions.map(q => q.toolId)).toEqual([laterId])
   })
 
   it('still detects claude AskUserQuestion entries in the same pass', async () => {
     writeFileSync(file, `${claudeAskUserQuestion()}\n`)
-    const scan = await scanPendingInputsPromise(file)
+    const scan = await scanPendingInputs(file)
     expect(scan.askUserQuestions.map(q => q.toolId)).toEqual(['toolu_claude_auq'])
   })
 
@@ -181,7 +181,7 @@ describe('scanPendingInputsPromise — ohmypi transcripts (PAN-3766)', () => {
       },
     })
     writeFileSync(file, `${bashCall}\nnot json\n${piAssistantAsk()}\n`)
-    const scan = await scanPendingInputsPromise(file)
+    const scan = await scanPendingInputs(file)
     expect(scan.askUserQuestions.map(q => q.toolId)).toEqual([ASK_ID])
   })
 })

@@ -69,9 +69,9 @@ describe('sync legacy pre-manifest adoption', () => {
     write(join(dirs.skills, 'pan-memory', 'SKILL.md'), '# Pan Memory\nnew content\n');
     write(join(dirs.claude, 'skills', 'pan-memory', 'SKILL.md'), '# Pan Memory\nstale content\n');
 
-    const { planSyncSync } = await import('../../../src/lib/sync.js');
+    const { planSync } = await import('../../../src/lib/sync.js');
 
-    const plan = planSyncSync();
+    const plan = planSync();
 
     expect(plan.skills).toEqual([
       expect.objectContaining({
@@ -87,9 +87,9 @@ describe('sync legacy pre-manifest adoption', () => {
     write(sourcePath, '# Pan Memory\nnew content\n');
     write(targetPath, '# Pan Memory\nstale content\n');
 
-    const { executeSyncSync } = await import('../../../src/lib/sync.js');
+    const { executeSync } = await import('../../../src/lib/sync.js');
 
-    const result = executeSyncSync();
+    const result = executeSync();
 
     expect(result.adopted).toEqual(['skills/pan-memory/SKILL.md']);
     expect(result.skipped).toEqual([]);

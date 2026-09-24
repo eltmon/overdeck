@@ -27,14 +27,14 @@ const mockCleanupMergedLabels = vi.hoisted(() => vi.fn(() => Effect.succeed({ su
 const mockSetAgentPaused = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
   agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
 )));
-const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
+const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) =>
   agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
-)));
+));
 const mockSessionExists = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(agentId === 'strike-pan-399')));
 const mockKillSession = vi.hoisted(() => vi.fn(() => Effect.void));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
-const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(() => Effect.succeed({ killed: [] as string[] })));
+const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(async () => ({ killed: [] as string[] })));
 const mockEnqueueMergedDockerCleanup = vi.hoisted(() => vi.fn());
 const mockTeardownWorkspaceDockerByNamePromise = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] }),
@@ -112,7 +112,19 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   killSession: mockKillSession,
   killSessionSync: vi.fn(() => Effect.void),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
+}));
+
+// PAN-3947: post-merge closes terminals through the terminal backend. Model a
+// tmux host: closing an agent's terminal kills its tmux session, and there are
+// no Herdr panes to close by issue token.
+vi.mock('../../../../src/lib/terminal-backends/launch.js', () => ({
+  closeAgentPane: vi.fn(async (agentId: string) => {
+    if (!(await Effect.runPromise(mockSessionExists(agentId)))) return false;
+    await Effect.runPromise(mockKillSession(agentId));
+    return true;
+  }),
+  closeIssuePanes: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../src/lib/paths.js', () => ({
@@ -130,9 +142,7 @@ vi.mock('../../../../src/lib/paths.js', () => ({
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
-  resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
-  resolveTrackerTypeSync: vi.fn().mockReturnValue('github'),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -147,7 +157,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
       },
     },
   }),
-  findProjectByPathSync: vi.fn().mockReturnValue(null),
+  findProjectByPath: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
   loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));
@@ -175,11 +185,11 @@ vi.mock('../../../../src/lib/git-utils.js', () => ({
 
 vi.mock('../../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: vi.fn().mockReturnValue(false),
-  listPullRequestsForHead: vi.fn().mockReturnValue(Effect.succeed([])),
+  listPullRequestsForHead: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  getMergeSetSync: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
+  getMergeSet: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
 }));
 
 vi.mock('../../../../src/lib/activity-log.js', () => ({
@@ -195,13 +205,12 @@ vi.mock('../../../../src/lib/cloister/merged-docker-cleanup-worker.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/workspace-manager/docker.js', () => ({
-  teardownWorkspaceDockerByNamePromise: mockTeardownWorkspaceDockerByNamePromise,
+  teardownWorkspaceDockerByName: mockTeardownWorkspaceDockerByNamePromise,
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   setAgentPaused: mockSetAgentPaused,
   getAgentState: mockGetAgentState,
-  getAgentStateSync: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({

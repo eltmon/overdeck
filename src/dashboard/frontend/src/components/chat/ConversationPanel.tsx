@@ -8,7 +8,7 @@ import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
-import { XTerminal } from '../XTerminal';
+import { ConversationTerminalView } from './ConversationTerminalView';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
@@ -42,6 +42,7 @@ import { ForkProgressView } from './ForkProgressView';
 import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
+import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // PAN-1635: a turn that has shown no transcript progress for this long is
@@ -163,6 +164,7 @@ export function ConversationPanel({
   const [sendResumeContract, setSendResumeContract] = useState(true);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const confirm = useConfirm();
   // Self-hosted mutations + ForkModal so the header can favorite / stop / hand
   // off / fork without threading callbacks through every embed site.
@@ -241,8 +243,8 @@ export function ConversationPanel({
   }, [conversation.name]);
 
   // Query messages at this level so we can drive the header working-spinner.
-  // Live claude-code conversations are pushed through useConversationMessagesStream;
-  // keep the existing polling path for non-claude harnesses and historical views.
+  // Live transcripts are pushed through WS/RPC. HTTP supplies the initial
+  // snapshot/backfill and is the sole read path for stopped history.
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
     queryFn: async ({ signal }) => {
@@ -260,8 +262,8 @@ export function ConversationPanel({
       }
       return fetched;
     },
-    enabled: !streamMessagesEnabled,
-    refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
+    enabled: true,
+    refetchInterval: streamMessagesEnabled || agentId ? false : (conversation.sessionAlive ? 2000 : false),
   });
   // PAN-2876 — the rail lists the main agent plus every subagent; picking a subagent swaps the body to its transcript.
   const subagents = messagesData?.subagents ?? [];
@@ -407,6 +409,10 @@ export function ConversationPanel({
       // resumedAwaitingConfirm clear effect below.
       toastResumeOutcome(conversation.name);
       setResumedAwaitingConfirm(true);
+    },
+    // A failed resume must say so; without this the button did nothing visible.
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
     },
   });
 
@@ -799,6 +805,7 @@ export function ConversationPanel({
               {/* Overflow menu — long-tail / prefs / config / destructive */}
               <div className={styles.headerMenuWrap}>
                 <button
+                  ref={menuTriggerRef}
                   className={styles.copyLinkButton}
                   onClick={() => setMenuOpen(v => !v)}
                   title="More actions"
@@ -810,20 +817,22 @@ export function ConversationPanel({
                 </button>
                 {menuOpen && (
                   <>
-                    <div className={styles.headerMenuOverlay} onClick={() => setMenuOpen(false)} />
-                    <div role="menu" className={styles.headerMenu}>
-                      <button
-                        role="menuitem"
-                        className={`${styles.headerMenuItem} ${conversation.isFavorited ? styles.headerMenuItemActive : ''}`}
+                    <MenuOverlay onClick={() => setMenuOpen(false)} />
+                    <MenuSurface
+                      aria-label="Conversation actions"
+                      onClose={() => setMenuOpen(false)}
+                      returnFocusRef={menuTriggerRef}
+                      className="absolute right-0 top-full z-[1000] mt-1 min-w-[220px]"
+                    >
+                      <MenuItemButton
+                        active={conversation.isFavorited}
                         onClick={() => { convMutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); setMenuOpen(false); }}
                       >
                         <Star size={14} style={{ fill: conversation.isFavorited ? 'currentColor' : 'none' }} />
                         {conversation.isFavorited ? 'Unfavorite' : 'Favorite'}
-                      </button>
+                      </MenuItemButton>
 
-                      <button
-                        role="menuitem"
-                        className={styles.headerMenuItem}
+                      <MenuItemButton
                         onClick={() => { retitleMutation.mutate(); setMenuOpen(false); }}
                         disabled={retitleMutation.isPending}
                       >
@@ -831,7 +840,7 @@ export function ConversationPanel({
                           ? <Loader2 size={14} className={styles.spinnerIcon} />
                           : <Sparkles size={14} />}
                         Regenerate title
-                      </button>
+                      </MenuItemButton>
 
                       {conversation.harness === 'claude-code' && (
                         <div className={styles.headerMenuDeliveryRow}>
@@ -851,77 +860,64 @@ export function ConversationPanel({
                         </div>
                       )}
 
-                      <div className={styles.headerMenuDivider} />
+                      <MenuSeparator />
                       {conversation.claudeSessionId && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.openForkModal(conversation, { mode: 'handoff' }); setMenuOpen(false); }}
                         >
                           <Share2 size={14} />
                           Hand off to new conversation
-                        </button>
+                        </MenuItemButton>
                       )}
                       {conversation.claudeSessionId && conversation.harness !== 'pi' && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.openForkModal(conversation); setMenuOpen(false); }}
                         >
                           <GitBranchPlus size={14} />
                           Create summary fork
-                        </button>
+                        </MenuItemButton>
                       )}
-                      <button
-                        role="menuitem"
-                        className={styles.headerMenuItem}
+                      <MenuItemButton
                         onClick={() => { handleExportTranscript(); setMenuOpen(false); }}
                       >
                         <Download size={14} />
                         Export transcript
-                      </button>
+                      </MenuItemButton>
 
                       {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
-                        <div className={styles.headerMenuDivider} />
+                        <MenuSeparator />
                       )}
                       {conversation.handoffDocPath && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { openHandoffDoc(); setMenuOpen(false); }}
                         >
                           <FileText size={14} />
                           Open handoff doc
-                        </button>
+                        </MenuItemButton>
                       )}
                       {conversation.handoffTargetConvId && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { openHandoffTarget(); setMenuOpen(false); }}
                         >
                           <ExternalLink size={14} />
                           Open handoff target
-                        </button>
+                        </MenuItemButton>
                       )}
 
                       {(conversation.sessionAlive || onArchived) && (
-                        <div className={styles.headerMenuDivider} />
+                        <MenuSeparator />
                       )}
                       {conversation.sessionAlive && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.stop(conversation.name); setMenuOpen(false); }}
                         >
                           <Square size={14} />
                           Stop agent
-                        </button>
+                        </MenuItemButton>
                       )}
                       {onArchived && (
-                        <button
-                          role="menuitem"
-                          className={`${styles.headerMenuItem} ${styles.headerMenuItemDestructive}`}
+                        <MenuItemButton
+                          destructive
                           onClick={async () => {
                             setMenuOpen(false);
                             const ok = await confirm({
@@ -938,9 +934,9 @@ export function ConversationPanel({
                         >
                           <Archive size={14} />
                           Archive conversation
-                        </button>
+                        </MenuItemButton>
                       )}
-                    </div>
+                    </MenuSurface>
                   </>
                 )}
               </div>
@@ -1028,7 +1024,7 @@ export function ConversationPanel({
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
           {showTerminal && effectiveViewMode === 'terminal' && (
-            <XTerminal sessionName={conversation.tmuxSession} />
+            <ConversationTerminalView conversation={conversation} />
           )}
           {(effectiveViewMode === 'conversation' || !showTerminal) && (selectedSubagent ? (
             <SubagentTranscript conversation={conversation} subagent={selectedSubagent} resolvedTheme={resolvedTheme} onBack={clearSubagent} />
@@ -1128,6 +1124,7 @@ interface MessagesResponse {
   /** Server-side resolution failure to surface in the panel (e.g. the live
    * session could not be resolved from the launcher). Rendered as a banner. */
   error?: string;
+  checked?: string[];
 }
 
 export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
@@ -1135,13 +1132,19 @@ export async function fetchMessages(name: string, signal?: AbortSignal, agentId?
   // during a server restart rejects (and retries) instead of pinning the
   // panel on "Loading…" forever, and switching conversations cancels the
   // previous conversation's fetch.
-  const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
-  // An agent the store knows (queued specialist, wiped workspace, cleaned
-  // session file) 404s here — that means "no saved history", not an incident.
-  // Render the honest empty state instead of the warning card. Real user
-  // conversations (no agentId) keep the failure card + Retry.
+  const path = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
+    : `/api/conversations/${encodeURIComponent(name)}/messages`;
+  const res = await fetchWithTimeout(path, { signal });
   if (res.status === 404 && agentId) {
-    return { messages: [], workLog: [], streaming: false };
+    const missing = await res.json() as { error?: string; checked?: string[] };
+    return {
+      messages: [],
+      workLog: [],
+      streaming: false,
+      error: missing.error ?? `No transcript found for ${agentId}.`,
+      checked: missing.checked ?? [],
+    };
   }
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
@@ -1266,7 +1269,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // PAN-3744: before this subscription emits, the transcript is loading rather
   // than empty. Keep this signal hook-local because query-cache entries survive
   // conversation switches and could flash a stale empty state.
-  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0;
+  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0 && !data?.error;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
   // the CLIProxy 7.2 upgrade (2026-08-03) GPT-harness sessions emit only
@@ -1325,7 +1328,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
             ⚠ Session could not be resolved
           </p>
-          <p className={styles.conversationEmptyStateSubtitle}>{data.error}</p>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            {data.error}{data.checked && data.checked.length > 0 ? ` Checked: ${data.checked.join(', ')}` : ''}
+          </p>
         </div>
       ) : messagesFetchFailed ? (
         <div className={styles.conversationEmptyState}>

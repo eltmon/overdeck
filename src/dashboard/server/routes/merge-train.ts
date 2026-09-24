@@ -25,12 +25,17 @@ import { hasDashboardInternalToken, rejectUnsafeDashboardMutationRequest } from 
 import { getProjectSync, listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
 import type { MergeQueueItem } from '../../../lib/flywheel-merge-order.js';
 import { gatherMergeEligibility, isMergeEligible } from '../../../lib/cloister/merge-eligibility.js';
-import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { emitActivityTts } from '../../../lib/activity-logger.js';
 import { parseArtifactRef } from '../../../lib/forge.js';
 import { validateOrigin } from './origin-validation.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
-import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
-import { getProjectAutoMergeDefault, shouldHoldForUat, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
+import { isAutoMergeEligible, issueHoldsForUat, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import {
+  getProjectAutoMergeDefault,
+  projectHoldsForUat,
+  shouldHoldForUat,
+  type ProjectAutoMergeDefault,
+} from '../../../lib/cloister/auto-merge-policy.js';
 import { getMergeBlockersPayload } from '../../../lib/cloister/merge-blockers.js';
 import {
   isFlywheelAutoPickupBacklog,
@@ -75,6 +80,13 @@ export interface MergeTrainQueueEntry {
   projectName: string;
   /** Effective per-project flag: the project override, else the global setting. */
   enabled: boolean;
+  /**
+   * PAN-3965: one ready feature still gets a batch (its UAT stack). With
+   * exactly one feature queued this is that feature's own hold (its label,
+   * then the project, then global); otherwise the project-level hold.
+   * False = one ready feature merges directly.
+   */
+  holdsForUat: boolean;
   queue: MergeQueueItem[];
 }
 
@@ -96,7 +108,9 @@ async function queueEntryForProject(
   config: ProjectConfig,
   enabled: boolean,
 ): Promise<MergeTrainQueueEntry> {
-  const base = { projectKey: key, projectName: config.name, enabled };
+  const globalRequireUat = isFlywheelRequireUatBeforeMerge();
+  const holdsForUat = projectHoldsForUat(config, globalRequireUat);
+  const base = { projectKey: key, projectName: config.name, enabled, holdsForUat };
   if (!enabled) return { ...base, queue: [] };
 
   const projectPath = resolve(config.path);
@@ -111,6 +125,12 @@ async function queueEntryForProject(
   const queue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
   );
+  // Review of #4017: a lone ready feature's hold is its own (label, then
+  // project, then global), the same one the reconciler applies — the page must
+  // not say "merges directly" for a feature that gets a UAT batch.
+  if (queue.length === 1) {
+    return { ...base, holdsForUat: await issueHoldsForUat(queue[0]!.issueId, config, globalRequireUat), queue };
+  }
   return { ...base, queue };
 }
 
@@ -133,7 +153,7 @@ export async function getMergeTrainQueuesPayload(): Promise<MergeTrainQueueEntry
     if (!entry) return [];
     const reason = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
     console.warn(`[merge-train] queue for project ${entry.key} failed: ${reason}`);
-    return [{ projectKey: entry.key, projectName: entry.config.name, enabled: true, queue: [] }];
+    return [{ projectKey: entry.key, projectName: entry.config.name, enabled: true, holdsForUat: projectHoldsForUat(entry.config, isFlywheelRequireUatBeforeMerge()), queue: [] }];
   });
 }
 
@@ -268,8 +288,8 @@ export async function postMergeTrainGenerationShipPayload(
   name: string,
   version: string,
 ): Promise<{ status: number; body: unknown }> {
-  const { getUatGenerationSync } = await import('../../../lib/overdeck/merge-sync.js');
-  const generation = getUatGenerationSync(name);
+  const { getUatGeneration } = await import('../../../lib/overdeck/merge-sync.js');
+  const generation = getUatGeneration(name);
   if (!generation) return { status: 404, body: { error: `No UAT generation named ${name}` } };
 
   const { shipPromotedBatch, ShipPromotedBatchError } = await import('../services/generation-ship.js');
@@ -479,7 +499,7 @@ export interface AutoMergeCancelDeps {
 }
 
 function announceAutoMergeScheduled(issueId: string, _entry: PendingAutoMerge): void {
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
     priority: 1,
     issueId,
@@ -489,7 +509,7 @@ function announceAutoMergeScheduled(issueId: string, _entry: PendingAutoMerge): 
 }
 
 function announceAutoMergeCancelled(issueId: string): void {
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: `auto-merge cancelled for ${issueId}`,
     priority: 1,
     issueId,

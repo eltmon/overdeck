@@ -71,8 +71,7 @@ vi.mock('../../agents.js', async () => {
   // PAN-1048 P1: activeRoleRunExists is now async and uses listRunningAgentsProgram
   // on the reactive scheduler hot path.
   listRunningAgentsProgram: effectMock([]),
-  getAgentState: effectMock(null),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   // PAN-1048 round-5 mechanical fix: resolveWorkspaceForIssue now awaits the
   // async agent-state read, so the mock module must export this symbol or the
   // dynamic call in the scheduler throws before reaching the wrapper spy.
@@ -126,24 +125,18 @@ vi.mock('../merge-verification.js', () => ({
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
 }));
 
 vi.mock('../../persistent-logger.js', () => ({
   logDeaconEvent: vi.fn(),
-  logDeaconEventSync: vi.fn(),
   logAgentLifecycle: vi.fn(),
-  logAgentLifecycleSync: vi.fn(),
 }));
 
 vi.mock('../no-resume-mode.js', () => ({
-  getNoResumeMode: () => ({ active: false, since: null }),
 }));
 
 vi.mock('../concurrency.js', () => ({
-  workResumeSlotsAvailable: () => 1,
   countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
   getConcurrencyLimits: () => ({
     maxWorkAgents: 6,
@@ -152,11 +145,8 @@ vi.mock('../concurrency.js', () => ({
     exemptOperatorStarted: true,
   }),
   resetPatrolDispatchBudget: vi.fn(),
-  tryReserveAdvancingSlot: () => true,
-  releaseAdvancingSlot: vi.fn(),
   tryReserveSwarmSlot: () => true,
   releaseSwarmSlot: vi.fn(),
-  describeRunningAgents: () => 'counts: work=0 advancing=0 total=0/9 | advancing=[] work=[]',
 }));
 
 vi.mock('../memory-governor.js', () => ({
@@ -242,15 +232,15 @@ vi.mock('../../tmux.js', async () => {
   return {
   sessionExists: effectMock(false),
   sessionExistsSync: vi.fn(() => false),
-  querySessionSync: vi.fn(() => ({ status: 'missing', detail: 'mock session absent' })),
-  capturePane: effectMock('❯ '),
+  querySession: vi.fn(() => ({ status: 'missing', detail: 'mock session absent' })),
+  capturePane: vi.fn(async () => '❯ '),
   killSession: effectMock(undefined),
   killSessionSync: vi.fn(() => undefined),
   };
 });
 
-import { emitActivityEntrySync } from '../../activity-logger.js';
-import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState, getAgentStateSync, resumeAgent } from '../../agents.js';
+import { emitActivityEntry } from '../../activity-logger.js';
+import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState, resumeAgent } from '../../agents.js';
 import { sessionExists, killSession, sessionExistsSync } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
@@ -273,7 +263,7 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(listRunningAgentsSync).mockReturnValue([]);
     vi.mocked(listRunningAgents).mockResolvedValue([]);
     vi.mocked(spawnRun).mockResolvedValue({ id: 'agent-pan-503-review' } as any);
-    vi.mocked(getAgentState).mockResolvedValue(null);
+    vi.mocked(getAgentState).mockReturnValue(null);
     vi.mocked(sessionExists).mockResolvedValue(false);
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
@@ -307,12 +297,12 @@ describe('reactive Cloister scheduler', () => {
     autonomousPlanMock.labels = [];
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+    await onIssueStateChange('PAN-503', 'in_planning');
 
     const refusalText = 'Autonomous planning dispatch was refused because the issue is not released';
     expect(spawnRun).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(refusalText));
-    expect(emitActivityEntrySync).toHaveBeenCalledWith({
+    expect(emitActivityEntry).toHaveBeenCalledWith({
       source: 'cloister',
       level: 'warn',
       message: expect.stringContaining(refusalText),
@@ -323,7 +313,7 @@ describe('reactive Cloister scheduler', () => {
   });
 
   it('passes the concrete configured autonomous planning model to spawnRun', async () => {
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+    await onIssueStateChange('PAN-503', 'in_planning');
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
       prompt: expect.stringContaining('PLAN TASK for PAN-503'),
@@ -335,7 +325,7 @@ describe('reactive Cloister scheduler', () => {
   it('prefers the recorded planning model over roles.plan.autonomousModel', async () => {
     autonomousPlanMock.recordedModel = 'gpt-5.5';
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+    await onIssueStateChange('PAN-503', 'in_planning');
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
       prompt: expect.stringContaining('PLAN TASK for PAN-503'),
@@ -352,12 +342,12 @@ describe('reactive Cloister scheduler', () => {
     };
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+    await onIssueStateChange('PAN-503', 'in_progress');
 
     const message = 'PAN-503: Autonomous work dispatch was refused because the issue is not ready.';
     expect(spawnRun).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(`[cloister] ${message}`);
-    expect(emitActivityEntrySync).toHaveBeenCalledWith({
+    expect(emitActivityEntry).toHaveBeenCalledWith({
       source: 'cloister',
       level: 'warn',
       message,
@@ -374,7 +364,7 @@ describe('reactive Cloister scheduler', () => {
       reason: 'Autonomous work dispatch was refused because no active implementation plan with work items is available.',
     };
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+    await onIssueStateChange('PAN-503', 'in_progress');
 
     expect(spawnRun).not.toHaveBeenCalled();
   });
@@ -384,7 +374,7 @@ describe('reactive Cloister scheduler', () => {
     autonomousPlanMock.autonomousModel = undefined;
     autonomousWorkMock.decision = { allow: true, releaseSource: 'released-label' };
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+    await onIssueStateChange('PAN-503', 'in_progress');
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
       prompt: expect.stringContaining('WORK TASK for PAN-503'),
@@ -396,7 +386,7 @@ describe('reactive Cloister scheduler', () => {
   it('requires a consent claim when planning consent authorized reactive work', async () => {
     autonomousWorkMock.decision = { allow: true, releaseSource: 'planning-consent' };
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+    await onIssueStateChange('PAN-503', 'in_progress');
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
       prompt: expect.stringContaining('WORK TASK for PAN-503'),
@@ -406,7 +396,7 @@ describe('reactive Cloister scheduler', () => {
   });
 
   it('starts the review role for an issue state transition via the wrapper', async () => {
-    await Effect.runPromise(onIssueStateChange('pan-503', 'in_review'));
+    await onIssueStateChange('pan-503', 'in_review');
 
     // Review dispatches through spawnReviewRoleForIssue so the wrapper carries
     // review-temp stash + reviewSpawnedAt + status-posting prompt + idempotency.
@@ -423,7 +413,7 @@ describe('reactive Cloister scheduler', () => {
   ] as const)('skips %s dispatch when the issue is closed', async (state) => {
     vi.mocked(isIssueClosed).mockResolvedValue(true);
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', state));
+    await onIssueStateChange('PAN-503', state);
 
     expect(isIssueClosed).toHaveBeenCalledWith('PAN-503');
     expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
@@ -444,7 +434,7 @@ describe('reactive Cloister scheduler', () => {
     // a merged PR is the same terminal signal a closed issue is.
     vi.mocked(shouldSkipDispatchAsMerged).mockResolvedValue({ skip: true, reason: 'PR #42 is merged' });
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', state));
+    await onIssueStateChange('PAN-503', state);
 
     expect(shouldSkipDispatchAsMerged).toHaveBeenCalledWith('PAN-503');
     expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
@@ -455,7 +445,7 @@ describe('reactive Cloister scheduler', () => {
   it('does not dispatch a role for the shipping state', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'shipping'));
+    await onIssueStateChange('PAN-503', 'shipping');
 
     expect(logSpy).toHaveBeenCalledWith("[cloister] PAN-503: no role for issue state 'shipping'");
     expect(isIssueClosed).not.toHaveBeenCalled();
@@ -487,7 +477,7 @@ describe('reactive Cloister scheduler', () => {
       },
     ] as any);
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_review'));
+    await onIssueStateChange('PAN-503', 'in_review');
 
     expect(spawnRun).not.toHaveBeenCalled();
   });
@@ -515,9 +505,9 @@ describe('reactive Cloister scheduler', () => {
   });
 
   it('reacts to work, review, and test completion events by routing only spawned roles through dispatchers', async () => {
-    await Effect.runPromise(handleCloisterDomainEvent({ type: 'work.completed', payload: { issueId: 'PAN-503' } }));
-    await Effect.runPromise(handleCloisterDomainEvent({ type: 'review.approved', payload: { issueId: 'PAN-503' } }));
-    await Effect.runPromise(handleCloisterDomainEvent({ type: 'test.passed', payload: { issueId: 'PAN-503' } }));
+    await handleCloisterDomainEvent({ type: 'work.completed', payload: { issueId: 'PAN-503' } });
+    await handleCloisterDomainEvent({ type: 'review.approved', payload: { issueId: 'PAN-503' } });
+    await handleCloisterDomainEvent({ type: 'test.passed', payload: { issueId: 'PAN-503' } });
 
     // PAN-1048 review feedback 003: review/test go through dedicated wrappers.
     // Shipping remains a lifecycle state, but no longer maps to a spawned role.
@@ -564,7 +554,7 @@ describe('reactive Cloister scheduler', () => {
 
 
   it('routes agent.heartbeat_dead events to the deacon orphan handler', async () => {
-    vi.mocked(getAgentStateSync).mockReturnValue({
+    vi.mocked(getAgentState).mockReturnValue({
       id: 'agent-pan-503',
       issueId: 'PAN-503',
       workspace: '/tmp/workspace',
@@ -576,10 +566,10 @@ describe('reactive Cloister scheduler', () => {
     } as any);
     vi.mocked(sessionExistsSync).mockReturnValue(false);
 
-    await Effect.runPromise(handleCloisterDomainEvent({
+    await handleCloisterDomainEvent({
       type: 'agent.heartbeat_dead',
       payload: { agentId: 'agent-pan-503', issueId: 'PAN-503' },
-    }));
+    });
 
     expect(killSession).not.toHaveBeenCalled();
   });
@@ -587,31 +577,31 @@ describe('reactive Cloister scheduler', () => {
 
 
   it('routes issue.statusChanged(closed) to the closed-issue reaper handler', async () => {
-    await Effect.runPromise(handleCloisterDomainEvent({
+    await handleCloisterDomainEvent({
       type: 'issue.statusChanged',
       payload: { issueId: 'PAN-503', status: 'Closed', canonicalStatus: 'closed' },
-    }));
+    });
 
     expect(closedIssueReaperMock.handleIssueStatusChangedClosed).toHaveBeenCalledWith('PAN-503');
   });
 
 
   it('routes agent.started to the idle-stack grace-clock reset', async () => {
-    await Effect.runPromise(handleCloisterDomainEvent({
+    await handleCloisterDomainEvent({
       type: 'agent.started',
       payload: { agentId: 'agent-pan-503' },
-    }));
+    });
 
     expect(idleStackReaperMock.handleAgentLifecycleEventForIdleStack).toHaveBeenCalledWith('agent-pan-503');
   });
 
   it('routes agent.stopped to the idle-stack grace-clock reset', async () => {
-    vi.mocked(getAgentStateSync).mockReturnValue(null);
+    vi.mocked(getAgentState).mockReturnValue(null);
 
-    await Effect.runPromise(handleCloisterDomainEvent({
+    await handleCloisterDomainEvent({
       type: 'agent.stopped',
       payload: { agentId: 'agent-pan-503' },
-    }));
+    });
 
     expect(idleStackReaperMock.handleAgentLifecycleEventForIdleStack).toHaveBeenCalledWith('agent-pan-503');
   });
@@ -630,7 +620,7 @@ describe('PAN-2159: duplicate planner twin on in_planning', () => {
     }) as never);
     vi.mocked(sessionExists).mockResolvedValue(false);
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+    await onIssueStateChange('PAN-503', 'in_planning');
 
     expect(spawnRun).not.toHaveBeenCalled();
   });
@@ -644,7 +634,7 @@ describe('PAN-2159: duplicate planner twin on in_planning', () => {
     }) as never);
     vi.mocked(sessionExists).mockResolvedValue(false);
 
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+    await onIssueStateChange('PAN-503', 'in_planning');
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', expect.anything());
   });

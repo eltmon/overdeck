@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
@@ -9,9 +9,6 @@ import {
   ensureDir,
   ensureParentDir,
   resolveArchiveDir,
-  resolveCheckpointFile,
-  resolveFtsDbPath,
-  resolveIssueMemoryRoot,
   resolveMemoryRoot,
   resolveObservationsFile,
   resolvePendingDir,
@@ -58,10 +55,6 @@ describe('memory path resolvers (PAN-1990: keyed by workspaceId)', () => {
       .toBe(join(tempDir!, 'memory/overdeck/workspace-pan-1052/rag-runs/2026-05-16.jsonl'));
   });
 
-  it('resolves workspace checkpoint and project FTS database paths', () => {
-    expect(resolveCheckpointFile('/workspace/feature-pan-1052')).toBe('/workspace/feature-pan-1052/.pan/memory-checkpoint.json');
-    expect(resolveFtsDbPath('overdeck')).toBe(join(tempDir!, 'memory/overdeck/memory-search.db'));
-  });
 
   it('keeps path functions pure and exposes separate idempotent directory helpers', async () => {
     const file = resolveRagRunsFile('overdeck', 'workspace-pan-1052', '2026-05-16');
@@ -77,22 +70,16 @@ describe('memory path resolvers (PAN-1990: keyed by workspaceId)', () => {
     expect(existsSync(dir)).toBe(true);
   });
 
-  it('keeps deprecated resolveIssueMemoryRoot working for migration use', () => {
-    expect(resolveIssueMemoryRoot('overdeck', 'PAN-1052')).toBe(join(tempDir!, 'memory/overdeck/PAN-1052'));
-  });
 
   it('rejects unsafe segments for resolveWorkspaceMemoryRoot', () => {
     expect(() => resolveWorkspaceMemoryRoot('overdeck', '..')).toThrow('Invalid memory workspaceId');
   });
 
-  it('has no non-migration caller of the deprecated resolveIssueMemoryRoot outside paths.ts (PAN-1990 ac4)', () => {
+  it('has no caller of the deleted resolveIssueMemoryRoot left in src (PAN-1990 ac4, PAN-3958 CH-8)', () => {
     const repoRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
-    const output = execFileSync(
-      'git',
-      ['grep', '-l', 'resolveIssueMemoryRoot', '--', 'src/'],
-      { cwd: repoRoot, encoding: 'utf-8' },
-    );
-    const files = output.trim().split('\n').filter(Boolean);
-    expect(files).toEqual(['src/lib/memory/paths.ts']);
+    // The search exits 1 when nothing matches, which is the expected outcome here.
+    const result = spawnSync('git', ['grep', '-l', 'resolveIssueMemoryRoot', '--', 'src/'], { cwd: repoRoot, encoding: 'utf-8' });
+    const files = result.stdout.trim().split('\n').filter(Boolean);
+    expect(files).toEqual([]);
   });
 });

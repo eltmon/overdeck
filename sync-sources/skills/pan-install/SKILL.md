@@ -28,7 +28,8 @@ This skill guides you through installing all prerequisites for Overdeck, includi
 Overdeck requires:
 - **Node.js** v18+ (for CLI and dashboard)
 - **Docker** and Docker Compose (for workspaces)
-- **tmux** (for agent sessions)
+- **Herdr** (default terminal backend for agent panes; auto-installed by `pan install` from https://herdr.dev/install.sh into `~/.local/bin`)
+- **tmux** (legacy agent sessions and the opt-in `terminal.backend: tmux`)
 - **Git** (for version control and workspace management)
 - **Linear API key** (optional, for Linear integration)
 
@@ -57,7 +58,29 @@ pan install
 This will:
 - Check for missing dependencies
 - Offer to install missing components
+- Install and verify Herdr: the binary, `~/.config/herdr/config.toml` with
+  `[session] resume_agents_on_restore = false`, this home's session server
+  (`overdeck-herdr.service` on systemd hosts), and the pilot integrations
+  (`pi`, `omp`, `kimi`, `opencode`) for harnesses that are installed
 - Guide you through platform-specific setup
+
+Options:
+
+| Flag | Effect |
+| --- | --- |
+| `--check` | Check prerequisites only (prints a `Herdr` row) |
+| `--minimal` | Skip Traefik and mkcert (port-based routing) |
+| `--skip-mkcert` | Skip mkcert/HTTPS setup |
+| `--skip-docker` | Skip Docker network setup |
+| `--skip-moonshine` | Skip the Moonshine voice sidecar build |
+| `--skip-tts-daemon` | Skip the Qwen TTS daemon venv install |
+| `--skip-herdr` | Skip Herdr terminal backend install/verify (tmux-only hosts) |
+
+Herdr setup is also skipped under `CI`, under Vitest, and when the terminal
+backend is explicitly tmux (`terminal.backend: tmux` in
+`~/.overdeck/config.yaml` or `OVERDECK_TERMINAL_BACKEND=tmux`). Without Herdr
+on a Herdr host, agent launches fail with an error naming `pan install` —
+there is no silent tmux fallback.
 
 #### Manual Installation
 

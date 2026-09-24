@@ -48,7 +48,7 @@ vi.mock('../../../src/lib/health.js', () => ({
 }));
 vi.mock('../../../src/lib/cv.js', () => ({
   getAgentCV: getAgentCVMock,
-  readAgentCVSync: getAgentCVMock,
+  readAgentCV: getAgentCVMock,
 }));
 vi.mock('../../../src/lib/terminal-backends/select.js', () => ({
   hostTerminalBackendName: backendNameMock,
@@ -58,7 +58,7 @@ vi.mock('../../../src/lib/agents/liveness.js', () => ({
   getAgentEffectiveLastActivityMs: lastActivityMock,
 }));
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentStateSync: getAgentStateMock,
+  getAgentState: getAgentStateMock,
   getAgentRuntimeState: getAgentRuntimeStateMock,
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));

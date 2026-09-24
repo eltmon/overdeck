@@ -9,11 +9,11 @@ import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import {
   extractTeamPrefix,
-  findProjectByTeamSync,
+  findProjectByTeam,
   listProjectsSync,
   resolveProjectFromIssueSync,
 } from '../../lib/projects.js';
-import { loadWorkspaceMetadataSync } from '../../lib/remote/workspace-metadata.js';
+import { loadWorkspaceMetadata } from '../../lib/remote/workspace-metadata.js';
 import { removeWorkspace as removeWorkspaceFromConfig } from '../../lib/workspace-manager.js';
 import { listWorktrees, removeWorktree, type WorktreeInfo } from '../../lib/worktree.js';
 import { destroyRemoteWorkspace } from './workspace-remote.js';
@@ -396,7 +396,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
     }
 
     // Check if this is a remote workspace
-    const metadata = loadWorkspaceMetadataSync(normalizedId);
+    const metadata = loadWorkspaceMetadata(normalizedId);
     if (metadata && metadata.location === 'remote') {
       await destroyRemoteWorkspace(issueId, normalizedId, metadata, spinner, options);
       await finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
@@ -405,7 +405,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
 
     // Try to find project config from registry
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
     // Priority 1: Use workspace-manager if project has workspace config.
     // PAN-3887: destroy every existing shape (base, strike, slots), not just
@@ -422,10 +422,10 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
       const steps: string[] = [];
       const errors: string[] = [];
       for (const target of targets) {
-        const result = await Effect.runPromise(removeWorkspaceFromConfig({
+        const result = await removeWorkspaceFromConfig({
           projectConfig,
           featureName: target.name.replace(/^feature-/, ''),
-        }));
+        });
         steps.push(...result.steps.map((step) => `${target.name}: ${step}`));
         errors.push(...result.errors);
         const branchStep = await deleteBranchBestEffort(projectConfig.path, target.branch);

@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-07-26.
+Live landmines a change in this repo can step on. Verified 2026-09-20.
 
 - **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -87,12 +87,15 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
 - **Dead UI code** — `components/Settings/Provider/` (ProviderCard, ProviderPanel,
   ThinkingLevelSlider) is entirely unimported (references the Material Symbols
   font removed in a37f8c890). Slated for deletion in PAN-1787.
-- **The status layer is gone (PAN-3917)** — `src/lib/pan-dir/records.ts`,
-  the `review_status` table, `IssueRecord`, and the `readyForMerge`/`*Status`
-  mirror fields were deleted. Never reintroduce a stored status; read
-  `DerivedIssueState` (server: `services/derived-issue-state.ts`; CLI: `pan show
-  --json`). `scripts/guard-no-state-layer.sh` fails lint on any reference in
-  `src/` and in `sync-sources/**/*.md` (PAN-3929 widened the Markdown set).
+- **`pipeline.updatedAt` conflates write-recency with verdict-truth** (PAN-3092) —
+  `projectPipeline()` (`src/lib/pan-dir/records.ts:109`) stamps it on EVERY status
+  write, verdict or not, and every newer-wins comparison (`pickNewerPipeline`,
+  the verdict-fallback drain's supersede check) inherits the conflation: a
+  newer-but-verdict-free write makes the drain DELETE a fallback unlanded and
+  makes `pickNewerPipeline` silently drop a verdict fold while reporting success.
+  Any change touching record merges must stay verdict-aware (terminal verdicts
+  survive same-cycle verdict-free writes; only a newer `reviewSpawnedAt` or a
+  newer terminal verdict supersedes).
 - **Per-workspace `.venv`** (TLDR) can be ~7.5GB each — don't copy/back up
   workspaces blindly.
 - **Fly Machine rootfs resets on every start** — the rootfs is rebuilt from the
@@ -101,5 +104,35 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   instructions; the durable tier mitigates it by mounting a persistent Fly volume at
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
+- **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
+  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts executeCloseOut`
+  is dead (no production caller; PAN-3968 deletes it) — only `isBranchMerged` there is
+  live. Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
+  (keeps `state.json`/`sessions.json`); `removeAgentStateDir` is the destructive door
+  for deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
+  (`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
+  (PAN-3950, PAN-3968).
+- **`tests/unit/lib/lifecycle/workflows.test.ts` has two agent roots** — it mocks
+  `paths.js` `AGENTS_DIR` to `<tmpdir>/overdeck-wf-test-home/agents`, but
+  `listAgentStatesSync`/`saveAgentStateSync` resolve `getOverdeckHome()` (per-worker
+  `OVERDECK_HOME`). Seed agent-state fixtures under `getOverdeckHome()/agents/` or the
+  test proves nothing.
+- **OpenCode ACP drops permission asks from Task-subagent sessions** (PAN-3937) —
+  opencode 1.18.31's `acp/permission.ts` `Handler.process()` looks up the asking
+  session via `ACPSession.tryGet(sessionID)` and returns silently if it misses;
+  a `mode=subagent` session spawned by the `task` tool is never registered as an
+  ACP session, so any permission key opencode defaults to `ask`
+  (`external_directory`, `doom_loop`, `read` for `*.env`/`*.env.*`) deadlocks that
+  subagent — and the parent's `session/prompt` — forever, with no
+  `permission_request` ever written to `acp-session.jsonl`. Subagents inherit the
+  parent session's `external_directory` ruleset verbatim
+  (`agent/subagent-permissions.ts` `deriveSubagentSessionPermission`), so
+  Overdeck's launch-time permission policy (`OPENCODE_PERMISSION` env,
+  `buildOpenCodeAcpSpawnInput`) is the only lever that reaches subagents; the
+  ACP relay auto-approve path (`AcpHost.handlePermissionRequest`,
+  `selectAutoPermissionOutcome`) never fires for them. `OPENCODE_PERMISSION`
+  deep-merges last over the user's own `opencode.jsonc`, including any explicit
+  `deny` — widening the pre-allow keys widens what a user's own denial can no
+  longer block.
 
-<!-- last-verified: 2026-09-19 -->
+<!-- last-verified: 2026-09-20 -->

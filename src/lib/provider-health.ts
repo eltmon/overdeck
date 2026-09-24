@@ -6,8 +6,7 @@
  * network issues BEFORE the agent enters Claude Code's opaque retry loop.
  */
 
-import { Effect } from 'effect';
-import { getProviderEnvSync, getProviderForModelSync, type ProviderConfig } from './providers.js';
+import { getProviderEnv, getProviderForModel, type ProviderConfig } from './providers.js';
 import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
 import type { ModelId } from './settings.js';
@@ -69,7 +68,13 @@ export function buildAnthropicMessagesUrl(baseUrl: string): string {
   return normalized.endsWith('/v1')
     ? `${normalized}/messages`
     : `${normalized}/v1/messages`;
-}async function probeProviderPromise(
+}
+
+/**
+ * Probe a provider with a minimal request. Never rejects: probe results,
+ * including error classifications, are returned as a `ProbeResult`.
+ */
+export async function probeProvider(
   provider: ProviderConfig,
   apiKey: string,
   model: string,
@@ -95,8 +100,10 @@ export function buildAnthropicMessagesUrl(baseUrl: string): string {
 
 /**
  * Clear cached probe result for a provider (e.g. after key change).
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function invalidateProbeCacheSync(provider?: string): void {
+export function invalidateProbeCache(provider?: string): void {
   if (provider) {
     for (const k of cache.keys()) {
       if (k.startsWith(`${provider}:`)) cache.delete(k);
@@ -116,7 +123,7 @@ async function doProbe(
   // is booted on the first spawn after every dashboard restart and surfaces a
   // spurious "Cannot reach <provider>: fetch failed" toast.
   if (provider.name === 'nous' || provider.name === 'dashscope') {
-    await Effect.runPromise(ensureOpenAICompatibleProxyRunning());
+    await ensureOpenAICompatibleProxyRunning();
     // Use GET /v1/models instead of POST /v1/messages. These providers serve
     // reasoning models (qwen/qwen3.6-plus; qwen3.8-max has always-on thinking)
     // that ignore max_tokens for their reasoning phase and routinely take >8s
@@ -125,7 +132,7 @@ async function doProbe(
     return probeModelsEndpoint(provider, apiKey);
   }
 
-  const providerEnv = getProviderEnvSync(provider, apiKey);
+  const providerEnv = getProviderEnv(provider, apiKey);
   const baseUrl = providerEnv.ANTHROPIC_BASE_URL ?? provider.baseUrl;
   if (!baseUrl) return { ok: true };
 
@@ -211,7 +218,7 @@ function classifyFetchError(err: unknown, provider: ProviderConfig): ProbeResult
 /**
  * User-facing error message for a failed probe, suitable for dashboard display.
  */
-export function formatProbeError(provider: ProviderConfig, model: string, result: ProbeResult & { ok: false }): string {
+function formatProbeError(provider: ProviderConfig, model: string, result: ProbeResult & { ok: false }): string {
   const prefix = `${provider.displayName} (${model})`;
 
   switch (result.kind) {
@@ -228,11 +235,13 @@ export function formatProbeError(provider: ProviderConfig, model: string, result
     default:
       return `${prefix}: pre-flight check failed — ${result.message}`;
   }
-}async function validateProviderHealthPromise(
+}
+
+async function validateProviderHealthBody(
   model: string,
   apiKey?: string,
 ): Promise<void> {
-  const provider = getProviderForModelSync(model as ModelId);
+  const provider = getProviderForModel(model as ModelId);
 
   // Skip: Anthropic native and OpenAI subscription routing have their own checks.
   if (provider.name === 'anthropic' || provider.name === 'openai') {
@@ -242,7 +251,7 @@ export function formatProbeError(provider: ProviderConfig, model: string, result
   const key = apiKey ?? resolveApiKey(provider);
   if (!key) return; // No key configured — let downstream handle the "no key" error
 
-  const result = await Effect.runPromise(probeProvider(provider, key, model));
+  const result = await probeProvider(provider, key, model);
   if (!result.ok) {
     throw new ProviderHealthError(provider, model, result);
   }
@@ -267,40 +276,21 @@ export class ProviderHealthError extends Error {
   }
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
 /**
- * Effect variant of {@link probeProvider}. Never fails — probe results
- * (including error classifications) are carried in the success channel as
- * `ProbeResult`.
+ * Probe the provider for `model` before a spawn. Rejects only with
+ * {@link ProviderHealthError}: any other throw is re-wrapped as kind `'unknown'`,
+ * so a caller that blocks on failure fails closed.
  */
-export const probeProvider = (
-  provider: ProviderConfig,
-  apiKey: string,
-  model: string,
-): Effect.Effect<ProbeResult, never> =>
-  Effect.promise(() => probeProviderPromise(provider, apiKey, model));
-
-/** Effect variant of {@link validateProviderHealth}. */
-export const validateProviderHealth = (
-  model: string,
-  apiKey?: string,
-): Effect.Effect<void, ProviderHealthError> =>
-  Effect.tryPromise({
-    try: () => validateProviderHealthPromise(model, apiKey),
-    catch: (cause) => {
-      if (cause instanceof ProviderHealthError) return cause;
-      // Should never happen — validateProviderHealth only throws ProviderHealthError.
-      // Re-wrap defensively so the typed error channel stays narrow.
-      const provider = getProviderForModelSync(model as ModelId);
-      return new ProviderHealthError(provider, model, {
-        ok: false,
-        kind: 'unknown',
-        message: cause instanceof Error ? cause.message : String(cause),
-      });
-    },
-  });
-
-/** Effect variant of {@link invalidateProbeCacheSync}. Pure cache mutation; cannot fail. */
-export const invalidateProbeCache = (provider?: string): Effect.Effect<void, never> =>
-  Effect.sync(() => invalidateProbeCacheSync(provider));
+export async function validateProviderHealth(model: string, apiKey?: string): Promise<void> {
+  try {
+    await validateProviderHealthBody(model, apiKey);
+  } catch (cause) {
+    if (cause instanceof ProviderHealthError) throw cause;
+    const provider = getProviderForModel(model as ModelId);
+    throw new ProviderHealthError(provider, model, {
+      ok: false,
+      kind: 'unknown',
+      message: cause instanceof Error ? cause.message : String(cause),
+    });
+  }
+}

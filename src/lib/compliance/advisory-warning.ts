@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import { readFile, rename, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
-import { Effect } from 'effect';
 import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 import { COMPLIANCE_MODES, loadConfigNoMigration, type ComplianceMode } from '../config-yaml.js';
 import { ensureParentDir, resolveWorkspaceMemoryRoot } from '../memory/paths.js';
@@ -41,7 +40,7 @@ export async function resolveComplianceAdvisoryWarning(input: ResolveComplianceA
 }
 
 export async function loadComplianceMode(): Promise<ComplianceMode> {
-  const { config } = await Effect.runPromise(loadConfigNoMigration());
+  const { config } = await loadConfigNoMigration();
   return COMPLIANCE_MODES.includes(config.compliance.mode) ? config.compliance.mode : 'advisory';
 }
 
@@ -61,7 +60,7 @@ export async function readComplianceWarningMarkers(projectId: string, workspaceI
   }
 }
 
-export async function writeComplianceWarningMarkers(projectId: string, workspaceId: string, markers: ComplianceWarningMarkers): Promise<void> {
+async function writeComplianceWarningMarkers(projectId: string, workspaceId: string, markers: ComplianceWarningMarkers): Promise<void> {
   const path = resolveComplianceWarningMarkersFile(projectId, workspaceId);
   await ensureParentDir(path);
   const tempPath = join(dirname(path), `.${randomUUID()}.tmp`);
@@ -69,7 +68,7 @@ export async function writeComplianceWarningMarkers(projectId: string, workspace
   await rename(tempPath, path);
 }
 
-export function resolveComplianceWarningMarkersFile(projectId: string, workspaceId: string): string {
+function resolveComplianceWarningMarkersFile(projectId: string, workspaceId: string): string {
   return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'compliance', 'warned-misses.json');
 }
 

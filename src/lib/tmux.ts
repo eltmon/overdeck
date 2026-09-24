@@ -1,6 +1,26 @@
-import { execSync, execFileSync, execFile } from 'child_process';
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `capturePaneSync` (async: `capturePane`): src/lib/agents/termination.ts:170.
+ * - `getAgentSessionsSync` (async: `getAgentSessions`): src/cli/commands/doctor.ts:511.
+ * - `killSessionSync` (async: `killSession`): src/lib/agents/termination.ts:180,
+ *   src/lib/runtimes/claude-code.ts:332.
+ * - `listPaneValuesSync` (async: `listPaneValues`): src/lib/agents/liveness.ts:161,326.
+ * - `listSessionNamesSync` (async: `listSessionNames`): 9 sites in cli/commands/doctor.ts, cli/commands/pause.ts,
+ *   cli/commands/swarm-status.ts, cli/commands/swarm.ts.
+ * - `listSessionsSync` (async: `listSessions`): src/cli/commands/resources.ts:153, src/lib/agents/queries.ts:36,
+ *   src/lib/hygiene.ts:51, src/lib/runtimes/ohmypi.ts:210, src/lib/tmux.ts:628,815.
+ * - `sessionExistsSync` (async: `sessionExists`): 7 sites in cli/commands/answer.ts, lib/agents/liveness.ts,
+ *   lib/agents/termination.ts, lib/runtimes/claude-code.ts.
+ * Each of these blocks on a child process: never call one from src/dashboard/** or src/lib/cloister/** (FR-8).
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
+import { execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
-import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync, readFileSync } from 'fs';
+import { writeFileSync, appendFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join, resolve } from 'path';
 import { homedir, tmpdir } from 'os';
@@ -9,7 +29,7 @@ import { Effect } from 'effect';
 import { getCanonicalOverdeckHome, getOverdeckHome } from './paths.js';
 import { DEFAULT_INSTANCE_NAME, managedInstanceName } from './instance-name.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
-import { buildChildEnvSync } from './child-env.js';
+import { buildChildEnv } from './child-env.js';
 import { MessageDeliveryFailed, TmuxError } from './errors.js';
 
 export { MessageDeliveryFailed } from './errors.js';
@@ -132,7 +152,7 @@ function isManagedServerAliveSync(): boolean {
  * MainPID when we manage it; fall back to pgrep so the founder guard still
  * fires on pre-fix or manually-founded servers.
  */
-export function findManagedServerPidSync(): number | undefined {
+export function findManagedServerPid(): number | undefined {
   try {
     const mainPidOut = execFileSync(
       'systemctl',
@@ -195,7 +215,7 @@ function readServerCmdlineSync(pid: number): string {
  * restart — the operator must decide when to migrate off the live founder.
  */
 function warnIfServerInTmuxSpawnScopeSync(): boolean {
-  const pid = findManagedServerPidSync();
+  const pid = findManagedServerPid();
   if (pid === undefined) return false;
   const cgroup = readServerCgroupSync(pid);
   if (!cgroup.includes('tmux-spawn-')) return false;
@@ -215,7 +235,7 @@ function warnIfServerInTmuxSpawnScopeSync(): boolean {
  * (pkill -f, pgrep -f) can hit the server itself. Never auto-restart.
  */
 function warnIfServerCmdlineIsDirtySync(): boolean {
-  const pid = findManagedServerPidSync();
+  const pid = findManagedServerPid();
   if (pid === undefined) return false;
   const cmdline = readServerCmdlineSync(pid);
   // A clean dedicated founding looks like `tmux -L overdeck -f ... start-server`.
@@ -246,7 +266,7 @@ function warnIfServerCmdlineIsDirtySync(): boolean {
  * captured env; only future sessions change.
  */
 /** @internal Exported only for focused sanitizer tests. */
-export function sanitizeManagedServerGlobalEnvSync(cleanEnv: NodeJS.ProcessEnv): void {
+export function sanitizeManagedServerGlobalEnv(cleanEnv: NodeJS.ProcessEnv): void {
   const sock = getManagedTmuxSocketName();
   const canonicalOverdeckHome = getCanonicalOverdeckHome();
   const sharedSocket = sock === DEFAULT_MANAGED_TMUX_SOCKET;
@@ -316,7 +336,7 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
   if (isManagedServerAliveSync()) {
     // PAN-1798: repair a poisoned global environment so new sessions spawn clean,
     // even on a server founded by a stray client `new-session`.
-    sanitizeManagedServerGlobalEnvSync(cleanEnv);
+    sanitizeManagedServerGlobalEnv(cleanEnv);
     // Surface the dirty-founding teardown hazard once per process (not per spawn).
     if (!warnedManagedServerTmuxSpawnScope) {
       warnedManagedServerTmuxSpawnScope = warnIfServerInTmuxSpawnScopeSync();
@@ -415,7 +435,7 @@ function reloadManagedTmuxConfigSync(): void {
     // the tmux server doesn't inherit stale provider config. Without this,
     // every session spawned by the server inherits the parent's env — and tmux
     // -e can only override, not unset, so stale vars leak through.
-    const cleanEnv = buildChildEnvSync();
+    const cleanEnv = buildChildEnv();
     ensureOverdeckTmuxServerSync(cleanEnv);
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
@@ -427,7 +447,7 @@ function reloadManagedTmuxConfigSync(): void {
 
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
-    const cleanEnv = buildChildEnvSync();
+    const cleanEnv = buildChildEnv();
     await ensureOverdeckTmuxServerAsync(cleanEnv);
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
@@ -451,9 +471,6 @@ async function ensureManagedTmuxConfigAsync(): Promise<void> {
   await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
   await reloadManagedTmuxConfigAsync();
   tmuxContextPrepared = true;
-}async function ensureManagedTmuxContextOncePromise(): Promise<void> {
-  const mode = getTmuxConfigMode();
-  await ensureTmuxContextPreparedAsync(mode);
 }
 
 export function getTmuxConfigMode(): TmuxConfigMode {
@@ -485,14 +502,13 @@ async function ensureTmuxContextPreparedAsync(mode: TmuxConfigMode): Promise<voi
  * Pure: returns the tmux socket/config args for the active mode.
  *
  * Callers that build a tmux command line directly (e.g., `pty.spawn('tmux',
- * buildTmuxArgs(...))`) MUST have `ensureManagedTmuxContextOnce()` awaited
- * earlier in the process lifetime — the dashboard server does this from
- * main.ts before `server.listen`. The `tmuxExecAsync` / `tmuxExecSync`
- * helpers still call `ensureTmuxContextPrepared*` themselves (cheap after the
- * first call) so CLI entry points that never went through the server init
- * still work on first use.
+ * buildTmuxArgs(...))`) MUST have run a tmux command through the helpers below
+ * earlier in the process lifetime: `tmuxExecAsync` / `tmuxExecSync` call
+ * `ensureTmuxContextPrepared*` themselves (cheap after the first call), which
+ * prepares the managed context on first use. There is no boot-time hook (see
+ * the PAN-3958 note in the dashboard's main.ts).
  */
-export function getTmuxBaseArgs(): string[] {
+function getTmuxBaseArgs(): string[] {
   return getTmuxContextArgsForMode(getTmuxConfigMode());
 }
 
@@ -502,15 +518,6 @@ export function buildTmuxArgs(args: string[]): string[] {
 
 export function getTmuxCommand(args: string[]): { command: string; args: string[] } {
   return { command: 'tmux', args: buildTmuxArgs(args) };
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'"'"'`)}'`;
-}
-
-export function buildTmuxCommandString(args: string[]): string {
-  const { command, args: commandArgs } = getTmuxCommand(args);
-  return [command, ...commandArgs.map(shellQuote)].join(' ');
 }
 
 export async function tmuxExecAsync(args: string[], options?: Parameters<typeof execFileAsync>[2]) {
@@ -660,21 +667,23 @@ export type SessionQueryResult =
   | { status: 'missing'; detail: string }
   | { status: 'error'; detail: string };
 
-function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { status: 'exists' }> {
-  const error = cause as NodeJS.ErrnoException & { stderr?: string | Buffer; status?: number };
+/** Classify a failed `has-session`; the exit code is `status` (execFileSync) or a numeric `code` (promisified execFile). */
+export function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { status: 'exists' }> {
+  const error = cause as Omit<NodeJS.ErrnoException, 'code'> & { code?: string | number; stderr?: string | Buffer; status?: number };
+  const exitCode = typeof error.status === 'number' ? error.status : typeof error.code === 'number' ? error.code : undefined;
   const stderr = String(error.stderr ?? '').trim();
   const detail = [
-    `exit=${error.status ?? 'unknown'}`,
-    error.code ? `code=${error.code}` : '',
+    `exit=${exitCode ?? 'unknown'}`,
+    typeof error.code === 'string' ? `code=${error.code}` : '',
     stderr ? `stderr=${stderr}` : '',
     error.message ? `message=${error.message}` : '',
   ].filter(Boolean).join(' ');
-  return error.status === 1 && /can't find session:/i.test(stderr)
+  return exitCode === 1 && /can't find session:/i.test(stderr)
     ? { status: 'missing', detail }
     : { status: 'error', detail };
 }
 
-export function querySessionSync(name: string): SessionQueryResult {
+export function querySession(name: string): SessionQueryResult {
   try {
     // Explicit stdio — without it execFileSync echoes the routine "can't find session" stderr of dead-session probes into the server log.
     tmuxExecSync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -685,41 +694,7 @@ export function querySessionSync(name: string): SessionQueryResult {
 }
 
 export function sessionExistsSync(name: string): boolean {
-  return querySessionSync(name).status === 'exists';
-}
-
-/**
- * @deprecated Legacy sync function — blocks the event loop. Use `createSession` instead.
- * Kept for CLI-only callers. Never call from server-reachable code.
- */
-export function createSessionSync(
-  name: string,
-  cwd: string,
-  initialCommand?: string,
-  options?: { env?: Record<string, string>; width?: number; height?: number }
-): void {
-  // PAN-1798: every spawn path must ensure the shared server lives in its
-  // dedicated unit before creating a session, so no client becomes the founder.
-  ensureOverdeckTmuxServerSync(buildChildEnvSync());
-  if (initialCommand && (initialCommand.includes('`') || initialCommand.includes('\n') || initialCommand.length > 500)) {
-    tmuxExecSync(buildNewSessionArgs(name, cwd, undefined, options));
-    execSync('sleep 0.5');
-
-    const tmpFile = join(tmpdir(), `pan-cmd-${name}.sh`);
-    writeFileSync(tmpFile, initialCommand);
-    chmodSync(tmpFile, '755');
-
-    try {
-      tmuxExecSync(['send-keys', '-t', name, `bash ${tmpFile}`]);
-      tmuxExecSync(['send-keys', '-t', name, 'C-m']);
-      execSync('sleep 2');
-    } finally {
-      try { unlinkSync(tmpFile); } catch {}
-    }
-    return;
-  }
-
-  tmuxExecSync(buildNewSessionArgs(name, cwd, initialCommand, options));
+  return querySession(name).status === 'exists';
 }
 
 export function killSessionSync(name: string): void {
@@ -727,30 +702,6 @@ export function killSessionSync(name: string): void {
   // `agent-pan-977-review` when asked to kill `agent-pan-977`.
   // Explicit stdio — killing a maybe-dead session is routine; see querySessionSync.
   tmuxExecSync(['kill-session', '-t', exactSession(name)], { stdio: ['ignore', 'pipe', 'pipe'] });
-}
-
-
-/**
- * Send keys to a tmux session (sync, blocks event loop).
- * Only use from CLI commands — NEVER from the dashboard server.
- */
-export function sendKeysSync(sessionName: string, keys: string, caller?: string): void {
-  validateSessionName(sessionName);
-  logSendKeys(sessionName, keys, caller);
-
-  const sendId = randomUUID();
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
-  const bufferName = `pan-${sendId}`;
-  try {
-    writeFileSync(tmpFile, keys);
-    tmuxExecSync(['load-buffer', '-b', bufferName, tmpFile]);
-    tmuxExecSync(['paste-buffer', '-b', bufferName, '-t', sessionName]);
-    try { tmuxExecSync(['delete-buffer', '-b', bufferName], { stdio: 'ignore' }); } catch {}
-    execSync('sleep 0.6');
-    tmuxExecSync(['send-keys', '-t', sessionName, 'C-m']);
-  } finally {
-    try { unlinkSync(tmpFile); } catch {}
-  }
 }
 
 export function capturePaneSync(sessionName: string, lines: number = 50): string {
@@ -763,7 +714,8 @@ export function capturePaneSync(sessionName: string, lines: number = 50): string
   }
 }
 
-export async function capturePaneText(
+/** Capture the last `lines` lines of a pane; empty string on any tmux failure. */
+export async function capturePane(
   sessionName: string,
   lines: number = 50,
   options?: { escapeSequences?: boolean }
@@ -810,7 +762,8 @@ export function listPaneValuesSync(target: string, format: string): string[] {
   }
 }
 
-async function listPaneValuesText(target: string, format: string): Promise<string[]> {
+/** List one `#{format}` value per pane of a target; empty on any tmux failure. */
+export async function listPaneValues(target: string, format: string): Promise<string[]> {
   try {
     const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
     return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
@@ -834,7 +787,7 @@ async function listPaneValuesText(target: string, format: string): Promise<strin
  * (PAN-1769, conv 2701/2707 false-"ended").
  */
 export async function isHarnessProcessAlive(sessionName: string): Promise<boolean> {
-  const panePids = (await listPaneValuesText(sessionName, '#{pane_pid}'))
+  const panePids = (await listPaneValues(sessionName, '#{pane_pid}'))
     .map((value) => Number.parseInt(value, 10))
     .filter((pid) => Number.isInteger(pid) && pid > 0);
   if (panePids.length === 0) return false;
@@ -851,155 +804,24 @@ export async function isHarnessProcessAlive(sessionName: string): Promise<boolea
 }
 
 
-/**
- * Categorizes an API failure surfaced inside an interactive Claude Code pane.
- *
- * "Terminal" here means the upstream provider returned an error that won't be
- * fixed by waiting or retrying the same request — quota exhausted, auth/login
- * required, permission denied. The CLI prints the error and returns to the
- * input prompt, which means session-alive and pane-alive checks both pass:
- * callers polling for completion will sit idle until their timeout fires.
- * Detecting these in pane content is the only reliable signal.
- *
- * Distinct from the transient family the deacon already handles
- * (Overloaded / Rate limit / 5xx / Timed out), which are nudge-to-retry.
- */
-export type TerminalApiErrorKind =
-  | 'quota_exhausted'
-  | 'auth_failed'
-  | 'permission_denied'
-  | 'login_required';
-
-export interface TerminalApiError {
-  kind: TerminalApiErrorKind;
-  /** Short, user-facing summary suitable for review_notes / dashboard text. */
-  summary: string;
-  /** First matching line from the pane, for diagnostics. */
-  raw: string;
-}
-
-const TERMINAL_API_ERROR_PATTERNS: Array<{
-  re: RegExp;
-  kind: TerminalApiErrorKind;
-  summary: string;
-}> = [
-  // Specific quota messages precede generic status codes to preserve the actionable diagnosis.
-  { re: /usage limit for this billing cycle/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted (billing cycle limit reached)' },
-  { re: /reached your usage limit/i,           kind: 'quota_exhausted', summary: 'Provider quota exhausted (usage limit reached)' },
-  { re: /(?:^|[^a-z])quota[^a-z].{0,40}(?:exceeded|exhausted|reached)/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted' },
-  { re: /You've hit your limit/i,              kind: 'quota_exhausted', summary: 'Provider usage limit reached' },
-  { re: /credit balance is too low/i,          kind: 'quota_exhausted', summary: 'Provider credit balance too low' },
-  { re: /Please run \/login/i,                 kind: 'login_required',  summary: 'Provider login required' },
-  { re: /authentication_error/i,               kind: 'auth_failed',     summary: 'Provider authentication failed' },
-  { re: /API Error:\s*401\b/i,                 kind: 'auth_failed',     summary: 'Provider rejected request (401 unauthorized)' },
-  { re: /API Error:\s*402\b|unable to verify your membership benefits/i, kind: 'permission_denied', summary: 'Provider rejected request (402 account or membership required)' },
-  { re: /permission_error/i,                   kind: 'permission_denied', summary: 'Provider returned permission_error' },
-  { re: /API Error:\s*403\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (403 forbidden)' },
-];
-
-/**
- * Scan a captured tmux pane for terminal upstream-API failures.
- * Returns the first match, or null if none. Safe to call frequently — pure
- * regex, no I/O.
- *
- * Why we collapse whitespace: real tmux captures wrap long error messages at
- * the pane width, so a phrase like "usage limit for this billing cycle" can
- * land across two or three lines. Matching against the raw capture would miss
- * those. We normalize a copy to a single-spaced string for matching, then
- * preserve the original for the `raw` diagnostics field.
- */
-export function detectTerminalApiErrorSync(paneOutput: string): TerminalApiError | null {
-  if (!paneOutput) return null;
-  const normalized = paneOutput.replace(/\s+/g, ' ');
-  for (const entry of TERMINAL_API_ERROR_PATTERNS) {
-    const match = normalized.match(entry.re);
-    if (match) {
-      // For raw, find the original line that contained the start of the
-      // match. Approximate: match.index in normalized doesn't map 1:1 to
-      // paneOutput, so just grab the first 240 chars around any line in
-      // paneOutput that contains the matched substring.
-      const matchedText = match[0];
-      const rawIdx = paneOutput.indexOf(matchedText.split(' ')[0] ?? matchedText);
-      const lineStart = rawIdx >= 0 ? paneOutput.lastIndexOf('\n', rawIdx) + 1 : 0;
-      const lineEnd = rawIdx >= 0 ? paneOutput.indexOf('\n', rawIdx) : -1;
-      const raw = paneOutput.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim().slice(0, 240);
-      return { kind: entry.kind, summary: entry.summary, raw };
-    }
-  }
-  return null;
-}
-
 // waitForClaudePromptPromise / waitForClaudePrompt removed in PAN-1596.
 // Readiness is hook-driven now: ready.json (waitForReadySignal) for post-launch
 // readiness and the runtime mirror 'idle' (waitForAgentIdle) for live idleness,
 // both in agents.ts. The old `❯` pane-scrape was non-deterministic and is no
 // longer used by any caller.
 
-/**
- * Verify that a message sent to Claude was actually received and processing started.
- * Compares tmux output before and after to detect new activity.
- */
-export async function confirmDelivery(
-  sessionName: string,
-  outputBefore: string,
-  timeoutMs: number = 10000,
-): Promise<boolean> {
-  const start = Date.now();
-  const poll = 1000;
-  const beforeText = outputBefore.trimEnd();
-  const processingPatterns = [
-    '●',
-    '⎿',
-    'Read',
-    '✻',
-    '✶',
-    '✽',
-    '✢',
-    'Generating',
-    'thinking',
-    'thought for',
-    'Retrying in',
-    'API Error',
-    "You've hit your limit",
-    'Tool use',
-  ];
-
-  while (Date.now() - start < timeoutMs) {
-    await new Promise(r => setTimeout(r, poll));
-    const after = await Effect.runPromise(capturePane(sessionName, 50));
-    const afterText = after.trimEnd();
-    if (afterText === beforeText) continue;
-
-    const newOutput = afterText.startsWith(beforeText)
-      ? afterText.slice(beforeText.length)
-      : afterText;
-
-    if (processingPatterns.some(pattern => newOutput.includes(pattern))) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export function getAgentSessionsSync(): TmuxSession[] {
   return listSessionsSync().filter(s => s.name.startsWith('agent-'));
 }
 
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 const toTmuxError = (op: string, cause: unknown): TmuxError =>
   new TmuxError({
     command: op,
     message: cause instanceof Error ? cause.message : String(cause),
     cause,
-  });
-
-/** Prepare the managed tmux config + server (idempotent). */
-export const ensureManagedTmuxContextOnce = (): Effect.Effect<void, TmuxError> =>
-  Effect.tryPromise({
-    try: () => ensureManagedTmuxContextOncePromise(),
-    catch: (cause) => toTmuxError('ensureManagedTmuxContext', cause),
   });
 
 export const listSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
@@ -1107,21 +929,6 @@ export const sessionExists = (
     catch: (cause) => toTmuxError('session-exists', cause),
   });
 
-export const querySession = (
-  name: string,
-): Effect.Effect<SessionQueryResult, TmuxError> =>
-  Effect.tryPromise({
-    try: async () => {
-      try {
-        await tmuxExecAsync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
-        return { status: 'exists' } as const;
-      } catch (cause) {
-        return sessionQueryFailure(cause);
-      }
-    },
-    catch: (cause) => toTmuxError('query-session', cause),
-  });
-
 export const createSession = (
   name: string,
   cwd: string,
@@ -1132,7 +939,7 @@ export const createSession = (
     try: async () => {
       // PAN-1798: every spawn path must ensure the shared server lives in its
       // dedicated unit before creating a session, so no client becomes the founder.
-      await ensureOverdeckTmuxServerAsync(buildChildEnvSync());
+      await ensureOverdeckTmuxServerAsync(buildChildEnv());
       await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
       // Stamp the initial window's background with the dashboard theme so tmux
       // answers OSC 11 background queries even with no client attached. Claude
@@ -1244,7 +1051,7 @@ export const sendKeys = (
         // observation is the only uncontaminated one the tier gets. Skipped for
         // short key sequences, which never reach that guard.
         const menuBeforePaste = verifyLine.length >= 3
-          && paneHasBlockingChoiceMenu(await capturePaneText(sessionName, 90).catch(() => ''));
+          && paneHasBlockingChoiceMenu(await capturePane(sessionName, 90).catch(() => ''));
 
         await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
         // 1.5s per attempt × 2 attempts = 3s worst case. The previous 8s × 2 = 16s
@@ -1260,7 +1067,7 @@ export const sendKeys = (
             const verifyStart = Date.now();
             const deadline = verifyStart + VERIFY_TIMEOUT_MS;
             while (Date.now() < deadline) {
-              const pane = await capturePaneText(sessionName, 10);
+              const pane = await capturePane(sessionName, 10);
               if (pane.includes(verifyLine.slice(0, 40))) {
                 pasteVerified = true;
                 const elapsed = Date.now() - verifyStart;
@@ -1276,7 +1083,7 @@ export const sendKeys = (
             // Wide-window fallback on every attempt (including the last) so we
             // catch pastes that landed off-screen of the 10-line tail before
             // giving up and stranding Enter.
-            const wideCheck = await capturePaneText(sessionName, 200);
+            const wideCheck = await capturePane(sessionName, 200);
             if (wideCheck.includes(verifyLine.slice(0, 40))) {
               pasteVerified = true;
               break attemptLoop;
@@ -1296,7 +1103,7 @@ export const sendKeys = (
         await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
 
         if (!pasteVerified) {
-          const snapshot = await capturePaneText(sessionName, 90);
+          const snapshot = await capturePane(sessionName, 90);
           // A blocking menu swallowed the paste, and Enter would confirm ITS
           // highlighted row — at the resume gate, "Resume from summary" over
           // the operator's "as-is" (PAN-3212). Never answer a menu we did not
@@ -1321,7 +1128,7 @@ export const sendKeys = (
           const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
           let stillPendingSubmit = true;
           while (Date.now() < submitDeadline) {
-            const pane = await capturePaneText(sessionName, 5);
+            const pane = await capturePane(sessionName, 5);
             if (!pane.includes(verifyLine.slice(0, 40))) {
               stillPendingSubmit = false;
               break;
@@ -1341,44 +1148,15 @@ export const sendKeys = (
     catch: (cause) => cause instanceof MessageDeliveryFailed ? cause : toTmuxError('send-keys', cause),
   });
 
-export const capturePane = (
-  sessionName: string,
-  lines: number = 50,
-  options?: { escapeSequences?: boolean },
-): Effect.Effect<string, TmuxError> =>
-  Effect.tryPromise({
-    try: () => capturePaneText(sessionName, lines, options),
-    catch: (cause) => toTmuxError('capture-pane', cause),
-  });
-
-export const listPaneValues = (
-  target: string,
-  format: string,
-): Effect.Effect<readonly string[], TmuxError> =>
-  Effect.tryPromise({
-    try: () => listPaneValuesText(target, format),
-    catch: (cause) => toTmuxError('list-pane-values', cause),
-  });
-
 export const isPaneDead = (
   sessionName: string,
 ): Effect.Effect<boolean, TmuxError> =>
   Effect.gen(function* () {
-    const values = yield* listPaneValues(sessionName, '#{pane_dead}');
+    const values = yield* Effect.promise(() => listPaneValues(sessionName, '#{pane_dead}'));
     return values.some(v => v === '1');
   }).pipe(Effect.catch(() => Effect.succeed(false)));
-
-export const detectTerminalApiError = (
-  paneOutput: string,
-): Effect.Effect<TerminalApiError | null> =>
-  Effect.sync(() => detectTerminalApiErrorSync(paneOutput));
 
 export const getAgentSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
   listSessions().pipe(
     Effect.map((sessions) => sessions.filter(s => s.name.startsWith('agent-'))),
-  );
-
-export const getReviewSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
-  listSessions().pipe(
-    Effect.map((sessions) => sessions.filter(s => /^review-/.test(s.name))),
   );

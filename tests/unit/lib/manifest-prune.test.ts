@@ -3,8 +3,8 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, sy
 import { tmpdir } from 'os';
 import { join, relative } from 'path';
 import {
-  hashFileSync,
-  pruneStaleManifestEntriesSync,
+  hashFile,
+  pruneStaleManifestEntries,
   type Manifest,
   type ManifestEntry,
 } from '../../../src/lib/manifest.js';
@@ -38,15 +38,15 @@ afterEach(() => {
   }
 });
 
-describe('pruneStaleManifestEntriesSync', () => {
+describe('pruneStaleManifestEntries', () => {
   it('deletes a stale unmodified file and drops its manifest entry', () => {
     const targetBase = createTargetBase();
     const filePath = write(targetBase, 'skills/removed/SKILL.md', '# removed\n');
     const manifest = createManifest({
-      'skills/removed/SKILL.md': entry(hashFileSync(filePath)),
+      'skills/removed/SKILL.md': entry(hashFile(filePath)),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set());
 
     expect(result).toEqual({ pruned: ['skills/removed/SKILL.md'], keptModified: [] });
     expect(existsSync(filePath)).toBe(false);
@@ -59,7 +59,7 @@ describe('pruneStaleManifestEntriesSync', () => {
       'skills/missing/SKILL.md': entry('sha256:missing'),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set());
 
     expect(result).toEqual({ pruned: ['skills/missing/SKILL.md'], keptModified: [] });
     expect(manifest.installed).toEqual({});
@@ -72,7 +72,7 @@ describe('pruneStaleManifestEntriesSync', () => {
       'skills/missing/SKILL.md': entry('sha256:missing'),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set());
 
     expect(result).toEqual({ pruned: ['skills/missing/SKILL.md'], keptModified: [] });
     expect(manifest.installed).toEqual({});
@@ -85,7 +85,7 @@ describe('pruneStaleManifestEntriesSync', () => {
       'rules/removed.md': entry('sha256:original'),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set());
 
     expect(result).toEqual({ pruned: [], keptModified: ['rules/removed.md'] });
     expect(readFileSync(filePath, 'utf-8')).toBe('user modification\n');
@@ -98,11 +98,11 @@ describe('pruneStaleManifestEntriesSync', () => {
     const currentFile = write(targetBase, 'rules/current.md', 'current\n');
     const unmanifestedFile = write(targetBase, 'rules/user.md', 'user\n');
     const manifest = createManifest({
-      'rules/project.md': entry(hashFileSync(projectFile), 'project-template'),
-      'rules/current.md': entry(hashFileSync(currentFile)),
+      'rules/project.md': entry(hashFile(projectFile), 'project-template'),
+      'rules/current.md': entry(hashFile(currentFile)),
     });
 
-    const result = pruneStaleManifestEntriesSync(
+    const result = pruneStaleManifestEntries(
       targetBase,
       manifest,
       new Set(['rules/current.md']),
@@ -120,11 +120,11 @@ describe('pruneStaleManifestEntriesSync', () => {
     const skillFile = write(targetBase, 'skills/removed/SKILL.md', 'skill\n');
     const ruleFile = write(targetBase, 'rules/removed.md', 'rule\n');
     const manifest = createManifest({
-      'skills/removed/SKILL.md': entry(hashFileSync(skillFile)),
-      'rules/removed.md': entry(hashFileSync(ruleFile)),
+      'skills/removed/SKILL.md': entry(hashFile(skillFile)),
+      'rules/removed.md': entry(hashFile(ruleFile)),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set(), {
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set(), {
       prefixes: ['skills/'],
     });
 
@@ -140,10 +140,10 @@ describe('pruneStaleManifestEntriesSync', () => {
     const outsideFile = write(outsideDir, 'outside.txt', 'outside\n');
     const traversalPath = `skills/../${relative(targetBase, outsideFile)}`;
     const manifest = createManifest({
-      [traversalPath]: entry(hashFileSync(outsideFile)),
+      [traversalPath]: entry(hashFile(outsideFile)),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set(), {
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set(), {
       prefixes: ['skills/'],
     });
 
@@ -157,10 +157,10 @@ describe('pruneStaleManifestEntriesSync', () => {
     const outsideDir = createTargetBase();
     const outsideFile = write(outsideDir, 'absolute.txt', 'outside\n');
     const manifest = createManifest({
-      [outsideFile]: entry(hashFileSync(outsideFile)),
+      [outsideFile]: entry(hashFile(outsideFile)),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set(), {
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set(), {
       prefixes: ['skills/', 'agents/', 'rules/'],
     });
 
@@ -177,10 +177,10 @@ describe('pruneStaleManifestEntriesSync', () => {
     mkdirSync(join(targetBase, 'skills'), { recursive: true });
     symlinkSync(outsideDir, linkedParent, 'dir');
     const manifest = createManifest({
-      'skills/linked/SKILL.md': entry(hashFileSync(outsideFile)),
+      'skills/linked/SKILL.md': entry(hashFile(outsideFile)),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set());
 
     expect(result).toEqual({ pruned: [], keptModified: ['skills/linked/SKILL.md'] });
     expect(readFileSync(outsideFile, 'utf-8')).toBe('outside\n');
@@ -200,7 +200,7 @@ describe('pruneStaleManifestEntriesSync', () => {
       'skills/dangling/SKILL.md': entry('sha256:link'),
     });
 
-    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+    const result = pruneStaleManifestEntries(targetBase, manifest, new Set());
 
     expect(result).toEqual({
       pruned: [],
@@ -215,10 +215,10 @@ describe('pruneStaleManifestEntriesSync', () => {
     const targetBase = createTargetBase();
     const filePath = write(targetBase, 'skills/removed/nested/SKILL.md', 'skill\n');
     const manifest = createManifest({
-      'skills/removed/nested/SKILL.md': entry(hashFileSync(filePath)),
+      'skills/removed/nested/SKILL.md': entry(hashFile(filePath)),
     });
 
-    pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+    pruneStaleManifestEntries(targetBase, manifest, new Set());
 
     expect(existsSync(join(targetBase, 'skills'))).toBe(false);
     expect(existsSync(targetBase)).toBe(true);
@@ -228,11 +228,11 @@ describe('pruneStaleManifestEntriesSync', () => {
     const targetBase = createTargetBase();
     const filePath = write(targetBase, 'agents/removed.md', 'agent\n');
     const manifest = createManifest({
-      'agents/removed.md': entry(hashFileSync(filePath)),
+      'agents/removed.md': entry(hashFile(filePath)),
     });
 
-    const first = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
-    const second = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+    const first = pruneStaleManifestEntries(targetBase, manifest, new Set());
+    const second = pruneStaleManifestEntries(targetBase, manifest, new Set());
 
     expect(first).toEqual({ pruned: ['agents/removed.md'], keptModified: [] });
     expect(second).toEqual({ pruned: [], keptModified: [] });

@@ -23,7 +23,6 @@ vi.mock('../../../../lib/paths.js', async () => {
   return { ...real, OVERDECK_HOME: TEST_HOME, CONFIG_DIR: TEST_HOME };
 });
 vi.mock('../../../../lib/workspace-manager.js', () => ({
-  preTrustDirectorySync: vi.fn(),
   preTrustDirectory: vi.fn(),
 }));
 vi.mock('../../../../lib/context-layers/index.js', () => ({

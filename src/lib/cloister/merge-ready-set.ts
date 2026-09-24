@@ -12,12 +12,11 @@
 import { resolvePipelineMembership } from '../pipeline-membership.js';
 import type { ProjectConfig } from '../projects.js';
 import type { gatherProjectLensSignalsForProjects } from '../pipeline-membership-gather.js';
-import { evaluateMergeReadiness, getPrFacts, type PrFacts } from './pr-facts.js';
+import { evaluateIssueMergeGate, type MergeGateDeps } from './merge-gate.js';
 
-export interface MergeCandidateDeps {
+export interface MergeCandidateDeps extends MergeGateDeps {
   listProjects?: () => Promise<Array<{ key: string; config: ProjectConfig }>>;
   gather?: typeof gatherProjectLensSignalsForProjects;
-  getFacts?: (issueId: string) => Promise<PrFacts>;
 }
 
 /**
@@ -44,12 +43,16 @@ export async function listInFlightIssuesWithPr(deps: MergeCandidateDeps = {}): P
   return [...new Set(candidates)];
 }
 
-/** The issues whose PRs the forge says are ready to merge right now. */
+/**
+ * The issues whose PRs the forge says are ready to merge right now, judged by
+ * the one merge gate (`merge-gate.ts`): approved, green, mergeable, the CI
+ * test job passed in a `verification.tests: ci` project (#4021), and no failed
+ * required UAT at the head (#4036).
+ */
 export async function getMergeReadyIssues(deps: MergeCandidateDeps = {}): Promise<string[]> {
-  const getFacts = deps.getFacts ?? getPrFacts;
   const ready: string[] = [];
   for (const issueId of await listInFlightIssuesWithPr(deps)) {
-    if (evaluateMergeReadiness(await getFacts(issueId)).ready) ready.push(issueId);
+    if ((await evaluateIssueMergeGate(issueId, deps)).ready) ready.push(issueId);
   }
   return ready;
 }

@@ -19,7 +19,7 @@ import { activityEntriesFromStoredEvents } from '../read-model.js';
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { getBackendPanes } from '../services/backend-inventory.js';
 import { getDerivedIssueState } from '../services/derived-issue-state.js';
-import { getTodayCostSync } from '../../../lib/overdeck/cost-sync.js';
+import { getTodayCost } from '../../../lib/overdeck/cost-sync.js';
 import { getEventLoopDelaySample } from '../services/event-loop-monitor.js';
 import { readDurableCloisterStatus } from '../services/cloister-control-surface.js';
 
@@ -58,7 +58,7 @@ export function _resetStuckCacheForTests(): void {
   _cachedStuckIssueIds = null;
   _cachedStuckAt = 0;
 }
-import { listGitOperationsSync, type GitOperation } from '../../../lib/git-activity.js';
+import { listGitOperations, type GitOperation } from '../../../lib/git-activity.js';
 import { httpHandler } from './http-handler.js';
 
 /** Live panes in the shape the metrics helpers read. */
@@ -155,10 +155,10 @@ const getMetricsSummaryRoute = HttpRouter.add(
   '/api/metrics/summary',
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
-    const status = readDurableCloisterStatus();
+    const status = yield* Effect.promise(() => readDurableCloisterStatus());
 
     const costSummary = service.getCostSummary();
-    const todayCost = getTodayCostSync();
+    const todayCost = getTodayCost();
 
     const runningAgents = yield* Effect.promise(() => listRunningPanes());
     return jsonResponse(buildMetricsSummaryPayload({
@@ -198,7 +198,7 @@ const getMetricsStuckRoute = HttpRouter.add(
   '/api/metrics/stuck',
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
-    const status = readDurableCloisterStatus();
+    const status = yield* Effect.promise(() => readDurableCloisterStatus());
     const runningAgents = yield* Effect.promise(() => listRunningPanes());
     const current = computeStuckCount(
       status.agentsNeedingAttention,
@@ -337,7 +337,7 @@ const getGitActivityRoute = HttpRouter.add(
 
     const { since, issueId, limit } = parseGitActivityParams(params);
 
-    const ops = listGitOperationsSync({ since, issueId, limit });
+    const ops = listGitOperations({ since, issueId, limit });
     const entries = ops.map(mapGitOperationToActivityEntry);
     return jsonResponse(entries);
   }))

@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: () => ({ projectKey: 'test', projectPath: '/tmp/proj' }),
 }));
-vi.mock('../../../../src/lib/issue-id.js', () => ({ resolveIssueIdSync: (id: string) => id.toUpperCase() }));
+vi.mock('../../../../src/lib/issue-id.js', () => ({ resolveIssueId: (id: string) => id.toUpperCase() }));
 vi.mock('../../../../src/lib/xbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));
 vi.mock('node:fs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:fs')>()),

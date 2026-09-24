@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackendAgentSnapshot } from '@overdeck/contracts';
 
 import {
@@ -79,6 +79,7 @@ describe('parseAgentSessionName', () => {
     expect(parseAgentSessionName('agent-pan-3917-test')).toEqual({ issue: 'PAN-3917', role: 'test' });
     expect(parseAgentSessionName('agent-pan-3917-uat')).toEqual({ issue: 'PAN-3917', role: 'uat' });
     expect(parseAgentSessionName('agent-pan-3917-slot-2')).toEqual({ issue: 'PAN-3917', role: 'worker' });
+    expect(parseAgentSessionName('agent-pan-3920-worker-3')).toEqual({ issue: 'PAN-3920', role: 'worker' });
     expect(parseAgentSessionName('strike-pan-3844')).toEqual({ issue: 'PAN-3844', role: 'strike' });
     expect(parseAgentSessionName('planning-pan-4000')).toEqual({ issue: 'PAN-4000', role: 'plan' });
   });
@@ -110,8 +111,67 @@ describe('listBackendPanes — Herdr fixture', () => {
     expect(HERDR_SNAPSHOT[2]?.tokens.issue).toBeUndefined();
   });
 
-  it('falls back to tmux when the adapter reports the inventory unsupported', async () => {
+  it('carries the snapshot agentId onto the pane', async () => {
+    // PAN-3920 W1: on Herdr the pane id is `w1:p1`, so joins to agents use agentId.
+    const [first, second] = HERDR_SNAPSHOT;
+    const panes = await listBackendPanes({
+      backend: herdrBackend([{ ...first!, agentId: 'agent-pan-3917' }, second!]),
+      now: () => NOW,
+    });
+    expect(panes[0]?.agentId).toBe('agent-pan-3917');
+    expect(panes[1]).not.toHaveProperty('agentId');
+  });
+
+  // PAN-3956 D8: a Herdr host never reads tmux as a fallback inventory.
+  it('serves the last-known panes and never reads tmux when the herdr adapter reports unsupported', async () => {
+    const previous = new BackendPaneCache(await listBackendPanes({ backend: herdrBackend(), now: () => NOW }));
     const backend = { name: 'herdr', list: () => Effect.succeed(unsupported('no session')) } as unknown as TerminalBackend;
+    const listTmuxPanes = vi.fn(async () => TMUX_PROBES);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const panes = await listBackendPanes({ backend, now: () => NOW, listTmuxPanes }, previous);
+      expect(panes).toEqual(previous.list());
+      expect(listTmuxPanes).not.toHaveBeenCalled();
+      // One warning per failure streak, not per poll.
+      await listBackendPanes({ backend, now: () => NOW, listTmuxPanes }, previous);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain('no session');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('serves the last-known panes when the herdr list() fails outright', async () => {
+    const previous = new BackendPaneCache(await listBackendPanes({ backend: herdrBackend(), now: () => NOW }));
+    const backend = {
+      name: 'herdr',
+      list: () => Effect.fail(new Error('socket refused')),
+    } as unknown as TerminalBackend;
+    const listTmuxPanes = vi.fn(async () => TMUX_PROBES);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const panes = await listBackendPanes({ backend, now: () => NOW, listTmuxPanes }, previous);
+      expect(panes.map((pane) => pane.id)).toEqual(['w1:p1', 'w1:p2', 'w9:p1']);
+      expect(listTmuxPanes).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('returns [] with no cache when the herdr adapter cannot answer', async () => {
+    const backend = { name: 'herdr', list: () => Effect.succeed(unsupported('no session')) } as unknown as TerminalBackend;
+    const listTmuxPanes = vi.fn(async () => TMUX_PROBES);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await expect(listBackendPanes({ backend, now: () => NOW, listTmuxPanes })).resolves.toEqual([]);
+      expect(listTmuxPanes).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('reads tmux when the adapter is tmux', async () => {
+    const backend = { name: 'tmux', list: () => Effect.succeed(unsupported('tmux')) } as unknown as TerminalBackend;
     const panes = await listBackendPanes({
       backend,
       now: () => NOW,
@@ -158,6 +218,15 @@ describe('listBackendPanes — tmux fixture', () => {
     });
     expect(first?.harness).toBe('unknown');
     expect(first?.model).toBe('unknown');
+  });
+
+  it('uses the session name as the agent id', async () => {
+    const [first] = await listBackendPanes({
+      backend: null,
+      now: () => NOW,
+      listTmuxPanes: async () => TMUX_PROBES,
+    });
+    expect(first?.agentId).toBe('agent-pan-3917');
   });
 });
 

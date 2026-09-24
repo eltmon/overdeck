@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 
 /**
  * Wait for the dashboard to be healthy, then — when Traefik is enabled — wait for
@@ -17,17 +16,13 @@ export async function resolveDashboardReadyUrl(config: {
   expectedPid?: number;
 }): Promise<{ readyUrl: string; apiUrl: string; traefikReady: boolean }> {
   const { waitForDashboardHealth, waitForTraefikHealth } = await import('../lib/platform-lifecycle.js');
-  await Effect.runPromise(
-    waitForDashboardHealth(config.dashboardApiPort, {
+  await waitForDashboardHealth(config.dashboardApiPort, {
       timeoutMs: config.healthTimeoutMs ?? 15_000,
       expectedIdentity: config.expectedIdentity,
       expectedPid: config.expectedPid,
-    }),
-  );
+    });
   if (config.traefikEnabled) {
-    const traefikReady = await Effect.runPromise(
-      waitForTraefikHealth(config.traefikDomain, { timeoutMs: config.traefikTimeoutMs ?? 10_000 }),
-    );
+    const traefikReady = await waitForTraefikHealth(config.traefikDomain, { timeoutMs: config.traefikTimeoutMs ?? 10_000 });
     if (traefikReady) {
       return {
         readyUrl: `https://${config.traefikDomain}`,

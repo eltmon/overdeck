@@ -18,7 +18,7 @@ vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
 vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', () => ({
   isAutoMergeEligible: vi.fn(async () => ({ eligible: true })),
 }));
-vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTtsSync: vi.fn() }));
+vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
 vi.mock('../derived-issue-state.js', () => ({
   getDerivedIssueState: vi.fn(async (issueId: string) => ({ issueId, state: 'ready' })),
 }));

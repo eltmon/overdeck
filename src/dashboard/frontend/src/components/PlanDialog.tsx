@@ -566,8 +566,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
         className="fixed bottom-4 right-4 z-50 bg-card rounded-lg shadow-2xl border border-border px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-popover transition-colors"
         onClick={() => setMinimized(false)}
       >
-        <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-          <Sparkles className="w-3 h-3 text-foreground" />
+        <div className="flex h-6 w-6 items-center justify-center rounded border border-signal-review/32 bg-signal-review/8">
+          <Sparkles className="h-3 w-3 text-signal-review-foreground" />
         </div>
         <span className="text-sm text-foreground font-medium">Plan: {issue.identifier}</span>
         {step === 'setting-up' && (
@@ -623,8 +623,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
             {/* Header - drag handle */}
             <div className="drag-handle flex items-center justify-between px-6 py-4 border-b border-border cursor-move">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-foreground" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-signal-review/32 bg-signal-review/8">
+                  <Sparkles className="h-5 w-5 text-signal-review-foreground" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">Plan: {issue.identifier}</h2>
@@ -634,16 +634,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
               <div className="flex items-center gap-2">
                 {step === 'planning' && (
                   <>
-                    <span className="flex items-center gap-1.5 px-2 py-1 badge-bg-signal-review text-signal-review text-xs rounded-full">
+                    <span className="flex items-center gap-1.5 rounded-md px-2 py-1 badge-bg-signal-review text-xs text-signal-review-foreground">
                       <span className="w-2 h-2 bg-signal-review rounded-full animate-pulse" />
                       Planning Active
                     </span>
                     {statusQuery.data?.isRemote ? (
-                      <span className="px-2 py-1 badge-bg-primary text-primary text-xs rounded-full" title={statusQuery.data.vmName ? `VM: ${statusQuery.data.vmName}` : undefined}>
+                      <span className="rounded-md px-2 py-1 badge-bg-primary text-xs text-primary" title={statusQuery.data.vmName ? `VM: ${statusQuery.data.vmName}` : undefined}>
                         Remote
                       </span>
                     ) : (
-                      <span className="px-2 py-1 bg-muted text-muted-foreground text-xs rounded-full">
+                      <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
                         Local
                       </span>
                     )}
@@ -690,7 +690,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
               {/* Ready step - start planning */}
               {step === 'ready' && (
                 <div className="flex-1 flex flex-col items-center p-8 pt-6 overflow-y-auto">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-signal-review/20 to-primary/20 border border-signal-review/30 flex items-center justify-center mb-6">
+                  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-signal-review/32 bg-signal-review/8">
                     <Terminal className="w-10 h-10 text-signal-review" />
                   </div>
                   {/* Check if already in planning state */}

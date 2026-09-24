@@ -21,9 +21,9 @@ vi.mock('../../projects.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../projects.js')>();
   return {
     ...actual,
-    findProjectByPathSync: (workspacePath: string) => projectRegistry.entries.find(({ config }) => (
+    findProjectByPath: (workspacePath: string) => projectRegistry.entries.find(({ config }) => (
       workspacePath === config.path || workspacePath.startsWith(`${config.path}/`)
-    ))?.config ?? actual.findProjectByPathSync(workspacePath),
+    ))?.config ?? actual.findProjectByPath(workspacePath),
     listProjectsSync: () => projectRegistry.entries.length > 0
       ? projectRegistry.entries
       : actual.listProjectsSync(),

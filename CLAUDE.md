@@ -14,7 +14,7 @@
 
 ## Critical Operational Facts
 
-- **tmux socket:** agents live on `tmux -L overdeck` (the default socket shows nothing). Attach/capture with `-L overdeck`.
+- **Terminal backend:** Herdr is the default and is strict — no binary/socket means launches fail with `pan install` in the error, never a silent tmux fallback; `pan install`/`pan sync` own the binary, `~/.config/herdr/config.toml` (`resume_agents_on_restore = false`), the `<session>-herdr.service` unit and the pilot integrations; `pan doctor` FAILs when Herdr is selected but unavailable. tmux only via `terminal.backend: tmux`; legacy tmux agents live on `tmux -L overdeck`.
 - **Dashboard runs Node 22 dist only — never Bun, never tsx** (`@lydell/node-pty` + circular ESM). `pan up`/`pan reload` handle it; after server changes run `npm run build` first.
 - **Releases:** always `pan release stable --version X.Y.Z`, then push main + tag. Never manual tags, `npm version`, or `--no-verify`; hooks enforce it.
 - **Deep-wipe** (`POST /api/issues/:id/deep-wipe`) destroys workspace, branches, and tracker state irreversibly. Never call it — or any destructive HTTP request — speculatively.
@@ -27,16 +27,20 @@
 
 - **Stack:** TypeScript, Node 22+, React dashboard, SQLite, Effect.js. Package manager: Bun (9 workspaces incl. `packages/contracts`, `packages/effect-acp`, `apps/desktop`).
 - **Build:** `npm run build` (tsdown + Vite). **Dev:** `npm run dev`.
-- **Quality gates** (must pass before `pan done`): `npm run typecheck`, `npm run lint`, `npm test`.
+- **Quality gates** (must pass before `pan done`): `npm run typecheck`, `npm run lint`, and `npx vitest run <the test files you touched>`. Never run the full `npm test` on the host: it runs once, on CI, against the PR head, and a red CI test job returns as verification feedback (`verification.tests`, PAN-3965 — [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md)).
 - **Workspaces** are git worktrees at `workspaces/feature-<issue>/` with their own `bun install` — never symlink node_modules.
 - **Planning artifacts** (drafts, specs, continues, orders, notes, backlog sequence) live under `.pan/` in the project repo (or the configured plan-home repo for polyrepo projects), committed on the feature branch.
 
 ## Key Invariants (one-liners)
 
+- `sessions.json` is the append-only session index (only an explicit operator reset may truncate it); there is no `session.id`; close-out prunes caches, never state or transcripts. Entries carry the transcript's absolute path, recorded at session start by each harness's capture point; the resolver (`src/lib/agents/transcript-resolver.ts`) prefers it over per-harness path formulas, which apply only to pre-PAN-3959 entries. Registrations under `agents/ext-*` (agents other tools launched, PAN-3920) are write-once facts plus that same index; cleanup keeps them.
 - The resource governor holds dispatch during memory or CPU saturation, and every local Vitest run enters the shared CPU admission queue. See "Agent Auto-Resume Gates" in [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md).
 - `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; shipped subagent definitions carry no `model:` pin — they inherit the session model so Cloister routing applies (prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
 - Project CI state reaches Command Deck rows through the shared read-model event path (`ciByProjectKey` → `/ws/rpc`); webhook observations and server-side REST repair feed it, never frontend polling. [docs/EXTERNAL-EVENT-STREAM.md](docs/EXTERNAL-EVENT-STREAM.md)
+- The per-issue **pipeline journal** (`src/lib/cloister/pipeline-journal.ts`, `<workspace>/.overdeck/pipeline.jsonl`) is the one piece of stored pipeline state: append-only, written at the moment of the action, event-fired on `pipeline-notifier`, never authority — where it disagrees with the PR, the PR wins. Nothing repairs it and nothing rewrites it. [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md)
+- Delegation goes through `pan worker run` (a registered, issue-linked agent that reports back); `pan spawn` stays the foreman's pane-only item worker.
 - One module answers agent liveness and idleness — `src/lib/agents/liveness.ts` (session + live pane + harness process in the pane subtree; idle = stale work activity, never the mirror label alone). Agent state is written only after the terminal-backend session exists — there are no placeholder rows — and supervisor-launched agents write `stopped` from the supervisor's own `exited` lifecycle event, never inferred.
+- **One variant per operation in src/lib.** No exported Effect wrapper around in-repo Promise or sync code (Shapes A/B), no sync/async twin without a documented sync caller; `npm run lint:effect-facades` ratchets it. [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md)
 
 ## Topic Index
 
@@ -51,9 +55,10 @@
 | Workspaces & projects domain, quick actions, memory homes | [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md) |
 | Merge workflow, post-merge handoff, Docker cleanup, close-out | [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md) |
 | xBRIEF plans, four artifacts, status lifecycle | [docs/XBRIEF.md](docs/XBRIEF.md) |
-| Effect bridging + diagnostics ratchet | [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md), [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md) |
+| Effect bridging, façade ratchet, diagnostics ratchet | [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md), [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md) |
 | Issue views, God View | [docs/ISSUE-VIEW.md](docs/ISSUE-VIEW.md), [docs/GOD-VIEW.md](docs/GOD-VIEW.md) |
 | Context layers (rules/skills distribution) | [docs/CONTEXT-LAYERS.md](docs/CONTEXT-LAYERS.md) |
+| Flywheel page and loop skill | [docs/FLYWHEEL.md](docs/FLYWHEEL.md) |
 | The no-loss map: every deleted verb/route/view and its new home | [docs/THE-CUT.md](docs/THE-CUT.md) |
 
 ## Small But Sharp

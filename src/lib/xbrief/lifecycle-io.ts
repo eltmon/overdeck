@@ -10,14 +10,11 @@
 import { basename, join } from 'path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { Effect } from 'effect';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 
 import type { ContinueFeedbackEntry, ContinueSessionEntry, ContinueState } from './continue-state.js';
 import {
-  LEGACY_VBRIEF_FILENAME_SUFFIX,
   LEGACY_VBRIEF_LIFECYCLE_DIRS,
-  XBRIEF_FILENAME_SUFFIX,
-  ensureXBriefDirsSync,
+  ensureXBriefDirs,
   generateXBriefFilename,
   parseXBriefFilename,
   resolveXBriefDir,
@@ -30,8 +27,7 @@ import type { XBriefDocument } from './types.js';
 import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
-import { readContinueState, updateContinueState, writeContinueState } from './continue-state.js';
-import { FsError } from '../errors.js';
+import { readContinueState, updateContinueState } from './continue-state.js';
 
 // PAN-1249: pan-dir/specs.ts migrated `findSpecByIssue`, `writeSpecForIssue`,
 // and `updateSpecStatus` to return Effects. The sync surface in this module
@@ -186,6 +182,7 @@ function findLegacyXBriefByIssue(projectRoot: string, issueId: string): FoundXBr
   return null;
 }
 
+/** Find the issue's xBRIEF: its `.pan/specs` entry first, else a legacy lifecycle xBRIEF. Throws on an I/O failure. */
 export function findXBriefByIssueSync(projectRoot: string, issueId: string): FoundXBrief | null {
   const spec = findSpecByIssueSync(projectRoot, issueId);
   if (spec) {
@@ -232,32 +229,6 @@ export function updatePlanStatus(filePath: string, newStatus: string): void {
   renameSync(tmp, filePath);
 }
 
-async function moveXBriefPromise(
-  projectRoot: string,
-  issueId: string,
-  targetDir: XBriefLifecycleDir,
-): Promise<{ from: FoundXBrief; toPath: string }> {
-  const found = findXBriefByIssueSync(projectRoot, issueId);
-  if (!found) {
-    throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
-  }
-
-  ensureXBriefDirsSync(projectRoot);
-  const ensured = ensurePanSpecForIssue(projectRoot, found);
-  const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
-  if (!updatedSpec) {
-    throw new Error(`Failed to update pan spec status for ${issueId}`);
-  }
-
-  // PAN-3917: the spec is a tracked file in the plan home; the agent that
-  // changed it commits it on its feature branch.
-  invalidateXBriefIndex(projectRoot);
-  return {
-    from: found,
-    toPath: updatedSpec.path,
-  };
-}
-
 export interface XBriefTransitionResult {
   fromDir: XBriefLifecycleDir;
   toDir: XBriefLifecycleDir;
@@ -267,7 +238,8 @@ export interface XBriefTransitionResult {
   moved: boolean;
 }
 
-async function transitionXBriefOnMainPromise(
+/** Move an issue's xBRIEF to `targetDir` with `newStatus` and commit the move on main. */
+export async function transitionXBriefOnMain(
   projectRoot: string,
   issueId: string,
   targetDir: XBriefLifecycleDir,
@@ -279,7 +251,7 @@ async function transitionXBriefOnMainPromise(
     throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
-  ensureXBriefDirsSync(projectRoot);
+  ensureXBriefDirs(projectRoot);
   const ensured = ensurePanSpecForIssue(projectRoot, found);
   const ensuredSpec = ensured.found;
   const needsMove = ensuredSpec.lifecycleDir !== targetDir;
@@ -328,45 +300,11 @@ export interface PromotedXBrief {
   canonicalFilename: string;
 }
 
-export function promoteXBriefToProposed(
-  workspacePath: string,
-  projectRoot: string,
-  issueId: string,
-): PromotedXBrief {
-  const panDir = join(workspacePath, PAN_DIRNAME);
-  const sourceXBrief = join(panDir, PAN_SPEC_FILENAME);
-  if (!existsSync(sourceXBrief)) {
-    throw new Error(`No workspace spec found at ${join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)}`);
-  }
-
-  const planDoc = readPlanSync(sourceXBrief);
-  const upperIssueId = issueId.toUpperCase();
-  const existingFilename = planDoc.plan.metadata?.canonicalFilename;
-  const canonicalFilename = (existingFilename && typeof existingFilename === 'string')
-    ? existingFilename.endsWith(LEGACY_VBRIEF_FILENAME_SUFFIX)
-      ? `${existingFilename.slice(0, -LEGACY_VBRIEF_FILENAME_SUFFIX.length)}${XBRIEF_FILENAME_SUFFIX}`
-      : existingFilename
-    : generateXBriefFilename(upperIssueId, slugify(planDoc.plan.title || planDoc.plan.id || upperIssueId));
-
-  const promoted = writeSpecForIssueSync(projectRoot, planDoc, 'proposed', canonicalFilename);
-
-  invalidateXBriefIndex(projectRoot);
-  return { destXBrief: promoted.path, destContinue: null, canonicalFilename };
-}
-
 export function readContinueStateForIssue(
   projectRoot: string,
   issueId: string,
 ): ContinueState | null {
   return readContinueState(resolvePlanHome(projectRoot), issueId);
-}
-
-export function writeContinueStateForIssue(
-  projectRoot: string,
-  issueId: string,
-  state: ContinueState,
-): void {
-  writeContinueState(resolvePlanHome(projectRoot), issueId, state);
 }
 
 export function appendContinueSessionEntryForIssue(
@@ -411,44 +349,3 @@ export function clearFeedbackForIssue(
     feedback: [],
   }));
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Effect-channel adapters around the existing sync/Promise helpers so callers
-// composing xBRIEF lifecycle ops with other Effect code can stay on the
-// channel. Follows the additive-variant pattern established for io.ts /
-// xbrief-index.ts / auto-synthesize.ts in commit 3783c7003.
-
-/** Effect variant of `findXBriefByIssue` — failures surface as typed errors. */
-export const findXBriefByIssue = (
-  projectRoot: string,
-  issueId: string,
-): Effect.Effect<FoundXBrief | null, FsError> =>
-  Effect.try({
-    try: () => findXBriefByIssueSync(projectRoot, issueId),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'findXBriefByIssue', cause }),
-  });
-
-/** Effect variant of `moveXBrief`. */
-export const moveXBrief = (
-  projectRoot: string,
-  issueId: string,
-  targetDir: XBriefLifecycleDir,
-): Effect.Effect<{ from: FoundXBrief; toPath: string }, FsError> =>
-  Effect.tryPromise({
-    try: () => moveXBriefPromise(projectRoot, issueId, targetDir),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'moveXBrief', cause }),
-  });
-
-/** Effect variant of `transitionXBriefOnMain`. */
-export const transitionXBriefOnMain = (
-  projectRoot: string,
-  issueId: string,
-  targetDir: XBriefLifecycleDir,
-  newStatus: string,
-  commitMessage: string,
-): Effect.Effect<XBriefTransitionResult, FsError> =>
-  Effect.tryPromise({
-    try: () => transitionXBriefOnMainPromise(projectRoot, issueId, targetDir, newStatus, commitMessage),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'transitionXBriefOnMain', cause }),
-  });

@@ -10,6 +10,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
+import { appendSessionIdToHistory } from '../../session-history.js';
 
 const mocks = vi.hoisted(() => ({
   assertWorkspaceStackHealthyForSpawn: vi.fn(async () => undefined),
@@ -21,7 +22,17 @@ const mocks = vi.hoisted(() => ({
   prepareAutonomousAgentResumePane: vi.fn(async () => ({ ready: true, action: 'clear' })),
   waitForReadySignal: vi.fn(async () => true),
   killSession: vi.fn(() => Effect.succeed(undefined)),
+  closeAgentPane: vi.fn(async () => true),
 }));
+
+// PAN-3960: resume closes panes through the terminal backend, not tmux directly.
+vi.mock('../../terminal-backends/launch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../terminal-backends/launch.js')>();
+  return {
+    ...actual,
+    closeAgentPane: mocks.closeAgentPane,
+  };
+});
 
 vi.mock('../spawn-prep.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../spawn-prep.js')>();
@@ -80,15 +91,16 @@ vi.mock('../../tmux.js', async (importOriginal) => {
     sessionExists: vi.fn(() => Effect.succeed(false)),
     killSession: mocks.killSession,
     isPaneDead: vi.fn(() => Effect.succeed(false)),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: vi.fn(async () => []),
   };
 });
 
 import { resumeAgent } from '../resume.js';
 import { saveAgentStateSync, getAgentDir } from '../agent-state.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 
 let tempHome: string;
+let prevHome: string | undefined;
 let prevOverdeckHome: string | undefined;
 let workspace: string;
 
@@ -103,18 +115,22 @@ beforeEach(() => {
   mocks.prepareAutonomousAgentResumePane.mockResolvedValue({ ready: true, action: 'clear' });
   mocks.waitForReadySignal.mockResolvedValue(true);
   mocks.killSession.mockReturnValue(Effect.succeed(undefined));
+  mocks.closeAgentPane.mockResolvedValue(true);
 
   tempHome = mkdtempSync(join(tmpdir(), 'pan-resume-kimi-test-'));
+  prevHome = process.env.HOME;
   prevOverdeckHome = process.env.OVERDECK_HOME;
+  process.env.HOME = tempHome;
   process.env.OVERDECK_HOME = tempHome;
   workspace = mkdtempSync(join(tmpdir(), 'pan-resume-kimi-workspace-'));
 });
 
 afterEach(() => {
+  if (prevHome === undefined) delete process.env.HOME;
+  else process.env.HOME = prevHome;
   if (prevOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = prevOverdeckHome;
   rmSync(tempHome, { recursive: true, force: true });
-  rmSync(dirname(sessionFilePath(workspace, 'cleanup')), { recursive: true, force: true });
   rmSync(workspace, { recursive: true, force: true });
 });
 
@@ -124,7 +140,7 @@ describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
     mkdirSync(dirname(transcriptPath), { recursive: true });
     writeFileSync(transcriptPath, '{"type":"summary","summary":"prior work"}\n');
     mkdirSync(getAgentDir(agentId), { recursive: true });
-    writeFileSync(join(getAgentDir(agentId), 'session.id'), `${sessionId}\n`);
+    appendSessionIdToHistory(agentId, sessionId, 'launcher');
     saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-3411',
@@ -162,7 +178,9 @@ describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
     const result = await resumeAgent(agentId);
 
     expect(result).toEqual({ success: true, messageDelivered: true });
-    expect(mocks.prepareAutonomousAgentResumePane).toHaveBeenCalledWith(agentId, 'work');
+    expect(mocks.prepareAutonomousAgentResumePane).toHaveBeenCalledWith(agentId, 'work', {
+      pane: expect.objectContaining({ backend: 'tmux', paneId: agentId }),
+    });
     expect(mocks.deliverResumeMessageWithTranscriptConfirmation).toHaveBeenCalledWith(expect.objectContaining({
       agentId,
       sessionId: 'pan-3411-session',
@@ -170,7 +188,8 @@ describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
     }));
     expect(mocks.prepareAutonomousAgentResumePane.mock.invocationCallOrder[0])
       .toBeLessThan(mocks.deliverResumeMessageWithTranscriptConfirmation.mock.invocationCallOrder[0]!);
-    expect(mocks.killSession).not.toHaveBeenCalled();
+    // Only the pre-launch zombie sweep — nothing tears the relaunched pane down.
+    expect(mocks.closeAgentPane).toHaveBeenCalledTimes(1);
   });
 
   it('tears down without injecting when a non-resume choice still owns the pane', async () => {
@@ -186,7 +205,9 @@ describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('Resume continue prompt did not become a confirmed turn');
     expect(mocks.deliverResumeMessageWithTranscriptConfirmation).not.toHaveBeenCalled();
-    expect(mocks.killSession).toHaveBeenCalledWith(agentId);
+    // Pre-launch zombie sweep, then the teardown of the relaunched pane.
+    expect(mocks.closeAgentPane).toHaveBeenCalledTimes(2);
+    expect(mocks.closeAgentPane).toHaveBeenLastCalledWith(agentId);
   });
 });
 
@@ -259,6 +280,7 @@ describe('resumeAgent — native Kimi Code session resume (PAN-1837 review fix)'
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Kimi Code continue prompt did not land');
-    expect(mocks.killSession).toHaveBeenCalledWith(agentId);
+    expect(mocks.closeAgentPane).toHaveBeenCalledTimes(2);
+    expect(mocks.closeAgentPane).toHaveBeenLastCalledWith(agentId);
   });
 });

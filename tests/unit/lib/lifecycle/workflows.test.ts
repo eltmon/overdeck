@@ -138,7 +138,7 @@ vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: mockResolveProjectReposForIssueSync,
+  resolveProjectReposForIssue: mockResolveProjectReposForIssueSync,
 }));
 
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
@@ -157,7 +157,7 @@ vi.mock('../../../../src/lib/agents/agent-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/agents/agent-state.js')>();
   return {
     ...actual,
-    clearAgentOperatorGatesForIssueSync: mockClearAgentOperatorGatesForIssueSync,
+    clearAgentOperatorGatesForIssue: mockClearAgentOperatorGatesForIssueSync,
   };
 });
 
@@ -185,7 +185,7 @@ const closeOut = (...args: Parameters<typeof closeOutProgram>) => Effect.runProm
 const deepWipe = (...args: Parameters<typeof deepWipeProgram>) => Effect.runPromise(deepWipeProgram(...args));
 const close = (...args: Parameters<typeof closeProgram>) => Effect.runPromise(closeProgram(...args));
 const resetToTodo = (...args: Parameters<typeof resetToTodoProgram>) => Effect.runPromise(resetToTodoProgram(...args));
-import { AGENTS_DIR, OVERDECK_HOME } from '../../../../src/lib/paths.js';
+import { AGENTS_DIR, OVERDECK_HOME, getOverdeckHome } from '../../../../src/lib/paths.js';
 import { findSpecByIssue as findSpecByIssueProgram, writeSpecForIssue as writeSpecForIssueProgram } from '../../../../src/lib/pan-dir/specs.js';
 
 // PAN-1249: pan-dir/specs functions return Effect; bridge to sync via runPromise for tests.
@@ -1241,6 +1241,163 @@ describe('workflows', () => {
       expect(spec?.status).toBe('completed');
       expect(spec?.document.plan.status).toBe('completed');
       expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
+    });
+
+    it("keeps state.json and sessions.json of the issue's agents (PAN-3968)", async () => {
+      const agentDir = join(getOverdeckHome(), 'agents', 'agent-pan-100');
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
+        id: 'agent-pan-100',
+        issueId: 'PAN-100',
+        role: 'work',
+        status: 'running',
+        workspace: '/repo/workspaces/feature-pan-100',
+        harness: 'claude-code',
+        model: 'claude',
+        startedAt: '2026-09-20T00:00:00.000Z',
+      }));
+      writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify({
+        sessionId: 'session-1',
+        at: '2026-09-20T00:00:00.000Z',
+        source: 'hook',
+        harness: 'claude-code',
+        model: 'claude',
+      }) + '\n');
+      writeFileSync(join(agentDir, 'activity.jsonl'), '');
+      writeFileSync(join(agentDir, 'pending.lock'), '');
+
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
+
+        const ctx = { issueId: 'PAN-100', projectPath: testDir };
+        const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
+        expect(existsSync(join(agentDir, 'sessions.json'))).toBe(true);
+        expect(existsSync(join(agentDir, 'activity.jsonl'))).toBe(true);
+        expect(existsSync(join(agentDir, '.retained-transcripts'))).toBe(false);
+
+        const state = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf-8'));
+        expect(state.status).toBe('stopped');
+
+        expect(result.steps.some(s => s.step === 'close-out:prune-agent-rows')).toBe(false);
+      } finally {
+        rmSync(agentDir, { recursive: true, force: true });
+      }
+    });
+
+    // teardown:agent-state (teardown-workspace.ts removeAgentStateImpl) reads AGENTS_DIR
+    // directly and matches directory NAMES against the issue — it does not go through
+    // listAgentStatesSync/getOverdeckHome() at all, so these fixtures live under the
+    // mocked AGENTS_DIR, not getOverdeckHome() (PAN-3968: previously uncovered).
+    it('removes pending.lock from the agent directory during close-out teardown', async () => {
+      const dir = join(AGENTS_DIR, 'agent-pan-101');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-101'), 'active');
+        const result = await closeOut({ issueId: 'PAN-101', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'pending.lock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('removes *.sock files from the agent directory during close-out teardown', async () => {
+      const dir = join(AGENTS_DIR, 'agent-pan-102');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'daemon.sock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-102'), 'active');
+        const result = await closeOut({ issueId: 'PAN-102', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'daemon.sock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('removes codex-home cache files but keeps the sessions subdirectory', async () => {
+      const dir = join(AGENTS_DIR, 'agent-pan-103');
+      const codexHome = join(dir, 'codex-home1');
+      const sessions = join(codexHome, 'sessions');
+      mkdirSync(sessions, { recursive: true });
+      writeFileSync(join(codexHome, 'cache.db'), '');
+      writeFileSync(join(sessions, 'rollout.jsonl'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-103'), 'active');
+        const result = await closeOut({ issueId: 'PAN-103', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(codexHome, 'cache.db'))).toBe(false);
+        expect(existsSync(join(sessions, 'rollout.jsonl'))).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('prunes the planning-<issue> agent directory alongside agent-<issue>', async () => {
+      const dir = join(AGENTS_DIR, 'planning-pan-104');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-104'), 'active');
+        const result = await closeOut({ issueId: 'PAN-104', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'pending.lock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('prunes agent-<issue>-<specialist> directories alongside the work agent', async () => {
+      const dir = join(AGENTS_DIR, 'agent-pan-105-review');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-105'), 'active');
+        const result = await closeOut({ issueId: 'PAN-105', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'pending.lock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('prunes the strike-<issue> agent directory alongside the work agent', async () => {
+      const dir = join(AGENTS_DIR, 'strike-pan-106');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-106'), 'active');
+        const result = await closeOut({ issueId: 'PAN-106', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'pending.lock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('does not touch an agent directory belonging to a different issue', async () => {
+      const otherDir = join(AGENTS_DIR, 'agent-pan-999');
+      mkdirSync(otherDir, { recursive: true });
+      writeFileSync(join(otherDir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-107'), 'active');
+        const result = await closeOut({ issueId: 'PAN-107', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(otherDir, 'pending.lock'))).toBe(true);
+      } finally {
+        rmSync(otherDir, { recursive: true, force: true });
+      }
     });
 
     it('should abort before closing the tracker issue on teardown failure', async () => {

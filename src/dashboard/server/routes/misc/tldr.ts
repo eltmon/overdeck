@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
-import { isTldrEnabledSync } from '../../../../lib/config-yaml.js';
+import { isTldrEnabled } from '../../../../lib/config-yaml.js';
 import { jsonResponse } from '../../http-helpers.js';
 
 async function getIndexStats(
@@ -77,7 +77,7 @@ const getTldrStatusRoute = HttpRouter.add(
   '/api/services/tldr/status',
   Effect.promise(async () => {
     try {
-      const { getTldrDaemonServiceSync } = await import('../../../../lib/tldr-daemon.js');
+      const { getTldrDaemonService } = await import('../../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -93,7 +93,7 @@ const getTldrStatusRoute = HttpRouter.add(
       }> = [];
 
       if (existsSync(venvPath)) {
-        const service = getTldrDaemonServiceSync(projectRoot, venvPath);
+        const service = getTldrDaemonService(projectRoot, venvPath);
         const status = await service.getStatus();
         const indexStats = getIndexStats(projectRoot, true);
 
@@ -118,7 +118,7 @@ const getTldrStatusRoute = HttpRouter.add(
           const wsVenvPath = join(wsPath, '.venv');
 
           if (existsSync(wsVenvPath)) {
-            const service = getTldrDaemonServiceSync(wsPath, wsVenvPath);
+            const service = getTldrDaemonService(wsPath, wsVenvPath);
             const status = await service.getStatus();
             const indexStats = getIndexStats(wsPath, false);
 
@@ -149,7 +149,7 @@ const postTldrStartRoute = HttpRouter.add(
   '/api/services/tldr/start',
   Effect.promise(async () => {
     try {
-      const { getTldrDaemonServiceSync } = await import('../../../../lib/tldr-daemon.js');
+      const { getTldrDaemonService } = await import('../../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -160,7 +160,7 @@ const postTldrStartRoute = HttpRouter.add(
         );
       }
 
-      const service = getTldrDaemonServiceSync(projectRoot, venvPath);
+      const service = getTldrDaemonService(projectRoot, venvPath);
       await service.start();
       return jsonResponse({ success: true, message: 'TLDR daemon started' });
     }    catch (error: unknown) {
@@ -177,7 +177,7 @@ const postTldrStopRoute = HttpRouter.add(
   '/api/services/tldr/stop',
   Effect.promise(async () => {
     try {
-      const { getTldrDaemonServiceSync } = await import('../../../../lib/tldr-daemon.js');
+      const { getTldrDaemonService } = await import('../../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
 
@@ -188,7 +188,7 @@ const postTldrStopRoute = HttpRouter.add(
         );
       }
 
-      const service = getTldrDaemonServiceSync(projectRoot, venvPath);
+      const service = getTldrDaemonService(projectRoot, venvPath);
       await service.stop();
       return jsonResponse({ success: true, message: 'TLDR daemon stopped' });
     }    catch (error: unknown) {
@@ -209,8 +209,8 @@ const postTldrReloadRoute = HttpRouter.add(
   '/api/services/tldr/reload',
   Effect.promise(async () => {
     try {
-      const { getTldrDaemonServiceSync } = await import('../../../../lib/tldr-daemon.js');
-      const enabled = isTldrEnabledSync();
+      const { getTldrDaemonService } = await import('../../../../lib/tldr-daemon.js');
+      const enabled = isTldrEnabled();
       const projectRoot = process.cwd();
 
       // Collect every workspace that has a .venv (main + feature-* worktrees).
@@ -234,7 +234,7 @@ const postTldrReloadRoute = HttpRouter.add(
 
       for (const wsPath of targets) {
         try {
-          const service = getTldrDaemonServiceSync(wsPath, join(wsPath, '.venv'));
+          const service = getTldrDaemonService(wsPath, join(wsPath, '.venv'));
           if (enabled) {
             await service.restart();
             restarted++;

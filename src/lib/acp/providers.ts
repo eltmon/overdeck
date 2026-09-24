@@ -19,7 +19,7 @@ const openCodeSupport = {
   translateModelId: translateOpenCodeAcpModelId,
 };
 
-export const ACP_PROVIDER_SUPPORT = {
+const ACP_PROVIDER_SUPPORT = {
   opencode: openCodeSupport,
   "opencode-go": openCodeSupport,
   kimi: {

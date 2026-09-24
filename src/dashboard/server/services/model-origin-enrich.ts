@@ -7,7 +7,7 @@
  * (`command-deck.ts`) and the left project tree (`projects.ts`). Both call this so
  * the enrichment can never drift between them.
  */
-import { getAgentStateSync, type Role } from '../../../lib/agents.js';
+import { getAgentState, type Role } from '../../../lib/agents.js';
 import { computeModelOrigin, loadConfigSync, type ModelOriginData } from '../../../lib/config-yaml.js';
 
 /**
@@ -45,7 +45,7 @@ export function enrichSessionsWithModelOrigin(
     for (const section of sections) {
       const role = sessionTypeToModelRole(section.type);
       if (!role) continue;
-      const state = getAgentStateSync(section.sessionId);
+      const state = getAgentState(section.sessionId);
       const spawnKey = state?.modelSpawnKey ?? `${role}:${state?.issueId ?? fallbackIssueId}`;
       const origin = computeModelOrigin(role, spawnKey, config);
       if (origin) section.modelOrigin = origin;

@@ -28,24 +28,49 @@ not a throw. The error channel carries only genuine failures (socket down, tmux 
 Operations: `workspaceFor`, `startAgent`, `prompt`, `wait`, `observe`, `control`, `list`, `events`,
 `reportMetadata`, `close`, `resume`.
 
-## Selection (D10)
+## Selection (D10, PAN-3956)
 
-`selectTerminalBackend(config)` in `select.ts`, in precedence order:
+Selection is **policy**; availability is a separate **probe**. Neither ever turns a missing Herdr
+into a tmux selection.
 
-1. `OVERDECK_TERMINAL_BACKEND=tmux|herdr` — the explicit override, above config and above any host
-   probe. An unrecognized value is ignored with a warning. Every harness that spawns real agents
-   under an isolated home sets it to `tmux`.
-2. `terminal.backend` in `config.yaml`.
-3. The host probe: Herdr when the `herdr` binary is on `PATH` **and** *this instance's* session
-   socket exists; otherwise tmux, with a diagnostic naming the reason.
+`selectTerminalBackend(config)` in `select.ts` returns `{ backend, source, diagnostic }`, in
+precedence order, and never touches the filesystem:
 
-No subprocess — `fs.access` only, so it is safe on every spawn. Adapters register themselves at
-import time; `registry.ts` resolves a name to an adapter and throws with the missing import when
-nothing registered it.
+1. `OVERDECK_TERMINAL_BACKEND=tmux|herdr` (`source: 'env'`) — the explicit override, above config.
+   An unrecognized value is ignored with a warning. Every harness that spawns real agents under an
+   isolated home sets it to `tmux`, and so does the unit-test setup (`tests/setup.ts`).
+2. `terminal.backend` in `~/.overdeck/config.yaml` (`source: 'config'`).
+3. Otherwise `herdr` (`source: 'default'`).
+
+`hostTerminalBackendName()` memoizes that policy per process; a failure reading config falls back to
+`herdr`, never `tmux`.
+
+`probeHerdrAvailability()` answers whether Herdr can serve **right now**: the `herdr` binary on
+`PATH` or in `~/.local/bin`, **and** *this instance's* session socket. No subprocess — `fs.access`
+only — and never memoized, so a session server started after dashboard boot is usable at once.
+
+What an unavailable Herdr does:
+
+- **Launch:** `resolveLaunchBackend()` (and so `launchAgentPane`, `agentPaneExists`, `pan spawn`)
+  throws `TerminalBackendUnavailableError`, whose message names the reason, `pan install`, and
+  `terminal.backend: tmux`. `closeAgentPane` still kills a legacy tmux session of the agent's name;
+  read paths (`liveAgentInventory`, the terminal bridge, `closeIssuePanes`) read "nothing".
+- **Boot:** the dashboard logs exactly one `[terminal] backend=… source=…` line
+  (`describeTerminalBackendBoot`), with `console.error` and `UNAVAILABLE:` when Herdr is selected
+  but unavailable.
+- **Inventory:** the backend inventory never reads tmux on a Herdr host; it serves the last-known
+  panes and warns once per failure streak.
+- **Doctor:** `pan doctor` reports the `Terminal backend` row as an error, so it exits 1.
+
+Opting into tmux is explicit: `terminal.backend: tmux`. The user-facing page is
+[`configuration/terminal-backend.mdx`](../configuration/terminal-backend.mdx).
+
+Adapters register themselves at import time; `registry.ts` resolves a name to an adapter and throws
+with the missing import when nothing registered it.
 
 `src/lib/terminal-backends/launch.ts` is the one launch path: it resolves the backend, finds or
 creates the issue workspace, starts the pane, and stamps the tokens. Every launcher goes through
-it, so none of them can forget a token.
+it, so none of them can forget a token — see "Spawn paths" below for the full list.
 
 ### Session naming and isolation
 
@@ -60,15 +85,33 @@ The Herdr session name is the **per-home instance name**, `managedInstanceName()
 It is resolved at call time, never at module load, because `OVERDECK_HOME` is set per process.
 
 This is the Herdr half of the PAN-3673 rule: **a derived per-home instance must never take over the
-default one.** Selection then requires *that* instance's socket, so a process serving a `/tmp` home
-(a test, an isolated verification stack) cannot see the live `overdeck` session and falls back to
-tmux. Before this, any test process on a host with the `herdr` binary and a live `overdeck` socket
+default one.** The availability probe requires *that* instance's socket, so a process serving a
+`/tmp` home (a test, an isolated verification stack) cannot see the live `overdeck` session — it
+either runs on an explicit tmux policy or fails to launch with `TerminalBackendUnavailableError`.
+Before this, any test process on a host with the `herdr` binary and a live `overdeck` socket
 selected Herdr and spawned real agents into the operator's session.
 
 A systemd unit that serves the default home therefore runs `herdr --session overdeck server`, which
 is correct precisely because `~/.overdeck` owns the `overdeck` instance. A second Overdeck instance
 needs its own unit with its own `--session overdeck-<hash>`; it must not reuse the default unit or
 the default session name.
+
+### Host setup (PAN-3956)
+
+`pan install` and `pan sync` own the Herdr host setup (`src/lib/herdr-setup/`); `pan up` makes sure
+the session server runs. All three skip under an explicit tmux policy, `CI`, Vitest, or
+`pan install --skip-herdr`.
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| Binary | `~/.local/bin/herdr` | Vendor installer (`https://herdr.dev/install.sh`); stable channel. `pan install` updates when `https://herdr.dev/latest.json` is newer; `pan sync` only when no session server runs for this home. |
+| Config | `~/.config/herdr/config.toml` | `[session] resume_agents_on_restore = false`, edited line by line, checked by `herdr config check`, reloaded with `server reload-config`. |
+| Session server | `<session>-herdr.service` (`overdeck-herdr.service` for the default home) | systemd user unit, else a detached `herdr --session <session> server` logging to `~/.overdeck/logs/herdr-<session>.log`. |
+| Integrations | pilot set `pi`, `omp`, `kimi` (≥ 0.14.0), `opencode` | Installed only when the harness binary resolves. `claude`, `codex`, `hermes` are never installed or removed. |
+
+Nothing ever stops or restarts a running session server — a restart closes every agent pane.
+`pan doctor` reports `Terminal backend`, `Herdr binary`, `Herdr server`, `Herdr config`, and one
+`Herdr integration: <target>` row per target.
 
 ## Detection policy per harness (PAN-3917 W12)
 
@@ -113,6 +156,49 @@ Everything downstream follows the pane instead of the agent record:
 - **Close** is by pane reference (`AgentState.paneId`, recorded the moment `startAgent` returns), so
   a spawn failure cleans up its own pane on either policy.
 
+## Stopping an agent (PAN-3947)
+
+Every stop path terminates the agent **through the terminal backend** — never by rewriting state
+alone, and never by assuming a tmux session exists. Before PAN-3947, `stopAgent` ran only
+`tmux kill-session`; on a Herdr host there is no such session, so `pan kill`, dashboard Stop and the
+post-merge lifecycle wrote `stopped` while the pane and the idle harness in it stayed alive. Every
+liveness reader still saw the agent, the next start was refused as "already running", and
+close-out's DoD row 5 failed on "running agents" until the panes were closed by hand.
+
+The primitives live in `src/lib/terminal-backends/launch.ts` and go through the adapter's `close`:
+
+| Primitive | Herdr | tmux |
+| --- | --- | --- |
+| `closeAgentPane(agentId)` | `pane.close` on the agent's pane, found by live agent name, then by its `agentId` token — **with no liveness check**, so a residue pane whose shell is back at `$` closes too (`findHerdrAgentPane`). A same-name tmux session left from before the host moved to Herdr is killed as well. | `kill-session` through the tmux adapter, when the session exists. |
+| `closeIssuePanes(issueId, { roles? })` | `pane.close` on every inventory pane whose `issue` token matches, optionally filtered by `role` — never an operator conversation pane (`conv-*`). | No-op — the callers' session-name scans already reach every tmux session, and a tmux pane carries no tokens. |
+
+Both never throw; a Herdr socket failure closes nothing and the stop still completes.
+
+Who uses them:
+
+- **`stopAgent`** (async, `src/lib/agents/termination.ts`) — calls `closeAgentPane` after capturing
+  output and before the orphan-launcher sweep. Every async caller inherits it: the dashboard
+  Stop/Delete routes, recovery and restart, preemption, the closed-issue reaper, spawn-failure
+  cleanup.
+- **`pan kill` / `pan stop` / `pan pause`** — use the async `stopAgent`, and decide "running" and "live
+  sibling" with `agentPaneExists`, not `sessionExistsSync`.
+- **Dashboard Pause and Suspend** — probe with `agentPaneExists` and close with `closeAgentPane`.
+- **Post-merge lifecycle** (`postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`) —
+  `closeAgentPane` for the work, planning and strike agents; `closeIssuePanes` with roles
+  `review`, `test`, `uat` for the specialists.
+- **Close-out teardown** (`teardown-workspace.ts`) and the closed-issue residue reaper
+  (`reap-issue-residue.ts`) — `closeIssuePanes(issueId)` for every pane of the issue, after the
+  tmux session-name sweep.
+
+`stopAgentSync` is **tmux-only**: Herdr is an async socket, so the sync variant can kill a tmux
+session but cannot close a Herdr pane. Its remaining callers are sync internals (`health.ts`
+force-kill, the `concurrency.ts` emergency brake, `handoff.ts`, the memory governor's hard-band
+shed); a new stop path must use `stopAgent`.
+
+Stopping does not infer lifecycle state: supervisor-launched agents still write `stopped` from the
+supervisor's own `exited` event, and liveness stays with `src/lib/agents/liveness.ts`, which now
+sees the pane gone.
+
 ## Pane metadata (FR-5)
 
 Every launcher stamps four tokens on its pane: `issue`, `role`, `harness`, `model`, plus `agentId` —
@@ -121,9 +207,77 @@ the Overdeck agent id. `role` is one of
 `issue` token — that absence is also how the prompt guard recognizes an operator sender.
 Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
 
-Launch sites, all routed: `spawnAgent` and `spawnRun` in `src/lib/agents/spawn.ts` (work agents,
-`pan start`, `pan strike`, the review/test/ship/plan specialists, and `pan review spawn-reviewer`
-through `spawnRun`).
+`BackendPane.agentId` (PAN-3920) carries the Overdeck agent id into the dashboard's pane
+inventory: on Herdr it is the pane's `agentId` token, else Herdr's live agent name — but only on
+a pane that carries Overdeck tokens, because Herdr names every agent it detects (`codex-1`,
+`claude-1`), the operator's own panes included; on tmux it is the session name of an Overdeck
+session (agent state, or an `agent-`/`planning-`/`strike-`/`conv-` name). On Herdr `pane.id` is the
+backend handle (`w1:p1`), not the agent name, so any join from an agent to its pane — the
+Agents Directory's first of all — must match `pane.agentId === agent.id`, never `pane.id`.
+A pane created by a live event gets its `agentId` on the next inventory refresh (at most 5 s).
+
+## Spawn paths (PAN-3960)
+
+Every path that starts an agent or a planner goes through `launchAgentPane`, so each one lands on
+the backend the host selects **now** and stamps the same four tokens. None of them calls tmux
+`createSession` directly; tmux lives only inside the tmux adapter.
+
+| Path | Code | `role` token |
+| --- | --- | --- |
+| Work agents (`pan start`, `pan strike`) | `spawnAgent` in `src/lib/agents/spawn.ts` | `work`, `strike` |
+| Specialists (review, test, ship, plan) and `pan review spawn-reviewer` | `spawnRun` in `src/lib/agents/spawn.ts` | `review`, `test`, `uat`, `plan` |
+| Registered workers (`pan worker run`, PAN-3920) | `startWorker` in `src/lib/agents/worker/start.ts` → `spawnRun` | `worker` (plus a `parent` token when the worker has a parent) |
+| Planning (`pan plan`, the plan phase of `pan start`, dashboard Start Planning) | `spawnPlanningSession` in `src/lib/planning/spawn-planning-session.ts` | `plan` |
+| Planning continuation (a user message to a dead planner) | `POST /api/planning/:issueId/message` in `src/dashboard/server/routes/misc/planning.ts` | `plan` |
+| Resume (`pan resume`, dashboard Resume, auto-resume) | `resumeAgent` in `src/lib/agents/resume.ts` | the agent's role |
+| Restart (dashboard Restart and restart-all) | `restartAgent` in `src/lib/agents/recovery.ts` | the agent's role |
+| Crash recovery (`pan recover`, dashboard Recover, the health force-kill path) | `recoverAgent` in `src/lib/agents/recovery.ts` | the agent's role |
+| Message-triggered fallback relaunch (only while `ALLOW_SESSION_ROTATION_ON_RESUME` is on; it is off) | `messageAgent` in `src/lib/agents/messaging.ts` | the agent's role |
+
+**Resume, restart and recovery relaunch on the host's backend, not the old pane's.** An agent that
+last ran in a tmux session is relaunched as a Herdr pane on a Herdr host, and the other way round.
+Before the relaunch, `closeAgentPane` closes whatever is left of the old one — on Herdr that
+includes a same-name tmux session from before the host moved. Recorded `backend` / `paneId` on the
+agent state are overwritten from the pane `launchAgentPane` returns; nothing reads them to choose a
+backend.
+
+Liveness on these paths comes from `src/lib/agents/liveness.ts` (`isAlive`), like every other
+reader: resume treats a confirmed death as a crash, recovery leaves an `alive` agent alone, and a
+`runtime-indeterminate` probe is never a death, so neither reaps on it.
+
+Two tmux-only behaviors the planning path always had are kept, and are no-ops on Herdr
+(`src/lib/terminal-backends/launch.ts`):
+
+- `prepareTmuxServer(backend, vars)` starts the tmux server with a parked `overdeck-init` session
+  and removes leaked variables (`GITHUB_TOKEN`, `LINEAR_API_KEY`, `CLAUDECODE`, provider keys) from
+  its global environment — `-e` can set a variable but never unset one.
+- `keepTmuxSessionOpen(pane)` sets `destroy-unattached off` and `remain-on-exit on`.
+
+The planner's launcher keeps its `while true; do sleep 60; done` keep-alive tail on tmux only: in a
+Herdr pane that loop is a non-shell foreground process, so the Herdr liveness probe would read a
+finished planner as alive forever. A Herdr pane already outlives its process.
+
+The planner's stop and status paths follow the same backend: finalize (`planning-promotion.ts`),
+abort (`planning-sessions.ts`), and the dashboard's planning status, message and Stop routes use
+`closeAgentPane`, `agentPaneExists` and `deliverAgentMessage` rather than tmux calls.
+
+**Not yet routed** (tracked elsewhere): operator conversations and `pan handoff` (#3921); the
+runtime-class `spawnAgent` of the muse and kimi-code runtimes (#3936) and of the codex, acp, ohmypi
+and pi runtimes, reached only from Cloister's session rotation and crash respawn
+(`session-rotation.ts`, `service-crash.ts`) — the claude-code runtime delegates to `spawnAgent` and
+is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
+commands, plain dashboard terminals and the codex auth login are not agents.
+
+A graceful restart's 60-second warning reaches a Herdr agent through `deliverAgentMessage`; on tmux
+it is still Escape twice and a tmux paste (`src/lib/graceful-restart.ts`).
+
+**Known gaps on Herdr** (readers, not spawners): `detectCrashedAgents` (`pan recover --all`,
+`autoRecoverAgents`) still filters on the sync, tmux-only `tmuxActive`, so on Herdr it lists live
+agents as crashed — `recoverAgent`'s `isAlive` gate then answers `already-running` for them, so
+nothing is double-spawned, but they are reported as failed. The Claude resume-summary gate crossing
+(`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the
+tmux pane, so on Herdr they see no menu and fall through (the AskUserQuestion transcript check
+still runs).
 
 ## The prompt guard (FR-17)
 
@@ -136,13 +290,15 @@ through `spawnRun`).
    which is where the repeated deliveries came from. A retry of a *failed* delivery must use a new
    id — the guard records an id when it admits it.
 2. **Authority.** A pane whose tokens say issue X and role `worker` accepts prompts only from the
-   pane whose tokens say issue X and role `work`, or from an operator conversation (a `conv-` id
-   with no `issue` token). Anything else gets `{ refused: true, reason }`. Other roles keep today's
-   open delivery.
+   pane whose tokens say issue X and role `work`, from the sender whose id equals the pane's
+   `parent` token (the agent or conversation that ran `pan worker run`, PAN-3920), or from an
+   operator conversation (a `conv-` id with no `issue` token). Anything else gets
+   `{ refused: true, reason }`. Other roles keep today's open delivery. On tmux the `parent` token
+   comes from `state.json`'s `parentId`.
 
 Sender identity: the Herdr adapter reads the target's tokens from `agent.get`; on tmux the sender is
 `OVERDECK_AGENT_ID` and the target's tokens come from the agent's launch metadata
-(`getAgentStateSync`), because a tmux pane carries no tokens.
+(`getAgentState`), because a tmux pane carries no tokens.
 
 `deliverAgentMessage` returns the drop or refusal in `DeliveryResult.failure` (`refused: …` /
 `dropped: …`); a refusal is `ok: false`, so `pan tell` exits non-zero.
@@ -181,6 +337,121 @@ exited before kickoff.
 Spawn guards are backend-aware too: "is this agent already running" is `agentPaneExists`, a live
 tmux session or a live Herdr agent of that name, and the tmux-only session options
 (`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
+
+## Companion terminals (PAN-3974)
+
+A **companion terminal** is a second terminal session next to a conversation's own (owner)
+session, running a harness's native client attached to the owner's live runtime and exact
+session. It exists only so the operator can use the native CLI from the conversation TERMINAL
+view; dashboard delivery never goes through it (the composer keeps the ACP socket, app-server
+socket, and so on). Adapters: OpenCode `opencode attach` (PAN-3974) and Codex
+`codex resume --remote` (PAN-3835).
+
+| Piece | Where |
+| --- | --- |
+| Shared vocabulary (`CompanionTerminalKind`, `CompanionTerminalState`, `companionTerminalKindFor`, body whitelists) | `packages/contracts/src/companion-terminal.ts` |
+| Lifecycle (open / close / owner teardown, per-owner lock, generation checks) | `src/lib/overdeck/companion-terminal/lifecycle.ts` |
+| Host port + tmux implementation (async `tmuxExecAsync` / `createSession`, no keystrokes) | `src/lib/overdeck/companion-terminal/host.ts` |
+| OpenCode adapter | `src/lib/overdeck/companion-terminal/opencode-adapter.ts` |
+| Codex adapter; host native endpoint and `prepare-terminal` | `src/lib/overdeck/companion-terminal/codex-adapter.ts`; `src/lib/codex/app-server-host.ts`, `app-server-transport.ts`, `native-endpoint.ts` |
+| Wiring + `closeCompanionTerminalForOwner` | `src/lib/overdeck/companion-terminal/index.ts` |
+| Routes | `src/dashboard/server/routes/conversation-companion-terminal.ts` |
+| UI | `src/dashboard/frontend/src/components/chat/ConversationTerminalView.tsx` |
+
+**Session.** One companion per owner, named `companion-<ownerSession>` on the managed tmux
+socket (conversations are tmux on every host until PAN-3921). The prefix is ignored by the
+backend inventory, `isAgentSessionName`, and every reaper. The pane runs
+`exec <absolute binary> …`, so the session ends when the native client exits. The dashboard
+streams it through the ordinary `/ws/terminal?session=` path; a browser disconnect only drops the
+PTY client, and no `destroy-unattached` is set, so the companion survives.
+
+**Generation.** `sha256(ownerSession, owner #{session_created}, adapter fingerprint)`, 24 hex. The
+OpenCode fingerprint is `<port>:<sessionId>`, so any owner respawn (new tmux session, new port)
+changes it. It is stamped on the companion at creation as the session env var
+`OVERDECK_COMPANION_GENERATION` (`new-session -e`, atomic) and read back with `show-environment`;
+the tmux session is the authority and nothing else is stored. Rules:
+
+- Every operation on one owner runs through a per-owner promise lock, so concurrent opens create
+  one companion.
+- Open reuses a companion only when its stamp equals the current generation; any other session
+  under that name is killed and replaced. When unsure, kill and recreate: the companion holds no
+  state, the harness session does.
+- After creating, open resolves the generation again. If the owner changed meanwhile, it kills the
+  companion it created (only if the stamp is still its own) and answers `owner-changed` (409).
+- Close must carry the generation the browser was given; a mismatch answers `stale-generation`
+  (409) and kills nothing.
+- An owner whose tmux session is gone makes open reap any companion (`owner-not-running`).
+
+**Owner teardown.** `closeCompanionTerminalForOwner(ownerSession)` never throws and is called from
+`stopConversationRuntime` (stop, delete, archive, resume/restart failure, flywheel archive; after
+the shared-session early return, so a runtime another conversation still owns keeps its companion),
+from `spawnConversationSession` right before it kills the owner
+session (every resume and restart-all), and for owners that exited on their own from both the
+conversation lifecycle poll and the PTY supervisor's `exited` event (`agent-projection.ts`). Those
+two close the companion before marking the row ended, because later writers skip ended rows.
+
+**OpenCode adapter.** Reads `~/.overdeck/agents/<ownerSession>/opencode-port` and `acp-session-id`
+(PAN-3937), the cwd from the conversation record, and the binary from `resolveHarnessBinary`, then
+asks `GET http://127.0.0.1:<port>/session/<id>` (2 s timeout) before handing out
+`opencode attach http://127.0.0.1:<port> --session <id> --dir <cwd>`. Attach only; never `--fork`,
+`--continue`, `serve`, or a second `acp`.
+
+| owner tmux | `opencode-port` | `acp-session-id` | `GET /session/<id>` | result |
+| --- | --- | --- | --- | --- |
+| gone | – | – | – | `owner-not-running` |
+| alive | any | missing | – | `owner-starting` |
+| alive | missing | present | – | `restart-required` (pre-PAN-3937 host) |
+| alive | malformed | or malformed | – | `restart-required` |
+| alive | present | present | error / non-2xx | `owner-starting` |
+| alive | present | present | 404 | `session-missing` |
+| alive | present | present | 2xx | attach |
+
+**Routes.** `POST /api/conversations/:name/companion-terminal/open` (body `{}`) and
+`…/close` (body `{ generation }`), both behind `rejectUnsafeDashboardMutationRequest`. Any other
+body key or any query parameter is a 400: the browser can never name a URL, command, session id,
+cwd, binary, or terminal target. Responses are `CompanionTerminalState` bodies; `unsupported` is
+400, `owner-changed` / `stale-generation` are 409, everything else 200.
+
+**Codex adapter (PAN-3835).** Kind `codex-resume-remote`, for every `harness: codex` conversation.
+The conversation's app-server host runs with `--native-endpoint`: `codex app-server --listen
+unix://~/.overdeck/agents/<ownerSession>/codex-native/app.sock`, with the host itself as the
+first WebSocket client, and the URL recorded in `codex-native-endpoint`. The adapter's health
+check is the host's token-authenticated `prepare-terminal` op over
+`~/.overdeck/sockets/appserver-<ownerSession>.sock` (async client
+`src/lib/codex/app-server-client.ts`, 25 s bound). The op never creates a thread or starts a turn.
+It strictly resumes a saved thread the host has not loaded yet and answers only once the pinned
+thread's rollout exists. The adapter then hands out
+`codex resume -c check_for_update_on_startup=false --remote <endpoint> <threadId>`, with
+`CODEX_HOME` set to the conversation's `codex-home-v2` through the new optional `env` field on the
+target and `CompanionCreateSpec`. The generation stamp and `TERM` always override that env. The
+endpoint must equal the socket Overdeck derives for that owner and the recorded file. The
+fingerprint is `<host generation>:<threadId>:<navigationEpoch>`, so a host restart or a TUI that
+navigated away (`/new`, `/resume`, `/fork`) gets a fresh companion on the conversation's thread at
+the next open. The remote TUI keeps retrying when its app-server dies instead of exiting. The
+owner-teardown hooks above reap it when the owner stops; when the app-server dies but the host's
+pane (and so the owner session) stays alive, the host itself removes `codex-native-endpoint` and
+calls `closeCompanionTerminalForOwner`. The host kills its app-server on every exit path, and the
+manager reaps an app-server orphaned by a SIGKILLed host (recorded in `codex-native/app.pid`,
+matched by `/proc/<pid>/cmdline`) before reusing the socket.
+
+| owner tmux | host answer | result |
+| --- | --- | --- |
+| gone | – | `owner-not-running` |
+| alive | no token, `codex.transport: tui` | `unsupported` (the owner pane is the native TUI) |
+| alive | unreachable / timeout | `owner-starting` |
+| alive | `400 unsupported app-server op` (pre-PAN-3835 host) | `restart-required` |
+| alive | `422 native-unavailable`: `not-requested` / `connect-failed` | `restart-required` |
+| alive | `422 native-unavailable`: `cli-unsupported` (below 0.153.4) | `cli-unsupported` |
+| alive | `422 native-unavailable`: `socket-path-too-long` | `unsupported` |
+| alive | `409 no-thread` (no thread, or no saved turn yet) | `session-not-started` |
+| alive | `409 resume-failed` | `session-missing` |
+| alive | `200`, endpoint not this owner's socket or not the recorded one | `restart-required` |
+| alive | `200` | attach |
+
+**Adding a harness.** Add a kind to `CompanionTerminalKind`, map it in
+`companionTerminalKindFor`, write an adapter whose `resolveTarget` returns argv, cwd, optional env,
+and a fingerprint from server-side records, and register it in `defaultAdapters()` in `index.ts`.
+The lifecycle, routes, and UI need no change.
 
 ## Herdr wire facts (v0.9.1, protocol 22)
 
@@ -464,3 +735,30 @@ agent-fix14-exits      liveness {"kind":"exited","paneId":"wK:p3"}   ← shell b
 ```
 
 Teardown: both panes closed, `workspace.close wK` → `{ok:true}`, no app-server host survived.
+
+## Live verification record — OpenCode companion terminal (PAN-3974)
+
+2026-09-23, OpenCode 1.18.31, tmux 3.4. Everything ran on a private socket (`tmux -L pan3974-test`)
+against a throwaway owner: `opencode acp --hostname 127.0.0.1 --port 54333` in a scratch directory,
+with an ACP session created over stdio (`ses_f31392699ffePn4CdhKK6zUR0E`). The real lifecycle,
+OpenCode adapter, and tmux host drove it, with the host's `exec`/`createSession` bound to that socket.
+No live conversation or dashboard was touched.
+
+```
+GET /session/<ACP session id>           → 200 (an ACP-created session is visible over HTTP)
+open ×2 concurrently                    → one companion created, second answer reused:true
+pane command                            → opencode "exec '<abs>/opencode' 'attach' 'http://127.0.0.1:54333'
+                                            '--session' 'ses_…' '--dir' '<scratch>/oc-acp'"
+OVERDECK_COMPANION_GENERATION           → 9bd653f22a0eef0992eb340f
+capture-pane -e                         → native OpenCode TUI (prompt box, "Build · <model> · xhigh",
+                                            "tab agents / ctrl+p commands"), 162 ANSI escape runs, truecolor
+OpenCode sessions before/after attach   → 13 → 13 (no second session)
+PTY tmux client attached, then killed   → companion still alive (browser disconnect)
+reopen                                  → reused:true
+close with a stale generation           → stale-generation; companion still alive
+close with the current generation       → closed; companion gone; owner alive; GET /session/<id> 200
+owner teardown after reopening          → companion gone
+opencode-port removed                   → restart-required; no companion created
+```
+
+Teardown: `tmux -L pan3974-test kill-server`; port 54333 no longer answers.

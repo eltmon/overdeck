@@ -1,3 +1,11 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `acquireProjectsConfigLockSync` (async: `acquireProjectsConfigLock`): src/lib/projects-config-write.ts:117.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:net';
 import { resolve } from 'node:path';

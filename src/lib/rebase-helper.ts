@@ -17,7 +17,6 @@ import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { Data, Effect } from 'effect';
 import { MergeSet } from './merge-set.js';
 
 const execAsync = promisify(exec);
@@ -33,7 +32,14 @@ export interface RebaseAllResult {
   success: boolean;
   results: RebaseResult[];
   firstFailure?: RebaseResult;
-}async function rebaseAndPushReposPromise(
+}
+
+/**
+ * Rebase every repo in the merge set onto its target and push. A failed repo is
+ * reported in the result (`success: false`); it rejects only on an unexpected
+ * exception.
+ */
+export async function rebaseAndPushRepos(
   workspacePath: string,
   mergeSet: MergeSet
 ): Promise<RebaseAllResult> {
@@ -258,35 +264,3 @@ async function tryResolvePlanningConflicts(
     return { resolved: false, remainingConflicts: ['(error checking rebase status)'] };
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel variant of the rebase helper. The Promise-returning
-// API is preserved for existing callers; new Effect-based callers can compose
-// `rebaseAndPushReposProgram` directly without round-tripping through
-// `Effect.runPromise`.
-
-/** Tagged error for rebase-helper Effect variants. */
-export class RebaseError extends Data.TaggedError('RebaseError')<{
-  readonly workspacePath: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `rebaseAndPushRepos`. Failure shape never throws — the
- *  result's `success: false` carries the failed-repo details. The Effect
- *  channel surfaces unexpected exceptions only. */
-export const rebaseAndPushRepos = (
-  workspacePath: string,
-  mergeSet: MergeSet,
-): Effect.Effect<RebaseAllResult, RebaseError> =>
-  Effect.tryPromise({
-    try: () => rebaseAndPushReposPromise(workspacePath, mergeSet),
-    catch: (cause) =>
-      new RebaseError({
-        workspacePath,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-

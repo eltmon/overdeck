@@ -5,8 +5,8 @@ import { Effect } from 'effect';
 import { getShadowState } from '../shadow-state.js';
 import { getLinearApiKey } from '../shadow-utils.js';
 import {
-  resolveGitHubIssueSync,
-  resolveTrackerTypeSync,
+  resolveGitHubIssue,
+  resolveTrackerType,
 } from '../tracker-utils.js';
 import { getIssueState, isGitHubAppConfigured } from '../github-app.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
@@ -35,10 +35,10 @@ export type LiveTrackerIssueState = 'open' | 'closed';
  * a stale cached close-out decision.
  */
 export async function readLiveTrackerIssueState(issueId: string): Promise<LiveTrackerIssueState> {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     if (isGitHubAppConfigured()) {
-      const issue = await Effect.runPromise(getIssueState(resolved.owner, resolved.repo, resolved.number));
+      const issue = await getIssueState(resolved.owner, resolved.repo, resolved.number);
       return issue.state === 'closed' ? 'closed' : 'open';
     }
 
@@ -63,7 +63,7 @@ export async function readLiveTrackerIssueState(issueId: string): Promise<LiveTr
   const project = getProjectSync(resolvedProject.projectKey);
   if (!project) throw new Error(`Project ${resolvedProject.projectKey} is not configured`);
 
-  const trackerType = resolveTrackerTypeSync(issueId);
+  const trackerType = resolveTrackerType(issueId);
   const githubRepo = project.github_repo?.split('/');
   const tracker = createTracker({
     type: trackerType,
@@ -87,7 +87,7 @@ export async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
   const now = Date.now();
   if (cached && now - cached.checkedAt < TRACKER_CLOSED_CACHE_TTL_MS) return cached.closed;
 
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (!resolved.isGitHub) {
     const closed = await isLinearIssueClosed(issueId);
     trackerClosedCache.set(issueId, { closed, checkedAt: now });
@@ -96,7 +96,7 @@ export async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
 
   try {
     if (isGitHubAppConfigured()) {
-      const issue = await Effect.runPromise(getIssueState(resolved.owner, resolved.repo, resolved.number));
+      const issue = await getIssueState(resolved.owner, resolved.repo, resolved.number);
       const closed = issue.state === 'closed';
       trackerClosedCache.set(issueId, { closed, checkedAt: now });
       return closed;
@@ -131,7 +131,7 @@ export async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
  * fuzzy-search hit on the wrong issue must never read as closed).
  */
 async function isLinearIssueClosed(issueId: string): Promise<boolean> {
-  if (resolveTrackerTypeSync(issueId) !== 'linear') return false;
+  if (resolveTrackerType(issueId) !== 'linear') return false;
   if (!resolveProjectFromIssueSync(issueId)) return false;
 
   let tracker: IssueTracker | null = null;
@@ -157,7 +157,7 @@ async function isLinearIssueClosed(issueId: string): Promise<boolean> {
 export async function isIssueClosed(issueId: string, closedIssueIds?: Set<string>): Promise<boolean> {
   if (closedIssueIds) return closedIssueIds.has(issueId);
 
-  const shadowState = await Effect.runPromise(getShadowState(issueId).pipe(Effect.catch(() => Effect.succeed(null))));
+  const shadowState = await getShadowState(issueId).catch(() => null);
   return shadowState?.trackerStatus === 'closed'
     || shadowState?.shadowStatus === 'closed'
     || shadowState?.targetCanonicalState === 'done'

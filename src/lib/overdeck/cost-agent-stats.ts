@@ -1,5 +1,5 @@
 /** Canonical resource-cost read: aggregate in SQLite; never materialize ledger events. */
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 
 export interface AgentCostStats {
   burnUsdPerHour: number;
@@ -7,12 +7,12 @@ export interface AgentCostStats {
   totalUsd: number;
 }
 
-export function getAgentCostStatsSync(input: {
+export function getAgentCostStats(input: {
   agentIds: string[];
   nowMs: number;
 }): Array<[string, AgentCostStats]> {
   if (input.agentIds.length === 0) return [];
-  const rows = getOverdeckDatabaseSync().prepare(`
+  const rows = getOverdeckDatabase().prepare(`
     SELECT agent_id AS agentId,
       SUM(CASE WHEN source_file IS 'subscription-covered' THEN 0 ELSE COALESCE(cost, 0) END) AS totalUsd,
       SUM(CASE WHEN ts >= ? AND source_file IS NOT 'subscription-covered' THEN COALESCE(cost, 0) ELSE 0 END) AS recentBillable,

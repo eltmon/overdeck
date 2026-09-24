@@ -82,7 +82,7 @@ function detectStatus(output: string): { status: SessionInfo['status']; detail: 
 
 function analyzeSession(name: string, lines: number) {
   return Effect.gen(function* () {
-    const output = yield* capturePane(name, lines);
+    const output = yield* Effect.promise(() => capturePane(name, lines));
     const model = extractModel(output);
     const cost = extractCost(output);
     const { status, detail } = detectStatus(output);

@@ -10,7 +10,6 @@ import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { ConfigError } from '../errors.js';
 
 export interface FlyMachineConfig {
   image: string;
@@ -339,7 +338,7 @@ function readFlyctlConfigToken(): string | undefined {
 }
 
 /** Create a FlyApiClient from an explicit token, env, or flyctl's stored auth */
-export function createFlyApiClientSync(token?: string): FlyApiClient {
+export function createFlyApiClient(token?: string): FlyApiClient {
   const tok = token ?? process.env.FLY_API_TOKEN ?? readFlyctlConfigToken();
   if (!tok) {
     throw new Error(
@@ -349,7 +348,7 @@ export function createFlyApiClientSync(token?: string): FlyApiClient {
   return new FlyApiClient(tok);
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 // Additive Effect-typed wrappers around the FlyApiClient methods and the
 // constructor helper, so callers in Effect graphs can stay end-to-end Effect
 // without `Effect.tryPromise`-wrapping every call site. The wrappers surface
@@ -364,20 +363,6 @@ const toFlyApiError = (cause: unknown): FlyApiError =>
         0,
         '',
       );
-
-/** Build a FlyApiClient from env or explicit token (Effect variant). */
-export const createFlyApiClient = (
-  token?: string,
-): Effect.Effect<FlyApiClient, ConfigError> =>
-  Effect.try({
-    try: () => createFlyApiClientSync(token),
-    catch: (cause) =>
-      new ConfigError({
-        message:
-          cause instanceof Error ? cause.message : 'Failed to build FlyApiClient',
-        cause,
-      }),
-  });
 
 /** Create a machine in an app (Effect variant). */
 export const createMachine = (

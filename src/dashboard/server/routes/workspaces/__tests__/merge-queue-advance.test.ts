@@ -10,10 +10,10 @@ vi.mock('../../../../../lib/agents.js', () => ({
   spawnAgent: vi.fn(),
 }));
 vi.mock('../../../../../lib/agents/agent-state.js', () => ({
-  clearYieldForResumeSync: vi.fn(),
+  clearYieldForResume: vi.fn(),
   decideResumeGate: vi.fn(() => ({ decision: 'proceed' })),
   getAgentResumeGateBlockReason: vi.fn(() => null),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   saveAgentStateSync: vi.fn(),
 }));
 // config-yaml's defaults pull tier-table, which still imports the record plane
@@ -25,8 +25,9 @@ vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleStateSync: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
 }));
 
-const { advanceMergeQueue } = await import('../merge-strike.js');
+const { advanceMergeQueue, mergeGateRefusal } = await import('../merge-strike.js');
 type MergeQueueAdvanceDeps = Parameters<typeof advanceMergeQueue>[0];
+type MergeGateVerdict = Awaited<ReturnType<MergeQueueAdvanceDeps['checkMergeGate']>>;
 
 /**
  * PAN-3328: the merge queue must not be able to wedge behind an entry that
@@ -36,6 +37,9 @@ type MergeQueueAdvanceDeps = Parameters<typeof advanceMergeQueue>[0];
  *
  * PAN-3917: startability is now the forge's answer — `DerivedIssueState.state`
  * is `ready` only when the PR is approved, green, and mergeable.
+ *
+ * #4016/#4021/#4036: every entry, whatever branches the issue has, also passes
+ * the forge-facts merge gate (CI test job, failed required UAT).
  */
 
 function derived(issueId: string, state: IssueState): DerivedIssueState {
@@ -48,7 +52,7 @@ function derived(issueId: string, state: IssueState): DerivedIssueState {
 function harness(
   queue: string[],
   states: Record<string, IssueState>,
-  strikeHeads: Record<string, string> = {},
+  gates: Record<string, MergeGateVerdict> = {},
 ): { deps: MergeQueueAdvanceDeps; queue: string[]; triggered: Array<[string, unknown]>; warnings: string[] } {
   const triggered: Array<[string, unknown]> = [];
   const warnings: string[] = [];
@@ -61,10 +65,9 @@ function harness(
       return queue[0] ?? null;
     },
     getDerivedState: async (issueId) => derived(issueId, states[issueId] ?? 'backlog'),
-    getProjectPath: () => '/projects/overdeck',
-    getStrikeHead: async (issueId) => strikeHeads[issueId] ?? null,
-    triggerMerge: async (issueId, request) => {
-      triggered.push([issueId, request]);
+    checkMergeGate: async (issueId) => gates[issueId] ?? { ready: true },
+    triggerMerge: async (issueId, ...rest: unknown[]) => {
+      triggered.push([issueId, rest[0]]);
       return { success: true };
     },
     log: () => {},
@@ -124,27 +127,42 @@ describe('advanceMergeQueue', () => {
     expect(triggered).toEqual([]);
   });
 
-  it('passes a strike request through without consulting normal merge eligibility', async () => {
-    const { deps, triggered } = harness(
+  it('never turns an entry into a strike landing that skips the gate (#4016)', async () => {
+    // PAN-400 has a pushed strike branch whose PR has red checks. The queue
+    // used to see `origin/strike/pan-400` and land it without asking the gate;
+    // now the entry is judged like any other and the red PR is dropped.
+    const { deps, queue, triggered, warnings } = harness(
       ['PAN-400'],
-      // A strike landing is never `ready` on its own PR — git's pushed
-      // strike branch is the signal, so it must not be dropped as unstartable.
-      { 'PAN-400': 'working' },
-      { 'PAN-400': 'abc123' },
+      { 'PAN-400': 'in-review' },
     );
 
     await advanceMergeQueue(deps, 'pan');
 
-    expect(triggered).toEqual([[
-      'PAN-400',
-      {
-        kind: 'strike',
-        markerHead: 'abc123',
-        workspacePath: '/projects/overdeck/workspaces/feature-pan-400-strike',
-        branchName: 'strike/pan-400',
-        recoveryTarget: 'strike-pan-400',
-      },
-    ]]);
+    expect(triggered).toEqual([]);
+    expect(queue).toEqual([]);
+    expect(warnings.join('\n')).toContain('Dropped PAN-400 from the pan merge queue');
+  });
+
+  it('triggers a ready entry as a normal merge, with no strike request', async () => {
+    const { deps, triggered } = harness(['PAN-400'], { 'PAN-400': 'ready' });
+
+    await advanceMergeQueue(deps, 'pan');
+
+    expect(triggered).toEqual([['PAN-400', undefined]]);
+  });
+
+  it('drops a ready entry the forge-facts merge gate refuses and starts the next one', async () => {
+    const { deps, queue, triggered, warnings } = harness(
+      ['PAN-500', 'PAN-600'],
+      { 'PAN-500': 'ready', 'PAN-600': 'ready' },
+      { 'PAN-500': { ready: false, reason: 'browser UAT failed on PR HEAD abc1234' } },
+    );
+
+    await advanceMergeQueue(deps, 'pan');
+
+    expect(triggered).toEqual([['PAN-600', undefined]]);
+    expect(queue).toEqual(['PAN-600']);
+    expect(warnings.join('\n')).toContain('Dropped PAN-500 from the pan merge queue: Cannot merge: browser UAT failed on PR HEAD abc1234');
   });
 
   it('terminates when the queue keeps handing back the same unstartable entry', async () => {
@@ -153,8 +171,7 @@ describe('advanceMergeQueue', () => {
       {
         dequeue,
         getDerivedState: async (issueId) => derived(issueId, 'planned'),
-        getProjectPath: () => '/projects/overdeck',
-        getStrikeHead: async () => null,
+        checkMergeGate: async () => ({ ready: true }),
         triggerMerge: async () => ({}),
         log: () => {},
         warn: () => {},
@@ -163,5 +180,32 @@ describe('advanceMergeQueue', () => {
     );
 
     expect(dequeue).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('mergeGateRefusal', () => {
+  it('lets a ready gate through', () => {
+    expect(mergeGateRefusal({ ready: true, facts: { headBranch: 'feature/pan-1' } })).toBeNull();
+  });
+
+  it('refuses with the gate reason', () => {
+    expect(mergeGateRefusal({ ready: false, reason: 'CI checks failing on PR HEAD abc' })).toEqual({
+      success: false,
+      statusCode: 400,
+      error: 'Cannot merge: CI checks failing on PR HEAD abc',
+    });
+  });
+
+  it('refuses a strike landing gated on some other PR than strike/<issue> (#4016)', () => {
+    const refusal = mergeGateRefusal({ ready: true, facts: { headBranch: 'feature/pan-400' } }, 'strike/pan-400');
+    expect(refusal?.error).toBe('Cannot merge: the open pull request is on feature/pan-400, not strike/pan-400');
+  });
+
+  it('refuses a strike whose own PR has red checks (#4016)', () => {
+    const refusal = mergeGateRefusal(
+      { ready: false, reason: 'CI checks failing on PR HEAD def5678', facts: { headBranch: 'strike/pan-400' } },
+      'strike/pan-400',
+    );
+    expect(refusal?.error).toBe('Cannot merge: CI checks failing on PR HEAD def5678');
   });
 });

@@ -15,7 +15,7 @@ vi.mock('../../harness-binary.js', () => harnessMocks)
 
 import { OhmypiRuntimeSync, createOhmypiRuntimeSync, OhmypiSpawnTimeout } from '../ohmypi.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
-import { createClaudeCodeRuntimeSync } from '../claude-code.js'
+import { createClaudeCodeRuntime } from '../claude-code.js'
 import { createOhmypiFifo } from '../ohmypi-fifo.js'
 import { OhmypiNotReady } from '../ohmypi-fifo.js'
 import { sessionExists } from '../../tmux.js'
@@ -52,7 +52,7 @@ describe('OhmypiRuntime registry registration (AC1)', () => {
 
   it('default global registry contains both claude-code and ohmypi (AC1)', () => {
     const fresh = new RuntimeRegistry()
-    fresh.register(createClaudeCodeRuntimeSync())
+    fresh.register(createClaudeCodeRuntime())
     fresh.register(createOhmypiRuntimeSync())
     setGlobalRegistry(fresh)
     expect(getRuntime('ohmypi')?.name).toBe('ohmypi')
@@ -221,7 +221,7 @@ vi.mock('../../tmux.js', async () => {
   }
 })
 
-describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', () => {
+describe('OhmypiRuntime.spawnAgent resume via sessions.json (PAN-636 / PAN-1989)', () => {
   let h: ReturnType<typeof withFakeHome>
   let warnSpy: ReturnType<typeof vi.spyOn>
   beforeEach(() => {
@@ -239,12 +239,14 @@ describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', 
     writeFileSync(join(dir, 'ready.json'), JSON.stringify({ sessionId: 'irrelevant' }))
   }
 
-  it('AC2: re-spawning after a kill passes resumeSessionId to the launcher when session.id is present', async () => {
+  it('AC2: re-spawning after a kill passes the newest indexed id to the launcher', async () => {
     const agentId = 'agent-resume-1'
     const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
     mkdirSync(sessionsDir, { recursive: true })
-    writeFileSync(join(dir, 'session.id'), 'sess-stored-7777\n')
+    writeFileSync(join(dir, 'sessions.json'), JSON.stringify([
+      { sessionId: 'sess-stored-7777', at: '2026-09-20T00:00:00.000Z', source: 'session-start' },
+    ]))
     writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session"}\n')
     preCreateReady(agentId)
 
@@ -261,7 +263,7 @@ describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', 
     expect(launcher).toMatch(/sess-stored-7777/)
   })
 
-  it('AC3: goes fresh and warns only when NEITHER session.id NOR a parseable session id exists', async () => {
+  it('AC3: goes fresh and warns only when neither index nor a parseable session id exists', async () => {
     const agentId = 'agent-resume-2'
     const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
@@ -281,7 +283,7 @@ describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', 
     expect(warned).toMatch(/no resumable session id/)
   })
 
-  it('PAN-1988: recovers the real session id from the freshest JSONL when session.id is absent', async () => {
+  it('PAN-1988: recovers the real session id from the freshest JSONL when the index is absent', async () => {
     const agentId = 'agent-resume-jsonl'
     const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
@@ -304,7 +306,7 @@ describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', 
     expect(warned).not.toMatch(/no resumable session id/)
   })
 
-  it('first-ever spawn (no prior sessions/*.jsonl, no session.id) does NOT warn — clean path', async () => {
+  it('first-ever spawn (no prior sessions/*.jsonl or index) does not warn', async () => {
     const agentId = 'agent-resume-3-first'
     preCreateReady(agentId)
 
@@ -317,7 +319,7 @@ describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', 
     } as any)
 
     const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
-    expect(warned).not.toMatch(/session\.id/)
+    expect(warned).not.toMatch(/session index/)
   })
 
   it('AC(launcher-omp): launcher contains omp binary and no pi --mode invocation', async () => {

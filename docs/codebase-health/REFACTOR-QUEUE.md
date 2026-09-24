@@ -102,6 +102,26 @@ time, full suite before merge, verify against origin HEAD.
 | 19 | PAN-1983 / PAN-1984 | Legacy `panopticon.db` module + test teardown (dual-DB coexistence) | **PRDs written — on main**; partial progress recorded on both issues |
 | 20 | PAN-1936 / PAN-2008 | Read-door consolidation + store-access CI guard | largely *absorbed by Phase 2 PRDs*; close or re-scope after Phase 2 |
 
+## Phase 5 — Effect façade and twin cut (PAN-3958, 2026-09-23)
+
+PRD: `.pan/drafts/pan-3958.md`. One exported variant per operation in `src/lib`: delete
+Effect façades (Shapes A/B) and sync/async twins (Shape C), collapse duplicate harness
+storage code. Landing order is fixed: the ratchet first, then one child at a time.
+
+| # | Issue | What | Status |
+|---|---|---|---|
+| 21 | PAN-3958 | Audit tool (`scripts/audit-effect-boundary.mjs`) + `lint:effect-facades` ratchet, baseline A 220 / B 301 / C 82 | **LANDED** #4006 |
+| 21a | CH-1 | Delete dead Effect wrappers and Effect runtime twins (two PRs: CH-1a dead Shape B; CH-1b dead Shape A + runtime twins + Shape C C1–C3) | **LANDED** #4026, #4029 |
+| 21b | CH-2 | Promise-native cluster K1: `src/lib/cloister/**` | **LANDED** #4037 |
+| 21c | CH-3 | Promise-native cluster K2: agents, runtime, tmux, health, git, checkpoint, workspace | **LANDED** #4041 |
+| 21d | CH-4 | Promise-native cluster K3a: TTS, platform, cliproxy, tunnels, auth, GitHub app, webhooks | **LANDED** #4042 |
+| 21e | CH-5 | Promise-native cluster K3b: config, projects, settings, shadow, costs, conversations, xbrief, memory | **LANDED** #4043 |
+| 21f | CH-6 | Live Shape B callers + Shape C twins C4–C6 + no blocking sync in server code | **LANDED** #4044, #4048 |
+| 21g | CH-7 | One owner per harness for transcript/session/home paths (skips ohmypi, removed by #4003) | **LANDED** #4049 |
+| 21h | CH-8 | Dead exports, `export` pruning, alias shims (CH-8a deletions in two PRs; CH-8b `export` pruning and the comment-blind scan) | **LANDED** #4050, #4051, #4055 |
+| 21i | CH-9 | The nine twin pairs AC-W8 still listed after CH-8b: four variants deleted (the Effect `withConcurrencyLimit`, sync `getBook`, sync `readAutoSpawnOnFinalizeFlag`, the Effect `listProjects`), the other five pairs C6 with header notes; parser-exact comment stripping for the dead-export scan | in review |
+| 21j | follow-up | AC-W6: 26 `async function …Promise(` names left in cluster modules outside Oh My Pi. 12 are the only variant left (their Effect twin was deleted as dead), so the suffix is stale: rename to the bare name. 14 are private bodies behind a kept Effect export: rename `…Body`, as CH-4 did. Candidate scope for #4002 (ledger, CH-9) | **LANDED** #4002 |
+
 ## Related in-pipeline items being shepherded alongside (not queue members)
 
 - PAN-2150 — RE-CLOSED 2026-07-02 with goal-met evidence (all Settings modules < 1,000 lines).

@@ -6,6 +6,10 @@
  * and carries each open issue's `records/` item-status overrides into its
  * `.pan/continues/<ISSUE>.xbrief.json` `items` map. Never writes to the
  * state worktree, never deletes anything, never pushes.
+ *
+ * `--repair-ignore` (PAN-3996) does only the `.gitignore` repair: it removes
+ * Overdeck's legacy `.pan/` line and commits `.gitignore` alone, with no copy
+ * and no tracker lookup.
  */
 import type { Command } from 'commander';
 import { Effect } from 'effect';
@@ -15,15 +19,19 @@ import { loadConfigSync } from '../../../lib/config.js';
 import { getIssuePrefix, getProjectSync, type ProjectConfig } from '../../../lib/projects.js';
 import { createTracker } from '../../../lib/tracker/factory.js';
 import type { Issue, TrackerType } from '../../../lib/tracker/interface.js';
+import { describePanIgnore } from '../../../lib/pan-dir/legacy-pan-ignore.js';
 import {
   migratePanHome,
   readOpenIssuesFile,
   resolveMigrationTargets,
+  type MigratePanHomeResult,
 } from '../../../lib/pan-dir/migrate-plan-home.js';
+import { repairLegacyPanIgnore } from '../../../lib/pan-dir/plan-home-commit.js';
 
 export interface MigratePlanHomeCliOptions {
   commit?: boolean;
   dryRun?: boolean;
+  repairIgnore?: boolean;
   stateRoot?: string;
   planHome?: string;
   openIssues?: string;
@@ -95,7 +103,111 @@ async function listOpenIssuesFromTracker(project: ProjectConfig): Promise<string
   return filterOpenIssueIds(issues, trackerType, issuePrefix);
 }
 
+/**
+ * What the run found and did about a plan home that ignores `.pan/`
+ * (PAN-3996). Empty when `.pan/` is not ignored.
+ */
+export function panIgnoreReport(
+  result: Pick<MigratePanHomeResult, 'panIgnore' | 'ignoreLinesRemoved'>,
+  options: Pick<MigratePlanHomeCliOptions, 'commit' | 'dryRun'>,
+): string[] {
+  const status = result.panIgnore;
+  if (status.kind === 'check-failed') {
+    return [
+      `Warning: could not check whether the plan home ignores .pan/ (${status.detail}).`,
+      '  A --commit run needs that check and stops on the same error.',
+    ];
+  }
+  if (status.kind !== 'legacy' && status.kind !== 'foreign') return [];
+  const where = describePanIgnore(status);
+  if (result.ignoreLinesRemoved.length > 0) {
+    const lines = result.ignoreLinesRemoved.join(', ');
+    return [`Removed Overdeck's legacy .pan/ ignore rule (${status.source} line ${lines}); committed with the artifacts.`];
+  }
+  if (status.kind === 'foreign') {
+    return [
+      `Warning: the plan home ignores .pan/ via ${where}, which is not Overdeck's legacy line.`,
+      '  Artifacts under .pan/ cannot be committed until that rule is removed or narrowed; it was not edited.',
+    ];
+  }
+  if (options.dryRun) {
+    return [
+      `The plan home ignores .pan/ via Overdeck's legacy rule ${where}.`,
+      `  ${options.commit ? 'Without --dry-run, --commit' : '--commit'} removes that line and commits .gitignore with the artifacts.`,
+    ];
+  }
+  return [
+    `Warning: the plan home ignores .pan/ via Overdeck's legacy rule ${where};`
+    + ' the copied artifacts are ignored by git and were not committed.',
+    '  Fix: rerun with --repair-ignore (removes that line and commits .gitignore alone),',
+    '  or rerun with --commit (also commits the migrated artifacts),',
+    `  or delete line ${status.line} from ${status.source} and commit it yourself.`,
+  ];
+}
+
+/**
+ * `--repair-ignore`: remove Overdeck's legacy `.pan/` line from the plan
+ * home's `.gitignore` and commit that file alone (PAN-3996). No artifacts are
+ * copied and the tracker is never called.
+ */
+export async function runRepairPlanHomeIgnore(
+  projectKey: string,
+  options: Pick<MigratePlanHomeCliOptions, 'dryRun' | 'planHome' | 'stateRoot'>,
+): Promise<number> {
+  let planHome: string;
+  try {
+    ({ planHome } = resolveMigrationTargets({
+      project: projectKey,
+      stateRoot: options.stateRoot,
+      planHome: options.planHome,
+    }));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    return 1;
+  }
+
+  let result: Awaited<ReturnType<typeof repairLegacyPanIgnore>>;
+  try {
+    result = await repairLegacyPanIgnore(planHome, { dryRun: options.dryRun });
+  } catch (error) {
+    console.error(`migrate-plan-home: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+
+  const status = result.panIgnore;
+  if (status.kind === 'not-a-repo') {
+    console.error(`migrate-plan-home: ${planHome} is not inside a git work tree`);
+    return 1;
+  }
+  if (status.kind === 'not-ignored') {
+    console.log(`.pan/ is not ignored in ${planHome}; nothing to repair.`);
+    return 0;
+  }
+  if (status.kind === 'foreign') {
+    // Only reachable on --dry-run: a real run refuses before writing.
+    console.log(`.pan/ is ignored by ${describePanIgnore(status)}, which is not Overdeck's legacy line;`
+      + ' --repair-ignore will not edit it. Remove or narrow that rule yourself.');
+    return 1;
+  }
+  if (options.dryRun) {
+    console.log(`Would remove Overdeck's legacy .pan/ ignore rule ${describePanIgnore(status)} and commit .gitignore alone.`);
+    return 0;
+  }
+  console.log(`Removed Overdeck's legacy .pan/ ignore rule (${status.source} line ${result.linesRemoved.join(', ')}).`);
+  console.log(result.committed ? 'Committed .gitignore.' : 'Nothing to commit.');
+  return 0;
+}
+
 export async function runMigratePlanHome(projectKey: string, options: MigratePlanHomeCliOptions): Promise<number> {
+  // Before the tracker lookup: the repair must not depend on a working tracker.
+  if (options.repairIgnore) {
+    if (options.commit) {
+      console.error('migrate-plan-home: --repair-ignore commits .gitignore alone; do not combine it with --commit');
+      return 1;
+    }
+    return runRepairPlanHomeIgnore(projectKey, options);
+  }
+
   let stateRoot: string;
   let planHome: string;
   try {
@@ -127,13 +239,23 @@ export async function runMigratePlanHome(projectKey: string, options: MigratePla
   }
   console.log(`Found ${openIssues.length} open issue(s) for ${projectKey}.`);
 
-  const result = await migratePanHome({
-    stateRoot,
-    planHome,
-    openIssues,
-    commit: options.commit,
-    dryRun: options.dryRun,
-  });
+  let result: MigratePanHomeResult;
+  try {
+    result = await migratePanHome({
+      stateRoot,
+      planHome,
+      openIssues,
+      commit: options.commit,
+      dryRun: options.dryRun,
+    });
+  } catch (error) {
+    // PAN-3996: typed failures (MigratePlanHomeError, PlanHomeGitError) carry
+    // an operator-facing message; nothing here prints a raw stack.
+    console.error(`migrate-plan-home: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+
+  for (const line of panIgnoreReport(result, options)) console.log(line);
 
   const verb = options.dryRun ? 'would copy' : 'copied';
   console.log(
@@ -143,6 +265,20 @@ export async function runMigratePlanHome(projectKey: string, options: MigratePla
   console.log(`Progress copied for ${result.progressUpdated.length} issue(s).`);
   if (result.copied.length > 0) {
     for (const rel of result.copied) console.log(`  ${verb === 'copied' ? 'copied' : 'would copy'}: ${rel}`);
+  }
+  if (result.conflicts.length > 0) {
+    console.log(
+      `${result.conflicts.length} file(s) already exist under .pan/ and differ from the state worktree copy;`
+      + ' they were not overwritten. Compare them and keep the version you want by hand:',
+    );
+    for (const rel of result.conflicts) console.log(`  conflict: .pan/${rel}`);
+  }
+  if (result.leftUncommitted.length > 0) {
+    console.log(
+      `Left ${result.leftUncommitted.length} file(s) under .pan/ uncommitted: this run did not write them and they `
+      + 'differ from the state worktree copy, so they are not migration output. Review and commit them yourself:',
+    );
+    for (const rel of result.leftUncommitted) console.log(`  left uncommitted: .pan/${rel}`);
   }
   if (result.committed) console.log('Committed.');
 
@@ -159,6 +295,7 @@ export function registerMigratePlanHomeCommand(admin: Command): void {
     )
     .option('--commit', 'Commit the copied artifacts in the plan home')
     .option('--dry-run', 'Preview what would be copied without writing anything')
+    .option('--repair-ignore', "Only remove Overdeck's legacy .pan/ line from .gitignore and commit that file (no copy)")
     .option('--state-root <dir>', 'Override the state worktree root (tests / odd setups)')
     .option('--plan-home <dir>', 'Override the plan home (tests / odd setups)')
     .option('--open-issues <file>', 'Read open issue ids from a file instead of calling the tracker')

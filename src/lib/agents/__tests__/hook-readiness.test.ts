@@ -10,7 +10,7 @@ vi.mock('../../claude-hooks-provision.js', () => ({
 }));
 
 vi.mock('../../persistent-logger.js', () => ({
-  logAgentLifecycleSync: logAgentLifecycleSyncMock,
+  logAgentLifecycle: logAgentLifecycleSyncMock,
 }));
 
 import { ensureLifecycleHooksBeforeLaunch } from '../hook-readiness.js';

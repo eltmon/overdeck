@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ROLE_COLORS,
   acquireRadius,
   advanceFrostAccrual,
   aggregateTracePerSecond,
@@ -213,5 +214,13 @@ describe('Confluence model', () => {
 
       expect(pruneTraceEvents(events, now).map((event) => event.name)).toEqual(['edge', 'new']);
     });
+  });
+});
+
+describe('ROLE_COLORS', () => {
+  it('colors every agent role, including PAN-3920 workers', () => {
+    for (const role of ['plan', 'work', 'worker', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'] as const) {
+      expect(ROLE_COLORS[role]).toMatch(/^#[0-9a-f]{6}$/i);
+    }
   });
 });

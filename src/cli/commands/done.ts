@@ -27,14 +27,14 @@ import { Effect } from 'effect';
 import ora from 'ora';
 
 import { exitCli } from '../exit.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { cleanupWorkflowLabels } from '../../core/state-mapping.js';
 import { getForgeAdapter } from '../../lib/forge.js';
-import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
+import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
-import { buildMergeSetForIssueSync } from '../../lib/merge-set.js';
+import { buildMergeSetForIssue } from '../../lib/merge-set.js';
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
-import { computeWorkspaceRepoRootsSync, resolveProjectReposForIssueSync } from '../../lib/project-repos.js';
+import { computeWorkspaceRepoRoots, resolveProjectReposForIssue } from '../../lib/project-repos.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { runPreflightChecks } from '../../lib/work/done-preflight.js';
@@ -106,7 +106,7 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
   try {
     const ghConfig = getGitHubConfig();
     if (!ghConfig) return false;
-    const number = extractNumberSync(issueId);
+    const number = extractNumber(issueId);
     if (number === null) return false;
     const { owner, repo } = ghConfig.repos.find((r) => r.prefix === 'PAN') ?? ghConfig.repos[0];
     const headers = {
@@ -143,8 +143,8 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
 /** Refuse a done on an issue the tracker already closed. */
 async function refuseIfIssueClosed(issueId: string): Promise<string | null> {
-  const { resolveGitHubIssueSync } = await import('../../lib/tracker-utils.js');
-  const ghInfo = resolveGitHubIssueSync(issueId);
+  const { resolveGitHubIssue } = await import('../../lib/tracker-utils.js');
+  const ghInfo = resolveGitHubIssue(issueId);
   if (ghInfo.isGitHub) {
     try {
       const { stdout } = await execAsync(
@@ -167,9 +167,9 @@ async function refuseIfIssueClosed(issueId: string): Promise<string | null> {
   try {
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
-    const { extractPrefixSync } = await import('../../lib/issue-id.js');
-    const issueNum = extractNumberSync(issueId);
-    const teamKey = extractPrefixSync(issueId);
+    const { extractPrefix } = await import('../../lib/issue-id.js');
+    const issueNum = extractNumber(issueId);
+    const teamKey = extractPrefix(issueId);
     if (issueNum === null || teamKey === null) return null;
     const results = await client.issues({ filter: { number: { eq: issueNum }, team: { key: { eq: teamKey } } }, first: 1 });
     const state = results.nodes.length > 0 ? await results.nodes[0].state : null;
@@ -183,7 +183,7 @@ async function refuseIfIssueClosed(issueId: string): Promise<string | null> {
 
 /** Acceptance criteria from the plan, so the PR body carries the checklist. */
 async function buildPrBody(issueId: string, workspacePath: string): Promise<string> {
-  const lines = [`**Issue:** #${extractNumberSync(issueId) ?? issueId}`, ''];
+  const lines = [`**Issue:** #${extractNumber(issueId) ?? issueId}`, ''];
   try {
     const { readWorkspacePlanSync } = await import('../../lib/xbrief/io.js');
     const items = readWorkspacePlanSync(workspacePath)?.plan.items ?? [];
@@ -221,8 +221,8 @@ async function repoHasChanges(dir: string, targetBranch: string): Promise<boolea
  * about the result is stored.
  */
 export async function openOrUpdatePullRequests(issueId: string, workspacePath: string): Promise<OpenedPr[]> {
-  const repos = resolveProjectReposForIssueSync(issueId);
-  const roots = computeWorkspaceRepoRootsSync(repos, issueId, workspacePath);
+  const repos = resolveProjectReposForIssue(issueId);
+  const roots = computeWorkspaceRepoRoots(repos, issueId, workspacePath);
   const forgeByKey = new Map((repos ?? []).map((repo) => [repo.repoKey, repo.forge]));
   const body = await buildPrBody(issueId, workspacePath);
   const opened: OpenedPr[] = [];
@@ -278,7 +278,7 @@ export async function startReviewPipeline(
   message?: string,
 ): Promise<{ started: boolean; line: string }> {
   const { requestReviewViaDashboard } = await import('./request-review.js');
-  const response = await requestReviewViaDashboard(issueId, message);
+  const response = await requestReviewViaDashboard(issueId, message, undefined, 'pan-done');
 
   if (response.kind === 'unreachable') {
     return {
@@ -307,7 +307,7 @@ export function augmentCommentWithWaiver(comment: string | undefined, waiverReas
 // ─── The verb ────────────────────────────────────────────────────────────────
 
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
-  const issueId = resolveIssueIdSync(id);
+  const issueId = resolveIssueId(id);
 
   if (options.strike) {
     const resolved = resolveProjectFromIssueSync(issueId);
@@ -323,7 +323,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.error(chalk.red(`Strike ${issueId} is not contained in origin/main: ${(error as Error).message}`));
       return exitCli(1);
     }
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'strike',
       level: 'info',
       issueId,
@@ -348,7 +348,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   }
 
   if (!options.force) {
-    const failures = await Effect.runPromise(runPreflightChecks(workspacePath, issueId, options.testWaived));
+    const failures = await runPreflightChecks(workspacePath, issueId, options.testWaived);
     if (failures.length > 0) {
       console.error(chalk.red(`\n✖ Work completion checks failed for ${issueId}:\n`));
       for (const line of failures) console.error(line);
@@ -375,11 +375,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   try {
     // Step 1: rebase onto the target branch and push. `pan done` is one command
     // for the agent; the fetch/rebase/push it used to do by hand lives here.
-    const mergeSet = buildMergeSetForIssueSync(issueId);
+    const mergeSet = buildMergeSetForIssue(issueId);
     if (mergeSet && mergeSet.repos.length > 0) {
       const { rebaseAndPushRepos } = await import('../../lib/rebase-helper.js');
       spinner.text = 'Rebasing onto target branch and pushing...';
-      const rebaseResult = await Effect.runPromise(rebaseAndPushRepos(workspacePath, mergeSet));
+      const rebaseResult = await rebaseAndPushRepos(workspacePath, mergeSet);
       if (!rebaseResult.success) {
         const failure = rebaseResult.firstFailure!;
         spinner.fail(`Rebase failed in ${failure.repoKey}`);
@@ -440,13 +440,13 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     console.log(reviewStarted.line);
 
     spinner.succeed(`Work complete: ${issueId}`);
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'work-agent',
       level: 'info',
       message: `${issueId} work complete — pull request open for review`,
       issueId,
     });
-    emitActivityTtsSync({
+    emitActivityTts({
       utterance: `Work agent finished ${issueId}, entering review`,
       priority: 2,
       issueId,

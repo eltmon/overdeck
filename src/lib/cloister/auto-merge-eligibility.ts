@@ -14,9 +14,14 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { getProjectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
+import { Effect } from 'effect';
+
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import type { TrackerType } from '../tracker/interface.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
+import { getProjectAutoMergeDefault, projectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
 import { evaluateMergeReadiness, getPrFacts, type PrFacts } from './pr-facts.js';
+import { issueRunsTestsOnCi } from './verification-tests-mode.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,6 +38,8 @@ export interface AutoMergeEligibilityDeps {
   getIssueLabels?: (issueId: string) => Promise<string[]>;
   getProjectDefault?: typeof getProjectAutoMergeDefault;
   isGlobalUatRequired?: () => boolean;
+  /** #4021: true when the issue's project runs `verification.tests: ci`. */
+  ciTestsRequired?: (issueId: string) => boolean;
 }
 
 /** The per-issue auto-merge decision as the tracker's labels express it. */
@@ -42,9 +49,23 @@ export function autoMergeFromLabels(labels: readonly string[]): boolean | undefi
   return undefined;
 }
 
+/**
+ * The issue's labels from its own tracker (review of #4017). A project whose
+ * tracker is not GitHub (Linear, GitLab, Rally) may still have a `github_repo`
+ * for its code; reading `<github_repo>#<n>` there would read an unrelated
+ * GitHub issue, so a non-GitHub tracker is asked through its tracker client,
+ * and a GitHub lookup must resolve to the project's own `github_repo`.
+ */
 async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const project = resolveProjectFromIssueSync(issueId);
+  const config = project ? getProjectSync(project.projectKey) : null;
+  if (config?.tracker && config.tracker !== 'github') return readTrackerIssueLabels(issueId, config.tracker);
+
+  const resolved = resolveGitHubIssue(issueId);
   if (!resolved.isGitHub) return [];
+  if (config?.github_repo && `${resolved.owner}/${resolved.repo}`.toLowerCase() !== config.github_repo.toLowerCase()) {
+    return [];
+  }
 
   const { stdout } = await execFileAsync('gh', [
     'issue',
@@ -61,9 +82,49 @@ async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
   return stdout.trim().split('\n').filter(Boolean);
 }
 
+/** Labels read through the configured tracker client; [] when it is not configured. */
+async function readTrackerIssueLabels(issueId: string, tracker: TrackerType): Promise<string[]> {
+  const [{ loadConfigSync }, { createTrackerFromConfig }] = await Promise.all([
+    import('../config.js'),
+    import('../tracker/factory.js'),
+  ]);
+  const trackers = loadConfigSync().trackers;
+  if (!trackers?.[tracker]) return [];
+  const issue = await Effect.runPromise(createTrackerFromConfig(trackers, tracker).getIssue(issueId));
+  return [...(issue.labels ?? [])];
+}
+
 async function defaultIsGlobalUatRequired(): Promise<boolean> {
   const { isFlywheelRequireUatBeforeMerge } = await import('../overdeck/control-settings.js');
   return isFlywheelRequireUatBeforeMerge();
+}
+
+/**
+ * Review of #3993 (PAN-3965): whether this issue is held for UAT, all three
+ * tiers — its `auto-merge` / `hold-for-uat` label, then the project default,
+ * then the global flag — the same decision {@link isAutoMergeEligible} applies.
+ * The merge-train reconciler asks it for a lone ready feature: one held by its
+ * label still needs its UAT stack. A label read failure falls back to the
+ * project and global tiers, unless `strict` is set: the merge gate (#4036)
+ * cannot let an unreadable `auto-merge` label decide for it, so there the
+ * failure is thrown and the gate holds.
+ */
+export async function issueHoldsForUat(
+  issueId: string,
+  project: { auto_merge_default?: unknown } | null | undefined,
+  globalRequireUat: boolean,
+  deps: Pick<AutoMergeEligibilityDeps, 'getIssueLabels'> & { strict?: boolean } = {},
+): Promise<boolean> {
+  let labels: string[] = [];
+  try {
+    labels = await (deps.getIssueLabels ?? defaultGetIssueLabels)(issueId);
+  } catch (err) {
+    if (deps.strict) throw err;
+    console.warn(
+      `[auto-merge] Could not read labels for ${issueId}; using the project/global UAT hold: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  return shouldHoldForUat(autoMergeFromLabels(labels), projectAutoMergeDefault(project), globalRequireUat);
 }
 
 export async function isAutoMergeEligible(
@@ -71,7 +132,11 @@ export async function isAutoMergeEligible(
   deps: AutoMergeEligibilityDeps = {},
 ): Promise<AutoMergeEligibility> {
   const facts = await (deps.getFacts ?? getPrFacts)(issueId);
-  const readiness = evaluateMergeReadiness(facts);
+  // The UAT policy is applied below as the hold itself: an issue that requires
+  // UAT is never auto-merged, so a failed UAT verdict (#4036) cannot reach here.
+  const readiness = evaluateMergeReadiness(facts, {
+    ciTestsRequired: facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId),
+  });
   if (!readiness.ready) {
     return { eligible: false, reason: readiness.reason ?? 'PR is not ready to merge' };
   }

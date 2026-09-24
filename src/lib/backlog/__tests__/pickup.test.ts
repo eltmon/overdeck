@@ -3,7 +3,6 @@ import type { SequenceNode } from '../types.js';
 import {
   classifyIssue,
   isAutoPickable,
-  isUnblockEligible,
   normalizeGate,
   computeWaves,
   computeLanes,
@@ -11,7 +10,6 @@ import {
   computeStats,
   pickableQueue,
   selectNeedsPlanning,
-  selectUnblockTargets,
   effortOf,
   type ClassifyLookups,
 } from '../pickup.js';
@@ -112,15 +110,6 @@ describe('isAutoPickable', () => {
   });
 });
 
-describe('isUnblockEligible (override)', () => {
-  const u = { ready: false, planned: false, released: false, objection: false, parked: false, vetoed: false, blocksMain: true, inPipeline: false, gate: 'auto' as const };
-  it('blocks-main bypasses ready/planned/released, but vetoed and objection are stops', () => {
-    expect(isUnblockEligible(u)).toBe(true);
-    expect(isUnblockEligible({ ...u, vetoed: true, gate: 'vetoed' })).toBe(false);
-    expect(isUnblockEligible({ ...u, objection: true })).toBe(false); // PAN-2059: open objection halts even blocks-main
-    expect(isUnblockEligible({ ...u, blocksMain: false, ready: true, planned: true, released: true })).toBe(false);
-  });
-});
 
 describe('pickableQueue ordering', () => {
   it('promoted jumps ahead of rank, otherwise rank order', () => {
@@ -196,32 +185,6 @@ describe('computeCohort', () => {
   });
 });
 
-describe('selectUnblockTargets', () => {
-  it('returns blocks-main issues in rank order, capped, never vetoed or in-flight', () => {
-    const nodes = [
-      node({ issue: 'BM-LOW', rank: 9 }),
-      node({ issue: 'BM-HIGH', rank: 3 }),
-      node({ issue: 'BM-VETO', rank: 1 }),
-      node({ issue: 'BM-FLIGHT', rank: 2 }),
-      node({ issue: 'PLAIN', rank: 4 }),
-    ];
-    const lk = lookups({
-      'BM-LOW': { labels: ['blocks-main'] },
-      'BM-HIGH': { labels: ['blocks-main'] },
-      'BM-VETO': { labels: ['blocks-main', 'vetoed'] }, // vetoed wins — excluded
-      'BM-FLIGHT': { labels: ['blocks-main'], inPipeline: true }, // already running — excluded
-      'PLAIN': {},
-    });
-    const targets = selectUnblockTargets(nodes, lk, { cap: 2 });
-    expect(targets.map((t) => t.issue)).toEqual(['BM-HIGH', 'BM-LOW']);
-  });
-
-  it('respects the cap', () => {
-    const nodes = [node({ issue: 'A', rank: 1 }), node({ issue: 'B', rank: 2 }), node({ issue: 'C', rank: 3 })];
-    const lk = lookups({ A: { labels: ['blocks-main'] }, B: { labels: ['blocks-main'] }, C: { labels: ['blocks-main'] } });
-    expect(selectUnblockTargets(nodes, lk, { cap: 1 }).map((t) => t.issue)).toEqual(['A']);
-  });
-});
 
 describe('selectNeedsPlanning', () => {
   it('returns ready-but-unplanned issues in rank order', () => {

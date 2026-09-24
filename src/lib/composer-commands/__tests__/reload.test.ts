@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const emit = vi.hoisted(() => vi.fn(async (_entry: { output?: string }) => 'appended'));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntryOncePortable: emit }));
-vi.mock('../../config.js', () => ({ getDashboardLoopbackApiUrlSync: () => 'http://127.0.0.1:3011' }));
+vi.mock('../../config.js', () => ({ getDashboardLoopbackApiUrl: () => 'http://127.0.0.1:3011' }));
 import { reportComposerReloadProgress, runComposerReload } from '../reload.js';
 
 let home: string;

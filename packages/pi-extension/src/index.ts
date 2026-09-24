@@ -5,8 +5,8 @@
  * to emit Overdeck lifecycle signals via filesystem markers and HTTP POSTs.
  */
 
-import { watch, type FSWatcher } from 'node:fs'
-import { appendFile, mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { appendFileSync, watch, type FSWatcher } from 'node:fs'
+import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { matchSpecialistCompletion, normalizeSpecialistCompletionName } from './specialist-completion-patterns.js'
@@ -102,6 +102,7 @@ export async function setThinkingLevelIfSupported(runtime: unknown, level: Think
 export interface SessionStartEvent {
   reason?: string
   sessionId?: string
+  model?: string
 }
 
 export interface UsageLike {
@@ -147,7 +148,7 @@ export interface OverdeckPaths {
   readyPath: string
   completedPath: string
   heartbeatPath: string
-  sessionIdPath: string
+  sessionsIndexPath: string
   pendingEventsPath: string
   costEventsPath: string
   progressStatePath: string
@@ -163,7 +164,7 @@ export function overdeckPathsFor(agentId: string, home: string = homedir()): Ove
     readyPath: join(agentDir, 'ready.json'),
     completedPath: join(agentDir, 'completed'),
     heartbeatPath: join(heartbeatsDir, `${agentId}.json`),
-    sessionIdPath: join(agentDir, 'session.id'),
+    sessionsIndexPath: join(agentDir, 'sessions.json'),
     pendingEventsPath: join(agentDir, 'pending-events.jsonl'),
     costEventsPath: join(agentDir, 'cost-events.jsonl'),
     progressStatePath: join(agentDir, 'pi-progress.json'),
@@ -389,11 +390,74 @@ async function workspaceFor(env: HookEnv): Promise<string | null> {
 async function sessionIdFor(env: HookEnv): Promise<string | null> {
   const { paths } = envFor(env)
   try {
-    const sessionId = (await readFile(paths.sessionIdPath, 'utf8')).trim()
-    return sessionId.length > 0 ? sessionId : null
+    const contents = await readFile(paths.sessionsIndexPath, 'utf8')
+    const trimmed = contents.trimStart()
+    const values: unknown[] = []
+    let lines = contents
+    if (trimmed.startsWith('[')) {
+      const end = trimmed.lastIndexOf(']')
+      if (end < 0) return null
+      const legacy: unknown = JSON.parse(trimmed.slice(0, end + 1))
+      if (Array.isArray(legacy)) values.push(...legacy)
+      lines = trimmed.slice(end + 1)
+    }
+    for (const line of lines.split(/\r?\n/)) {
+      try { if (line.trim()) values.push(JSON.parse(line)) } catch { /* skip malformed lines */ }
+    }
+    const ids = new Map<string, string>()
+    for (const value of values) {
+      const id = typeof value === 'string' ? value : (value as { sessionId?: unknown } | null)?.sessionId
+      if (typeof id === 'string' && id.trim()) {
+        ids.delete(id.trim())
+        ids.set(id.trim(), id.trim())
+      }
+    }
+    return [...ids.values()].at(-1) ?? null
   } catch {
     return null
   }
+}
+
+async function appendSessionIndexEntry(
+  path: string,
+  sessionId: string,
+  at: string,
+  model: string,
+  source: 'session-start' | 'turn-end' = 'session-start',
+  transcriptPath?: string,
+): Promise<void> {
+  const line = `${JSON.stringify({ sessionId, at, source, harness: 'pi', model, ...(transcriptPath ? { path: transcriptPath } : {}) })}\n`
+  if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF')
+  appendFileSync(path, line, { flag: 'a' })
+}
+
+const SESSION_LOG_SCAN_MAX_DEPTH = 3
+
+/** Recursively scan <agentDir>/sessions (depth <= 3) for this session's log file. */
+async function findPiSessionLogFile(agentDir: string, sessionId: string): Promise<string | null> {
+  const target = `${sessionId}.jsonl`
+  async function walk(dir: string, level: number): Promise<string | null> {
+    let entries
+    try {
+      entries = await readdir(dir, { withFileTypes: true })
+    } catch {
+      return null
+    }
+    for (const entry of entries) {
+      if (entry.isFile() && (entry.name === target || entry.name.endsWith(`_${target}`))) {
+        return join(dir, entry.name)
+      }
+    }
+    if (level >= SESSION_LOG_SCAN_MAX_DEPTH) return null
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const found = await walk(join(dir, entry.name), level + 1)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  return walk(join(agentDir, 'sessions'), 1)
 }
 
 function roleFor(env: HookEnv): string {
@@ -576,7 +640,10 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
     pid: env.pid ?? process.pid,
   })
   if (event.sessionId) {
-    await writeFile(paths.sessionIdPath, `${event.sessionId}\n`, 'utf8')
+    const state = await readAgentState(env)
+    const model = event.model ?? (typeof state['model'] === 'string' ? state['model'] : 'unknown')
+    const transcriptPath = await findPiSessionLogFile(paths.agentDir, event.sessionId)
+    await appendSessionIndexEntry(paths.sessionsIndexPath, event.sessionId, ts, model, 'session-start', transcriptPath ?? undefined)
   }
   await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
   await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
@@ -598,6 +665,8 @@ export async function handleToolExecutionEnd(env: HookEnv, event: ToolExecutionE
   await recordCostEvent(env, event, event.toolName ?? 'unknown', ts)
 }
 
+let lastRecordedSessionPath: string | undefined
+
 export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<void> {
   const { paths, pid, now } = envFor(env)
   const ts = now()
@@ -611,6 +680,16 @@ export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<
   })
   await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
   await recordCostEvent(env, event, 'turn_end', ts)
+
+  if (event.sessionLogPath && event.sessionLogPath !== lastRecordedSessionPath) {
+    const sessionId = await sessionIdFor(env)
+    if (sessionId) {
+      const state = await readAgentState(env)
+      const model = typeof state['model'] === 'string' ? state['model'] : 'unknown'
+      await appendSessionIndexEntry(paths.sessionsIndexPath, sessionId, ts, model, 'turn-end', event.sessionLogPath)
+    }
+    lastRecordedSessionPath = event.sessionLogPath
+  }
 
   const role = roleFor(env)
   if (role === 'work') {

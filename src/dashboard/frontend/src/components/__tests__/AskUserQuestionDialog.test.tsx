@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -48,5 +48,40 @@ describe('AskUserQuestionDialog issue reference', () => {
     expect(screen.getAllByText('Conversation title')).toHaveLength(2);
     expect(screen.queryByText('Issue')).toBeNull();
     expect(screen.queryByText('Unknown')).toBeNull();
+  });
+});
+
+describe('AskUserQuestionDialog answer state', () => {
+  function subjectWith(pending: AskUserQuestionSubject['pendingAskUserQuestion']): AskUserQuestionSubject {
+    return { id: 'conv-1', title: 'Conversation title', pendingAskUserQuestion: pending };
+  }
+
+  it('enables Send for a new single question after a multi-question one was answered', () => {
+    const twoQuestions = {
+      toolUseId: 'toolu_two',
+      askedAt: '2026-09-24T12:00:00.000Z',
+      questions: [
+        { question: 'First?', options: [{ label: 'A1' }, { label: 'A2' }] },
+        { question: 'Second?', options: [{ label: 'B1' }, { label: 'B2' }] },
+      ],
+    };
+    const oneQuestion = {
+      toolUseId: 'toolu_one',
+      askedAt: '2026-09-24T12:05:00.000Z',
+      questions: [{ question: 'Publish?', options: [{ label: 'Yes' }, { label: 'No' }] }],
+    };
+    const props = { isOpen: true, onSubmit: vi.fn(), onDismiss: vi.fn() };
+    const { rerender } = render(<AskUserQuestionDialog {...props} subject={subjectWith(twoQuestions)} />);
+    fireEvent.click(screen.getByText('A1'));
+    fireEvent.click(screen.getByText('B2'));
+
+    rerender(<AskUserQuestionDialog {...props} subject={subjectWith(oneQuestion)} />);
+    const send = screen.getByRole('button', { name: /Send Answer/ });
+    expect(send).toBeDisabled();
+
+    fireEvent.click(screen.getByText('Yes'));
+    expect(send).toBeEnabled();
+    fireEvent.click(send);
+    expect(props.onSubmit).toHaveBeenCalledWith(['Yes']);
   });
 });

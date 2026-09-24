@@ -24,9 +24,7 @@ import {
   AGENTS_CACHE_TTL_MS,
   agentsCache,
   buildStoppedAgentLifecycle,
-  filterClosedIssueAgents,
   getGitStatusAsync,
-  getIssueDataService,
   getWorkspaceLocation,
   readRemoteAgentState,
 } from './shared.js';
@@ -161,7 +159,7 @@ export const getAgentsRoute = HttpRouter.add(
             }
 
             const hasActiveSpecialist = specialistIssues.has(issueId);
-            const enrichment = await Effect.runPromise(computeAgentEnrichment(name, startedAt, hasActiveSpecialist));
+            const enrichment = await computeAgentEnrichment(name, startedAt, hasActiveSpecialist);
             const workspaceLocation = isRemote ? 'remote' : await getWorkspaceLocation(issueId);
             const workspace = isRemote && remoteState.vmName
               ? `/workspace (${String(remoteState.vmName)})`
@@ -218,10 +216,9 @@ export const getAgentsRoute = HttpRouter.add(
             };
           }),
         ))).filter(Boolean);
-        const visibleAgents = filterClosedIssueAgents(allAgents, getIssueDataService().getIssues());
-        agentsCache.data = visibleAgents;
+        agentsCache.data = allAgents;
         agentsCache.timestamp = now;
-        return jsonResponse(visibleAgents);
+        return jsonResponse(allAgents);
   })),
 );
 
@@ -271,7 +268,7 @@ export const getAgentGitInfoRoute = HttpRouter.add(
       return jsonResponse({ error: 'missing agent id' }, { status: 400 });
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentState(id);
     if (!agentHasResolvableWorkspace(agentState)) {
       // PAN-1718: unknown session id / no workspace bound → "unknown", not
       // "worktree missing". Return the benign shape so the chip hides instead of
@@ -318,7 +315,7 @@ export const getAgentHasSessionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     return jsonResponse({
       hasSession: lifecycle.canResumeSession,
       lifecycle,

@@ -3,7 +3,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { museSessionId } from '../runtimes/muse-session.js';
+import { museSessionId } from '../runtimes/storage/muse.js';
 import { museTimestamp, parseMuseRecords, summarizeMuseRecords } from '../cost-parsers/muse-parser.js';
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';

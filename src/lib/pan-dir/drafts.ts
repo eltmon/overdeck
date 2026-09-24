@@ -180,7 +180,7 @@ export interface PrdGateResult {
  * lowercase → workspacePath uppercase → workspacePath lowercase. A null/empty
  * root skips its candidates. Non-trivial means at least MIN_PRD_LINES lines.
  */
-export function checkPrdGateSync(args: {
+export function checkPrdGate(args: {
   projectRoot?: string | null
   workspacePath?: string | null
   issueId: string

@@ -6,8 +6,7 @@
  * as Claude-side `parseConversationMessages` returns. This module is the
  * adapter — it reads a Pi v3 JSONL file and emits the matching ParseResult.
  *
- * Scope: chat panel display only. Cost aggregation for the conversation list
- * is still handled by `parsePiSession` in src/lib/cost-parsers/pi-parser.ts.
+ * Scope: chat panel display only.
  *
  * Differences from Claude format:
  *   - Pi has top-level `type: 'session'|'message'|'model_change'|...` entries.

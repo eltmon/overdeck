@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 
 import { createActiveSlice } from '../xbrief/dag.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
-import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
 import type { RegisteredSlotSpawn } from './spawn-prep.js';
 
 const execAsync = promisify(exec);
@@ -48,7 +48,7 @@ export function buildRegisteredSlotPrompt(
 }
 
 export async function ensureRegisteredSlotWorktree(issueId: string, baseWorkspace: string, slot: RegisteredSlotSpawn): Promise<void> {
-  const repoRoots = resolveWorkspaceRepoRootsSync(issueId, baseWorkspace);
+  const repoRoots = resolveWorkspaceRepoRoots(issueId, baseWorkspace);
   const polyrepoRoots = repoRoots.filter(root => root.isPolyrepo);
   if (polyrepoRoots.length > 0) {
     const expected = polyrepoRoots.map(root => ({

@@ -83,6 +83,7 @@ export function stopHygieneScheduler(): void {
   intervals = [];
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function isHygieneSchedulerRunning(): boolean {
   return intervals.length > 0;
 }

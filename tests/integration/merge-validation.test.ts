@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
-import { runMergeValidation, autoRevertMerge } from '../../src/lib/cloister/validation.js';
+import { autoRevertMerge } from '../../src/lib/cloister/validation.js';
 
 const execAsync = promisify(exec);
 const testFileDir = dirname(fileURLToPath(import.meta.url));
@@ -78,152 +78,6 @@ describe('merge-validation integration', () => {
     }
   });
 
-  describe('clean merge scenario', () => {
-    it('should validate a clean merge successfully', async () => {
-      // Setup: Create validation script that passes
-      const scriptPath = join(testRepo, 'scripts', 'validate-merge.sh');
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "✓ No conflict markers found"
-echo ""
-echo "Running build..."
-echo "✓ Build passed"
-echo ""
-echo "Running tests..."
-echo "✓ Tests passed"
-echo ""
-echo "=== VALIDATION PASSED ==="
-exit 0
-`,
-        { mode: 0o755 }
-      );
-
-      // Execute validation
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testRepo,
-        issueId: 'TEST-CLEAN',
-      }));
-
-      // Verify
-      expect(result.success).toBe(true);
-      expect(result.valid).toBe(true);
-      expect(result.conflictMarkersFound).toBe(false);
-      expect(result.buildPassed).toBe(true);
-      expect(result.testsPassed).toBe(true);
-      expect(result.failures).toHaveLength(0);
-    });
-  });
-
-  describe('merge with conflicts scenario', () => {
-    it('should detect conflicts and fail validation', async () => {
-      // Setup: Create script that reports conflicts
-      const scriptPath = join(testRepo, 'scripts', 'validate-merge.sh');
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "ERROR: Conflict start markers found in files:"
-echo "src/conflicted-file.ts"
-echo ""
-echo "VALIDATION FAILED: Conflict markers detected"
-exit 1
-`,
-        { mode: 0o755 }
-      );
-
-      // Execute validation
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testRepo,
-        issueId: 'TEST-CONFLICT',
-      }));
-
-      // Verify
-      expect(result.success).toBe(true); // Script ran
-      expect(result.valid).toBe(false); // But validation failed
-      expect(result.conflictMarkersFound).toBe(true);
-      expect(result.failures.length).toBeGreaterThan(0);
-      expect(result.failures[0].type).toBe('conflict');
-    });
-  });
-
-  describe('build failure scenario', () => {
-    it('should detect build failures', async () => {
-      // Setup: Create script that reports build failure
-      const scriptPath = join(testRepo, 'scripts', 'validate-merge.sh');
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "✓ No conflict markers found"
-echo ""
-echo "Running build..."
-echo "ERROR: Build failed"
-echo ""
-echo "VALIDATION FAILED: Build errors detected"
-exit 1
-`,
-        { mode: 0o755 }
-      );
-
-      // Execute validation
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testRepo,
-        issueId: 'TEST-BUILD-FAIL',
-      }));
-
-      // Verify
-      expect(result.valid).toBe(false);
-      expect(result.conflictMarkersFound).toBe(false);
-      expect(result.buildPassed).toBe(false);
-      expect(result.failures).toContainEqual(
-        expect.objectContaining({ type: 'build' })
-      );
-    });
-  });
-
-  describe('test failure scenario', () => {
-    it('should detect test failures', async () => {
-      // Setup: Create script that reports test failure
-      const scriptPath = join(testRepo, 'scripts', 'validate-merge.sh');
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "✓ No conflict markers found"
-echo ""
-echo "Running build..."
-echo "✓ Build passed"
-echo ""
-echo "Running tests..."
-echo "ERROR: Tests failed"
-echo ""
-echo "VALIDATION FAILED: Test failures detected"
-exit 1
-`,
-        { mode: 0o755 }
-      );
-
-      // Execute validation
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testRepo,
-        issueId: 'TEST-TEST-FAIL',
-      }));
-
-      // Verify
-      expect(result.valid).toBe(false);
-      expect(result.testsPassed).toBe(false);
-      expect(result.failures).toContainEqual(
-        expect.objectContaining({ type: 'test' })
-      );
-    });
-  });
-
   describe('auto-revert workflow', () => {
     it('should refuse to target the host repo', async () => {
       await expect(assertNotHostRepo(hostRepoRoot)).rejects.toThrow(
@@ -265,22 +119,6 @@ exit 1
 
       expect(revertedCommit).toBe(initialCommit);
       expect(existsSync(join(testRepo, 'merged.txt'))).toBe(false);
-    });
-  });
-
-  describe('validation script missing', () => {
-    it('should handle gracefully when validation script is missing', async () => {
-      // No validation script created
-
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testRepo,
-        issueId: 'TEST-NO-SCRIPT',
-      }));
-
-      // No validation script = skip (specialist already ran build + tests)
-      expect(result.success).toBe(true);
-      expect(result.valid).toBe(true);
-      expect(result.skipped).toBe(true);
     });
   });
 });

@@ -6,7 +6,7 @@ import {
   recoverAgent,
   autoRecoverAgents,
   normalizeAgentId,
-  resolveAgentTargetSync,
+  resolveAgentTarget,
   resumeAgent,
 } from '../../lib/agents.js';
 
@@ -96,7 +96,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
     // strike namespace had no recovery door at all. resolveAgentTargetSync still
     // prefers the canonical work agent when one exists, and falls back to the
     // single registered agent for the issue whatever its prefix.
-    const agentId = resolveAgentTargetSync(id) ?? normalizeAgentId(id);
+    const agentId = resolveAgentTarget(id) ?? normalizeAgentId(id);
     spinner.text = options.model
       ? `Recovering ${agentId} on ${options.model}...`
       : `Recovering ${agentId}...`;

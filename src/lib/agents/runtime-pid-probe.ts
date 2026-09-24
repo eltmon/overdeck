@@ -7,6 +7,15 @@
  * reports a dead agent alive. Kept in its own small module so the liveness
  * oracle (agents/liveness.ts) and its tests can mock this exact boundary.
  */
+
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `findAgentRuntimePidInSubtreeSync` (async: `findAgentRuntimePidInSubtree`): src/lib/agents/liveness.ts:291.
+ * It blocks on a child process: never call it from src/dashboard/** or src/lib/cloister/** (FR-8).
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
 import { exec, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 

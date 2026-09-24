@@ -1,8 +1,8 @@
 /** Heavy polling reads run only inside the dashboard database worker. */
-import { getCostsByIssueSync } from '../../../lib/overdeck/cost-sync.js';
+import { getCostsByIssue } from '../../../lib/overdeck/cost-sync.js';
 
 export function getCostsByIssueSnapshot() {
-  const dbIssues = getCostsByIssueSync();
+  const dbIssues = getCostsByIssue();
 
   const issues = Object.entries(dbIssues).map(([issueId, d]) => {
     return {

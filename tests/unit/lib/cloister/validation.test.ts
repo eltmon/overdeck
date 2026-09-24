@@ -16,7 +16,7 @@ vi.mock('../../../../src/lib/cloister/quality-gate-admission.js', () => ({
   acquireQualityGateAdmission: admissionMocks.acquire,
 }));
 
-import { runMergeValidation, autoRevertMerge, runQualityGates } from '../../../../src/lib/cloister/validation.js';
+import { autoRevertMerge, runQualityGates } from '../../../../src/lib/cloister/validation.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -38,220 +38,6 @@ describe('validation', () => {
     }
   });
 
-  describe('runMergeValidation', () => {
-    it('should return skipped when validation script does not exist', async () => {
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testDir,
-        issueId: 'TEST-1',
-      }));
-
-      // No validation script = skip (specialist already ran build + tests)
-      expect(result.success).toBe(true);
-      expect(result.valid).toBe(true);
-      expect(result.skipped).toBe(true);
-    });
-
-    it('should return success when validation script passes', async () => {
-      // Create a simple passing validation script
-      const scriptPath = join(testDir, 'scripts', 'validate-merge.sh');
-      mkdirSync(join(testDir, 'scripts'), { recursive: true });
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "✓ No conflict markers found"
-echo ""
-echo "Running build..."
-echo "✓ Build passed"
-echo ""
-echo "Running tests..."
-echo "✓ Tests passed"
-echo ""
-echo "=== VALIDATION PASSED ==="
-exit 0
-`,
-        { mode: 0o755 }
-      );
-
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testDir,
-        issueId: 'TEST-1',
-      }));
-
-      expect(result.success).toBe(true);
-      expect(result.valid).toBe(true);
-      expect(result.conflictMarkersFound).toBe(false);
-      expect(result.buildPassed).toBe(true);
-      expect(result.testsPassed).toBe(true);
-      expect(result.failures).toHaveLength(0);
-    });
-
-    it('should detect conflict markers and return failure', async () => {
-      const scriptPath = join(testDir, 'scripts', 'validate-merge.sh');
-      mkdirSync(join(testDir, 'scripts'), { recursive: true });
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "ERROR: Conflict start markers found in files:"
-echo "src/file1.ts"
-echo "src/file2.ts"
-echo ""
-echo "VALIDATION FAILED: Conflict markers detected"
-exit 1
-`,
-        { mode: 0o755 }
-      );
-
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testDir,
-        issueId: 'TEST-1',
-      }));
-
-      expect(result.success).toBe(true); // Script ran successfully
-      expect(result.valid).toBe(false); // But validation failed
-      expect(result.conflictMarkersFound).toBe(true);
-      expect(result.failures).toHaveLength(1);
-      expect(result.failures[0].type).toBe('conflict');
-      expect(result.failures[0].files).toContain('src/file1.ts');
-      expect(result.failures[0].files).toContain('src/file2.ts');
-    });
-
-    it('should detect build failure', async () => {
-      const scriptPath = join(testDir, 'scripts', 'validate-merge.sh');
-      mkdirSync(join(testDir, 'scripts'), { recursive: true });
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "✓ No conflict markers found"
-echo ""
-echo "Running build..."
-echo "ERROR: Build failed"
-echo ""
-echo "VALIDATION FAILED: Build errors detected"
-exit 1
-`,
-        { mode: 0o755 }
-      );
-
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testDir,
-        issueId: 'TEST-1',
-      }));
-
-      expect(result.valid).toBe(false);
-      expect(result.conflictMarkersFound).toBe(false);
-      expect(result.buildPassed).toBe(false);
-      expect(result.failures).toHaveLength(1);
-      expect(result.failures[0].type).toBe('build');
-    });
-
-    it('should detect test failure', async () => {
-      const scriptPath = join(testDir, 'scripts', 'validate-merge.sh');
-      mkdirSync(join(testDir, 'scripts'), { recursive: true });
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "✓ No conflict markers found"
-echo ""
-echo "Running build..."
-echo "✓ Build passed"
-echo ""
-echo "Running tests..."
-echo "ERROR: Tests failed"
-echo ""
-echo "VALIDATION FAILED: Test failures detected"
-exit 1
-`,
-        { mode: 0o755 }
-      );
-
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testDir,
-        issueId: 'TEST-1',
-      }));
-
-      expect(result.valid).toBe(false);
-      expect(result.conflictMarkersFound).toBe(false);
-      expect(result.buildPassed).toBe(true);
-      expect(result.testsPassed).toBe(false);
-      expect(result.failures).toHaveLength(1);
-      expect(result.failures[0].type).toBe('test');
-    });
-
-    it('should handle multiple failures', async () => {
-      const scriptPath = join(testDir, 'scripts', 'validate-merge.sh');
-      mkdirSync(join(testDir, 'scripts'), { recursive: true });
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "ERROR: Conflict start markers found in files:"
-echo "src/conflict.ts"
-echo ""
-echo "Running build..."
-echo "ERROR: Build failed"
-echo ""
-echo "Running tests..."
-echo "⚠ skipping test check"
-echo ""
-echo "VALIDATION FAILED"
-exit 1
-`,
-        { mode: 0o755 }
-      );
-
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testDir,
-        issueId: 'TEST-1',
-      }));
-
-      expect(result.valid).toBe(false);
-      expect(result.failures).toHaveLength(2); // conflict + build
-      expect(result.failures.map(f => f.type)).toContain('conflict');
-      expect(result.failures.map(f => f.type)).toContain('build');
-    });
-
-    it('should handle skipped build/tests gracefully', async () => {
-      const scriptPath = join(testDir, 'scripts', 'validate-merge.sh');
-      mkdirSync(join(testDir, 'scripts'), { recursive: true });
-      writeFileSync(
-        scriptPath,
-        `#!/bin/bash
-echo "=== Merge Validation ==="
-echo "Checking for conflict markers..."
-echo "✓ No conflict markers found"
-echo ""
-echo "Running build..."
-echo "⚠ No build system detected (no package.json or pom.xml), skipping build check"
-echo ""
-echo "Running tests..."
-echo "⚠ No test system detected, skipping test check"
-echo ""
-echo "=== VALIDATION PASSED ==="
-exit 0
-`,
-        { mode: 0o755 }
-      );
-
-      const result = await Effect.runPromise(runMergeValidation({
-        projectPath: testDir,
-        issueId: 'TEST-1',
-      }));
-
-      expect(result.valid).toBe(true);
-      expect(result.buildPassed).toBe(null); // Skipped, not passed or failed
-      expect(result.testsPassed).toBe(null); // Skipped
-    });
-  });
-
   describe('runQualityGates', () => {
     it('preserves the complete failed gate output', async () => {
       const scriptPath = join(testDir, 'failing-gate.sh');
@@ -269,9 +55,9 @@ exit 1
         { mode: 0o755 },
       );
 
-      const [result] = await Effect.runPromise(runQualityGates({
+      const [result] = await runQualityGates({
         test: { command: scriptPath },
-      }, testDir));
+      }, testDir);
 
       expect(result.passed).toBe(false);
       expect(result.output).toContain('leading stdout 1');
@@ -296,9 +82,9 @@ echo "pass stderr diagnostic" >&2
         { mode: 0o755 },
       );
 
-      const [result] = await Effect.runPromise(runQualityGates({
+      const [result] = await runQualityGates({
         test: { command: scriptPath },
-      }, testDir));
+      }, testDir);
 
       expect(result.passed).toBe(true);
       expect(result.output).toContain('pass output starts here');

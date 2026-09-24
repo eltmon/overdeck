@@ -604,7 +604,7 @@ describe('pan swarm status (PAN-2214)', () => {
       getFailedMergeBlocks: vi.fn(() => (options.getFailedMergeBlocks ? options.getFailedMergeBlocks() : [])),
       readSwarmHold: vi.fn(() => options.hold ?? undefined),
       readSwarmInterventions: vi.fn(() => ({})),
-      readItemStatuses: vi.fn(() => options.itemStatuses ?? {}),
+      readItemStatuses: vi.fn(async () => options.itemStatuses ?? {}),
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       getConcurrencyLimits: vi.fn(() => ({
         maxWorkAgents: 4,

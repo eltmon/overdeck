@@ -1,5 +1,4 @@
 import type { DomainEvent } from '@overdeck/contracts';
-import { Effect } from 'effect';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -153,7 +152,7 @@ describe('Linear MCP auth wake processor', () => {
   it('reacts to healthy by delivering one wake and recording its outcome and receipt', async () => {
     events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
 
-    await Effect.runPromise(handleCloisterDomainEvent({ type: 'linear_mcp_auth.healthy' }));
+    await handleCloisterDomainEvent({ type: 'linear_mcp_auth.healthy' });
 
     expect(mocks.messageAgent).toHaveBeenCalledOnce();
     expect(mocks.messageAgent).toHaveBeenCalledWith(

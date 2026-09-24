@@ -40,7 +40,6 @@ vi.mock('../../../../src/lib/paths.js', async () => {
 });
 
 vi.mock('../../../../src/lib/workspace-manager.js', () => ({
-  preTrustDirectorySync: vi.fn(),
   preTrustDirectory: vi.fn(),
 }));
 
@@ -591,11 +590,16 @@ describe('resolveProjectCreateIntent', () => {
     let callCount = 0;
     // Hold every ls-remote answer so the first resolve is still in the probe when
     // the second arrives. Firing on a timer instead would make the overlap a race.
+    // Once released, a late probe answers at once, so a coalescing regression
+    // fails the callCount assertion instead of hanging until the test timeout.
     const held: Array<() => void> = [];
+    let released = false;
     execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         callCount++;
-        held.push(() => cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' }));
+        const answer = () => cb(null, { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '' });
+        if (released) answer();
+        else held.push(answer);
       } else {
         cb(new Error('Unknown command'));
       }
@@ -611,11 +615,13 @@ describe('resolveProjectCreateIntent', () => {
     const pA = resolveProjectCreateIntent(input);
     const pB = resolveProjectCreateIntent(input);
 
-    // Drain enough event-loop turns for the second resolve to finish its own
-    // filesystem reads and reach the probe; the first cannot advance past it.
-    for (let i = 0; i < 50; i++) {
-      await new Promise((r) => setImmediate(r));
-    }
+    // Both resolves do real filesystem reads before the probe, so a fixed count
+    // of event-loop turns raced them under CI load (nothing held yet → both
+    // promises hung to the timeout). Wait until the first resolve is inside the
+    // probe, then give the second real time to reach it and join the in-flight run.
+    await vi.waitFor(() => expect(held.length).toBeGreaterThanOrEqual(1), { timeout: 3000 });
+    await new Promise((r) => setTimeout(r, 250));
+    released = true;
     for (const fire of held) fire();
 
     const [a, b] = await Promise.all([pA, pB]);

@@ -3,7 +3,7 @@ import type { OrderBook } from '@overdeck/contracts';
 import type { SequenceNode } from '../backlog/types.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { LEGACY_PARKED_LABELS, PARKED_LABEL } from '../backlog/pickup.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPath } from '../projects.js';
 import { backlogSequencePath, listOrderBookIds, readOrderBook, readOrderBookAsync, readOrderBookIndex } from './io.js';
 import type { OrderBookProgress, OrderIssueLookup, OrderIssueState } from './types.js';
 
@@ -14,9 +14,9 @@ const COMPLETE_STATUS = 'complete';
  * or null when it cannot be determined. `panDir` is `<planHome>/.pan`, which
  * lives inside a registered checkout, so path containment is the match.
  */
-export function issuePrefixForStateRoot(panDir: string): string | null {
+function issuePrefixForStateRoot(panDir: string): string | null {
   try {
-    const byPath = findProjectByPathSync(panDir);
+    const byPath = findProjectByPath(panDir);
     return byPath?.issue_prefix ? byPath.issue_prefix.toUpperCase() : null;
   } catch {
     return null;
@@ -124,6 +124,13 @@ export const liveOrderIssueLookup: OrderIssueLookup = (issueIds) => {
   return result;
 };
 
+/**
+ * Load the issue-service module through `import()` and start the shared service without polling.
+ *
+ * Test seam: no production caller (the dashboard starts the shared service itself). Tests call it so
+ * the resolver's module cache holds the mocked issue-service module, which the `require()` path in
+ * `loadIssueServiceModuleSync` cannot reach (PAN-3958 CH-8).
+ */
 export async function ensureOrderIssueStore(): Promise<void> {
   const { startSharedIssueService } = await loadIssueServiceModule();
   await startSharedIssueService({ skipPolling: true });
@@ -149,19 +156,14 @@ export function listBooks(panDir: string): OrderBook[] {
   });
 }
 
-export function getBook(panDir: string, bookId: string): OrderBook | null {
-  const book = readOrderBook(panDir, bookId);
-  return book ? normalizeBookIssues(panDir, book) : null;
-}
-
 export function getBookAsync(panDir: string, bookId: string): Promise<OrderBook | null> {
   return readOrderBookAsync(panDir, bookId).then((book) => (book ? normalizeBookIssues(panDir, book) : null));
 }
 
 /** The first 'ready' book in index.json queue order, or null if none is ready. */
-export function firstReadyBookInQueue(panDir: string): OrderBook | null {
+export async function firstReadyBookInQueue(panDir: string): Promise<OrderBook | null> {
   for (const entry of readOrderBookIndex(panDir)) {
-    const book = getBook(panDir, entry.id);
+    const book = await getBookAsync(panDir, entry.id);
     if (book?.status === 'ready') return book;
   }
   return null;

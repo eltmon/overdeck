@@ -17,7 +17,7 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
-import { registerProjectSync, unregisterProjectSync } from '../../../src/lib/projects.js';
+import { registerProject, unregisterProject } from '../../../src/lib/projects.js';
 import { getWorkspaceById, listWorkspaces } from '../../../src/lib/workspaces/resolver.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
 import { clearParentBranchCache } from '../../../src/lib/workspaces/create.js';
@@ -65,12 +65,12 @@ beforeEach(() => {
   writeFileSync(join(projectRoot, 'README.md'), 'root\n', 'utf-8');
   execFileSync('git', ['add', '-A'], { cwd: projectRoot });
   execFileSync('git', ['commit', '-m', 'init', '--quiet'], { cwd: projectRoot });
-  registerProjectSync(PROJECT_KEY, { name: 'Registry integration project', path: projectRoot });
+  registerProject(PROJECT_KEY, { name: 'Registry integration project', path: projectRoot });
   targetDir = mkdtempSync(join(tmpdir(), 'pan-3330-registry-target-'));
 });
 
 afterEach(() => {
-  unregisterProjectSync(PROJECT_KEY);
+  unregisterProject(PROJECT_KEY);
   clearParentBranchCache();
   teardownOverdeckTestDb(odb);
   rmSync(projectRoot, { recursive: true, force: true });

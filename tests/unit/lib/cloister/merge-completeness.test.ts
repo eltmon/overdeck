@@ -39,15 +39,15 @@ vi.mock('child_process', () => {
 });
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
-  getMergeSetSync: getMergeSetMock,
-  upsertMergeSetSync: upsertMergeSetMock,
-  withRepoArtifactUrlSync: withRepoArtifactUrlMock,
-  withRepoStateSync: withRepoStateMock,
+  ensureMergeSetForIssue: ensureMergeSetForIssueMock,
+  getMergeSet: getMergeSetMock,
+  upsertMergeSet: upsertMergeSetMock,
+  withRepoArtifactUrl: withRepoArtifactUrlMock,
+  withRepoState: withRepoStateMock,
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: resolveProjectReposForIssueMock,
+  resolveProjectReposForIssue: resolveProjectReposForIssueMock,
 }));
 
 vi.mock('../../../../src/lib/forge.js', () => ({
@@ -56,7 +56,6 @@ vi.mock('../../../../src/lib/forge.js', () => ({
 
 import {
   assessMergeCompleteness,
-  reconcileStrandedRepos,
 } from '../../../../src/lib/cloister/merge-completeness.js';
 
 function repo(
@@ -74,15 +73,8 @@ function repo(
   };
 }
 
-let storedMergeSet: any = null;
-
 function mergeSet(repos: ReturnType<typeof repo>[]) {
   return { issueId: 'MIN-857', repos };
-}
-
-function seedMergeSet(repos: ReturnType<typeof repo>[]) {
-  storedMergeSet = mergeSet(repos);
-  return storedMergeSet;
 }
 
 const currentHead = 'current-head-sha\n';
@@ -268,130 +260,3 @@ describe('assessMergeCompleteness', () => {
   });
 });
 
-describe('reconcileStrandedRepos (PAN-3917: forge + git only, no merge-set writes)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    storedMergeSet = null;
-    getForgeAdapterMock.mockReturnValue({
-      discoverArtifact: discoverArtifactMock,
-      findMergedArtifact: findMergedArtifactMock,
-    });
-    execMock.mockResolvedValue(gitResult());
-    discoverArtifactMock.mockResolvedValue(null);
-    findMergedArtifactMock.mockResolvedValue(null);
-    getMergeSetMock.mockImplementation(() => storedMergeSet);
-  });
-
-  it('self-heals an unrecorded review artifact in the returned set', async () => {
-    const stranded = repo('api', 'gitlab');
-    discoverArtifactMock.mockResolvedValue({
-      forge: 'gitlab',
-      created: false,
-      url: 'https://gitlab.com/org/api/-/merge_requests/56',
-      id: '56',
-    });
-    execMock.mockImplementation(async (command) => repoGitResult(command, '2\n'));
-
-    const result = await reconcileStrandedRepos(seedMergeSet([stranded]) as any);
-
-    expect(result.blockers).toEqual([]);
-    expect(result.mergeSet.repos[0]).toEqual(expect.objectContaining({
-      artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
-      artifactId: '56',
-    }));
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
-
-  it('treats a stranded change-free repo as no blocker', async () => {
-    execMock.mockImplementation(async (command) => (
-      command.includes('rev-list --count') ? gitResult('0\n') : gitResult()
-    ));
-
-    const result = await reconcileStrandedRepos(seedMergeSet([repo('api', 'gitlab')]) as any);
-
-    expect(result.blockers).toEqual([]);
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
-
-  it('returns a repo-naming blocker for commits without an artifact', async () => {
-    execMock.mockImplementation(async (command) => repoGitResult(command, '2\n'));
-
-    const result = await reconcileStrandedRepos(seedMergeSet([repo('api', 'gitlab')]) as any);
-
-    expect(result.blockers).toEqual([
-      expect.objectContaining({
-        repoKey: 'api',
-        state: 'unmerged',
-        reason: expect.stringContaining('api has 2 commits'),
-      }),
-    ]);
-  });
-
-  it('clears an artifact-backed repo once the forge proves it landed, whatever it said before', async () => {
-    const stranded = {
-      ...repo('api', 'gitlab'),
-      artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
-    };
-    execMock.mockImplementation(async (command) => repoGitResult(command, '2\n'));
-    findMergedArtifactMock.mockResolvedValue({
-      forge: 'gitlab',
-      created: false,
-      url: 'https://gitlab.com/org/api/-/merge_requests/56',
-      id: '56',
-    });
-
-    const result = await reconcileStrandedRepos(seedMergeSet([stranded]) as any);
-
-    expect(result.blockers).toEqual([]);
-    expect(result.mergeSet.repos[0]).toEqual(expect.objectContaining({
-      artifactId: '56',
-      artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
-    }));
-    expect(discoverArtifactMock).not.toHaveBeenCalled();
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
-
-  it('reports a sibling blocker while the other repo verifies clean', async () => {
-    const repoA = repo('fe', 'gitlab');
-    const repoB = repo('api', 'gitlab');
-    execMock.mockImplementation(async (command) => repoGitResult(command, '2\n'));
-    discoverArtifactMock.mockImplementation(async ({ cwd }) => {
-      if (cwd.endsWith('/api')) throw new Error('forge unavailable');
-      return {
-        forge: 'gitlab',
-        created: false,
-        url: 'https://gitlab.com/org/fe/-/merge_requests/55',
-        id: '55',
-      };
-    });
-    findMergedArtifactMock.mockResolvedValue({
-      forge: 'gitlab',
-      created: false,
-      url: 'https://gitlab.com/org/fe/-/merge_requests/55',
-      id: '55',
-    });
-
-    const result = await reconcileStrandedRepos(seedMergeSet([repoA, repoB]) as any);
-
-    expect(result.blockers).toEqual([
-      expect.objectContaining({ repoKey: 'api', state: 'unverifiable' }),
-    ]);
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when artifact discovery cannot be verified', async () => {
-    discoverArtifactMock.mockRejectedValue(new Error('forge unavailable'));
-
-    const result = await reconcileStrandedRepos(seedMergeSet([repo('api', 'gitlab')]) as any);
-
-    expect(result.blockers).toEqual([
-      expect.objectContaining({
-        repoKey: 'api',
-        state: 'unverifiable',
-        reason: expect.stringContaining('forge unavailable'),
-      }),
-    ]);
-    expect(execMock).not.toHaveBeenCalled();
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
-});

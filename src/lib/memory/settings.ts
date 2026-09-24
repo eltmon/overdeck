@@ -7,8 +7,8 @@ import type { ExtractionProviderTarget, MemoryProviderSettings } from './provide
 const CACHE_TTL_MS = 5_000;
 let cachedSettings: { path: string; settings: MemorySettings; expiresAt: number } | null = null;
 
-export const DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD = 4;
-export const DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS = 10_000;
+const DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD = 4;
+const DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS = 10_000;
 export const DEFAULT_MEMORY_WORKER_CONCURRENCY = 4;
 
 export interface MemorySettings {
