@@ -71,6 +71,16 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   backoff (1s, 2s, 4s, 8s, 16s) and, when EventRouter re-bootstraps after a
   `/ws/rpc` reconnect, cancels in-flight fetches and refetches them, so a failed
   or hung fetch during a dashboard restart does not leave the sidebar empty.
+- The Command Deck's pipeline-membership banner (`ProjectMembershipBoundary`,
+  PAN-3527) tells a temporary outage from a settled answer. While a restarted
+  server's snapshot warms, `GET /api/pipeline/membership` returns 503 with
+  `{ status: 'loading', code: 'snapshot_loading' }` and `Retry-After: 5`. That
+  503, a failed or timed-out request, and a proxy 502/503/504 are transient:
+  the banner keeps retrying them (backoff capped at 30s, never sooner than
+  `Retry-After`), shows "retrying automatically" instead of the error alert, and
+  keeps its last good result meanwhile. A typed `status: 'unavailable'` body or
+  another HTTP error is a settled answer and shows the alert with its Retry
+  button. The membership query also joins the reconnect refetch above.
 
 **Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
 starts a discuss-first conversation through `POST /api/conversations` and opens

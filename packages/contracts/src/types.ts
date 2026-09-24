@@ -31,6 +31,21 @@ export interface PipelineMembershipUnavailableBody {
   projectKey: string
 }
 
+/**
+ * PAN-3527 — the membership snapshot has not been gathered yet (a freshly
+ * restarted server warming its cache). Sent with HTTP 503 and a `Retry-After`
+ * header. Unlike `PipelineMembershipUnavailableBody` (a settled answer about
+ * the project), this is a temporary state: callers retry it.
+ */
+export const PIPELINE_MEMBERSHIP_LOADING_CODE = "snapshot_loading" as const
+
+export interface PipelineMembershipLoadingBody {
+  status: "loading"
+  code: typeof PIPELINE_MEMBERSHIP_LOADING_CODE
+  error: string
+  projectKey: string
+}
+
 /** Server-computed pipeline membership attached to dashboard issue DTOs. */
 export interface IssuePipelineMembership {
   available?: boolean
