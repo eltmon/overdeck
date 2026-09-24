@@ -84,11 +84,18 @@ const {
 vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
   agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
   // PAN-3939: reviewer kills close through the terminal backend. Here the close
-  // stands in for the tmux kill the assertions below count.
+  // stands in for the tmux kill the assertions below count. Like the real
+  // close, it never throws: a kill that fails is a `failed` outcome.
   closeAgentPaneDetailed: async (agentId: string) => {
-    await mockKillSessionAsync(agentId);
-    return { outcome: 'closed' };
+    try {
+      await mockKillSessionAsync(agentId);
+      return { outcome: 'closed' };
+    } catch (err) {
+      return { outcome: 'failed', reason: err instanceof Error ? err.message : String(err) };
+    }
   },
+  // The shutdown sweep lists Herdr panes only on Herdr; these tests run on tmux.
+  resolveLaunchBackend: async () => ({ name: 'tmux' }),
 }));
 
 // PAN-3939: the synthesis dispatch guard asks the liveness oracle. These tests
