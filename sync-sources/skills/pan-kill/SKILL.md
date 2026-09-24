@@ -106,6 +106,7 @@ curl -s http://localhost:3011/api/agents \
   | jq -r '.[] | select(.issueId == "ISSUE-123" and .hasLiveTmuxSession == true) | "\(.id) pane=\(.paneState)"'
 ```
 
+`/api/agents` caches for about 5 seconds, so wait that long after a kill before trusting it.
 Then run `pan kill <agent-id>` again. If it still survives, find the pane on the backend itself:
 
 ```bash

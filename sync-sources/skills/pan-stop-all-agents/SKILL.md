@@ -97,12 +97,12 @@ tmux -L overdeck kill-session -t agent-<issue>
 "No Bandaids"). State files live at `~/.overdeck/agents/<id>/state.json`. The most
 common breakage is a doubled trailing `}` from a partial write.
 
-### 3. Verify no agent pane remains
+### 3. Verify no agent is alive
 
 ```bash
-curl -s http://localhost:3011/api/agents \
-  | jq -r '.[] | select(.hasLiveTmuxSession == true) | .id'
-# Expect no output. Conversations are not listed here; they stay up.
+# pan status probes each agent live (Herdr or tmux); /api/agents caches for ~5s
+pan status --json | jq -r '.[] | select(.alive) | select(.id | startswith("conv-") | not) | .id'
+# Expect no output. Conversations stay up.
 ```
 
 ### 4. Verify conversations survived
