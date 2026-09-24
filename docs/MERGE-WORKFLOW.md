@@ -180,6 +180,25 @@ pane alive, and close-out's DoD row 5 then failed on "running agents" (PAN-3947)
 merge** — a concurrency guard prevents the handoff from re-triggering itself
 (a missing guard caused a 24,626-call tracker API loop, PAN-328).
 
+A merged **strike** also cleans up after itself (PAN-3981). When the
+`pull_request` webhook reports a `strike/<issue>` PR merged, it runs
+`finishStrike`
+([`src/lib/cloister/strike-completion.ts`](../src/lib/cloister/strike-completion.ts))
+next to the handoff: it stops the `strike-<issue>` agent through the terminal
+backend (`stopAgent`, which closes the Herdr pane or kills the tmux session and
+writes `stopped`), removes the `feature-<issue>-strike` worktree unless it holds
+uncommitted changes to tracked files, and deletes the local `strike/<issue>`
+branch only when its content is on `origin/main`. Strikes land by squash merge,
+which `git merge-base --is-ancestor` cannot see, so the merged check
+(`isStrikeBranchMerged`) also accepts a branch whose `git merge-tree` result
+against `origin/main` is main's own tree. A commit made on the branch after the
+merge fails that check, and the branch is kept. The run journals `strike.landed`
+when the issue has a `feature-<issue>` workspace. The deacon
+strike-workspace reaper (`strike-workspace-reaper.ts`) is the fallback for what
+this misses: it uses the same merged check, asks the selected terminal backend
+whether the strike agent is alive (never reaping on an indeterminate answer),
+and logs each reap as a warning that completion missed it.
+
 Docker cleanup happens at merge time because orphaned networks from merged
 workspaces accumulate and eventually block new workspace creation ("all
 predefined address pools have been fully subnetted" — Docker's default pool
