@@ -13,16 +13,25 @@
  *
  * An issue no tracker has answered for is reported `trackerUnknown`, never as
  * an open issue.
+ *
+ * Board reads through `loadIssueStatesForProject` take the repo's PR listing
+ * stale-while-revalidate (`listRepoPullRequestsStaleOk`, PAN-3925): a listing
+ * past its 30s TTL still answers while one refresh runs, so a request waits
+ * on `gh pr list` only when no listing younger than two minutes exists.
+ * `loadIssueStatesForIssues` groups ids by project and batches each project
+ * in parallel — the door for routes that hold ids from many projects.
  */
 
 import type { DerivedIssueState } from '@overdeck/contracts';
 
 import {
   getDerivedIssueState as libGetDerivedIssueState,
+  listRepoPullRequestsStaleOk,
   loadIssueStatesForProject as libLoadIssueStatesForProject,
   type IssueStateLoaderDeps,
   type TrackerIssueFacts,
 } from '../../../lib/overdeck/derived-issue-state.js';
+import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { getBackendPanes } from './backend-inventory.js';
 import { getSharedIssueService } from './issue-service-singleton.js';
 
@@ -34,6 +43,7 @@ export {
   issueIdFromBranch,
   listReadyIssuesForProject,
   listRepoPullRequests,
+  listRepoPullRequestsStaleOk,
   loadIssueStateFacts,
   mrFromGlabRow,
   paneFromBackendSnapshot,
@@ -80,6 +90,8 @@ export async function getDerivedIssueState(
   return libGetDerivedIssueState(issueId, await withServerFacts(issueId, deps));
 }
 
+type BatchDeps = NonNullable<Parameters<typeof libLoadIssueStatesForProject>[2]>;
+
 /**
  * Derive many issues at once — one forge listing per repo, one inventory read.
  * Callers that already hold the tracker rows pass them in `issues`; the rest
@@ -88,9 +100,7 @@ export async function getDerivedIssueState(
 export async function loadIssueStatesForProject(
   projectPath: string,
   issueIds: readonly string[],
-  deps: IssueStateLoaderDeps & {
-    readonly issues?: Readonly<Record<string, TrackerIssueFacts | null>>;
-  } = {},
+  deps: BatchDeps = {},
 ): Promise<Map<string, DerivedIssueState>> {
   const panes = deps.panes ?? await getBackendPanes();
   const issues = deps.issues ?? Object.fromEntries(
@@ -99,5 +109,35 @@ export async function loadIssueStatesForProject(
       return [issueId, cachedTrackerIssue(issueId)];
     }),
   );
-  return libLoadIssueStatesForProject(projectPath, issueIds, { ...deps, panes, issues });
+  const listPullRequests = deps.listPullRequests ?? listRepoPullRequestsStaleOk;
+  return libLoadIssueStatesForProject(projectPath, issueIds, { ...deps, panes, issues, listPullRequests });
+}
+
+/**
+ * Derive issues from any number of projects: ids grouped by project, one
+ * batch per project, the projects in parallel, one inventory read shared by
+ * all of them. An id with no registered project is absent from the result, and
+ * a project whose batch fails drops only its own ids.
+ */
+export async function loadIssueStatesForIssues(
+  issueIds: Iterable<string>,
+  deps: BatchDeps & {
+    readonly resolveProject?: (issueId: string) => { readonly projectPath: string } | null;
+  } = {},
+): Promise<Map<string, DerivedIssueState>> {
+  const resolveProject = deps.resolveProject ?? resolveProjectFromIssueSync;
+  const byProject = new Map<string, string[]>();
+  for (const issueId of new Set([...issueIds].map((id) => id.toUpperCase()))) {
+    const project = resolveProject(issueId);
+    if (!project) continue;
+    const ids = byProject.get(project.projectPath);
+    if (ids) ids.push(issueId); else byProject.set(project.projectPath, [issueId]);
+  }
+  const out = new Map<string, DerivedIssueState>();
+  if (byProject.size === 0) return out;
+  const panes = deps.panes ?? await getBackendPanes();
+  const batches = await Promise.all([...byProject].map(([projectPath, ids]) =>
+    loadIssueStatesForProject(projectPath, ids, { ...deps, panes }).catch(() => new Map<string, DerivedIssueState>())));
+  for (const batch of batches) for (const [issueId, state] of batch) out.set(issueId, state);
+  return out;
 }

@@ -9,7 +9,6 @@ import { listCommand } from './list.js';
 import { wakeCommand } from './wake.js';
 import { resetCommand } from './reset.js';
 import { doneAndExitCommand } from './done.js';
-import { logsCommand, cleanupLogsCommand } from './logs.js';
 
 export function registerSpecialistsCommands(program: Command): void {
   const specialists = program
@@ -49,21 +48,4 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--tested-sha <sha>', 'Test/UAT only: the commit the run exercised (git rev-parse HEAD before the gates)')
     .option('--run-id <runId>', 'Review cycle ID used to deduplicate review feedback')
     .action(doneAndExitCommand);
-
-  // pan specialists logs <project> <type> [runId]
-  specialists
-    .command('logs [project] [type] [runId]')
-    .description('View specialist run logs')
-    .option('--json', 'Output in JSON format')
-    .option('--limit <count>', 'Number of runs to show (default: 10)')
-    .option('--tail', 'Follow active run log in real-time')
-    .action(logsCommand);
-
-  // pan specialists cleanup-logs <project> <type> or --all
-  specialists
-    .command('cleanup-logs [project] [type]')
-    .description('Clean up old specialist logs')
-    .option('--force', 'Skip confirmation prompt')
-    .option('--all', 'Clean up logs for all projects')
-    .action(cleanupLogsCommand);
 }

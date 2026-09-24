@@ -15,6 +15,13 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `src/dashboard/server/services/*.ts` — domain services (cache, agent enrichment, TTS runtime/playback, etc.)
 - `src/dashboard/server/event-store.ts`, `read-model.ts` — event store and in-memory read model, at the server root
 
+**Deacon child process** (PAN-3922):
+- The dashboard forks `dist/dashboard/deacon.js` (`src/dashboard/server/deacon-main.ts`) through `services/deacon-supervisor.ts`. Cloister and deacon-lite run only in that child, never in the dashboard process.
+- IPC, parent to child: `{type:'patrol'}` (run one patrol now) and `{type:'reload-config'}`. Child to parent: `{type:'patrol-done', at, error}` after every completed deacon-lite tick, scheduled or manual.
+- The supervisor keeps the latest `patrol-done` report in memory, across child restarts. Nothing is written to disk.
+- `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
+- The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
+
 **Two WebSocket endpoints:**
 - `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
 - `/ws/terminal?session=<name>` — Raw WebSocket: live PTY terminal streaming via `ws` library.
@@ -152,6 +159,17 @@ door that does not exist; a real record read door would be a separate change.
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.
+- The dashboard runs the built bundle, where `dashboard-db-worker.js` is its own entry in
+  `dist/dashboard/` (`src/dashboard/server/tsdown.config.ts`). `dashboard-db-task.ts`
+  resolves it from the `dist/` root, like the memory FTS worker, so it is found whichever
+  chunk the bundler puts the task module in.
+- Under a source run (Vitest, `tsx`) `dashboard-db-task.ts` loads as `.ts`. Node's type
+  stripping does not rewrite the worker's `.js` import specifiers, and a `--import tsx`
+  flag in `execArgv` does not reach a worker thread, so a raw `.ts` worker dies on its
+  first relative import. The `.ts` branch instead boots the thread through an `eval`
+  bootstrap that registers `tsx`'s resolver and then imports `dashboard-db-worker.ts`
+  (PAN-3930). Bun runs the `.ts` worker directly. Tests that boot the real worker call
+  `__testInternals.terminateWorkers()` in `afterEach`.
 - Jobs that wait or run for more than one second emit
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.
@@ -245,6 +263,8 @@ components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
 marker so the no-loss gate proves that no existing surface disappeared.
 
 **God View:** `/god-view` centers the Confluence production canvas from [PAN-3447](https://github.com/eltmon/overdeck/issues/3447); its deliberate style-guide exemption and live-data contract are documented in `docs/GOD-VIEW.md`.
+
+**Derived issue state on board routes (PAN-3925):** routes that derive many issues go through the server adapter's batch doors in `services/derived-issue-state.ts`: `loadIssueStatesForProject` for one project, and `loadIssueStatesForIssues` for ids from many projects (one batch per project, the projects in parallel). A batch costs one `gh pr list` per repo, two `git for-each-ref` calls, and no per-issue spawn. The server batch doors read the PR listing stale-while-revalidate (`listRepoPullRequestsStaleOk`): a busy repo's listing takes ~11s, so once the 30s TTL passes, reads get the last listing immediately while a single refresh runs. A read waits for the forge only when no listing is younger than two minutes. Gates that act on readiness (merge scheduling, the ready set) keep the strict `listRepoPullRequests`. Route code must not call `getDerivedIssueState` in a loop.
 
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.

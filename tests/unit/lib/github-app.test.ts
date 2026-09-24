@@ -36,6 +36,9 @@ vi.mock('child_process', async (importOriginal) => {
 });
 
 import {
+  GITHUB_API_TIMEOUT_MS,
+  GitHubRequestTimeoutError,
+  generateInstallationToken,
   getCiCheckRunsState,
   getIssueState,
   getMergeBackendStatus,
@@ -43,6 +46,7 @@ import {
   isIntegrationPermissionError,
   listOpenIssuesWithLabels,
   listPullRequestsForHead,
+  mergePullRequestWithApp,
   postOverdeckTestsStatus,
   verifyAppCanMerge,
 } from '../../../src/lib/github-app.js';
@@ -511,4 +515,87 @@ describe('postOverdeckTestsStatus sha binding (PAN-3847)', () => {
     expect(execFileMock.mock.calls.some((call) => String(call[0]).includes('rev-parse'))).toBe(false);
   });
 
+});
+
+describe('GitHub App request timeout (PAN-4047)', () => {
+  const fetchMock = vi.fn();
+
+  function tokenResponse() {
+    return new Response(JSON.stringify({ token: 'token', expires_at: '2026-09-24T00:00:00Z' }), { status: 201 });
+  }
+
+  /** A fetch that never answers; it settles only when its signal aborts, like real fetch. */
+  function hangUntilAborted(_input: unknown, init?: RequestInit): Promise<Response> {
+    return new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+    });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('fails the installation-token fetch with a typed timeout instead of hanging', async () => {
+    fetchMock.mockImplementation(hangUntilAborted);
+    let settled = false;
+    const result = Effect.runPromise(Effect.flip(generateInstallationToken()))
+      .finally(() => { settled = true; });
+
+    await vi.advanceTimersByTimeAsync(GITHUB_API_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+
+    const error = await result;
+    expect(error._tag).toBe('GitHubApiError');
+    expect(error.message).toContain(`timed out after ${GITHUB_API_TIMEOUT_MS}ms`);
+    if (error._tag === 'GitHubApiError') {
+      expect(error.cause).toBeInstanceOf(GitHubRequestTimeoutError);
+    }
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.signal?.aborted).toBe(true);
+  });
+
+  it('rejects an API call with GitHubRequestTimeoutError when the request never answers', async () => {
+    // Never settles and ignores the signal: the bound must hold regardless.
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockImplementationOnce(() => new Promise<Response>(() => {}));
+
+    const assertion = expect(getIssueState('eltmon', 'overdeck', 4047)).rejects.toBeInstanceOf(GitHubRequestTimeoutError);
+    await vi.advanceTimersByTimeAsync(GITHUB_API_TIMEOUT_MS);
+    await assertion;
+
+    const init = fetchMock.mock.calls[1][1] as RequestInit;
+    expect(init.signal?.aborted).toBe(true);
+  });
+
+  it('bounds the merge request too', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockImplementationOnce(hangUntilAborted);
+
+    const assertion = expect(mergePullRequestWithApp('eltmon', 'overdeck', 4047)).rejects.toMatchObject({
+      name: 'GitHubRequestTimeoutError',
+      operation: 'PUT /repos/eltmon/overdeck/pulls/4047/merge',
+      timeoutMs: GITHUB_API_TIMEOUT_MS,
+    });
+    await vi.advanceTimersByTimeAsync(GITHUB_API_TIMEOUT_MS);
+    await assertion;
+  });
+
+  it('clears the timer once a request answers', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'open' }), { status: 200 }));
+
+    await expect(getIssueState('eltmon', 'overdeck', 4047)).resolves.toEqual({ state: 'open' });
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

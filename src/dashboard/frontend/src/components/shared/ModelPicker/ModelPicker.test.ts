@@ -56,6 +56,17 @@ describe('ModelPicker harness policy', () => {
     });
   });
 
+  it('does not allow a harness missing from a loaded model decision row', () => {
+    const decision = canUsePickerHarness('codex', 'claude-sonnet-4-6', policyDecisions);
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toContain('No harness-policy decision for codex');
+  });
+
+  it('leaves options usable while the model has no decision row yet', () => {
+    expect(canUsePickerHarness('codex', 'model-not-in-batch', policyDecisions)).toEqual({ allowed: true });
+    expect(canUsePickerHarness('codex', 'claude-sonnet-4-6', undefined)).toEqual({ allowed: true });
+  });
+
   it('keeps Claude Code available for Anthropic subscription auth', () => {
     expect(canUsePickerHarness('claude-code', 'claude-sonnet-4-6', policyDecisions)).toEqual({
       allowed: true,

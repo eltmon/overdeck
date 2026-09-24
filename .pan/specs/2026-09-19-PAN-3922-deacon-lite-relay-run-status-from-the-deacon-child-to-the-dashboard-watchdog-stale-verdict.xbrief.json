@@ -1,0 +1,554 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-19T11:42:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3922: Deacon-lite: relay run status from the deacon child to the dashboard; watchdog stale verdict",
+    "updated": "2026-09-19T13:20:20.237Z"
+  },
+  "plan": {
+    "id": "pan-3922",
+    "title": "Deacon-lite: relay run status from the deacon child to the dashboard; watchdog stale verdict",
+    "status": "running",
+    "uid": "8484accf-3f4c-4635-96a0-3b872b07d0c1",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 3,
+    "created": "2026-09-19T11:42:35Z",
+    "updated": "2026-09-19T13:20:20.237Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3922",
+        "label": "PAN-3922",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-3922.md",
+        "label": "PRD draft (.pan/drafts/pan-3922.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917 (The Overdeck Cut)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "deacon-lite",
+      "dashboard-server",
+      "supervisor-watchdog",
+      "ipc"
+    ],
+    "narratives": {
+      "Problem": "GET /api/deacon/status and GET /api/cloister/status read getDeaconLiteStatus() from the dashboard process, but deacon-lite runs only inside the forked deacon child (deacon-main.ts), so every consumer (pan admin cloister status, the DeaconStatus widget, DeaconActivityView, the core-services row, and the pan up supervisor watchdog) sees running:false and lastRunAt:null. The watchdog's stale verdict was neutralised in c8a7c0f for this reason, so a wedged deacon is invisible. A manual patrol (POST /api/deacon/patrol) also bypasses the child's tick(), so it never stamps status even locally.",
+      "Proposal": "Keep status in memory and file-free (PAN-3917 W4). Add one child-to-parent IPC message: deacon-lite gains a setPatrolRunObserver seam and an exported runDeaconLitePatrol tick; deacon-main registers an observer that sends {type:'patrol-done', at, error} after every tick and routes the manual patrol through the tick; the deacon supervisor stores the latest report (kept across child restarts) and exports lastPatrolReport; the control surface composes deaconLite from the supervisor (running = child running, intervalMs = the exported constant, lastRunAt/lastRunError = the report); the supervisor watchdog reads deaconLite.intervalMs and deaconLite.lastRunAt only, keeping the c8a7c0f missing-means-no-verdict rule. No new routes, no disk writes, no frontend changes.",
+      "NonGoals": "- Restoring the pre-cut 'heartbeat missing for N seconds' watchdog verdict; a null lastRunAt still yields no verdict.\n- Persisting run status to disk or the event store; no patrol log ring; GET /api/deacon/logs stays empty.\n- Changing src/cli/commands/cloister/status.ts; its dead DeaconStatusResponse.lastPatrol block (lines 15-22, 87-92) is left as-is.\n- Any frontend source change; DeaconStatus.tsx and DeaconActivityView.tsx already render the relayed fields.\n- A re-entrancy guard on runDeaconLitePatrol for overlapping slow ticks.\n- Resetting the stored patrol report when the deacon child respawns.\n- Relaying through the deacon event client / event store instead of IPC."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Relay over the existing fork() IPC channel, not the deacon event client.",
+        "rationale": "IPC already carries patrol and reload-config; a run-status ping needs no durability, batching, or sequence numbers, and the issue body names this transport."
+      },
+      {
+        "summary": "The supervisor keeps the last patrol report across child respawns.",
+        "rationale": "Resetting on respawn would blind the watchdog to a child that restarts but never completes a patrol, which is exactly the case the neutralised verdict cannot see; keeping it is also less code."
+      },
+      {
+        "summary": "deaconLite.running in the dashboard's composed status means the deacon child process is running (isChildRunning()).",
+        "rationale": "The child starts deacon-lite as part of Cloister start and exits with code 1 when that fails, so process liveness is the honest proxy; the CLI already renders running-with-null-lastRunAt as 'waiting for first run'."
+      },
+      {
+        "summary": "Keep the c8a7c0f behaviour: a null lastRunAt produces no watchdog verdict; only a stale or unparsable reported timestamp restarts.",
+        "rationale": "The issue asks for the stale verdict to read the relayed value; restoring the missing-timestamp verdict re-opens the restart loop risk on slow first patrols and was deliberately removed."
+      },
+      {
+        "summary": "The watchdog reads deaconLite.intervalMs and deaconLite.lastRunAt only; the config.patrolIntervalMs and state.lastPatrol reads and their test fixtures are removed/migrated.",
+        "rationale": "Those fields belonged to the deleted deacon and can never appear in /api/deacon/status again; leaving the fallback chain makes the staleness threshold ignore the real interval and turns seven test fixtures into no-ops."
+      },
+      {
+        "summary": "Manual patrols (POST /api/deacon/patrol) run through the exported tick so they stamp and relay status.",
+        "rationale": "Today deacon-main calls runDeaconLite() directly, so the DeaconActivityView 'Run patrol now' button can never move lastRunAt; routing through the tick fixes that with a one-line change."
+      },
+      {
+        "summary": "No frontend changes; documentation goes to docs/DASHBOARD-ARCHITECTURE.md (new deacon-child block) and sync-sources/skills/pan-admin-cloister/SKILL.md (status bullet).",
+        "rationale": "Both widgets already read deaconLite.lastRunAt/lastRunError/running; the architecture doc has no deacon-child section at all and the skill is the operator-facing description of status."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Six subsystems by the first-two-segment rule (src/lib, src/dashboard, src/supervisor, tests/unit, docs, sync-sources/skills) at the limit, not over it; the change is one relay path end to end and cannot be split without shipping a dashboard that still reports running:false.",
+      "canonicalFilename": "2026-09-19-PAN-3922-deacon-lite-relay-run-status-from-the-deacon-child-to-the-dashboard-watchdog-stale-verdict.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "lite-observer-seam",
+        "title": "deacon-lite: export the interval, an exported patrol tick, and a patrol-run observer seam",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:42:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3922",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "child-relay-ipc",
+            "control-surface-compose"
+          ],
+          "files_scope": [
+            "src/lib/cloister/deacon-lite.ts",
+            "tests/unit/lib/cloister/deacon-lite.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-lite.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/deacon-lite.test.ts passes including the new runDeaconLitePatrol describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In src/lib/cloister/deacon-lite.ts: (1) export DEACON_LITE_INTERVAL_MS (line 179); (2) add `export interface PatrolRunReport { at: string; error: string | null }`, a module-level `patrolRunObserver`, and `export function setPatrolRunObserver(fn | null)` in the style of setAgentStoppedNotifier (line 107); (3) rename `async function tick()` (line 185) to `export async function runDeaconLitePatrol()`, keep its try/catch stamping of lastRunAt/lastRunError, and after the try/catch call the observer with { at: lastRunAt, error: lastRunError } inside its own try/catch that only console.errors; update the two tick() call sites in startDeaconLite (lines 199-200); (4) update the module docstring (lines 9-11) to say the child relays each completed tick through setPatrolRunObserver (PAN-3922). Tests: extend the import destructure at tests/unit/lib/cloister/deacon-lite.test.ts:77 and add the five cases listed in the PRD (clean run reports {at, error:null} and stamps lastRunAt; a rejected reconcileClosedIssueAgents reports error text; a globally paused tick still reports; a throwing observer is swallowed; DEACON_LITE_INTERVAL_MS is 60_000). Reset the observer to null in afterEach. In each new case set mocks.listAgentStates.mockReturnValue([]) and mocks.liveAgentInventory.mockResolvedValue(inventory([])) as the existing runDeaconLite block does, otherwise checkStuckWorkAgents iterates undefined and the clean-run case reports an error. Use the existing fake timers/system time."
+        },
+        "items": [
+          {
+            "id": "lite-observer-seam.ac1",
+            "title": "Given an observer is registered, When runDeaconLitePatrol() completes cleanly, Then the observer is called exactly once with { at: <ISO of the fake clock>, error: null } and getDeaconLiteStatus().lastRunAt equals that timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lite-observer-seam.ac2",
+            "title": "Given reconcileClosedIssueAgents rejects with Error('tracker down'), When runDeaconLitePatrol() runs, Then it resolves, the observer receives error 'tracker down', and getDeaconLiteStatus().lastRunError is 'tracker down'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lite-observer-seam.ac3",
+            "title": "Given the deacon is globally paused, When runDeaconLitePatrol() runs, Then none of the four routines is called and the observer still receives a report with error null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lite-observer-seam.ac4",
+            "title": "Given the registered observer throws, When runDeaconLitePatrol() runs, Then the promise resolves and lastRunAt is stamped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lite-observer-seam.ac5",
+            "title": "Given deacon-lite.ts is imported, When DEACON_LITE_INTERVAL_MS and runDeaconLitePatrol are read, Then the constant equals 60000 and the function is exported; and startDeaconLite() runs runDeaconLitePatrol immediately and again on every interval",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "child-relay-ipc",
+        "title": "deacon child: send patrol-done over IPC after every tick and route manual patrols through the tick",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:42:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/deacon-main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build",
+            "grep -n \"patrol-done\\|runDeaconLitePatrol\\|setPatrolRunObserver\" src/dashboard/server/deacon-main.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "build completes and the deacon-entry-chunk-assertion still finds dist/dashboard/deacon.js",
+            "grep prints the setPatrolRunObserver registration with a process.send?.({ type: 'patrol-done' ... }) body and the patrol handler calling runDeaconLitePatrol"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ],
+          "acJustification": "Entry script with import-time side effects; no unit seam. Two ACs are grep/build-checkable by the work agent and two are live checks for the test/UAT role against the deployed dashboard."
+        },
+        "narrative": {
+          "Action": "PRD W2. In src/dashboard/server/deacon-main.ts: change the deacon-lite import (lines 6-10) to import runDeaconLitePatrol and setPatrolRunObserver instead of runDeaconLite; after the setAgentStatusChangedNotifier(...) registration and before process.on('message') (line 92) add `setPatrolRunObserver((report) => { process.send?.({ type: 'patrol-done', at: report.at, error: report.error }); });` with a PAN-3922 comment; in the 'patrol' IPC branch (lines 94-98) replace `void runDeaconLite().catch(...)` with `void runDeaconLitePatrol().catch(...)`. Do not start a dashboard on port 3011 to verify; the live checks belong to the test/UAT role."
+        },
+        "items": [
+          {
+            "id": "child-relay-ipc.ac1",
+            "title": "Given deacon-main.ts is grepped, When the patrol observer registration is read, Then it contains setPatrolRunObserver with a process.send?.({ type: 'patrol-done', at, error }) body and the file contains no import of runDeaconLite",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "child-relay-ipc.ac2",
+            "title": "Given the parent sends {type:'patrol'}, When the child handles it, Then it calls runDeaconLitePatrol (the tick), so the run stamps lastRunAt and emits a patrol-done report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "child-relay-ipc.ac3",
+            "title": "Given the built dashboard is deployed with its deacon child running, When GET /api/deacon/status is read 90 s after deaconLite.running turns true and again 60 s later, Then deaconLite.lastRunAt is non-null on the first read and advances by roughly 60 s on the second",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "child-relay-ipc.ac4",
+            "title": "Given the deployed dashboard, When POST /api/deacon/patrol returns accepted and GET /api/deacon/status is read within 30 s, Then deaconLite.lastRunAt is later than the value read before the POST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-store-report",
+        "title": "deacon supervisor: store the latest patrol-done report from the child and export lastPatrolReport",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:42:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/deacon-supervisor.ts",
+            "tests/unit/dashboard/deacon-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/deacon-supervisor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/deacon-supervisor.test.ts passes including the four new patrol-report cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In src/dashboard/server/services/deacon-supervisor.ts: add `export interface DeaconPatrolReport { at: string; error: string | null }`; add `lastPatrolReport(): DeaconPatrolReport | null` to the DeaconSupervisor interface (line 22-28); inside createDeaconSupervisor add `let lastPatrol: DeaconPatrolReport | null = null;` next to restartTimestamps (line 77); in spawnChild after `child = next;` (line 110-118) attach `next.on('message', ...)` that ignores non-object messages, requires type === 'patrol-done' and typeof at === 'string', and stores { at, error: typeof error === 'string' ? error : null }; never reset lastPatrol on exit or respawn; return `lastPatrolReport() { return lastPatrol; }` from the factory object (line 143); add `export const lastPatrolReport = defaultSupervisor.lastPatrolReport;` next to the other singleton exports (lines 206-212). Tests in tests/unit/dashboard/deacon-supervisor.test.ts using the existing EventEmitter fakeChild and child.emit('message', ...): starts null; stores the latest of two reports; ignores 'hello', {type:'patrol-done'} without at, and {type:'other', at:'x'}; keeps the report across an exit + 1 s respawn and replaces it when the new child reports."
+        },
+        "items": [
+          {
+            "id": "supervisor-store-report.ac1",
+            "title": "Given a freshly created supervisor before and after startDeaconChild(), When lastPatrolReport() is called, Then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-store-report.ac2",
+            "title": "Given the child emits two patrol-done messages, When lastPatrolReport() is read, Then it returns the second report's at and error verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-store-report.ac3",
+            "title": "Given the child emits a string, a patrol-done message without a string at, and a message of another type, When lastPatrolReport() is read, Then it is still null and nothing throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-store-report.ac4",
+            "title": "Given a stored report, When the child exits and is respawned after the 1 s restart delay, Then lastPatrolReport() still returns the stored report until the new child emits its own patrol-done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-store-report.ac5",
+            "title": "Given deacon-supervisor.ts is grepped, When the default-singleton exports are read, Then the file contains `export const lastPatrolReport = defaultSupervisor.lastPatrolReport` next to isChildRunning, and the DeaconSupervisor interface contains lastPatrolReport(): DeaconPatrolReport | null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "control-surface-compose",
+        "title": "control surface: compose deaconLite status from the supervisor's relayed report",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:42:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/cloister-control-surface.ts",
+            "tests/unit/dashboard/cloister-control-surface.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/cloister-control-surface.test.ts",
+            "npx vitest run tests/unit/dashboard/routes/resources-core-services.test.ts",
+            "npm run typecheck",
+            "grep -c getDeaconLiteStatus src/dashboard/server/services/cloister-control-surface.ts || true"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/cloister-control-surface.test.ts passes including the three new composition cases",
+            "resources-core-services test still passes unchanged",
+            "typecheck completes without errors",
+            "grep count for getDeaconLiteStatus in cloister-control-surface.ts is 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In src/dashboard/server/services/cloister-control-surface.ts: import DEACON_LITE_INTERVAL_MS and type DeaconLiteStatus from deacon-lite.js (drop getDeaconLiteStatus, line 3); add lastPatrolReport to the deacon-supervisor.js import (lines 8-14); add `lastPatrolReport?: typeof lastPatrolReport` to CloisterControlDeps and retype readDeaconLiteStatus as `() => DeaconLiteStatus` (line 23); add `export function readRelayedDeaconLiteStatus(deps = {}): DeaconLiteStatus` returning { running: (deps.isChildRunning ?? isChildRunning)(), intervalMs: DEACON_LITE_INTERVAL_MS, lastRunAt: report?.at ?? null, lastRunError: report?.error ?? null } where report = (deps.lastPatrolReport ?? lastPatrolReport)(); replace the docstring at lines 28-31 with the PAN-3922 relay explanation; in both readers (lines 35 and 76) use `deps.readDeaconLiteStatus ? deps.readDeaconLiteStatus() : readRelayedDeaconLiteStatus(deps)`. Tests: in tests/unit/dashboard/cloister-control-surface.test.ts add DEACON_LITE_INTERVAL_MS: 60_000 to the deacon-lite.js mock (line 39), add lastPatrolReport: mocks.lastPatrolReport (default { at: '2026-07-03T00:00:00.000Z', error: null }) to the deacon-supervisor.js mock (line 52), replace the getDeaconLiteStatus call assertion (line 99) with one on mocks.lastPatrolReport, and add the three cases from the PRD (relayed report with an error composes deaconLite and lastCheck; no child + no report gives running false and null fields with lastCheck null; an injected readDeaconLiteStatus wins and lastPatrolReport is not called)."
+        },
+        "items": [
+          {
+            "id": "control-surface-compose.ac1",
+            "title": "Given isChildRunning returns true and lastPatrolReport returns { at: '2026-07-03T00:05:00.000Z', error: 'tracker down' }, When readDurableDeaconStatus() is called, Then deaconLite equals { running: true, intervalMs: 60000, lastRunAt: '2026-07-03T00:05:00.000Z', lastRunError: 'tracker down' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-surface-compose.ac2",
+            "title": "Given the same report, When readDurableCloisterStatus() is called, Then patrol carries the same four fields and lastCheck.toISOString() equals '2026-07-03T00:05:00.000Z'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-surface-compose.ac3",
+            "title": "Given isChildRunning returns false and lastPatrolReport returns null, When either reader is called, Then deaconLite/patrol equals { running: false, intervalMs: 60000, lastRunAt: null, lastRunError: null } and lastCheck is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-surface-compose.ac4",
+            "title": "Given deps.readDeaconLiteStatus is injected, When a reader is called, Then its result echoes the injected status and lastPatrolReport is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-surface-compose.ac5",
+            "title": "cloister-control-surface.ts contains no reference to getDeaconLiteStatus and the deacon-lite.js / deacon-supervisor.js mocks in its test list DEACON_LITE_INTERVAL_MS and lastPatrolReport respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watchdog-relayed-verdict",
+        "title": "supervisor watchdog: stale verdict reads deaconLite.intervalMs and deaconLite.lastRunAt only",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:42:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/supervisor/watchdog.ts",
+            "src/supervisor/__tests__/watchdog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/supervisor/__tests__/watchdog.test.ts",
+            "npm run typecheck",
+            "grep -n \"state.lastPatrol\\|config.patrolIntervalMs\" src/supervisor/watchdog.ts || true"
+          ],
+          "expected_outputs": [
+            "src/supervisor/__tests__/watchdog.test.ts passes including the two new cases and the migrated fixtures",
+            "typecheck completes without errors",
+            "grep prints no matches in watchdog.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In src/supervisor/watchdog.ts assessDeaconPatrol (line 523): delete the `config` and `state` record extraction (lines 545-546); compute `interval` from `deaconLite.intervalMs` (finite, > 0, else 60_000) after extracting `deaconLite` (line 557); set `lastPatrol = typeof deaconLite.lastRunAt === 'string' ? deaconLite.lastRunAt : null` (replacing lines 560-562); keep the `if (!lastPatrol) { patrolUnhealthySince = null; return null; }` branch and everything after it unchanged; rewrite the comment block to say the fields come from the relayed deaconLite shape (PAN-3922) and that a missing timestamp is still no verdict (PAN-3917). In src/supervisor/__tests__/watchdog.test.ts migrate the fixtures at lines 53-55, 222-224, 418-420, 461-463, 493-495, 618-620, 767-769 from `config: { patrolIntervalMs: 60_000 }, state: { lastPatrol: <ts> }` to `deaconLite: { running: true, intervalMs: 60_000, lastRunAt: <ts>, lastRunError: null }` with the same timestamp, drop the `config` key at lines 528-530 and 552-554, and add: 'uses the relayed interval for the staleness threshold' (busyFailThreshold 1, intervalMs 30_000, lastRunAt 60 s old → spawns.count 0; advance now by 40 s → spawns.count 1 and lastError contains 'stale for 100s' — under the 60 s default a 100 s-old timestamp would not restart, so this discriminates); 'ignores the deleted config/state fields' (only config.patrolIntervalMs 1_000 + state.lastPatrol from 2020 + deaconLite.lastRunAt null → no restart after an hour). Fake timers / injected now() as the file already does."
+        },
+        "items": [
+          {
+            "id": "watchdog-relayed-verdict.ac1",
+            "title": "Given /api/deacon/status reports isRunning true and deaconLite.lastRunAt 60 s old with intervalMs 60000, When checkOnce runs, Then no restart is spawned; and after the timestamp is 240 s old a restart is spawned with lastError containing 'deacon patrol heartbeat stale'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watchdog-relayed-verdict.ac2",
+            "title": "Given deaconLite.intervalMs is 30000, busyFailThreshold is 1, and lastRunAt is 60 s old, When checkOnce runs, Then no restart is spawned; and after the clock advances 40 s (100 s old, past the 90 s threshold) a restart is spawned and lastError contains 'stale for 100s'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watchdog-relayed-verdict.ac3",
+            "title": "Given the status carries only the deleted config.patrolIntervalMs and state.lastPatrol fields and deaconLite.lastRunAt is null, When checkOnce runs repeatedly over an hour, Then no restart is spawned and lastError never mentions 'heartbeat'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watchdog-relayed-verdict.ac4",
+            "title": "watchdog.ts contains no read of state.lastPatrol or config.patrolIntervalMs, and every watchdog.test.ts fixture supplies deaconLite.lastRunAt instead of state.lastPatrol except the 'ignores the deleted config/state fields' case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-deacon-child-relay",
+        "title": "docs: describe the deacon child, its IPC messages, and what cloister status now shows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:42:35Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "sync-sources/skills/pan-admin-cloister/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"patrol-done\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n \"lastRunAt\" sync-sources/skills/pan-admin-cloister/SKILL.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep finds patrol-done in a 'Deacon child process' block of docs/DASHBOARD-ARCHITECTURE.md",
+            "grep finds lastRunAt in the status bullet of the pan-admin-cloister skill",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. (1) docs/DASHBOARD-ARCHITECTURE.md: after the 'Server structure' bullet list and before '**Two WebSocket endpoints:**', add a '**Deacon child process:**' block in the file's bold-lead bullet style stating: the dashboard forks dist/dashboard/deacon.js (src/dashboard/server/deacon-main.ts) through services/deacon-supervisor.ts; Cloister and deacon-lite run only in that child; IPC carries parent→child {type:'patrol'} and {type:'reload-config'} and child→parent {type:'patrol-done', at, error} after every completed tick (PAN-3922); the supervisor keeps the latest report across child restarts; GET /api/deacon/status and GET /api/cloister/status compose deaconLite from it (running = child process running, intervalMs = 60000, lastRunAt/lastRunError = the report); the pan up supervisor watchdog restarts the dashboard when deaconLite.lastRunAt is older than three intervals and never on a null timestamp. (2) sync-sources/skills/pan-admin-cloister/SKILL.md: extend the `status` bullet (line 38) to say the 'Deacon loop:' line shows the last patrol the deacon child relayed (lastRunAt, lastRunError), that 'waiting for first run' means the child is up but has not completed a tick, and that a last run older than three minutes prints red and is the same condition on which the supervisor watchdog restarts the dashboard."
+        },
+        "items": [
+          {
+            "id": "docs-deacon-child-relay.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md renders a 'Deacon child process' block that names deacon-supervisor.ts, the three IPC message types including patrol-done, and the three-interval watchdog restart rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-deacon-child-relay.ac2",
+            "title": "Given the pan-admin-cloister skill is read, When the status bullet is rendered, Then it shows that the Deacon loop line reflects lastRunAt/lastRunError relayed from the deacon child and that 'waiting for first run' means no tick has completed yet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-deacon-child-relay.ac3",
+            "title": "npm run lint (including scripts/lint-skills.sh) exits 0 after both doc edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lite-observer-seam",
+        "to": "child-relay-ipc",
+        "type": "blocks"
+      },
+      {
+        "from": "lite-observer-seam",
+        "to": "control-surface-compose",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-store-report",
+        "to": "control-surface-compose",
+        "type": "blocks"
+      },
+      {
+        "from": "control-surface-compose",
+        "to": "docs-deacon-child-relay",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

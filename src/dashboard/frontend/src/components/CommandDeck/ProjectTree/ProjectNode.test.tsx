@@ -204,6 +204,29 @@ describe('ProjectNode', () => {
     expect(screen.queryByTestId('project-ci-chip')).not.toBeInTheDocument();
   });
 
+  it('shows the in-flight deploy on its owning project row (PAN-3751)', () => {
+    useDashboardStore.setState({
+      deployByProjectKey: {
+        overdeck: {
+          projectKey: 'overdeck', trigger: 'pan reload', phase: 'awaiting-approval', pid: 1,
+          startedAt: new Date().toISOString(),
+        },
+      },
+    });
+    render(
+      <ProjectNode
+        projectKey="overdeck"
+        name="overdeck"
+        features={[]}
+        selectedFeature={null}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId('project-deploy-chip')).toHaveTextContent('Deploy: approve restart');
+    useDashboardStore.setState({ deployByProjectKey: {} });
+  });
+
   it('renders the CI chip and opens it without selecting the project', () => {
     useDashboardStore.setState({
       ciByProjectKey: {

@@ -46,7 +46,7 @@ agent's last real action, and is it moving its task forward?*
 | tool calls / edits / `Working (…)` advancing its task | **progressing** | none |
 | `pan done … completed`, `Slot N work complete`, review "passed/blocked" verdict signaled | **done** | let it flow; if verdict blocked, its work agent should be fixing findings |
 | `Pane is dead (status …)` / `token_revoked` / `refresh token was revoked` | **dead** | one stale agent, not fleet-wide — confirm codex fleet with `codex login status` + `codex doctor` (gpt-5.5 and the gpt-5.6 family = **codex** harness, auth `~/.codex/auth.json`, NOT ohmypi); then kill/restart the dead one |
-| `OVERDECK_SPECIALIST_RESULT: review-agent failed` **but** a verdict was produced | **FALSE failure** — verify in `overdeck.db` `review_status` (NOT stale `panopticon.db`) before believing it | fix the signal (substrate), don't re-dispatch blindly |
+| `OVERDECK_SPECIALIST_RESULT: review-agent failed` **but** a verdict was produced | **FALSE failure** — verify against the PR and the pipeline journal (Step 3) before believing it | fix the signal (substrate), don't re-dispatch blindly |
 | POST error e.g. `Effect.catchAll is not a function`, `Project not found for PAN-x`, `Dashboard POST failed` | **substrate bug** blocking status/verdict recording (verdict artifact may be journaled for recovery) | file + root-fix the endpoint/resolver |
 | looping on `Deacon: container … crashed and was auto-restarted (attempt 1/5)` duplicates | **container crash-loop and/or duplicate-notification spam** distracting the agent | root-cause the crashing workspace container + the notification dedup |
 | reads a kickoff for a **different** issue (e.g. "cede PAN-2203 planning") | **cross-wired kickoff** — wrong brief delivered; agent stops or does wrong work | root-cause the kickoff/message misdelivery; the agent's real task is stalled |
@@ -55,13 +55,17 @@ agent's last real action, and is it moving its task forward?*
 
 ## Step 3 — verify verdicts at the source, not the pane
 
-Panes lie (false "failed", stale text). The authoritative review/test/merge state is in
-`~/.overdeck/overdeck.db` (the rebranded DB; `panopticon.db` is deprecated/empty):
+Panes lie (false "failed", stale text). Overdeck stores no review/test/merge status: the
+issue's state is derived from the tracker, the PR, its checks, git, and the terminal backend,
+and `pan show` prints it. Review verdicts are PR reviews; the per-issue pipeline journal
+(`<workspace>/.overdeck/pipeline.jsonl`) logs what Overdeck did (`review.verdict`,
+`verification.failed`, `merge.attempted`, …). Where the journal and the PR disagree, the PR wins.
 
 ```bash
-python3 -c "import sqlite3,os; d=sqlite3.connect('file:'+os.path.expanduser('~/.overdeck/overdeck.db')+'?mode=ro',uri=True); \
-c=[x[1] for x in d.execute('PRAGMA table_info(review_status)')]; \
-[print(r[c.index('issue_id')], 'rev='+str(r[c.index('review_status')]), 'test='+str(r[c.index('test_status')]), 'ready='+str(r[c.index('ready_for_merge')])) for r in d.execute('SELECT * FROM review_status').fetchall() if str(r[c.index('issue_id')]).startswith('PAN')]"
+pan show PAN-1234 --json | python3 -c "import json,sys; d=json.load(sys.stdin); pr=d.get('pr') or {}; \
+print(d['issueId'], 'state='+str(d['state']), 'needs='+str(d.get('attention')), \
+'review='+str(pr.get('reviewState')), 'checks='+str(pr.get('checks')), 'mergeable='+str(pr.get('mergeable'))); \
+[print('  ', e['at'], e['type'], json.dumps(e.get('data') or {})) for e in d.get('journal', [])[-6:]]"
 ```
 
 ## Step 4 — root-cause, don't nudge

@@ -52,7 +52,7 @@ vi.mock('../../../../../lib/agents.js', async () => {
 });
 
 vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
-  getWorkAgentLifecycleStateSync: () => mocks.lifecycle,
+  getWorkAgentLifecycleState: () => mocks.lifecycle,
 }));
 
 import { ensureAgentReadyForMerge, rebaseWithAgentFallback } from '../merge-strike.js';

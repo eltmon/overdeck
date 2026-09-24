@@ -148,6 +148,7 @@ async function relaunchAgentPane(input: {
   });
   input.state.backend = pane.backend;
   input.state.paneId = pane.paneId;
+  input.state.terminalId = pane.terminalId;
   saveAgentStateSync(input.state);
   return pane;
 }

@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
-import { withConcurrencyLimitPromise } from '../concurrency.js';
+import { withConcurrencyLimit } from '../concurrency.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { isHarnessProcessAlive, listSessionNames } from '../tmux.js';
 import { resolveConversationGitInfo } from '../../dashboard/server/services/git-info.js';
@@ -103,7 +103,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   ]);
   const ledgerCosts = new Map(ledgerEntries);
   const liveSessionNames = new Set(sessionNames);
-  return withConcurrencyLimitPromise(
+  return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
       const tmuxSessionAlive = liveSessionNames.has(conv.tmuxSession);

@@ -467,6 +467,40 @@ export const ProjectCiSnapshot = Schema.Struct({
 })
 export type ProjectCiSnapshot = typeof ProjectCiSnapshot.Type
 
+// ─── Project Deploy (PAN-3751) ───────────────────────────────────────────────
+
+/**
+ * Where an in-flight dashboard self-deploy (`pan reload`) stands.
+ *
+ * `building` the reload holds the restart lock and is building from origin/main;
+ * `awaiting-approval` the build is ready and the reload waits on the restart gate;
+ * `restarting` the operator approved and the old dashboard is being replaced;
+ * `failed` the last reload recorded a failure (visible for a short window).
+ */
+export const ProjectDeployPhase = Schema.Literals(["building", "awaiting-approval", "restarting", "failed"])
+export type ProjectDeployPhase = typeof ProjectDeployPhase.Type
+
+/**
+ * One project's deploy, derived on the server from live runtime files: the
+ * restart lock, the restart gate, the restart-status journal and the reload
+ * process's own stdout. Nothing here is stored; a server restart re-derives it.
+ */
+export const ProjectDeploySnapshot = Schema.Struct({
+  projectKey: Schema.String,
+  trigger: Schema.String,
+  phase: ProjectDeployPhase,
+  /** The deploying process, while it is alive. */
+  pid: Schema.optional(Schema.Number),
+  /** When the server first observed this deploy (for `failed`, when it failed). */
+  startedAt: Schema.String,
+  error: Schema.optional(Schema.String),
+  /** The reload's output file, when its stdout is a regular file. */
+  logPath: Schema.optional(Schema.String),
+  /** Last lines of `logPath`. */
+  logTail: Schema.optional(Schema.Array(Schema.String)),
+})
+export type ProjectDeploySnapshot = typeof ProjectDeploySnapshot.Type
+
 // ─── Restart Gate (PAN-3729) ─────────────────────────────────────────────────
 
 /** What kind of process asked for the voluntary dashboard restart. */
@@ -539,6 +573,8 @@ export const DashboardSnapshot = Schema.Struct({
   embedProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EmbedProgressSnapshot)),
   ciByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectCiSnapshot)),
   restartGate: Schema.optional(RestartGateSnapshot),
+  /** PAN-3751 — in-flight deploys keyed by project key. */
+  deployByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectDeploySnapshot)),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type

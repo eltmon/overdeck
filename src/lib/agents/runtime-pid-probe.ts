@@ -8,15 +8,7 @@
  * oracle (agents/liveness.ts) and its tests can mock this exact boundary.
  */
 
-/**
- * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
- * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
- * as sync) and cannot await:
- * - `findAgentRuntimePidInSubtreeSync` (async: `findAgentRuntimePidInSubtree`): src/lib/agents/liveness.ts:291.
- * It blocks on a child process: never call it from src/dashboard/** or src/lib/cloister/** (FR-8).
- * Do not add new synchronous callers; server-reachable code uses the async variants.
- */
-import { exec, execFileSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -115,61 +107,6 @@ export async function findAgentRuntimePidInSubtree(rootPid: string, harness: Run
     } catch (error) {
       // pgrep exits non-zero when there are no children — not an error.
       // Anything else leaves the subtree below unobserved: indeterminate.
-      if (!isCleanProcessLookupMiss(error)) probeFailed = true;
-    }
-  }
-  return probeFailed ? 'indeterminate' : null;
-}
-
-/**
- * Synchronous variant of {@link findAgentRuntimePidInSubtree} for the liveness
- * oracle's `isAliveSync`. Each node is a sync `ps`/`pgrep` exec — acceptable
- * for the lifecycle classifier's per-agent calls, never for a hot loop.
- */
-export function findAgentRuntimePidInSubtreeSync(rootPid: string, harness: RuntimeName = 'claude-code'): RuntimePidProbeResult {
-  const expectedProcessNames = new Set(getHarnessBehavior(harness).processNames);
-  const queue: string[] = [rootPid];
-  const seen = new Set<string>();
-  let probeFailed = false;
-  while (queue.length > 0) {
-    const pid = queue.shift()!;
-    if (seen.has(pid)) continue;
-    seen.add(pid);
-    // A non-numeric pid is tmux garbage, not a process tree — the probe
-    // cannot run here, so this is indeterminate, never confirmed absence.
-    if (!/^\d+$/.test(pid)) { probeFailed = true; continue; }
-
-    // Same fall-through contract as the async variant: a failed identity
-    // lookup never prunes the subtree below the pid.
-    let name: string | null = null;
-    try {
-      name = execFileSync('ps', ['-p', pid, '-o', 'comm='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    } catch (error) {
-      // Identity unknown — the child lookup below still runs. A clean miss
-      // (pid gone, status 1) is absence evidence; any other failure taints
-      // the walk.
-      if (!isCleanProcessLookupMiss(error)) probeFailed = true;
-    }
-    if (name !== null && matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
-    // PAN-3879: codex app-server hosts present as `node` — confirm by args.
-    if (harness === 'codex' && name === 'node') {
-      let args: string | null = null;
-      try {
-        args = execFileSync('ps', ['-p', pid, '-o', 'args='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-      } catch (error) {
-        if (!isCleanProcessLookupMiss(error)) probeFailed = true;
-      }
-      if (isCodexAppServerHost(harness, name, args)) return Number.parseInt(pid, 10);
-    }
-
-    try {
-      const kids = execFileSync('pgrep', ['-P', pid], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-      for (const kid of kids.trim().split('\n').filter(Boolean)) {
-        queue.push(kid);
-      }
-    } catch (error) {
-      // pgrep exits 1 when there are no children — not an error. Anything
-      // else leaves the subtree below unobserved: indeterminate.
       if (!isCleanProcessLookupMiss(error)) probeFailed = true;
     }
   }

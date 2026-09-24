@@ -51,12 +51,16 @@ purge the complete composer contents before a retry.
      matches your configuration).
 
 3. **Observe the dev-channels dialog auto-dismiss.**
-   - `tmux -L overdeck attach -t agent-pan-XXX`.
+   - Attach to the agent's pane. On Herdr, the default backend:
+     `herdr --session overdeck agent attach agent-pan-XXX` (the Herdr session
+     is `overdeck` for the default `~/.overdeck` home). On tmux
+     (`terminal.backend: tmux`): `tmux -L overdeck attach -t agent-pan-XXX`.
+     The dashboard's Terminal tab shows the same pane.
    - Within 8–15 seconds of cold start, the TUI dialog
      `WARNING: Loading development channels` appears and is dismissed
      within ~500ms by a single Enter keystroke. If the dialog visibly
      lingers, dismissal is broken (see Failure modes below).
-   - Detach with `Ctrl-B d`.
+   - Detach when done (tmux: `Ctrl-B d`).
 
 4. **Tail the bridge log.**
    - `tail -f ${OVERDECK_HOME:-~/.overdeck}/logs/bridge-agent-pan-XXX.log`.

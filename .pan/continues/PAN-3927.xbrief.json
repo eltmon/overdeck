@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "issueId": "PAN-3927",
+  "created": "2026-09-19T13:27:49.865Z",
+  "updated": "2026-09-19T13:32:23.494Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-lint-push-before-done": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3927",
+      "claimedAt": "2026-09-19T13:27:49.864Z",
+      "doneAt": "2026-09-19T13:29:07.740Z"
+    },
+    "w2-work-prompt-loop": {
+      "status": "completed",
+      "doneAt": "2026-09-19T13:32:04.523Z"
+    },
+    "w3-role-prompt-loop": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3927",
+      "claimedAt": "2026-09-19T13:32:23.494Z"
+    }
+  }
+}

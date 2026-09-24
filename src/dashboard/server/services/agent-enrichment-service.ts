@@ -10,19 +10,25 @@
  *
  * These fields were dropped in the Effect server migration (PAN-428) and are
  * restored here via the event-driven projection pipeline.
+ *
+ * A peer dashboard (PAN-3931) shares the primary's event log, and the primary
+ * runs this same poller. The peer fans its events out to its own subscribers
+ * with `emitOnly`, so its UI stays live, and appends nothing durable and
+ * announces nothing: the primary's log and activity feed get each fact once.
  */
 
 import { Effect } from 'effect'
 import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
 import { getBackendPanes } from './backend-inventory.js'
-import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js'
+import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
-import { getEventStore } from '../event-store.js'
+import { getEventStore, type EventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js'
 import type { AgentEnrichmentChangedEvent, AgentCreatedEvent } from '@overdeck/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
+import { isPeerDashboardProcess } from '../../../lib/boot-gates.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +47,21 @@ interface EnrichmentServiceState {
   lastScan: Map<string, { mtime: number; scan: PendingInputsScan }>
   /** Agent IDs for which we've already emitted agent.created this server lifetime */
   seenAgentIds: Set<string>
+  /** Peer dashboard (PAN-3931): emit to live subscribers only, never append or announce. */
+  peer: boolean
+}
+
+/** Append an enrichment event, or in a peer dashboard fan it out in memory only. */
+async function publishEnrichmentEvent(
+  state: Pick<EnrichmentServiceState, 'peer'>,
+  eventStore: Pick<EventStore, 'appendAsync' | 'emitOnly'>,
+  event: Parameters<EventStore['emitOnly']>[0],
+): Promise<void> {
+  if (state.peer) {
+    eventStore.emitOnly(event)
+    return
+  }
+  await eventStore.appendAsync(event)
 }
 
 // ─── Diff helpers ─────────────────────────────────────────────────────────────
@@ -185,7 +206,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   // changing state — its enrichment is static.
   const activeAgents = runningAgents.filter(a => livePaneIds.has(a.id))
 
-  await withConcurrencyLimitPromise(
+  await withConcurrencyLimit(
     activeAgents.map((agent) => async () => {
       const { id: agentId, issueId, startedAt } = agent
 
@@ -223,7 +244,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
               },
             },
           }
-          saveAgentStateAndEmitEvent(agent, createdEvent)
+          if (state.peer) eventStore.emitOnly(createdEvent as never)
+          else saveAgentStateAndEmitEvent(agent, createdEvent)
         } catch {
           // Non-fatal — event store may not be ready at startup
         }
@@ -260,7 +282,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       // PAN-1834 — on the rising edge of an agent becoming blocked on input,
       // emit an activity entry + TTS so the operator is notified loudly.
-      if (isAwaitingInputRisingEdge(previousEnrichment, enrichment)) {
+      if (!state.peer && isAwaitingInputRisingEdge(previousEnrichment, enrichment)) {
         const message = buildAwaitingInputActivityMessage(agentId, issueId, enrichment.pendingInputKinds)
         const source = toRole(agent.role) ?? 'work'
         emitActivityEntry({ source, level: 'warn', message, issueId })
@@ -300,7 +322,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       }
 
       try {
-        await eventStore.appendAsync(event as never)
+        await publishEnrichmentEvent(state, eventStore, event as never)
       } catch {
         // Non-fatal — event store may not be initialized yet at startup
       }
@@ -316,18 +338,20 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         const agentRecord = runningAgents.find(agent => agent.id === id)
         const reapIssueId = agentRecord?.issueId
         try {
-          await eventStore.appendAsync(buildPendingReapEvent(id, previousEnrichment, reapIssueId) as never)
+          await publishEnrichmentEvent(state, eventStore, buildPendingReapEvent(id, previousEnrichment, reapIssueId) as never)
         } catch {
           // Non-fatal — event store may not be initialized yet at startup
         }
 
         const issueId = reapIssueId
-        emitActivityEntry({
-          source: toRole(agentRecord?.role) ?? 'work',
-          level: 'info',
-          message: buildExpiredQuestionActivityMessage(id, issueId),
-          issueId,
-        })
+        if (!state.peer) {
+          emitActivityEntry({
+            source: toRole(agentRecord?.role) ?? 'work',
+            level: 'info',
+            message: buildExpiredQuestionActivityMessage(id, issueId),
+            issueId,
+          })
+        }
       }
 
       state.lastEnrichment.delete(id)
@@ -348,10 +372,12 @@ const serviceState: EnrichmentServiceState = {
   lastEnrichment: new Map(),
   lastScan: new Map(),
   seenAgentIds: new Set(),
+  peer: false,
 }
 
 export function startAgentEnrichmentService(): void {
   if (serviceState.timer !== null) return // Already running
+  serviceState.peer = isPeerDashboardProcess()
 
   serviceState.timer = setInterval(() => {
     pollOnce(serviceState).catch(() => {

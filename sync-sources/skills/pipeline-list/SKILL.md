@@ -30,8 +30,8 @@ Two views of "the pipeline", because they answer different questions:
 
 | View | Flag | Source | Answers |
 |------|------|--------|---------|
-| **Resource** (default) | *(none)* | `/api/issues/resource-allocated` | "What has a live **workspace / branch / agent / PR** right now?" — the operational set. Mirrors the **Command Deck project tree**. Detects ready-to-merge (`readyForMerge`). |
-| **Lifecycle** | `--phase` | `/api/issues` + `getPipelineIssuePhase` rule | "What is moving through the **lifecycle**, including **planned-but-not-started** work?" — the forward queue. Mirrors the **Pipeline page** (`/pipeline`). |
+| **Resource** (default) | *(none)* | `/api/issues/resource-allocated` | "What has a live **workspace / branch / agent / PR** right now?" — the operational set. Mirrors the **Command Deck project tree**. Detects ready-to-merge from the derived `state: ready`. |
+| **Lifecycle** | `--phase` | `/api/issues` + derived `state` + `getPipelineIssuePhase` rule | "What is moving through the **lifecycle**, including **planned-but-not-started** work?" — the forward queue. Mirrors the **Pipeline page** (`/pipeline`). |
 
 Both group by **Ship · Review · Work · Plan** and print `ISSUE-ID — title`.
 The default (resource) view is usually what you want ("what's actually in
@@ -45,7 +45,7 @@ work). Neither view includes the Todo backlog or closed/cancelled issues.
 The dashboard Pipeline list is **virtualized** — a Playwright/DOM scrape sees
 only the rows in the viewport (slow + silently incomplete), and titles
 cross-reference other issue IDs ("deferred from PAN-1229"), polluting naive ID
-extraction. Don't scrape. This skill makes **one read-only HTTP call** to the
+extraction. Don't scrape. This skill makes **read-only HTTP calls** to the
 dashboard read model (the same data those surfaces render).
 
 ## Run it
@@ -74,19 +74,34 @@ if SHOW_ALL:
     PHASES.append(("verifying", "✅ Verifying (awaiting close-out — NOT active pipeline)"))
 buckets = {k: [] for k, _ in PHASES}
 
+# Derived issue state → lane (PHASE_BY_DERIVED_STATE in
+# src/dashboard/frontend/src/lib/pipeline-state.ts). backlog/parked are Todo.
+LANE = {"planned": "plan", "working": "work", "in-review": "review",
+        "changes-requested": "review", "ready": "ship", "merged": "ship", "closed": "ship"}
+TODO_STATES = ("backlog", "parked")
+
 if MODE_PHASE:
     # ── Lifecycle view: phase over ALL issues (mirrors the Pipeline page) ──
     issues = fetch("/api/issues")
     if issues is None:
         sys.exit("Dashboard API not reachable on :3011/:3010 — is `pan up` running?")
+    # /api/issues carries no derived state; join it from the resource view.
+    derived = {(r.get("issueId") or "").upper(): r.get("state")
+               for r in (fetch("/api/issues/resource-allocated") or [])}
     def phase(it):
         cs = it.get("canonicalStatus") or it.get("state") or it.get("status")
         if cs in ("done", "closed", "completed", "cancelled", "canceled"):
             return None
         if cs == "verifying_on_main":
             return "verifying"
-        if it.get("mergeStatus") in ("queued", "merging", "verifying", "failed", "merged"):
+        pm = it.get("pipelineMembership") or {}
+        if pm.get("available") is True and pm.get("bucket") == "post_merge_limbo":
             return "ship"
+        st = derived.get((it.get("identifier") or "").upper())
+        if st in LANE:
+            return LANE[st]
+        if st in TODO_STATES:
+            return None
         if cs == "in_review":
             return "review"
         if cs == "in_progress":
@@ -105,8 +120,12 @@ else:
     if ra is None:
         sys.exit("Dashboard API not reachable on :3011/:3010 — is `pan up` running?")
     def phase(it):
-        if it.get("readyForMerge") or it.get("mergeStatus") in ("queued", "merging", "verifying", "failed", "merged"):
-            return "ship"
+        st = it.get("state")
+        if st in LANE:
+            return LANE[st]
+        if st in TODO_STATES:
+            return None
+        # state is null (derivation failed): fall back to the display label.
         sl = (it.get("stateLabel") or "").lower()
         if "review" in sl:
             return "review"
@@ -140,15 +159,19 @@ PY
 - **Resource view** is backed by the resource-discovery service
   (`src/dashboard/server/services/resource-discovery.ts`), which includes an
   issue when it has ≥1 `resourceSource` (workspace, branch, tmux, docker, pr,
-  xBRIEF plan, task state, or active tracker state) and computes `readyForMerge` +
-  `stateLabel`. Same data the Command Deck `fetchProjects()` consumes.
+  xBRIEF plan, task state, or active tracker state) and carries the derived
+  `state` (PAN-3917 FR-6: computed from the tracker, the PR, checks, the branch,
+  and the terminal backend) plus `stateLabel`. Same data the Command Deck
+  `fetchProjects()` consumes. Lanes follow `PHASE_BY_DERIVED_STATE`; the
+  `stateLabel` heuristics apply only when `state` is `null`.
 - **Lifecycle view** ports `getPipelineIssuePhase`
-  (`src/dashboard/frontend/src/lib/pipeline-state.ts`). It can't see
-  `readyForMerge`/review-status (those are RPC-snapshot only), so a "ready to
-  merge" issue shows under Review until its merge is actually queued, and Ship
-  reflects merge-in-flight only.
+  (`src/dashboard/frontend/src/lib/pipeline-state.ts`). `/api/issues` carries no
+  derived state, so the script joins `state` from `/api/issues/resource-allocated`;
+  issues with no resources fall back to tracker state and planning flags.
+  Post-merge limbo (`pipelineMembership.bucket`) goes to Ship first, as on the
+  Pipeline page.
 - **Long-term:** the clean fix is a first-class `pan pipeline` verb / a
-  `/api/issues/pipeline` endpoint that runs `getPipelineIssuePhase` server-side
+  `/api/issues/pipeline` endpoint that returns the derived state for every issue
   so the dashboard, CLI, and this skill share one implementation. Point this
   skill at it when it exists.
 - If `getPipelineIssuePhase` or the resource-discovery fields change, update

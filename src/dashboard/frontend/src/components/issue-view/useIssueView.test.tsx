@@ -244,6 +244,44 @@ describe('buildIssueViewModel', () => {
     expect(model.header.phase).toBe('merged');
   });
 
+  // PAN-3420: `pan close` closes the tracker issue, and `closed` outranks
+  // `merged`, so a closed-out issue must still render as shipped with its history.
+  it('renders a closed-out issue with a merged PR as shipped, not pending or stopped', () => {
+    const sessions = [
+      makeSession({ type: 'planning', sessionId: 'planning-pan-2499', status: 'stopped', presence: 'ended' }),
+      makeSession({ type: 'work', sessionId: 'agent-pan-2499', status: 'stopped', presence: 'ended' }),
+      makeSession({ type: 'review', sessionId: 'agent-pan-2499-review', status: 'stopped', presence: 'ended' }),
+    ];
+    const model = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined,
+      makeDerived('closed', { pr: { ...GREEN_PR, mergeable: null } }),
+      undefined, undefined, makeActivity(sessions), {},
+    );
+    expect(model.ship.status).toBe('merged');
+    expect(model.ship.blockerReason).toBeUndefined();
+    expect(model.pipeline.plan.done).toBe(true);
+    expect(model.pipeline.work.done).toBe(true);
+    expect(model.pipeline.review.done).toBe(true);
+    expect(model.pipeline.test.done).toBe(true);
+    expect(model.pipeline.ship).toMatchObject({ status: 'merged', done: true });
+    expect(model.narrative.now).toBe('Merged and closed out');
+    expect(model.agents.map((agent) => agent.label)).toEqual(['Plan', 'Work', 'Review']);
+    expect(model.operator.needsYouItems).toEqual([]);
+  });
+
+  it('does not report a cancelled issue (closed, no PR) as shipped', () => {
+    const sessions = [makeSession({ type: 'work', sessionId: 'agent-pan-2499', status: 'stopped', presence: 'ended' })];
+    const model = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined,
+      makeDerived('closed'),
+      undefined, undefined, makeActivity(sessions), {},
+    );
+    expect(model.ship.status).toBe('pending');
+    expect(model.pipeline.ship.done).toBe(false);
+    expect(model.narrative.now).toBe('Closed');
+    expect(model.operator.needsYouItems).toEqual([]);
+  });
+
   it('derives the blocker reason from the forge when the PR is not mergeable', () => {
     const model = buildIssueViewModel(
       'PAN-2499', undefined, undefined, undefined,
