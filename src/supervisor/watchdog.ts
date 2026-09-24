@@ -4,7 +4,6 @@ import { dirname, join, resolve } from 'node:path';
 import { acquireRestartLock, readRestartLockHolder } from '../lib/restart-lock.js';
 import { writeRestartStatus } from '../lib/restart-status.js';
 import { getOverdeckHome } from '../lib/paths.js';
-import { getBootReconciliationState } from '../lib/overdeck/control-settings.js';
 import { evictPortHolders, type PortEvictionResult } from './port-eviction.js';
 
 export interface SupervisorWatchdogConfig {
@@ -44,7 +43,6 @@ export interface SupervisorWatchdogStatus {
 export type SpawnRestartResult = { pid: number | null; error: string | null; done?: Promise<void> };
 export type SpawnRestart = (options?: {
   restartLockHeld?: boolean;
-  bootId?: string | null;
 }) => SpawnRestartResult | Promise<SpawnRestartResult>;
 export type LogFn = (msg: string) => void | Promise<void>;
 
@@ -143,14 +141,6 @@ export function readWatchdogConfig(
     requestTimeoutMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_TIMEOUT_MS, 10_000),
     bootGraceMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_BOOT_GRACE_MS, 5 * 60_000),
   };
-}
-
-export function readBootReconciliationBootIdForRestart(): string | null {
-  try {
-    return getBootReconciliationState().bootId ?? process.env.OVERDECK_BOOT_ID ?? null;
-  } catch {
-    return process.env.OVERDECK_BOOT_ID ?? null;
-  }
 }
 
 /** AbortSignal.timeout() rejects fetch with a TimeoutError (AbortError on older
@@ -454,10 +444,7 @@ export class SupervisorWatchdog {
 
     let restartError: string | null = null;
     try {
-      const result = await this.spawnRestart({
-        restartLockHeld: true,
-        bootId: readBootReconciliationBootIdForRestart(),
-      });
+      const result = await this.spawnRestart({ restartLockHeld: true });
       if (result.error) {
         restartError = result.error;
       } else {
