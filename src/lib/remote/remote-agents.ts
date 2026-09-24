@@ -31,6 +31,7 @@ import {
   type AcceptAutoSpawnConsent,
 } from '../planning/auto-spawn-consent.js';
 import { isOperatorStartedBy } from '../agents/provenance.js';
+import { determineModel } from '../agents/provider-env.js';
 
 export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
 export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
@@ -556,7 +557,10 @@ async function spawnRemoteAgentWithoutConsentClaim(
   options: SpawnRemoteAgentOptions,
   acceptConsent?: AcceptAutoSpawnConsent,
 ): Promise<RemoteAgentState> {
-  const { issueId, workspace, startedBy, model = 'claude-sonnet-4-6', prompt } = options;
+  const { issueId, workspace, startedBy, prompt } = options;
+  // No explicit model → the configured work-role routing, same as a local
+  // spawn. Throws when routing cannot resolve; never a literal model ID.
+  const model = determineModel({ model: options.model, role: 'work' });
   const tier = options.tier ?? 'ephemeral';
 
   const agentId = `agent-${issueId.toLowerCase()}`;

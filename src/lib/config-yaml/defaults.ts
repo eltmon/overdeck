@@ -54,6 +54,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   // PAN-4160: documented default for the Command Deck status review
   // (`models.status_review_model`); replaces a literal in command-deck.ts.
   statusReviewModel: 'claude-sonnet-5',
+  // models.provider_fallback_model: the Anthropic model substituted when a
+  // selected model's provider is disabled and the model has no explicit entry
+  // in FALLBACK_MAP (src/lib/model-fallback.ts). Sonnet, not Opus, to keep the
+  // silent substitute's cost reasonable.
+  providerFallbackModel: 'claude-sonnet-5',
   apiKeys: {},
   providerAuth: {},
   providerPlan: {},
@@ -62,7 +67,6 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),
   tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
-  overrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
   conversations: {

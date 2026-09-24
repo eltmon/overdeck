@@ -23,7 +23,6 @@ const SETTINGS: SettingsConfig = {
       nous: false,
       dashscope: false,
     },
-    overrides: {},
   },
   api_keys: {},
   tracker_keys: {},

@@ -40,7 +40,7 @@ describe('GET /api/settings/minimax-defaults — route handler payload', () => {
   it('uses minimax workhorses for role-based model selection', () => {
     const defaults = getMiniMaxDefaultsApi();
 
-    expect(defaults.models.overrides).toBeUndefined();
+    expect(defaults.models).not.toHaveProperty('overrides');
     expect(defaults.workhorses).toEqual({
       expensive: 'minimax-m2.7-highspeed',
       mid: 'minimax-m2.7-highspeed',

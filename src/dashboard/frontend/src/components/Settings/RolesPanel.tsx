@@ -124,7 +124,6 @@ const ROLES: RoleDefinition[] = [
       { id: 'correctness', name: 'Correctness', description: 'Logic and behavior validation.', defaultModel: 'workhorse:mid' },
       { id: 'performance', name: 'Performance', description: 'Performance and scalability review.', defaultModel: 'workhorse:mid' },
       { id: 'requirements', name: 'Requirements', description: 'Acceptance criteria and xBRIEF coverage.', defaultModel: 'workhorse:mid' },
-      { id: 'synthesis', name: 'Synthesis', description: 'Combines reviewer findings into the final verdict.', defaultModel: 'workhorse:expensive' },
     ],
   },
   {
@@ -734,12 +733,16 @@ export function RolesPanel() {
                   // requires ONE model for synthesis + all four reviewers (the
                   // prompt cache is per-model); the banner is the operator
                   // surface for that invariant — full mode only (quick/none
-                  // neither fork nor cache-share).
+                  // neither fork nor cache-share). Synthesis is written by the
+                  // review parent, so it runs on the review role's own model.
                   const reviewMode: ReviewModeValue = settings?.roles?.review?.mode ?? 'quick';
-                  const resolvedReviewModels = (role.subRoles ?? []).map((sr) => ({
-                    id: sr.id,
-                    resolved: resolveModelRef(getSubRoleModel(settings, role, sr), workhorses, parentModelRefForSubRoles),
-                  }));
+                  const resolvedReviewModels = [
+                    { id: 'synthesis', resolved: resolveModelRef(parentModelRefForSubRoles ?? role.defaultModel, workhorses) },
+                    ...(role.subRoles ?? []).map((sr) => ({
+                      id: sr.id,
+                      resolved: resolveModelRef(getSubRoleModel(settings, role, sr), workhorses, parentModelRefForSubRoles),
+                    })),
+                  ];
                   const uniform = new Set(resolvedReviewModels.map((r) => r.resolved)).size <= 1;
                   return (
                     <div className="mt-4 border-t border-border pt-3">

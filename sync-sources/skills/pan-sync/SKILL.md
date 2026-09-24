@@ -131,6 +131,16 @@ WARNING: pan sync is distributing from /home/you/Projects/overdeck/sync-sources,
   Update that checkout (e.g. `git -C /home/you/Projects/overdeck pull --ff-only` on main) and re-run `pan sync`.
 ```
 
+`pan doctor` reports the same thing in its **Sync Sources Checkout** row. Doctor
+does not fetch: it compares with the last-fetched upstream ref and says so, so
+run `git fetch` in the checkout (or `pan sync`, which fetches) for a current gap.
+
+Git hooks in `sync-sources/hooks/git-hooks/` are installed as symlinks in each
+registered project's `.git/hooks/`. When a git hook is deleted from the sources,
+the next sync removes its dangling symlink and lists it in the output. Only
+symlinks that point into Overdeck's own git-hook source dir and whose target is
+gone are removed; other hooks and `.backup` copies are never touched (PAN-3881).
+
 ### Startup Sync (Skip When Unchanged)
 
 ```bash

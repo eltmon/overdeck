@@ -19,6 +19,7 @@ import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { FsError } from '../../../../lib/errors.js';
 import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
+import { workspaceNeedsSetup } from '../../../../lib/workspace-manager/setup-marker.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
@@ -376,7 +377,8 @@ export const postAgentsRoute = HttpRouter.add(
     // order books under .pan, so a spawn request is simply honoured.
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    if (!existsSync(workspacePath)) {
+    // PAN-4171: `pan workspace create` also resumes an unfinished setup.
+    if (workspaceNeedsSetup(workspacePath)) {
       try {
         const nodeDir = dirname(process.execPath);
         yield* Effect.promise(() => execAsync(

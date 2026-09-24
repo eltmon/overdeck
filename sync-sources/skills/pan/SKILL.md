@@ -34,9 +34,7 @@ LIFECYCLE VERBS (top-level)
   pan recover <id>         Recover a crashed agent
   pan sync-main <id>       Sync latest main into feature branch
   pan done <id>            Mark work complete + signal pipeline
-  pan approve <id>         Approve work and merge
   pan reopen <id>          Reopen a completed issue
-  pan reset-to-planned <id>  Return to post-planning; preserve workspace + branch
   pan wipe <id>            Destructive reset-to-Todo for an issue
   pan close <id>           Close-out ceremony for completed issues
   pan plan <id>            Create execution plan
@@ -51,15 +49,15 @@ OBSERVATION
   pan show <id> --health   Health + heartbeat only
 
 REVIEW
-  pan review pending        Completed work awaiting review
   pan review request <id>   Request re-review after fixing feedback
-  pan review reset <id>     Reset review/test/merge cycles
-  pan review reset <id> --session  Also clears saved Claude session
+  pan review abort <id>     Abort the current review run
+  pan review restart <id>   Re-dispatch reviewers missing a report
+  gh pr list                Work awaiting review (open PRs)
+  gh pr review <n> --approve  Approve a PR (merge from the dashboard MERGE button)
 
 MANAGED NOUNS
   pan workspace <subcommand>  Workspace lifecycle
   pan project <subcommand>    Project configuration
-  pan convoy <subcommand>     Multi-agent convoys
   pan cost <subcommand>       Cost tracking
 
 SYSTEM / DAEMON

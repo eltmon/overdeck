@@ -134,6 +134,16 @@ wrote `.pan/` into project `.gitignore` files, and that rule makes every plannin
 
 Doctor only reports; it has no `--fix`.
 
+### 8. Sync sources checkout
+
+`pan sync` distributes from the primary checkout's `sync-sources/` when it can. The
+`Sync Sources Checkout` row WARNs when that checkout is behind its upstream, on a branch other
+than the remote's default branch, or has a detached HEAD, because every sync would then distribute
+an old tree (PAN-3881). Doctor does not fetch; it compares with the last-fetched upstream ref and
+says so in the row. Fix: fetch and fast-forward the checkout on its default branch, then `pan sync`.
+The row is skipped (OK) when sync distributes a frozen `pan reload` generation's own copy; the
+`Deployed Hooks` row covers that case.
+
 ## Health Checklist
 
 | Component | Check Command | Expected |

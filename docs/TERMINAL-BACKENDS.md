@@ -182,10 +182,81 @@ Who uses them:
   cleanup.
 - **`pan kill` / `pan stop` / `pan pause`** — use the async `stopAgent`, and decide "running" and "live
   sibling" with `agentPaneExists`, not `sessionExistsSync`.
+- **`killAllReviewerSessions`** (`pan review abort`, forced review re-dispatch, merge, reset;
+  `src/lib/cloister/review-agent.ts`) — closes each of the issue's reviewers (its `agent-<id>-review*`
+  rows plus any matching tmux session) with `closeAgentPaneDetailed`, then writes `stopped` through
+  `stopAgent` for every reviewer it closed or whose row still claims `running`/`starting`. A failed close
+  is returned in `failed` and that reviewer's row is left alone. It used to list tmux sessions only, so on
+  Herdr it closed nothing and wrote no row (PAN-3939).
+- **The review synthesis dispatch guard** (`spawnReviewRoleForIssue`) — asks `isAlive` for
+  `agent-<id>-review`. A live harness is the review in progress (subject to the run-id and finished-report
+  checks); a confirmed death with a pane left behind (`pane-dead`, `runtime-missing`) is closed and
+  re-dispatched; `runtime-indeterminate` holds the dispatch rather than launch a duplicate. It used to read
+  tmux's session list and `#{pane_dead}`, so a bare shell after the harness exited blocked every later
+  dispatch on tmux, and on Herdr the guard never matched (PAN-3939).
 - **`spawnRun`'s warm-idle reap** (PAN-2579, `reapWarmIdleRoleRun` in `src/lib/agents/warm-idle-reap.ts`) — when
-  a role run's pane is still there at dispatch, it asks `isAlive` and reaps through `stopAgent` only on
-  `pane-dead`. It used to read tmux's `#{pane_dead}`, which a Herdr host always answered "not dead",
-  so every re-dispatch was refused as "already running" (PAN-3966).
+  a role run's pane is still there at dispatch, it asks `isAlive` and reaps through `stopAgent` when
+  `isFinishedRoleRun` says the previous run finished. It used to read tmux's `#{pane_dead}`, which a
+  Herdr host always answered "not dead", so every re-dispatch was refused as "already running"
+  (PAN-3966). A role run's harness is interactive and never exits on its own, so a finished run is
+  usually a live harness idle at its prompt, not a dead pane (PAN-3923). Role runs do not close their
+  own pane when they finish, on either backend: sessions stay warm (PAN-2579), and the next dispatch
+  reaps the leftover here. The rule:
+
+  | Liveness verdict | Previous run's `state.json` | Result |
+  | --- | --- | --- |
+  | any | missing, no status, or `starting` | refused |
+  | `pane-dead`, `runtime-missing`, `no-session` (no live harness in the pane) | status past `starting` | reaped |
+  | alive, Herdr `idle` or `done` on two probes 5 s apart, work activity older than 60 s | one-shot role (`sequencer`), `running` | reaped |
+  | alive, Herdr `idle` or `done` | any other role, fresh activity, or a second probe that no longer reads idle/done | refused |
+  | alive, Herdr `unknown`, transcript says the newest turn ended, on two probes 5 s apart, work activity older than 60 s | one-shot role (`sequencer`), `running`, transcript written since the run started | reaped |
+  | alive, Herdr `unknown` | any other role, fresh activity, a turn still running, no readable transcript, or a Claude Code or Muse transcript | refused |
+  | alive, Herdr `working` or `blocked` | any | refused |
+  | alive on tmux (no per-pane agent state) | any | refused |
+  | `runtime-indeterminate`, or the probe threw | any | refused |
+
+  A run that is `starting`, or has no state, may be booting: `launcher.sh` runs its prologue before the
+  harness execs, so the pane reads `runtime-missing`, and `resumeAgent` and `restartAgent` both hold
+  `starting` while they relaunch. `spawnRun` marks a run `running` only after its prompt is delivered.
+
+  Herdr's `idle`/`done` means "waiting for input", not "done for good": Claude Code also sits at its
+  prompt while it waits on a background task or a usage limit. So the idle branch applies only to roles
+  whose prompt is a single turn that ends the run (`ONE_SHOT_ROLES` in `warm-idle-reap.ts`: the
+  sequencer), and only when work activity is stale by the `liveness.ts` rule (`idleAgeMs`, never the
+  label alone) on two probes. The review synthesis parent waits idle in STANDBY for its reviewers, and
+  the tier supervisor stays resident between commit deliveries; a re-dispatch of either is refused.
+  Work, plan, test, knowledge, worker and review-lane runs are refused too.
+
+  After a reap, `spawnRun` waits (up to 3 s) for the backend to drop the pane before it relaunches under
+  the same name, because Herdr drops the record asynchronously. On Herdr, `isAlive` carries the pane's
+  `agent_status` as `backendState` on an alive verdict; tmux verdicts carry none.
+
+  **Non-Claude harnesses on Herdr (#4169).** Herdr tracks `agent_status` only for Claude Code panes
+  (`detectionPolicyFor` in `src/lib/terminal-backends/launch.ts`). Codex, kimi-code, pi, opencode and
+  ACP panes are pane-bound and read `unknown`. For those, the run's own transcript stands in for the
+  label: `roleRunTurnFinished` (`warm-idle-reap.ts`) resolves the transcript through
+  `resolveAgentTranscriptCandidate` and `transcriptTurnFinished` (`src/lib/agents/transcript-turn.ts`)
+  reads its tail for the newest record that starts or ends a turn:
+
+  | Harness | Transcript | Finished when the newest turn record is |
+  | --- | --- | --- |
+  | codex | rollout JSONL | `task_complete` or `turn_aborted` (not `task_started`) |
+  | kimi-code | `wire.jsonl` | a `step.end` with `finishReason: end_turn` (not `turn.prompt`, `step.begin`, or a `step.end` for a tool call) |
+  | pi, ohmypi | session JSONL | an assistant `message` with `stopReason` `stop` or `aborted` (not `toolUse`, and not `error`, which Pi may retry) |
+  | acp, opencode | ACP host transcript | `turn_completed` or `prompt_failed` (not a user prompt or `prompt_queued`; `prompt_stalled` is skipped) |
+
+  Every #4162 guard still applies: only a one-shot role that is `running`, work activity older than
+  60 s, and a second probe 5 s later that re-reads the transcript. The transcript must also have been
+  written since the run's `startedAt`, so an earlier run's finished transcript never counts. A missing
+  or unreadable transcript, a Claude Code pane that reads `unknown`, and Muse panes stay refused until
+  the process exits and the pane reads confirmed dead. The signal is consulted only for Herdr's
+  `unknown`; tmux panes are unchanged. `getSequencerRunStatus` uses the same reader.
+- **tmux `has-session` errors** — on the tmux path, `isAlive` re-asks a false `sessionExists` through the
+  three-part `queryTmuxSession` (`src/lib/agents/tmux-session-query.ts`). Only a clean "no such
+  session" is `no-session`; a tmux error or timeout is `runtime-indeterminate`, never a confirmed death.
+  A missing tmux binary is `runtime-indeterminate` on a tmux host, which requires it, and `no-session` for
+  the legacy check on a Herdr host, which does not. The other `sessionExists` callers outside the
+  liveness door still read a failure as false.
 - **Dashboard Pause and Suspend** — probe with `agentPaneExists` and close with `closeAgentPane`.
 - **Post-merge lifecycle** (`postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`) —
   `closeAgentPane` for the work, planning and strike agents; `closeIssuePanes` with roles

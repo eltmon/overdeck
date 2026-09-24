@@ -47,7 +47,6 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
       correctness: { model: 'workhorse:mid' },
       performance: { model: 'workhorse:mid' },
       requirements: { model: 'workhorse:mid' },
-      synthesis: { model: 'workhorse:expensive' },
     },
   },
   test: { model: 'workhorse:mid' },
@@ -67,10 +66,14 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   },
 };
 
-// Sub-roles deleted with the inspect gate (#3927). An operator's config.yaml may
-// still carry them; config load drops them and the Settings API accepts them silently.
+// Sub-roles nothing spawns any more: work.inspect/inspect-deep went with the
+// inspect gate (#3927); review.synthesis never reached a spawn, because the review
+// parent writes the synthesis on roles.review.model (#4131). An operator's
+// config.yaml may still carry them; config load drops them and the Settings API
+// accepts them silently.
 export const RETIRED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],
+  review: ['synthesis'],
 };
 
 export function cloneRoles(roles: RolesConfig): RolesConfig {

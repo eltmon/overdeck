@@ -9,29 +9,31 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 Spawn, monitor, and control autonomous AI coding agents.
 
-## pan work issue
+## pan start
 
 Spawn an agent for a Linear or GitHub issue.
 
 ```bash
 # Spawn an agent for a Linear issue
-pan work issue MIN-123
+pan start MIN-123
 
 # Spawn an agent for a GitHub issue
-pan work issue 42
+pan start 42
 ```
 
 This command:
-1. Creates a workspace (git worktree) if it doesn't exist
-2. Spawns an autonomous agent in a tmux session
-3. The agent reads the issue, explores the codebase, and implements the solution
+1. Plans the issue first if it has no plan yet (`--plan interactive|auto|skip`)
+2. Creates a workspace (git worktree) if it doesn't exist
+3. Spawns an autonomous agent in a terminal-backend pane (Herdr by default)
+4. The agent reads the issue and plan, explores the codebase, and implements the solution
 
-## pan work status
+## pan status
 
 List all running agents and their status.
 
 ```bash
-pan work status
+pan status
+pan status --json
 ```
 
 Shows:
@@ -50,171 +52,144 @@ The dashboard's **Agents** page is the visual counterpart to this command. A met
 />
 
 <Tip>
-Use `pan work status` from the terminal for a quick check, and the Agents page when you want to watch many agents at once and spot stuck ones at a glance.
+Use `pan status` from the terminal for a quick check, and the Agents page when you want to watch many agents at once and spot stuck ones at a glance.
 </Tip>
 
-## pan work tell
+## pan tell
 
 Send a message to a running agent.
 
 ```bash
 # Send a message to an agent (handles Enter key automatically)
-pan work tell min-123 "Please also add tests"
+pan tell min-123 "Please also add tests"
 ```
 
 This command:
-- Sends your message to the agent's tmux session
+- Sends your message to the agent's pane
 - The agent receives it and responds accordingly
 - Useful for providing feedback, clarification, or guidance
 
-## pan work kill
+## pan kill
 
 Stop a running agent.
 
 ```bash
-pan work kill min-123
+pan kill min-123
 ```
 
-Terminates the agent's tmux session. The workspace and any uncommitted work remain intact.
+Stops the agent. The workspace, branch, and any uncommitted work remain intact.
 
-## pan work pending
+## Reviewing and approving work
 
-Show work completed and awaiting review.
+Finished work is an open pull request. Approval is a PR review, not a CLI verb.
 
 ```bash
-pan work pending
+# Work awaiting review
+gh pr list
+
+# Approve a PR
+gh pr review <pr-number> --approve
 ```
 
-Lists issues where agents have finished work but haven't been approved yet.
+Merge from the dashboard's **MERGE** button. Merge readiness is derived live
+from the PR: approvals, green checks, and forge mergeability.
 
-## pan work approve
-
-Approve agent work, merge MR, and update issue tracker.
-
-```bash
-pan work approve min-123
-```
-
-This command:
-1. Spawns a merge-agent specialist
-2. Reviews the changes
-3. Merges the pull/merge request
-4. Updates the issue status
-
-## pan work list
+## pan issues
 
 List issues from configured trackers.
 
 ```bash
-pan work list
+pan issues
+
+# Show the triage queue
+pan issues --triage
 ```
 
 Shows issues from Linear, GitHub, or GitLab based on your configuration.
 
-## pan work triage
+## pan reopen
 
-Triage issues from secondary tracker.
-
-```bash
-pan work triage
-```
-
-Process issues from a secondary tracker (e.g., Rally) and create equivalent issues in your primary tracker.
-
-## pan work reopen
-
-Reopen a closed issue and re-run planning.
+Re-enter the pipeline for a closed, completed, or cancelled issue.
 
 ```bash
-pan work reopen min-123
+pan reopen min-123 --reason "Regression found in staging"
 ```
 
-Reopens the issue in your tracker and restarts the planning session.
+For an issue that is still in progress, use `pan review restart` or `pan start` instead.
 
-## pan work request-review
+## pan review request
 
 Request re-review after fixing feedback.
 
 ```bash
-pan work request-review min-123 -m "Fixed: added tests and removed duplication"
+pan review request min-123 -m "Fixed: added tests and removed duplication"
 ```
 
-For agents, this command has a maximum of 3 auto-requeues to prevent infinite loops.
+## pan wipe
 
-## pan work wipe
-
-Deep wipe: completely reset all state for an issue.
+Deep wipe: completely reset an issue.
 
 ```bash
-# Clean up agents, state, Linear status
-pan work wipe min-123
-
-# Also delete workspace
-pan work wipe min-123 -w
+# Asks for confirmation
+pan wipe min-123
 
 # Skip confirmation
-pan work wipe min-123 -y -w
+pan wipe min-123 -y
 ```
 
 This is a nuclear option that:
 - Kills any running agents
-- Cleans up state files
-- Updates issue tracker status
-- Optionally removes the workspace
+- Removes the workspace files
+- Deletes the issue's branches
+- Resets the issue tracker status
 
-## pan work recover
+## pan recover
 
 Recover crashed agents.
 
 ```bash
 # Recover a specific agent
-pan work recover min-123
+pan recover min-123
 
 # Recover all crashed agents
-pan work recover --all
+pan recover --all
 ```
 
 Attempts to resume agents that crashed or were interrupted.
 
-## pan specialists
+## pan admin specialists
 
-Manage specialist agents (review, test, inspect, UAT, merge).
+Manage specialist agents (review, test, UAT, merge).
 
 ```bash
-# Check status of all specialists
-pan specialists status
+# Show all specialists and their status
+pan admin specialists list
 
-# Wake a specialist for an issue
-pan specialists wake review-agent --issue MIN-123
+# Wake a specialist with a task
+pan admin specialists wake review-agent --task "review MIN-123"
 
-# View specialist queue
-pan specialists queue review-agent
-
-# Clear a specialist's queue
-pan specialists clear-queue review-agent
-
-# Reset a specialist's state
-pan specialists reset review-agent
+# Reset a specialist (clear session, start fresh)
+pan admin specialists reset review-agent
 ```
 
 See [Specialist Agents](/features/specialists) for detailed information on each specialist type.
 
-## pan remote
+## pan admin remote
 
 Manage remote workspaces via Fly.io.
 
 ```bash
-# Initialize Fly.io provider
-pan remote init
+# Initialize the Fly.io app for workspace machines
+pan admin remote init
 
-# Configure remote environment
-pan remote setup
+# Install flyctl and configure auth
+pan admin remote setup
 
-# Check remote workspace status
-pan remote status
+# Check Fly.io connection and machine status
+pan admin remote status
 
-# View resource allocation
-pan remote resources
+# Show RAM/disk usage across VMs
+pan admin remote resources
 ```
 
 See [Workspaces](/features/workspaces#remote-workspaces-flyio) for details on remote workspace execution.

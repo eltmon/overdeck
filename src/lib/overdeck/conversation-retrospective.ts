@@ -120,7 +120,7 @@ export async function handleRetrospectiveConversationCreate(
     collectProjects?: () => Promise<RetrospectiveProjectLine[]>;
     now?: () => Date;
     overdeckHome?: () => string;
-    /** Injected for tests; defaults to the canonical issue-record read door. */
+    /** Injected for tests; defaults to querying the project's tracker and forge. */
     listRecords?: (
       project: RetrospectiveProjectLine,
     ) => Promise<RetrospectiveSourceIssue[] | RetrospectiveRecordListing>;
@@ -218,7 +218,7 @@ export interface RetrospectiveProjectEvidence {
   unreadable: { path: string; message: string }[];
   /** Issues dropped by the per-project cap. */
   truncated: number;
-  /** Populated when the read door itself failed for this project. */
+  /** Populated when the tracker query itself failed for this project. */
   unavailable?: string;
 }
 
@@ -343,7 +343,7 @@ export function formatEvidence(projects: RetrospectiveProjectEvidence[]): string
   const blocks: string[] = [];
   for (const project of projects) {
     if (project.unavailable) {
-      blocks.push(`### ${project.key}\n\nEVIDENCE UNAVAILABLE — the issue-record read door failed for this project: ${project.unavailable}. Treat this project as unexamined; do not infer that nothing happened in it.`);
+      blocks.push(`### ${project.key}\n\nEVIDENCE UNAVAILABLE — the tracker query for this project's issues and pull requests failed: ${project.unavailable}. Treat this project as unexamined; do not infer that nothing happened in it.`);
       continue;
     }
     const unreadableNote = project.unreadable.length

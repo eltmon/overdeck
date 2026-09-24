@@ -28,6 +28,7 @@ import { sessionExistsSync, killSessionSync, sendKeys, getAgentSessionsSync } fr
 import { isRuntimeAgentAlive } from './runtime-liveness.js';
 import { parseClaudeSession, getSessionFiles, getProjectDirs } from '../cost-parsers/jsonl-parser.js';
 import { claudeProjectsRoot } from './storage/claude-code.js';
+import { readSessionIndex } from '../session-history.js';
 
 const CLAUDE_PROJECTS_DIR = claudeProjectsRoot();
 
@@ -130,6 +131,14 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
    * Get the session path for an agent
    */
   getSessionPath(agentId: string): string | null {
+    // PAN-3948: prefer the absolute transcript path the capture point recorded
+    // in the agent's own sessions.json (PAN-3959). The sessions-index.json
+    // lookup below is a pre-PAN-3959 formula and finds nothing on current
+    // hosts, which left the transcript heartbeat (and liveness.ts `isIdle`)
+    // blind in any process without the runtime mirror, such as the deacon child.
+    const indexed = readSessionIndex(agentId).at(-1);
+    if (indexed?.path && existsSync(indexed.path)) return indexed.path;
+
     const state = getAgentState(agentId);
     if (!state) {
       return null;

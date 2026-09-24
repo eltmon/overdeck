@@ -274,7 +274,7 @@ For **GitLab** projects, TBD — not yet supported in dashboard polling.
 No per-project task database initialization is required. xBRIEF plan items become the executable checklist after planning, and `pan task` reads and updates their state through the canonical state door.
 
 ```bash
-pan task --help >/dev/null && echo "PASS: pan task available"
+pan task --help >/dev/null && echo "PASS: task command available"
 ```
 
 ### Step 6 (optional): Workspaces directory and exclusion
@@ -333,7 +333,7 @@ grep 'GITHUB_REPOS' ~/.overdeck.env | grep -q '<PREFIX>' && \
   echo "PASS: in GITHUB_REPOS" || echo "FAIL: not in GITHUB_REPOS"
 
 # 5. xBRIEF task command available
-pan task --help >/dev/null && echo "PASS" || echo "FAIL: pan task unavailable"
+pan task --help >/dev/null && echo "PASS" || echo "FAIL: task command unavailable"
 
 # 6. workspaces/ exists
 test -d <path>/workspaces && echo "PASS" || echo "FAIL: no workspaces/"

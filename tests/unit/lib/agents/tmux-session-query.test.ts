@@ -20,6 +20,16 @@ describe('classifyHasSessionFailure', () => {
     })).toBe('missing');
   });
 
+  it('reads a host with no tmux binary as missing: it can hold no session', () => {
+    expect(classifyHasSessionFailure({ code: 'ENOENT', stderr: '' })).toBe('missing');
+  });
+
+  it('reads no tmux binary as error when the caller requires tmux (a tmux-backend host)', () => {
+    expect(classifyHasSessionFailure({ code: 'ENOENT', stderr: '' }, { noBinary: 'error' })).toBe('error');
+    // A clean "no such session" is still missing there.
+    expect(classifyHasSessionFailure({ code: 1, stderr: "can't find session: agent-x\n" }, { noBinary: 'error' })).toBe('missing');
+  });
+
   it('reads a timeout (the probe was killed) as error', () => {
     expect(classifyHasSessionFailure({ killed: true, stderr: '' })).toBe('error');
   });
@@ -29,7 +39,6 @@ describe('classifyHasSessionFailure', () => {
       code: 1,
       stderr: 'error connecting to /tmp/tmux-1000/overdeck (Permission denied)\n',
     })).toBe('error');
-    expect(classifyHasSessionFailure({ code: 'ENOENT', stderr: '' })).toBe('error');
     expect(classifyHasSessionFailure(new Error('boom'))).toBe('error');
   });
 });
