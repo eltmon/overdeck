@@ -72,37 +72,6 @@ export function writeHealthEvent(event: Omit<HealthEvent, 'id'>): number {
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 
-/** Drop-in for getLatestHealthEvent() from database/health-events-db.ts. */
-export function getLatestHealthEvent(agentId: string): HealthEventWithMetadata | null {
-  const db = getOverdeckDatabaseSync();
-  const row = db.prepare(`
-    SELECT id, agent_id, timestamp, state, source, metadata
-    FROM health_events
-    WHERE agent_id = ?
-    ORDER BY timestamp DESC
-    LIMIT 1
-  `).get(agentId) as {
-    id: number;
-    agent_id: string;
-    timestamp: number | null;
-    state: string;
-    source: string | null;
-    metadata: string | null;
-  } | undefined;
-
-  if (!row) return null;
-
-  const event: HealthEvent = {
-    id: row.id,
-    agentId: row.agent_id,
-    timestamp: fromMs(row.timestamp) ?? new Date().toISOString(),
-    state: row.state as HealthState,
-    source: row.source ?? undefined,
-    metadata: row.metadata ?? undefined,
-  };
-  return parseMetadata(event);
-}
-
 /**
  * Drop-in for getHealthHistory() from the legacy database/health-events-db.ts —
  * reads overdeck.db (the single source of truth). Accepts ISO start/end (the

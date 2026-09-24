@@ -624,11 +624,6 @@ function resolveProjectKeyForCwdFromProjects(
   return bestMatch?.key ?? null;
 }
 
-/** Resolve the registered project owning a cwd via longest path-prefix match. */
-export function resolveProjectKeyForCwd(cwd: string): string | null {
-  return resolveProjectKeyForCwdFromProjects(cwd, listProjectsSync());
-}
-
 /** Async request-path variant of {@link resolveProjectKeyForCwd}. */
 export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string | null> {
   return resolveProjectKeyForCwdFromProjects(cwd, await listProjectsAsync());

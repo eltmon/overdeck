@@ -353,11 +353,6 @@ declare const headAnchorBrand: unique symbol;
 /** A producer-issued snapshot of every code HEAD in a workspace. */
 export type HeadAnchor = string & { readonly [headAnchorBrand]: true };
 
-/** Rehydrate a persisted anchor after it crosses an unbranded storage boundary. */
-export function rehydrateHeadAnchor(anchor: string): HeadAnchor {
-  return anchor as HeadAnchor;
-}
-
 export function parseCompositeSnapshot(snapshot: string | undefined): Map<string, string> {
   const heads = new Map<string, string>();
   if (!snapshot) return heads;

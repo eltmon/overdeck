@@ -2,7 +2,6 @@ import { Effect } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  workResumeSlotsAvailable,
   tryReserveSwarmSlot,
   resetPatrolDispatchBudget,
   type ConcurrencyLimits,
@@ -11,18 +10,6 @@ import {
 
 const LIMITS: ConcurrencyLimits = { maxWorkAgents: 6, reservedAdvancingSlots: 3, reservedSwarmSlots: 3, totalCeiling: 9, exemptOperatorStarted: true };
 
-describe('concurrency governor — pure math', () => {
-  it('reports free work slots below the cap', () => {
-    const counts: RunningCounts = { work: 2, advancing: 1, swarm: 0, total: 3 };
-    expect(workResumeSlotsAvailable(counts, LIMITS)).toBe(4);
-  });
-
-  it('reports zero slots at the cap (never negative)', () => {
-    expect(workResumeSlotsAvailable({ work: 6, advancing: 0, swarm: 0, total: 6 }, LIMITS)).toBe(0);
-    // Over the cap (e.g. forced starts) → still 0, never negative; deacon resumes nothing.
-    expect(workResumeSlotsAvailable({ work: 9, advancing: 0, swarm: 0, total: 9 }, LIMITS)).toBe(0);
-  });
-});
 
 describe('concurrency governor — swarm reserve (PAN-2212)', () => {
   it('lets the swarm dispatch its reserve even when work+advancing fill the ceiling', () => {

@@ -102,17 +102,6 @@ function resolveBudgets(config?: PatrolBudgetsConfig): PatrolBudgetsConfig {
   };
 }
 
-/** The action budget for one patrol: per-patrol override, else the default. */
-export function getPatrolBudget(name: string, config?: PatrolBudgetsConfig): number {
-  const budgets = resolveBudgets(config);
-  return budgets.overrides?.[name] ?? budgets.default;
-}
-
-/** Alarms are exempt from suspension (they still accrue a tally for `pan doctor`). */
-export function isPatrolBudgetExempt(name: string, config?: PatrolBudgetsConfig): boolean {
-  return resolveBudgets(config).exempt.includes(name);
-}
-
 /**
  * Record `count` actions for a patrol on the given day. Returns the new tally.
  * Zero-action passes are free: they leave the tally untouched.
@@ -128,18 +117,6 @@ export function recordPatrolActions(name: string, count: number, now: Date = new
   entry.actions += count;
   writePatrolBudgetState(state);
   return entry.actions;
-}
-
-/**
- * True when the patrol is suspended for the rest of this UTC day: either it
- * was explicitly suspended, or its tally already exceeds the budget (covers a
- * crash between recording the actions and writing the suspension).
- */
-export function isPatrolSuspended(name: string, now: Date = new Date(), config?: PatrolBudgetsConfig): boolean {
-  if (isPatrolBudgetExempt(name, config)) return false;
-  const entry = readPatrolBudgetState().days[utcDayKey(now)]?.[name];
-  if (!entry) return false;
-  return entry.suspendedAt !== undefined || entry.actions > getPatrolBudget(name, config);
 }
 
 /**
@@ -174,31 +151,6 @@ export async function suspendPatrol(name: string, reason: string, now: Date = ne
       writePatrolBudgetState(current);
     }
   }
-}
-
-/**
- * Run one patrol under its firing budget (PAN-3850 W39). A suspended patrol
- * is skipped for the rest of the UTC day (logged, returns no actions).
- * Otherwise the patrol runs, its action count is tallied, and crossing the
- * budget suspends it with a once-per-day needs-you. Exempt alarm patrols run
- * and tally but never suspend.
- */
-export async function runBudgetedPatrol<T>(
-  name: string,
-  fn: () => Promise<T[]>,
-  options: { now?: Date; config?: PatrolBudgetsConfig } = {},
-): Promise<T[]> {
-  const now = options.now ?? new Date();
-  if (isPatrolSuspended(name, now, options.config)) {
-    console.log(`[deacon] patrol ${name} suspended for the rest of ${utcDayKey(now)} (budget exceeded) — skipping`);
-    return [];
-  }
-  const actions = await fn();
-  const tally = recordPatrolActions(name, actions.length, now);
-  if (!isPatrolBudgetExempt(name, options.config) && tally > getPatrolBudget(name, options.config)) {
-    await suspendPatrol(name, `fired ${tally} actions in one UTC day (budget ${getPatrolBudget(name, options.config)})`, now);
-  }
-  return actions;
 }
 
 /** `pan doctor` table data: today's tally, budget and suspension per patrol. */

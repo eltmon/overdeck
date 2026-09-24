@@ -19,7 +19,7 @@ const projectsMocks = vi.hoisted(() => ({
 }));
 
 const mergeOrderMocks = vi.hoisted(() => ({
-  listEligibleCandidatesByProject: vi.fn(() => [] as Array<{ issueId: string; title: string; pr?: number }>),
+  listReadyIssuesForProject: vi.fn(() => [] as Array<{ issueId: string; title: string; pr?: number }>),
   computeMergeQueueFromCandidates: vi.fn(),
 }));
 
@@ -116,7 +116,7 @@ vi.mock('../../services/derived-issue-state.js', async (importOriginal) => {
   return {
     ...original,
     listReadyIssuesForProject: async (projectPath: string) =>
-      mergeOrderMocks.listEligibleCandidatesByProject(projectPath),
+      mergeOrderMocks.listReadyIssuesForProject(projectPath),
   };
 });
 vi.mock('../../../../lib/flywheel-merge-order.js', () => mergeOrderMocks);
@@ -200,7 +200,7 @@ beforeEach(() => {
     key === 'overdeck' ? PAN : key === 'myn' ? MYN : null,
   );
   mergeSyncMocks.isMergeTrainEnabledForProject.mockReturnValue(true);
-  mergeOrderMocks.listEligibleCandidatesByProject.mockReturnValue([]);
+  mergeOrderMocks.listReadyIssuesForProject.mockReturnValue([]);
   mergeOrderMocks.computeMergeQueueFromCandidates.mockReturnValue(Effect.succeed([]));
   mergeBatchMocks.shipMergeBatch.mockImplementation(
     (async (issueIds: readonly string[]) => issueIds.map((issueId) => ({ issueId, ok: true as const }))) as never,
@@ -220,7 +220,7 @@ describe('PAN-1696 merge-train-routes', () => {
   // ── AC1: aggregate queues, no flywheel run ─────────────────────────────────
   describe('GET /api/merge-train/queues (ac1)', () => {
     it('returns one entry per tracked project with key, effective flag, and queue', async () => {
-      mergeOrderMocks.listEligibleCandidatesByProject.mockImplementation((path: string) =>
+      mergeOrderMocks.listReadyIssuesForProject.mockImplementation((path: string) =>
         path === '/repos/myn' ? [{ issueId: 'MIN-831', title: 'MIN-831' }] : [],
       );
       mergeOrderMocks.computeMergeQueueFromCandidates.mockImplementation((candidates: readonly { issueId: string }[]) =>
@@ -246,7 +246,7 @@ describe('PAN-1696 merge-train-routes', () => {
       const myn = entries.find((e) => e.projectKey === 'myn');
       expect(myn).toEqual({ projectKey: 'myn', projectName: 'Mind Your Now', enabled: false, holdsForUat: expect.any(Boolean), queue: [] });
       // A disabled project must never trigger git work in its repo (hazard H2).
-      expect(mergeOrderMocks.listEligibleCandidatesByProject).not.toHaveBeenCalledWith('/repos/myn');
+      expect(mergeOrderMocks.listReadyIssuesForProject).not.toHaveBeenCalledWith('/repos/myn');
     });
 
     it('reports whether each project holds merges for UAT (PAN-3965)', async () => {
@@ -263,7 +263,7 @@ describe('PAN-1696 merge-train-routes', () => {
       projectsMocks.listProjectsSync.mockReturnValue([
         { key: 'myn', config: { ...MYN, auto_merge_default: 'auto' } },
       ]);
-      mergeOrderMocks.listEligibleCandidatesByProject.mockImplementation(() => [{ issueId: 'MIN-831', title: 'MIN-831' }]);
+      mergeOrderMocks.listReadyIssuesForProject.mockImplementation(() => [{ issueId: 'MIN-831', title: 'MIN-831' }]);
       mergeOrderMocks.computeMergeQueueFromCandidates.mockImplementation((candidates: readonly { issueId: string }[]) =>
         Effect.succeed(candidates.map((c, i) => ({ issueId: c.issueId, title: c.issueId, mergeOrder: i }))),
       );
@@ -276,7 +276,7 @@ describe('PAN-1696 merge-train-routes', () => {
     });
 
     it('keeps the other projects when one project throws', async () => {
-      mergeOrderMocks.listEligibleCandidatesByProject.mockImplementation((path: string) => {
+      mergeOrderMocks.listReadyIssuesForProject.mockImplementation((path: string) => {
         if (path === '/repos/overdeck') throw new Error('git fetch failed');
         return [];
       });
@@ -547,7 +547,7 @@ describe('PAN-1696 merge-train-routes', () => {
     });
 
     it('merges the first n issues of the named project ready set', async () => {
-      mergeOrderMocks.listEligibleCandidatesByProject.mockImplementation((path: string) =>
+      mergeOrderMocks.listReadyIssuesForProject.mockImplementation((path: string) =>
         path === '/repos/myn'
           ? [{ issueId: 'MIN-831', title: 'MIN-831' }, { issueId: 'MIN-900', title: 'MIN-900' }, { issueId: 'MIN-901', title: 'MIN-901' }]
           : [],
@@ -558,7 +558,7 @@ describe('PAN-1696 merge-train-routes', () => {
 
       const result = await postMergeTrainMergeNextPayload({ n: 2, project: 'myn' });
       expect(result.status).toBe(200);
-      expect(mergeOrderMocks.listEligibleCandidatesByProject).toHaveBeenCalledWith('/repos/myn');
+      expect(mergeOrderMocks.listReadyIssuesForProject).toHaveBeenCalledWith('/repos/myn');
       expect(mergeBatchMocks.shipMergeBatch).toHaveBeenCalledWith(['MIN-831', 'MIN-900'], expect.anything());
       expect(result.body).toMatchObject({ projectKey: 'myn' });
     });

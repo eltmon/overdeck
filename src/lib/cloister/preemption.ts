@@ -71,38 +71,6 @@ export interface YieldCandidate {
   lastYieldResumeMs: number | null;
 }
 
-/**
- * FR-2 predicate + ordering, pure. Returns the best victim or null.
- *
- * Excludes any agent that is not idle, is operator-attached, is already paused,
- * or is inside its post-resume re-yield cooldown. Among the eligible, prefers
- * (a) an agent blocked on its own review, then (b) the longest-idle
- * (`lastActivity` ascending).
- */
-export function selectYieldVictim(
-  candidates: readonly YieldCandidate[],
-  nowMs: number,
-  cooldownSecs: number,
-): YieldCandidate | null {
-  const cooldownMs = cooldownSecs * 1000;
-  const eligible = candidates.filter((c) => {
-    if (!c.idle) return false;
-    if (c.attached) return false;
-    if (c.paused) return false;
-    if (c.lastYieldResumeMs !== null && nowMs - c.lastYieldResumeMs < cooldownMs) return false;
-    return true;
-  });
-  if (eligible.length === 0) return null;
-
-  const ordered = [...eligible].sort((a, b) => {
-    // (a) prefer pipeline-blocked agents
-    if (a.reviewBlocked !== b.reviewBlocked) return a.reviewBlocked ? -1 : 1;
-    // (b) then longest-idle first (oldest lastActivity)
-    return (a.lastActivityMs ?? 0) - (b.lastActivityMs ?? 0);
-  });
-  return ordered[0];
-}
-
 function parseMs(iso: string | undefined): number | null {
   if (!iso) return null;
   const ms = Date.parse(iso);

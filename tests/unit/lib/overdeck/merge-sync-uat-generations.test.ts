@@ -19,7 +19,6 @@ import {
   listUatGenerationsSync,
   listUatGenerationNamesSync,
   listUatGenerationsWithStacksSync,
-  updateUatGenerationStatusSync,
   updateUatGenerationSync,
   setUatGenerationStackStartedAtSync,
   type UatGeneration,
@@ -196,18 +195,18 @@ describe('status transitions', () => {
     const gen = makeGeneration();
     insertUatGenerationSync(gen);
 
-    updateUatGenerationStatusSync(gen.name, 'ready');
+    updateUatGenerationSync(gen.name, { status: 'ready' });
     expect(getUatGenerationSync(gen.name)!.status).toBe('ready');
 
-    updateUatGenerationStatusSync(gen.name, 'superseded');
+    updateUatGenerationSync(gen.name, { status: 'superseded' });
     expect(getUatGenerationSync(gen.name)!.status).toBe('superseded');
 
-    updateUatGenerationStatusSync(gen.name, 'promoted');
+    updateUatGenerationSync(gen.name, { status: 'promoted' });
     expect(getUatGenerationSync(gen.name)!.status).toBe('promoted');
   });
 
   it('throws for an unknown generation', () => {
-    expect(() => updateUatGenerationStatusSync('uat/ghost-0101', 'ready')).toThrow();
+    expect(() => updateUatGenerationSync('uat/ghost-0101', { status: 'ready' })).toThrow();
   });
 });
 

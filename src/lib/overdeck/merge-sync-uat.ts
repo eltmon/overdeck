@@ -453,17 +453,6 @@ export function listUatGenerationNamesSync(): string[] {
   return rows.map((r) => r.name);
 }
 
-/** Drop-in for updateUatGenerationStatusSync() from uat-generations-db.ts. */
-export function updateUatGenerationStatusSync(name: string, status: UatGenerationStatus): void {
-  const db = getOverdeckDatabaseSync();
-  const result = db.prepare(
-    'UPDATE uat_generations SET status = ?, updated_at = ? WHERE name = ?',
-  ).run(status, nowMillis(), name);
-  if (result.changes === 0) {
-    throw new Error(`[merge-sync] uat generation not found: ${name}`);
-  }
-}
-
 /** Drop-in for updateUatGenerationSync() from uat-generations-db.ts. */
 export function updateUatGenerationSync(
   name: string,

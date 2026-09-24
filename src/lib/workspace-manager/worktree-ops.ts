@@ -1,5 +1,5 @@
 import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
-import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, statSync, renameSync, rmSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, statSync, renameSync, rmSync } from 'fs';
 import { join, dirname, extname, relative, resolve } from 'path';
 import { homedir } from 'os';
 import { exec, execFile } from 'child_process';
@@ -279,34 +279,6 @@ export function releasePort(portFile: string, featureFolder: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * @deprecated Use copyProjectTemplateDirs instead. Kept for non-.claude paths.
- */
-export function createSymlinks(
-  sourceDir: string,
-  targetDir: string,
-  symlinks: string[]
-): string[] {
-  const steps: string[] = [];
-
-  for (const symlink of symlinks) {
-    const sourcePath = join(sourceDir, symlink);
-    const targetPath = join(targetDir, symlink);
-
-    if (existsSync(sourcePath)) {
-      mkdirSync(dirname(targetPath), { recursive: true });
-      try {
-        symlinkSync(sourcePath, targetPath);
-        steps.push(`Created symlink: ${symlink}`);
-      } catch {
-        // Symlink might already exist
-      }
-    }
-  }
-
-  return steps;
 }
 
 /**

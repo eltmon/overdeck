@@ -15,7 +15,6 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { Context, Effect, Schema, Stream } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckDatabaseSync } from './infra.js';
@@ -195,34 +194,6 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
 // ── ConversationsApi — HttpApiGroup (controller declarations) ─────────────────
 // Handlers wire in at bootstrap; R = ConversationsResolver | TranscriptsResolver |
 // ConversationWriter, never Db directly.
-
-export const ConversationsApi = HttpApiGroup.make('conversations')
-  .add(HttpApiEndpoint.get('list', '/conversations', {
-    success: Schema.Array(Conversation),
-  }))
-  .add(HttpApiEndpoint.get('get', '/conversations/:name', {
-    params:  Schema.Struct({ name: ConversationName }),
-    success: Conversation,
-    error:   ConversationNotFound,
-  }))
-  .add(HttpApiEndpoint.get('getHandoffDoc', '/conversations/:name/handoff-doc', {
-    params:  Schema.Struct({ name: ConversationName }),
-    success: Schema.String,
-    error:   ConversationNotFound,
-  }))
-  .add(HttpApiEndpoint.post('create', '/conversations', {
-    success: Conversation,
-  }))
-  .add(HttpApiEndpoint.post('archive', '/conversations/:name/archive', {
-    params:  Schema.Struct({ name: ConversationName }),
-    success: Conversation,
-    error:   [ConversationNotFound, AlreadyArchived],
-  }))
-  .add(HttpApiEndpoint.post('unarchive', '/conversations/:name/unarchive', {
-    params:  Schema.Struct({ name: ConversationName }),
-    success: Conversation,
-    error:   [ConversationNotFound, NotArchived],
-  }));
 
 // ── Legacy-compatible sync door ──────────────────────────────────────────────
 //

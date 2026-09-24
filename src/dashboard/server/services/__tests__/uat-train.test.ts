@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => ({
   readXBriefDocument: vi.fn(),
   reviewRecordEligibility: vi.fn(),
   isMergeTrainEnabledForProject: vi.fn(),
-  listEligibleCandidatesByProject: vi.fn(),
+  listReadyIssuesForProject: vi.fn(),
   reconcileUatGenerations: vi.fn(),
   assemblePolyrepoUatGeneration: vi.fn(),
   buildPolyrepoGitDeps: vi.fn(),
@@ -116,7 +116,7 @@ vi.mock('../derived-issue-state.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../derived-issue-state.js')>();
   return {
     ...original,
-    listReadyIssuesForProject: async () => mocks.listEligibleCandidatesByProject(),
+    listReadyIssuesForProject: async () => mocks.listReadyIssuesForProject(),
   };
 });
 
@@ -125,7 +125,7 @@ vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
   return {
     ...original,
     reviewRecordEligibility: mocks.reviewRecordEligibility,
-    listEligibleCandidatesByProject: mocks.listEligibleCandidatesByProject,
+    listReadyIssuesForProject: mocks.listReadyIssuesForProject,
   };
 });
 
@@ -480,7 +480,7 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
-    mocks.listEligibleCandidatesByProject.mockReturnValue([
+    mocks.listReadyIssuesForProject.mockReturnValue([
       { issueId: 'MIN-901', title: 'MIN-901' },
     ]);
     mocks.listUatGenerationsSync.mockReturnValue([]);
@@ -610,7 +610,7 @@ describe('runUatTrainReconcile — terminal generation cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
-    mocks.listEligibleCandidatesByProject.mockReturnValue([]);
+    mocks.listReadyIssuesForProject.mockReturnValue([]);
     mocks.buildUatGenerationStore.mockReturnValue({
       insert: vi.fn(), update: vi.fn(), listNames: () => [], listChain: () => [],
     });
@@ -653,7 +653,7 @@ describe('runUatTrainReconcile — ref-refresh outage preserves the live generat
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
-    mocks.listEligibleCandidatesByProject.mockReturnValue([{ issueId: 'MIN-901', title: 'MIN-901' }]);
+    mocks.listReadyIssuesForProject.mockReturnValue([{ issueId: 'MIN-901', title: 'MIN-901' }]);
     mocks.listUatGenerationsSync.mockReturnValue([{ name: 'uat/min-otter-0727', status: 'ready' }]);
     mocks.buildUatGenerationStore.mockReturnValue({});
     mocks.buildPolyrepoGitDeps.mockReturnValue(new Map());

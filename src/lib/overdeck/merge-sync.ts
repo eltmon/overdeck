@@ -512,27 +512,3 @@ export function getMergeSetFromDb(issueId: string): MergeSet | null {
   if (!row) return null;
   return rowToMergeSet(row, loadReposForMergeSet(db, issueId));
 }
-
-/** Drop-in for getAllMergeSetsFromDb() from merge-set-db.ts. */
-export function getAllMergeSetsFromDb(projectKey?: string): MergeSet[] {
-  const db = getOverdeckDatabaseSync();
-  const rows = (
-    projectKey
-      ? db.prepare(
-          'SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at FROM merge_sets WHERE project_key = ? ORDER BY updated_at DESC',
-        ).all(projectKey)
-      : db.prepare(
-          'SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at FROM merge_sets ORDER BY updated_at DESC',
-        ).all()
-  ) as OverdeckMergeSetRow[];
-
-  return rows.map((row) => rowToMergeSet(row, loadReposForMergeSet(db, row.issue_id)));
-}
-
-/** Drop-in for deleteMergeSet() from merge-set-db.ts. */
-export function deleteMergeSet(issueId: string): void {
-  const db = getOverdeckDatabaseSync();
-  // Delete repos first — FK to merge_sets has ON DELETE no action
-  db.prepare('DELETE FROM merge_set_repos WHERE issue_id = ?').run(issueId);
-  db.prepare('DELETE FROM merge_sets WHERE issue_id = ?').run(issueId);
-}

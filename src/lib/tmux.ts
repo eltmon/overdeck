@@ -930,21 +930,6 @@ export const sessionExists = (
     catch: (cause) => toTmuxError('session-exists', cause),
   });
 
-export const querySession = (
-  name: string,
-): Effect.Effect<SessionQueryResult, TmuxError> =>
-  Effect.tryPromise({
-    try: async () => {
-      try {
-        await tmuxExecAsync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
-        return { status: 'exists' } as const;
-      } catch (cause) {
-        return sessionQueryFailure(cause);
-      }
-    },
-    catch: (cause) => toTmuxError('query-session', cause),
-  });
-
 export const createSession = (
   name: string,
   cwd: string,

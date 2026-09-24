@@ -1,6 +1,5 @@
 import { Context, Effect, Schema } from 'effect';
 import { real } from 'drizzle-orm/sqlite-core';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
@@ -242,77 +241,6 @@ export class MergeWriter extends Context.Service<MergeWriter, {
 // query: (not urlParams:) for GET params per Effect v4. Schema.Union([...]) array form.
 // HttpApiEndpoint['delete'] for reserved word. PAN-1696: merge-train endpoints are under
 // /merge-train/* (per-project concern); auto-merge + merge-blockers stay /flywheel/*.
-
-export const MergeApi = HttpApiGroup.make('merge')
-  .add(HttpApiEndpoint.get('getMergeSet', '/issues/:id/merge-set', {
-    params:  { id: IssueId },
-    success: MergeSet,
-    error:   MergeSetNotFound,
-  }))
-  .add(HttpApiEndpoint.get('listQueues', '/merge-queue', {
-    success: Schema.Array(QueueView),
-  }))
-  .add(HttpApiEndpoint.get('listAutoMerges', '/flywheel/auto-merge', {
-    query:   AutoMergeFilter,
-    success: Schema.Array(AutoMerge),
-  }))
-  .add(HttpApiEndpoint.get('listBlockers', '/flywheel/merge-blockers', {
-    success: Schema.Array(AutoMerge),
-  }))
-  .add(HttpApiEndpoint.get('listUatGenerations', '/merge-train/generations', {
-    query:   UatGenerationFilter,
-    success: Schema.Array(UatGeneration),
-  }))
-  .add(HttpApiEndpoint.post('merge', '/issues/:id/merge', {
-    params:  { id: IssueId },
-    success: MergeSet,
-    error:   Schema.Union([MergeSetNotFound, NotReadyForMerge, MergeInProgress, ForgeMergeFailed]),
-  }))
-  .add(HttpApiEndpoint.post('approveForge', '/issues/:id/forge-approve', {
-    params:  { id: IssueId },
-    success: MergeSet,
-    error:   Schema.Union([MergeSetNotFound, ForgeMergeFailed]),
-  }))
-  .add(HttpApiEndpoint.post('rebaseOntoMain', '/issues/:id/sync-main', {
-    params:  { id: IssueId },
-    success: MergeSet,
-    error:   MergeSetNotFound,
-  }))
-  .add(HttpApiEndpoint.post('mergeNext', '/merge-train/merge-next', {
-    payload: Schema.Struct({ projectKey: ProjectKey }),
-    success: Schema.NullOr(MergeSet),
-    error:   Schema.Union([MergeSetNotFound, NotReadyForMerge, MergeInProgress, ForgeMergeFailed]),
-  }))
-  .add(HttpApiEndpoint.post('scheduleAutoMerge', '/flywheel/auto-merge/schedule', {
-    payload: Schema.Struct({
-      issueId:          IssueId,
-      prUrl:            Schema.String,
-      prNumber:         Schema.optional(Schema.Number),
-      projectKey:       ProjectKey,
-      forge:            Schema.optional(Schema.String),
-      scheduledMergeAt: Schema.Date,
-    }),
-    success: AutoMerge,
-  }))
-  .add(HttpApiEndpoint['delete']('cancelAutoMerge', '/flywheel/auto-merge/:id', {
-    params:  { id: IssueId },
-    payload: Schema.Struct({ cancelledBy: Schema.String }),
-    success: AutoMerge,
-    error:   AutoMergeNotFound,
-  }))
-  .add(HttpApiEndpoint.post('assembleUat', '/merge-train/assemble', {
-    success: Schema.Array(UatGeneration),
-  }))
-  .add(HttpApiEndpoint.post('startUatStack', '/merge-train/generations/:name/stack', {
-    params:  { name: UatName },
-    success: UatGeneration,
-    error:   Schema.Union([UatGenerationNotFound, UatNotPromotable]),
-  }))
-  .add(HttpApiEndpoint.post('promoteUat', '/merge-train/generations/:name/promote', {
-    params:  { name: UatName },
-    success: UatGeneration,
-    error:   Schema.Union([UatGenerationNotFound, UatNotPromotable]),
-  }));
 
 // ── Sync helpers for merge-queue (used by synchronous call sites) ────────────
 
