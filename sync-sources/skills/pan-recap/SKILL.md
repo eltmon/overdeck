@@ -144,10 +144,23 @@ git log origin/main --since="$HOURS hours ago" --no-merges \
 
 ### 2. What's in flight — active agents and in-review work
 
+Live agents come from `GET /api/agents`, which reads the host's terminal
+backend (Herdr by default, tmux only under `terminal.backend: tmux`). Listing
+`tmux -L overdeck` sessions instead misses every agent on a Herdr host.
+
 ```bash
 echo "=== live agent / planning / strike sessions ==="
-tmux -L overdeck list-sessions -F '#{session_name}' 2>/dev/null \
-  | grep -E '^(agent|planning|strike)-' | sort
+python3 -c "
+import json,urllib.request
+try:
+    with urllib.request.urlopen('http://localhost:3011/api/agents', timeout=30) as r:
+        agents=json.load(r)
+except Exception as e:
+    raise SystemExit(f'(dashboard unavailable: {e})')
+for a in sorted(agents, key=lambda a: a['id']):
+    if a.get('hasLiveTmuxSession'):
+        print(a['id'], a.get('paneState'), a.get('runtime'), a.get('model'))
+"
 
 echo "=== in-review issues (need a merge decision) ==="
 python3 -c "
@@ -319,7 +332,7 @@ Plain language, second person, no issue IDs in the prose.>
 ## Notes
 
 - **Read-only.** Gathers from `gh`, git, the dashboard API, flywheel run
-  snapshots, and tmux. Changes nothing.
+  snapshots, and the `flywheel-orchestrator` tmux pane. Changes nothing.
 - The `/api/issues` and orchestrator-pane steps need the dashboard up on
   `localhost:3011` and a live `flywheel-orchestrator` session; both degrade
   gracefully (the recap just omits that slice if absent).
