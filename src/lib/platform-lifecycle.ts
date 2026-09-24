@@ -564,6 +564,8 @@ async function restartDashboardBody(
     portOwnerProbe?: (port: number) => Promise<number[]>;
     pidDescriptor?: (pid: number) => Promise<string>;
     pidSurvivorProbe?: PidSurvivorProbe;
+    /** Is the spawned server still alive after a failed health wait? Defaults to a ps probe. */
+    spawnedPidAlive?: (pid: number) => Promise<boolean>;
   } = {},
 ): Promise<DashboardRestartResult> {
   try {
@@ -604,6 +606,19 @@ async function restartDashboardBody(
     // own, a genuinely broken one is visible for inspection, and the next
     // `pan restart` stops whatever holds the port anyway.
     const healthFailure = error instanceof Error ? error.message : String(error);
+    // A spawned server that already exited (e.g. refused at config load) is
+    // not "left running": say so, and drop the recovery label so a deploy does
+    // not promote the build it was running (PAN-3899). An unknown pid keeps
+    // the label: nothing proves the spawn died.
+    const spawnedPidAlive = opts.spawnedPidAlive
+      ?? (async (pid: number) => (await describeSurvivingPid(pid)) !== null);
+    if (spawnedPid !== null && !(await spawnedPidAlive(spawnedPid))) {
+      throw new StageError({
+        stage: 'dashboard',
+        reason: `${healthFailure}; the newly spawned dashboard (pid ${spawnedPid}) exited before it became healthy — `
+          + `check ${logPath}`,
+      });
+    }
     throw new StageError({
       stage: 'dashboard',
       reason:
@@ -723,6 +738,7 @@ export function restartDashboard(
     portOwnerProbe?: (port: number) => Promise<number[]>;
     pidDescriptor?: (pid: number) => Promise<string>;
     pidSurvivorProbe?: PidSurvivorProbe;
+    spawnedPidAlive?: (pid: number) => Promise<boolean>;
   } = {},
 ): Promise<DashboardRestartResult> {
   return asStage('restartDashboard', () => restartDashboardBody(config, startDashboardFn, opts));

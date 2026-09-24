@@ -517,13 +517,7 @@ describe('reloadCommand', () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it('never promotes a build whose dashboard failed its health check, but keeps the generation the left-running process executes from', async () => {
-    const previousBundle = {
-      repoRoot: DEFAULT_REPO_ROOT,
-      deployRoot: ALTERNATE_BUILD_WORKTREE,
-      serverPath: `${ALTERNATE_BUILD_WORKTREE}/dist/dashboard/server.js`,
-    };
-    mocks.readActiveDashboardBundle.mockReturnValue(previousBundle);
+  it('preserves a deployment when the lifecycle leaves its dashboard running after health timeout', async () => {
     mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
     mocks.restartDashboard.mockRejectedValue(Object.assign(new Error('health timed out'), {
       failure: {
@@ -536,24 +530,53 @@ describe('reloadCommand', () => {
 
     await reloadCommand({});
 
-    // The new build was recorded before the restart, then the previous one restored.
-    expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledTimes(2);
-    expect(mocks.writeActiveDashboardBundle).toHaveBeenLastCalledWith(previousBundle);
-    // Primary dist goes back to the previous build; the CLI is not repointed.
-    expect(mocks.fsRename).toHaveBeenCalledWith(`/repo/dist.rollback.${process.pid}`, '/repo/dist');
-    expect(mocks.repointGlobalCliToDeployment).not.toHaveBeenCalled();
-    // The left-running process executes from the new generation, so it stays.
-    const newRoot = (mocks.writeActiveDashboardBundle.mock.calls[0][0] as { deployRoot: string }).deployRoot;
-    expect(newRoot).not.toBe(ALTERNATE_BUILD_WORKTREE);
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledTimes(1);
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledWith({
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: DEFAULT_BUILD_WORKTREE,
+      serverPath: `${DEFAULT_BUILD_WORKTREE}/dist/dashboard/server.js`,
+    });
     expect(mocks.exec).not.toHaveBeenCalledWith(
-      `git 'worktree' 'remove' '--force' '${newRoot}'`,
+      `git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`,
       expect.anything(),
     );
-    const restartOrder = mocks.restartDashboard.mock.invocationCallOrder[0];
-    const removedAfterRestart = mocks.fsRm.mock.calls
-      .filter((_, index) => mocks.fsRm.mock.invocationCallOrder[index] > restartOrder)
-      .map(([path]) => path);
-    expect(removedAfterRestart).not.toContain(newRoot);
+    expect(mocks.fsRename).not.toHaveBeenCalledWith(
+      `/repo/dist.rollback.${process.pid}`,
+      '/repo/dist',
+    );
+    expect(mocks.fsRm).toHaveBeenCalledWith(
+      `/repo/dist.rollback.${process.pid}`,
+      { recursive: true, force: true },
+    );
+    expect(mocks.repointGlobalCliToDeployment).toHaveBeenCalledWith(DEFAULT_BUILD_WORKTREE);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('never promotes a build whose new dashboard exited before it became healthy (PAN-3899)', async () => {
+    const previousBundle = {
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: ALTERNATE_BUILD_WORKTREE,
+      serverPath: `${ALTERNATE_BUILD_WORKTREE}/dist/dashboard/server.js`,
+    };
+    mocks.readActiveDashboardBundle.mockReturnValue(previousBundle);
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    // What restartDashboard throws when the spawned pid is gone: no recovery label.
+    mocks.restartDashboard.mockRejectedValue(Object.assign(new Error('health timed out'), {
+      failure: {
+        stage: 'dashboard',
+        reason: 'health timed out; the newly spawned dashboard (pid 4242) exited before it became healthy',
+      },
+    }));
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    const newRoot = (mocks.writeActiveDashboardBundle.mock.calls[0][0] as { deployRoot: string }).deployRoot;
+    expect(newRoot).toBe(DEFAULT_BUILD_WORKTREE);
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenLastCalledWith(previousBundle);
+    expect(mocks.fsRename).toHaveBeenCalledWith(`/repo/dist.rollback.${process.pid}`, '/repo/dist');
+    expect(mocks.repointGlobalCliToDeployment).not.toHaveBeenCalled();
+    expect(mocks.fsRm).toHaveBeenLastCalledWith(DEFAULT_BUILD_WORKTREE, { recursive: true, force: true });
     expect(process.exitCode).toBe(1);
   });
 

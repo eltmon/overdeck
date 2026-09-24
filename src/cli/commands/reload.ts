@@ -380,24 +380,26 @@ async function runReload(
       });
     } catch (error) {
       if (deployment) {
-        // A server that failed its health check is not promoted: the previous
-        // bundle stays the recorded active deployment, the primary `dist/` goes
-        // back to it, and the global CLI is not repointed, so the next
-        // `pan restart` launches the last known-good build (PAN-3899). When the
-        // lifecycle left the new process running (a slow boot may still finish,
-        // or it is there to inspect), its generation stays on disk because that
-        // process executes from it (while it lives, the next reload builds into
-        // the other slot).
-        await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
-        await activation?.rollback();
-        const keepRoots = [
-          ...dashboardDeploymentRoots(),
-          ...(previousBundle ? [previousBundle.deployRoot] : []),
-        ];
-        if (!leavesDashboardRunning(error)) {
+        if (leavesDashboardRunning(error)) {
+          // PAN-3128: the new server is alive (a slow boot may still finish, or
+          // it is there to inspect) and executes from this generation, so the
+          // generation stays the active deployment and the CLI follows it.
+          await activation?.commit();
+          await reportCliRepoint(deployment.deployRoot);
+          await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
+        } else {
+          // Any other failure, including a new server that exited before it
+          // became healthy (PAN-3899), is never promoted: the previous bundle
+          // stays the recorded deployment, the primary `dist/` goes back to it,
+          // and the global CLI is not repointed.
+          await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
+          await activation?.rollback();
           await removeDashboardDeployment(repoRoot, deployment.deployRoot);
+          await sweepDashboardDeployments(repoRoot, [
+            ...dashboardDeploymentRoots(),
+            ...(previousBundle ? [previousBundle.deployRoot] : []),
+          ]).catch(() => undefined);
         }
-        await sweepDashboardDeployments(repoRoot, keepRoots).catch(() => undefined);
       }
       throw error;
     }

@@ -132,7 +132,7 @@ afterEach(async () => {
 });
 
 describe('reloadCommand health-timeout recovery', () => {
-  it('does not promote the timed-out build, but keeps its generation so the delayed dashboard can become healthy', async () => {
+  it('keeps the timed-out deployment intact so its delayed dashboard can become healthy', async () => {
     temporaryRoot = await fs.mkdtemp(join(tmpdir(), 'overdeck-reload-timeout-'));
     const repoRoot = join(temporaryRoot, 'repo');
     const overdeckHome = join(temporaryRoot, 'home');
@@ -197,24 +197,20 @@ describe('reloadCommand health-timeout recovery', () => {
     await reload;
 
     expect(process.exitCode).toBe(1);
-    // PAN-3899: a build whose server failed its health check is not promoted.
-    // There was no previous marker, so none is recorded now, and the primary
-    // dist is the previous bundle again.
-    expect(readActiveDashboardBundle()).toBeNull();
-    await expect(fs.readFile(join(repoRoot, 'dist', 'previous.js'), 'utf8')).resolves.toBe('previous bundle');
-    await expect(fs.access(join(repoRoot, 'dist', 'dashboard', 'server.js')))
-      .rejects.toMatchObject({ code: 'ENOENT' });
+    expect(mocks.removeDashboardDeployment).not.toHaveBeenCalled();
+    expect(readActiveDashboardBundle()).toEqual({ repoRoot, deployRoot, serverPath });
+    await expect(fs.readFile(serverPath, 'utf8')).resolves.toBe('canonical bundle');
+    await expect(fs.readFile(join(repoRoot, 'dist', 'dashboard', 'server.js'), 'utf8'))
+      .resolves.toBe('canonical bundle');
     await expect(fs.access(join(repoRoot, `dist.rollback.${process.pid}`)))
       .rejects.toMatchObject({ code: 'ENOENT' });
-    // The left-running process executes from the new generation, so it stays.
-    expect(mocks.removeDashboardDeployment).not.toHaveBeenCalled();
-    await expect(fs.readFile(serverPath, 'utf8')).resolves.toBe('canonical bundle');
 
     await vi.advanceTimersByTimeAsync(500);
     await listening;
     const health = await realFetch(`http://127.0.0.1:${apiPort}/api/health`);
     expect(health.ok).toBe(true);
     await expect(health.json()).resolves.toMatchObject({ repoRoot, mode: 'primary' });
-    await expect(fs.access(activeDashboardBundleFile())).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(fs.readFile(activeDashboardBundleFile(), 'utf8'))
+      .resolves.toContain(serverPath);
   });
 });
