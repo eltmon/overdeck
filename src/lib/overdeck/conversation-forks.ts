@@ -64,7 +64,9 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
 import { activeComposerRegion } from '../pane-composer.js';
-import { capturePane, capturePaneViewport, deliveryVerifyLine, sendKeysAsync } from '../tmux.js';
+import { capturePane, capturePaneViewport, deliveryVerifyLine, sendKeysAsync, sessionExists } from '../tmux.js';
+import { Effect } from 'effect';
+import type { DeliveryResult } from '../agents/delivery.js';
 import { conversationHarnessAlive, conversationSessionAlive } from './conversation-liveness.js';
 import { writeConversationPaneRole } from './conversation-pane-role.js';
 import { getIssueWorkspacePath } from './issue-projects.js';
@@ -350,22 +352,36 @@ export async function ensureForkSessionReady(
  * composer stayed full after two standalone-Enter nudges and must be surfaced as
  * a failed fork without re-delivering duplicate text.
  */
+/** A refused or failed delivery must surface as a failed fork, never vanish (PAN-3921). */
+function assertForkDelivered(conv: Conversation, caller: string, delivery: DeliveryResult): void {
+  if (!delivery.ok) throw new Error(`[${caller}] fork summary not delivered to ${conv.name}: ${delivery.failure ?? delivery.path}`);
+}
+
+async function tmuxSessionPresent(sessionName: string): Promise<boolean> {
+  return Effect.runPromise(sessionExists(sessionName)).catch(() => false);
+}
+
 export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<'submitted' | 'stranded'> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
   const behavior = getHarnessBehavior(conv.harness);
   if (behavior.transcriptKind === 'ohmypi-jsonl') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
-    await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+    assertForkDelivered(conv, caller, await deliverAgentMessage(conv.tmuxSession, summary, caller, method));
     return 'submitted';
   }
   const ready = await waitForReadySignal(conv.tmuxSession, 60);
   if (!ready) {
     console.warn(`[${caller}] ready signal not detected for ${conv.name} within 60s — delivering and confirming anyway`);
   }
-  await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+  const delivery = await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+  assertForkDelivered(conv, caller, delivery);
   const outcome = await self.confirmForkPromptAccepted(conv.tmuxSession, 8000);
   if (outcome === 'accepted') return 'submitted';
+  // The composer evidence below reads the tmux pane. `agent.prompt` submits on
+  // its own, and a pane with no tmux session (Herdr) shows nothing to check, so
+  // an empty read there is no sign of a stranded turn (PAN-3921).
+  if (delivery.path === 'herdr' || !(await tmuxSessionPresent(conv.tmuxSession))) return 'submitted';
 
   const normalizePaneVerification = (value: string): string => value
     .replace(/[─-╿]/g, '')
