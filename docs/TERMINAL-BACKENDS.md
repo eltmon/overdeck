@@ -223,9 +223,10 @@ Who uses them:
   still refused as "already running" until its process exits and it reads confirmed dead (#4169).
 - **tmux `has-session` errors** — on the tmux path, `isAlive` re-asks a false `sessionExists` through the
   three-part `queryTmuxSession` (`src/lib/agents/tmux-session-query.ts`). Only a clean "no such
-  session" (or no tmux binary) is `no-session`; a tmux error or timeout is `runtime-indeterminate`, never
-  a confirmed death. The other `sessionExists` callers outside the liveness door still read a failure as
-  false.
+  session" is `no-session`; a tmux error or timeout is `runtime-indeterminate`, never a confirmed death.
+  A missing tmux binary is `runtime-indeterminate` on a tmux host, which requires it, and `no-session` for
+  the legacy check on a Herdr host, which does not. The other `sessionExists` callers outside the
+  liveness door still read a failure as false.
 - **Dashboard Pause and Suspend** — probe with `agentPaneExists` and close with `closeAgentPane`.
 - **Post-merge lifecycle** (`postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`) —
   `closeAgentPane` for the work, planning and strike agents; `closeIssuePanes` with roles
