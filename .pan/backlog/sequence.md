@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T23:19:14.449Z · model: claude-opus-5 · open: 804_
+_Last sequenced: 2026-09-24T23:23:11.182Z · model: claude-opus-5 · open: 805_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -426,6 +426,7 @@ _Last sequenced: 2026-09-24T23:19:14.449Z · model: claude-opus-5 · open: 804_
 | 476 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
 | 477 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
 | 478 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 479 | PAN-4185 | M | medium | ok |  |  | Bare-conversation checkbox: skip composed context, briefing and injecting hooks for a fast spawn; observe-only hooks keep working |
 | 480 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
 | 482 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
 | 483 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
@@ -1119,10 +1120,10 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T23:19:14.449Z",
+  "generatedAt": "2026-09-24T23:23:11.182Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 804,
+  "openCount": 805,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11062,6 +11063,19 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "rationale": "New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified (\"very likely\"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4185",
+      "rank": 479,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Bare-conversation checkbox: skip composed context, briefing and injecting hooks for a fast spawn; observe-only hooks keep working",
+      "rationale": "New operator request filed 2026-09-24; inserted at the free rank 479 in the medium Command Deck band, between PAN-3700 and PAN-1164. Well-specified (what to skip, what must still work, persistence on the conversation record), so condition is ok — the native ~/.claude/CLAUDE.md question is scoped inside the issue as investigate-then-document, not an unresolved requirement. Convenience and launch latency, not a pipeline unblocker, so medium rather than high. Touches the conversation spawn path PAN-3921 is rewriting, which is an informs relationship, not a blocker.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12093,6 +12107,13 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-3921",
+      "to": "PAN-4185",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
