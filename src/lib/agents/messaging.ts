@@ -256,12 +256,14 @@ export async function messageAgent(
   // documented completed-handoff exception can clear stoppedByUser and deliver,
   // instead of silently mailing feedback to a queue nothing drains.
   const decideMessageGate = (): ResumeGateDecision => {
-    // PAN-3911: an issue pause stops the issue's review and test agents with
-    // no per-agent gate; the issue gate is the hold. A message must not resume
-    // one of them while the issue is paused (or its pause cannot be read).
-    if (agentState && agentState.role !== 'work' && agentState.issueId) {
+    // PAN-3911: an issue pause stops the issue's in-flight review with no
+    // per-agent gate; the issue gate is the hold. A message must not resume a
+    // reviewer that pause stopped while the issue is still paused. Only that:
+    // other roles, reviewers the pause did not stop, and an issue whose pause
+    // cannot be read (`unknown`) all fall through to the per-agent gate.
+    if (agentState?.role === 'review' && agentState.issueId) {
       const issuePause = getIssuePause(agentState.issueId);
-      if (issuePause.status !== 'unpaused') {
+      if (issuePause.status === 'paused' && issuePause.stoppedAgents.includes(normalizedId)) {
         return { decision: 'queue-message', reason: `issue ${agentState.issueId.toUpperCase()} is paused` };
       }
     }

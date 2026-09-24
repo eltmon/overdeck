@@ -214,6 +214,18 @@ export interface AgentState {
   parentId?: string;
 }
 
+/**
+ * The one answer to "did the operator set this pause?" (PAN-3911): a pause
+ * written by `pan pause` or the dashboard Pause button, which stamp
+ * `pausedBy: 'operator'`. Machine pauses (memory shed, post-merge, Fly
+ * migration, escalations) and scheduler yields never stamp it, and a machine
+ * pause written over an operator pause keeps it. `getIssuePause` and the
+ * feedback ladder's `classifyPause` both read this.
+ */
+export function isOperatorPause(state: Pick<AgentState, 'paused' | 'pausedBy'>): boolean {
+  return state.paused === true && state.pausedBy === 'operator';
+}
+
 export function getAgentDir(agentId: string): string {
   return join(getOverdeckHome(), 'agents', agentId);
 }

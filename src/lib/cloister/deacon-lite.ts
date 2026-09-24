@@ -213,6 +213,32 @@ function stalledReviewReason(type: string): string | null {
   return null;
 }
 
+/**
+ * PAN-3911: a `review.halted` tail is a review an issue pause stopped. While
+ * the issue stays paused (or its pause cannot be read) it holds. Once the pause
+ * is gone, by whatever door (`pan unpause` whose re-request failed, `pan start
+ * --force`, dashboard Start with `clearGates`, an unpause while the dashboard
+ * was down), the review is owed: re-request a fresh one through the guarded
+ * review route. The route journals `review.requested`, which ends the halt;
+ * the cooldown keeps a refused request from repeating every tick.
+ */
+async function rerequestHaltedReview(issueId: string, now: number): Promise<string | null> {
+  if (getIssuePause(issueId).status !== 'unpaused') return null;
+  const lastRedispatch = lastReviewRedispatchAt.get(issueId);
+  if (lastRedispatch !== undefined && now - lastRedispatch < STALLED_REVIEW_COOLDOWN_MS) return null;
+  lastReviewRedispatchAt.set(issueId, now);
+
+  const { requestReviewThroughRoute } = await import('./review-request-route.js');
+  const outcome = await requestReviewThroughRoute(issueId, {
+    message: 'an issue pause halted this review and has since been cleared',
+    source: 'deacon-lite',
+  });
+  if (outcome.requested) return `recoverStalledReviews: re-requested the halted ${issueId} review`;
+  if (outcome.noReviewNeeded) console.log(`[deacon-lite] ${issueId}: halted review not re-requested — ${outcome.reason}`);
+  else console.warn(`[deacon-lite] ${issueId}: could not re-request the halted review — ${outcome.reason}`);
+  return null;
+}
+
 export async function recoverStalledReviews(now = Date.now()): Promise<string[]> {
   const actions: string[] = [];
   // An unreadable inventory is indeterminate: re-dispatch nobody rather than
@@ -235,6 +261,11 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
 
     const last = lastPipelineEntry(workspace.path);
     if (!last) continue;
+    if (last.type === 'review.halted') {
+      const action = await rerequestHaltedReview(issueId, now);
+      if (action) actions.push(action);
+      continue;
+    }
     const reason = stalledReviewReason(last.type);
     if (!reason) continue;
     const at = Date.parse(last.at);

@@ -3,12 +3,21 @@
  * does to the issue's review and test agents, and what `pan unpause` does to
  * bring them back.
  *
- * - **Pause** stops the issue's running review convoy (lanes and synthesis
- *   parent) and test agent, records their ids next to the pause
- *   (`pauseStoppedAgents`), and journals `review.halted` when reviewers were
- *   stopped. The journal entry ends the run for `recoverStalledReviews`, which
- *   only relaunches lanes against the parent they were started with, and that
- *   parent is now stopped.
+ * - **Pause** stops the issue's running test agent and, when a review is in
+ *   flight (the journal's last entry is `review.requested`,
+ *   `review.dispatched` or `review.redispatched`: no verdict yet), its review
+ *   convoy (lanes and synthesis parent). It records their ids next to the
+ *   pause (`pauseStoppedAgents`) and journals `review.halted` when reviewers
+ *   were stopped. Reviewers that already posted their verdict and sit warm at
+ *   their prompt are left alone: stopping them would make unpause re-review a
+ *   head that was already reviewed.
+ * - **`review.halted`** ends the run for convoy recovery, which only relaunches
+ *   lanes against the parent they were started with, and that parent is now
+ *   stopped. Once the issue is unpaused by any door (`pan unpause`, the
+ *   dashboard, `pan start --force`, Start with `clearGates`), stalled-review
+ *   recovery re-requests a fresh review for a `review.halted` tail through the
+ *   guarded review-request route, so a failed or skipped re-request never
+ *   wedges the review.
  * - **Unpause** clears the operator-stop gate on those rows and starts the
  *   review again through the normal review-request door: a fresh synthesis
  *   parent and convoy for the current head. A test agent alone is re-dispatched
@@ -19,7 +28,7 @@
  * queueing mail that nothing drains, so a lane's `REVIEWER_*` signal or a
  * convoy notice would sit unread. The hold lives in one place instead: the
  * issue gate (`getIssuePause`), which `messageAgent` reads before it resumes a
- * stopped review or test agent, and which stalled-review recovery reads too.
+ * reviewer this pause stopped, and which stalled-review recovery reads too.
  */
 import { Effect } from 'effect';
 
@@ -50,6 +59,7 @@ export interface IssueSpecialistSweep {
 }
 
 const SPECIALIST_ROLES = ['review', 'test'] as const;
+type SpecialistRole = (typeof SPECIALIST_ROLES)[number];
 
 function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -65,7 +75,10 @@ function errorText(err: unknown): string {
  * Lanes go first and the synthesis parent last, so a lane that reports while
  * it is being closed reaches a parent that is still alive.
  */
-export async function stopIssueSpecialistAgents(issueId: string): Promise<IssueSpecialistSweep> {
+export async function stopIssueSpecialistAgents(
+  issueId: string,
+  roles: readonly SpecialistRole[] = SPECIALIST_ROLES,
+): Promise<IssueSpecialistSweep> {
   const sweep: IssueSpecialistSweep = { stopped: [], failed: [], unknown: [], closedPanes: [] };
   const upperIssueId = issueId.trim().toUpperCase();
   if (!upperIssueId) return sweep;
@@ -87,7 +100,7 @@ export async function stopIssueSpecialistAgents(issueId: string): Promise<IssueS
 
   const parentId = `${issuePauseAgentId(upperIssueId)}-review`;
   const specialists = agents
-    .filter((agent) => (SPECIALIST_ROLES as readonly string[]).includes(agent.role))
+    .filter((agent) => (roles as readonly string[]).includes(agent.role))
     .filter((agent) => (agent.issueId ?? '').trim().toUpperCase() === upperIssueId)
     .sort((a, b) => Number(a.id === parentId) - Number(b.id === parentId));
 
@@ -109,7 +122,7 @@ export async function stopIssueSpecialistAgents(issueId: string): Promise<IssueS
   }
 
   if (sweep.unknown.length === 0) {
-    const closed = await closeIssuePanes(upperIssueId, { roles: SPECIALIST_ROLES }).catch(() => [] as string[]);
+    const closed = await closeIssuePanes(upperIssueId, { roles }).catch(() => [] as string[]);
     for (const id of closed) {
       if (sweep.stopped.includes(id)) continue;
       // The first close of this agent failed, but its pane is gone now.
@@ -128,7 +141,8 @@ export async function stopIssueSpecialistAgents(issueId: string): Promise<IssueS
 /**
  * The pause half. Runs only when `agentId` is the issue's work agent, the one
  * `getIssuePause` reads; a swarm slot pause pauses the slot and nothing else.
- * Returns null when the pause is not an issue pause. Never throws.
+ * Stops the review convoy only while a review is in flight (see the module
+ * comment). Returns null when the pause is not an issue pause. Never throws.
  */
 export async function haltIssueSpecialistsForPause(
   agentId: string,
@@ -138,7 +152,7 @@ export async function haltIssueSpecialistsForPause(
   const issueId = state.issueId?.trim().toUpperCase();
   if (!issueId || state.role !== 'work' || agentId.trim().toLowerCase() !== issuePauseAgentId(issueId)) return null;
 
-  const sweep = await stopIssueSpecialistAgents(issueId);
+  const sweep = await stopIssueSpecialistAgents(issueId, await reviewInFlight(state.workspace) ? SPECIALIST_ROLES : ['test']);
   if (sweep.stopped.length === 0) return sweep;
 
   try {
@@ -163,6 +177,18 @@ export async function haltIssueSpecialistsForPause(
   return sweep;
 }
 
+/** True when the workspace journal says a review is running with no verdict yet. Never throws. */
+async function reviewInFlight(workspace: string | undefined): Promise<boolean> {
+  if (!workspace) return false;
+  try {
+    const { isReviewInFlightEntry, lastPipelineEntry } = await import('../cloister/pipeline-journal.js');
+    return isReviewInFlightEntry(lastPipelineEntry(workspace));
+  } catch (err) {
+    console.warn(`[agents] Could not read the pipeline journal in ${workspace}: ${errorText(err)}`);
+    return false;
+  }
+}
+
 function roleOf(agentId: string): string | undefined {
   try {
     return getAgentState(agentId)?.role;
@@ -171,7 +197,40 @@ function roleOf(agentId: string): string | undefined {
   }
 }
 
-export type ReviewRequestOutcome = { requested: true } | { requested: false; reason: string };
+/**
+ * What a review re-request did. `noReviewNeeded`: the guarded route found
+ * nothing to review (the issue is merged, or its head is already approved) and
+ * did not start one; that is not a failure.
+ */
+export type ReviewRequestOutcome =
+  | { requested: true; message?: string }
+  | { requested: false; noReviewNeeded?: boolean; reason: string };
+
+/** The body `POST /api/review/:issueId/request` answers with, as far as the outcome needs it. */
+export interface ReviewRequestRouteBody {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  hint?: string;
+  alreadyMerged?: boolean;
+  alreadyPassed?: boolean;
+  requeued?: boolean;
+}
+
+/**
+ * Read the guarded review-request route's answer. The route answers 200 with
+ * `success: false` for a merged issue and 200 with `alreadyPassed` when it
+ * started nothing, so a 2xx alone is not a request.
+ */
+export function reviewRequestOutcomeFromRoute(ok: boolean, status: number, body: ReviewRequestRouteBody): ReviewRequestOutcome {
+  const text = body.message ?? body.error ?? `the review route answered ${status}`;
+  if (body.alreadyMerged === true) return { requested: false, noReviewNeeded: true, reason: text };
+  if (!ok || body.success === false) {
+    return { requested: false, reason: body.error ?? body.message ?? `the review route answered ${status}` };
+  }
+  if (body.alreadyPassed === true || body.requeued === true) return { requested: false, noReviewNeeded: true, reason: text };
+  return { requested: true, ...(body.message ? { message: body.message } : {}) };
+}
 
 /** What `restartIssueAfterUnpause` did. */
 export interface UnpauseRestart {
@@ -241,6 +300,16 @@ export async function restartIssueAfterUnpause(
     return { clearedStopGates, test };
   }
   return { clearedStopGates };
+}
+
+/** One line per restart that did not happen, for the dashboard unpause response. */
+export function describeUnpauseRestartProblems(restart: UnpauseRestart): string[] {
+  const problems: string[] = [];
+  if (restart.review && !restart.review.requested && restart.review.noReviewNeeded !== true) {
+    problems.push(`review not re-requested: ${restart.review.reason}`);
+  }
+  if (restart.test && !restart.test.dispatched) problems.push(`test agent not re-dispatched: ${restart.test.reason}`);
+  return problems;
 }
 
 /** One line per problem, for the CLI and the dashboard response. */

@@ -5,17 +5,18 @@ import { clearAgentPaused, getAgentState, resolveAgentTarget } from '../../lib/a
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 import { resumeAgent } from '../../lib/agents/resume.js';
-import { restartIssueAfterUnpause, type ReviewRequestOutcome } from '../../lib/agents/issue-pause.js';
+import {
+  restartIssueAfterUnpause,
+  reviewRequestOutcomeFromRoute,
+  type ReviewRequestOutcome,
+} from '../../lib/agents/issue-pause.js';
 import { requestReviewViaDashboard } from './request-review.js';
 
 /** The review-request door from the CLI: the dashboard route `pan review request` uses. */
 async function requestReviewFromCli(issueId: string): Promise<ReviewRequestOutcome> {
   const response = await requestReviewViaDashboard(issueId, 'review re-requested after pan unpause', 120_000, 'pan-unpause');
   if (response.kind === 'unreachable') return { requested: false, reason: `dashboard unreachable (${response.error})` };
-  if (response.kind === 'rejected') {
-    return { requested: false, reason: response.result.error ?? `dashboard answered ${response.status}` };
-  }
-  return { requested: true };
+  return reviewRequestOutcomeFromRoute(response.kind === 'ok', response.status, response.result);
 }
 
 export async function unpauseCommand(id: string): Promise<void> {
@@ -56,6 +57,8 @@ export async function unpauseCommand(id: string): Promise<void> {
     if (restart?.review) {
       if (restart.review.requested) {
         console.log(chalk.green(`Re-requested review for ${issueId}: the pause had stopped its reviewers.`));
+      } else if (restart.review.noReviewNeeded) {
+        console.log(chalk.dim(`No review re-requested for ${issueId}: ${restart.review.reason}`));
       } else {
         console.error(chalk.red(`Review not re-requested for ${issueId}: ${restart.review.reason}`));
         console.error(chalk.dim(`Run pan review request ${issueId} to start it again.`));

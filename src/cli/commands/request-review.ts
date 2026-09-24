@@ -16,6 +16,10 @@ interface RequestReviewOptions {
 }
 
 interface RequestReviewResponse {
+  success?: boolean;
+  alreadyMerged?: boolean;
+  alreadyPassed?: boolean;
+  requeued?: boolean;
   message?: string;
   error?: string;
   hint?: string;

@@ -171,6 +171,21 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
     expect(target).toMatchObject({ needsYou: true });
   });
 
+  it('holds an operator pause that a later machine pause re-labelled with a needs-you reason (PAN-3911)', async () => {
+    // `pan pause`, then a verification-stuck escalation writes its reason over
+    // it. The pause is still the operator's: the same test getIssuePause uses.
+    agentState.states.set(AGENT, {
+      id: AGENT, status: 'stopped', paused: true, pausedBy: 'operator',
+      pausedReason: 'needs-you: verification failed 3x',
+    });
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999');
+
+    expect(agentState.clearPaused).not.toHaveBeenCalled();
+    expect(resume.resumeAgent).not.toHaveBeenCalled();
+    expect(target).toMatchObject({ needsYou: true });
+  });
+
   it('keeps a pipeline pause the caller names, read at resurrection time (CodeRabbit on #4039)', async () => {
     // The verification door read "not stuck" before a concurrent escalation
     // paused the agent; the pause it finds when resurrecting is the stuck one.

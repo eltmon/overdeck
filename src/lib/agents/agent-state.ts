@@ -38,6 +38,7 @@ import {
   getAgentState,
   listAgentStatesSync,
   cleanAgentState,
+  isOperatorPause,
 } from './agent-state-read.js';
 
 export type { Role } from './role.js';
@@ -46,7 +47,7 @@ export type { Role } from './role.js';
 // agent-state-read.ts (lint:circular fixup — see that file's header). This
 // keeps every existing `from './agent-state.js'` import working unchanged.
 export type { AgentState, AgentStopCause } from './agent-state-read.js';
-export { getAgentDir, getAgentStateFilePath, getAgentState, listAgentStatesSync } from './agent-state-read.js';
+export { getAgentDir, getAgentStateFilePath, getAgentState, isOperatorPause, listAgentStatesSync } from './agent-state-read.js';
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
@@ -618,16 +619,23 @@ export function issuePauseAgentId(issueId: string): string {
 /** What `getIssuePause` found. `unknown`: the work agent's state could not be read. */
 export type IssuePause =
   | { status: 'unpaused' }
-  | { status: 'paused'; agentId: string; pausedAt?: string; pausedReason?: string }
+  | {
+    status: 'paused';
+    agentId: string;
+    pausedAt?: string;
+    pausedReason?: string;
+    /** Review and test agents this pause stopped (`pauseStoppedAgents`). */
+    stoppedAgents: string[];
+  }
   | { status: 'unknown'; agentId: string; reason: string };
 
 /**
  * The issue-level pause gate (PAN-3911). An operator pause of the issue's work
  * agent (`issuePauseAgentId`) holds the issue: stalled-review recovery does not
- * re-dispatch its reviewers, and a message does not resume its stopped review
- * or test agents. Other dispatchers do not read it. A machine pause (memory
+ * re-dispatch its reviewers, and a message does not resume a reviewer the
+ * pause stopped. Other dispatchers do not read it. A machine pause (memory
  * shed, post-merge, migration, escalation) or a scheduler yield is not an
- * issue pause: only a pause with `pausedBy: 'operator'` is.
+ * issue pause: only an operator pause (`isOperatorPause`) is.
  *
  * Never throws. A state file that exists but cannot be read or parsed (a
  * crash-truncated write, EACCES) is `unknown`, never `unpaused`, and callers
@@ -643,8 +651,14 @@ export function getIssuePause(issueId: string): IssuePause {
     return { status: 'unknown', agentId, reason: err instanceof Error ? err.message : String(err) };
   }
   if (!state) return { status: 'unknown', agentId, reason: 'state.json is unparsable' };
-  if (state.paused !== true || state.pausedBy !== 'operator') return { status: 'unpaused' };
-  return { status: 'paused', agentId, pausedAt: state.pausedAt, pausedReason: state.pausedReason };
+  if (!isOperatorPause(state)) return { status: 'unpaused' };
+  return {
+    status: 'paused',
+    agentId,
+    pausedAt: state.pausedAt,
+    pausedReason: state.pausedReason,
+    stoppedAgents: state.pauseStoppedAgents ?? [],
+  };
 }
 
 /** Reports whether callers should block start, resume, auto-resume, or message delivery on the troubled gate. */

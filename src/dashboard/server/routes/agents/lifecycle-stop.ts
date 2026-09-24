@@ -19,11 +19,13 @@ import { sessionExists } from '../../../../lib/tmux.js';
 import { agentPaneExists, closeAgentPane, closeAgentPaneDetailed } from '../../../../lib/terminal-backends/launch.js';
 import {
   describeSweepProblems,
+  describeUnpauseRestartProblems,
   haltIssueSpecialistsForPause,
   restartIssueAfterUnpause,
   type ReviewRequestOutcome,
 } from '../../../../lib/agents/issue-pause.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
+import { requestReviewGuarded } from '../workspaces/review-pipeline.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -283,15 +285,37 @@ export const postAgentPauseRoute = HttpRouter.add(
 
 // ─── Route: POST /api/agents/:id/unpause ──────────────────────────────────────
 
-/** The review-request door, in this process: the starter `review-pipeline.ts` registers. */
+/**
+ * The review-request door, in this process: the same guarded request
+ * `POST /api/review/:issueId/request` makes for `pan unpause` (merged check,
+ * approved-head check, re-request breaker), never the bare pipeline starter.
+ */
 async function requestReviewInProcess(issueId: string): Promise<ReviewRequestOutcome> {
-  const { getRequestReviewStarter } = await import('../../../../lib/cloister/request-review-pipeline.js');
-  const startReview = getRequestReviewStarter();
-  if (!startReview) return { requested: false, reason: 'the review pipeline is not loaded in this process' };
-  const outcome = await startReview(issueId, { note: 'review re-requested after pan unpause', source: 'pan-unpause' });
-  // A request already in flight will dispatch the review itself.
-  if (outcome.started || outcome.reason === 'already-running') return { requested: true };
-  return { requested: false, reason: outcome.reason === 'dirty-workspace' ? outcome.error : outcome.reason };
+  const outcome = await requestReviewGuarded(issueId, {
+    message: 'review re-requested after pan unpause',
+    source: 'pan-unpause',
+  });
+  switch (outcome.kind) {
+    case 'started':
+      return { requested: true };
+    case 'already-running':
+      // A request already in flight will dispatch the review itself.
+      return { requested: true, message: 'a review request was already running' };
+    case 'already-merged':
+      return { requested: false, noReviewNeeded: true, reason: `${issueId} is already merged` };
+    case 'already-passed':
+      return { requested: false, noReviewNeeded: true, reason: 'the PR is approved at its current head' };
+    case 'tests-requeued':
+      return { requested: false, noReviewNeeded: true, reason: 'the PR is approved; its tests were re-queued' };
+    case 'circuit-breaker':
+      return { requested: false, reason: `the re-review limit is reached (${outcome.autoRequeueCount} requests)` };
+    case 'dirty-workspace':
+      return { requested: false, reason: outcome.error };
+    case 'no-workspace':
+      return { requested: false, reason: 'the workspace does not exist' };
+    case 'no-project':
+      return { requested: false, reason: `no project is configured for ${issueId}` };
+  }
 }
 
 export const postAgentUnpauseRoute = HttpRouter.add(
@@ -369,6 +393,15 @@ export const postAgentUnpauseRoute = HttpRouter.add(
         .catch((err) => console.warn(`[agents] immediate resume after unpause errored for ${id}:`, err));
     }
 
-    return jsonResponse({ success: true, agent: updatedState, resumeTriggered, ...(restart ? { restart } : {}) });
+    // PAN-3911: a re-request that did not go out is reported, never a silent success.
+    const warnings = restart ? describeUnpauseRestartProblems(restart) : [];
+    for (const warning of warnings) console.warn(`[agents] Unpause of ${id}: ${warning}`);
+    return jsonResponse({
+      success: true,
+      agent: updatedState,
+      resumeTriggered,
+      ...(restart ? { restart } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
+    });
   })),
 );
