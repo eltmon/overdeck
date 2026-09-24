@@ -397,10 +397,10 @@ roles:
 ```
 
 **Removed:** the `[[specialists.review_agents]]` list in `cloister.toml`
-(`name`, `model`, `focus`, `enabled`) and the `review:<lane>` keys in
-`models.overrides`. Reviewer dispatch reads neither one. The reviewer lanes are fixed; a
-lane's model comes from `roles.review.sub.<lane>.model`, and whether the lanes
-run at all comes from `roles.review.mode`.
+(`name`, `model`, `focus`, `enabled`). Nothing reads it. The reviewer lanes are
+fixed: a lane's model comes from `roles.review.sub.<lane>.model`, and whether
+the lanes run at all comes from `roles.review.mode`. Reviewer dispatch does not
+consult the `review:*` keys in `models.overrides` shown elsewhere on this page.
 
 ---
 
