@@ -276,7 +276,7 @@ pan health
 pan doctor
 
 # View dashboard logs
-pan logs dashboard
+less ~/.overdeck/logs/dashboard.log
 ```
 
 ### Workspace Commands
@@ -301,8 +301,14 @@ pan workspace open PAN-123
 # Check agent status
 pan status
 
-# View agent logs
-pan logs agent-pan-123
+# View agent state, recent pipeline journal entries, and health
+pan show PAN-123
+
+# Read the agent's recent terminal output (either terminal backend)
+curl -s "http://localhost:3011/api/agents/agent-pan-123/output?lines=200"
+
+# Print a conversation's transcript path (N is the /conv/<N> id)
+pan conv jsonl <N>
 
 # Inspect raw agent runtime logs directly
 less ~/.overdeck/agents/agent-pan-123/lifecycle.log
@@ -314,6 +320,14 @@ pan tell agent-pan-123 "Your message"
 # Kill stuck agent
 pan kill agent-pan-123
 ```
+
+There is no `pan logs` command. The dashboard shows each agent's live terminal
+and conversation on the issue view. From a shell, `pan show` gives the agent's
+state and pipeline journal, and `/api/agents/:id/output` returns the recent
+terminal text: it reads the pane through the selected terminal backend and
+falls back to `~/.overdeck/agents/<id>/output.log`. For the full conversation,
+`pan conv jsonl <N>` prints a conversation's transcript path. A work agent's
+transcript path is recorded in `~/.overdeck/agents/<id>/sessions.json`.
 
 ### Issue Lifecycle Commands
 
@@ -559,8 +573,11 @@ tmux list-sessions
 # Restart dashboard
 pan restart
 
-# Check high-level agent logs
-pan logs agent-pan-123
+# Check agent state and recent pipeline journal entries
+pan show PAN-123
+
+# Read the agent's recent terminal output
+curl -s "http://localhost:3011/api/agents/agent-pan-123/output?lines=200"
 
 # Check detailed start/resume lifecycle events
 less ~/.overdeck/agents/agent-pan-123/lifecycle.log
