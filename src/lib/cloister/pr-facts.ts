@@ -631,23 +631,24 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
   }
 }
 
-/** Reads a PR's reviews with the commit each one judged. */
-export type ReadGitHubReviews = (
-  repo: string,
-  number: number,
-) => Promise<ReadonlyArray<{ state?: string; commit?: { oid?: string } | null }>>;
+/** A PR's head and its reviews, each with the commit it judged, from one read. */
+export interface GitHubReviewsAtHead {
+  headRefOid?: string | null;
+  reviews?: ReadonlyArray<{ state?: string; commit?: { oid?: string } | null }> | null;
+}
 
-async function defaultReadGitHubReviews(repo: string, number: number): ReturnType<ReadGitHubReviews> {
+export type ReadGitHubReviews = (repo: string, number: number) => Promise<GitHubReviewsAtHead>;
+
+async function defaultReadGitHubReviews(repo: string, number: number): Promise<GitHubReviewsAtHead> {
   const { stdout } = await execFileAsync(
     'gh',
     [
-      'pr', 'view', String(number), '--repo', repo, '--json', 'reviews',
-      '--jq', '[.reviews[] | {state, commit: {oid: .commit.oid}}]',
+      'pr', 'view', String(number), '--repo', repo, '--json', 'headRefOid,reviews',
+      '--jq', '{headRefOid, reviews: [.reviews[] | {state, commit: {oid: .commit.oid}}]}',
     ],
     { encoding: 'utf-8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 },
   );
-  const parsed: unknown = JSON.parse(stdout);
-  return Array.isArray(parsed) ? parsed as Awaited<ReturnType<ReadGitHubReviews>> : [];
+  return JSON.parse(stdout) as GitHubReviewsAtHead;
 }
 
 /**
@@ -656,9 +657,13 @@ async function defaultReadGitHubReviews(repo: string, number: number): ReturnTyp
  * does not). Only the verdict guard asks, and only for an agent's rejection,
  * so the shared `gh pr view` field list every PR read uses stays as it is.
  *
+ * The head is re-read in the same call: a push between the PR read and this
+ * one leaves the approval unproven rather than proven against a stale head.
+ *
  * `true` is proof. `false` means the reviews were read and none approved the
  * head, an empty list included. `undefined` means it could not be told: not
- * GitHub, no head, or the read failed. Only `true` lets the guard refuse.
+ * GitHub, no head, the head moved, or the read failed. Only `true` lets the
+ * guard refuse.
  */
 export async function forgeApprovalAtHead(
   facts: Pick<PrFacts, 'forge' | 'url' | 'number' | 'headSha'>,
@@ -669,8 +674,9 @@ export async function forgeApprovalAtHead(
   if (!repo) return undefined;
   const head = facts.headSha.toLowerCase();
   try {
-    const reviews = await readReviews(`${repo[1]}/${repo[2]}`, facts.number);
-    return reviews.some((review) => (
+    const read = await readReviews(`${repo[1]}/${repo[2]}`, facts.number);
+    if (read.headRefOid?.toLowerCase() !== head) return undefined;
+    return (read.reviews ?? []).some((review) => (
       normalize(review.state) === 'APPROVED' && review.commit?.oid?.toLowerCase() === head
     ));
   } catch {

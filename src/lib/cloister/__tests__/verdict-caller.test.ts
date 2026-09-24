@@ -245,31 +245,40 @@ describe('forgeApprovalAtHead', () => {
     number: 3979,
     headSha: HEAD,
   };
+  const atHead = (reviews: Array<{ state: string; commit: { oid: string } }>) =>
+    async () => ({ headRefOid: HEAD, reviews });
 
   it('is true only for an APPROVED review whose commit is the head', async () => {
-    const read = vi.fn(async () => [
+    const read = vi.fn(atHead([
       { state: 'CHANGES_REQUESTED', commit: { oid: OLDER } },
       { state: 'APPROVED', commit: { oid: HEAD } },
-    ]);
+    ]));
     expect(await forgeApprovalAtHead(facts, read)).toBe(true);
     expect(read).toHaveBeenCalledWith('eltmon/overdeck', 3979);
   });
 
   it('is false for an approval of an older commit, whenever it was submitted', async () => {
-    expect(await forgeApprovalAtHead(facts, async () => [
+    expect(await forgeApprovalAtHead(facts, atHead([
       { state: 'APPROVED', commit: { oid: OLDER } },
       { state: 'COMMENTED', commit: { oid: HEAD } },
-    ])).toBe(false);
+    ]))).toBe(false);
   });
 
   it('is false for an empty or oid-less review list: no approval proven', async () => {
-    expect(await forgeApprovalAtHead(facts, async () => [])).toBe(false);
-    expect(await forgeApprovalAtHead(facts, async () => [{ state: 'APPROVED', commit: { oid: '' } }])).toBe(false);
+    expect(await forgeApprovalAtHead(facts, atHead([]))).toBe(false);
+    expect(await forgeApprovalAtHead(facts, async () => ({ headRefOid: HEAD, reviews: null }))).toBe(false);
+    expect(await forgeApprovalAtHead(facts, atHead([{ state: 'APPROVED', commit: { oid: '' } }]))).toBe(false);
+  });
+
+  it('is undefined when the head moved between the PR read and the review read', async () => {
+    expect(await forgeApprovalAtHead({ ...facts, headSha: OLDER }, atHead([
+      { state: 'APPROVED', commit: { oid: OLDER } },
+    ]))).toBeUndefined();
   });
 
   it('is undefined when it cannot be told', async () => {
     expect(await forgeApprovalAtHead(facts, async () => { throw new Error('gh: rate limited'); })).toBeUndefined();
-    expect(await forgeApprovalAtHead({ ...facts, headSha: null }, async () => [])).toBeUndefined();
-    expect(await forgeApprovalAtHead({ ...facts, forge: 'gitlab' }, async () => [])).toBeUndefined();
+    expect(await forgeApprovalAtHead({ ...facts, headSha: null }, atHead([]))).toBeUndefined();
+    expect(await forgeApprovalAtHead({ ...facts, forge: 'gitlab' }, atHead([]))).toBeUndefined();
   });
 });

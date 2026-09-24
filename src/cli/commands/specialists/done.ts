@@ -217,8 +217,13 @@ export async function doneCommand(
     let guardFacts: Pick<PrFacts, 'approved' | 'approvedAtHead' | 'headSha'> | null = facts ?? null;
     let operatorRequested = false;
     if (caller.kind === 'agent' && options.status !== 'passed' && facts?.approved === true) {
-      operatorRequested = getAgentState(`agent-${normalizedIssueId.toLowerCase()}-review`)
-        ?.reviewOperatorRequested === true;
+      try {
+        operatorRequested = getAgentState(`agent-${normalizedIssueId.toLowerCase()}-review`)
+          ?.reviewOperatorRequested === true;
+      } catch {
+        // An unreadable state file is no operator request; the approval must
+        // still be proven at head before anything is refused.
+      }
       // Only this path reads the reviews' commit shas, so the shared PR read
       // every other caller runs carries no review payload.
       if (!operatorRequested && facts.approvedAtHead !== true) {
