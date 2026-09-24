@@ -15,7 +15,6 @@ const mockHasCompletionMarker = vi.fn(() => false);
 
 vi.mock('../agents.js', () => ({
   getAgentStateSync: () => mockGetAgentState(),
-  getAgentState: () => Effect.succeed(mockGetAgentState()),
   getAgentRuntimeStateSync: () => mockGetAgentRuntimeState(),
   getAgentRuntimeState: () => Effect.succeed(mockGetAgentRuntimeState()),
   getLatestSessionIdSync: () => mockGetLatestSessionId(),

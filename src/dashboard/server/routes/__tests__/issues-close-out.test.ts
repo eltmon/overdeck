@@ -31,7 +31,6 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/tracker-utils.js')>();
   return {
     ...actual,
-    resolveGitHubIssue: resolveGitHubIssueMock,
     resolveGitHubIssueSync: resolveGitHubIssueMock,
   };
 });

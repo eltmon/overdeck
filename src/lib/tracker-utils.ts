@@ -8,10 +8,8 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import { loadProjectsConfigSync, getIssuePrefix } from './projects.js';
 import { extractPrefixSync, extractNumberSync, parseIssueIdSync } from './issue-id.js';
-import { ConfigError } from './errors.js';
 
 export interface GitHubRepoConfig {
   owner: string;
@@ -172,23 +170,3 @@ export function resolveTrackerTypeSync(issueId: string): TrackerTypeResolution {
   // Default to Linear for unknown prefixes
   return 'linear';
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Resolve an issue ID to a GitHub repo, or signal it's not a GitHub issue. */
-export const resolveGitHubIssue = (
-  issueId: string,
-): Effect.Effect<IssueResolution, ConfigError> =>
-  Effect.try({
-    try: () => resolveGitHubIssueSync(issueId),
-    catch: (cause) =>
-      new ConfigError({ message: `resolveGitHubIssue(${issueId}) failed`, cause }),
-  });
-
-/** True if the issue prefix matches a configured github_repo project. */
-export const isGitHubIssue = (issueId: string): Effect.Effect<boolean, ConfigError> =>
-  Effect.try({
-    try: () => isGitHubIssueSync(issueId),
-    catch: (cause) =>
-      new ConfigError({ message: `isGitHubIssue(${issueId}) failed`, cause }),
-  });

@@ -17,7 +17,7 @@ import { requireModelOverrideSync } from '../../../../lib/model-validation.js';
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 import { getRuntimeForAgent } from '../../../../lib/runtimes/index.js';
 import {
-  getAgentState,
+  getAgentStateSync,
   setAgentDeliveryMethod,
 } from '../../../../lib/agents.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -52,7 +52,7 @@ export const getAgentHandoffSuggestionRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentStateSync(id);
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -147,7 +147,7 @@ export const getAgentCostRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentStateSync(id);
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -274,7 +274,7 @@ export const postAgentDeliveryMethodRoute = HttpRouter.add(
       return jsonResponse({ error: 'deliveryMethod must be auto, channels, or tmux' }, { status: 400 });
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentStateSync(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }

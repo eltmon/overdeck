@@ -13,7 +13,7 @@ import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agen
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { parseIssueIdSync } from '../issue-id.js';
 import { operatorInterventionEvent } from '../operator-interventions.js';
-import { getAgentState } from '../agents.js';
+import { getAgentStateSync } from '../agents.js';
 import {
   getIssueForCleanup,
   isOrphanedIssue,
@@ -135,7 +135,7 @@ export async function deepWipeIssue(
   // be projected through the transactional boundary after the wipe succeeds.
   const workAgentId = `agent-${id.toLowerCase()}`;
   const planningAgentId = `planning-${id.toLowerCase()}`;
-  const workAgentStateBeforeWipe = await Effect.runPromise(getAgentState(workAgentId));
+  const workAgentStateBeforeWipe = getAgentStateSync(workAgentId);
 
   const encoder = new TextEncoder();
   const nodeStream = new ReadableStream<Uint8Array>({

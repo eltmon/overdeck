@@ -55,7 +55,6 @@ vi.mock('../../../src/lib/config-yaml.js', async () => {
   const actual = await vi.importActual<typeof import('../../../src/lib/config-yaml.js')>('../../../src/lib/config-yaml.js');
   return {
     ...actual,
-    loadConfig: vi.fn(() => ({ config: { roles: actual.DEFAULT_ROLES, workhorses: actual.DEFAULT_WORKHORSES } })),
     loadConfigSync: vi.fn(() => ({ config: { roles: actual.DEFAULT_ROLES, workhorses: actual.DEFAULT_WORKHORSES } })),
   };
 });

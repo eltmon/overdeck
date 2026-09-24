@@ -71,7 +71,6 @@ vi.mock('../../agents.js', async () => {
   // PAN-1048 P1: activeRoleRunExists is now async and uses listRunningAgentsProgram
   // on the reactive scheduler hot path.
   listRunningAgentsProgram: effectMock([]),
-  getAgentState: effectMock(null),
   getAgentStateSync: vi.fn(() => null),
   // PAN-1048 round-5 mechanical fix: resolveWorkspaceForIssue now awaits the
   // async agent-state read, so the mock module must export this symbol or the
@@ -125,7 +124,6 @@ vi.mock('../merge-verification.js', () => ({
 }));
 
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
   emitActivityTtsSync: vi.fn(),
@@ -250,7 +248,7 @@ vi.mock('../../tmux.js', async () => {
 });
 
 import { emitActivityEntrySync } from '../../activity-logger.js';
-import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState, getAgentStateSync, resumeAgent } from '../../agents.js';
+import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentStateSync, resumeAgent } from '../../agents.js';
 import { sessionExists, killSession, sessionExistsSync } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
@@ -273,7 +271,7 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(listRunningAgentsSync).mockReturnValue([]);
     vi.mocked(listRunningAgents).mockResolvedValue([]);
     vi.mocked(spawnRun).mockResolvedValue({ id: 'agent-pan-503-review' } as any);
-    vi.mocked(getAgentState).mockResolvedValue(null);
+    vi.mocked(getAgentStateSync).mockReturnValue(null);
     vi.mocked(sessionExists).mockResolvedValue(false);
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
@@ -430,7 +428,7 @@ describe('reactive Cloister scheduler', () => {
     expect(dispatchTestAgentAndNotify).not.toHaveBeenCalled();
     expect(spawnRun).not.toHaveBeenCalled();
     expect(listRunningAgents).not.toHaveBeenCalled();
-    expect(getAgentState).not.toHaveBeenCalled();
+    expect(getAgentStateSync).not.toHaveBeenCalled();
     expect(sessionExists).not.toHaveBeenCalled();
   });
 
@@ -622,7 +620,7 @@ describe('PAN-2159: duplicate planner twin on in_planning', () => {
     // The start-planning route writes planning-<issue> state BEFORE the
     // lifecycle transition; the tmux session is created after it. The guard
     // must treat this fresh 'starting' state as alive.
-    vi.mocked(getAgentState).mockImplementation(((id: string) => {
+    vi.mocked(getAgentStateSync).mockImplementation(((id: string) => {
       if (id === 'planning-pan-503') {
         return { id, issueId: 'PAN-503', role: 'plan', status: 'starting', startedAt: new Date().toISOString() };
       }
@@ -636,7 +634,7 @@ describe('PAN-2159: duplicate planner twin on in_planning', () => {
   });
 
   it('still unsticks a stale crashed spawn (starting past the grace window, no session)', async () => {
-    vi.mocked(getAgentState).mockImplementation(((id: string) => {
+    vi.mocked(getAgentStateSync).mockImplementation(((id: string) => {
       if (id === 'planning-pan-503') {
         return { id, issueId: 'PAN-503', role: 'plan', status: 'starting', startedAt: new Date(Date.now() - 10 * 60_000).toISOString() };
       }

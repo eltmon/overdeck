@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { promises as fs } from 'fs';
 import { join, dirname, parse as parsePath } from 'path';
@@ -514,13 +513,3 @@ export function getConversationsConfigSync(): ConversationsConfig {
 export async function getConversationsConfig(): Promise<ConversationsConfig> {
   return resolveConversationsConfig(await loadConfig());
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Config IO is plain async (`loadConfig`, `getConversationsConfig`; preferred in
-// dashboard-reachable code) or sync (`…Sync`); callers inside an Effect bridge
-// with Effect.promise/tryPromise (PAN-3958). Only the pure getter below keeps
-// an Effect variant.
-
-/** Compute the dashboard's external API URL. Pure (reads env). */
-export const getDashboardApiUrl = (): Effect.Effect<string> =>
-  Effect.sync(() => getDashboardApiUrlSync());

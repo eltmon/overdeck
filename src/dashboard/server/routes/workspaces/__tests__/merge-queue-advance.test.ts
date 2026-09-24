@@ -5,7 +5,7 @@ import type { DerivedIssueState, IssueState } from '@overdeck/contracts';
 // reaches the record plane W3 is deleting. These tests exercise the queue walk
 // only, so the agent surface is stubbed rather than loaded.
 vi.mock('../../../../../lib/agents.js', () => ({
-  getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
 }));

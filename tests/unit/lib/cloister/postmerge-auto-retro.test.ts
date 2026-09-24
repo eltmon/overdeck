@@ -95,7 +95,6 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 2468 }),
   resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 2468 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
   resolveTrackerTypeSync: vi.fn().mockReturnValue('github'),

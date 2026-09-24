@@ -15,7 +15,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentState: vi.fn(),
   getAgentStateSync: vi.fn(),
   getAgentDir: vi.fn(() => '/tmp/agent-dir'),
   spawnAgent: vi.fn(),

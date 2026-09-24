@@ -45,7 +45,7 @@ vi.mock('../../../../../lib/agents/agent-state.js', async (importOriginal) => {
 vi.mock('../../../../../lib/agents.js', async () => {
   const { Effect } = await import('effect');
   return {
-    getAgentState: () => Effect.succeed(mocks.agentState),
+    getAgentStateSync: () => mocks.agentState,
     messageAgent: mocks.messageAgent,
     spawnAgent: mocks.spawnAgent,
   };

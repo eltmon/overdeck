@@ -13,7 +13,7 @@ import { invalidateAgentsCache } from '../../dashboard/server/routes/agents.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { cleanupAgentStateDirs } from './workspace-hygiene.js';
-import { getAgentState, getProviderAuthMode, saveAgentStateSync } from '../agents.js';
+import { getAgentStateSync, getProviderAuthMode, saveAgentStateSync } from '../agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { isPlanningComplete, findPlan } from '../xbrief/io.js';
@@ -760,7 +760,7 @@ export function restartFromPlan(options: {
     // 7. Emit events
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
     // append in one SQLite transaction.
-    const restartAgentState = yield* getAgentState(`agent-${issueLower}`);
+    const restartAgentState = getAgentStateSync(`agent-${issueLower}`);
     if (restartAgentState) {
       yield* saveAgentStateAndEmitEventProgram(restartAgentState, {
         type: 'agent.stopped',

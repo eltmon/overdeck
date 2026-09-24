@@ -15,7 +15,7 @@ import { loadConfigSync } from '../../../../lib/config-yaml.js';
 import { getIssueStageSync, isTerminalIssueStage } from '../../../../lib/overdeck/agents.js';
 
 import {
-  getAgentState,
+  getAgentStateSync,
   getLatestSessionId,
   recoverAgent,
   resumeAgent,
@@ -110,7 +110,7 @@ export const postAgentResumeRoute = HttpRouter.add(
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction so the read model transitions agent
       // status from 'stopped' → 'running' and the frontend updates immediately.
-      const agentState = yield* getAgentState(id);
+      const agentState = getAgentStateSync(id);
       if (agentState) {
         yield* saveAgentStateAndEmitEventProgram(agentState, {
           type: 'agent.started',
@@ -185,7 +185,7 @@ export const postAgentRecoverRoute = HttpRouter.add(
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const stateBeforeRecover = yield* getAgentState(id);
+    const stateBeforeRecover = getAgentStateSync(id);
     if (!stateBeforeRecover) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
@@ -214,7 +214,7 @@ export const postAgentRecoverRoute = HttpRouter.add(
       return jsonResponse({ success: false, error }, { status: result ? 409 : 400 });
     }
 
-    const updatedState = yield* getAgentState(id);
+    const updatedState = getAgentStateSync(id);
     if (updatedState) {
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction.
@@ -273,7 +273,7 @@ export const postAgentRestartRoute = HttpRouter.add(
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentStateSync(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
@@ -315,7 +315,7 @@ export const postAgentRestartRoute = HttpRouter.add(
           const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message, force });
 
           if (result.success || result.code === 'pending-operator-decision') {
-            const updatedState = result.success ? await Effect.runPromise(getAgentState(id)) : agentState;
+            const updatedState = result.success ? getAgentStateSync(id) : agentState;
             // PAN-1908: write-through projection — preserve running state when a
             // late operator decision aborts before the destructive stop boundary.
             if (updatedState) {
@@ -362,7 +362,7 @@ export const postAgentRestartRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, graceful: false, message, force }));
 
     if (result.success) {
-      const updatedState = yield* getAgentState(id);
+      const updatedState = getAgentStateSync(id);
       yield* eventStore.appendAsync(operatorInterventionEvent({
         issueId: updatedState?.issueId || agentState.issueId,
         kind: 'restart',
@@ -464,7 +464,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       }
     }
 
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentStateSync(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
@@ -717,7 +717,7 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
-    const agentState = yield* getAgentState(id);
+    const agentState = getAgentStateSync(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found`, lifecycle }, { status: 404 });
     }
@@ -942,7 +942,7 @@ export const postAgentsRestartWithConfigRoute = HttpRouter.add(
           continue;
         }
 
-        const agentState = yield* getAgentState(agentId);
+        const agentState = getAgentStateSync(agentId);
         if (!agentState) {
           results.push({ id: agentId, status: 'not_found', error: `Agent state not found` });
           continue;

@@ -184,8 +184,8 @@ export const postAgentPlanChecklistRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const { getAgentState } = yield* Effect.promise(() => import('../../../../lib/agents.js'));
-    const state = yield* getAgentState(id);
+    const { getAgentStateSync } = yield* Effect.promise(() => import('../../../../lib/agents.js'));
+    const state = getAgentStateSync(id);
     if (!state?.workspace || !state.issueId) {
       return jsonResponse({ success: false, error: 'agent has no resolvable workspace or issue id' }, { status: 422 });
     }

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getAgentState, getAgentRuntimeState, messageAgent, transitionIssueToInProgress } from '../../../../lib/agents.js';
+import { getAgentStateSync, getAgentRuntimeState, messageAgent, transitionIssueToInProgress } from '../../../../lib/agents.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { commentOnArtifact, parseArtifactRef } from '../../../../lib/forge.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
@@ -633,7 +633,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const { issueId: requestIssueId, status: requestStatus, agentId } = body;
 
-    const agentState = agentId ? yield* getAgentState(agentId) : null;
+    const agentState = agentId ? getAgentStateSync(agentId) : null;
     const runtimeState = agentId ? yield* getAgentRuntimeState(agentId) : null;
     const metadata = validateSpecialistAutoCompleteMetadata(name, body, agentState, runtimeState);
     if (!metadata.ok) {

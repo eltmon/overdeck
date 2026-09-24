@@ -9,7 +9,6 @@ const mockResolveGitHubIssue = vi.fn();
 vi.mock('../../../../lib/tracker-utils.js', () => ({
   resolveTrackerType: mockResolveTrackerType,
   resolveTrackerTypeSync: mockResolveTrackerType,
-  resolveGitHubIssue: mockResolveGitHubIssue,
   resolveGitHubIssueSync: mockResolveGitHubIssue,
 }));
 

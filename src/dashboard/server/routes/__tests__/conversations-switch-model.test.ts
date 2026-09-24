@@ -60,9 +60,7 @@ vi.mock('../../../../lib/providers.js', () => ({
   qualifyPiModel: vi.fn((m: string) => m),
 }));
 
-vi.mock('../../../../lib/workspace-manager.js', () => ({
-  preTrustDirectory: vi.fn(),
-}));
+vi.mock('../../../../lib/workspace-manager.js', () => ({}));
 
 vi.mock('../../../../lib/tmux.js', () => ({
   // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list

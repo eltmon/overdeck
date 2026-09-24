@@ -25,7 +25,6 @@ const mockSpawnAgent = vi.fn();
 const mockStopAgent = vi.fn();
 const mockMessageAgent = vi.fn();
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentState: mockGetAgentState,
   getAgentStateSync: mockGetAgentState,
   getAgentStateProgram: mockGetAgentState,
   spawnAgent: mockSpawnAgent,
@@ -94,7 +93,7 @@ describe('AgentSpawner — integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
-    mockGetAgentState.mockReturnValue(Effect.succeed(null));
+    mockGetAgentState.mockReturnValue(null);
     mockReadWorkspacePlanSync.mockReturnValue({ plan: { items: [{ id: 'wi-1' }] } });
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
     mockStopAgent.mockReturnValue(undefined);
@@ -146,7 +145,7 @@ describe('AgentSpawner — integration', () => {
     });
 
     it('fails with AgentAlreadyRunning when agent status is running', async () => {
-      mockGetAgentState.mockReturnValue(Effect.succeed({ status: 'running', issueId: 'PAN-1' }));
+      mockGetAgentState.mockReturnValue({ status: 'running', issueId: 'PAN-1' });
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
       const program = Effect.gen(function* () {

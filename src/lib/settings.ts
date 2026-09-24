@@ -1,8 +1,6 @@
-import { Effect } from 'effect';
 import { getHarnessBehavior } from '@overdeck/contracts';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
-import { FsError } from './errors.js';
 
 // Model identifiers
 export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
@@ -347,16 +345,3 @@ export function getAgentCommandSync(modelId: ModelId | string): { command: strin
     args: ['--model', modelId],
   };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Sync FS wrappers (CLI-only by design); pure helpers stay Effect.sync.
-
-/** Persist settings.json; surfaces FsError on failure. */
-export const saveSettings = (
-  settings: SettingsConfig,
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveSettingsSync(settings),
-    catch: (cause) =>
-      new FsError({ path: SETTINGS_FILE, operation: 'save-settings', cause }),
-  });

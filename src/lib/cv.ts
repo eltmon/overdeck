@@ -4,11 +4,9 @@
  * Tracks agent performance over time to enable capability-based routing.
  */
 
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
-import { FsError } from './errors.js';
 
 export interface WorkEntry {
   issueId: string;
@@ -283,19 +281,3 @@ export function formatCVSync(cv: AgentCV): string {
 
   return lines.join('\n');
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// CV file IO is sync by design. Read paths return Effect.sync; write paths
-// surface FsError.
-
-/** Mark the start of a work item on an agent's CV. */
-export const startWork = (
-  agentId: string,
-  issueId: string,
-  skills?: string[],
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => startWorkSync(agentId, issueId, skills),
-    catch: (cause) =>
-      new FsError({ path: agentId, operation: 'cv-start-work', cause }),
-  });

@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 // reaches the record plane W3 is deleting. Stub the one constant it needs.
 // lib/agents pulls agents/spawn, which imports the removed `state-home`.
 vi.mock('../../../../../lib/agents.js', () => ({
-  getAgentState: vi.fn(),
+  getAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
 }));

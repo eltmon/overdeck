@@ -19,7 +19,7 @@ import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from '../issue-id.js';
-import { getAgentState, markAgentStoppedState, saveAgentState } from '../agents.js';
+import { getAgentStateSync, markAgentStoppedState, saveAgentState } from '../agents.js';
 
 const execAsync = promisify(exec);
 
@@ -62,7 +62,7 @@ export interface CloseIssueOptions {
  */
 async function markWorkAgentStoppedForIssue(issueId: string): Promise<void> {
   const agentId = `agent-${normalizeIssueIdSync(issueId)}`;
-  const state = await Effect.runPromise(getAgentState(agentId));
+  const state = getAgentStateSync(agentId);
   if (!state) return;
   markAgentStoppedState(state);
   await Effect.runPromise(saveAgentState(state));

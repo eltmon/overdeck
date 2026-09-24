@@ -1,6 +1,6 @@
 /** Cloister reactive lifecycle scheduler. */
 import { Effect } from 'effect';
-import { getAgentState } from '../agents.js';
+import { getAgentStateSync } from '../agents.js';
 import type { Role } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -113,7 +113,7 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
   // writes to planning-pan-X while spawnRun uses agent-pan-X-plan.
   if (role === 'plan') {
     const legacyId = `planning-${issueLower}`;
-    const legacyState = await Effect.runPromise(getAgentState(legacyId));
+    const legacyState = getAgentStateSync(legacyId);
     if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
       // S1 (age-aware): only a STALE 'starting' state with no live tmux
       // session is a crashed spawn; a fresh one is mid-startup (PAN-2159).
@@ -128,7 +128,7 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
     ? `agent-${issueLower}`
     : `agent-${issueLower}-${role}`;
 
-  const state = await Effect.runPromise(getAgentState(candidateId));
+  const state = getAgentStateSync(candidateId);
   if (!state) return false;
 
   const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
@@ -185,7 +185,7 @@ Required steps:
  */
 async function resolveWorkspaceForIssue(issueId: string): Promise<string | null> {
   const issueLower = issueId.toLowerCase();
-  const agentState = await Effect.runPromise(getAgentState(`agent-${issueLower}`));
+  const agentState = getAgentStateSync(`agent-${issueLower}`);
   if (agentState?.workspace) return agentState.workspace;
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) return null;

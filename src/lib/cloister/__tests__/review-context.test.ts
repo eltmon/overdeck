@@ -45,7 +45,6 @@ vi.mock('../../xbrief/io.js', () => ({
   readPlanProgram: (...args: unknown[]) => mockReadPlan(...args),
 }));
 vi.mock('../../xbrief/lifecycle-io.js', () => ({
-  findXBriefByIssue: vi.fn(() => null),
   findXBriefByIssueSync: vi.fn(() => null),
 }));
 vi.mock('../../config.js', () => ({

@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
-import { getAgentState, messageAgent, spawnAgent } from '../../../../lib/agents.js';
+import { messageAgent, spawnAgent } from '../../../../lib/agents.js';
 import { isAlive } from '../../../../lib/agents/liveness.js';
 import {
   clearYieldForResumeSync,
@@ -320,7 +320,7 @@ export async function ensureAgentReadyForMerge(issueId: string, workspacePath: s
     assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));
     return { recovered: true, agentId, detail: `Work agent already running; sent merge preparation request${gateSuffix}.` };
   }
-  const agentState = await Effect.runPromise(getAgentState(agentId));
+  const agentState = getAgentStateSync(agentId);
   if (agentState) try {
     assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));
     const updatedLifecycle = getWorkAgentLifecycleStateSync(agentId);

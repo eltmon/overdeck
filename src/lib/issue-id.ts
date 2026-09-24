@@ -7,7 +7,6 @@
  * - Custom:    Per-project regex patterns
  */
 
-import { Effect } from 'effect';
 import type { ProjectConfig } from './projects.js';
 
 /**
@@ -198,10 +197,3 @@ export function extractStandardNumberSync(issueId: string): number | null {
   const match = issueId.match(/^([A-Za-z]+)-(\d+)$/i);
   return match ? parseInt(match[2], 10) : null;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure-sync id parsing — additive Effect.sync wrapper.
-
-/** Lowercase filesystem-safe form. Pure. */
-export const normalizeIssueId = (issueId: string): Effect.Effect<string> =>
-  Effect.sync(() => normalizeIssueIdSync(issueId));

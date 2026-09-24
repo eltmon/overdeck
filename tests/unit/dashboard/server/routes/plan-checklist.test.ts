@@ -13,7 +13,7 @@ const routeMocks = vi.hoisted(() => ({
 
 vi.mock('../../../../../src/lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../src/lib/agents.js')>();
-  return { ...actual, getAgentState: routeMocks.getAgentState };
+  return { ...actual, getAgentStateSync: routeMocks.getAgentState };
 });
 
 import { postAgentPlanChecklistRoute } from '../../../../../src/dashboard/server/routes/agents/runtime-events.js';
@@ -81,7 +81,7 @@ beforeEach(async () => {
   await mkdir(workspace, { recursive: true });
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
   routeMocks.getAgentState.mockReset();
-  routeMocks.getAgentState.mockReturnValue(Effect.succeed({
+  routeMocks.getAgentState.mockReturnValue({
     id: 'agent-pan-3451',
     issueId: 'PAN-3451',
     workspace,
@@ -89,7 +89,7 @@ beforeEach(async () => {
     model: 'test-model',
     status: 'running',
     startedAt: '2026-08-01T00:00:00.000Z',
-  }));
+  });
 });
 
 afterEach(async () => {
@@ -133,7 +133,7 @@ describe('POST /api/agents/:id/plan-checklist', () => {
   });
 
   it('returns 422 when the agent has no resolvable workspace', async () => {
-    routeMocks.getAgentState.mockReturnValue(Effect.succeed(null));
+    routeMocks.getAgentState.mockReturnValue(null);
 
     const result = await postPlanChecklist({ token: 'test-token', agentId: 'missing-agent' });
 

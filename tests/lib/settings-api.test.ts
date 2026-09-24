@@ -27,30 +27,6 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
   const actual = await vi.importActual<typeof import('../../src/lib/config-yaml.js')>('../../src/lib/config-yaml.js');
   return {
     ...actual,
-    loadConfig: vi.fn(() => ({
-      config: {
-        preset: 'balanced',
-        enabledProviders: new Set(['anthropic', 'openai']),
-        apiKeys: {
-          openai: 'sk-test-123',
-        },
-        overrides: {},
-        geminiThinkingLevel: 3,
-        tmux: {
-          configMode: 'managed',
-        },
-        ui: { openInEditorCommand: null, theme: 'broadsheet' },
-        conversations: {
-          compactionModel: 'claude-haiku-4-5',
-          manualCompactMode: 'claude-code',
-          richCompaction: false,
-        },
-        defaultConversationModel: 'claude-sonnet-4-6',
-        trackerKeys: {},
-        tts: makeTtsConfig(),
-      },
-      migration: null,
-    })),
     loadConfigSync: vi.fn(() => ({
       config: {
         preset: 'balanced',

@@ -581,21 +581,6 @@ export const getConversationsConfig = (): Effect.Effect<
   });
 
 /**
- * Effect-native loadConfig — sync read, wraps any failure (parse / fs) as
- * ConfigError. Use this from Effect contexts that need merged config without
- * forcing the codebase to migrate every loadConfig call site.
- */
-export const loadConfig = (): Effect.Effect<ConfigLoadResult, ConfigError> =>
-  Effect.try({
-    try: () => loadConfigSync(),
-    catch: (cause) =>
-      new ConfigError({
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/**
  * Effect-native updateConversationsConfig. Persists the supplied
  * ConversationsConfig overrides into config.yaml. Fails with ConfigError on
  * write failure.

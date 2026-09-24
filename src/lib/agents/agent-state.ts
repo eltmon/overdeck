@@ -103,13 +103,6 @@ registerActiveReviewArtifactContextReader((issueId) => {
   };
 });
 
-export const getAgentState = (agentId: string): Effect.Effect<AgentState | null, FsError> => {
-  return Effect.try({
-    try: () => getAgentStateSync(agentId),
-    catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
-  });
-};
-
 function prepareAgentStateForSave(state: AgentState): AgentState {
   if (state.status === 'running' || state.status === 'starting') {
     delete state.stoppedAt;
@@ -196,7 +189,10 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
       catch: (cause) => toAgentFsError('mkdir', dir, cause),
     });
 
-    const oldState = yield* getAgentState(state.id);
+    const oldState = yield* Effect.try({
+      try: () => getAgentStateSync(state.id),
+      catch: (cause) => toAgentFsError('read', `agents-db:${state.id}`, cause),
+    });
     const oldStatus = oldState?.status;
 
     if (state.status === 'running' || state.status === 'starting') {
@@ -286,7 +282,10 @@ export const setAgentPaused = (
   stoppedByPause = false,
 ): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
-    const state = yield* getAgentState(agentId);
+    const state = yield* Effect.try({
+      try: () => getAgentStateSync(agentId),
+      catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
+    });
     if (!state) return null;
 
     applyAgentPaused(state, reason, stoppedByPause);
@@ -362,7 +361,10 @@ export function clearAgentPausedSync(agentId: string): boolean {
 
 export const clearAgentPaused = (agentId: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
-    const state = yield* getAgentState(agentId);
+    const state = yield* Effect.try({
+      try: () => getAgentStateSync(agentId),
+      catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
+    });
     if (!state) return null;
     if (isAgentPauseClear(state)) return state;
 
@@ -407,7 +409,10 @@ export function clearAgentTroubledSync(agentId: string): boolean {
 
 export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
-    const state = yield* getAgentState(agentId);
+    const state = yield* Effect.try({
+      try: () => getAgentStateSync(agentId),
+      catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
+    });
     if (!state) return null;
     if (isAgentTroubledClear(state)) return state;
 
@@ -514,7 +519,10 @@ function applyAgentFailure(state: AgentState, reason: string): void {
 
 export const recordAgentFailure = (agentId: string, reason: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
-    const state = yield* getAgentState(agentId);
+    const state = yield* Effect.try({
+      try: () => getAgentStateSync(agentId),
+      catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
+    });
     if (!state) return null;
 
     applyAgentFailure(state, reason);
@@ -545,7 +553,7 @@ export function isAgentTroubled(agentId: string): boolean {
 
 export async function recordStartupSessionExit(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<never> {
   await Effect.runPromise(recordAgentFailure(state.id, SESSION_EXITED_BEFORE_KICKOFF));
-  const failedState = await Effect.runPromise(getAgentState(state.id));
+  const failedState = getAgentStateSync(state.id);
   if (failedState) {
     failedState.status = 'stopped';
     failedState.stoppedAt = new Date().toISOString();

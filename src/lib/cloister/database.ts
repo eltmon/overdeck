@@ -7,21 +7,9 @@
 
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
-import { Data, Effect } from 'effect';
 import { openDatabase, type SqliteDatabase } from '../database/driver.js';
 import { OVERDECK_HOME } from '../paths.js';
 import type { HealthState } from '../runtimes/types.js';
-
-/**
- * Local error class for the cloister health-history SQLite store. Distinct from
- * `DatabaseError` in the application-settings store because this layer has its
- * own health-history failure surfaces.
- */
-export class CloisterDatabaseError extends Data.TaggedError('CloisterDatabaseError')<{
-  readonly operation: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
 
 const CLOISTER_DB_PATH = join(OVERDECK_HOME, 'cloister.db');
 const RETENTION_DAYS = 7;
@@ -383,41 +371,3 @@ export function getDatabaseStatsSync(): {
     newestEvent,
   };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// The shared SQLite driver is intentionally synchronous, so
-// these wrappers stay sync at the call site and lift failures into a typed
-// `CloisterDatabaseError` channel via `Effect.try`. They exist so callers in
-// the Effect world can compose health-history reads/writes without manually
-// wrapping every call.
-
-/** Effect variant of `writeHealthEvent`. */
-export const writeHealthEvent = (
-  event: Omit<HealthEvent, 'id'>,
-): Effect.Effect<number, CloisterDatabaseError> =>
-  Effect.try({
-    try: () => writeHealthEventSync(event),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'writeHealthEvent',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getHealthHistory`. */
-export const getHealthHistory = (
-  agentId: string,
-  startTime: string,
-  endTime: string,
-): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
-  Effect.try({
-    try: () => getHealthHistorySync(agentId, startTime, endTime),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'getHealthHistory',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

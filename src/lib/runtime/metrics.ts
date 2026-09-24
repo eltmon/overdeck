@@ -6,7 +6,6 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { Data, Effect } from 'effect';
 import { OVERDECK_HOME } from '../paths.js';
 import { RuntimeType } from './interface.js';
 
@@ -319,20 +318,3 @@ export function clearMetricsSync(): void {
   saveMetricsSync({ ...DEFAULT_METRICS });
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel variants of the sync helpers above. Sync variants are
-// preserved so existing CLI callers keep working; new callers can use the
-// Effect variants to compose with typed error channels.
-
-/** Tagged error for metrics parse failures. */
-export class MetricsParseError extends Data.TaggedError('MetricsParseError')<{
-  readonly path: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `getIssueTasks`. */
-export const getIssueTasks = (
-  issueId: string,
-): Effect.Effect<TaskRecord[]> => Effect.sync(() => getIssueTasksSync(issueId));

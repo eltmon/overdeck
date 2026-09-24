@@ -11,7 +11,6 @@ import type { AgentState } from '../agents.js';
 import type { PromptResult, PromptSender } from '../terminal-backends/types.js';
 import {
   normalizeAgentId,
-  getAgentState,
   getAgentStateSync,
   saveAgentState,
   getAgentDir,
@@ -365,7 +364,7 @@ export async function deliverAgentMessage(
   let resolvedMethod = deliveryMethod;
   let state: AgentState | null = null;
   try {
-    state = await Effect.runPromise(getAgentState(normalizedId));
+    state = getAgentStateSync(normalizedId);
     channelsEnabled = Boolean(state?.channelsEnabled);
     // A persisted deliveryMethod is a launch-time hint, not a per-call
     // transport opt-in: state can project 'supervisor' for an agent with no
@@ -854,7 +853,7 @@ export async function deliverInitialPromptWithRetry(
   const probe = options.probe ?? probeTranscriptSince;
   const getState = options.getState ?? (async (id: string) => {
     try {
-      return await Effect.runPromise(getAgentState(normalizeAgentId(id)));
+      return getAgentStateSync(normalizeAgentId(id));
     } catch {
       return null;
     }
@@ -1000,7 +999,7 @@ export async function deliverAgentPermissionDecision(
 
   let state: AgentState | null = null;
   try {
-    state = await Effect.runPromise(getAgentState(normalizedId));
+    state = getAgentStateSync(normalizedId);
   } catch {
     state = null;
   }
@@ -1041,7 +1040,7 @@ export async function setAgentDeliveryMethod(
   agentId: string,
   deliveryMethod: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<void> {
-  const state = await Effect.runPromise(getAgentState(agentId));
+  const state = getAgentStateSync(agentId);
   if (!state) return;
   state.deliveryMethod = deliveryMethod;
   await Effect.runPromise(saveAgentState(state));

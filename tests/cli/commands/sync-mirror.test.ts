@@ -51,7 +51,6 @@ vi.mock('../../../src/lib/sync.js', () => ({
   planSyncSync: mockPlanSync,
   executeSync: mockExecuteSync,
   executeSyncSync: mockExecuteSync,
-  syncContextLayers: mockSyncContextLayers,
   syncContextLayersSync: mockSyncContextLayers,
   refreshCache: mockRefreshCache,
   refreshCacheSync: mockRefreshCache,
@@ -81,7 +80,6 @@ vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: mockLoadConfig,
   loadConfigSync: mockLoadConfig,
   checkDevrootDeprecation: mockCheckDevrootDeprecation,
-  getDashboardApiUrl: vi.fn().mockReturnValue('http://localhost:3000'),
   getDashboardApiUrlSync: vi.fn().mockReturnValue('http://localhost:3000'),
 }));
 
@@ -117,7 +115,6 @@ vi.mock('../../../src/lib/claude-mcp.js', () => ({
 }));
 
 vi.mock('../../../src/lib/backup.js', () => ({
-  createBackup: mockCreateBackup,
   createBackupSync: mockCreateBackup,
 }));
 

@@ -151,12 +151,12 @@ export const AgentSpawnerLive = Layer.effect(
           }
 
           // Guard: no agent already running
-          const { getAgentState, spawnAgent, normalizeAgentId } = await import(
+          const { getAgentStateSync, spawnAgent, normalizeAgentId } = await import(
             '../../../lib/agents.js'
           ) as any;
           const normalizedId = normalizeAgentId(issueId);
 
-          const existing = await Effect.runPromise(getAgentState(normalizedId)) as { status?: string } | null;
+          const existing = getAgentStateSync(normalizedId) as { status?: string } | null;
           if (existing?.status === 'running') {
             throw new AgentAlreadyRunning({ id: issueId });
           }

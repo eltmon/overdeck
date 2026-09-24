@@ -919,3 +919,111 @@ No other hit: the remaining `Effect.*` mocks in test files target functions that
 
 The `cliproxy.ts` docs for `installCliproxy`, `stopCliproxy` and `restartCliproxy` get back the detail the deleted façade docs
 carried (download + unpack from GitHub releases; best-effort SIGTERM via the pidfile; stop, wait 500ms, start).
+
+## CH-6a: Live Shape B wrappers (#4012, part 1 of 2)
+
+PRD W7. Every Shape B wrapper outside Oh My Pi (#4003) is deleted and its callers call the `Sync` function directly
+(D3). The audit counted 34 of them as live, but its usage walk matches names, not imports: 31 had no production caller
+at all. Their "callers" were same-named functions elsewhere (the eight private `isGitHubIssue` / `normalizeIssueId`
+copies, the frontend `formatCost` / `saveSettings` / `parseContainerServiceName`, the `CostWriter` budget operations,
+the context route's own `syncContextLayers`, `overdeck/health-events.ts`, `xbrief-index.ts`'s own `findXBriefByIssue`,
+and so on). `tsc` on the root and dashboard projects after deleting all 34 reported only the sites below.
+
+Ratchet: B 38 → 4 (the four left are Oh My Pi: `cost-parsers/ohmypi-parser.ts` 2, `runtimes/ohmypi-fifo.ts` 2). A and C are
+unchanged (1 and 52); C is CH-6b's. Effect diagnostics: 254 → 250.
+
+### Shape B wrappers (34) → the `Sync` function
+
+| Module | Wrapper (deleted) | Survivor | Note |
+| --- | --- | --- | --- |
+| `activity-logger.ts` | `emitActivityEntry` | `emitActivityEntrySync` | no production caller |
+| `agents/agent-state.ts` | `getAgentState` | `getAgentStateSync` | the one wrapper with real callers: 81 references in 38 files, rewritten per D3 (see below) |
+| `backup.ts` | `createBackup` | `createBackupSync` | no production caller |
+| `child-env.ts` | `buildChildEnv` | `buildChildEnvSync` | no production caller |
+| `cloister/database.ts` | `getHealthHistory` | `getHealthHistorySync` | no production caller |
+| `cloister/database.ts` | `writeHealthEvent` | `writeHealthEventSync` | no production caller |
+| `config-migration.ts` | `hasLegacySettings` | `hasLegacySettingsSync` | no production caller |
+| `config-migration.ts` | `needsMigration` | `needsMigrationSync` | no production caller |
+| `config-yaml/load.ts` | `loadConfig` | `loadConfigSync` | no production caller |
+| `config.ts` | `getDashboardApiUrl` | `getDashboardApiUrlSync` | no production caller |
+| `context.ts` | `estimateTokens` | `estimateTokensSync` | no production caller |
+| `cost.ts` | `checkBudget` | `checkBudgetSync` | no production caller |
+| `cost.ts` | `createBudget` | `createBudgetSync` | no production caller |
+| `cost.ts` | `deleteBudget` | `deleteBudgetSync` | no production caller |
+| `cost.ts` | `formatCost` | `formatCostSync` | no production caller |
+| `cost.ts` | `generateReport` | `generateReportSync` | no production caller |
+| `costs/migration.ts` | `needsMigration` | `needsMigrationSync` | the `costs/` one was re-exported from `costs/index.ts` with no importer; the re-export is dropped |
+| `costs/retention.ts` | `needsPruning` | `needsPruningSync` | re-exported from `costs/index.ts` with no importer; the re-export is dropped |
+| `cv.ts` | `startWork` | `startWorkSync` | no production caller |
+| `issue-id.ts` | `normalizeIssueId` | `normalizeIssueIdSync` | no production caller |
+| `merge-set.ts` | `getMergeSet` | `getMergeSetSync` | no production caller |
+| `model-fallback.ts` | `detectEnabledProviders` | `detectEnabledProvidersSync` | no production caller |
+| `resource-utils.ts` | `parseContainerServiceName` | `parseContainerServiceNameSync` | no production caller |
+| `resource-utils.ts` | `parseIssueIdFromText` | `parseIssueIdFromTextSync` | no production caller |
+| `runtime/metrics.ts` | `getIssueTasks` | `getIssueTasksSync` | no production caller |
+| `settings.ts` | `saveSettings` | `saveSettingsSync` | no production caller |
+| `sync.ts` | `syncContextLayers` | `syncContextLayersSync` | no production caller |
+| `tracker-utils.ts` | `isGitHubIssue` | `isGitHubIssueSync` | no production caller |
+| `tracker-utils.ts` | `resolveGitHubIssue` | `resolveGitHubIssueSync` | no production caller |
+| `tts-speak.ts` | `buildTtsSpeakPayload` | `buildTtsSpeakPayloadSync` | no production caller |
+| `work-agent-lifecycle.ts` | `assertCanStartFresh` | `assertCanStartFreshSync` | no production caller |
+| `workspace-manager.ts` | `preTrustDirectory` | `preTrustDirectorySync` | dead call removed, behaviour unchanged: three dynamic-import sites (`agents/spawn.ts` `spawnRun` and `spawnAgent`, `overdeck/conversation-runtime.ts` conversation spawn) cast it to `(dir) => void` and called it, which built an Effect and never ran it (dead since PAN-1379, 2026-05-22). The calls are deleted; workspace creation and project registration still pre-trust through `preTrustDirectorySync` |
+| `workspace/ensure-devcontainer.ts` | `ensureDevcontainer` | `ensureDevcontainerSync` | no production caller |
+| `xbrief/lifecycle-io.ts` | `findXBriefByIssue` | `findXBriefByIssueSync` | no production caller |
+
+All paths are relative to `src/lib/`.
+
+### `getAgentState` callers
+
+- `await Effect.runPromise(getAgentState(id))` in an `async` function → `getAgentStateSync(id)`. A throw is still a
+  rejection of that function.
+- Promise-returning readers that were plain functions (`permissions.ts` `readAgentState` default, `pending-feedback.ts`
+  `getAgentState` default, `memory/reconciliation.ts` `getAgentStateFromStore`) → `async` functions around the sync read,
+  so a throw stays a rejection (D3).
+- `yield* getAgentState(id)` in a route handler → `getAgentStateSync(id)` (D3).
+- Kept typed: where a failure is recovered or the Effect declares `FsError`, the call is
+  `yield* Effect.try({ try: () => getAgentStateSync(id), catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${id}`, cause }) })`,
+  the old wrapper's mapping: `routes/agents/spawn.ts` `resolveStartAgentGateForRoute` (its generator is piped into
+  `Effect.catch`, which logs and falls back to the gate), the `agent-state.ts` Effect functions (`saveAgentState`'s
+  old-state read, `setAgentPaused`, `clearAgentPaused`, `clearAgentTroubled`, `recordAgentFailure`), and
+  `termination.ts` `stopAgent`. `routes/agents/permissions.ts` plan-action swallowed a failure to null with
+  `.pipe(Effect.catch(() => null))`; it is now a plain `try`/`catch` around the sync read.
+- Effect 4's `Effect.try` takes only the `{ try, catch }` options form: `Effect.try(() => x)` throws "options.catch is
+  not a function" even on success. D3's single-argument form is therefore never used; every bridge is two-argument.
+
+### Also deleted because only deleted code used them
+
+| Name | Where |
+| --- | --- |
+| `CloisterDatabaseError` | `cloister/database.ts` |
+| `MetricsParseError` | `runtime/metrics.ts` |
+| `WorkAgentLifecycleViolation` | `work-agent-lifecycle.ts` |
+| private `toSyncFsError` | `sync.ts` |
+| private `toWmFsError` | `workspace-manager.ts` |
+| `needsMigration`, `needsPruning` re-exports | `costs/index.ts` |
+
+Empty `// ─── Effect variants (PAN-1249)` section headers are removed with their sections. Where a deleted wrapper's
+doc said more than the survivor's, the detail moved to the `Sync` function (`createBackupSync`, `getMergeSetSync`,
+`parseIssueIdFromTextSync`, `parseContainerServiceNameSync`, `buildTtsSpeakPayloadSync`, `assertCanStartFreshSync`,
+`findXBriefByIssueSync`, `getAgentStateSync`).
+
+### Behaviour notes for reviewers
+
+- `preTrustDirectory`: the three dead calls are deleted rather than revived (operator decision on #4044).
+  `preTrustDirectorySync` writes `~/.claude.json`, which every Claude Code session on the machine shares, without an
+  atomic rename, so concurrent spawns could race on it. The calls have done nothing since PAN-1379, and workspace
+  creation and project registration already pre-trust. Behaviour is unchanged.
+- `getAgentState`: a route handler whose agent-state read throws (an existing `state.json` that cannot be read) now
+  answers 500 with the underlying error message instead of "read failed for agents-db:<id>: <cause>". Parse
+  errors and missing files never threw (they return null), so this is only an unreadable file.
+
+### Tests
+
+None are deleted, and the diff adds and removes no `it()`/`test()` calls. Mocks of `getAgentState` (Effect) became
+mocks of `getAgentStateSync` returning plain values (`Effect.succeed(v)` → `v`, `Effect.fail(e)` → a throwing
+implementation); where a factory mocked both names, the stale `getAgentState` entry is removed and the test's inputs
+moved to the `Sync` entry (`postmerge-cleanup-async`, `cloister/__tests__/review-agent`). Where a `workspace-manager.js`
+mock provided only `preTrustDirectory` for a deleted call (`agent-state-role`, `conversations-switch-model`,
+`conversations-supervisor`), the factory is now empty so the module stays mocked out; where it also provided
+`preTrustDirectorySync` (registration and creation tests), the stale key is dropped. Factory entries for the 31 wrappers that had no production caller are removed as
+stale (26 files). `agents-barrel-exports.test.ts` drops `getAgentState` from the frozen list.

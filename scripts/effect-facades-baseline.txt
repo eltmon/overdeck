@@ -1,34 +1,8 @@
 # Effect façade ratchet baseline (PAN-3958). Rows: <shape> <count> <path>. Shapes: A=Promise façade,
 # B=sync façade, C=sync/async twin pair. Lower with: bash scripts/lint-effect-facades.sh --update
 A 1 src/lib/runtimes/ohmypi-fifo.ts
-B 1 src/lib/activity-logger.ts
-B 1 src/lib/agents/agent-state.ts
-B 1 src/lib/backup.ts
-B 1 src/lib/child-env.ts
-B 1 src/lib/config-yaml/load.ts
-B 1 src/lib/config.ts
-B 1 src/lib/context.ts
-B 1 src/lib/costs/migration.ts
-B 1 src/lib/costs/retention.ts
-B 1 src/lib/cv.ts
-B 1 src/lib/issue-id.ts
-B 1 src/lib/merge-set.ts
-B 1 src/lib/model-fallback.ts
-B 1 src/lib/runtime/metrics.ts
-B 1 src/lib/settings.ts
-B 1 src/lib/sync.ts
-B 1 src/lib/tts-speak.ts
-B 1 src/lib/work-agent-lifecycle.ts
-B 1 src/lib/workspace-manager.ts
-B 1 src/lib/workspace/ensure-devcontainer.ts
-B 1 src/lib/xbrief/lifecycle-io.ts
-B 2 src/lib/cloister/database.ts
-B 2 src/lib/config-migration.ts
 B 2 src/lib/cost-parsers/ohmypi-parser.ts
-B 2 src/lib/resource-utils.ts
 B 2 src/lib/runtimes/ohmypi-fifo.ts
-B 2 src/lib/tracker-utils.ts
-B 5 src/lib/cost.ts
 C 1 src/lib/agents/activity.ts
 C 1 src/lib/agents/liveness.ts
 C 1 src/lib/agents/queries.ts

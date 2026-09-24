@@ -28,7 +28,6 @@ vi.mock('../../src/lib/pipeline-notifier.js', () => ({
 }));
 
 vi.mock('../../src/lib/activity-logger.js', () => ({
-  emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
   emitActivityTtsSync: vi.fn(),

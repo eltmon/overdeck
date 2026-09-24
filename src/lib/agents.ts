@@ -55,7 +55,6 @@ export {
   clearAgentTroubled,
   clearAgentTroubledSync,
   getAgentDir,
-  getAgentState,
   getAgentStateFilePath,
   getAgentStateSync,
   isAgentPaused,

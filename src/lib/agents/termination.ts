@@ -7,7 +7,6 @@ import { Effect } from 'effect';
 import {
   getAgentDir,
   getAgentStateSync,
-  getAgentState,
   saveAgentStateSync,
   saveAgentState,
   markAgentStoppedState,
@@ -259,7 +258,10 @@ export const stopAgent = (
       }
     });
 
-    const state = yield* getAgentState(normalizedId);
+    const state = yield* Effect.try({
+      try: () => getAgentStateSync(normalizedId),
+      catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${normalizedId}`, cause }),
+    });
     if (state) {
       if (!state.id) state.id = normalizedId;
 

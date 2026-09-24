@@ -5,11 +5,9 @@
  * Supports multiple AI providers with configurable pricing.
  */
 
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { COSTS_DIR } from './paths.js';
-import { FsError } from './errors.js';
 
 // ============== Types ==============
 
@@ -655,38 +653,3 @@ export function formatCostSync(cost: number, currency: string = 'USD'): string {
   }
   return `${cost.toFixed(4)} ${currency}`;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Cost-tracking helpers — sync FS by design (CLI / cron scripts). Read paths
-// are Effect.sync; write paths surface FsError via Effect.try.
-
-/** Budget CRUD. */
-export const createBudget = (
-  budget: Omit<CostBudget, 'id' | 'spent'>,
-): Effect.Effect<CostBudget, FsError> =>
-  Effect.try({
-    try: () => createBudgetSync(budget),
-    catch: (cause) =>
-      new FsError({ path: COSTS_DIR, operation: 'create-budget', cause }),
-  });
-export const checkBudget = (
-  id: string,
-): Effect.Effect<ReturnType<typeof checkBudgetSync>> => Effect.sync(() => checkBudgetSync(id));
-export const deleteBudget = (id: string): Effect.Effect<boolean, FsError> =>
-  Effect.try({
-    try: () => deleteBudgetSync(id),
-    catch: (cause) =>
-      new FsError({ path: COSTS_DIR, operation: 'delete-budget', cause }),
-  });
-
-/** Render a human-readable cost report. Pure-ish. */
-export const generateReport = (
-  startDate: string,
-  endDate: string,
-): Effect.Effect<string> => Effect.sync(() => generateReportSync(startDate, endDate));
-
-/** Format a cost number for display. Pure. */
-export const formatCost = (
-  cost: number,
-  currency: string = 'USD',
-): Effect.Effect<string> => Effect.sync(() => formatCostSync(cost, currency));

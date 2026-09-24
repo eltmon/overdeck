@@ -4,10 +4,8 @@
  * Manages the rolling 90-day retention window for cost events.
  */
 
-import { Effect } from 'effect';
 import { readEventsSync, replaceEventsFileSync, getLastEventMetadataSync, CostEvent } from './events.js';
 import { rebuildCacheSync } from './aggregator.js';
-import { FsError } from '../errors.js';
 
 // ============== Types ==============
 
@@ -133,14 +131,3 @@ export function getRetentionStatusSync(retentionDays: number = 90): {
     eventsToRemove,
   };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of needsPruning. */
-export const needsPruning = (
-  retentionDays: number = 90,
-): Effect.Effect<boolean, FsError> =>
-  Effect.try({
-    try: () => needsPruningSync(retentionDays),
-    catch: (cause) => new FsError({ path: '<events>', operation: 'needsPruning', cause }),
-  });

@@ -6,7 +6,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
-  saveAgentState, determineModel, getProviderAuthMode, getAgentState,
+  saveAgentState, determineModel, getProviderAuthMode, getAgentStateSync,
   clearAgentPaused, clearAgentTroubled,
 } from '../../../../lib/agents.js';
 import { resolveIssueWorkModel } from '../../../../lib/agents/staffing.js';
@@ -16,6 +16,7 @@ import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
 import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
 import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { FsError } from '../../../../lib/errors.js';
 import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
@@ -114,7 +115,10 @@ export function resolveStartAgentGateForRoute(input: {
   let gate: AgentStartGateDecision | null = null;
 
   return Effect.gen(function* () {
-    const state = yield* getAgentState(input.agentSessionName);
+    const state = yield* Effect.try({
+      try: () => getAgentStateSync(input.agentSessionName),
+      catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${input.agentSessionName}`, cause }),
+    });
     gate = evaluateAgentStartGate(input.agentSessionName, state);
     if (!gate) return null;
 
@@ -149,7 +153,10 @@ export function resolveStartAgentGateForRoute(input: {
 
     if (!cleared) return gate;
 
-    gate = evaluateAgentStartGate(input.agentSessionName, yield* getAgentState(input.agentSessionName));
+    gate = evaluateAgentStartGate(input.agentSessionName, yield* Effect.try({
+      try: () => getAgentStateSync(input.agentSessionName),
+      catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${input.agentSessionName}`, cause }),
+    }));
     return gate;
   }).pipe(
     Effect.catch((err) => {
@@ -278,7 +285,7 @@ export const postAgentsRoute = HttpRouter.add(
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
     const clearGates = (body as any).clearGates === true;
-    const initialAgentState = yield* getAgentState(agentSessionName);
+    const initialAgentState = getAgentStateSync(agentSessionName);
     const startGateBlock = evaluateAgentStartGate(agentSessionName, initialAgentState);
     if (startGateBlock) {
       if (!clearGates) {

@@ -16,7 +16,6 @@ const mockGetPrFacts = vi.fn();
 vi.mock('../../../../src/lib/agents.js', () => ({
   spawnRun: (...args: Parameters<typeof mockSpawnRun>) => mockSpawnRun(...args),
   messageAgent: vi.fn(),
-  getAgentState: vi.fn(() => Effect.succeed(null)),
   getAgentStateSync: (...args: Parameters<typeof mockGetAgentStateSync>) => mockGetAgentStateSync(...args),
   getLatestSessionIdSync: (...args: Parameters<typeof mockGetLatestSessionIdSync>) => mockGetLatestSessionIdSync(...args),
   saveAgentState: (...args: Parameters<typeof mockSaveAgentState>) => mockSaveAgentState(...args),

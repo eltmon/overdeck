@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { Data, Effect } from 'effect';
-import { getAgentStateSync, getAgentState, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, getLatestSessionId, normalizeAgentId } from './agents.js';
+import { Effect } from 'effect';
+import { getAgentStateSync, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, getLatestSessionId, normalizeAgentId } from './agents.js';
 import { hasCompletionMarkerForAgent } from './agents/supervisor-channels.js';
 import { claudeSessionTranscriptExists } from './paths.js';
 import { getPrFacts } from './cloister/pr-facts.js';
@@ -196,7 +196,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
 /** Snapshot an agent's lifecycle: running, resumable, restartable, and the recommended action. */
 export async function getWorkAgentLifecycleState(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
   const agentId = normalizeAgentId(agentOrIssueId);
-  const agentState = await Effect.runPromise(getAgentState(agentId));
+  const agentState = getAgentStateSync(agentId);
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId));
   const hasAgentState = !!agentState;
   const sessionId = await Effect.runPromise(getLatestSessionId(agentId)) ?? null;
@@ -320,6 +320,7 @@ interface StartFreshOptions {
   explicitFresh?: boolean;
 }
 
+/** Assert the agent can start fresh; throws an Error naming the reason when it cannot. */
 export function assertCanStartFreshSync(agentOrIssueId: string, options: StartFreshOptions = {}): WorkAgentLifecycleState {
   const lifecycle = getWorkAgentLifecycleStateSync(agentOrIssueId);
   const pausedForceOverride = options.allowPausedForce === true
@@ -343,27 +344,3 @@ export function assertCanResumeSessionSync(agentOrIssueId: string): WorkAgentLif
   return lifecycle;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Asserts about agent lifecycle (cannot start fresh / cannot resume) fail in
- * the typed error channel as `WorkAgentLifecycleViolation`.
- */
-export class WorkAgentLifecycleViolation extends Data.TaggedError('WorkAgentLifecycleViolation')<{
-  readonly agentId: string;
-  readonly reason: string;
-}> {}
-
-/** Assert the agent can start fresh; lifts the synchronous throw to a typed error. */
-export const assertCanStartFresh = (
-  agentOrIssueId: string,
-  options: { allowPausedForce?: boolean } = {},
-): Effect.Effect<WorkAgentLifecycleState, WorkAgentLifecycleViolation> =>
-  Effect.try({
-    try: () => assertCanStartFreshSync(agentOrIssueId, options),
-    catch: (cause) =>
-      new WorkAgentLifecycleViolation({
-        agentId: agentOrIssueId,
-        reason: cause instanceof Error ? cause.message : String(cause),
-      }),
-  });

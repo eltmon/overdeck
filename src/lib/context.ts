@@ -10,7 +10,6 @@
  * not here.
  */
 
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
@@ -297,11 +296,3 @@ export function readMaterializedSync(filepath: string): string | null {
   if (!existsSync(filepath)) return null;
   return readFileSync(filepath, 'utf-8');
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Context-engineering helpers — sync FS by design (CLI / agent-local), wrapped
-// for callers in Effect graphs. FsError surfaces only on write paths.
-
-/** Estimate token count from text. Pure. */
-export const estimateTokens = (text: string): Effect.Effect<number> =>
-  Effect.sync(() => estimateTokensSync(text));

@@ -39,7 +39,6 @@ vi.mock('../../agents.js', () => ({
   spawnRun: mocks.spawnRun,
   saveAgentState: mocks.saveAgentStateProgram,
   saveAgentStateProgram: mocks.saveAgentStateProgram,
-  getAgentState: mocks.getAgentStateProgram,
   getAgentStateProgram: mocks.getAgentStateProgram,
   getAgentStateSync: mocks.getAgentStateSync,
   getLatestSessionIdSync: mocks.getLatestSessionIdSync,
@@ -68,7 +67,6 @@ vi.mock('../../tmux.js', () => ({
 }));
 
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntry: mocks.emitActivityEntry,
   emitActivityEntrySync: mocks.emitActivityEntry,
 }));
 
@@ -83,7 +81,6 @@ vi.mock('../pr-facts.js', () => ({
 }));
 
 vi.mock('../../config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: vi.fn(() => ({ config: {} })),
   resolveModel: vi.fn(() => 'sonnet'),
 }));
@@ -137,7 +134,7 @@ describe('spawnReviewRoleForIssue', () => {
       startedAt: '2026-05-18T00:00:00.000Z',
     }));
     mocks.saveAgentStateProgram.mockReturnValue(Effect.void);
-    mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
+    mocks.getAgentStateSync.mockImplementation((id: string) => (id === 'agent-pan-1194' ? { hostOverride: true } : undefined));
     mocks.getAgentStateFileSync.mockReturnValue(undefined);
     mocks.getAgentStateFileSync.mockReturnValue(undefined);
     mocks.listAgentIdsByPrefixSync.mockReturnValue([]);
@@ -196,7 +193,7 @@ describe('spawnReviewRoleForIssue', () => {
     }));
 
     expect(result.success).toBe(true);
-    expect(mocks.getAgentStateProgram).toHaveBeenCalledWith('agent-pan-1194');
+    expect(mocks.getAgentStateSync).toHaveBeenCalledWith('agent-pan-1194');
     expect(mocks.spawnRun).toHaveBeenCalledWith(
       'PAN-1194',
       'review',

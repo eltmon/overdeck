@@ -13,8 +13,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { Effect } from 'effect';
-import { messageAgent, getAgentState as getAgentStateProgram, type AgentState } from '../../lib/agents.js';
+import { messageAgent, getAgentStateSync, type AgentState } from '../../lib/agents.js';
 import type { DerivedIssueState } from '@overdeck/contracts';
 import { getDerivedIssueState } from './services/derived-issue-state.js';
 import { getOverdeckHome } from '../../lib/paths.js';
@@ -121,7 +120,7 @@ export async function processPendingFeedbackDeliveries(options?: {
   const staleThresholdMs = options?.staleThresholdMs ?? STALE_THRESHOLD_MS;
   const now = options?.now ?? Date.now();
   const deliver = options?._deliver ?? messageAgent;
-  const getAgentState = options?._getAgentState ?? ((agentId: string) => Effect.runPromise(getAgentStateProgram(agentId)));
+  const getAgentState = options?._getAgentState ?? (async (agentId: string) => getAgentStateSync(agentId));
   const getState = options?._getState
     ?? ((issueId: string) => getDerivedIssueState(issueId).catch(() => null));
 

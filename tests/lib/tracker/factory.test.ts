@@ -7,7 +7,6 @@ import { TrackerAuthError } from '../../../src/lib/tracker/interface.js';
 
 // Mock config-yaml to prevent filesystem reads
 vi.mock('../../../src/lib/config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({ trackerKeys: {} })),
   loadConfigSync: vi.fn(() => ({ trackerKeys: {} })),
 }));
 

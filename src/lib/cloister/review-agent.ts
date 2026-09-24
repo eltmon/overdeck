@@ -454,8 +454,8 @@ async function spawnReviewRoleForIssuePromise(
   }
 
   try {
-    const { spawnRun, saveAgentState, getAgentState, getAgentStateSync, getLatestSessionIdSync, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
-    const workAgentState = await Effect.runPromise(getAgentState(`agent-${opts.issueId.toLowerCase()}`));
+    const { spawnRun, saveAgentState, getAgentStateSync, getLatestSessionIdSync, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
+    const workAgentState = getAgentStateSync(`agent-${opts.issueId.toLowerCase()}`);
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
     // Build the shared context manifest before spawning so all reviewers

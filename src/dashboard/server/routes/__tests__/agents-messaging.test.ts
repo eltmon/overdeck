@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
@@ -17,7 +16,7 @@ vi.mock('../../../../lib/composer-commands/executors.js', () => ({
   runCapturedCommand: agentMocks.runCapturedCommand,
 }));
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentState: agentMocks.getAgentState,
+  getAgentStateSync: agentMocks.getAgentState,
   messageAgent: agentMocks.messageAgent,
 }));
 
@@ -31,12 +30,12 @@ function decodeJsonResponse(response: { body: unknown }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  agentMocks.getAgentState.mockReturnValue(Effect.succeed({
+  agentMocks.getAgentState.mockReturnValue({
     id: 'agent-pan-42',
     issueId: 'PAN-42',
     workspace: '/tmp/pan-42',
     harness: 'codex',
-  }));
+  });
 });
 
 describe('agent message composer routing', () => {
@@ -68,7 +67,7 @@ describe('agent message composer routing', () => {
   });
 
   it('returns 404 without executing a command when the agent target is missing', async () => {
-    agentMocks.getAgentState.mockReturnValue(Effect.succeed(null));
+    agentMocks.getAgentState.mockReturnValue(null);
 
     const response = await handleAgentMessage('missing-agent', '/pan status');
 
@@ -82,7 +81,7 @@ describe('agent message composer routing', () => {
   });
 
   it('returns 503 without executing a command when agent resolution fails', async () => {
-    agentMocks.getAgentState.mockReturnValue(Effect.fail(new Error('registry unavailable')));
+    agentMocks.getAgentState.mockImplementation(() => { throw new Error('registry unavailable'); });
 
     const response = await handleAgentMessage('agent-pan-42', '/pan status');
 
@@ -96,11 +95,11 @@ describe('agent message composer routing', () => {
   });
 
   it('returns 503 without executing a command when the agent harness is unresolved', async () => {
-    agentMocks.getAgentState.mockReturnValue(Effect.succeed({
+    agentMocks.getAgentState.mockReturnValue({
       id: 'agent-pan-42',
       issueId: 'PAN-42',
       workspace: '/tmp/pan-42',
-    }));
+    });
 
     const response = await handleAgentMessage('agent-pan-42', '/pan status');
 
