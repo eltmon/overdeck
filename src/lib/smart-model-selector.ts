@@ -98,12 +98,6 @@ const WORK_TYPE_REQUIREMENTS: Record<string, SkillRequirement[]> = {
     { skill: 'debugging', weight: 0.3 }, // Resolving issues
   ],
 
-  'role-work-inspect': [
-    { skill: 'code-review', weight: 0.4 }, // Compare implementation to bead/spec
-    { skill: 'debugging', weight: 0.3 }, // Catch regressions and bad diffs
-    { skill: 'testing', weight: 0.3 }, // Compile/smoke verification
-  ],
-
   'role-test-uat': [
     { skill: 'testing', weight: 0.4 }, // Browser verification is primary
     { skill: 'debugging', weight: 0.3 }, // Investigating console/network failures
