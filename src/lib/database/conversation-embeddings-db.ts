@@ -2,7 +2,8 @@
  * Conversation Embeddings Sidecar Database (PAN-1395)
  *
  * Manages ~/.overdeck/conversations/embeddings.db:
- *   - chunks source table keyed by (session_id, byte_offset)
+ *   - chunks source table keyed by (session_id, byte_offset); subagent chunks
+ *     also carry parent_session_id (schema v2, PAN-3982)
  *   - FTS5 virtual table for BM25 keyword search
  *   - sqlite-vec vec0 virtual table for cosine ANN search
  *   - file_cursors for idempotent incremental indexing
@@ -18,6 +19,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { openDatabase, type SqliteDatabase, type SqliteStatement } from './driver.js';
+import { parentSessionIdFromPath, sessionIdFromPath } from '../conversation-search/transcript-paths.js';
 
 const _require = createRequire(import.meta.url);
 
@@ -26,6 +28,8 @@ const _require = createRequire(import.meta.url);
 export interface ChunkInsert {
   sessionId: string;
   projectId: string;
+  /** Parent session UUID for a Claude subagent transcript chunk (PAN-3982). */
+  parentSessionId?: string | null;
   role: string;
   ts?: string | null;
   byteOffset: number;
@@ -39,6 +43,7 @@ export interface ChunkRow {
   rowid: number;
   sessionId: string;
   projectId: string;
+  parentSessionId: string | null;
   role: string;
   ts: string | null;
   byteOffset: number;
@@ -113,7 +118,7 @@ export interface OpenEmbeddingsDbOptions {
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function tableExists(db: SqliteDatabase, tableName: string): boolean {
   const row = db
@@ -134,6 +139,7 @@ function initSchema(db: SqliteDatabase, dimensions: number): void {
       rowid       INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id  TEXT    NOT NULL,
       project_id  TEXT    NOT NULL,
+      parent_session_id TEXT,
       role        TEXT    NOT NULL,
       ts          TEXT,
       byte_offset INTEGER NOT NULL,
@@ -186,9 +192,39 @@ function initSchema(db: SqliteDatabase, dimensions: number): void {
   `);
 
   db.prepare(`INSERT OR IGNORE INTO db_config(key, value) VALUES (?, ?)`).run('dimensions', String(dimensions));
-  db.prepare(`INSERT OR REPLACE INTO db_config(key, value) VALUES (?, ?)`).run('schema_version', String(SCHEMA_VERSION));
+}
+
+function hasColumn(db: SqliteDatabase, table: string, column: string): boolean {
+  return (db.pragma(`table_info(${table})`) as Array<{ name: string }>).some((c) => c.name === column);
+}
+
+/**
+ * v1 → v2: nullable parent pointer for subagent chunks, backfilled once from the
+ * absolute cursor paths so already-indexed subagent files need no re-embed
+ * (PAN-3982). Tolerates a concurrent handle adding the column first.
+ */
+function migrateSchema(db: SqliteDatabase): void {
+  if (!hasColumn(db, 'chunks', 'parent_session_id')) {
+    try {
+      db.exec('ALTER TABLE chunks ADD COLUMN parent_session_id TEXT');
+    } catch (err) {
+      if (!/duplicate column name/i.test(String(err))) throw err;
+    }
+  }
 
   const version = db.pragma('user_version', { simple: true }) as number;
+  if (version < 2) {
+    const backfill = db.prepare('UPDATE chunks SET parent_session_id = ? WHERE session_id = ? AND parent_session_id IS NULL');
+    const cursors = db.prepare('SELECT file_path FROM file_cursors').all() as Array<{ file_path: string }>;
+    db.transaction(() => {
+      for (const { file_path } of cursors) {
+        const parent = parentSessionIdFromPath(file_path);
+        if (parent) backfill.run(parent, sessionIdFromPath(file_path));
+      }
+    })();
+  }
+
+  db.prepare(`INSERT OR REPLACE INTO db_config(key, value) VALUES (?, ?)`).run('schema_version', String(SCHEMA_VERSION));
   if (version < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -209,10 +245,11 @@ interface Stmts {
 function prepareStmts(db: SqliteDatabase): Stmts {
   return {
     upsertChunk: db.prepare(`
-      INSERT INTO chunks(session_id, project_id, role, ts, byte_offset, char_length, text, token_count, indexed_at)
-      VALUES (@sessionId, @projectId, @role, @ts, @byteOffset, @charLength, @text, @tokenCount, @indexedAt)
+      INSERT INTO chunks(session_id, project_id, parent_session_id, role, ts, byte_offset, char_length, text, token_count, indexed_at)
+      VALUES (@sessionId, @projectId, @parentSessionId, @role, @ts, @byteOffset, @charLength, @text, @tokenCount, @indexedAt)
       ON CONFLICT(session_id, byte_offset) DO UPDATE SET
         project_id   = excluded.project_id,
+        parent_session_id = excluded.parent_session_id,
         role         = excluded.role,
         ts           = excluded.ts,
         char_length  = excluded.char_length,
@@ -256,6 +293,7 @@ interface DbChunkSearchRow {
   rowid: number;
   session_id: string;
   project_id: string;
+  parent_session_id: string | null;
   role: string;
   ts: string | null;
   byte_offset: number;
@@ -271,6 +309,7 @@ function mapSearchRow(row: DbChunkSearchRow): ChunkSearchRow {
     rowid: row.rowid,
     sessionId: row.session_id,
     projectId: row.project_id,
+    parentSessionId: row.parent_session_id,
     role: row.role,
     ts: row.ts,
     byteOffset: row.byte_offset,
@@ -348,6 +387,7 @@ export function openEmbeddingsDb(
     }
 
     initSchema(db, dimensions);
+    migrateSchema(db);
   } catch (err) {
     db.close();
     return unavailable(`Schema init failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -360,7 +400,7 @@ export function openEmbeddingsDb(
     dimensions,
 
     upsertChunk(chunk: ChunkInsert): number {
-      const row = stmts.upsertChunk.get({ ...chunk, ts: chunk.ts ?? null }) as { rowid: number };
+      const row = stmts.upsertChunk.get({ ...chunk, ts: chunk.ts ?? null, parentSessionId: chunk.parentSessionId ?? null }) as { rowid: number };
       return row.rowid;
     },
 
@@ -383,7 +423,7 @@ export function openEmbeddingsDb(
 
     searchBm25(query: string, limit: number): ChunkSearchRow[] {
       const rows = db.prepare(`
-        SELECT c.rowid, c.session_id, c.project_id, c.role, c.ts, c.byte_offset, c.char_length, c.text, c.token_count, c.indexed_at,
+        SELECT c.rowid, c.session_id, c.project_id, c.parent_session_id, c.role, c.ts, c.byte_offset, c.char_length, c.text, c.token_count, c.indexed_at,
                bm25(chunks_fts) AS score
         FROM chunks_fts
         JOIN chunks c ON c.rowid = chunks_fts.rowid
@@ -397,7 +437,7 @@ export function openEmbeddingsDb(
     searchVector(embedding: Float32Array, limit: number): ChunkSearchRow[] {
       const vector = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
       const rows = db.prepare(`
-        SELECT c.rowid, c.session_id, c.project_id, c.role, c.ts, c.byte_offset, c.char_length, c.text, c.token_count, c.indexed_at,
+        SELECT c.rowid, c.session_id, c.project_id, c.parent_session_id, c.role, c.ts, c.byte_offset, c.char_length, c.text, c.token_count, c.indexed_at,
                v.distance AS score
         FROM chunks_vec v
         JOIN chunks c ON c.rowid = v.rowid

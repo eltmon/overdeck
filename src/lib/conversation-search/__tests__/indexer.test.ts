@@ -8,6 +8,7 @@ import type { ChunkInsert, EmbeddingsDbHandle } from '../../database/conversatio
 import type { ConversationEmbeddingProvider } from '../embedding-provider.js';
 import type { NormalizedConversationSearchConfig } from '../../config-yaml.js';
 import { encodeClaudeProjectDir } from '../../runtimes/storage/claude-code.js';
+import { parentSessionIdFromPath } from '../transcript-paths.js';
 
 let tmpDir: string | undefined;
 
@@ -132,6 +133,22 @@ describe('conversation search indexer', () => {
     expect(db.cursors.has(keptPath)).toBe(true);
   });
 
+  it('records the parent session id on subagent chunks (PAN-3982)', async () => {
+    const dir = makeTmpDir();
+    const parent = '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607';
+    const projectDir = join(dir, 'projects', 'enc');
+    mkdirSync(join(projectDir, parent, 'subagents'), { recursive: true });
+    writeFileSync(join(projectDir, `${parent}.jsonl`), line(message('user', 'parent text')));
+    writeFileSync(join(projectDir, parent, 'subagents', 'agent-abc123.jsonl'), line(message('user', 'subagent text')));
+    const db = fakeDb();
+
+    await indexConversationSearch({ config: config(), roots: [dir], db, provider: fakeProvider() });
+
+    const byText = Object.fromEntries(db.chunks.map((chunk) => [chunk.text, chunk]));
+    expect(byText['subagent text']).toMatchObject({ sessionId: 'agent-abc123', parentSessionId: parent });
+    expect(byText['parent text']).toMatchObject({ sessionId: parent, parentSessionId: null });
+  });
+
   it('never indexes background AI utility transcripts, and prunes ones already indexed', async () => {
     const dir = makeTmpDir();
     const overdeckHome = join(dir, 'overdeck-home');
@@ -252,5 +269,16 @@ describe('conversation search indexer', () => {
     expect(provider.embed).not.toHaveBeenCalled();
     expect(provider.estimateCost).toHaveBeenCalledWith(['cost estimate text']);
     expect(estimate).toMatchObject({ filesScanned: 1, chunksEstimated: 1, disabled: false, estimatedUsd: 0.00000008 });
+  });
+});
+
+describe('parentSessionIdFromPath', () => {
+  const parent = '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607';
+
+  it('returns the parent uuid only for <uuid>/subagents/agent-*.jsonl', () => {
+    expect(parentSessionIdFromPath(`/h/.claude/projects/enc/${parent}/subagents/agent-abc.jsonl`)).toBe(parent);
+    expect(parentSessionIdFromPath(`/h/.claude/projects/enc/${parent}.jsonl`)).toBeNull();
+    expect(parentSessionIdFromPath('/h/.claude/projects/enc/not-a-uuid/subagents/agent-abc.jsonl')).toBeNull();
+    expect(parentSessionIdFromPath(`C:\\h\\.claude\\projects\\enc\\${parent}\\subagents\\agent-abc.jsonl`)).toBe(parent);
   });
 });

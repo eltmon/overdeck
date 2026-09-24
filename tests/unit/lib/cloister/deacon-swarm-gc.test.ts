@@ -722,8 +722,10 @@ describe('deacon-swarm orphaned slot GC', () => {
     aheadCountByBranch?: Record<string, string>;
     sessionNames?: string[];
     slotAssignments?: Array<{ slotIndex: number; itemId: string }>;
-  } = {}): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'listSessionNames' | 'listSlotAssignments'> {
+  } = {}): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'listSessionNames' | 'listSlotAssignments'> & { listSlotWorkspaceWorktrees: () => { isPolyrepo: false; nested: [] } } {
     return {
+      // Hermetic default: monorepo, so the real project config resolver never runs.
+      listSlotWorkspaceWorktrees: () => ({ isPolyrepo: false, nested: [] }),
       runGitCommand: vi.fn(async (command: string) => {
         if (command === 'git worktree list --porcelain') {
           const lines = [`worktree ${workspacePath}`, ''];
@@ -844,5 +846,128 @@ describe('deacon-swarm orphaned slot GC', () => {
 
     const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
     expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+  });
+});
+
+describe('deacon-swarm orphaned slot GC — polyrepo (PAN-3689)', () => {
+  const workspacePath = '/repo/workspaces/feature-min-888';
+  const slotWorkspace = `${workspacePath}-slot-2`;
+  const slotBranch = 'feature/min-888-slot-2';
+  const featureBranch = 'feature/min-888';
+  const nested = [
+    { repoKey: 'fe', dir: `${slotWorkspace}/fe`, parentRepo: '/repo/fe', featureBranch },
+    { repoKey: 'api', dir: `${slotWorkspace}/api`, parentRepo: '/repo/api', featureBranch },
+  ];
+  const emptyReconciled: SlotReconcileResult = {
+    issueId: 'MIN-888', merged: [], inFlight: [], pending: [], branches: [], agents: [],
+  };
+
+  function polyDeps(options: {
+    checkoutAhead?: Record<string, string | Error>;
+    branchAhead?: Record<string, string | Error>;
+    dirty?: Record<string, string>;
+    removeFails?: string;
+  } = {}) {
+    const answer = (value: string | Error | undefined) => {
+      if (value instanceof Error) throw value;
+      return { stdout: `${value ?? '0'}\n` };
+    };
+    const runGitCommand = vi.fn(async (command: string, cwd: string) => {
+      if (command === 'git worktree list --porcelain') {
+        if (cwd === workspacePath) return { stdout: `worktree ${workspacePath}\n\nworktree ${slotWorkspace}\n` };
+        const worktree = nested.find(entry => entry.parentRepo === cwd);
+        return { stdout: `worktree ${cwd}\n\nworktree ${worktree?.dir}\n` };
+      }
+      if (command === `git rev-list --count ${JSON.stringify(featureBranch)}..HEAD`) {
+        return answer(options.checkoutAhead?.[nested.find(entry => entry.dir === cwd)!.repoKey]);
+      }
+      if (command === `git branch --list ${JSON.stringify(slotBranch)}`) {
+        // The polyrepo wrapper holds no slot branch; each parent repo does.
+        return { stdout: cwd === workspacePath ? '' : `  ${slotBranch}\n` };
+      }
+      if (command === `git rev-list --count ${JSON.stringify(featureBranch)}..${JSON.stringify(slotBranch)}`) {
+        return answer(options.branchAhead?.[nested.find(entry => entry.parentRepo === cwd)!.repoKey]);
+      }
+      if (command === 'git status --porcelain --untracked-files=all') {
+        return { stdout: options.dirty?.[nested.find(entry => entry.dir === cwd)!.repoKey] ?? '' };
+      }
+      if (command.startsWith('git worktree remove') && options.removeFails && cwd === options.removeFails) {
+        throw new Error('fatal: cannot remove worktree: lock held');
+      }
+      return { stdout: '' };
+    });
+    return {
+      runGitCommand,
+      listSessionNames: vi.fn(async () => [] as string[]),
+      listSlotAssignments: vi.fn(() => []),
+      listSlotWorkspaceWorktrees: vi.fn(() => ({ isPolyrepo: true, nested })),
+      removeDirectory: vi.fn(async () => undefined),
+    };
+  }
+
+  function mutations(fakeDeps: ReturnType<typeof polyDeps>): Array<[string, string]> {
+    return fakeDeps.runGitCommand.mock.calls
+      .filter(([command]) => command.startsWith('git worktree remove') || command.startsWith('git branch -D'))
+      .map(([command, cwd]) => [command, cwd]);
+  }
+
+  it('detaches every nested worktree in its parent repo before removing the aggregate root', async () => {
+    const fakeDeps = polyDeps();
+
+    await expect(gcOrphanedSlots('MIN-888', workspacePath, emptyReconciled, fakeDeps))
+      .resolves.toEqual(['[swarm] gc-orphan slot 2 for MIN-888']);
+
+    expect(mutations(fakeDeps)).toEqual([
+      [`git worktree remove --force ${JSON.stringify(nested[0]!.dir)}`, '/repo/fe'],
+      [`git branch -D ${JSON.stringify(slotBranch)}`, '/repo/fe'],
+      [`git worktree remove --force ${JSON.stringify(nested[1]!.dir)}`, '/repo/api'],
+      [`git branch -D ${JSON.stringify(slotBranch)}`, '/repo/api'],
+      [`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath],
+    ]);
+  });
+
+  it('preserves the slot untouched when a nested merge state is unknown', async () => {
+    const fakeDeps = polyDeps({ branchAhead: { api: new Error('unknown revision') } });
+
+    const actions = await gcOrphanedSlots('MIN-888', workspacePath, emptyReconciled, fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('orphan slot 2 for MIN-888 preserved: api');
+    expect(actions[0]).toContain('an unknown number of');
+    expect(mutations(fakeDeps)).toEqual([]);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
+  });
+
+  it('preserves a nested checkout whose commits are not in its feature branch', async () => {
+    const fakeDeps = polyDeps({ checkoutAhead: { fe: '2' } });
+
+    const actions = await gcOrphanedSlots('MIN-888', workspacePath, emptyReconciled, fakeDeps);
+
+    expect(actions[0]).toContain('preserved: fe: nested checkout has 2 commit(s) not in feature/min-888');
+    expect(actions[0]).toContain('pan swarm reset MIN-888');
+    expect(mutations(fakeDeps)).toEqual([]);
+  });
+
+  it('preserves non-ignored untracked or tracked changes in a nested worktree', async () => {
+    const fakeDeps = polyDeps({ dirty: { api: '?? notes.md\n' } });
+
+    const actions = await gcOrphanedSlots('MIN-888', workspacePath, emptyReconciled, fakeDeps);
+
+    expect(actions).toEqual([
+      '[swarm] gc-orphan deferred slot 2 for MIN-888: preserving nested work: api: worktree has uncommitted changes',
+    ]);
+    expect(mutations(fakeDeps)).toEqual([]);
+  });
+
+  it('reports a partial nested removal failure instead of throwing, leaving the aggregate root in place', async () => {
+    const fakeDeps = polyDeps({ removeFails: '/repo/api' });
+
+    const actions = await gcOrphanedSlots('MIN-888', workspacePath, emptyReconciled, fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('gc-orphan deferred slot 2 for MIN-888: nested worktree remove failed in api (already detached: fe)');
+    const commands = mutations(fakeDeps).map(([command]) => command);
+    expect(commands).not.toContain(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`);
+    expect(fakeDeps.removeDirectory).not.toHaveBeenCalled();
   });
 });

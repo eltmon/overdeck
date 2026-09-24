@@ -17,12 +17,14 @@ import {
   listMergedPullRequestHeadsBatched,
   PipelineMembershipUnavailableError,
   projectRepositories,
+  projectTrackerIssueRows,
   resolveRepositoryDefaultBranch,
   snapshotBranchRefs,
   type PipelineMembershipGatherDeps,
 } from '../../../src/lib/pipeline-membership-gather.js';
 import { resolvePipelineMembership } from '../../../src/lib/pipeline-membership.js';
 import type { ProjectConfig } from '../../../src/lib/projects.js';
+import type { Issue } from '../../../src/lib/tracker/interface.js';
 
 const project: ProjectConfig = {
   name: 'overdeck',
@@ -1357,5 +1359,48 @@ describe('gatherProjectLensSignals', () => {
 
     const source = await readFile(entry, 'utf-8');
     expect(source).not.toMatch(/execSync|spawnSync/);
+  });
+});
+
+describe('projectTrackerIssueRows', () => {
+  function trackerIssue(overrides: Partial<Issue>): Issue {
+    return {
+      id: 'issue-1',
+      ref: '#1',
+      title: 'issue',
+      description: '',
+      state: 'open',
+      labels: [],
+      url: 'https://example.com/issue/1',
+      tracker: 'github',
+      ...overrides,
+    };
+  }
+
+  it('PAN-3924: prefixes bare GitHub #N refs instead of filtering them all out', () => {
+    expect(projectTrackerIssueRows([
+      trackerIssue({ ref: '#12', state: 'open', labels: ['ready'] }),
+      trackerIssue({ ref: '#13', state: 'closed', labels: [] }),
+    ], 'github', 'PAN')).toEqual([
+      { issueId: 'PAN-12', state: 'open', labels: ['ready'] },
+      { issueId: 'PAN-13', state: 'closed', labels: [] },
+    ]);
+  });
+
+  it('keeps only prefixed Linear refs that match the project prefix', () => {
+    expect(projectTrackerIssueRows([
+      trackerIssue({ ref: 'MIN-1', tracker: 'linear' }),
+      trackerIssue({ ref: 'OTHER-2', tracker: 'linear' }),
+    ], 'linear', 'MIN')).toEqual([
+      { issueId: 'MIN-1', state: 'open', labels: [] },
+    ]);
+  });
+
+  it('maps every state other than closed to open', () => {
+    expect(projectTrackerIssueRows([
+      trackerIssue({ ref: 'MIN-3', tracker: 'linear', state: 'in_progress' }),
+    ], 'linear', 'min')).toEqual([
+      { issueId: 'MIN-3', state: 'open', labels: [] },
+    ]);
   });
 });

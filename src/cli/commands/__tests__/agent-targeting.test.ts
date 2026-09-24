@@ -18,7 +18,7 @@ const interventionMocks = vi.hoisted(() => ({
 }));
 
 const unpauseMocks = vi.hoisted(() => ({
-  getWorkAgentLifecycleStateSync: vi.fn(() => ({ canResumeSession: false })),
+  getWorkAgentLifecycleState: vi.fn(() => ({ canResumeSession: false })),
   resumeAgent: vi.fn(async () => ({ success: true })),
 }));
 
@@ -68,7 +68,7 @@ vi.mock('../../../lib/operator-interventions.js', () => ({
 }));
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
-  getWorkAgentLifecycleStateSync: unpauseMocks.getWorkAgentLifecycleStateSync,
+  getWorkAgentLifecycleState: unpauseMocks.getWorkAgentLifecycleState,
 }));
 
 vi.mock('../../../lib/agents/resume.js', () => ({

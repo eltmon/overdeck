@@ -105,10 +105,6 @@ const ROLES: RoleDefinition[] = [
     icon: Code,
     description: 'Implements tasks in the issue workspace.',
     defaultModel: 'workhorse:mid',
-    subRoles: [
-      { id: 'inspect', name: 'Inspect', description: 'Fast per-task inspection.', defaultModel: 'workhorse:cheap' },
-      { id: 'inspect-deep', name: 'Inspect Deep', description: 'Deeper inspection for complex task diffs.', defaultModel: 'workhorse:mid' },
-    ],
   },
   {
     id: 'strike',

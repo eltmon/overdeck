@@ -95,7 +95,7 @@ overdeck/
 │   └── skills/                 # Bundled Claude Code skills shipped with pan
 ├── packages/
 │   └── contracts/              # Shared TypeScript types (RPC schema, domain events)
-├── scripts/                    # Shell scripts: post-merge-deploy, webhook relay, etc.
+├── scripts/                    # Build, lint, and guard scripts
 ├── docs/
 │   └── INDEX.md                # Master documentation index — start here
 ├── CLAUDE.md                   # Rules for AI agents working in this repo
@@ -480,8 +480,8 @@ pan start <PAN-XXX>
                          │   (resolves conflicts if any, pushes rebased branch)
                          ├─ gh pr merge --squash (squash commit to main)
                          ▼
-                    scripts/post-merge-deploy.sh
-                    (flock-guarded, runs npm run build, restarts server)
+                    pan reload (flywheel, after green CI on main)
+                    (builds origin/main, waits on the restart gate, restarts)
 ```
 
 ### Review status state machine
@@ -497,7 +497,7 @@ mergeStatus:  pending → merging → merged
 
 ### Specialist initialization
 
-Specialists (review-agent, test-agent, inspect-agent) are Claude Code processes in their own tmux sessions. They initialize once at server startup via `initializeSpecialist()`. Requirements:
+Specialists (review-agent, test-agent) are Claude Code processes in their own tmux sessions. They initialize once at server startup via `initializeSpecialist()`. Requirements:
 
 1. Run from the project root (`getDevrootPath()`)
 2. Have their directory pre-trusted, which project registration does (`preTrustDirectory()`)

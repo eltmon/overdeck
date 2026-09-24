@@ -473,7 +473,7 @@ describe('settings-api', () => {
       for (const role of ['plan', 'work', 'review', 'test', 'ship'] as const) {
         expect(settings.roles?.[role]?.model).toBeDefined();
       }
-      expect(settings.roles?.work?.sub?.inspect?.model).toBeDefined();
+      expect(settings.roles?.work?.sub).toBeUndefined();
       expect(settings.roles?.review?.sub?.security?.model).toBeDefined();
     });
 
@@ -1002,10 +1002,10 @@ describe('OpenRouter favorites', () => {
       const result = validateSettingsApi({
         ...baseProviders,
         roles: {
-          work: {
+          review: {
             model: 'claude-sonnet-4-6',
             sub: {
-              inspect: {
+              security: {
                 model: [{ model: 'claude-haiku-4-5', weight: 1 }],
               },
             },

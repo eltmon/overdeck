@@ -46,7 +46,13 @@ vi.mock('../../DialogProvider', () => ({
 
 // Mock heavy child components that are not under test
 vi.mock('../../XTerminal', () => ({ XTerminal: () => <div data-testid="xterminal" /> }));
-vi.mock('../MessagesTimeline', () => ({ MessagesTimeline: () => null }));
+const timelineMock = vi.hoisted(() => ({ props: vi.fn() }));
+vi.mock('../MessagesTimeline', () => ({
+  MessagesTimeline: (props: Record<string, unknown>) => {
+    timelineMock.props(props);
+    return null;
+  },
+}));
 vi.mock('../../DiffWorkerPoolProvider', () => ({
   DiffWorkerPoolProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -904,5 +910,73 @@ describe('ConversationPanel spawn-placeholder window (post-reboot interrupted ro
       { messages: [], workLog: [], streaming: false },
     );
     expect(screen.getByText('Starting…')).toBeInTheDocument();
+  });
+});
+
+describe('ConversationPanel subagent message target (PAN-3982)', () => {
+  const subagentMessages = {
+    messages: [{ id: 'm-1', role: 'user', text: 'main agent content', createdAt: '2026-08-04T14:00:00Z' }],
+    workLog: [],
+    streaming: false,
+    subagents: [{
+      agentId: 'cafe01',
+      agentType: 'Explore',
+      description: 'Find the needle',
+      toolUseId: 'toolu_cafe01',
+      spawnDepth: 1,
+      status: 'done',
+    }],
+  };
+
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/conversations/test-conv/messages?agentId=cafe01') {
+        return Response.json({ messages: [], workLog: [], streaming: false });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    vi.clearAllMocks();
+    localStorage.clear();
+    window.history.replaceState(null, '', '/');
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    window.history.replaceState(null, '', '/');
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  });
+
+  it('selects the target subagent once the rail lists it, once per open', async () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderPanel(
+      mockConversation,
+      { targetSubagentId: 'cafe01', targetMessageId: 'm-2', targetMessageIndex: 1, targetMessageNonce: 1 },
+      subagentMessages as Parameters<typeof makeClient>[0],
+    );
+
+    await waitFor(() => expect(window.location.search).toContain('subagent=cafe01'));
+    expect(screen.getByRole('button', { name: 'Back to main agent' })).toBeInTheDocument();
+    expect(pushState).toHaveBeenCalledTimes(1);
+    pushState.mockRestore();
+  });
+
+  it('keeps the main timeline from consuming a subagent target', () => {
+    const onTargetMessageHandled = vi.fn();
+    renderPanel(
+      mockConversation,
+      { targetSubagentId: 'not-listed', targetMessageId: 'm-2', targetMessageIndex: 1, targetMessageNonce: 1, onTargetMessageHandled },
+      subagentMessages as Parameters<typeof makeClient>[0],
+    );
+
+    expect(timelineMock.props).toHaveBeenCalled();
+    for (const [props] of timelineMock.props.mock.calls) {
+      expect(props).toMatchObject({ targetMessageId: undefined, targetMessageIndex: undefined, targetMessageNonce: undefined, onTargetMessageHandled: undefined });
+    }
+    expect(window.location.search).not.toContain('subagent=');
   });
 });

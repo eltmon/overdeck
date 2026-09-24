@@ -174,6 +174,22 @@ describe('CodexAppServerHost', () => {
     vi.restoreAllMocks();
   });
 
+  it('routes child operations without invoking the parent message path', async () => {
+    const manager = Object.assign(new FakeManager(), {
+      readSubagentInput: vi.fn(async () => ({ direct: true })),
+      sendSubagentMessage: vi.fn(async () => ({})),
+    });
+    const host = makeHost(manager);
+    expect(await host.handleOp({ op: 'subagent-input', threadId: 'child' })).toEqual({ status: 200, body: { direct: true } });
+    expect(await host.handleOp({ op: 'subagent-message', threadId: 'child', content: 'hello child' })).toEqual({ status: 200, body: { ok: true, threadId: 'child' } });
+    expect(manager.sendSubagentMessage).toHaveBeenCalledWith('child', 'hello child');
+    expect(manager.startThreadCalls).toEqual([]);
+    expect(manager.startTurnCalls).toEqual([]);
+    manager.sendSubagentMessage.mockRejectedValueOnce(new Error('Child no longer available'));
+    expect((await host.handleOp({ op: 'subagent-message', threadId: 'child', content: 'hello child' })).status).toBe(500);
+    expect(manager.startTurnCalls).toEqual([]);
+  });
+
   it('rejects a first message without a model before starting a thread', async () => {
     const manager = new FakeManager();
     const host = makeHost(manager);

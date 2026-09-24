@@ -2,8 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import {
   fetchProjectPipelineMembership,
+  fetchProjects,
   groupProjects,
+  isMembershipTransientError,
   isUnscopedConversation,
+  MembershipTransientError,
   refreshProjectPipelineMembership,
   resolveConversationProject,
   type RegisteredProjectLite,
@@ -90,13 +93,46 @@ describe('project pipeline membership probes', () => {
     await expect(fetchProjectPipelineMembership('overdeck')).resolves.toBe(true);
   });
 
-  it('preserves non-OK membership errors through readMembershipError', async () => {
+  it('PAN-3527: classifies the snapshot-loading 503 as transient and carries Retry-After', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({
+      status: 'loading',
+      code: 'snapshot_loading',
       error: 'Pipeline membership snapshot is loading',
-    }), { status: 503 }));
+      projectKey: 'overdeck',
+    }), { status: 503, headers: { 'Retry-After': '5' } }));
 
-    await expect(fetchProjectPipelineMembership('overdeck'))
-      .rejects.toThrow('Pipeline membership snapshot is loading');
+    const error = await fetchProjectPipelineMembership('overdeck').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MembershipTransientError);
+    expect((error as MembershipTransientError).message).toBe('Pipeline membership snapshot is loading');
+    expect((error as MembershipTransientError).retryAfterMs).toBe(5_000);
+  });
+
+  it('PAN-3527: classifies a non-JSON proxy 502 and a failed fetch as transient', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('Bad Gateway', { status: 502 }));
+    const proxyError = await fetchProjectPipelineMembership('overdeck').catch((e: unknown) => e);
+    expect(isMembershipTransientError(proxyError)).toBe(true);
+    expect((proxyError as Error).message).toBe('Pipeline membership is temporarily unavailable');
+
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const networkError = await fetchProjectPipelineMembership('overdeck').catch((e: unknown) => e);
+    expect(isMembershipTransientError(networkError)).toBe(true);
+    expect((networkError as Error).message).toBe('Failed to fetch');
+  });
+
+  it('PAN-3527: keeps a typed unavailable answer and a 500 as settled errors', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      status: 'unavailable',
+      reason: 'forge_unavailable',
+      message: 'HTTP 404',
+      projectKey: 'overdeck',
+    }), { status: 200 }));
+    const unavailable = await fetchProjectPipelineMembership('overdeck').catch((e: unknown) => e);
+    expect(isMembershipTransientError(unavailable)).toBe(false);
+
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'boom' }), { status: 500 }));
+    const serverError = await fetchProjectPipelineMembership('overdeck').catch((e: unknown) => e);
+    expect(isMembershipTransientError(serverError)).toBe(false);
+    expect((serverError as Error).message).toBe('boom');
   });
 
   it('rejects a typed unavailable POST refresh body returned with HTTP 200', async () => {
@@ -167,5 +203,22 @@ describe('groupProjects', () => {
     ]);
 
     expect(projects.map((project) => project.name)).toEqual(['Alpha', 'Zeta']);
+  });
+});
+
+describe('fetchProjects (PAN-3527)', () => {
+  it('bounds both requests with a timeout so a hung fetch cannot pin the query', async () => {
+    fetchMock.mockImplementation(async (input: unknown) => new Response(
+      JSON.stringify(input === '/api/registered-projects' ? [{ key: 'overdeck', name: 'Overdeck', path: '/p' }] : []),
+      { status: 200 },
+    ));
+
+    await expect(fetchProjects()).resolves.toEqual([
+      expect.objectContaining({ key: 'overdeck', name: 'Overdeck' }),
+    ]);
+
+    for (const url of ['/api/issues/resource-allocated', '/api/registered-projects']) {
+      expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    }
   });
 });

@@ -7,8 +7,6 @@ import { resolveHarness } from '../harness-resolve.js';
 
 function roleForSpecialistModel(specialistType: string): { role: 'plan' | 'work' | 'review' | 'test' | 'ship'; subRole?: string } {
   const normalized = specialistType.replace(/-agent$/, '');
-  if (normalized === 'inspect') return { role: 'work', subRole: 'inspect' };
-  if (normalized === 'inspect-deep') return { role: 'work', subRole: 'inspect-deep' };
   if (normalized === 'review') return { role: 'review' };
   if (normalized === 'test' || normalized === 'uat') return { role: 'test' };
   if (normalized === 'merge' || normalized === 'ship') return { role: 'ship' };

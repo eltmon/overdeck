@@ -28,12 +28,17 @@ import {
   saveSessionId,
 } from '../../../../../src/lib/agents.js';
 import { Effect } from 'effect';
-import { setAgentRuntimeMirror } from '../../../../../src/lib/agent-runtime-mirror.js';
-import { getWorkAgentLifecycleStateSync } from '../../../../../src/lib/work-agent-lifecycle.js';
+import { markAgentStateServiceInProcess, setAgentRuntimeMirror } from '../../../../../src/lib/agent-runtime-mirror.js';
+import { getWorkAgentLifecycleState } from '../../../../../src/lib/work-agent-lifecycle.js';
 import type { WorkAgentLifecycleState } from '../../../../../src/lib/work-agent-lifecycle.js';
 import * as claudeStorage from '../../../../../src/lib/runtimes/storage/claude-code.js';
-import * as tmux from '../../../../../src/lib/tmux.js';
 import * as liveness from '../../../../../src/lib/agents/liveness.js';
+
+// The lifecycle door reads runtime state through the async agent-state
+// service, which outside the dashboard process fetches it over HTTP. Mark the
+// service in-process so it reads the mirror these fixtures seed and the test
+// never reaches a live dashboard.
+Effect.runSync(markAgentStateServiceInProcess());
 
 /** The resume route's gate predicate — extracted for contract testing. */
 function resumeGateAllows(lifecycle: WorkAgentLifecycleState): boolean {
@@ -58,7 +63,7 @@ afterEach(() => {
 });
 
 describe('resume route gate predicate', () => {
-  it('returns 409 for a truly-running agent (active runtime, live session)', () => {
+  it('returns 409 for a truly-running agent (active runtime, live session)', async () => {
     // Scenario: agent is running and making progress — no resume needed.
     const agentId = makeAgentId('running-active');
     const workspace = join('/tmp', agentId);
@@ -79,8 +84,8 @@ describe('resume route gate predicate', () => {
     }));
     saveSessionId(agentId, 'session-active');
 
-    const sessionSpy = vi.spyOn(liveness, 'isAliveSync').mockReturnValue({ alive: true, paneAlive: true });
-    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
+    const sessionSpy = vi.spyOn(liveness, 'isAlive').mockResolvedValue({ alive: true, paneAlive: true });
+    const lifecycle = await getWorkAgentLifecycleState(agentId);
 
     // Gate must BLOCK — agent is genuinely running, isRunning:true, isRunningButStuck:false.
     expect(lifecycle.isRunning).toBe(true);
@@ -91,7 +96,7 @@ describe('resume route gate predicate', () => {
     sessionSpy.mockRestore();
   });
 
-  it('returns 200 for a running-but-stuck agent (idle runtime, live session) — PAN-1014 regression', () => {
+  it('returns 200 for a running-but-stuck agent (idle runtime, live session) — PAN-1014 regression', async () => {
     // Scenario: agent has a live tmux session but the model stopped producing
     // output (e.g. model-not-found errors). Runtime fell to 'idle'.
     // The route should allow resume to restart the stuck runtime.
@@ -114,8 +119,8 @@ describe('resume route gate predicate', () => {
     }));
     saveSessionId(agentId, 'session-stuck');
 
-    const sessionSpy = vi.spyOn(liveness, 'isAliveSync').mockReturnValue({ alive: true, paneAlive: true });
-    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
+    const sessionSpy = vi.spyOn(liveness, 'isAlive').mockResolvedValue({ alive: true, paneAlive: true });
+    const lifecycle = await getWorkAgentLifecycleState(agentId);
 
     // Gate must ALLOW — agent is running-but-stuck, isRunningButStuck:true.
     expect(lifecycle.isRunning).toBe(true);
@@ -126,7 +131,7 @@ describe('resume route gate predicate', () => {
     sessionSpy.mockRestore();
   });
 
-  it('returns 200 for a stopped agent with a saved session (normal resume)', () => {
+  it('returns 200 for a stopped agent with a saved session (normal resume)', async () => {
     // Scenario: agent was cleanly stopped, has a JSONL session to replay.
     const agentId = makeAgentId('stopped-resumable');
     const workspace = join('/tmp', agentId);
@@ -146,9 +151,9 @@ describe('resume route gate predicate', () => {
     // agentStatus='stopped' drives isStopped=true independently.
     saveSessionId(agentId, 'session-stopped');
 
-    const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
+    const sessionSpy = vi.spyOn(liveness, 'isAlive').mockResolvedValue({ alive: false, reason: 'no-session' });
     const transcriptSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
-    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
+    const lifecycle = await getWorkAgentLifecycleState(agentId);
 
     // Gate must ALLOW — canResumeSession:true (stopped + saved session).
     expect(lifecycle.isRunning).toBe(false);
@@ -160,12 +165,12 @@ describe('resume route gate predicate', () => {
     sessionSpy.mockRestore();
   });
 
-  it('returns 409 for an agent with no state and no saved session', () => {
+  it('returns 409 for an agent with no state and no saved session', async () => {
     // Scenario: fresh agent that has never been started — nothing to resume.
     const agentId = makeAgentId('no-state');
 
-    const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
+    const sessionSpy = vi.spyOn(liveness, 'isAlive').mockResolvedValue({ alive: false, reason: 'no-session' });
+    const lifecycle = await getWorkAgentLifecycleState(agentId);
 
     expect(lifecycle.isRunning).toBe(false);
     expect(lifecycle.isRunningButStuck).toBe(false);

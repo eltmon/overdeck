@@ -11,7 +11,6 @@ const LIVE_TASK_SURFACES = [
   'src/cli/commands/specialists/done.ts',
   'src/cli/commands/wipe.ts',
   'src/lib/backlog/pickup.ts',
-  'src/lib/cloister/prompts/inspect-agent.md',
   'src/lib/cloister/prompts/planning.md',
   'src/lib/cloister/prompts/work.md',
   'src/lib/overdeck/planning-promotion.ts',

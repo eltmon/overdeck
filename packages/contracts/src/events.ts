@@ -13,6 +13,7 @@ import {
   ProjectCiSuite,
   ResourceStats,
   RestartGateSnapshot,
+  ProjectDeploySnapshot,
   Role,
   SequenceNumber,
   WaitingReason,
@@ -126,6 +127,24 @@ export const RestartGateChangedEvent = Schema.Struct({
   payload: RestartGateSnapshot,
 })
 export type RestartGateChangedEvent = typeof RestartGateChangedEvent.Type
+
+/**
+ * The set of in-flight project deploys changed (PAN-3751).
+ *
+ * The payload is the COMPLETE projection keyed by project key, so the reducer
+ * is a plain replace. The server derives it from runtime files (restart lock,
+ * restart gate, restart-status journal) and emits it in-memory only, like
+ * `restart_gate.changed`: it is never persisted and never replayed at boot.
+ */
+export const ProjectDeployChangedEvent = Schema.Struct({
+  type: Schema.Literal("project.deploy_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    deploys: Schema.Record(Schema.String, ProjectDeploySnapshot),
+  }),
+})
+export type ProjectDeployChangedEvent = typeof ProjectDeployChangedEvent.Type
 
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
@@ -1495,6 +1514,7 @@ export const DomainEvent = Schema.Union([
   ProjectCiSuiteObservedEvent,
   ProjectCiHeadObservedEvent,
   RestartGateChangedEvent,
+  ProjectDeployChangedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,

@@ -378,6 +378,60 @@ describe('showCommand', () => {
       expect(output).not.toContain('in_progress never');
       expect(output).not.toContain('last activity 0s ago');
     });
+
+    // PAN-3420: nothing records a CV outcome, so a closed-out issue's entry is
+    // still `in_progress` on disk. The merged PR is the outcome.
+    it.each(['merged', 'closed'] as const)('reports a %s issue with a merged PR as a success, not zero percent and active', async (state) => {
+      derivedIssueStateMock.mockResolvedValue({
+        issueId: 'PAN-3941',
+        state,
+        pr: { url: 'https://github.com/eltmon/overdeck/pull/3945', number: 3945, reviewState: 'approved', checks: 'green', mergeable: null },
+      });
+      getAgentStateMock.mockReturnValue({ id: 'agent-pan-3941', issueId: 'PAN-3941', status: 'stopped' });
+      getAgentCVMock.mockReturnValue({
+        agentId: 'agent-pan-3941',
+        createdAt: '2026-09-20T01:24:45.560Z',
+        lastActive: '2026-09-20T01:24:45.560Z',
+        runtime: 'claude',
+        model: 'sonnet',
+        stats: { totalIssues: 1, successCount: 0, failureCount: 0, abandonedCount: 0, avgDuration: 0, successRate: 0 },
+        skillsUsed: [],
+        recentWork: [{ issueId: 'PAN-3941', startedAt: '2026-09-20T01:24:45.560Z', outcome: 'in_progress' }],
+      });
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await showCommand('PAN-3941');
+      const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+      logSpy.mockRestore();
+
+      expect(output).toContain('100% success');
+      expect(output).not.toMatch(/\d+ active\)/);
+      expect(output).not.toMatch(/\s0% success/);
+      expect(output).toContain('success');
+      expect(output).not.toContain('in_progress');
+    });
+
+    it('leaves a cancelled issue (closed, no PR) in progress rather than claiming success', async () => {
+      derivedIssueStateMock.mockResolvedValue({ issueId: 'PAN-9', state: 'closed' });
+      getAgentCVMock.mockReturnValue({
+        agentId: 'agent-pan-9',
+        createdAt: '2026-09-20T01:24:45.560Z',
+        lastActive: '2026-09-20T01:24:45.560Z',
+        runtime: 'claude',
+        model: 'sonnet',
+        stats: { totalIssues: 1, successCount: 0, failureCount: 0, abandonedCount: 0, avgDuration: 0, successRate: 0 },
+        skillsUsed: [],
+        recentWork: [{ issueId: 'PAN-9', startedAt: '2026-09-20T01:24:45.560Z', outcome: 'in_progress' }],
+      });
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await showCommand('PAN-9');
+      const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+      logSpy.mockRestore();
+
+      expect(output).toContain('1 total (0 done, 1 active)');
+      expect(output).not.toContain('100% success');
+    });
   });
 });
 

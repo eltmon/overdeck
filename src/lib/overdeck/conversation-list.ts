@@ -6,7 +6,7 @@ import { Effect } from 'effect';
 
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
-import { withConcurrencyLimitPromise } from '../concurrency.js';
+import { withConcurrencyLimit } from '../concurrency.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { isHarnessProcessAlive, listSessionNames } from '../tmux.js';
 import { resolveConversationGitInfo } from '../../dashboard/server/services/git-info.js';
@@ -107,7 +107,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   const liveSessionNames = new Set(sessionNames);
   // PAN-3822: one query for the whole page's PR links, never one per row.
   const pullRequestLinks = listPullRequestLinksForConversations(conversations.map((conv) => conv.name));
-  return withConcurrencyLimitPromise(
+  return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
       const tmuxSessionAlive = liveSessionNames.has(conv.tmuxSession);

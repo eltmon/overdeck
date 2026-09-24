@@ -6,6 +6,7 @@
  */
 import { compareIssueIds } from '@overdeck/contracts';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
 /** Sentinel deck key for the "No project" bucket — conversations/terminals not
@@ -111,9 +112,65 @@ async function readMembershipSuccess(response: Response): Promise<true> {
   return true;
 }
 
-export async function fetchProjectPipelineMembership(projectKey: string): Promise<true> {
-  const response = await fetch(`/api/pipeline/membership?project=${encodeURIComponent(projectKey)}`);
+/**
+ * PAN-3527 — a membership read that failed for a temporary reason: the server's
+ * snapshot is still loading after a restart, the request never reached the
+ * server, or a proxy answered for a backend that is down. Callers retry it and
+ * keep what they last showed; it is not an answer about the project.
+ * `retryAfterMs` carries the server's `Retry-After` hint when it sent one.
+ */
+export class MembershipTransientError extends Error {
+  readonly retryAfterMs: number | undefined;
+
+  constructor(message: string, retryAfterMs?: number) {
+    super(message);
+    this.name = 'MembershipTransientError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+export function isMembershipTransientError(error: unknown): error is MembershipTransientError {
+  return error instanceof MembershipTransientError;
+}
+
+/** Proxy statuses Traefik returns while the dashboard backend is restarting. */
+const TRANSIENT_PROXY_STATUSES = new Set([502, 503, 504]);
+
+function parseRetryAfterMs(response: Response): number | undefined {
+  const raw = response.headers?.get?.('Retry-After');
+  if (!raw) return undefined;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+  const date = Date.parse(raw);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
+}
+
+export async function fetchProjectPipelineMembership(
+  projectKey: string,
+  signal?: AbortSignal,
+): Promise<true> {
+  let response: Response;
+  try {
+    // Bounded: a GET hung against a restarting server must fail and retry
+    // instead of pinning the query in its first load.
+    response = await fetchWithTimeout(
+      `/api/pipeline/membership?project=${encodeURIComponent(projectKey)}`,
+      signal ? { signal } : {},
+    );
+  } catch (error) {
+    // Query cancellation (e.g. the reconnect refetch) must stay a cancellation.
+    if (signal?.aborted) throw error;
+    // "Failed to fetch" or the timeout: the request never got an answer.
+    throw new MembershipTransientError(error instanceof Error ? error.message : String(error));
+  }
   if (response.ok) return readMembershipSuccess(response);
+  if (TRANSIENT_PROXY_STATUSES.has(response.status)) {
+    // A proxy error page is not JSON; the status alone says "try again".
+    throw new MembershipTransientError(
+      await readMembershipError(response, 'Pipeline membership is temporarily unavailable'),
+      parseRetryAfterMs(response),
+    );
+  }
   throw new Error(await readMembershipError(response));
 }
 
@@ -131,8 +188,11 @@ export async function refreshProjectPipelineMembership(projectKey: string): Prom
   throw new Error(await readMembershipError(response));
 }
 
-async function readMembershipError(response: Response): Promise<string> {
-  let message = 'Pipeline membership could not be loaded';
+async function readMembershipError(
+  response: Response,
+  fallback = 'Pipeline membership could not be loaded',
+): Promise<string> {
+  let message = fallback;
   try {
     const body = await response.json() as { error?: unknown };
     if (typeof body.error === 'string') message = body.error;
@@ -143,9 +203,12 @@ async function readMembershipError(response: Response): Promise<string> {
 }
 
 export async function fetchProjects(): Promise<ProjectData[]> {
+  // PAN-3527: bounded like every other deck fetch. A request hung against a
+  // restarting server would otherwise pin the query in its first load, and
+  // every later poll or invalidation joins the hung promise.
   const [issuesRes, registeredRes] = await Promise.all([
-    fetch('/api/issues/resource-allocated'),
-    fetch('/api/registered-projects'),
+    fetchWithTimeout('/api/issues/resource-allocated'),
+    fetchWithTimeout('/api/registered-projects'),
   ]);
   if (!issuesRes.ok) throw new Error('Failed to fetch resource-allocated issues');
   if (!registeredRes.ok) throw new Error('Failed to fetch registered projects');

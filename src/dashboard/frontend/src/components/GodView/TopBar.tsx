@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Maximize2, Zap } from 'lucide-react';
 import { fmtAge, fmtTokens } from './confluence/model';
 import type { ConfluenceData } from './confluence/useConfluenceData';
+import { describeMemoryPressure, readMemoryPressure, type MemoryPressureReading } from './confluence/memoryPressure';
 
 interface TopBarProps {
   data: ConfluenceData;
@@ -79,6 +80,27 @@ function Meter({ label, value }: { label: string; value: number | null }) {
   );
 }
 
+/**
+ * Memory distress (PAN-3540): PSI `some` avg10 is the reading; the bar and
+ * color follow the pressure bands. Swap occupancy is hover detail only — a
+ * full swap of cold pages can never turn this meter amber or red.
+ */
+function PressureMeter({ reading }: { reading: MemoryPressureReading }) {
+  const value = reading.someAvg10;
+  const bounded = value == null ? 0 : Math.max(0, Math.min(100, value));
+  return (
+    <span
+      className="confluence-meter"
+      data-label="PSI"
+      data-level={reading.level}
+      title={describeMemoryPressure(reading)}
+    >
+      <i><b style={{ width: `${bounded}%` }} /></i>
+      <em>PSI {value == null ? '—' : value.toFixed(1)}</em>
+    </span>
+  );
+}
+
 function Stat({ label, value, title }: { label: string; value: string | number; title?: string }) {
   return <span className="confluence-stat" title={title}><em>{label}</em><b>{value}</b></span>;
 }
@@ -97,7 +119,7 @@ export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBar
   }, [hookStream.eventsPerSec]);
 
   const system = meta.system;
-  const swap = system?.summary.swapUsedPercent ?? null;
+  const pressure = readMemoryPressure(system);
   const load = system?.summary.loadAverage1m ?? null;
   const beads = meta.beads;
 
@@ -124,7 +146,7 @@ export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBar
       <span className="confluence-meters">
         <Meter label="CPU" value={system?.cpu ?? null} />
         <Meter label="MEM" value={system?.memPercent ?? null} />
-        <Meter label="SWAP" value={swap} />
+        <PressureMeter reading={pressure} />
       </span>
       <Stat label="LOAD" value={load == null ? '—' : load.toFixed(2)} />
       <Stat label="WIP" value={beads?.wip ?? '—'} />

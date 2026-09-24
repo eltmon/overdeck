@@ -521,7 +521,10 @@ export default function App() {
     // bucket when the conversation is under no registered project.
     const projectKey = hit.projectKey || NO_PROJECT_KEY;
     try {
-      const locator = await fetchConversationMessageLocator(conversationName, hit.byteOffset);
+      // A subagent hit opens its parent conversation, targeting the subagent
+      // transcript; the conversation panel selects it once listed (PAN-3982).
+      const subagentId = hit.subagentId ?? undefined;
+      const locator = await fetchConversationMessageLocator(conversationName, hit.byteOffset, subagentId);
       const nonce = Date.now();
       setPendingConversationTarget({
         conversationName,
@@ -529,6 +532,7 @@ export default function App() {
         messageIndex: locator.messageIndex,
         nonce,
         label: hit.label || 'Agent',
+        subagentId,
       });
       setActiveTab('command-deck');
       setSelectedProjectKey(projectKey);
@@ -546,6 +550,7 @@ export default function App() {
         targetMessageId: locator.messageId,
         targetMessageIndex: locator.messageIndex,
         targetMessageNonce: nonce,
+        targetSubagentId: subagentId,
       });
     } catch (err) {
       toast.error(describeConversationHitOpenFailure(hit, err));

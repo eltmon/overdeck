@@ -10,6 +10,7 @@ import { exec, execFile, execFileSync, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
+import { attachHintLines, resolveAttach } from '../../lib/terminal-backends/attach-hint.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
@@ -89,7 +90,7 @@ import {
 import { spawnRemoteAgent, isRemoteAgentRunning, createFlyProviderFromConfig, checkRemoteSpendCap, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
-import { assertCanStartFresh, getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
+import { assertCanStartFresh, getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 import { normalizeModelOverride } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 import type { IssueOptions } from './start-options.js';
@@ -791,7 +792,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
   // No-op with exit 0 when the work agent is already live and running.
   // Paused/troubled cases are handled above; stopped-but-resumable cases are
-  // left for assertCanStartFreshSync below so the user sees the resume/fresh
+  // left for assertCanStartFresh below so the user sees the resume/fresh
   // guidance unchanged (hazard H2).
   //
   // PAN-3150: --fresh is an explicit request to REPLACE the current session, so
@@ -799,17 +800,17 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   // as `isRunning`, and the flywheel is forbidden `pan kill` — without this the
   // only recovery door for a frozen agent is closed to the one role that runs
   // unattended.
-  const lifecycleState = getWorkAgentLifecycleStateSync(agentId);
+  const lifecycleState = await getWorkAgentLifecycleState(agentId);
   const swarmActive = resolveSwarmPolicy(id).mode === 'always';
   if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck && !options.fresh) {
     console.log(chalk.green(`Work agent for ${id} is already running.`));
     console.log('');
     console.log(chalk.dim('Message it:'), chalk.cyan(`pan tell ${id} "..."`));
-    console.log(chalk.dim('Attach:  '), chalk.cyan(`tmux -L overdeck attach -t ${agentId}`));
+    console.log(chalk.dim('Attach:  '), chalk.cyan((await resolveAttach(existingAgentState ?? { id: agentId })).command));
     process.exitCode = 0;
     return;
   }
-  const conflict = describeConflictingWorkAgents(id, agentId, { ignoreRegisteredSlots: swarmActive });
+  const conflict = await describeConflictingWorkAgents(id, agentId, { ignoreRegisteredSlots: swarmActive });
   if (conflict) {
     process.stderr.write(chalk.red(conflict));
     return exitCli(1);
@@ -935,7 +936,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     } else if (!swarmActive) {
       try {
-        assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
+        await assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
       } catch (error) {
         if (workspacePath || isRemote) {
           throw error;
@@ -1251,7 +1252,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     console.log('');
     console.log(chalk.dim('Commands:'));
-    console.log(`  Attach:   tmux attach -t ${agent.id}`);
+    for (const line of await attachHintLines(agent)) console.log(line);
     console.log(`  Message:  pan tell ${id} "your message"`);
     console.log(`  Kill:     pan kill ${id}`);
 

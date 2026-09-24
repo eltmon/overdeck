@@ -34,10 +34,12 @@ export function AgentPane({ pane, ctx }: PaneWrapperProps) {
         targetMessageId={pane.targetMessageId}
         targetMessageIndex={pane.targetMessageIndex}
         targetMessageNonce={pane.targetMessageNonce}
+        targetSubagentId={pane.targetSubagentId}
         onTargetMessageHandled={() => updatePane(ctx.workspaceId, pane.paneId, {
           targetMessageId: undefined,
           targetMessageIndex: undefined,
           targetMessageNonce: undefined,
+          targetSubagentId: undefined,
         })}
       />
     )

@@ -22,7 +22,7 @@
 
 import type { PullRequestKey, PullRequestSnapshot } from '@overdeck/contracts';
 
-import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
+import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { resolveConversationBranch } from '../../../lib/overdeck/conversation-branch.js';
 import {
   emitConversationPullRequestsChanged,
@@ -120,7 +120,7 @@ async function syncProject(
 
   // Branch detection.
   const defaultBranch = getRepoTargetBranch(undefined, project);
-  const branches = await withConcurrencyLimitPromise(
+  const branches = await withConcurrencyLimit(
     conversations.map((conversation) => () => resolveConversationBranch(conversation, defaultBranch)),
     BRANCH_READ_CONCURRENCY,
   );

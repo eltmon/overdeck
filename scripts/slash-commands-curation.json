@@ -2,9 +2,7 @@
   "deny": [],
   "insertOverrides": {
     "plan finalize": "pan plan finalize ",
-    "admin specialists done": "pan admin specialists done",
-    "admin specialists logs": "pan admin specialists logs",
-    "admin specialists cleanup-logs": "pan admin specialists cleanup-logs"
+    "admin specialists done": "pan admin specialists done"
   },
   "categories": {
     "up": "Core",

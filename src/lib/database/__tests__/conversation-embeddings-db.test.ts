@@ -145,6 +145,98 @@ describe('conversation-embeddings-db', () => {
     });
   });
 
+  describe('schema v2 migration (PAN-3982)', () => {
+    const parent = '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607';
+
+    /** A v1 DB: no parent_session_id column, user_version 1, one subagent + one top-level chunk and cursor. */
+    function buildV1Db(dir: string): string {
+      const dbPath = join(dir, 'embeddings.db');
+      const created = openEmbeddingsDb(dbPath, 8);
+      expect(created.available).toBe(true);
+      created.close();
+      const db = openRawDb(dbPath);
+      try {
+        db.exec('ALTER TABLE chunks DROP COLUMN parent_session_id');
+        db.pragma('user_version = 1');
+        db.prepare(`INSERT OR REPLACE INTO db_config(key, value) VALUES ('schema_version', '1')`).run();
+        const insertChunk = db.prepare(`INSERT INTO chunks(session_id, project_id, role, ts, byte_offset, char_length, text, token_count, indexed_at) VALUES (?, 'enc', 'user', NULL, 0, 4, ?, 1, 'now')`);
+        const insertCursor = db.prepare(`INSERT INTO file_cursors(file_path, byte_offset, updated_at) VALUES (?, 10, 'now')`);
+        insertChunk.run('agent-abc', 'subagent text');
+        insertCursor.run(join(dir, 'projects', 'enc', parent, 'subagents', 'agent-abc.jsonl'));
+        insertChunk.run(parent, 'parent text');
+        insertCursor.run(join(dir, 'projects', 'enc', `${parent}.jsonl`));
+      } finally {
+        db.close();
+      }
+      return dbPath;
+    }
+
+    function readParents(dbPath: string): { rows: Record<string, string | null>; userVersion: number; schemaVersion: string } {
+      const db = openRawDb(dbPath);
+      try {
+        const rows = Object.fromEntries(
+          (db.prepare('SELECT session_id, parent_session_id FROM chunks').all() as Array<{ session_id: string; parent_session_id: string | null }>)
+            .map((row) => [row.session_id, row.parent_session_id]),
+        );
+        return {
+          rows,
+          userVersion: db.pragma('user_version', { simple: true }) as number,
+          schemaVersion: (db.prepare(`SELECT value FROM db_config WHERE key = 'schema_version'`).get() as { value: string }).value,
+        };
+      } finally {
+        db.close();
+      }
+    }
+
+    it('adds the column and backfills subagent parents from file_cursors', () => {
+      const dbPath = buildV1Db(makeTmpDir());
+
+      handle = openEmbeddingsDb(dbPath, 8);
+      expect(handle.available).toBe(true);
+      handle.close();
+      handle = undefined;
+
+      expect(readParents(dbPath)).toEqual({ rows: { 'agent-abc': parent, [parent]: null }, userVersion: 2, schemaVersion: '2' });
+
+      const again = openEmbeddingsDb(dbPath, 8);
+      expect(again.available).toBe(true);
+      again.close();
+      expect(readParents(dbPath).rows).toEqual({ 'agent-abc': parent, [parent]: null });
+    });
+
+    it('tolerates two handles opening a v1 DB back-to-back', () => {
+      const dbPath = buildV1Db(makeTmpDir());
+      const first = openEmbeddingsDb(dbPath, 8);
+      const second = openEmbeddingsDb(dbPath, 8);
+      try {
+        expect(first.available).toBe(true);
+        expect(second.available).toBe(true);
+      } finally {
+        first.close();
+        second.close();
+      }
+    });
+
+    it('skips the backfill once the DB is at v2', () => {
+      const dir = makeTmpDir();
+      const dbPath = buildV1Db(dir);
+      const db = openRawDb(dbPath);
+      try {
+        db.exec('ALTER TABLE chunks ADD COLUMN parent_session_id TEXT');
+        db.pragma('user_version = 2');
+      } finally {
+        db.close();
+      }
+
+      handle = openEmbeddingsDb(dbPath, 8);
+      expect(handle.available).toBe(true);
+      handle.close();
+      handle = undefined;
+
+      expect(readParents(dbPath).rows['agent-abc']).toBeNull();
+    });
+  });
+
   describe('upsertChunk', () => {
     it('inserts a chunk and returns a positive rowid', () => {
       const dir = makeTmpDir();
@@ -166,15 +258,18 @@ describe('conversation-embeddings-db', () => {
         charLength: 42,
         text: 'field check text',
         tokenCount: 4,
+        parentSessionId: 'p-1',
       }));
+      expect(handle.searchBm25('field', 5)[0]).toMatchObject({ sessionId: 'session-fields', parentSessionId: 'p-1' });
       handle.close();
       handle = undefined;
 
       const db = openRawDb(dbPath);
       try {
-        expect(db.prepare(`SELECT session_id, project_id, role, ts, byte_offset, char_length, text, token_count FROM chunks WHERE rowid = ?`).get(rowid)).toEqual({
+        expect(db.prepare(`SELECT session_id, project_id, parent_session_id, role, ts, byte_offset, char_length, text, token_count FROM chunks WHERE rowid = ?`).get(rowid)).toEqual({
           session_id: 'session-fields',
           project_id: 'project-fields',
+          parent_session_id: 'p-1',
           role: 'user',
           ts: '2026-06-02T01:02:03.000Z',
           byte_offset: 128,

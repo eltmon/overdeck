@@ -31,17 +31,21 @@ const project = {
   github_repo: 'owner/repo',
 };
 
-async function requestMembershipRoute(path: string, init: RequestInit = {}): Promise<{
-  status: number;
-  body: unknown;
-}> {
+function runMembershipRoute(path: string, init: RequestInit = {}) {
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init));
-  const response = await Effect.runPromise(
+  return Effect.runPromise(
     Effect.scoped(
       Effect.flatMap(HttpRouter.toHttpEffect(pipelineMembershipRouteLayer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)),
     ),
   );
+}
+
+async function requestMembershipRoute(path: string, init: RequestInit = {}): Promise<{
+  status: number;
+  body: unknown;
+}> {
+  const response = await runMembershipRoute(path, init);
   const responseBody = response.body as { body?: Uint8Array } | null;
   const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
   return { status: response.status, body: JSON.parse(text) };
@@ -83,7 +87,7 @@ describe('pipeline membership routes', () => {
     });
   });
 
-  it('preserves the transient HTTP 503 response for a cold GET snapshot', async () => {
+  it('preserves the transient HTTP 503 response for a cold GET snapshot, typed as loading (PAN-3527)', async () => {
     routeMocks.readPipelineMembershipSnapshotsForProjects.mockReturnValue([{
       project,
       error: new Error('Pipeline membership snapshot is loading'),
@@ -91,8 +95,15 @@ describe('pipeline membership routes', () => {
 
     await expect(requestMembershipRoute('/api/pipeline/membership?project=route-project')).resolves.toEqual({
       status: 503,
-      body: { error: 'Pipeline membership snapshot is loading' },
+      body: {
+        status: 'loading',
+        code: 'snapshot_loading',
+        error: 'Pipeline membership snapshot is loading',
+        projectKey: 'route-project',
+      },
     });
+    const response = await runMembershipRoute('/api/pipeline/membership?project=route-project');
+    expect(response.headers['retry-after']).toBe('5');
   });
 
   it('returns a typed unavailable body with HTTP 200 after a failed POST refresh', async () => {
@@ -113,6 +124,23 @@ describe('pipeline membership routes', () => {
         message: 'GitHub App cannot access owner/repo',
         projectKey: 'route-project',
       },
+    });
+    expect(routeMocks.refreshMembershipSnapshotsForProjects).toHaveBeenCalledWith([project]);
+  });
+
+  it('PAN-3924: POST refresh returns the last-good array when the re-gather fails', async () => {
+    // The service swallows the failed re-gather and keeps the last-good snapshot.
+    routeMocks.readPipelineMembershipSnapshotsForProjects.mockReturnValue([{
+      project,
+      memberships: [{ issueId: 'PAN-9' }],
+    }]);
+
+    await expect(requestMembershipRoute(
+      '/api/pipeline/membership/refresh?project=route-project',
+      { method: 'POST' },
+    )).resolves.toEqual({
+      status: 200,
+      body: [{ issueId: 'PAN-9' }],
     });
     expect(routeMocks.refreshMembershipSnapshotsForProjects).toHaveBeenCalledWith([project]);
   });

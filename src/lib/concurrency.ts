@@ -1,4 +1,4 @@
-export function withConcurrencyLimitPromise<T>(
+export function withConcurrencyLimit<T>(
   tasks: Array<() => Promise<T>>,
   max: number,
 ): Promise<T[]> {

@@ -43,7 +43,7 @@ import { listAgentStatesAsync, type AgentState } from '../../../lib/agents/agent
 import { latestWorkerReportAt as defaultLatestWorkerReportAt } from '../../../lib/agents/worker/report.js';
 import { readWorkerFacts } from '../../../lib/agents/worker/facts.js';
 import { workerNumber } from '../../../lib/agents/worker/ids.js';
-import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
+import { createSettledTtlPromiseCache, withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { getEnrichedConversationList } from '../../../lib/overdeck/conversation-list.js';
 import { resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
@@ -455,7 +455,7 @@ export async function buildAgentDirectory(
     ...nativeParents.map(({ entry, workspace }) => () => listNativeSubagents(entry.id, workspace)
       .then((subs) => subagentCandidates(entry, subs, 'agent', entry.id, workspace, now))),
   ].map((task) => () => task().catch(() => [] as Candidate[]));
-  for (const batch of await withConcurrencyLimitPromise(subagentTasks, DIRECTORY_SUBAGENT_CONCURRENCY)) {
+  for (const batch of await withConcurrencyLimit(subagentTasks, DIRECTORY_SUBAGENT_CONCURRENCY)) {
     candidates.push(...batch);
   }
 

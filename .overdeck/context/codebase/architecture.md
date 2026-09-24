@@ -28,10 +28,10 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
   `codex.ts`, `acp.ts`, `kimi-code.ts`, `muse.ts`, plus OpenCode via ACP. `RuntimeName =
   'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'` (`pi` is a
   legacy alias). Per-harness behavior table: `packages/contracts/src/harness-behavior.ts`.
-- `harness-policy.ts` — ToS gate `canUseHarnessSync()` (ohmypi + Anthropic + subscription
+- `harness-policy.ts` — ToS gate `canUseHarness()` (ohmypi + Anthropic + subscription
   is the only blocked combo). Never weaken.
 - `providers.ts` — `PROVIDERS` registry (18 providers incl. opencode/meta),
-  `getProviderForModelSync()`, per-provider `tierModels` (opus/sonnet/haiku slots).
+  `getProviderForModel()`, per-provider `tierModels` (opus/sonnet/haiku slots).
 - `model-capabilities.ts` — `MODEL_CAPABILITIES` skill/cost matrix; `model-deprecations.ts`
   alias table; `model-capability-class.ts` (PAN-3842) frontier/workhorse/small classes.
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
@@ -49,7 +49,7 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 - `conversations/switch-strategy.ts` — model/harness switch tiers 1–4.
 - Cost metering — `cost-parsers/` (per-harness session parsers: `jsonl-parser.ts`
   claude-code, `ohmypi-parser.ts`, `codex-parser.ts`, legacy `pi-parser.ts`),
-  `cost.ts` (pricing table, `getPricingSync`), `overdeck/cost.ts` (the two-door
+  `cost.ts` (pricing table, `getPricing`), `overdeck/cost.ts` (the two-door
   CostWriter: `record()` dedupes by requestId/sourceFile → append-only archive →
   `cost_events` SQLite; `reconcile({source})` sweeps per-agent session dirs).
   Live triggers: claude via WAL/transcript sync, ohmypi via
@@ -81,7 +81,7 @@ are build-copied to `dist/dashboard/prompts/` and cached by `renderPrompt`.
 
 - `projects.yaml` (`~/.overdeck/projects.yaml`) is the project registry. Read it
   through `getProjectSync`/`listProjectsSync`/`listProjectsAsync` (`src/lib/projects.ts`,
-  mtime-cached); write it through `registerProjectSync`/`updateProjectsConfigSync`,
+  mtime-cached); write it through `registerProject`/`updateProjectsConfigSync`,
   which invalidate the cache. `src/lib/project-registration.ts` is the
   `registerProjectFromPath` entry every project-creation front door ends in.
 - The `projects`/`workspaces`/`project_targets`/`pinned_docs` tables in overdeck.db

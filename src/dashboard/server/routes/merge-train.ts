@@ -29,7 +29,7 @@ import { emitActivityTts } from '../../../lib/activity-logger.js';
 import { parseArtifactRef } from '../../../lib/forge.js';
 import { validateOrigin } from './origin-validation.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
-import { isAutoMergeEligible, issueHoldsForUat, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { autoMergeFromLabels, isAutoMergeEligible, issueHoldsForUat, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import {
   getProjectAutoMergeDefault,
   projectHoldsForUat,
@@ -57,6 +57,7 @@ import {
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
 import { getDerivedIssueState, listReadyIssuesForProject, type IssueStateLoaderDeps } from '../services/derived-issue-state.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import type { PipelineMembership } from '../../../lib/pipeline-membership.js';
 
 const readUnknownJsonBody = Effect.gen(function* () {
@@ -488,6 +489,21 @@ export interface AutoMergeScheduleDeps {
   schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
   announce?: (issueId: string, entry: PendingAutoMerge) => void;
   getProjectAutoMergeDefault?: (issueId: string) => ProjectAutoMergeDefault;
+  /** The issue's tracker labels; defaults to the dashboard's cached tracker row. */
+  getIssueLabels?: (issueId: string) => readonly string[];
+}
+
+/**
+ * PAN-3932: the issue's `auto-merge` / `hold-for-uat` labels from the cached
+ * tracker row. The auto-merge policy map is polled across every in-flight
+ * issue, so it reads the cache rather than asking the forge per issue.
+ */
+function cachedIssueLabels(issueId: string): readonly string[] {
+  try {
+    return getSharedIssueService().getTrackerIssue(issueId)?.labels ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export interface AutoMergeCancelDeps {
@@ -532,11 +548,12 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   }
   const issueId = rawIssueId.trim().toUpperCase();
 
-  // PAN-1691/1695 tiers, minus the per-issue tier: that flag lived on the
-  // review-status record, which no longer exists. Project default, then global.
+  // PAN-1691/1695 tiers: the issue's `auto-merge` / `hold-for-uat` label
+  // (PAN-3932), then the project default, then global.
+  const labels = (deps.getIssueLabels ?? cachedIssueLabels)(issueId);
   const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
   const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();
-  if (shouldHoldForUat(undefined, projectDefault, globalRequireUat)) {
+  if (shouldHoldForUat(autoMergeFromLabels(labels), projectDefault, globalRequireUat)) {
     return { status: 412, body: { error: 'UAT is still required before merge' } };
   }
   if (!(deps.isMergeTrainEnabled ?? isMergeTrainEnabled)()) {
@@ -625,10 +642,11 @@ export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCanc
 /**
  * The effective auto-merge routing key per in-flight issue (PAN-3917, D3).
  *
- * There is no per-issue routing key any more — it was a record field. The
- * answer is derived: the issue's project default, falling back to the global
- * `require_uat_before_merge`. `autoMerge: true` means the train may ship it
- * when green; `false` means hold for UAT.
+ * There is no per-issue routing key record any more. The answer is derived:
+ * the issue's own `auto-merge` / `hold-for-uat` tracker label (PAN-3932),
+ * then its project default, then the global `require_uat_before_merge`.
+ * `autoMerge: true` means the train may ship it when green; `false` means
+ * hold for UAT.
  */
 export async function getAutoMergePolicyPayload(): Promise<{
   issues: Array<{ issueId: string; autoMerge: boolean }>;
@@ -637,19 +655,29 @@ export async function getAutoMergePolicyPayload(): Promise<{
   const { loadIssueStatesForProject } = await import('../services/derived-issue-state.js');
   const IN_FLIGHT = new Set(['working', 'in-review', 'changes-requested', 'ready']);
 
-  const issues: Array<{ issueId: string; autoMerge: boolean }> = [];
-  for (const { config } of listProjectsSync()) {
+  // PAN-3925: the projects derive in parallel, each over its PR listing
+  // served stale-while-revalidate, so one slow `gh pr list` no longer
+  // serializes behind every other project's.
+  const perProject = await Promise.all(listProjectsSync().map(async ({ config }) => {
     const projectPath = resolve(config.path);
-    let states;
     try {
-      states = await loadIssueStatesForProject(projectPath, await listCandidateIssueIds(projectPath));
+      return await loadIssueStatesForProject(projectPath, await listCandidateIssueIds(projectPath));
     } catch (error) {
       console.warn(`[merge-train] auto-merge policy for ${config.name} failed: ${error instanceof Error ? error.message : String(error)}`);
-      continue;
+      return null;
     }
+  }));
+
+  const issues: Array<{ issueId: string; autoMerge: boolean }> = [];
+  for (const states of perProject) {
+    if (!states) continue;
     for (const [issueId, derived] of states) {
       if (!IN_FLIGHT.has(derived.state)) continue;
-      const held = shouldHoldForUat(undefined, getProjectAutoMergeDefault(issueId), globalRequireUat);
+      const held = shouldHoldForUat(
+        autoMergeFromLabels(cachedIssueLabels(issueId)),
+        getProjectAutoMergeDefault(issueId),
+        globalRequireUat,
+      );
       issues.push({ issueId, autoMerge: !held });
     }
   }
@@ -658,8 +686,8 @@ export async function getAutoMergePolicyPayload(): Promise<{
 
 /** Issue ids with an open PR in the project — the only ones the train can route. */
 async function listCandidateIssueIds(projectPath: string): Promise<string[]> {
-  const { listRepoPullRequests, issueIdFromBranch } = await import('../services/derived-issue-state.js');
-  const rows = await listRepoPullRequests(projectPath);
+  const { listRepoPullRequestsStaleOk, issueIdFromBranch } = await import('../services/derived-issue-state.js');
+  const rows = await listRepoPullRequestsStaleOk(projectPath);
   return rows.flatMap((row) => {
     const issueId = issueIdFromBranch(row.headRefName);
     return issueId ? [issueId] : [];
