@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   waitForPromptReady: vi.fn(async () => true),
   deliverAgentMessage: vi.fn(async () => ({ ok: true, path: 'herdr' })),
   deliverResumeMessageWithTranscriptConfirmation: vi.fn(async () => ({ delivered: true, attempts: 1 })),
+  deliverInitialPromptWithRetry: vi.fn(async (..._args: unknown[]) => ({ ok: true } as { ok: boolean; failure?: string })),
   prepareAutonomousAgentResumePane: vi.fn(async () => ({ ready: true, action: 'clear' })),
   waitForReadySignal: vi.fn(async () => true),
   stopAgent: vi.fn(() => Effect.succeed(undefined)),
@@ -110,6 +111,7 @@ vi.mock('../delivery.js', async (importOriginal) => {
     ...actual,
     deliverAgentMessage: mocks.deliverAgentMessage,
     deliverResumeMessageWithTranscriptConfirmation: mocks.deliverResumeMessageWithTranscriptConfirmation,
+    deliverInitialPromptWithRetry: mocks.deliverInitialPromptWithRetry,
   };
 });
 
@@ -153,6 +155,10 @@ beforeEach(() => {
   mocks.queryTmuxSession.mockResolvedValue('missing');
   mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
   mocks.waitForPromptReady.mockResolvedValue(true);
+  // clearAllMocks keeps queued *Once values; drop them so no test leaks into the next.
+  mocks.resolveHarness.mockReset().mockResolvedValue('claude-code');
+  mocks.deliverInitialPromptWithRetry.mockReset().mockResolvedValue({ ok: true });
+  mocks.deliverResumeMessageWithTranscriptConfirmation.mockReset().mockResolvedValue({ delivered: true, attempts: 1 });
 
   tempHome = mkdtempSync(join(tmpdir(), 'pan-3960-relaunch-home-'));
   workspace = mkdtempSync(join(tmpdir(), 'pan-3960-relaunch-ws-'));
@@ -176,6 +182,7 @@ function writeStoppedAgent(
   agentId: string,
   previousBackend: TerminalBackendName,
   status: 'stopped' | 'running' = 'stopped',
+  harness: 'claude-code' | 'acp' | 'kimi-code' = 'claude-code',
 ): void {
   const sessionId = `${agentId}-session`;
   const transcriptPath = sessionFilePath(workspace, sessionId);
@@ -183,13 +190,15 @@ function writeStoppedAgent(
   writeFileSync(transcriptPath, '{"type":"summary","summary":"prior work"}\n');
   mkdirSync(getAgentDir(agentId), { recursive: true });
   appendSessionIdToHistory(agentId, sessionId, 'launcher');
+  if (harness === 'acp') writeFileSync(join(getAgentDir(agentId), 'acp-session-id'), sessionId);
+  if (harness === 'kimi-code') writeFileSync(join(getAgentDir(agentId), 'kimi-session-id'), sessionId);
   saveAgentStateSync({
     id: agentId,
     issueId: 'PAN-3960',
     workspace,
-    harness: 'claude-code',
+    harness,
     role: 'work',
-    model: 'claude-sonnet-5',
+    model: harness === 'kimi-code' ? 'kimi-code/k3' : 'claude-sonnet-5',
     status,
     startedAt: new Date().toISOString(),
     kickoffDelivered: true,
@@ -254,6 +263,51 @@ describe('resumeAgent marks the relaunch as starting (PAN-3923 review, F3)', () 
     expect(statusAtLaunch).toEqual(['starting']);
     expect(statusWhileBooting.every((status) => status === 'starting')).toBe(true);
     expect(getAgentState(agentId)?.status).toBe('running');
+  });
+});
+
+describe('resumeAgent restores the prior status when the relaunch fails (PAN-3923 review 2)', () => {
+  type FailureExit = 'acp-delivery' | 'kimi-delivery' | 'continue-unconfirmed' | 'launch-throws';
+  const failureCases: Array<{ exit: FailureExit; prior: 'stopped' | 'running' }> = [
+    { exit: 'acp-delivery', prior: 'stopped' },
+    { exit: 'kimi-delivery', prior: 'stopped' },
+    { exit: 'continue-unconfirmed', prior: 'stopped' },
+    { exit: 'continue-unconfirmed', prior: 'running' },
+    { exit: 'launch-throws', prior: 'stopped' },
+    { exit: 'launch-throws', prior: 'running' },
+  ];
+
+  it.each(failureCases)('$exit leaves a $prior run at $prior, not starting', async ({ exit, prior }) => {
+    mocks.host = 'herdr';
+    const agentId = `agent-pan-3923-resume-fail-${exit}-${prior}`;
+    // A `running` prior status here is a crashed run: no pane, no process.
+    const harness = exit === 'acp-delivery' ? 'acp' : exit === 'kimi-delivery' ? 'kimi-code' : 'claude-code';
+    writeStoppedAgent(agentId, 'herdr', prior, harness);
+    mocks.resolveHarness.mockResolvedValueOnce(harness);
+    const stoppedAtBefore = getAgentState(agentId)?.stoppedAt;
+    const statusAtLaunch: Array<string | undefined> = [];
+    const realStart = herdr.startAgent;
+    vi.spyOn(herdr, 'startAgent').mockImplementation((workspaceRef, spec) => {
+      statusAtLaunch.push(getAgentState(agentId)?.status);
+      if (exit === 'launch-throws') throw new Error('herdr socket closed mid-launch');
+      return realStart(workspaceRef, spec);
+    });
+    if (exit === 'acp-delivery') {
+      mocks.deliverInitialPromptWithRetry.mockResolvedValueOnce({ ok: false, failure: 'acp session refused the prompt' });
+    } else if (exit === 'kimi-delivery') {
+      mocks.deliverInitialPromptWithRetry.mockResolvedValueOnce({ ok: false, failure: 'kimi prompt never landed' });
+    } else if (exit === 'continue-unconfirmed') {
+      mocks.deliverResumeMessageWithTranscriptConfirmation.mockResolvedValueOnce({ delivered: false, attempts: 3 });
+    }
+
+    const result = await resumeAgent(agentId);
+
+    expect(result.success).toBe(false);
+    // The relaunch really ran under `starting` — the restore is what undoes it.
+    expect(statusAtLaunch).toEqual(['starting']);
+    const after = getAgentState(agentId);
+    expect(after?.status).toBe(prior);
+    expect(after?.stoppedAt).toBe(stoppedAtBefore);
   });
 });
 
