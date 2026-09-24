@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T17:04:09.991Z · model: claude-opus-5 · open: 838_
+_Last sequenced: 2026-09-24T17:17:25.650Z · model: claude-opus-5 · open: 835_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,16 +10,14 @@ _Last sequenced: 2026-09-24T17:04:09.991Z · model: claude-opus-5 · open: 838_
 | 5 | PAN-3922 | S | high | ok |  |  | Deacon-lite status is read from the wrong process: dashboard always shows running:false; relay patrol-done from the child |
 | 6 | PAN-3926 | S | high | ok |  |  | isAliveSync is tmux-only; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled — make backend-aware before swarm re-enable |
 | 7 | PAN-3925 | S | medium | ok |  |  | /api/parked and /api/merge-train/auto-merge take 10s+ deriving state per request; batch through the issue-data cache |
-| 8 | PAN-3931 | S | medium | ok |  |  | Peer dashboards still mark primary conversations ended, write agent state and durable events; gate on isPeerDashboardProcess per site |
-| 9 | PAN-3924 | S | medium | ok |  |  | pipeline-membership: gh graphql failure drops stderr and toasts; retry once; listProjectTrackerIssues blind to GitHub-tracked projects |
+| 10 | PAN-4090 | S | high | ok |  |  | On a Herdr host pipeline-status, pan-agent-activity and pan-recap report every agent dead; pipeline-status 404s on a hardcoded project key |
 | 11 | PAN-3929 | S | medium | ok |  |  | Five SKILL.md files still tell agents to read deleted status fields; rewrite to the derived model and widen the guard's Markdown patterns |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 16 | PAN-3928 | XS | low | ok |  |  | pan start prints a tmux attach hint for Herdr panes; print backend, pane id and the Herdr attach command |
 | 17 | PAN-3982 | M | medium | ok |  |  | Palette hits 404: PAN-3950 dropped the unregistered-session fallback; subagent transcripts index as agent-* with no row |
-| 18 | PAN-3966 | S | critical | ok |  |  | stopAgent/warm-idle reap are tmux-only: a lingering Herdr pane blocks every role-run re-dispatch with "already running" (749 refusals) |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
+| 20 | PAN-3981 | M | critical | ok |  |  | Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision) |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
-| 23 | PAN-3981 | M | critical | ok |  | PAN-3966 | Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision) |
 | 25 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -283,7 +281,6 @@ _Last sequenced: 2026-09-24T17:04:09.991Z · model: claude-opus-5 · open: 838_
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
 | 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 307 | PAN-3787 | L | medium | ok |  |  | Add a per-child composer and live Working-for indicator to subagent transcripts for Codex and Claude Code |
 | 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
@@ -866,13 +863,9 @@ In pipeline — rank pinned. Herdr gaps in the sync liveness path and swarm acco
 
 In pipeline — rank pinned.
 
-### PAN-3931 (rank 8)
+### PAN-4090 (rank 10)
 
-In pipeline — rank pinned.
-
-### PAN-3924 (rank 9)
-
-In pipeline — rank pinned.
+New this run. Herdr is the default terminal backend, but three operator-facing skills still find agents through `tmux -L overdeck`, so on a Herdr host they list no sessions, mark every agent dead in the AGENT column and read no pane output; pipeline-status additionally hardcodes project=overdeck against a registry that knows the project as panopticon-cli, so the membership call returns 404 and the board renders empty. The fix is named in the body and backend-agnostic - read liveness from GET /api/agents and output from GET /api/agents/:id/conversation, and resolve the key from `pan project list --json` - so this is a small, high-leverage repair of the operator's read path into the pipeline. Ranked into the tail of the cut-follow-up cluster and ahead of PAN-3929, which rewrites prose in two of the same SKILL.md files (pipeline-status, pan-recap) and should land on corrected commands.
 
 ### PAN-3929 (rank 11)
 
@@ -890,21 +883,17 @@ In pipeline — rank pinned.
 
 In pipeline (planned) — new since the prior run, slotted at the first free rank after the pinned block so no other pinned rank moves. Restores a regression that PAN-3950 (#3951, merged) introduced by removing the Jul 30 unregistered-session fallback, and adds the never-worked subagent-transcript open path (resolve parent session from the subagents/ dir, record it at index time). Well-specified body with reproduced state and an operator directive, so condition ok; medium importance because it is a dashboard search surface, not substrate.
 
-### PAN-3966 (rank 18)
-
-The sequencer was refused 749 times over three weeks by its own finished pane; the same wall stands for every role run, and Stop/pan kill only rewrite state on a Herdr host. The fix shape is already proven (closeAgentPane through the backend, liveness from isAlive). Subsumes the stop half of PAN-3947.
-
 ### PAN-3983 (rank 19)
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Inserted at rank 19, the first non-pinned slot; ranks 1-18 are in-pipeline and stay pinned. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
 
+### PAN-3981 (rank 20)
+
+Rank held at 23, still behind its blocker PAN-3966 (Herdr-aware stopAgent, in pipeline at rank 18). The three issues it was cross-referenced with — PAN-2828, PAN-3898 and PAN-3967 — all closed since the prior run, so those informs edges drop. The squash blindness the body cites as 'same as PAN-2828' is now solved code rather than an open dependency: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) is the check the reaper's ahead-of-origin/main guard should adopt. The operator-decision framing is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, with the reaper as fallback. Rank lifted 23 -> 20 this run: its blocker PAN-3966 (tmux-only stopAgent/warm-idle reap) closed, so the Herdr pane-close primitive strike completion depends on now exists and this is startable.
+
 ### PAN-3939 (rank 22)
 
 Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.
-
-### PAN-3981 (rank 23)
-
-Rank held at 23, still behind its blocker PAN-3966 (Herdr-aware stopAgent, in pipeline at rank 18). The three issues it was cross-referenced with — PAN-2828, PAN-3898 and PAN-3967 — all closed since the prior run, so those informs edges drop. The squash blindness the body cites as 'same as PAN-2828' is now solved code rather than an open dependency: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) is the check the reaper's ahead-of-origin/main guard should adopt. The operator-decision framing is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, with the reaper as fallback.
 
 ### PAN-3977 (rank 25)
 
@@ -1166,6 +1155,14 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
 
 New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts shelling straight to docker builder prune --all --force, with no BuildKit bytes in the canonical inventory, no candidate through the resource reclaim door and no age or size floor. The partial strike is a fine urgent backstop, but closing PAN-3809 on it would quietly drop requirements 1-3. Ranked directly behind its parent so the completion work is not forgotten once the emergency lands. Dropped dependsOn PAN-3809 (closed since the prior run).
 
+### PAN-2179 (rank 101)
+
+Triage: verify the no-kickoff zombie gap against the current liveness definition (stale work activity, not a mirror label). Rank held.
+
+### PAN-2169 (rank 102)
+
+Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation heuristic gap against that routine. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1173,10 +1170,10 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T17:04:09.991Z",
+  "generatedAt": "2026-09-24T17:17:25.650Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 838,
+  "openCount": 835,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1244,28 +1241,15 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3931",
-      "rank": 8,
+      "issue": "PAN-4090",
+      "rank": 10,
       "size": "S",
-      "importance": "medium",
-      "score": 62,
+      "importance": "high",
+      "score": 68,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Peer dashboards still mark primary conversations ended, write agent state and durable events; gate on isPeerDashboardProcess per site",
-      "rationale": "In pipeline — rank pinned.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3924",
-      "rank": 9,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pipeline-membership: gh graphql failure drops stderr and toasts; retry once; listProjectTrackerIssues blind to GitHub-tracked projects",
-      "rationale": "In pipeline — rank pinned.",
+      "why": "On a Herdr host pipeline-status, pan-agent-activity and pan-recap report every agent dead; pipeline-status 404s on a hardcoded project key",
+      "rationale": "New this run. Herdr is the default terminal backend, but three operator-facing skills still find agents through `tmux -L overdeck`, so on a Herdr host they list no sessions, mark every agent dead in the AGENT column and read no pane output; pipeline-status additionally hardcodes project=overdeck against a registry that knows the project as panopticon-cli, so the membership call returns 404 and the board renders empty. The fix is named in the body and backend-agnostic - read liveness from GET /api/agents and output from GET /api/agents/:id/conversation, and resolve the key from `pan project list --json` - so this is a small, high-leverage repair of the operator's read path into the pipeline. Ranked into the tail of the cut-follow-up cluster and ahead of PAN-3929, which rewrites prose in two of the same SKILL.md files (pipeline-status, pan-recap) and should land on corrected commands.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1322,19 +1306,6 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3966",
-      "rank": 18,
-      "size": "S",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "stopAgent/warm-idle reap are tmux-only: a lingering Herdr pane blocks every role-run re-dispatch with \"already running\" (749 refusals)",
-      "rationale": "The sequencer was refused 749 times over three weeks by its own finished pane; the same wall stands for every role run, and Stop/pan kill only rewrite state on a Herdr host. The fix shape is already proven (closeAgentPane through the backend, liveness from isAlive). Subsumes the stop half of PAN-3947.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3983",
       "rank": 19,
       "size": "S",
@@ -1348,6 +1319,19 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "planning": "auto"
     },
     {
+      "issue": "PAN-3981",
+      "rank": 20,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision)",
+      "rationale": "Rank held at 23, still behind its blocker PAN-3966 (Herdr-aware stopAgent, in pipeline at rank 18). The three issues it was cross-referenced with — PAN-2828, PAN-3898 and PAN-3967 — all closed since the prior run, so those informs edges drop. The squash blindness the body cites as 'same as PAN-2828' is now solved code rather than an open dependency: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) is the check the reaper's ahead-of-origin/main guard should adopt. The operator-decision framing is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, with the reaper as fallback. Rank lifted 23 -> 20 this run: its blocker PAN-3966 (tmux-only stopAgent/warm-idle reap) closed, so the Herdr pane-close primitive strike completion depends on now exists and this is startable.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3939",
       "rank": 22,
       "size": "S",
@@ -1357,21 +1341,6 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "dependsOn": [],
       "why": "Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive",
       "rationale": "Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3981",
-      "rank": 23,
-      "size": "M",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-3966"
-      ],
-      "why": "Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision)",
-      "rationale": "Rank held at 23, still behind its blocker PAN-3966 (Herdr-aware stopAgent, in pipeline at rank 18). The three issues it was cross-referenced with — PAN-2828, PAN-3898 and PAN-3967 — all closed since the prior run, so those informs edges drop. The squash blindness the body cites as 'same as PAN-2828' is now solved code rather than an open dependency: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) is the check the reaper's ahead-of-origin/main guard should adopt. The operator-decision framing is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, with the reaper as fallback.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4692,19 +4661,6 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "why": "Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3787",
-      "rank": 307,
-      "size": "L",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add a per-child composer and live Working-for indicator to subagent transcripts for Codex and Claude Code",
-      "rationale": "New this pass. Extends the subagent rail from read-only viewing to direct child input, which needs thread-scoped routing on the Codex app-server adapter and a structured child-input connection under the Claude Code PTY. Genuine operator value once the rail exists, but it is conversation ergonomics rather than pipeline integrity, so it sits in the feature tier. In-pipeline, pinned.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1246",
@@ -12521,13 +12477,6 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "confidence": 1
     },
     {
-      "from": "PAN-3966",
-      "to": "PAN-3939",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-3921",
       "to": "PAN-3936",
       "type": "unblocks",
@@ -12580,20 +12529,6 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "from": "PAN-3909",
       "to": "PAN-1936",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3966",
-      "to": "PAN-3981",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3966",
-      "to": "PAN-3981",
-      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
     },
@@ -12778,6 +12713,13 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4090",
+      "to": "PAN-3929",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }
