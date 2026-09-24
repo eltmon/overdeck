@@ -253,7 +253,68 @@ describe('CommandPalette conversation results', () => {
       byteOffset: 42,
       label: 'semantic transcript hit',
       sourceLabel: 'Claude session session-',
+      subagentId: null,
     });
+    expect(getOptionByValue('conv-session-a-42').querySelector('svg.lucide-message-circle')).not.toBeNull();
+  });
+
+  it('opens a subagent hit with its parent conversation and bare subagent id (PAN-3982)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({
+          observations: [],
+          conversations: [{
+            sessionId: 'agent-deadbeef01',
+            conversationId: 'parent-conv',
+            parentSessionId: '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607',
+            subagentId: 'deadbeef01',
+            projectId: '-home-eltmon-Projects-overdeck',
+            projectKey: 'overdeck',
+            role: 'assistant',
+            ts: '2026-06-02T01:00:00.000Z',
+            byteOffset: 7,
+            displayContent: 'subagent transcript hit',
+            excerpt: 'subagent ⦇needle⦈',
+            excerptSegments: [{ text: 'subagent ', match: false }, { text: 'needle', match: true }],
+            rank: 1,
+          }],
+          memory: [],
+          summaries: [],
+        });
+      }
+      return undefined;
+    });
+    const onOpenConversationHit = vi.fn();
+    render(
+      <CommandPalette
+        isOpen
+        onClose={vi.fn()}
+        onNavigate={vi.fn()}
+        onOpenConversationHit={onOpenConversationHit}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'needle' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    const option = getOptionByValue('conv-agent-deadbeef01-7');
+    expect(option.querySelector('svg.lucide-messages-square')).not.toBeNull();
+    expect(option.querySelector('svg.lucide-message-circle')).toBeNull();
+    fireEvent.click(option);
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+
+    expect(onOpenConversationHit).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: 'agent-deadbeef01',
+      conversationId: 'parent-conv',
+      byteOffset: 7,
+      subagentId: 'deadbeef01',
+      sourceLabel: 'Subagent of Conversation parent-conv',
+    }));
   });
 });
 

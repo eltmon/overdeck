@@ -1,6 +1,6 @@
 ---
 name: pan-stop-all-agents
-description: "Drain Overdeck: kill every running work agent and its review/test specialists, optionally stop the dashboard, and preserve conversation tmux sessions and shared sidecars."
+description: "Drain Overdeck: kill every running work agent and its review/test specialists on the host terminal backend (Herdr or tmux), optionally stop the dashboard, and preserve conversations and shared sidecars."
 triggers:
   - stop all agents
   - kill all agents
@@ -17,7 +17,7 @@ allowed-tools:
 
 ## Overview
 
-Cleanly stops every running work agent plus its associated review-coordinators and test specialists, and (optionally) the dashboard — without touching conversation tmux sessions (`conv-*`) or shared sidecars (CLIProxy, Traefik, TLDR).
+Cleanly stops every running work agent plus its review and test specialists, and (optionally) the dashboard — without touching conversations (`conv-*`) or shared sidecars (CLIProxy, Traefik, TLDR).
 
 ## When to Use
 
@@ -28,14 +28,20 @@ Cleanly stops every running work agent plus its associated review-coordinators a
 
 ## What Gets Killed vs. Preserved
 
-| Tmux session prefix          | Action      | Why |
-| ---------------------------- | ----------- | --- |
-| `agent-<issue>`              | **kill**    | Work agents |
-| `review-coordinator-*`       | **kill**    | Review pipeline tied to a work agent |
-| `specialist-*-test-agent`    | **kill**    | Test specialist tied to a work agent |
-| `conv-*`                     | **PRESERVE**| Conversation tmux for `overdeck.localhost/conv/<id>` — these are user-facing chats, not work runs |
-| `overdeck` (server)        | **PRESERVE** unless stopping dashboard |
-| CLIProxy, Traefik, TLDR      | **PRESERVE** — shared sidecars |
+| What                                              | Action       | Why |
+| ------------------------------------------------- | ------------ | --- |
+| Work agents (`agent-<issue>`, swarm slots)        | **kill**     | Work runs |
+| Review/test specialists (`agent-<issue>-review`, `agent-<issue>-test`, …) | **kill** | Tied to the work agent; `pan kill <issue>` stops them with it |
+| Planning (`planning-<issue>`) and strike (`strike-<issue>`) agents | **kill** | Same issue-scoped runs |
+| Conversations (`conv-*`)                          | **PRESERVE** | Chats behind `overdeck.localhost/conv/<id>`, not work runs |
+| Dashboard                                         | **PRESERVE** unless stopping it |
+| CLIProxy, Traefik, TLDR                           | **PRESERVE** | Shared sidecars |
+
+Agents run on the host's terminal backend: Herdr by default, tmux only under
+`terminal.backend: tmux`. List them with `GET /api/agents`, which reads that
+backend, and stop them with `pan kill`, which closes the pane on either one.
+Never list or kill agents with `tmux -L overdeck`: on a Herdr host it sees none
+of them. Conversations still run on tmux until PAN-3921.
 
 The dashboard is treated as a separate axis: stop it explicitly only if asked.
 
@@ -47,42 +53,43 @@ The dashboard is treated as a separate axis: stop it explicitly only if asked.
 user has already explicitly said "kill all agents".
 
 ```bash
-# List live tmux sessions, classified
-tmux -L overdeck ls 2>/dev/null | awk -F: '{print }' | sort | awk '
-  /^agent-/                  { agents[++a] =  }
-  /^review-coordinator-/     { reviews[++r] =  }
-  /^specialist-/             { specs[++s] =  }
-  /^conv-/                   { convs[++c] =  }
-  END {
-    print "Work agents to kill ("a"):";          for (i=1;i<=a;i++) print "  " agents[i]
-    print "Review coordinators to kill ("r"):";  for (i=1;i<=r;i++) print "  " reviews[i]
-    print "Test specialists to kill ("s"):";     for (i=1;i<=s;i++) print "  " specs[i]
-    print "Conversations to PRESERVE ("c"):";    for (i=1;i<=c;i++) print "  " convs[i]
-  }
-'
+# Live agents (a live pane on the host backend), grouped by issue
+curl -s http://localhost:3011/api/agents | jq -r '
+  [.[] | select(.hasLiveTmuxSession == true) | select(.id | startswith("conv-") | not)]
+  | group_by(.issueId)[]
+  | "\(.[0].issueId): \([.[].id] | join(", "))"'
 ```
+
+`/api/agents` also lists agents stopped within the last hour; the
+`hasLiveTmuxSession` filter (true for a live pane on either backend) drops them.
 
 Show this list to the user. Wait for confirmation if they have not already pre-authorized.
 
-### 2. Kill work agents via the CLI (preferred)
+### 2. Kill every live agent's issue via the CLI
 
-Use `pan kill <issue-id>` so Cloister updates state cleanly. Derive the issue ID from
-the session name: `agent-pan-895` → `pan kill PAN-895`, `agent-min-215` → `pan kill MIN-215`.
+`pan kill <issue-id>` stops every agent of that issue (work, planning,
+review/test specialists, strike, swarm slots), writes its state, sweeps orphan
+launchers and tears down its Docker stack.
 
 ```bash
-# Loop over agent sessions and kill each via pan
-tmux -L overdeck ls 2>/dev/null \
-  | awk -F: '/^agent-/ {print }' \
-  | sed 's/^agent-//' \
-  | tr 'a-z' 'A-Z' \
-  | while read id; do
-      pan kill "$id" || true
+curl -s http://localhost:3011/api/agents \
+  | jq -r '.[] | select(.hasLiveTmuxSession == true) | select(.id | startswith("conv-") | not) | .issueId' \
+  | sort -u \
+  | while read -r issue; do
+      pan kill "$issue" --force || echo "pan kill $issue FAILED"
     done
 ```
 
-If `pan kill` fails (e.g., agent is in a broken state.json), fall back to tmux:
+If `pan kill` fails for an issue, retry with the one agent id
+(`pan kill agent-pan-895-review --force`). If it still fails (e.g. a broken
+state.json), close the pane on the backend that hosts it, as a last resort:
 
 ```bash
+# Herdr host: the pane carrying the agent id in its agentId token
+herdr pane list
+herdr pane close <pane-id>
+
+# tmux host, or a pre-Herdr agent still on tmux
 tmux -L overdeck kill-session -t agent-<issue>
 ```
 
@@ -90,26 +97,18 @@ tmux -L overdeck kill-session -t agent-<issue>
 "No Bandaids"). State files live at `~/.overdeck/agents/<id>/state.json`. The most
 common breakage is a doubled trailing `}` from a partial write.
 
-### 3. Kill review coordinators and test specialists
-
-These are spawned per-agent and don't have CLI verbs of their own. Killing the tmux
-session is the right move; their lifecycle is fully derived from the work agent.
+### 3. Verify no agent is alive
 
 ```bash
-for prefix in review-coordinator- specialist-; do
-  tmux -L overdeck ls 2>/dev/null \
-    | awk -F: -v p="^$prefix" ' { print  }' \
-    | while read sess; do
-        tmux -L overdeck kill-session -t "$sess" || true
-      done
-done
+# pan status probes each agent live (Herdr or tmux); /api/agents caches for ~5s
+pan status --json | jq -r '.[] | select(.alive) | select(.id | startswith("conv-") | not) | .id'
+# Expect no output. Conversations stay up.
 ```
 
-### 4. Verify only conversations and the server remain
+### 4. Verify conversations survived
 
 ```bash
-tmux -L overdeck ls 2>/dev/null | awk -F: '{print }' | sort
-# Expect only: conv-* sessions, plus possibly the overdeck control session.
+curl -s http://localhost:3011/api/conversations | jq -r '.[] | select(.status == "active") | .tmuxSession'
 ```
 
 ### 5. (Optional) Stop the dashboard
@@ -153,14 +152,18 @@ encodes this: dashboard restarts, sidecars are left alone. Mirror that here.
 
 ## Common Mistakes
 
-- **Killing `conv-*` sessions** — these are chat views, not work agents. Always filter
-  to `^agent-`, `^review-coordinator-`, `^specialist-` prefixes.
-- **Using `tmux kill-session` instead of `pan kill`** — bypasses Cloister's state
-  cleanup. Only fall back to tmux if `pan kill` errors.
+- **Killing `conv-*` sessions** — these are chat views, not work agents. Drive the drain
+  from `/api/agents`, which lists agents only, and drop any `conv-` id.
+- **Listing agents with `tmux -L overdeck ls`** — on a Herdr host (the default) it finds
+  no agents, so the drain silently does nothing.
+- **Using `tmux kill-session` or `herdr pane close` instead of `pan kill`** — bypasses
+  Cloister's state write, the orphan-launcher sweep and the Docker teardown. Only close a
+  pane by hand if `pan kill` errors.
 - **Calling `pan down` when only "kill agents" was asked** — leave the dashboard up
   unless explicitly told to stop it.
-- **Assuming the agent ID matches the session name verbatim** — sessions are lower-case
-  (`agent-pan-895`); `pan kill` expects upper-case issue IDs (`PAN-895`).
+- **Passing an agent id where an issue id is meant** — `pan kill PAN-895` stops every
+  agent of the issue; `pan kill agent-pan-895` stops only that one agent. The loop above
+  uses the `issueId` field from `/api/agents`.
 - **Working around a malformed state.json** — fix the file (and file an issue for the
   writer that produced it). No bandaids.
 

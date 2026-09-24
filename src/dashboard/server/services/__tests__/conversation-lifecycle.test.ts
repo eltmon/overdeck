@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, utimesSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock the conversations-db module
 const mockListConversations = vi.fn();
@@ -981,5 +981,47 @@ describe('ConversationLifecycleService — pollConversations on a Herdr host (PA
     await pollConversations();
 
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+});
+
+// PAN-3931: every poll writes the shared conversations table. A peer dashboard
+// (OVERDECK_DISABLE_DEACON=1) must start no poller, so it can never mark the
+// primary's live conversations ended.
+describe('ConversationLifecycleService — peer dashboard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+  afterEach(async () => {
+    const { stopConversationLifecycleService } = await import('../conversation-lifecycle.js');
+    stopConversationLifecycleService();
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  it('starts no poller and ends no conversation in a peer dashboard', async () => {
+    vi.stubEnv('OVERDECK_DISABLE_DEACON', '1');
+    mockListConversations.mockReturnValue([
+      { name: 'primary-live', tmuxSession: 'conv-primary-live', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed([]));
+
+    const { startConversationLifecycleService } = await import('../conversation-lifecycle.js');
+    expect(startConversationLifecycleService()).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mockListConversations).not.toHaveBeenCalled();
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  it('starts the poller in the primary dashboard', async () => {
+    vi.stubEnv('OVERDECK_DISABLE_DEACON', '');
+    mockListConversations.mockReturnValue([]);
+
+    const { startConversationLifecycleService } = await import('../conversation-lifecycle.js');
+    expect(startConversationLifecycleService()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(mockListConversations).toHaveBeenCalled();
   });
 });

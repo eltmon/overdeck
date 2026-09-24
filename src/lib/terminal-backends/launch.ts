@@ -23,7 +23,7 @@ import { homedir } from 'node:os';
 
 import { Effect } from 'effect';
 
-import { AGENT_ID_TOKEN } from './herdr.js';
+import { AGENT_ID_TOKEN, HerdrBackend } from './herdr.js';
 import './tmux.js';
 import { resolveTerminalBackend } from './registry.js';
 import { hostTerminalBackendName, probeHerdrAvailability } from './select.js';
@@ -34,6 +34,7 @@ import {
   type AgentPaneRef,
   type AgentRole,
   type BackendAgentSnapshot,
+  type BackendRef,
   type PaneTokens,
   type TerminalBackend,
   type TerminalBackendName,
@@ -206,7 +207,7 @@ export async function agentPaneExists(agentId: string, backend?: TerminalBackend
 }
 
 /** True when a backend `close` reported success (not `unsupported`, not a failure). */
-async function closeThrough(backend: TerminalBackend, pane: AgentPaneRef): Promise<boolean> {
+async function closeThrough(backend: TerminalBackend, pane: BackendRef): Promise<boolean> {
   try {
     const result = await Effect.runPromise(backend.close(pane));
     return !isUnsupported(result);
@@ -223,6 +224,26 @@ function tmuxSessionRef(agentId: string): AgentPaneRef {
  * What `closeAgentPaneDetailed` did: `closed` a pane or session, found nothing
  * running (`absent`), or could not stop it (`failed`, with the reason).
  */
+export interface CloseAgentPaneOptions {
+  /**
+   * The Herdr pane id the agent's state recorded at launch. Defaults to
+   * `state.paneId` when the state says the pane is on Herdr. Closed unless
+   * something in it names another owner (PAN-3966).
+   */
+  readonly recordedPaneId?: string;
+}
+
+/** `state.paneId` when the agent's state records a Herdr pane; never throws. */
+async function recordedHerdrPaneId(agentId: string): Promise<string | undefined> {
+  try {
+    const { getAgentState } = await import('../agents/agent-state-read.js');
+    const state = getAgentState(agentId);
+    return state?.backend === 'herdr' && state.paneId ? state.paneId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type CloseAgentPaneResult =
   | { readonly outcome: 'closed' }
   | { readonly outcome: 'absent' }
@@ -243,15 +264,23 @@ export type CloseAgentPaneResult =
  *   agent launched before the host moved to Herdr) is killed too.
  * - **tmux:** the agent's session is killed through the tmux adapter's `close`.
  *
+ * On Herdr every pane the agent occupies is closed: found by live agent name,
+ * by `agentId` token, or by the pane id its state recorded (`recordedPaneId`),
+ * which is the only handle left once a Herdr restore has dropped the pane's
+ * tokens (PAN-3966). A workspace that belongs to the agent alone (a role run
+ * launched with its own id as the issue) is closed whole. An issue workspace is
+ * shared by the issue's agents and is never closed here.
+ *
  * Never throws. Unlike `closeAgentPane`, it tells "nothing was running" apart
  * from "the close failed" (review of #3992, L2): a caller that reports the stop
  * to an operator must not call a failed close "already stopped". On Herdr,
- * `absent` inherits `findHerdrAgentPane`'s answer, which cannot tell "no such
- * pane" from "the socket did not answer the lookup".
+ * `absent` inherits `findHerdrAgentTerminals`'s answer, which cannot tell "no
+ * such pane" from "the socket did not answer the lookup".
  */
 export async function closeAgentPaneDetailed(
   agentId: string,
   backend?: TerminalBackend,
+  options: CloseAgentPaneOptions = {},
 ): Promise<CloseAgentPaneResult> {
   const { sessionExists } = await import('../tmux.js');
   const tmuxSessionLive = (): Promise<boolean> =>
@@ -283,9 +312,22 @@ export async function closeAgentPaneDetailed(
 
   const failures: string[] = [];
   let closed = false;
-  const { findHerdrAgentPane } = await import('./herdr.js');
-  const ref = await findHerdrAgentPane(agentId);
-  if (ref) {
+  const { findHerdrAgentTerminals } = await import('./herdr-agent-terminals.js');
+  const recordedPaneId = options.recordedPaneId ?? (await recordedHerdrPaneId(agentId));
+  const found = await findHerdrAgentTerminals(agentId, { recordedPaneId });
+  // A workspace that belongs to this agent alone goes whole, its root shell and
+  // any residue with it. A pane in a shared issue workspace goes by itself.
+  const closedWorkspaces = new Set<string>();
+  for (const workspaceId of found.workspaceIds) {
+    if (await closeThrough(resolved, { backend: resolved.name, workspaceId, cwd: '' })) {
+      closed = true;
+      closedWorkspaces.add(workspaceId);
+    } else {
+      failures.push(`${resolved.name} could not close workspace ${workspaceId}`);
+    }
+  }
+  for (const ref of found.panes) {
+    if (closedWorkspaces.has(ref.workspaceId)) continue;
     const ok = await closeThrough(resolved, {
       backend: resolved.name,
       workspaceId: ref.workspaceId,
@@ -310,8 +352,12 @@ export async function closeAgentPaneDetailed(
  * `closeAgentPaneDetailed` for callers that only need a boolean. Never throws.
  * Returns true only when a pane or session was closed and no close failed.
  */
-export async function closeAgentPane(agentId: string, backend?: TerminalBackend): Promise<boolean> {
-  return (await closeAgentPaneDetailed(agentId, backend)).outcome === 'closed';
+export async function closeAgentPane(
+  agentId: string,
+  backend?: TerminalBackend,
+  options: CloseAgentPaneOptions = {},
+): Promise<boolean> {
+  return (await closeAgentPaneDetailed(agentId, backend, options)).outcome === 'closed';
 }
 
 export interface CloseIssuePanesOptions {
@@ -327,6 +373,14 @@ export interface CloseIssuePanesOptions {
  * it carries the issue in its `issue` token — so on Herdr those name scans find
  * nothing and every pane survives. This reads the backend's live inventory and
  * closes the panes whose `issue` token matches (optionally filtered by `role`).
+ *
+ * Without a role filter (close-out) the issue's workspaces go whole, root shell
+ * and residue with them. They are found by `issue` token or, when a Herdr
+ * restore dropped it, by label, and every untagged pane in them counts as the
+ * issue's: a restore drops pane tokens too (#4096). A workspace holding a pane
+ * that names another owner (another issue, or an operator conversation) is not
+ * closed whole; only the issue's and untagged panes in it are. With a role
+ * filter an untagged pane is left alone, since nothing says what role it had.
  *
  * Herdr only: on tmux the callers' existing session-name scans already reach
  * every session, and a tmux pane carries no stamped tokens. Operator
@@ -348,14 +402,36 @@ export async function closeIssuePanes(
     return [];
   }
   const wanted = issueId.toLowerCase();
+  const agentNameOf = (pane: BackendAgentSnapshot): string =>
+    (pane.tokens as Record<string, string | undefined>)[AGENT_ID_TOKEN] ?? pane.paneId;
+  // An operator conversation is never an issue's agent, even if a pane were
+  // ever stamped with an issue: the tmux sweeps this mirrors never match `conv-*`.
+  const isConversation = (pane: BackendAgentSnapshot): boolean => agentNameOf(pane).toLowerCase().startsWith('conv-');
+  const namesOtherOwner = (pane: BackendAgentSnapshot): boolean =>
+    isConversation(pane) || (!!pane.tokens.issue && pane.tokens.issue.toLowerCase() !== wanted);
+
+  const issueWorkspaces = new Set<string>();
+  if (!options.roles && resolved instanceof HerdrBackend) {
+    for (const id of await resolved.issueWorkspaceIds(issueId).catch(() => [])) issueWorkspaces.add(id);
+  }
   const closed: string[] = [];
+  const closedWorkspaces = new Set<string>();
+  for (const workspaceId of issueWorkspaces) {
+    const members = inventory.filter((pane) => pane.workspaceId === workspaceId);
+    if (members.some(namesOtherOwner)) continue;
+    if (!(await closeThrough(resolved, { backend: resolved.name, workspaceId, cwd: '' }))) continue;
+    closedWorkspaces.add(workspaceId);
+    closed.push(...members.map(agentNameOf));
+  }
+
   for (const pane of inventory) {
-    if (pane.tokens.issue?.toLowerCase() !== wanted) continue;
+    if (closedWorkspaces.has(pane.workspaceId)) continue;
+    const ownPane = pane.tokens.issue?.toLowerCase() === wanted
+      || (issueWorkspaces.has(pane.workspaceId) && !namesOtherOwner(pane));
+    if (!ownPane) continue;
     if (options.roles && (!pane.tokens.role || !options.roles.includes(pane.tokens.role))) continue;
-    const agentName = (pane.tokens as Record<string, string | undefined>)[AGENT_ID_TOKEN] ?? pane.paneId;
-    // An operator conversation is never an issue's agent, even if a pane were
-    // ever stamped with an issue: the tmux sweeps this mirrors never match `conv-*`.
-    if (agentName.toLowerCase().startsWith('conv-')) continue;
+    const agentName = agentNameOf(pane);
+    if (isConversation(pane)) continue;
     const ok = await closeThrough(resolved, {
       backend: resolved.name,
       workspaceId: pane.workspaceId,

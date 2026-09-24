@@ -298,4 +298,38 @@ describe('startRestartAnnouncer', () => {
     await vi.advanceTimersByTimeAsync(45_000);
     expect(t.emitted).toHaveLength(1);
   });
+
+  // PAN-3931: a peer shares the primary's settings and restart-status.json. If
+  // it ran, it would record the primary's restart as announced (so the primary
+  // never announces it) and write the supervisor give-up status.
+  it('starts nothing in a peer dashboard and writes no restart state', async () => {
+    const t = makeDeps(watchdogSuccess);
+    const readStatus = vi.fn(t.deps.readStatus);
+    const writeStatus = vi.fn(t.deps.writeStatus);
+    const setLastAnnounced = vi.fn(t.deps.setLastAnnounced);
+
+    expect(startRestartAnnouncer({
+      ...t.deps,
+      readStatus,
+      writeStatus,
+      setLastAnnounced,
+      readSupervisorUnitFailed: async () => true,
+      isPeer: () => true,
+    })).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(readStatus).not.toHaveBeenCalled();
+    expect(writeStatus).not.toHaveBeenCalled();
+    expect(setLastAnnounced).not.toHaveBeenCalled();
+    expect(t.lastAnnounced()).toBeNull();
+    expect(t.emitted).toHaveLength(0);
+  });
+
+  it('starts in the primary dashboard', async () => {
+    const t = makeDeps(watchdogSuccess);
+    expect(startRestartAnnouncer({ ...t.deps, isPeer: () => false })).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(t.lastAnnounced()).toBe(RESTART_TS);
+    expect(t.emitted).toHaveLength(1);
+  });
 });

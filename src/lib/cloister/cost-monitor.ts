@@ -3,16 +3,13 @@
  *
  * Monitors agent costs against configured limits and emits alerts.
  * Does NOT automatically stop agents - just provides visibility and warnings.
+ * Every number is read from the cost_events table; this module stores nothing
+ * (the old cost-data.json accumulator had no writer and was removed, PAN-4052).
  */
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
-import { join, dirname } from 'path';
-import { OVERDECK_HOME } from '../paths.js';
 import { loadCloisterConfigSync, type CostLimitsConfig } from './config.js';
 import {
-  getAgentRollup,
   getDailyTrendsSync as getDailyTrends,
-  getCostForIssue as getCostForIssueFromDb,
   getAgentDailyCost,
 } from '../overdeck/cost-sync.js';
 
@@ -33,152 +30,6 @@ export interface CostAlert {
   limit: number;
   percentUsed: number;
   timestamp: string;
-}
-
-/**
- * Cost tracking data (persisted format)
- */
-interface CostDataPersisted {
-  perAgent: Record<string, number>;
-  perIssue: Record<string, number>;
-  dailyTotal: number;
-  lastResetDate: string; // ISO date string (YYYY-MM-DD)
-}
-
-/**
- * Cost tracking data (runtime format)
- */
-interface CostData {
-  perAgent: Map<string, number>;
-  perIssue: Map<string, number>;
-  dailyTotal: number;
-  lastResetDate: string; // ISO date string (YYYY-MM-DD)
-}
-
-/**
- * Path to cost data file
- */
-const COST_DATA_FILE = join(OVERDECK_HOME, 'cost-data.json');
-
-/**
- * Load cost data from file
- */
-function loadCostData(): CostData {
-  if (!existsSync(COST_DATA_FILE)) {
-    return {
-      perAgent: new Map(),
-      perIssue: new Map(),
-      dailyTotal: 0,
-      lastResetDate: new Date().toISOString().split('T')[0],
-    };
-  }
-
-  try {
-    const fileContent = readFileSync(COST_DATA_FILE, 'utf-8');
-    const persisted: CostDataPersisted = JSON.parse(fileContent);
-
-    return {
-      perAgent: new Map(Object.entries(persisted.perAgent || {})),
-      perIssue: new Map(Object.entries(persisted.perIssue || {})),
-      dailyTotal: persisted.dailyTotal || 0,
-      lastResetDate: persisted.lastResetDate || new Date().toISOString().split('T')[0],
-    };
-  } catch (error) {
-    console.error('Failed to load cost data, starting fresh:', error);
-    return {
-      perAgent: new Map(),
-      perIssue: new Map(),
-      dailyTotal: 0,
-      lastResetDate: new Date().toISOString().split('T')[0],
-    };
-  }
-}
-
-/**
- * Save cost data to file (atomic write)
- */
-function saveCostData(data: CostData): void {
-  try {
-    // Ensure directory exists
-    const dir = dirname(COST_DATA_FILE);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-
-    const persisted: CostDataPersisted = {
-      perAgent: Object.fromEntries(data.perAgent),
-      perIssue: Object.fromEntries(data.perIssue),
-      dailyTotal: data.dailyTotal,
-      lastResetDate: data.lastResetDate,
-    };
-
-    // Atomic write: write to temp file, then rename
-    const tempFile = `${COST_DATA_FILE}.tmp`;
-    writeFileSync(tempFile, JSON.stringify(persisted, null, 2));
-    writeFileSync(COST_DATA_FILE, readFileSync(tempFile));
-
-    // Clean up temp file
-    try {
-      unlinkSync(tempFile);
-    } catch (unlinkError: unknown) {
-      // Non-critical: temp file cleanup failure is logged but doesn't block operation
-      console.debug('Failed to cleanup temp file:', unlinkError instanceof Error ? unlinkError.message : unlinkError);
-    }
-  } catch (error) {
-    console.error('Failed to save cost data:', error);
-  }
-}
-
-// Load cost data on module initialization
-let costData: CostData = loadCostData();
-
-/**
- * Get today's date as ISO string (YYYY-MM-DD)
- */
-function getTodayDate(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
-/**
- * Reset daily totals if it's a new day
- */
-function checkDailyReset(): void {
-  const today = getTodayDate();
-  if (costData.lastResetDate !== today) {
-    costData.dailyTotal = 0;
-    costData.lastResetDate = today;
-    console.log(`🔔 Cost monitor: Daily totals reset for ${today}`);
-    saveCostData(costData);
-  }
-}
-
-/**
- * Record a cost event
- *
- * @param agentId - Agent ID
- * @param cost - Cost in USD
- * @param issueId - Optional issue ID
- *
- * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
- */
-export function recordCost(agentId: string, cost: number, issueId?: string): void {
-  checkDailyReset();
-
-  // Update per-agent cost
-  const currentAgentCost = costData.perAgent.get(agentId) || 0;
-  costData.perAgent.set(agentId, currentAgentCost + cost);
-
-  // Update per-issue cost
-  if (issueId) {
-    const currentIssueCost = costData.perIssue.get(issueId) || 0;
-    costData.perIssue.set(issueId, currentIssueCost + cost);
-  }
-
-  // Update daily total
-  costData.dailyTotal += cost;
-
-  // Persist to disk
-  saveCostData(costData);
 }
 
 /**
@@ -292,84 +143,4 @@ export function checkCostLimits(
   }
 
   return alerts;
-}
-
-/**
- * Get current cost data for an agent
- *
- * @param agentId - Agent ID
- * @returns Current cost
- *
- * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
- */
-export function getAgentCost(agentId: string): number {
-  return costData.perAgent.get(agentId) || 0;
-}
-
-/**
- * Get current cost data for an issue
- *
- * @param issueId - Issue ID
- * @returns Current cost
- *
- * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
- */
-export function getIssueCost(issueId: string): number {
-  return costData.perIssue.get(issueId) || 0;
-}
-
-/**
- * Get current daily total cost
- *
- * @returns Current daily total
- *
- * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
- */
-export function getDailyTotal(): number {
-  checkDailyReset();
-  return costData.dailyTotal;
-}
-
-/**
- * Get cost summary
- *
- * @returns Cost summary with top spenders
- */
-export function getCostSummary(): {
-  dailyTotal: number;
-  topAgents: Array<{ agentId: string; cost: number }>;
-  topIssues: Array<{ issueId: string; cost: number }>;
-} {
-  checkDailyReset();
-
-  // Sort agents by cost
-  const topAgents = Array.from(costData.perAgent.entries())
-    .map(([agentId, cost]) => ({ agentId, cost }))
-    .sort((a, b) => b.cost - a.cost)
-    .slice(0, 10);
-
-  // Sort issues by cost
-  const topIssues = Array.from(costData.perIssue.entries())
-    .map(([issueId, cost]) => ({ issueId, cost }))
-    .sort((a, b) => b.cost - a.cost)
-    .slice(0, 10);
-
-  return {
-    dailyTotal: costData.dailyTotal,
-    topAgents,
-    topIssues,
-  };
-}
-
-/**
- * Reset cost tracking (for testing)
- */
-export function resetCostTracking(): void {
-  costData = {
-    perAgent: new Map(),
-    perIssue: new Map(),
-    dailyTotal: 0,
-    lastResetDate: getTodayDate(),
-  };
-  saveCostData(costData);
 }

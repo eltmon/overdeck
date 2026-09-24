@@ -141,6 +141,48 @@ describe('HerdrBackend.workspaceFor', () => {
     expect(fresh.log.find((call) => call.method === 'workspace.report_metadata')?.params)
       .toMatchObject({ workspace_id: 'w8', source: 'overdeck', tokens: { issue: 'PAN-4000' } });
   });
+
+  // #4096: a Herdr restore drops workspace tokens and keeps labels. Seen live:
+  // two `sequencer-runner` workspaces, the restored `wD` (label only) and `w13`
+  // that the next launch created beside it.
+  it('re-adopts a restored workspace by its label and re-stamps its issue token', async () => {
+    const restored = fakeApi(({ method }) =>
+      method === 'workspace.list'
+        ? { workspaces: [{ workspace_id: 'wA', label: 'RUN-777' }, { workspace_id: 'wD', label: 'sequencer-runner' }] }
+        : {});
+    const readopted = await Effect.runPromise(
+      new HerdrBackend(restored.api as never).workspaceFor('sequencer-runner', '/w'),
+    );
+    expect(readopted).toMatchObject({ workspaceId: 'wD', issueId: 'sequencer-runner' });
+    expect(restored.log.some((call) => call.method === 'workspace.create')).toBe(false);
+    expect(restored.log.find((call) => call.method === 'workspace.report_metadata')?.params)
+      .toEqual({ workspace_id: 'wD', source: 'overdeck', tokens: { issue: 'sequencer-runner' } });
+  });
+
+  it('prefers the tagged workspace, and never adopts one whose token names another issue', async () => {
+    const both = fakeApi(({ method }) =>
+      method === 'workspace.list'
+        ? {
+          workspaces: [
+            { workspace_id: 'wD', label: 'sequencer-runner' },
+            { workspace_id: 'w13', label: 'sequencer-runner', tokens: { issue: 'sequencer-runner' } },
+          ],
+        }
+        : {});
+    const tagged = await Effect.runPromise(new HerdrBackend(both.api as never).workspaceFor('sequencer-runner', '/w'));
+    expect(tagged).toMatchObject({ workspaceId: 'w13' });
+    expect(both.log.some((call) => call.method === 'workspace.report_metadata')).toBe(false);
+
+    const renamed = fakeApi(({ method }) => {
+      if (method === 'workspace.list') {
+        return { workspaces: [{ workspace_id: 'w5', label: 'PAN-4000', tokens: { issue: 'PAN-3999' } }] };
+      }
+      if (method === 'workspace.create') return { workspace: { workspace_id: 'w9' } };
+      return {};
+    });
+    const created = await Effect.runPromise(new HerdrBackend(renamed.api as never).workspaceFor('PAN-4000', '/w'));
+    expect(created).toMatchObject({ workspaceId: 'w9' });
+  });
 });
 
 describe('HerdrBackend.startAgent when Herdr never detects the agent', () => {

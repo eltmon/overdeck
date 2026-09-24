@@ -30,7 +30,7 @@ import { DrawerActivityRailView } from '../../drawer/DrawerActivityRail'
 import type { DrawerActivityItem, DrawerActivityPhase } from '../../drawer/useDrawerData'
 import { IssueView } from '../../issue-view/IssueView'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
-import { deriveShip } from '../../issue-view/derivations'
+import { deriveShip, isShipped } from '../../issue-view/derivations'
 import { RunDetailsCard } from '../../issue-view/RunDetailsCard'
 import { VerificationGatesGrid } from '../../issue-view/VerificationGates'
 import { useIssueView } from '../../issue-view/useIssueView'
@@ -338,6 +338,7 @@ function deriveNow(issue: DerivedIssueState | undefined, active: { type: string;
   const model = active ? nowModel(active.model) : ''
   const agentLabel = active ? (model ? `${label.toLowerCase()} · ${model}` : label.toLowerCase()) : undefined
   if (issue?.state === 'merged') return { tone: 'success', text: 'Merged — ready to close out' }
+  if (issue?.state === 'closed') return isShipped(issue) ? { tone: 'success', text: 'Merged and closed out' } : { tone: 'muted', text: 'Closed' }
   if (issue?.state === 'ready') return { tone: 'warning', text: 'Approved and green — waiting on you to merge' }
   if (issue?.state === 'changes-requested') {
     const onIt = active?.type === 'work'

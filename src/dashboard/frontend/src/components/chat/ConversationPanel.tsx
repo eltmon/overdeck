@@ -104,6 +104,8 @@ interface ConversationPanelProps {
   targetMessageIndex?: number;
   targetMessageNonce?: number;
   onTargetMessageHandled?: () => void;
+  /** Bare subagent id whose transcript the message target points into (PAN-3982). */
+  targetSubagentId?: string;
   /** Controlled tool-call visibility for embedded agent panes. */
   hideToolCalls?: boolean;
   onToggleHideToolCalls?: () => void;
@@ -148,6 +150,7 @@ export function ConversationPanel({
   targetMessageIndex,
   targetMessageNonce,
   onTargetMessageHandled,
+  targetSubagentId,
   hideToolCalls: controlledHideToolCalls,
   onToggleHideToolCalls,
   onEmbeddedResume,
@@ -268,6 +271,20 @@ export function ConversationPanel({
   // PAN-2876 — the rail lists the main agent plus every subagent; picking a subagent swaps the body to its transcript.
   const subagents = messagesData?.subagents ?? [];
   const { selectedAgentId: selectedSubagentId, selectedSubagent, clearSelection: clearSubagent } = useSubagentSelection(subagents);
+  // PAN-3982: a palette hit on a subagent transcript opens the parent pane with
+  // targetSubagentId; select that subagent once the rail lists it, once per open.
+  const appliedSubagentTargetRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!targetSubagentId || targetMessageNonce === undefined) return;
+    if (appliedSubagentTargetRef.current === targetMessageNonce) return;
+    if (!subagents.some((subagent) => subagent.agentId === targetSubagentId)) return;
+    appliedSubagentTargetRef.current = targetMessageNonce;
+    if (selectedSubagentId !== targetSubagentId) updateSelectedSubagent(targetSubagentId);
+  }, [targetSubagentId, targetMessageNonce, subagents, selectedSubagentId]);
+  // The main timeline must never consume a subagent's target, and the subagent
+  // transcript only takes it once its row is the selected one.
+  const mainTarget = targetSubagentId === undefined;
+  const subagentTarget = targetSubagentId !== undefined && selectedSubagentId === targetSubagentId;
   const headerMessages = messagesData?.messages ?? [];
   const headerWorkLog = messagesData?.workLog ?? [];
   const canSwitchConversationModel =
@@ -1027,7 +1044,16 @@ export function ConversationPanel({
             <ConversationTerminalView conversation={conversation} />
           )}
           {(effectiveViewMode === 'conversation' || !showTerminal) && (selectedSubagent ? (
-            <SubagentTranscript conversation={conversation} subagent={selectedSubagent} resolvedTheme={resolvedTheme} onBack={clearSubagent} />
+            <SubagentTranscript
+              conversation={conversation}
+              subagent={selectedSubagent}
+              resolvedTheme={resolvedTheme}
+              onBack={clearSubagent}
+              targetMessageId={subagentTarget ? targetMessageId : undefined}
+              targetMessageIndex={subagentTarget ? targetMessageIndex : undefined}
+              targetMessageNonce={subagentTarget ? targetMessageNonce : undefined}
+              onTargetMessageHandled={subagentTarget ? onTargetMessageHandled : undefined}
+            />
           ) : (
             <ConversationView
               conversation={conversation}
@@ -1053,10 +1079,10 @@ export function ConversationPanel({
               messagesData={messagesData}
               messagesLoading={messagesLoading}
               onOpenTerminal={showTerminal ? () => handleViewMode('terminal') : undefined}
-              targetMessageId={targetMessageId}
-              targetMessageIndex={targetMessageIndex}
-              targetMessageNonce={targetMessageNonce}
-              onTargetMessageHandled={onTargetMessageHandled}
+              targetMessageId={mainTarget ? targetMessageId : undefined}
+              targetMessageIndex={mainTarget ? targetMessageIndex : undefined}
+              targetMessageNonce={mainTarget ? targetMessageNonce : undefined}
+              onTargetMessageHandled={mainTarget ? onTargetMessageHandled : undefined}
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}

@@ -33,6 +33,7 @@ import {
   Eye,
   Loader2,
   MessageCircle,
+  MessagesSquare,
   Clock,
 } from 'lucide-react';
 import { rememberRunSession } from './workspace/WorkspaceActionBand';
@@ -89,6 +90,8 @@ export interface ConversationPaletteOpenRequest {
   byteOffset: number;
   label: string;
   sourceLabel?: string;
+  /** Bare subagent id when the hit is a subagent transcript; opens on the parent (PAN-3982). */
+  subagentId?: string | null;
 }
 
 interface CommandPaletteProps {
@@ -133,6 +136,10 @@ interface PaletteConversationHit {
   conversationId: string;
   projectId: string;
   projectKey: string | null;
+  /** Parent session UUID when the hit is a Claude subagent transcript (PAN-3982). */
+  parentSessionId?: string | null;
+  /** Bare subagent id (`agent-<id>.jsonl` → `<id>`). */
+  subagentId?: string | null;
   role: string;
   ts: string | null;
   byteOffset: number;
@@ -800,10 +807,14 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       const label = hit.displayContent || hit.conversationId || hit.sessionId;
       const project = friendlyProjectLabel(hit.projectId);
       const issueId = issueIdFromProjectLabel(project);
-      const isDashboardConversation = hit.conversationId !== hit.sessionId;
-      const sourceLabel = isDashboardConversation
+      // A subagent hit opens through its parent conversation (PAN-3982).
+      const subagentId = hit.subagentId ?? null;
+      const rootSessionId = hit.parentSessionId ?? hit.sessionId;
+      const isDashboardConversation = hit.conversationId !== rootSessionId;
+      const rootLabel = isDashboardConversation
         ? `Conversation ${hit.conversationId}`
-        : `Claude session ${hit.sessionId.slice(0, 8)}`;
+        : `Claude session ${rootSessionId.slice(0, 8)}`;
+      const sourceLabel = subagentId ? `Subagent of ${rootLabel}` : rootLabel;
       const date = formatHitDate(hit.ts);
       const metaChips: PaletteAction['meta'] = [];
       if (project) metaChips.push({ icon: FolderOpen, text: project, pill: true });
@@ -815,7 +826,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
         id: `conv-${hit.sessionId}-${hit.byteOffset}`,
         label: label.length > 80 ? `${label.slice(0, 77)}…` : label,
         meta: metaChips,
-        icon: MessageCircle,
+        icon: subagentId ? MessagesSquare : MessageCircle,
         group: 'Conversations',
         rank: hit.rank,
         sortTs: hit.ts,
@@ -834,6 +845,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
               byteOffset: hit.byteOffset,
               label,
               sourceLabel,
+              subagentId,
             });
             return;
           }

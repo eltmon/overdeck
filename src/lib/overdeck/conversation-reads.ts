@@ -1,7 +1,10 @@
 /**
- * Read operations for registered conversations. Agent-backed issue sessions
- * use `/api/agents/:id/conversation`; this module never scans agent state or
- * global transcript directories to make a missing conversation row succeed.
+ * Read operations for conversations. Registered rows resolve through
+ * `resolveSessionFile`; a bare Claude session UUID with no row (a palette hit on
+ * an indexed transcript) falls back to an exact `<uuid>.jsonl` lookup under
+ * `~/.claude/projects/` and is served read-only. Agent-backed issue sessions use
+ * `/api/agents/:id/conversation`; `agent-*` names never trigger a transcript scan
+ * here.
  */
 import { isMuseSessionPath, resolveMuseSessionPath } from '../runtimes/storage/muse.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
@@ -87,6 +90,24 @@ export type ConversationMessagesParseResult = Awaited<ReturnType<typeof parseCon
 
 function result(body: unknown, status?: number): ConversationReadResult {
   return status === undefined ? { body } : { body, status };
+}
+
+/**
+ * A bare Claude Code session UUID, as used to name `<session-id>.jsonl`.
+ * Conversation search indexes every transcript under ~/.claude/projects/, but
+ * only a minority are dashboard conversations. A palette hit on one of the
+ * rest arrives here as a raw session id, so the read paths fall back to an
+ * exact by-id lookup and serve it read-only instead of 404ing a session the
+ * operator can see in search results. Only this exact shape may trigger the
+ * sweep: `agent-*` names (work agents, subagents) never do (PAN-3950 W3;
+ * subagent hits route through their parent, PAN-3982).
+ */
+const CLAUDE_SESSION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The transcript of an indexed-but-unregistered Claude session, or null. */
+async function resolveUnregisteredClaudeSessionFile(name: string): Promise<string | null> {
+  if (!CLAUDE_SESSION_UUID_PATTERN.test(name)) return null;
+  return findClaudeSessionFileById(name);
 }
 
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
@@ -492,8 +513,10 @@ export async function getConversationMessagesRead(
 ): Promise<ConversationReadResult> {
   try {
     const conv = getConversationByName(name);
-    if (!conv) return result({ error: 'Conversation not found', lookedUp: name }, 404);
-    let sessionFile: string | null = await deps.resolveSessionFile(conv);
+    let sessionFile: string | null = conv
+      ? await deps.resolveSessionFile(conv)
+      : await resolveUnregisteredClaudeSessionFile(name);
+    if (!conv && !sessionFile) return result({ error: 'Conversation not found', lookedUp: name }, 404);
 
     if (!sessionFile) {
       if (deps.shouldReportUnresolvedLiveSession(conv)) {
@@ -566,14 +589,27 @@ export async function getConversationMessageLocator(
   name: string,
   byteOffset: number,
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile'>,
+  agentId?: string,
 ): Promise<ConversationReadResult> {
   try {
     const conv = getConversationByName(name) ?? getConversationByClaudeSessionId(name);
-    if (!conv) return result({ error: 'Conversation not found', lookedUp: name }, 404);
-    const sessionFile = await deps.resolveSessionFile(conv);
-    if (!sessionFile) return result({ error: 'Conversation transcript not found' }, 404);
+    const sessionFile = conv
+      ? await deps.resolveSessionFile(conv)
+      : await resolveUnregisteredClaudeSessionFile(name);
+    if (!conv && !sessionFile) return result({ error: 'Conversation not found', lookedUp: name }, 404);
+    if (!sessionFile) return result({ error: 'Conversation transcript not found', lookedUp: name }, 404);
 
-    const locator = await resolveConversationMessageLocator(sessionFile, byteOffset);
+    // A subagent palette hit's byte offset points into the subagent transcript,
+    // not the parent's (PAN-3982). Codex parents are never indexed, so only the
+    // Claude `<session>/subagents/agent-<id>.jsonl` layout applies here.
+    let targetFile = sessionFile;
+    if (agentId !== undefined) {
+      const subagentFile = subagentTranscriptPath(sessionFile, agentId);
+      if (!subagentFile) return result({ error: 'Invalid subagent id' }, 400);
+      targetFile = subagentFile;
+    }
+
+    const locator = await resolveConversationMessageLocator(targetFile, byteOffset);
     if (!locator) return result({ error: 'Message not found for byteOffset' }, 404);
     return result(locator);
   } catch (error: unknown) {

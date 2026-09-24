@@ -21,9 +21,11 @@
  * owns (in-review, changes-requested, ready, working) can never appear here as
  * an operator gate.
  *
- * The candidate universe is the in-flight one (live panes ∪ tracker issues), so
- * a per-request resolve is cheap and there is no cache to drift. Rows contain
- * no secrets — this route is a GET and mutates nothing.
+ * The candidate universe is the in-flight one (live panes ∪ tracker issues).
+ * States come from the batch door, one batch per project in parallel, over a
+ * PR listing served stale-while-revalidate (PAN-3925), so a request pays no
+ * per-issue `gh` read and waits on the forge only when no recent listing
+ * exists. Rows contain no secrets — this route is a GET and mutates nothing.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
@@ -83,13 +85,11 @@ export async function resolveDerivedParkedRows(deps: ResolveParkedDeps = {}): Pr
 
   const derived = new Map<string, DerivedIssueState>();
   const loadStates = deps.loadStates ?? loadIssueStatesForProject;
-  for (const [projectPath, ids] of byProject) {
-    try {
-      for (const [issueId, state] of await loadStates(projectPath, ids)) derived.set(issueId, state);
-    } catch {
-      // One project's forge or git read failed — the rest still answer.
-    }
-  }
+  // PAN-3925: the projects derive in parallel. One project's forge or git
+  // read failing drops only that project's ids.
+  const batches = await Promise.all([...byProject].map(([projectPath, ids]) =>
+    loadStates(projectPath, ids).catch(() => new Map<string, DerivedIssueState>())));
+  for (const batch of batches) for (const [issueId, state] of batch) derived.set(issueId, state);
 
   const rows: ParkedRow[] = [];
   for (const [issueId, state] of derived) {

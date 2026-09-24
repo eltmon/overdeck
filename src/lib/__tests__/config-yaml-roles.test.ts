@@ -148,7 +148,7 @@ describe('role model configuration', () => {
     expect(config.workhorses).toEqual(DEFAULT_WORKHORSES);
     expect(config.roles).toEqual(DEFAULT_ROLES);
     expect(config.roles?.review?.mode).toBe('quick');
-    expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku-4-5');
+    expect(config.roles?.work?.sub).toBeUndefined();
     expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-8');
   });
 
@@ -177,21 +177,34 @@ describe('role model configuration', () => {
     })).toThrow('config.yaml: roles.review.mode must be quick, full, or none');
   });
 
-  it('seeds missing roles while preserving partial user role config', () => {
+  it('drops the retired work.inspect sub-roles from a legacy config.yaml (#3927)', () => {
     const { config } = mergeConfigs({
       roles: {
         work: {
+          model: 'workhorse:mid',
+          sub: { inspect: { model: 'parent' }, 'inspect-deep': { model: 'parent' } },
+        },
+      },
+    });
+
+    expect(config.roles?.work).toEqual({ model: 'workhorse:mid', sub: undefined });
+  });
+
+  it('seeds missing roles while preserving partial user role config', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        review: {
           model: 'gpt-5.5',
           sub: {
-            inspect: { model: 'claude-sonnet-4-6' },
+            security: { model: 'claude-sonnet-4-6' },
           },
         },
       },
     });
 
-    expect(config.roles?.work?.model).toBe('gpt-5.5');
-    expect(config.roles?.work?.sub?.inspect?.model).toBe('claude-sonnet-4-6');
-    expect(config.roles?.work?.sub?.['inspect-deep']?.model).toBe('workhorse:mid');
+    expect(config.roles?.review?.model).toBe('gpt-5.5');
+    expect(config.roles?.review?.sub?.security?.model).toBe('claude-sonnet-4-6');
+    expect(config.roles?.review?.sub?.correctness?.model).toBe('workhorse:mid');
     expect(config.roles?.plan).toEqual(DEFAULT_ROLES.plan);
     expect(config.roles?.ship).toEqual(DEFAULT_ROLES.ship);
     expect(config.roles?.knowledge).toEqual(DEFAULT_ROLES.knowledge);

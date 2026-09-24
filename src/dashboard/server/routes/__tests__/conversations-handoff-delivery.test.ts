@@ -8,7 +8,7 @@
  *    directory fails loudly instead of spawning a session that immediately dies.
  */
 import { Effect } from 'effect';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -79,6 +79,13 @@ describe('confirmForkPromptAccepted (PAN-1624)', () => {
 });
 
 describe('waitForPiTuiReady (PAN-1793)', () => {
+  // The pane read goes through the backend door (PAN-3921), which loads its
+  // modules and memoizes the host backend with real I/O; do it before fake timers.
+  beforeAll(async () => {
+    const { readAgentPaneText } = await import('../../../../lib/terminal-backends/agent-pane-io.js');
+    await readAgentPaneText('conv-warmup', 1).catch(() => '');
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
     paneSnapshots.values = [];

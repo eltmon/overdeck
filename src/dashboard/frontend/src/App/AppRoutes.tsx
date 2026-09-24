@@ -41,6 +41,8 @@ export interface PendingConversationTarget {
   messageIndex: number;
   nonce: number;
   label: string;
+  /** Bare subagent id when the target lives in a subagent transcript (PAN-3982). */
+  subagentId?: string;
 }
 
 type SelectProjectHandler = (projectName: string | null, opts?: { updateUrl?: boolean }) => void;

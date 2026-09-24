@@ -56,9 +56,17 @@ describe('shared ModelPicker branding', () => {
 
 describe('shared HarnessSelect blocked harness (PAN-2528)', () => {
   const BLOCK_REASON = PI_TOS_BLOCK_REASON;
+  // The server emits a decision for every harness (PAN-4061); a missing key
+  // is treated as not allowed, so fixtures mirror the full row.
   const blockedPolicy: HarnessPolicyDecisions = {
     'claude-sonnet-4-6': {
       ohmypi: { allowed: false, reason: BLOCK_REASON },
+      'claude-code': { allowed: true },
+      codex: { allowed: true },
+      acp: { allowed: true },
+      'kimi-code': { allowed: true },
+      opencode: { allowed: true },
+      muse: { allowed: true },
     },
   };
 
