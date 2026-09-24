@@ -310,14 +310,22 @@ the selected backend's live inventory (`listLiveAgentIds` / `listLiveAgentPanes`
 `.tmuxActive` reads in them. What each does when the inventory is unreadable (`null`) depends on
 whether it acts:
 
-- **Does not act on unknown:** the memory governor's `shed()` skips the merged-stack shed and the
-  work-agent pause. The Cloister health loop skips the round and keeps its previous running set,
-  so an outage never reads as every agent crashing. `POST /api/agents/restart-all` answers 503 and
-  restarts nothing, and the restart-with-current-config list is empty.
-- **Treats unknown as live:** `pan workspace update` (`findLiveAgentInWorkspace`, via `isAlive`)
-  refuses to run under a probe that did not answer. `pan show --health ping|check` (`lib/health.ts`)
-  reports an unanswered probe as a `warning` that never counts toward the force-kill threshold.
-  Cloister `emergencyStop` stops every `running` row, through `stopAgent`, so it closes Herdr panes.
+- **Does not act on unknown:** the memory governor pauses only agents the inventory lists, and
+  none when it is unreadable. The Cloister health loop skips a round whose inventory is
+  unreadable and keeps its previous running set. An agent missing from a readable inventory is a
+  crash only when `isConfirmedDead(await isAlive(id))` holds; otherwise it is re-checked next round.
+  `POST /api/agents/restart-all` answers 503 and restarts nothing, and the
+  restart-with-current-config list is empty.
+- **Treats unknown as live:** the governor still sheds merged stacks, but any agent for the issue
+  that the inventory lists or that has a `running` row protects its stack. `pan workspace update`
+  (`findLiveAgentInWorkspace`, via `isAlive`) refuses to run under a probe that did not answer.
+  `pan show --health ping|check` (`lib/health.ts`) reports an unanswered probe as a `warning` that
+  neither increments nor resets the force-kill counter. Cloister `emergencyStop` stops every agent
+  the inventory lists plus every `running` row, through `stopAgent` (which closes Herdr panes), and
+  reports a stop whose pane is not confirmed gone as `unconfirmedAgents`, apart from `killedAgents`.
+
+The tmux adapter's inventory reports a failed ps/pgrep probe (`runtime-indeterminate`) as
+`unknown`, never `exited`, so a live agent does not drop out of a readable inventory.
 - **Displays and read-only feeds fall back to the `running` rows** (`isListedOrRunning`): the
   Cloister agent-health lists, the memory transcript sources and the boot telemetry count. The
   all-output feed discovers nothing and still captures explicit subscriptions; it reads panes
