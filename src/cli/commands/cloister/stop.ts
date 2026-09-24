@@ -24,13 +24,19 @@ export async function stopCommand(options: StopOptions): Promise<void> {
     console.log(chalk.red.bold('🚨 EMERGENCY STOP - Killing all agents'));
     console.log(chalk.dim('   This will terminate all running agent sessions'));
 
-    const response = await cloisterApi<{ killedAgents: string[] }>('/api/cloister/emergency-stop', { method: 'POST' });
+    const response = await cloisterApi<{ killedAgents: string[]; unconfirmedAgents?: string[] }>('/api/cloister/emergency-stop', { method: 'POST' });
     const killedAgents = response.killedAgents;
+    const unconfirmedAgents = response.unconfirmedAgents ?? [];
 
     console.log('');
     console.log(chalk.green(`✓ Killed ${killedAgents.length} agent(s):`));
     for (const agentId of killedAgents) {
       console.log(chalk.dim(`  - ${agentId}`));
+    }
+    // A stop whose pane is not confirmed gone is not a success (#4109).
+    if (unconfirmedAgents.length > 0) {
+      console.log(chalk.yellow(`⚠ ${unconfirmedAgents.length} agent(s) could not be confirmed stopped: ${unconfirmedAgents.join(', ')}`));
+      console.log(chalk.dim('  Check them with pan status; their panes may still be running.'));
     }
   } else {
     // Normal stop - just stop monitoring
