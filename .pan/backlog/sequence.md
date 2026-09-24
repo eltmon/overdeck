@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T15:45:18.476Z · model: claude-opus-5 · open: 849_
+_Last sequenced: 2026-09-24T15:46:35.626Z · model: claude-opus-5 · open: 849_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -417,7 +417,7 @@ _Last sequenced: 2026-09-24T15:45:18.476Z · model: claude-opus-5 · open: 849_
 | 426 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
 | 427 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
 | 428 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
-| 429 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from resolved config |
+| 429 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
 | 430 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
 | 431 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
 | 432 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
@@ -1184,7 +1184,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T15:45:18.476Z",
+  "generatedAt": "2026-09-24T15:46:35.626Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 849,
@@ -6369,7 +6369,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "score": 54,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Settings permission-mode can desync from resolved config",
+      "why": "Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first",
       "rationale": "Rank, size, score and importance unchanged; only the condition moves. The 2026-09-24 touch is metadata (no new comment, no body edit), but verifying the prior pass's claim showed it was wrong: `resolvePermissionModeSync` does not exist and no code emits `--dangerously-skip-permissions` any more — every remaining hit in src/ is a comment or a docstring. The hazard the issue describes is still live in renamed form: `config.claude.permissionMode` still defaults to 'bypass' (settings-api.ts:793) and `getClaudePermissionFlags` (claude-permissions.ts:79) still emits `--permission-mode bypassPermissions` for it, so Settings can still disagree with the resolved mode and all three asks stand. The body needs a rewrite to the current flag and symbol names before anyone works it, which is what needs-refinement records.",
       "gate": "auto",
       "planning": "auto"
