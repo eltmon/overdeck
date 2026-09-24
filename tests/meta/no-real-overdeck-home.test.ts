@@ -1,5 +1,5 @@
-import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFile, copyFile, mkdir, open, rm, writeFile } from 'node:fs/promises';
+import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -40,6 +40,23 @@ describe('real OVERDECK_HOME test guard', () => {
     expect(() => rmSync(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true, force: true })).toThrow('[test-guard]');
     await expect(appendFile(transcript, '{}\n')).rejects.toThrow('[test-guard]');
     await expect(rm(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true, force: true })).rejects.toThrow('[test-guard]');
+  });
+
+  it('blocks copyFile and write-mode open into the real home trees', async () => {
+    const source = join(process.env.OVERDECK_HOME!, 'pan-3915-copy-source.jsonl');
+    writeFileSync(source, '{}\n');
+    for (const target of [
+      join(REAL_HOME_TARGET, 'file'),
+      join(REAL_CLAUDE_PROJECTS_TARGET, 'session.jsonl'),
+    ]) {
+      expect(() => copyFileSync(source, target)).toThrow('[test-guard]');
+      await expect(copyFile(source, target)).rejects.toThrow('[test-guard]');
+      expect(() => openSync(target, 'w')).toThrow('[test-guard]');
+      expect(() => openSync(target, 'a')).toThrow('[test-guard]');
+      await expect(open(target, 'w')).rejects.toThrow('[test-guard]');
+      // A read-only open is not a write: it reaches the fs and fails on the missing file.
+      expect(() => openSync(target, 'r')).toThrow(/ENOENT/);
+    }
   });
 
   it('has no direct homedir .overdeck write patterns in tests', () => {

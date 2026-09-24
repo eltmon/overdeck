@@ -67,7 +67,45 @@ function guardedPromise<T extends (...args: never[]) => Promise<unknown>>(
   } as T;
 }
 
+const OPEN_WRITE_BITS = ['O_WRONLY', 'O_RDWR', 'O_CREAT', 'O_APPEND', 'O_TRUNC'];
+
+// open/openSync only write when the flags ask for it; a read-only open of a
+// real transcript stays allowed.
+function isWriteOpenFlag(flags: unknown, constants: Record<string, number> | undefined): boolean {
+  if (typeof flags === 'string') return /[wa+]/.test(flags);
+  if (typeof flags === 'number') {
+    const writeMask = OPEN_WRITE_BITS.reduce((mask, name) => mask | (constants?.[name] ?? 0), 0);
+    return (flags & writeMask) !== 0;
+  }
+  return false;
+}
+
+function guardedOpen<T extends (...args: never[]) => unknown>(
+  original: T,
+  constants: Record<string, number> | undefined,
+): T {
+  return function guardedFsOpen(this: unknown, ...args: unknown[]) {
+    if (isWriteOpenFlag(args[1], constants)) assertNotRealOverdeckHome([args[0]]);
+    return Reflect.apply(original, this, args);
+  } as T;
+}
+
+function guardedPromiseOpen<T extends (...args: never[]) => Promise<unknown>>(
+  original: T,
+  constants: Record<string, number> | undefined,
+): T {
+  return function guardedPromiseFsOpen(this: unknown, ...args: unknown[]) {
+    try {
+      if (isWriteOpenFlag(args[1], constants)) assertNotRealOverdeckHome([args[0]]);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    return Reflect.apply(original, this, args);
+  } as T;
+}
+
 function withGuardedSyncFs(actual: Record<string, unknown>): Record<string, unknown> {
+  const constants = actual.constants as Record<string, number> | undefined;
   return {
     ...actual,
     writeFileSync: guarded(actual.writeFileSync as never, [0]),
@@ -78,12 +116,24 @@ function withGuardedSyncFs(actual: Record<string, unknown>): Record<string, unkn
     unlinkSync: guarded(actual.unlinkSync as never, [0]),
     renameSync: guarded(actual.renameSync as never, [0, 1]),
     cpSync: guarded(actual.cpSync as never, [0, 1]),
+    cp: guarded(actual.cp as never, [0, 1]),
+    copyFileSync: guarded(actual.copyFileSync as never, [1]),
+    copyFile: guarded(actual.copyFile as never, [1]),
+    symlinkSync: guarded(actual.symlinkSync as never, [1]),
+    symlink: guarded(actual.symlink as never, [1]),
+    truncateSync: guarded(actual.truncateSync as never, [0]),
+    truncate: guarded(actual.truncate as never, [0]),
+    openSync: guardedOpen(actual.openSync as never, constants),
+    open: guardedOpen(actual.open as never, constants),
     createWriteStream: guarded(actual.createWriteStream as never, [0]),
-    promises: withGuardedPromiseFs(actual.promises as Record<string, unknown>),
+    promises: withGuardedPromiseFs(actual.promises as Record<string, unknown>, constants),
   };
 }
 
-function withGuardedPromiseFs(actual: Record<string, unknown>): Record<string, unknown> {
+function withGuardedPromiseFs(
+  actual: Record<string, unknown>,
+  constants: Record<string, number> | undefined,
+): Record<string, unknown> {
   return {
     ...actual,
     writeFile: guardedPromise(actual.writeFile as never, [0]),
@@ -92,6 +142,10 @@ function withGuardedPromiseFs(actual: Record<string, unknown>): Record<string, u
     rm: guardedPromise(actual.rm as never, [0]),
     rename: guardedPromise(actual.rename as never, [0, 1]),
     cp: guardedPromise(actual.cp as never, [0, 1]),
+    copyFile: guardedPromise(actual.copyFile as never, [1]),
+    symlink: guardedPromise(actual.symlink as never, [1]),
+    truncate: guardedPromise(actual.truncate as never, [0]),
+    open: guardedPromiseOpen(actual.open as never, constants),
   };
 }
 
@@ -105,6 +159,6 @@ for (const moduleId of ['fs', 'node:fs']) {
 for (const moduleId of ['fs/promises', 'node:fs/promises']) {
   vi.doMock(moduleId, async (importOriginal) => {
     const actual = await importOriginal<Record<string, unknown>>();
-    return withGuardedPromiseFs(actual);
+    return withGuardedPromiseFs(actual, actual.constants as Record<string, number> | undefined);
   });
 }
