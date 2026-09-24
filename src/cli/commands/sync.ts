@@ -422,6 +422,14 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   } else {
     hooksSpinner.info('No hooks to sync');
   }
+  // PAN-3881: hooks deleted from sync-sources/ are removed from ~/.overdeck/bin/
+  // (only ones sync wrote, per its manifest); edited copies are kept.
+  if (hooksResult.pruned.length > 0) {
+    console.log(chalk.cyan(`  Removed ${hooksResult.pruned.length} hook(s) whose source was deleted: ${hooksResult.pruned.join(', ')}`));
+  }
+  if (hooksResult.keptModified.length > 0) {
+    console.log(chalk.yellow(`  Kept ${hooksResult.keptModified.length} user-modified hook(s) whose source was deleted: ${hooksResult.keptModified.join(', ')}`));
+  }
 
   // Registration is as important as copying the scripts. Repair the complete
   // global hook table on every explicit sync so upgrades cannot leave an old
