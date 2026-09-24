@@ -45,6 +45,9 @@ describe('orphaned workspace networks (PAN-3900)', () => {
       .toEqual({ issueId: 'PAN-3925', featureFolder: 'feature-pan-3925' });
     expect(workspaceNetworkIdentity(row('myn-feature-min-888-slot-3_devnet', 'myn-feature-min-888-slot-3', 'devnet')))
       .toEqual({ issueId: 'MIN-888', featureFolder: 'feature-min-888-slot-3' });
+    // No compose network label: the project label prefix still identifies it.
+    expect(workspaceNetworkIdentity(row('overdeck-feature-pan-3894_devnet', 'overdeck-feature-pan-3894', '')))
+      .toEqual({ issueId: 'PAN-3894', featureFolder: 'feature-pan-3894' });
   });
 
   it('never claims networks that are not workspace stack networks', () => {
@@ -57,6 +60,9 @@ describe('orphaned workspace networks (PAN-3900)', () => {
       row('overdeck-feature-pan-1_devnet', '', ''),
       // Label and name disagree: not compose's own naming.
       row('overdeck-feature-pan-1_devnet', 'overdeck-feature-pan-2', 'devnet'),
+      row('overdeck-feature-pan-1_devnet', 'overdeck-feature-pan-2', ''),
+      row('overdeck-feature-pan-1_devnet', 'overdeck-feature-pan-1', 'default'),
+      row('overdeck-feature-pan-1_', 'overdeck-feature-pan-1', ''),
       row('uat-overdeck-gen-3_devnet', 'uat-overdeck-gen-3', 'devnet'),
     ]) {
       expect(workspaceNetworkIdentity(r)).toBeNull();

@@ -8,8 +8,8 @@
  *
  * A network is reported as an Overdeck-owned orphan only when ALL of these
  * hold, so a network that is not ours is never touched:
- *   1. it carries a compose project label, and its name is exactly
- *      `<label>_<compose network label>`;
+ *   1. it carries a compose project label and its name is `<label>_<network>`
+ *      (exactly `<label>_<compose network label>` when that label is set);
  *   2. the compose project is a workspace stack name, `<prefix>-feature-<issue>`
  *      (optionally `-slot-<n>`), and the issue prefix maps to a registered
  *      Overdeck project;
@@ -72,8 +72,13 @@ export function parseNetworkRows(stdout: string): DockerNetworkRow[] {
  * network by Overdeck's naming.
  */
 export function workspaceNetworkIdentity(row: DockerNetworkRow): { issueId: string; featureFolder: string } | null {
-  if (!row.composeProject || !row.composeNetwork) return null;
-  if (row.name !== `${row.composeProject}_${row.composeNetwork}`) return null;
+  if (!row.composeProject) return null;
+  // Compose names a project's network `<project>_<network>`. When the network
+  // label is present the name must match it exactly; without it, the name
+  // must still carry the project label as its prefix.
+  const expectedPrefix = `${row.composeProject}_`;
+  if (!row.name.startsWith(expectedPrefix) || row.name.length === expectedPrefix.length) return null;
+  if (row.composeNetwork && row.name !== `${expectedPrefix}${row.composeNetwork}`) return null;
   const match = row.composeProject.match(WORKSPACE_COMPOSE_PROJECT_RE);
   if (!match) return null;
   const issueLower = match[1];

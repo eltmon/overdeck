@@ -222,7 +222,7 @@ the typed-count confirmation, or `--yes`). A network qualifies only when all
 of these hold, so nothing that is not an Overdeck workspace network is
 touched: it carries a compose project label of the form
 `<prefix>-feature-<issue>[-slot-<n>]` whose issue prefix belongs to a
-registered project, its name is `<label>_<network label>`, no container
+registered project, its name is `<label>_<network>`, no container
 (running or stopped) is attached, the `feature-<issue>[-slot-<n>]` workspace
 directory does not exist, and no agent is active on the issue. Attachment is
 re-checked immediately before each removal.
