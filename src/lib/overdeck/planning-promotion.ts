@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { invalidateAgentsCache } from '../../dashboard/server/routes/agents.js';
+import { AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT } from '../../dashboard/server/routes/agents/shared.js';
 import { validateOrigin } from '../../dashboard/server/routes/origin-validation.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
@@ -327,6 +328,9 @@ export async function recordPlanningAutoHandoffFailure(options: {
     workAgentSkipReason: skipReason,
     workAgentError: error,
   };
+  // PAN-3977: say it in dashboard.log too. The event store alone left the
+  // failure invisible there, and the issue was misdiagnosed from the log.
+  console.error(`[complete-planning] ${options.issueId} auto-handoff failed (${skipReason}): ${error}`);
 
   await Effect.runPromise(options.eventStore.append({
     type: 'planning.failed',
@@ -374,11 +378,18 @@ export async function completePlanningAutoSpawn(options: {
         origin: dashboardOrigin,
         ...internalTokenHeaders,
       },
+      // PAN-3977: the operator consented to the work agent when they launched
+      // planning with auto-start. Without an acknowledgement every finalize
+      // under tight RAM or a high agent count got a 409 and no work agent.
+      // Nobody is watching this request, so it acknowledges those two warning
+      // kinds only. The agent ceiling and leaked specialists still refuse it,
+      // and critical warnings refuse every request.
       body: JSON.stringify({
         issueId: options.issueId,
         role: 'work',
         startedBy: 'planning-auto-handoff',
         autoSpawnConsentRequired: true,
+        guardrailAcknowledgedWarnings: AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT,
       }),
     });
 
