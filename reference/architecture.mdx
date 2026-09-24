@@ -129,7 +129,7 @@ Each agent's state is tracked in `~/.overdeck/agents/{agent-id}/state.json`:
 | `handoffCount` | Number of times the agent has been handed off to a different model |
 | `sessionId` | Claude Code session ID (for resuming after handoff) |
 
-**State Cleanup:** When an agent is killed or aborted (`pan work kill`), Overdeck automatically cleans up its state files to prevent stale data from affecting future runs.
+**State Cleanup:** When an agent is killed or aborted (`pan kill`), Overdeck automatically cleans up its state files to prevent stale data from affecting future runs.
 
 ## Remote Workspaces
 
@@ -137,31 +137,30 @@ Overdeck supports remote workspace execution via Fly.io Machines. Remote workspa
 
 - **Cloud-hosted agent environments** — run agents on remote machines without local resource constraints
 - **On-demand provisioning** — Fly.io Machines spin up per workspace and shut down after merge
-- **Same workflow** — `pan remote` commands mirror local workspace operations
+- **Same workflow** — `pan admin remote` commands mirror local workspace operations
 
 Remote workspace management:
 ```bash
-pan remote init        # Initialize Fly.io provider
-pan remote setup       # Configure remote environment
-pan remote status      # Check remote workspace status
-pan remote resources   # View resource allocation
+pan admin remote init        # Initialize the Fly.io app for workspace machines
+pan admin remote setup       # Install flyctl and configure auth
+pan admin remote status      # Check Fly.io connection and machine status
+pan admin remote resources   # Show RAM/disk usage across VMs
 ```
 
 ## Deep Wipe
 
-For issues that get into a stuck or inconsistent state, use `pan work wipe` to completely reset:
+For issues that get into a stuck or inconsistent state, use `pan wipe` to completely reset:
 
 ```bash
-pan work wipe MIN-123           # Basic cleanup
-pan work wipe MIN-123 -w        # Also delete workspace
-pan work wipe MIN-123 -y -w     # Skip confirmation
+pan wipe MIN-123                # Asks for confirmation
+pan wipe MIN-123 -y             # Skip confirmation
 ```
 
 **Deep wipe cleans up:**
 - Tmux sessions (`planning-min-123`, `agent-min-123`)
 - Agent state directories (`~/.overdeck/agents/planning-*`, `agent-*`)
 - Legacy planning directories (`project/.planning/min-123/`)
-- Workspace (if `-w` flag is used)
+- Workspace files and the issue's branches
 - Issue tracker status (reset to Backlog/Open)
 
 **Dashboard UI:** When aborting planning, click "Deep Wipe" for a complete reset.

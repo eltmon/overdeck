@@ -20,7 +20,7 @@ is to **READ each agent's actual recent output and judge: is it advancing toward
 done, or stalled/errored — and if stalled, WHY (root cause)?** A hash-diff is a coarse liveness
 hint at best; it is NOT the method.
 
-**Doctrine (roles/flywheel.md Mission #4):** a stalled/errored agent is a symptom. Do NOT
+**Doctrine (roles/flywheel.md, Fix at the root):** a stalled/errored agent is a symptom. Do NOT
 `pan tell` a nudge to unstick one instance — find the **root cause / substrate bug** and land
 the fix so it self-heals for every agent.
 

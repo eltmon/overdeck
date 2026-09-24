@@ -18,7 +18,6 @@ function baseSettings(overrides: Partial<SettingsConfig> = {}): SettingsConfig {
         nous: false,
         dashscope: false,
       },
-      overrides: {},
     },
     api_keys: {},
     ...overrides,

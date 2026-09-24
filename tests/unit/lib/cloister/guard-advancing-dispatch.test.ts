@@ -52,7 +52,12 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExists: (...args: Parameters<typeof mockSessionExists>) => mockSessionExists(...args),
   killSession: vi.fn(() => Effect.succeed(undefined)),
   listSessionNames: vi.fn(() => Effect.succeed([])),
-  isPaneDead: vi.fn(() => Effect.succeed(false)),
+}));
+
+// PAN-3939: the review dispatch guard asks the liveness oracle; no reviewer is alive here.
+vi.mock('../../../../src/lib/agents/liveness.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../src/lib/agents/liveness.js')>(),
+  isAlive: vi.fn(async () => ({ alive: false, reason: 'no-session' })),
 }));
 
 vi.mock('../../../../src/lib/cloister/autonomous-work-dispatch.js', () => ({

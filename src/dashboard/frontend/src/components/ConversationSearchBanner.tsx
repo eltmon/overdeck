@@ -17,11 +17,23 @@ export function ConversationSearchBanner() {
   const recentlyFailing =
     health?.lastErrorAt != null &&
     (health.lastSuccessAt == null || health.lastErrorAt > health.lastSuccessAt);
-  if (status.available && !recentlyFailing) return null;
+  // PAN-3915: a dead transcript watcher is shown only while it is waiting to
+  // restart, or for good once restarts stopped; once re-armed, its last error
+  // is history, not current state.
+  const watcherState = health?.watcher?.state;
+  const watcherDown = watcherState === 'restarting' || watcherState === 'failed';
+  if (status.available && !recentlyFailing && !watcherDown) return null;
 
-  const reason = status.available
-    ? health?.lastErrorReason ?? 'recent embedding failures'
-    : status.unavailableReason ?? 'embedding provider unavailable';
+  const watcherOnly = status.available && !recentlyFailing;
+  const watcherFailed = watcherOnly && watcherState === 'failed';
+  const watcherReason = health?.watcher?.lastErrorReason ?? 'unknown error';
+  const reason = !status.available
+    ? status.unavailableReason ?? 'embedding provider unavailable'
+    : watcherFailed
+      ? `transcript watcher stopped after repeated failures (${watcherReason})`
+      : watcherOnly
+        ? `transcript watcher failed (${watcherReason}), restarting`
+        : health?.lastErrorReason ?? 'recent embedding failures';
   const creditRelated = /credit|billing|quota|insufficient/i.test(reason);
 
   return (
@@ -30,7 +42,11 @@ export function ConversationSearchBanner() {
       <p className="text-warning-foreground text-sm font-semibold flex-1 min-w-0 [&_span]:break-words">
         Conversation search is not working: <span className="font-normal">{reason}</span>
         <span className="font-normal ml-1 opacity-80">
-          — Ctrl+K conversation hits and transcript indexing are unavailable until this is fixed.
+          {watcherFailed
+            ? '— new transcripts are not indexed. Restart the dashboard or save the conversation-search settings to retry.'
+            : watcherOnly
+              ? '— new transcripts are not indexed until the watcher is back.'
+              : '— Ctrl+K conversation hits and transcript indexing are unavailable until this is fixed.'}
         </span>
       </p>
       {creditRelated && (

@@ -774,6 +774,21 @@ describe('ConversationPanel empty-state gating (workLog-only agent sessions)', (
     expect(screen.getByText('How can I help you?')).toBeInTheDocument();
   });
 
+  // PAN-3827: a harness that exits before writing a transcript leaves the
+  // launcher keep-alive loop holding the pane, so sessionAlive stays true.
+  // The recorded exit reason must win over the greeting.
+  it('shows the harness exit reason instead of the greeting when the spawn failed over a live pane', () => {
+    const reason = 'The conversation process exited before it was ready. Last output: Error: unknown model';
+    renderPanel(
+      { ...mockConversation, sessionAlive: true, status: 'active', endedAt: null, spawnError: reason },
+      {},
+      { messages: [], workLog: [], streaming: false },
+    );
+    expect(screen.getByText('Failed to start')).toBeInTheDocument();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(screen.queryByText('How can I help you?')).toBeNull();
+  });
+
   it('renders the agent id and every checked path when its transcript is missing', () => {
     renderPanel(
       mockConversation,

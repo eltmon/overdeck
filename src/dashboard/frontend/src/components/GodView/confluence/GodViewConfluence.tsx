@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isBackendOutage } from '../../../lib/backendOutageState';
 import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
 import { GodViewSidebar } from '../Sidebar';
@@ -96,7 +97,7 @@ export function GodViewConfluence({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || hasModalOrTextFocus()) return;
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || hasModalOrTextFocus() || isBackendOutage()) return;
       if (event.key === 'h' || event.key === '?') {
         event.preventDefault();
         onHelpOpenChange(!helpOpen);

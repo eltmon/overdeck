@@ -25,7 +25,6 @@ const settingsPayload = {
         correctness: { model: 'workhorse:mid' },
         performance: { model: 'workhorse:mid' },
         requirements: { model: 'workhorse:mid' },
-        synthesis: { model: 'workhorse:expensive' },
       },
     },
     test: { model: 'workhorse:mid' },
@@ -177,7 +176,8 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Review Correctness model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Review Performance model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Review Requirements model')).toHaveValue('workhorse:mid');
-    expect(screen.getByLabelText('Review Synthesis model')).toHaveValue('workhorse:expensive');
+    // review.synthesis is retired: the review parent writes the synthesis (#4131).
+    expect(screen.queryByLabelText('Review Synthesis model')).toBeNull();
   });
 
   it('round-trips nested role edits through PUT /api/settings', async () => {
@@ -341,12 +341,29 @@ describe('RolesPanel — review pipeline controls (PAN-1862 FR-10/FR-17)', () =>
       correctness: { model: 'workhorse:expensive' },
       performance: { model: 'workhorse:expensive' },
       requirements: { model: 'workhorse:expensive' },
-      synthesis: { model: 'workhorse:expensive' },
     };
     installFetchMock({ settings });
     await expandReviewCard();
 
     await screen.findByDisplayValue(/Full — four-reviewer convoy/);
     expect(screen.queryByTestId('review-model-uniformity-banner')).not.toBeInTheDocument();
+  });
+
+  it('shows no retired Synthesis sub-role and checks synthesis against the review model (#4131)', async () => {
+    const settings = structuredClone(settingsPayload);
+    (settings.roles.review as Record<string, unknown>).mode = 'full';
+    settings.roles.review.model = 'workhorse:mid';
+    settings.roles.review.sub = {
+      security: { model: 'workhorse:expensive' },
+      correctness: { model: 'workhorse:expensive' },
+      performance: { model: 'workhorse:expensive' },
+      requirements: { model: 'workhorse:expensive' },
+    };
+    installFetchMock({ settings });
+    await expandReviewCard();
+
+    const banner = await screen.findByTestId('review-model-uniformity-banner');
+    expect(banner.textContent).toContain('synthesis=claude-sonnet-4-6');
+    expect(screen.queryByLabelText('Review Synthesis model')).toBeNull();
   });
 });

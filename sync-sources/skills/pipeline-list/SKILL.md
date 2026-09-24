@@ -170,7 +170,7 @@ PY
   issues with no resources fall back to tracker state and planning flags.
   Post-merge limbo (`pipelineMembership.bucket`) goes to Ship first, as on the
   Pipeline page.
-- **Long-term:** the clean fix is a first-class `pan pipeline` verb / a
+- **Long-term:** the clean fix is a first-class pipeline CLI verb / a
   `/api/issues/pipeline` endpoint that returns the derived state for every issue
   so the dashboard, CLI, and this skill share one implementation. Point this
   skill at it when it exists.

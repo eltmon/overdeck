@@ -16,6 +16,7 @@ import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { getAgentState } from '../agents.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
+import { recordHandoffDeferred } from '../cloister/deferred-handoff.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
@@ -109,6 +110,13 @@ export interface CompletePlanningAutoSpawnResult {
   workAgentSession?: string;
   workAgentError?: string;
   workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'unauthorized' | 'spawn-failed';
+  /**
+   * PAN-4155: a spawn guardrail refused the start (the response carried a
+   * guardrail decision). Deacon-lite retries it later, so the hand-off is
+   * deferred, not failed. Other 409s (start gate, dirty tree) stay failures.
+   */
+  workAgentDeferred?: boolean;
+  workAgentHttpStatus?: number;
 }
 
 type CompletePlanningPhase = 'prdGate' | 'prdPromote' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
@@ -353,6 +361,36 @@ export async function recordPlanningAutoHandoffFailure(options: {
   return error;
 }
 
+/**
+ * PAN-4155: a guardrail refused the hand-off. Journal the deferral in the
+ * workspace so deacon-lite retries the spawn without acknowledgement, and say
+ * so at warn level. No `planning.failed`: that is recorded only if the retries
+ * give up.
+ */
+export function recordPlanningAutoHandoffDeferred(options: {
+  issueId: string;
+  workspacePath: string;
+  result: CompletePlanningAutoSpawnResult;
+  emitActivity?: typeof emitActivityEntry;
+}): string {
+  const error = options.result.workAgentError ?? 'Work agent startup refused by spawn guardrails';
+  recordHandoffDeferred({
+    workspacePath: options.workspacePath,
+    issueId: options.issueId,
+    error,
+    httpStatus: options.result.workAgentHttpStatus,
+  });
+  console.warn(`[complete-planning] ${options.issueId} auto-handoff deferred by spawn guardrails: ${error}`);
+  (options.emitActivity ?? emitActivityEntry)({
+    source: 'plan',
+    level: 'warn',
+    message: `${options.issueId} planning complete; work-agent start deferred by spawn guardrails and retried for up to 2 hours: ${error}`,
+    issueId: options.issueId,
+    details: JSON.stringify({ workAgentSkipReason: 'guardrails', workAgentError: error }),
+  });
+  return error;
+}
+
 export async function completePlanningAutoSpawn(options: {
   issueId: string;
   autoSpawn?: boolean;
@@ -446,6 +484,8 @@ export async function completePlanningAutoSpawn(options: {
       workAgentSpawned: false,
       workAgentError: error,
       workAgentSkipReason: skipReason,
+      workAgentHttpStatus: response.status,
+      ...(skipReason === 'guardrails' && body['guardrails'] ? { workAgentDeferred: true } : {}),
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -815,8 +855,14 @@ export async function completePlanningForIssue(options: {
     // projection via onSessionKilled once the delayed kill actually runs.
     await projectPlanningAgentStopped();
     const autoHandoffFailed = effectiveAutoSpawn && autoSpawnResult?.workAgentSpawned !== true;
+    // PAN-4155: a guardrail refusal is retried by deacon-lite from the journal,
+    // which needs the workspace. Without one it stays a plain failure.
+    const autoHandoffDeferred = autoHandoffFailed && autoSpawnResult?.workAgentDeferred === true
+      && Boolean(workspacePath) && existsSync(workspacePath);
     let autoHandoffError: string | undefined;
-    if (autoHandoffFailed && autoSpawnResult) {
+    if (autoHandoffDeferred && autoSpawnResult) {
+      autoHandoffError = recordPlanningAutoHandoffDeferred({ issueId: id, workspacePath, result: autoSpawnResult });
+    } else if (autoHandoffFailed && autoSpawnResult) {
       autoHandoffError = await recordPlanningAutoHandoffFailure({
         issueId: id,
         result: autoSpawnResult,
@@ -841,7 +887,7 @@ export async function completePlanningForIssue(options: {
         eventType: 'planning.complete',
       });
     }
-    emitCompletePlanningPhase(id, 'terminal', resolveCompletePlanningTerminalStatus(effectiveAutoSpawn, autoSpawnResult), autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
+    emitCompletePlanningPhase(id, 'terminal', autoHandoffDeferred ? 'skipped' : resolveCompletePlanningTerminalStatus(effectiveAutoSpawn, autoSpawnResult), autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
       autoSpawn: effectiveAutoSpawn,
       workAgentSpawned: autoSpawnResult?.workAgentSpawned ?? false,
       workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
@@ -855,7 +901,11 @@ export async function completePlanningForIssue(options: {
       gitPushed,
       ...(taskWarning ? { taskWarning } : {}),
       ...(autoSpawnResult ?? {}),
-      message: autoHandoffFailed
+      // Only a journaled deferral is retried; say so when it was not journaled.
+      ...(autoSpawnResult?.workAgentDeferred ? { workAgentDeferred: autoHandoffDeferred } : {}),
+      message: autoHandoffDeferred
+        ? `Planning complete; work-agent start deferred by spawn guardrails and retried automatically for up to 2 hours: ${autoHandoffError}`
+        : autoHandoffFailed
         ? `Planning complete, but work-agent startup failed (${autoSpawnResult?.workAgentSkipReason ?? 'spawn-failed'}): ${autoHandoffError}`
         : autoSpawnResult?.workAgentSpawned
           ? 'Planning complete and work agent spawn requested'

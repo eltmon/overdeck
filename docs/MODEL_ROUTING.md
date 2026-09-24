@@ -144,6 +144,11 @@ models:
     status-review: claude-sonnet-4-6
 
   gemini_thinking_level: 3
+
+  # Anthropic model substituted when a model's provider is disabled and the
+  # model has no explicit fallback entry (src/lib/model-fallback.ts).
+  # Default: claude-sonnet-5 (src/lib/config-yaml/defaults.ts)
+  provider_fallback_model: claude-sonnet-5
 ```
 
 For OpenRouter:

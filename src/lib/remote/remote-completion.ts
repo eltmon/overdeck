@@ -41,6 +41,7 @@ import {
 } from './remote-agents.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { createWorkspace } from '../workspace-manager.js';
+import { workspaceNeedsSetup } from '../workspace-manager/setup-marker.js';
 import { PAN_DIRNAME, PAN_CONTINUE_FILENAME } from '../pan-dir/index.js';
 
 const execAsync = promisify(exec);
@@ -285,7 +286,10 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
 
       // 2. Materialize the standard local worktree (tracks the pushed branch).
       const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
-      if (!existsSync(workspacePath)) {
+      const worktreeExisted = existsSync(workspacePath);
+      // PAN-4171: an existing worktree whose setup never finished goes back
+      // through createWorkspace, which resumes the setup.
+      if (workspaceNeedsSetup(workspacePath)) {
         if (!projectConfig) throw new Error(`No project config for ${issueId}; cannot create workspace`);
         const wsResult = await createWorkspace({
           projectConfig,
@@ -295,8 +299,11 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         if (!wsResult.success) {
           throw new Error(`Failed to create local worktree: ${wsResult.errors.join('; ')}`);
         }
-        details.push(`Materialized local worktree at ${workspacePath}`);
-      } else {
+        details.push(worktreeExisted
+          ? `Finished the setup of local worktree at ${workspacePath}`
+          : `Materialized local worktree at ${workspacePath}`);
+      }
+      if (worktreeExisted) {
         // Worktree exists (e.g. migrated issue with --keep) — fast-forward it.
         await execAsync(`git fetch origin ${branch}`, { cwd: workspacePath });
         await execAsync(`git merge --ff-only origin/${branch}`, { cwd: workspacePath }).catch(() => {

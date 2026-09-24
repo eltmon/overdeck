@@ -190,6 +190,20 @@ describe('role model configuration', () => {
     expect(config.roles?.work).toEqual({ model: 'workhorse:mid', sub: undefined });
   });
 
+  it('drops the retired review.synthesis sub-role from a legacy config.yaml (#4131)', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        review: {
+          model: 'workhorse:expensive',
+          sub: { synthesis: { model: 'claude-haiku-4-5' }, security: { model: 'workhorse:mid' } },
+        },
+      },
+    });
+
+    expect(config.roles?.review?.sub).not.toHaveProperty('synthesis');
+    expect(config.roles?.review?.sub?.security).toEqual({ model: 'workhorse:mid' });
+  });
+
   it('seeds missing roles while preserving partial user role config', () => {
     const { config } = mergeConfigs({
       roles: {

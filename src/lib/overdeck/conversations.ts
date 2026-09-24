@@ -863,8 +863,12 @@ export function markConversationRunning(name: string): void {
     .run(name);
 }
 
+// Called once a conversation is confirmed running (resume, reattach, restart,
+// fork ready, hook activity). A running harness disproves any earlier spawn
+// error, whatever the row's status: markConversationRunning skips active rows,
+// so an active row's spawn_error would otherwise never clear (review of #4137).
 export function markConversationActive(name: string): void {
-  overdeckDb().prepare(`UPDATE conversations SET archived_at = NULL WHERE name = ?`).run(name);
+  overdeckDb().prepare(`UPDATE conversations SET archived_at = NULL, spawn_error = NULL WHERE name = ?`).run(name);
 }
 
 export function reactivateConversationForSpawn(opts: {
@@ -921,7 +925,7 @@ export function archiveConversation(name: string): void {
 }
 
 export function unarchiveConversation(name: string): void {
-  overdeckDb().prepare(`UPDATE conversations SET archived_at = NULL WHERE name = ?`).run(name);
+  overdeckDb().prepare(`UPDATE conversations SET archived_at = NULL, spawn_error = NULL WHERE name = ?`).run(name);
 }
 
 export function updateConversationCost(name: string, totalCost: number, totalTokens?: number): void {

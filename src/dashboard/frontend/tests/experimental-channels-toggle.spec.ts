@@ -28,7 +28,6 @@ test.describe('Experimental — Claude Code Channels toggle', () => {
           mimo: false,
           openrouter: false,
         },
-        overrides: {},
         gemini_thinking_level: 3,
       },
       api_keys: {},

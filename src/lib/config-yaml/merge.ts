@@ -124,6 +124,19 @@ function warnInvalidClaudePermissionMode(raw: unknown, effective: string): void 
   );
 }
 
+// `models.overrides` belonged to the work-type router that PAN-1048 deleted;
+// nothing reads it. A config that still carries entries in it loads, the key
+// is ignored, and the operator is told once per process (#4131).
+let warnedRetiredModelOverrides = false;
+function warnRetiredModelOverrides(): void {
+  if (warnedRetiredModelOverrides) return;
+  warnedRetiredModelOverrides = true;
+  console.warn(
+    '[config] models.overrides is retired and ignored. Set models with roles.<role>.model ' +
+    '(and roles.review.sub.<lane>.model for review lanes), then remove models.overrides from config.yaml.',
+  );
+}
+
 // An unrecognized `terminal.backend` is ignored, once per distinct bad value,
 // so a typo falls back to auto-selection instead of stranding every spawn.
 const warnedInvalidTerminalBackends = new Set<string>();
@@ -453,6 +466,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.conversations?.title_model) {
       result.conversations.titleModel = resolveModelId(config.conversations.title_model);
     }
+    if (config.conversations?.fork_summary_model) {
+      result.conversations.forkSummaryModel = resolveModelId(config.conversations.fork_summary_model);
+    }
     if (config.conversations?.handoff_author_model) {
       result.conversations.handoffAuthorModel = resolveModelId(config.conversations.handoff_author_model);
     }
@@ -633,12 +649,14 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
-    // Merge overrides
-    if (config.models?.overrides) {
-      result.overrides = {
-        ...result.overrides,
-        ...config.models.overrides,
-      };
+    // An empty map (pan admin migrate-config wrote `overrides: {}` into every
+    // config it created) carries nothing to tell the operator about.
+    const retiredOverrides = (config.models as Record<string, unknown> | undefined)?.overrides;
+    if (
+      retiredOverrides != null &&
+      !(typeof retiredOverrides === 'object' && Object.keys(retiredOverrides).length === 0)
+    ) {
+      warnRetiredModelOverrides();
     }
 
     // Merge Gemini thinking level
@@ -649,6 +667,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge default conversation model
     if (config.models?.default_conversation_model) {
       result.defaultConversationModel = config.models.default_conversation_model;
+    }
+    if (config.models?.status_review_model) {
+      result.statusReviewModel = resolveModelId(config.models.status_review_model);
+    }
+
+    if (config.models?.provider_fallback_model) {
+      result.providerFallbackModel = config.models.provider_fallback_model;
     }
 
     // Merge tracker keys

@@ -1,0 +1,1 @@
+{"type":"assistant","timestamp":"2026-09-17T02:04:38.521Z","message":{"model":"<synthetic>","role":"assistant","stop_reason":"stop_sequence","type":"message","content":[{"type":"text","text":"API Error: Connection lost mid-response. The response above may be incomplete."}]},"error":"server_error","truncatedAfterOutput":true,"isApiErrorMessage":true,"version":"2.1.266"}

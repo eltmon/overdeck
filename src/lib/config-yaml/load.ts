@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync, chmodSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync, stat as statAsync, mkdir as mkdirAsync, chmod as chmodAsync } from 'fs/promises';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
@@ -6,15 +6,12 @@ import yaml from 'js-yaml';
 import { parseDocument } from 'yaml';
 import { Effect } from 'effect';
 import { ConfigError, ConfigParseError } from '../errors.js';
-import { MODEL_DEPRECATIONS } from '../model-capabilities.js';
 import type { ModelProvider } from '../model-fallback.js';
-import type { ModelId } from '../settings.js';
 import { DEFAULT_CONFIG, GLOBAL_CONFIG_PATH } from './defaults.js';
 import { mergeConfigs } from './merge.js';
 import {
   type ConfigLoadResult,
   type ConversationsConfig,
-  type MigrationResult,
   type NormalizedConfig,
   type NormalizedConversationSearchConfig,
   type RuntimeConversationsConfig,
@@ -166,87 +163,6 @@ async function pathExistsFromDisk(filePath: string): Promise<boolean> {
   }
 }
 
-/**
- * Detect deprecated model IDs in config overrides
- *
- * Returns array of migrations to perform, or empty array if none found.
- */
-function detectDeprecatedModels(config: YamlConfig | null): Array<{
-  workType: string;
-  from: string;
-  to: string;
-}> {
-  if (!config?.models?.overrides) {
-    return [];
-  }
-
-  const migrations: Array<{ workType: string; from: string; to: string }> = [];
-
-  for (const [workType, modelId] of Object.entries(config.models.overrides)) {
-    if (modelId && MODEL_DEPRECATIONS[modelId]) {
-      migrations.push({
-        workType,
-        from: modelId,
-        to: MODEL_DEPRECATIONS[modelId],
-      });
-    }
-  }
-
-  return migrations;
-}
-
-/**
- * Apply deprecation migrations to a YamlConfig (in-place)
- */
-function applyMigrations(
-  config: YamlConfig,
-  migrations: Array<{ workType: string; from: string; to: string }>
-): void {
-  if (!config.models) {
-    config.models = {};
-  }
-  if (!config.models.overrides) {
-    config.models.overrides = {};
-  }
-
-  for (const { workType, to } of migrations) {
-    config.models.overrides[workType] = to as ModelId;
-  }
-}
-
-/**
- * Create backup of global config file
- */
-function backupGlobalConfig(): boolean {
-  try {
-    const backupPath = `${GLOBAL_CONFIG_PATH}.bak`;
-    copyFileSync(GLOBAL_CONFIG_PATH, backupPath);
-    console.log(`✓ Backed up config.yaml → config.yaml.bak`);
-    return true;
-  } catch (error) {
-    console.error(`Failed to create config backup:`, error);
-    return false;
-  }
-}
-
-/**
- * Write YamlConfig back to global config file
- */
-function writeGlobalConfig(config: YamlConfig): void {
-  const yamlContent = yaml.dump(config, {
-    indent: 2,
-    lineWidth: 100,
-    noRefs: true,
-  });
-
-  writeFileSync(GLOBAL_CONFIG_PATH, yamlContent, 'utf-8');
-  // config.yaml contains API keys in api_keys.* — must not be world-readable.
-  // writeFileSync's `mode` option is only honored on file creation, so chmod
-  // explicitly to handle the case where the file already exists with looser
-  // permissions (e.g. from an older install).
-  chmodSync(GLOBAL_CONFIG_PATH, 0o600);
-}
-
 // ─── In-memory config cache (invalidated on file mtime change) ───────────────
 
 interface ConfigCache {
@@ -373,8 +289,8 @@ async function getMtimeFromDisk(filePath: string): Promise<number> {
 }
 
 /**
- * Read global and project config, merge with defaults and apply env fallbacks,
- * without running config migrations. Cached by file mtime. Rejects on a parse
+ * Read global and project config, merge with defaults and apply env fallbacks.
+ * Cached by file mtime. Rejects on a parse
  * error or on an I/O failure reading either config file.
  */
 export async function loadConfigNoMigration(): Promise<ConfigLoadResult> {
@@ -406,10 +322,8 @@ export async function loadConfigNoMigration(): Promise<ConfigLoadResult> {
 
 /**
  * Load complete configuration (global + project + defaults)
- * Also loads API keys from environment variables as fallback
- *
- * IMPORTANT: This function may modify config.yaml if deprecated model IDs
- * are detected. A backup is created before any modifications.
+ * Also loads API keys from environment variables as fallback.
+ * Never writes config.yaml.
  *
  * Results are cached in memory and invalidated when the underlying config
  * files change (checked via mtime).
@@ -424,39 +338,16 @@ export function loadConfigSync(): ConfigLoadResult {
     return configCache.result;
   }
 
-  let globalConfig = loadGlobalConfig();
+  const globalConfig = loadGlobalConfig();
   const projectConfig = loadProjectConfig();
-
-  // Check for deprecated models in global config
-  let migrationResult: MigrationResult | undefined;
-  if (globalConfig && hasGlobalConfig()) {
-    const migrations = detectDeprecatedModels(globalConfig);
-
-    if (migrations.length > 0) {
-      const backedUp = backupGlobalConfig();
-
-      applyMigrations(globalConfig, migrations);
-      writeGlobalConfig(globalConfig);
-
-      if (migrations.length > 0) {
-        console.log('\n🔄 Model ID Migration:');
-        for (const { workType, from, to } of migrations) {
-          console.log(`  ${workType}: ${from} → ${to}`);
-        }
-      }
-      console.log('');
-
-      migrationResult = { migrated: migrations, backedUp };
-    }
-  }
 
   const { config, explicitlyDisabled } = mergeConfigs(projectConfig, globalConfig);
 
   applyEnvironmentFallbacks(config, explicitlyDisabled);
 
-  const result: ConfigLoadResult = { config, migration: migrationResult };
+  const result: ConfigLoadResult = { config };
 
-  // Update cache with fresh mtimes (migration may have written global config)
+  // Update cache with fresh mtimes
   const freshMtimes = getConfigMtimes();
   configCache = {
     globalMtime: freshMtimes.global,
@@ -553,7 +444,7 @@ export const getOpenInEditorCommand = (): Effect.Effect<string | null> =>
 
 /**
  * The conversations config block with API keys and enabled providers merged in and `~/` watch dirs resolved.
- * Reads config without running the deprecated-model migration; fails with `ConfigError` on a read or parse error.
+ * Fails with `ConfigError` on a read or parse error.
  */
 export const getConversationsConfig = (): Effect.Effect<
   RuntimeConversationsConfig,

@@ -20,9 +20,6 @@ const MINIMAX_DEFAULTS: SettingsConfig = {
       nous: false,
       dashscope: false,
     },
-    overrides: {
-      'legacy.route': 'minimax-m2.7-highspeed',
-    },
     gemini_thinking_level: 3,
   },
   api_keys: {},
@@ -141,8 +138,8 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('const applyVoiceSettings = (next: VoiceSettings');
     // Text-input handlers debounce; click handlers save immediately.
     expect(BACKGROUND_AI_SECTION_SOURCE).toContain('{ debounce: true }');
-    // Deprecated-model migration kept its own explicit action.
-    expect(SETTINGS_PAGE_SOURCE).toContain('Migrate now');
+    // The retired models.overrides deprecation banner is gone (#4131).
+    expect(SETTINGS_PAGE_SOURCE).not.toContain('Migrate now');
   });
 
   it('debounces high-frequency autosaves', () => {
@@ -244,11 +241,11 @@ describe('MODELS_BY_PROVIDER', () => {
 
 
 describe('buildMiniMaxFormData', () => {
-  it('applies MiniMax providers and overrides', () => {
+  it('applies MiniMax providers without the retired models.overrides key', () => {
     const result = buildMiniMaxFormData(null, MINIMAX_DEFAULTS);
     expect(result.models.providers.minimax).toBe(true);
     expect(result.models.providers.anthropic).toBe(false);
-    expect(result.models.overrides['legacy.route']).toBe('minimax-m2.7-highspeed');
+    expect(result.models).not.toHaveProperty('overrides');
   });
 
   it('preserves existing conversations settings from formData', () => {

@@ -95,7 +95,7 @@ if [ "$API_ERROR_DETECTED" != "true" ]; then
 fi
 
 # If the agent stopped because of a transient API error, nudge it to retry.
-# This runs before chaining to specialist/work-agent hooks because it
+# This runs before the role-specific branches below because it
 # applies universally. 5-minute cooldown per agent.
 if [ "$API_ERROR_DETECTED" = "true" ]; then
   SHOULD_NUDGE=true
