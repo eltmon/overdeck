@@ -698,7 +698,7 @@ describe('reloadCommand', () => {
 
       await reloadCommand({ skipBuild: true });
 
-      expect(mocks.readRunningDashboardBootGates).toHaveBeenCalledWith(3011);
+      expect(mocks.readRunningDashboardBootGates).toHaveBeenCalledWith(3011, '/repo');
       expect(mocks.readRunningDashboardBootGates.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.restartDashboard.mock.invocationCallOrder[0]);
       expect(spawnOptionsOfReload()).toMatchObject({
@@ -740,7 +740,7 @@ describe('reloadCommand', () => {
       await reloadCommand({ skipBuild: true });
 
       expect(spawnOptionsOfReload()).toMatchObject({ inheritBootGates: null });
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('running dashboard did not report its gates'));
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('no running dashboard of this checkout reported its gates'));
       expect(process.exitCode).toBeUndefined();
     });
 

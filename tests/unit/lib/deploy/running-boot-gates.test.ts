@@ -9,10 +9,10 @@ const OFF_BY_FLAG = {
 
 describe('readRunningDashboardBootGates (PAN-3899)', () => {
   it('returns the gates the running dashboard reports on /api/health', async () => {
-    const fetchHealth = vi.fn(async () => ({ status: 'ok', pid: 42, bootGates: OFF_BY_FLAG }));
+    const fetchHealth = vi.fn(async () => ({ status: 'ok', repoRoot: '/repo', pid: 42, bootGates: OFF_BY_FLAG }));
     const readEnviron = vi.fn();
 
-    await expect(readRunningDashboardBootGates(3011, { fetchHealth, readEnviron })).resolves.toEqual(OFF_BY_FLAG);
+    await expect(readRunningDashboardBootGates(3011, '/repo', { fetchHealth, readEnviron })).resolves.toEqual(OFF_BY_FLAG);
     expect(fetchHealth).toHaveBeenCalledWith('http://127.0.0.1:3011/api/health');
     expect(readEnviron).not.toHaveBeenCalled();
   });
@@ -28,26 +28,35 @@ describe('readRunningDashboardBootGates (PAN-3899)', () => {
     ].join('\0');
     const readEnviron = vi.fn(async () => environ);
 
-    await expect(readRunningDashboardBootGates(3011, {
-      fetchHealth: async () => ({ status: 'ok', pid: 42 }),
+    await expect(readRunningDashboardBootGates(3011, '/repo', {
+      fetchHealth: async () => ({ status: 'ok', repoRoot: '/repo', pid: 42 }),
       readEnviron,
     })).resolves.toEqual(OFF_BY_FLAG);
     expect(readEnviron).toHaveBeenCalledWith(42);
   });
 
   it('returns null when no dashboard answers', async () => {
-    await expect(readRunningDashboardBootGates(3011, {
+    await expect(readRunningDashboardBootGates(3011, '/repo', {
       fetchHealth: async () => { throw new Error('ECONNREFUSED'); },
     })).resolves.toBeNull();
   });
 
   it('returns null when neither the health body nor the process env can be read', async () => {
-    await expect(readRunningDashboardBootGates(3011, {
-      fetchHealth: async () => ({ status: 'ok' }),
+    await expect(readRunningDashboardBootGates(3011, '/repo', {
+      fetchHealth: async () => ({ status: 'ok', repoRoot: '/repo' }),
     })).resolves.toBeNull();
-    await expect(readRunningDashboardBootGates(3011, {
-      fetchHealth: async () => ({ status: 'ok', pid: 42 }),
+    await expect(readRunningDashboardBootGates(3011, '/repo', {
+      fetchHealth: async () => ({ status: 'ok', repoRoot: '/repo', pid: 42 }),
       readEnviron: async () => { throw new Error('EACCES'); },
     })).resolves.toBeNull();
+  });
+
+  it('ignores a server of another checkout holding the port', async () => {
+    const readEnviron = vi.fn();
+    await expect(readRunningDashboardBootGates(3011, '/repo', {
+      fetchHealth: async () => ({ status: 'ok', repoRoot: '/elsewhere', pid: 42, bootGates: OFF_BY_FLAG }),
+      readEnviron,
+    })).resolves.toBeNull();
+    expect(readEnviron).not.toHaveBeenCalled();
   });
 });

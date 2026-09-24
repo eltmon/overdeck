@@ -211,17 +211,6 @@ async function runReload(
     }
 
     const config = readPlatformConfig();
-    // PAN-3899: a reload replaces the server, it does not re-choose its gates.
-    // Read the running server's Deacon/resume gates now, while it is certainly
-    // up, and hand them to the replacement; explicit flags still win.
-    const inheritBootGates = await readRunningDashboardBootGates(config.dashboardApiPort);
-    const gateOptions = { deacon: options.deacon, resume: options.resume };
-    const bootGateEnv = { ...process.env };
-    if (inheritBootGates) writeBootGateEnv(bootGateEnv, inheritBootGates);
-    const bootGates = resolveBootGates(gateOptions, bootGateEnv);
-    console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}${inheritBootGates
-      ? ' (carried from the running dashboard)'
-      : ' (running dashboard did not report its gates)'}`));
     let repoRoot = process.cwd();
     let deployment: DashboardDeployment | null = null;
     let activation: DashboardDeploymentActivation | null = null;
@@ -334,6 +323,20 @@ async function runReload(
     // reload that "took" as long as the operator was away from the dashboard.
     await progress('restarting');
     startedAt = Date.now();
+
+    // PAN-3899: a reload replaces the server, it does not re-choose its gates.
+    // Read the running server's Deacon/resume gates now (it is still up until
+    // restartDashboard stops it) and hand them to the replacement. Only a
+    // server of this checkout counts: a stray peer on the port must not pass
+    // its Deacon-off gate to the primary. Explicit flags still win.
+    const inheritBootGates = await readRunningDashboardBootGates(config.dashboardApiPort, repoRoot);
+    const gateOptions = { deacon: options.deacon, resume: options.resume };
+    const bootGateEnv = { ...process.env };
+    if (inheritBootGates) writeBootGateEnv(bootGateEnv, inheritBootGates);
+    const bootGates = resolveBootGates(gateOptions, bootGateEnv);
+    console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}${inheritBootGates
+      ? ' (carried from the running dashboard)'
+      : ' (no running dashboard of this checkout reported its gates)'}`));
 
     let restartResult: DashboardRestartResult;
     try {

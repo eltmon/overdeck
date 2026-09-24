@@ -9,6 +9,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 import {
   DEACON_GATE_SOURCE_ENV,
@@ -52,9 +53,14 @@ function gatesFromEnviron(environ: string): BootGateState {
   return resolveBootGates({}, env);
 }
 
-/** The running dashboard's boot gates, or null when no dashboard answers or none can be read. */
+/**
+ * The boot gates of the dashboard serving `apiPort`, or null when no dashboard
+ * answers, the one that answers serves another checkout than `repoRoot`, or its
+ * gates cannot be read.
+ */
 export async function readRunningDashboardBootGates(
   apiPort: number,
+  repoRoot: string,
   deps: RunningBootGatesDeps = {},
 ): Promise<BootGateState | null> {
   let body: unknown;
@@ -65,6 +71,7 @@ export async function readRunningDashboardBootGates(
   }
   if (!body || typeof body !== 'object') return null;
   const payload = body as Record<string, unknown>;
+  if (typeof payload.repoRoot !== 'string' || resolve(payload.repoRoot) !== resolve(repoRoot)) return null;
 
   const reported = parseBootGateState(payload.bootGates);
   if (reported) return reported;

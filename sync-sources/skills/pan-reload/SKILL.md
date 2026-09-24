@@ -26,7 +26,7 @@ pan reload --force   # explicit operator bypass of the deploy-window gate
 - `--deacon` / `--no-deacon` — start or skip Cloister/Deacon on the reloaded dashboard.
 - `--resume` / `--no-resume` — enable or disable agent auto-resume on the reloaded dashboard.
 
-Without these flags, `pan reload` keeps the running dashboard's boot gates: before it restarts anything it reads them from `/api/health` (`bootGates`, or the server's env markers for an older server) and hands them to the replacement, so a deploy keeps the Deacon/resume choice of the last `pan restart` (PAN-3899). It prints `Boot gates: … (carried from the running dashboard)`. An explicit flag overrides the carried gate. When no dashboard answers, the gates resolve from the shell env and defaults, as `pan restart` does.
+Without these flags, `pan reload` keeps the running dashboard's boot gates: before it restarts anything it reads them from `/api/health` (`bootGates`, or the server's env markers for an older server) and hands them to the replacement, so a deploy keeps the Deacon/resume choice of the last `pan restart` (PAN-3899). It prints `Boot gates: … (carried from the running dashboard)`. An explicit flag overrides the carried gate. When no dashboard of this checkout answers, the gates resolve from the shell env and defaults, as `pan restart` does.
 
 ## Notes
 
