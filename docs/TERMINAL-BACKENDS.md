@@ -291,6 +291,23 @@ session presence only and is always `false` for a Herdr agent (#4097).
 A graceful restart's 60-second warning reaches a Herdr agent through `deliverAgentMessage`; on tmux
 it is still Escape twice and a tmux paste (`src/lib/graceful-restart.ts`).
 
+**Every runtime's `isRunning` asks `isAlive`, and Cloister's pokes and crash handling never act on
+unknown liveness** (#4116). Runtime modules cannot import `liveness.ts` directly, because that closes
+an import cycle through `agents.ts`. Instead, `src/lib/runtimes/index.ts` registers the oracle in
+`src/lib/runtimes/runtime-liveness.ts`, and every runtime's `isRunning` asks it. `isRunning` is `true`
+only when the oracle confirms the agent alive.
+
+In `src/lib/cloister/service-crash.ts`:
+
+- `pokeAgentWithEscalation` asks `isAlive` itself. It pokes only a confirmed-alive agent. When the
+  backend does not answer (`runtime-indeterminate`), it neither pokes nor changes the no-progress
+  streak.
+- `handleAgentCrash` counts a crash and emits `agent.heartbeat_dead` only when `isConfirmedDead`
+  holds.
+
+`getAgentHealth` (`src/lib/cloister/health.ts`) is synchronous. It treats only a synchronous `false`
+as a dead agent, never a pending answer, and the health loop decides which agents are live.
+
 **Crash detection and the start conflict check ask `isAlive`** (#4105). `detectCrashedAgents`
 (`pan recover`, `pan recover --all`, `autoRecoverAgents`) lists a `running` agent as crashed only
 when `isConfirmedDead` holds, so a live Herdr agent is not crashed and a `runtime-indeterminate`
