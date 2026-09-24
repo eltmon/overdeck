@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T19:54:56.856Z · model: claude-opus-5 · open: 821_
+_Last sequenced: 2026-09-24T19:59:48.736Z · model: claude-opus-5 · open: 820_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -140,9 +140,7 @@ _Last sequenced: 2026-09-24T19:54:56.856Z · model: claude-opus-5 · open: 821_
 | 167 | PAN-3881 | S | high | ok |  |  | pan sync distributes from a stale primary checkout and never removes deleted sources — resurrects deleted subagent defs |
 | 168 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
-| 170 | PAN-3826 | M | high | ok |  |  | Conversation view freezes until refresh: Claude JSONL watcher relies solely on fs.watch with no missed-event safety net |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
-| 172 | PAN-3866 | S | high | ok |  |  | Test specialist copies the previous head's uatStatus/uatNotes into a new result instead of re-running browser UAT |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 174 | PAN-3022 | S | high | needs-refinement |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
@@ -308,6 +306,7 @@ _Last sequenced: 2026-09-24T19:54:56.856Z · model: claude-opus-5 · open: 821_
 | 346 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
 | 347 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 348 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 349 | PAN-4131 | M | medium | ok |  |  | Dead models.overrides still rewrites the user's config.yaml, and Command Deck status review silently falls back to a code default |
 | 350 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 351 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
 | 352 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
@@ -1136,10 +1135,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T19:54:56.856Z",
+  "generatedAt": "2026-09-24T19:59:48.736Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 821,
+  "openCount": 820,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -2854,19 +2853,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-3826",
-      "rank": 170,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Conversation view freezes until refresh: Claude JSONL watcher relies solely on fs.watch with no missed-event safety net",
-      "rationale": "Three quiet-failure paths in watchConversation and nothing upstream compensates while streaming is on; a poll fallback or dirty-flag reparse fixes all three.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3854",
       "rank": 171,
       "size": "S",
@@ -2876,19 +2862,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "dependsOn": [],
       "why": "Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT",
       "rationale": "The test role's browser UAT runs against the workspace stack; without session bootstrap every mutation AC is unprovable. Likely missing trusted-origin/Traefik env in the feature stack.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3866",
-      "rank": 172,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Test specialist copies the previous head's uatStatus/uatNotes into a new result instead of re-running browser UAT",
-      "rationale": "A stale failed UAT mark is indistinguishable from a real one; the result must carry the head SHA the verdict applies to and never copy a prior verdict.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11297,6 +11270,19 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "rationale": "New since the prior pass, and a silent regression rather than a missing feature: findLatestReviewRunDir in reviewer-tree.ts still looks for directories named review-<ISSUE>-<unixMillis>, a naming scheme review-agent.ts stopped writing when runs moved to agent-<issue>-review-<head8>. It therefore returns null on every current run, which switches off two behaviours that already shipped — the PAN-915 mid-round check and the PAN-1048 lane-done check. The operator reads the reviewer tree to know where a convoy stands, so the cost is a status lie in both directions: a live reviewer working the new round renders as a stopped zombie and invites a kill, and a finished lane keeps showing as working until the synthesiser exits. The existing tests pass only because their fixtures still use the retired directory name, so the suite cannot catch it. Ranked high at 74 rather than critical because nothing wedges — dispatch, convoy and synthesis all run correctly and only the view is wrong — and placed in the score-72-to-76 band at a free rank, with no renumbering. Size S: the body carries a verified fix (read reviewRunId from the review parent state row instead of scanning, with no fallback needed since buildReviewerNodes already returns no lanes when reviewRunId is absent) plus acceptance criteria that fail before it.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4131",
+      "rank": 349,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dead models.overrides still rewrites the user's config.yaml, and Command Deck status review silently falls back to a code default",
+      "rationale": "New since the prior run, a follow-up to the now-closed #4128. Scored 60 rather than treated as pure cleanup because two live defects ride along with the dead code: a load-time migration rewrites deprecated model IDs inside models.overrides, so Overdeck still edits the operator's own config.yaml for a key nothing reads, and command-deck.ts looks up a status-review key in data that never carries overrides, so the Command Deck status review always runs on a hardcoded code default the project's no-hardcoded-model-fallback rule forbids. Removal spans about ten files plus their tests and a docs/CONFIGURATION.md rewrite of the fallback-map sections that no longer describe src/lib, and it forces the roles.review.sub.synthesis decision: retire it alongside RETIRED_SUB_ROLES or wire it into the review parent's spawn, since synthesis currently runs on roles.review.model regardless.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11980,22 +11966,8 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "confidence": 0.5
     },
     {
-      "from": "PAN-3866",
-      "to": "PAN-3854",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-3881",
       "to": "PAN-3823",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-3827",
-      "to": "PAN-3826",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
@@ -12426,6 +12398,20 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-4131",
+      "to": "PAN-762",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4131",
+      "to": "PAN-736",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
