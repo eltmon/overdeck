@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T19:59:48.736Z · model: claude-opus-5 · open: 820_
+_Last sequenced: 2026-09-24T20:02:47.390Z · model: claude-opus-5 · open: 820_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,10 +8,10 @@ _Last sequenced: 2026-09-24T19:59:48.736Z · model: claude-opus-5 · open: 820_
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
 | 9 | PAN-4109 | M | critical | ok |  |  | Nine readers still filter on tmuxActive: on Herdr the health loop, emergencyStop and the memory governor's shed all see zero agents |
-| 11 | PAN-4121 | S | critical | ok |  |  | Poke escalation fingerprints panes with a hard-coded tmux capture-pane, so on Herdr an uncommitted working agent pauses as idle-alive |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
+| 23 | PAN-4134 | S | critical | ok |  |  | All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges |
 | 25 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -840,10 +840,6 @@ In pipeline — rank pinned. The sequencer half landed on main (reap through the
 
 Filed 2026-09-24, placed at rank 9 — freed when PAN-4097 closed — so it inherits its predecessor's slot in the same Herdr-blindness wave and no existing rank moves. PRs #4088, #4103 and #4107 moved the lifecycle guards, the output route and crash detection onto the backend-aware door (isAlive in src/lib/agents/liveness.ts plus the backend inventory), but nine readers still take liveness from the tmuxActive flag on listRunningAgents(), which reports tmux session presence on the overdeck socket alone and is therefore false for every agent on Herdr, the default backend. This is critical rather than high because two of those sites are protections, not reports: memory-governor.ts shed() never pauses a Herdr agent under HARD pressure and cannot protect a live agent's stack from the merged-stack shed, and service.ts emergencyStop() kills nothing — so the OOM defences the host relies on are inert on the default backend, while service-health.ts silently skips crash detection, pokes and stuck handling for the whole fleet. The body enumerates every site with the grep that finds them, states the safety rule (an unreachable backend must never read as dead where that drives a kill, restart, pause or stack stop), keeps tmuxActive where it is part of an API shape, and asks for scripts/lint-liveness.sh to be extended so the sites cannot regress. M rather than S because it is nine modules across CLI, Cloister and the dashboard server plus a lint ratchet.
 
-### PAN-4121 (rank 11)
-
-New since the prior pass and the third member of the Herdr-blindness wave that PAN-4109 (rank 9) and PAN-4116 (rank 10) open, so it takes rank 11 and nothing renumbers. progressFingerprint in src/lib/cloister/service-crash.ts reads the agent's pane tail with execFileAsync('tmux', ['-L', managedSocket, 'capture-pane', …]) instead of the backend-aware readAgentPaneText in src/lib/terminal-backends/agent-pane-io.ts that #4103 already routed /api/agents/:id/output through. A Herdr agent has no tmux session, the catch swallows the failure, and the pane half hashes the empty string forever — an unreadable pane is indistinguishable from an unchanged one — leaving the workspace HEAD as the only live input. An agent that is working but has not committed therefore holds one fingerprint across every poke, the third poke accuses it of making no observable progress and the fifth pauses it with needs-you: idle-alive. It is critical rather than high because the damage is inflicted on healthy work on the default backend: the pipeline stops agents that are doing their job. It also must land with or right after PAN-4116, because isRunning is currently false on Herdr and pokeAgentWithEscalation bails before the fingerprint is ever consulted — the moment that gate becomes backend-aware the pokes start firing and this constant fingerprint begins pausing live agents. The body names the file, the exact call, the safety rule (a failed or empty read makes the fingerprint unknown, an unknown fingerprint sends no poke and never advances the ineffective counter) and a backend-independent third input, transcript growth from the runtime heartbeat, so the change is small and fully specified.
-
 ### PAN-3930 (rank 15)
 
 In pipeline — rank pinned.
@@ -855,6 +851,10 @@ New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-me
 ### PAN-3939 (rank 22)
 
 Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.
+
+### PAN-4134 (rank 23)
+
+New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where "unknown" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two.
 
 ### PAN-3977 (rank 25)
 
@@ -1135,7 +1135,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T19:59:48.736Z",
+  "generatedAt": "2026-09-24T20:02:47.390Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 820,
@@ -11233,19 +11233,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-4121",
-      "rank": 11,
-      "size": "S",
-      "importance": "critical",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Poke escalation fingerprints panes with a hard-coded tmux capture-pane, so on Herdr an uncommitted working agent pauses as idle-alive",
-      "rationale": "New since the prior pass and the third member of the Herdr-blindness wave that PAN-4109 (rank 9) and PAN-4116 (rank 10) open, so it takes rank 11 and nothing renumbers. progressFingerprint in src/lib/cloister/service-crash.ts reads the agent's pane tail with execFileAsync('tmux', ['-L', managedSocket, 'capture-pane', …]) instead of the backend-aware readAgentPaneText in src/lib/terminal-backends/agent-pane-io.ts that #4103 already routed /api/agents/:id/output through. A Herdr agent has no tmux session, the catch swallows the failure, and the pane half hashes the empty string forever — an unreadable pane is indistinguishable from an unchanged one — leaving the workspace HEAD as the only live input. An agent that is working but has not committed therefore holds one fingerprint across every poke, the third poke accuses it of making no observable progress and the fifth pauses it with needs-you: idle-alive. It is critical rather than high because the damage is inflicted on healthy work on the default backend: the pipeline stops agents that are doing their job. It also must land with or right after PAN-4116, because isRunning is currently false on Herdr and pokeAgentWithEscalation bails before the fingerprint is ever consulted — the moment that gate becomes backend-aware the pokes start firing and this constant fingerprint begins pausing live agents. The body names the file, the exact call, the safety rule (a failed or empty read makes the fingerprint unknown, an unknown fingerprint sends no poke and never advances the ineffective counter) and a backend-independent third input, transcript growth from the runtime heartbeat, so the change is small and fully specified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4123",
       "rank": 447,
       "size": "S",
@@ -11281,6 +11268,19 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "dependsOn": [],
       "why": "Dead models.overrides still rewrites the user's config.yaml, and Command Deck status review silently falls back to a code default",
       "rationale": "New since the prior run, a follow-up to the now-closed #4128. Scored 60 rather than treated as pure cleanup because two live defects ride along with the dead code: a load-time migration rewrites deprecated model IDs inside models.overrides, so Overdeck still edits the operator's own config.yaml for a key nothing reads, and command-deck.ts looks up a status-review key in data that never carries overrides, so the Command Deck status review always runs on a hardcoded code default the project's no-hardcoded-model-fallback rule forbids. Removal spans about ten files plus their tests and a docs/CONFIGURATION.md rewrite of the fallback-map sections that no longer describe src/lib, and it forces the roles.review.sub.synthesis decision: retire it alongside RETIRED_SUB_ROLES or wire it into the review parent's spawn, since synthesis currently runs on roles.review.model regardless.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4134",
+      "rank": 23,
+      "size": "S",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges",
+      "rationale": "New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where \"unknown\" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12386,13 +12386,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "confidence": 0.5
     },
     {
-      "from": "PAN-4109",
-      "to": "PAN-4121",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-4123",
       "to": "PAN-4127",
       "type": "informs",
@@ -12412,6 +12405,20 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-3939",
+      "to": "PAN-4134",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3914",
+      "to": "PAN-4134",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
