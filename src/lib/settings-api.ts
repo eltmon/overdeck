@@ -38,19 +38,10 @@ import { validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
-import { MODEL_CAPABILITIES, hasModelCapability, MODEL_DEPRECATIONS, resolveModelId, getModelEffortLevels } from './model-capabilities.js';
+import { hasModelCapability, MODEL_DEPRECATIONS, resolveModelId, getModelEffortLevels } from './model-capabilities.js';
 import { resolveTelemetryEnabled, telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { getOrCreateInstallId } from './telemetry/install-id.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
-
-/**
- * Deprecation warning in API format
- */
-export interface ApiDeprecationWarning {
-  workType: string;
-  from: string;
-  to: string;
-}
 
 export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
 
@@ -141,8 +132,6 @@ export interface ApiSettingsConfig {
       "opencode-go"?: boolean;
       meta?: boolean;
     };
-    /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
-    overrides?: Partial<Record<string, ModelId>>;
     provider_harnesses?: ProviderHarnessesConfig;
     provider_default_harnesses?: BuiltInProviderHarnessesConfig;
     gemini_thinking_level?: number;
@@ -282,13 +271,10 @@ export interface ApiSettingsConfig {
     max_concurrent_agents?: number;
   };
   tiered_execution?: ApiTieredExecutionConfig;
-  deprecation_warnings?: ApiDeprecationWarning[];
 }
 
 /**
  * Load settings in API format (for GET /api/settings)
- *
- * Also detects deprecated model IDs in current overrides and returns warnings.
  */
 export function getDefaultConversationModelApi(): ModelId | undefined {
   const { config } = loadConfigSync();
@@ -664,19 +650,6 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfigSync();
 
-  // Detect deprecated models in current overrides. Overrides are no longer
-  // surfaced by GET /api/settings, but warnings help users clean stale config.
-  const deprecationWarnings: ApiDeprecationWarning[] = [];
-  for (const [workType, modelId] of Object.entries(config.overrides)) {
-    if (modelId && MODEL_DEPRECATIONS[modelId]) {
-      deprecationWarnings.push({
-        workType,
-        from: modelId,
-        to: MODEL_DEPRECATIONS[modelId],
-      });
-    }
-  }
-
   const conversationSettings = pruneUndefined({
     compaction_model: config.conversations?.compactionModel,
     manual_compact_mode: config.conversations?.manualCompactMode,
@@ -800,7 +773,6 @@ export function loadSettingsApi(): ApiSettingsConfig {
       max_concurrent_agents: config.remote?.maxConcurrentAgents ?? 0,
     },
     tiered_execution: config.tieredExecution,
-    deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }
 
@@ -833,6 +805,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   } else {
     doc.setIn(['models', 'providers'], config.models?.providers ?? {});
   }
+  // models.overrides is retired (#4131); an explicit Settings save drops it.
   doc.deleteIn(['models', 'overrides']);
 
   if (config.models?.gemini_thinking_level !== undefined) {
@@ -1105,7 +1078,6 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
         ...current.models.provider_harnesses,
         ...updates.models?.provider_harnesses,
       },
-      overrides: undefined,
     },
     api_keys: {
       ...current.api_keys,
@@ -1247,25 +1219,6 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
         if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
           errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or empty string`);
         }
-      }
-    }
-  }
-
-  // Validate overrides - check that model IDs are valid (including deprecated ones)
-  if (settings.models?.overrides) {
-    const validModelIds = Object.keys(MODEL_CAPABILITIES);
-    for (const [workType, modelId] of Object.entries(settings.models.overrides)) {
-      if (!modelId) continue;
-
-      // Check if deprecated
-      if (MODEL_DEPRECATIONS[modelId]) {
-        warnings.push(
-          `${workType}: "${modelId}" is deprecated, use "${MODEL_DEPRECATIONS[modelId]}" instead`
-        );
-      }
-      // Check if valid (current or deprecated)
-      else if (!validModelIds.includes(modelId)) {
-        errors.push(`Invalid model ID "${modelId}" for work type "${workType}"`);
       }
     }
   }

@@ -91,7 +91,6 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
   return {
     config: {
       enabledProviders: new Set(['anthropic']),
-      overrides: {},
       geminiThinkingLevel: 3,
       apiKeys: {},
       providerAuth: {},
