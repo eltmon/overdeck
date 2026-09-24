@@ -22,6 +22,7 @@ import { readRestartStatus, writeRestartStatus, type RestartStatus } from '../..
 import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.js';
 import { getConversationByTmuxSession } from '../../../lib/overdeck/conversations.js';
 import { isSupervisorUnitFailed, SUPERVISOR_UNIT_NAME } from '../../../lib/systemd.js';
+import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 
 export const RESTART_ANNOUNCER_LAST_TS_KEY = 'restart_announcer.last_announced_ts';
 const POLL_MS = 15_000;
@@ -128,6 +129,8 @@ export interface RestartAnnouncerDeps {
   getLastAnnounced?: () => string | null;
   setLastAnnounced?: (ts: string) => void;
   now?: () => number;
+  /** Whether this process is a peer dashboard; defaults to the boot-gate env. */
+  isPeer?: () => boolean;
 }
 
 function isSupervisorUnitFailureStatus(status: RestartStatus | null): status is RestartStatus {
@@ -211,8 +214,15 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 let runToken = 0;
 
-export function startRestartAnnouncer(deps: RestartAnnouncerDeps = {}): void {
-  if (running) return;
+/**
+ * Start the announcer. Returns false, and starts nothing, in a peer dashboard
+ * (PAN-3931): a pass writes `restart-status.json` and the shared
+ * last-announced setting, so a peer would record the primary's restarts as
+ * announced and the primary would never announce them.
+ */
+export function startRestartAnnouncer(deps: RestartAnnouncerDeps = {}): boolean {
+  if ((deps.isPeer ?? isPeerDashboardProcess)()) return false;
+  if (running) return true;
   running = true;
   const token = ++runToken;
   let remainingBootstrapPolls = BOOTSTRAP_FAST_POLL_COUNT;
@@ -239,6 +249,7 @@ export function startRestartAnnouncer(deps: RestartAnnouncerDeps = {}): void {
   };
 
   pass();
+  return true;
 }
 
 export function stopRestartAnnouncer(): void {

@@ -22,6 +22,7 @@ describe('project CI refill startup', () => {
     const result = startProjectCiRefillAfterProjectionReady(15 * 60 * 1000, {
       whenReady: () => ready,
       start,
+      isPeer: () => false,
     });
 
     await Promise.resolve();
@@ -31,6 +32,20 @@ describe('project CI refill startup', () => {
     await expect(result).resolves.toBe(timer);
     expect(start).toHaveBeenCalledOnce();
     expect(start).toHaveBeenCalledWith(15 * 60 * 1000);
+  });
+
+  // PAN-3931: a peer shares the primary's event log; the primary runs the refill.
+  it('starts no refill in a peer dashboard', async () => {
+    const whenReady = vi.fn(async () => undefined);
+    const start = vi.fn(() => ({ unref: vi.fn() }) as unknown as ReturnType<typeof setInterval>);
+
+    await expect(startProjectCiRefillAfterProjectionReady(15 * 60 * 1000, {
+      whenReady,
+      start,
+      isPeer: () => true,
+    })).resolves.toBeNull();
+    expect(whenReady).not.toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
   });
 
   it('releases current and future waiters when the projection is marked ready', async () => {
