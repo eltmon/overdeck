@@ -42,10 +42,13 @@ vi.mock('../../../../src/lib/agents.js', () => ({
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
   getAgentStateSync: (id: string) => h.states.get(id) ?? null,
-  clearAgentPausedSync: (id: string) => {
-    h.clearPaused(id);
+  clearAgentPausedSync: (id: string, onlyIf?: (state: Record<string, unknown>) => boolean) => {
     const state = h.states.get(id);
-    if (state) h.states.set(id, { ...state, paused: false, pausedReason: undefined });
+    if (!state) return false;
+    if (onlyIf && !onlyIf(state)) return false;
+    h.clearPaused(id);
+    h.states.set(id, { ...state, paused: false, pausedReason: undefined });
+    return true;
   },
   clearAgentTroubledSync: h.clearTroubled,
 }));
@@ -183,7 +186,9 @@ describe('#4019: the stuck notice never un-pauses the agent escalation paused', 
       paused: true,
       pausedReason: expect.stringMatching(new RegExp(`^${VERIFICATION_STUCK_PAUSE_PREFIX}`)),
     }));
-    expect(needsYouMessages()).toHaveLength(1);
+    expect(needsYouMessages()).toEqual([
+      expect.stringContaining(`Verification stuck: ${AGENT} is paused for the operator`),
+    ]);
   });
 
   it('a verification pass lifts the stuck pause; later feedback then reaches the agent normally', async () => {

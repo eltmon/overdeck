@@ -142,6 +142,9 @@ export async function deliverVerificationFeedback(
       : { keepPause: (reason) => reason.startsWith(VERIFICATION_STUCK_PAUSE_PREFIX) },
   );
   if (await skipMergedVerification(issueId, logPrefix)) return false;
+  // A stuck pause that landed during resolution is reported like one that was
+  // already there.
+  const heldForOperator = stuckPaused || isVerificationStuckPaused(issueId);
 
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
@@ -159,7 +162,7 @@ export async function deliverVerificationFeedback(
       return true;
     }
     const reason = outcome.reason ?? 'delivery was not accepted';
-    if (stuckPaused && outcome.queuedToMail) {
+    if (heldForOperator && outcome.queuedToMail) {
       console.log(`[${logPrefix}] ${target.agentId} is paused for verification stuck; the notice for ${issueId} is queued to its mail`);
       await surfaceIssueFeedbackNeedsYou(
         issueId,
@@ -178,7 +181,7 @@ export async function deliverVerificationFeedback(
 
   await surfaceIssueFeedbackNeedsYou(
     issueId,
-    stuckPaused
+    heldForOperator
       ? `Verification stuck: agent-${issueId.toLowerCase()} is paused for the operator and was not resumed to receive the notice. ${target.reason}`
       : target.reason,
     { specialist: 'verification-gate', ...details },

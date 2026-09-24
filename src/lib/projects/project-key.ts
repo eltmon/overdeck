@@ -7,25 +7,32 @@
  */
 import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { loadProjectsConfigSync } from '../projects.js';
 
 /**
  * Absolute, symlink-free form of a projects.yaml or agent path. projects.yaml
- * keeps path strings as written, so `~` is expanded here; a path that does not
- * exist (a deleted workspace, a stale project root) falls back to its lexical
- * form.
+ * keeps path strings as written, so `~` is expanded here. A path that does not
+ * exist (a deleted workspace, a stale project root) resolves its deepest
+ * existing ancestor and keeps the missing segments, so it still lands under a
+ * root reached through a symlink.
  */
 function canonicalPath(path: string): string {
   const expanded = path === '~' ? homedir()
     : path.startsWith('~/') || path.startsWith(`~${sep}`) ? join(homedir(), path.slice(2))
       : path;
-  const absolute = resolve(expanded);
-  try {
-    return realpathSync(absolute);
-  } catch {
-    return absolute;
+  let existing = resolve(expanded);
+  const missing: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync(existing), ...missing);
+    } catch {
+      const parent = dirname(existing);
+      if (parent === existing) return resolve(expanded);
+      missing.unshift(basename(existing));
+      existing = parent;
+    }
   }
 }
 

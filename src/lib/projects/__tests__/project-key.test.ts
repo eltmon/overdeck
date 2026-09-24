@@ -93,6 +93,21 @@ describe('findProjectKeyByPathSync', () => {
     expect(findProjectKeyByPathSync(join(fixture.home, 'Projects', 'overdeck', 'workspaces', 'deleted'))).toBe('overdeck');
   });
 
+  it('matches a deleted path under a symlinked root', () => {
+    // ~/Projects is a symlink to the real checkout directory; the workspace was deleted.
+    const realProjects = join(root, 'real-projects');
+    mkdirSync(join(realProjects, 'overdeck', 'workspaces'), { recursive: true });
+    const linkedHome = join(root, 'linked-home');
+    mkdirSync(linkedHome);
+    symlinkSync(realProjects, join(linkedHome, 'Projects'));
+    fixture.home = linkedHome;
+    fixture.projects = { overdeck: { name: 'Overdeck', path: '~/Projects/overdeck' } };
+
+    expect(findProjectKeyByPathSync('~/Projects/overdeck/workspaces/feature-gone/src')).toBe('overdeck');
+    expect(findProjectKeyByPathSync(join(realProjects, 'overdeck', 'workspaces', 'feature-gone'))).toBe('overdeck');
+    expect(findProjectKeyByPathSync(join(linkedHome, 'Projects', 'overdeck-gone'))).toBeNull();
+  });
+
   it('returns null for an empty path', () => {
     expect(findProjectKeyByPathSync('')).toBeNull();
   });
