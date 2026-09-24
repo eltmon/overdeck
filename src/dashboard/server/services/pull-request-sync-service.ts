@@ -137,6 +137,22 @@ interface SweepContext {
   readonly handled: Set<string>;
   /** Conversations with a link that went from open to merged/closed this sweep. */
   readonly settled: Set<string>;
+  /** PR key → conversations whose own link to it was open when the sweep began. */
+  readonly openBefore: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+function openLinksByKey(links: ReadonlyMap<string, readonly PullRequestLink[]>): Map<string, Set<string>> {
+  const open = new Map<string, Set<string>>();
+  for (const [name, conversationLinks] of links) {
+    for (const link of conversationLinks) {
+      if (link.snapshot?.state !== 'open') continue;
+      const id = keyString(link);
+      const names = open.get(id) ?? new Set<string>();
+      names.add(name);
+      open.set(id, names);
+    }
+  }
+  return open;
 }
 
 /**
@@ -161,10 +177,11 @@ function applySnapshot(link: PullRequestLink, row: GhPrRow, ctx: SweepContext): 
   const changed = setPullRequestLinkSnapshot(link, snapshot);
   // Only an observed open → merged/closed transition counts (a first read of an
   // already-settled PR does not), so auto-archive can't fire on a fresh link.
-  const settledNow = snapshot.state !== 'open' && link.snapshot?.state === 'open';
+  // Judged per conversation: links sharing a PR can hold different snapshots.
+  const openBefore = ctx.openBefore.get(keyString(link));
   for (const name of changed) {
     ctx.changedNames.add(name);
-    if (settledNow) ctx.settled.add(name);
+    if (snapshot.state !== 'open' && openBefore?.has(name)) ctx.settled.add(name);
   }
   return changed.length;
 }
@@ -381,10 +398,11 @@ export async function runPullRequestSyncOnce(
   readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
   listLiveSessions: () => Promise<readonly string[] | null> = listLiveConversationSessions,
 ): Promise<PullRequestSyncResult> {
+  const conversations = listConversationsForPullRequestSync();
   const ctx: SweepContext = {
     now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set(), settled: new Set(),
+    openBefore: openLinksByKey(listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name))),
   };
-  const conversations = listConversationsForPullRequestSync();
   const groups = new Map<string, { project: ProjectConfig; conversations: PullRequestSyncConversation[] }>();
   for (const conversation of conversations) {
     const project = findProjectByPath(conversation.cwd);

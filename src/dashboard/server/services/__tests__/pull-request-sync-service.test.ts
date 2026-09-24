@@ -457,6 +457,28 @@ describe('runPullRequestSyncOnce — auto-archive on merge (WI-11)', () => {
     expect(archivedAt(noServer)).not.toBeNull();
   });
 
+  it('judges the open → merged transition per conversation when links share a PR', async () => {
+    setConversationsAutoArchiveOnMerge(true);
+    const watched = conversation('feature/shared-merge');
+    prRows = [pr(23, 'feature/shared-merge')];
+    await runPullRequestSyncOnce(T0, async () => null, noLiveSessions);
+    expect(listConversationPullRequests(watched)[0]?.snapshot?.state).toBe('open');
+
+    // A second conversation links the same PR before it was ever synced for it,
+    // and sorts first (earlier linked_at), so a shared prior state would read null.
+    const fresh = conversation(null);
+    linkConversationPullRequest(fresh, {
+      host: 'github.com', repository: 'eltmon/overdeck', number: 23, url: 'https://github.com/eltmon/overdeck/pull/23',
+    }, 'manual', T0 - 3_600_000);
+    getOverdeckDatabase().prepare("UPDATE conversation_pull_requests SET snapshot_json = NULL WHERE conversation_id = (SELECT id FROM conversations WHERE name = ?)").run(fresh);
+
+    prRows = [merged(23, 'feature/shared-merge')];
+    await runPullRequestSyncOnce(T0 + 60_000, async () => null, noLiveSessions);
+
+    expect(archivedAt(watched)).not.toBeNull();
+    expect(archivedAt(fresh)).toBeNull();
+  });
+
   it('waits while another linked PR is still open', async () => {
     setConversationsAutoArchiveOnMerge(true);
     const name = conversation('feature/two');
