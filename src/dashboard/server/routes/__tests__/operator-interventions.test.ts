@@ -60,6 +60,15 @@ const sharedMocks = vi.hoisted(() => ({
   })),
 }));
 
+const terminationMocks = vi.hoisted(() => ({
+  stopIssueSpecialistAgents: vi.fn(async () => [] as string[]),
+}));
+
+vi.mock('../../../../lib/agents/termination.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/agents/termination.js')>()),
+  stopIssueSpecialistAgents: terminationMocks.stopIssueSpecialistAgents,
+}));
+
 vi.mock('../../../../lib/operator-interventions.js', () => ({
   appendOperatorInterventionEvent: operatorInterventionMocks.appendOperatorInterventionEvent,
   operatorInterventionEvent: (input: any) => ({
@@ -349,6 +358,8 @@ describe('operator.intervention dashboard routes', () => {
       type: 'operator.intervention',
       payload: { issueId: 'PAN-1', kind: 'pause', source: 'dashboard' },
     }));
+    // PAN-3911: pausing the work agent stops the issue's review/test agents.
+    expect(terminationMocks.stopIssueSpecialistAgents).toHaveBeenCalledWith('PAN-1');
   });
 
   it('emits restart from the successful dashboard restart route and forwards harness overrides', async () => {

@@ -5,6 +5,7 @@ import { getAgentState, listAgentStates, resolveAgentTarget, setAgentPaused, sto
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
+import { stopIssueSpecialistAgents } from '../../lib/agents/termination.js';
 
 interface PauseOptions {
   reason?: string;
@@ -42,11 +43,17 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
       // closes too — the sync variant could only reach a tmux session.
       await Effect.runPromise(stopAgent(agentId, 'operator'));
     }
+    // PAN-3911: pausing the work agent pauses the issue — its review and test
+    // agents stop too, and dispatchers read the issue gate before relaunching.
+    const stoppedSpecialists = state.role === 'work' && issueId ? await stopIssueSpecialistAgents(issueId) : [];
     await appendOperatorInterventionEvent({ issueId, kind: 'pause', source: 'pan pause' });
 
     const reason = options.reason ? ` (${options.reason})` : '';
     const stopped = shouldStop ? ' and stopped' : '';
     console.log(chalk.green(`Paused${stopped} agent: ${agentId}${reason}`));
+    if (stoppedSpecialists.length > 0) {
+      console.log(chalk.green(`Stopped ${issueId} review/test agent(s): ${stoppedSpecialists.join(', ')}`));
+    }
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));
     return exitCli(1);

@@ -287,3 +287,40 @@ export const stopAgent = (
     }));
   });
 };
+
+/**
+ * PAN-3911: an issue pause holds the whole issue, so pausing the work agent
+ * also stops the issue's live review and test agents. They are not paused
+ * themselves — a fresh spawn rewrites state.json and drops a per-agent pause —
+ * so the issue gate (`getIssuePause`) is what keeps dispatchers off them.
+ * Returns the ids it stopped. Best-effort per agent: one failed stop must not
+ * leave the rest running.
+ */
+export async function stopIssueSpecialistAgents(issueId: string): Promise<string[]> {
+  const upperIssueId = issueId.trim().toUpperCase();
+  if (!upperIssueId) return [];
+  const { listAgentStates } = await import('./queries.js');
+  const { agentPaneExists } = await import('../terminal-backends/launch.js');
+  let agents: ReturnType<typeof listAgentStates>;
+  try {
+    agents = listAgentStates();
+  } catch (err) {
+    console.warn(`[agents] Could not list agents to stop for paused ${upperIssueId}: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  }
+  const stopped: string[] = [];
+  for (const agent of agents) {
+    if (agent.role !== 'review' && agent.role !== 'test') continue;
+    if ((agent.issueId ?? '').trim().toUpperCase() !== upperIssueId) continue;
+    const claimsLive = agent.status === 'running' || agent.status === 'starting';
+    const hasPane = await agentPaneExists(agent.id).catch(() => false);
+    if (!claimsLive && !hasPane) continue;
+    try {
+      await Effect.runPromise(stopAgent(agent.id, 'operator'));
+      stopped.push(agent.id);
+    } catch (err) {
+      console.warn(`[agents] Could not stop ${agent.id} for paused ${upperIssueId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return stopped;
+}

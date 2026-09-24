@@ -17,6 +17,7 @@ import { operatorInterventionEvent } from '../../../../lib/operator-intervention
 import { stopWorkspaceDocker } from '../../../../lib/workspace-manager.js';
 import { sessionExists } from '../../../../lib/tmux.js';
 import { agentPaneExists, closeAgentPane } from '../../../../lib/terminal-backends/launch.js';
+import { stopIssueSpecialistAgents } from '../../../../lib/agents/termination.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -225,6 +226,13 @@ export const postAgentPauseRoute = HttpRouter.add(
         state: 'stopped',
         lastActivity: new Date().toISOString(),
       }));
+    }
+
+    // PAN-3911: pausing the work agent pauses the issue — its review and test
+    // agents stop too, and dispatchers read the issue gate before relaunching.
+    if (stateBeforePause.role === 'work' && stateBeforePause.issueId) {
+      const issueId = stateBeforePause.issueId;
+      yield* Effect.promise(() => stopIssueSpecialistAgents(issueId));
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.pause_requested', { reason }));
