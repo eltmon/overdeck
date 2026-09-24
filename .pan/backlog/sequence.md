@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:50:07.099Z · model: claude-opus-5 · open: 820_
+_Last sequenced: 2026-09-24T20:54:28.055Z · model: claude-opus-5 · open: 820_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -131,6 +131,7 @@ _Last sequenced: 2026-09-24T20:50:07.099Z · model: claude-opus-5 · open: 820_
 | 155 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
 | 156 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
 | 157 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
+| 158 | PAN-4167 | XS | high | ok |  |  | Fork spawn-pending test sleeps 10ms instead of awaiting the mock: a false CI red that stalls the merge gate; fix is a vi.waitFor |
 | 159 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
 | 160 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
 | 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
@@ -355,7 +356,6 @@ _Last sequenced: 2026-09-24T20:50:07.099Z · model: claude-opus-5 · open: 820_
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
-| 396 | PAN-3915 | S | medium | ok |  |  | resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -1135,7 +1135,7 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:50:07.099Z",
+  "generatedAt": "2026-09-24T20:54:28.055Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 820,
@@ -5506,19 +5506,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify",
       "rationale": "Triage: review-convoy re-dispatch is now one deacon-lite routine (recoverStalledReviews); verify pan pause against it specifically. Still a real token-spend hole; rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3915",
-      "rank": 396,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health",
-      "rationale": "New this run: medium/58 — resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11285,6 +11272,20 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "New issue (2026-09-24), the only delta since the prior run. pushPlanArtifacts replays the whole local range through git merge-tree, so one superseded rendering of .pan/backlog/sequence.md aborts the push and origin keeps serving a stale ranked order that the Flywheel reads for pickup; the silent reset --keep refusal then adds another unpushed commit every run, so the failure compounds. Ranked 31 rather than into the vacated top slots: the acute incident was hand-repaired (main is level with origin, the identical untracked drafts removed), so the bug is latent until the next untracked-draft collision, and it ranks behind the actively-biting pipeline blockers at 19-30 while staying in the critical band because a stale sequence misdirects every Flywheel pickup. Root cause is verified in the body with a named file, a proposed fix, and three mechanical acceptance criteria.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4167",
+      "rank": 158,
+      "size": "XS",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Fork spawn-pending test sleeps 10ms instead of awaiting the mock: a false CI red that stalls the merge gate; fix is a vi.waitFor",
+      "rationale": "Inserted at 158, in the high test-reliability band beside PAN-2421 (route-test flake) and PAN-2656: a single-file, fully specified fix — clear the mock history and await vi.waitFor on authorHandoffExternal instead of a 10ms real sleep — for a flake that already reported a false red on PR #4141 and burned its retry on a timeout.",
+      "gate": "auto",
+      "planning": "skip",
+      "isEpic": false
     }
   ],
   "edges": [
@@ -12418,6 +12419,13 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
     {
       "from": "PAN-3923",
       "to": "PAN-4166",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-1824",
+      "to": "PAN-4167",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
