@@ -7,7 +7,7 @@ import { jsonResponse } from "./http-helpers.js";
  *   - Node (prod): NodeHttpServer + NodeServices
  *
  * Routes:
- *   GET  /api/health  → { status: "ok", repoRoot, mode }
+ *   GET  /api/health  → { status: "ok", repoRoot, mode, bootGates, … }
  *   GET  /ws/rpc      → WebSocket RPC (PanRpcGroup)
  *   GET  /ws/terminal  → Raw WebSocket terminal (bypasses Effect RPC)
  *   GET  *            → static files from OVERDECK_FRONTEND_DIR

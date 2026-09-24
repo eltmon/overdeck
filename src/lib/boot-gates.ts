@@ -89,8 +89,16 @@ export function applyBootGateEnv(
   env: NodeJS.ProcessEnv,
   options: BootGateOptions = {},
 ): NodeJS.ProcessEnv {
-  const gates = resolveBootGates(options, env);
+  return writeBootGateEnv(env, resolveBootGates(options, env));
+}
 
+/**
+ * Stamp a resolved gate state into `env` so `resolveBootGates(env)` reads it
+ * back unchanged, source included. `pan reload` seeds the replacement server's
+ * env with the running server's gates this way (PAN-3899), so a deploy keeps
+ * the Deacon/resume choice of the last `pan restart` instead of relabelling it.
+ */
+export function writeBootGateEnv(env: NodeJS.ProcessEnv, gates: BootGateState): NodeJS.ProcessEnv {
   if (gates.deacon.enabled) {
     delete env.OVERDECK_DISABLE_DEACON;
   } else {
@@ -111,6 +119,21 @@ export function applyBootGateEnv(
   env[RESUME_GATE_SOURCE_ENV] = gates.resume.source;
 
   return env;
+}
+
+/** Parse a `bootGates` value reported by another process; null when malformed. */
+export function parseBootGateState(value: unknown): BootGateState | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const gate = (raw: unknown): { enabled: boolean; source: BootGateSource } | null => {
+    if (!raw || typeof raw !== 'object') return null;
+    const { enabled, source } = raw as Record<string, unknown>;
+    const parsedSource = typeof source === 'string' ? gateSourceFromEnv(source) : null;
+    return typeof enabled === 'boolean' && parsedSource ? { enabled, source: parsedSource } : null;
+  };
+  const deacon = gate(record.deacon);
+  const resume = gate(record.resume);
+  return deacon && resume ? { deacon, resume } : null;
 }
 
 export function formatBootGateState(state: BootGateState): string {

@@ -31,6 +31,8 @@ const mocks = vi.hoisted(() => ({
   supervisorDeploymentFailure: vi.fn(),
   dashboardServerBootFailure: vi.fn(),
   waitForRestartApproval: vi.fn(),
+  readRunningDashboardBootGates: vi.fn(),
+  repointGlobalCliToDeployment: vi.fn(),
 }));
 
 vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloadProgress: mocks.reportComposerReloadProgress }));
@@ -42,6 +44,15 @@ vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloa
 vi.mock('../../../lib/dev-supervisor.js', () => ({
   readDevSupervisorMarker: mocks.readDevSupervisorMarker,
   devSupervisorRefusalLines: mocks.devSupervisorRefusalLines,
+}));
+
+vi.mock('../../../lib/deploy/global-cli-link.js', () => ({
+  repointGlobalCliToDeployment: mocks.repointGlobalCliToDeployment,
+}));
+
+// PAN-3899: reload reads the running dashboard's boot gates over HTTP first.
+vi.mock('../../../lib/deploy/running-boot-gates.js', () => ({
+  readRunningDashboardBootGates: mocks.readRunningDashboardBootGates,
 }));
 
 vi.mock('../../../lib/restart-lock.js', () => ({
@@ -224,6 +235,8 @@ describe('reloadCommand', () => {
     mocks.supervisorDeploymentFailure.mockReturnValue(null);
     mocks.dashboardServerBootFailure.mockReturnValue(null);
     mocks.waitForRestartApproval.mockResolvedValue({ proceed: true, reason: 'ungated', detail: 'no gate in tests' });
+    mocks.readRunningDashboardBootGates.mockResolvedValue({ gates: null, reason: 'no dashboard in tests' });
+    mocks.repointGlobalCliToDeployment.mockResolvedValue({ status: 'absent' });
     mocks.fsAccess.mockImplementation(async (path: string) => {
       if (path === '/usr/bin/bun') return;
       throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
@@ -535,6 +548,35 @@ describe('reloadCommand', () => {
       `/repo/dist.rollback.${process.pid}`,
       { recursive: true, force: true },
     );
+    expect(mocks.repointGlobalCliToDeployment).toHaveBeenCalledWith(DEFAULT_BUILD_WORKTREE);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('never promotes a build whose new dashboard exited before it became healthy (PAN-3899)', async () => {
+    const previousBundle = {
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: ALTERNATE_BUILD_WORKTREE,
+      serverPath: `${ALTERNATE_BUILD_WORKTREE}/dist/dashboard/server.js`,
+    };
+    mocks.readActiveDashboardBundle.mockReturnValue(previousBundle);
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    // What restartDashboard throws when the spawned pid is gone: no recovery label.
+    mocks.restartDashboard.mockRejectedValue(Object.assign(new Error('health timed out'), {
+      failure: {
+        stage: 'dashboard',
+        reason: 'health timed out; the newly spawned dashboard (pid 4242) exited before it became healthy',
+      },
+    }));
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    const newRoot = (mocks.writeActiveDashboardBundle.mock.calls[0][0] as { deployRoot: string }).deployRoot;
+    expect(newRoot).toBe(DEFAULT_BUILD_WORKTREE);
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenLastCalledWith(previousBundle);
+    expect(mocks.fsRename).toHaveBeenCalledWith(`/repo/dist.rollback.${process.pid}`, '/repo/dist');
+    expect(mocks.repointGlobalCliToDeployment).not.toHaveBeenCalled();
+    expect(mocks.fsRm).toHaveBeenLastCalledWith(DEFAULT_BUILD_WORKTREE, { recursive: true, force: true });
     expect(process.exitCode).toBe(1);
   });
 
@@ -665,11 +707,107 @@ describe('reloadCommand', () => {
     const spawnFactory = mocks.restartDashboard.mock.calls[0][1] as () => unknown;
     spawnFactory();
     expect(mocks.spawnDashboardDetached).toHaveBeenCalledWith(expect.anything(), {
-      deacon: undefined,
+      bootGates: {
+        deacon: { enabled: true, source: 'default' },
+        resume: { enabled: true, source: 'default' },
+      },
       serverPath,
       repoRoot,
     });
     expect(process.exitCode).toBeUndefined();
+  });
+
+  describe('boot gates (PAN-3899)', () => {
+    const DEACON_OFF_RESUME_OFF = {
+      deacon: { enabled: false, source: 'flag' as const },
+      resume: { enabled: false, source: 'flag' as const },
+    };
+    const originalDisableDeacon = process.env.OVERDECK_DISABLE_DEACON;
+
+    afterEach(() => {
+      if (originalDisableDeacon === undefined) delete process.env.OVERDECK_DISABLE_DEACON;
+      else process.env.OVERDECK_DISABLE_DEACON = originalDisableDeacon;
+    });
+
+    function spawnOptionsOfReload(): Record<string, unknown> {
+      const spawnFactory = mocks.restartDashboard.mock.calls[0][1] as () => unknown;
+      spawnFactory();
+      return mocks.spawnDashboardDetached.mock.calls[0][1] as Record<string, unknown>;
+    }
+
+    it('refuses --no-deacon before building or stopping anything', async () => {
+      await reloadCommand({ deacon: false });
+
+      expect(process.exitCode).toBe(2);
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Refusing `pan reload --no-deacon`'));
+      expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
+      expect(mocks.exec).not.toHaveBeenCalled();
+      expect(mocks.spawn).not.toHaveBeenCalled();
+      expect(mocks.readRunningDashboardBootGates).not.toHaveBeenCalled();
+      expect(mocks.restartDashboard).not.toHaveBeenCalled();
+      expect(mocks.spawnDashboardDetached).not.toHaveBeenCalled();
+    });
+
+    it('carries only the resume gate: Deacon stays on even when the running server had it off', async () => {
+      mocks.readRunningDashboardBootGates.mockResolvedValue({ gates: DEACON_OFF_RESUME_OFF });
+
+      await reloadCommand({ skipBuild: true });
+
+      expect(mocks.readRunningDashboardBootGates).toHaveBeenCalledWith(3011, '/repo');
+      expect(mocks.readRunningDashboardBootGates.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.restartDashboard.mock.invocationCallOrder[0]);
+      expect(spawnOptionsOfReload()).toMatchObject({
+        bootGates: {
+          deacon: { enabled: true, source: 'default' },
+          resume: { enabled: false, source: 'flag' },
+        },
+      });
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining(
+        'Boot gates: deacon=on source=default resume=off source=flag',
+      ));
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Resume gate carried from the running dashboard'));
+      expect(mocks.restartDashboard.mock.calls[0][2]).toMatchObject({
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      });
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it('lets explicit --deacon/--resume flags override the carried gate', async () => {
+      mocks.readRunningDashboardBootGates.mockResolvedValue({ gates: DEACON_OFF_RESUME_OFF });
+
+      await reloadCommand({ skipBuild: true, deacon: true, resume: true });
+
+      expect(spawnOptionsOfReload()).toMatchObject({
+        bootGates: {
+          deacon: { enabled: true, source: 'flag' },
+          resume: { enabled: true, source: 'flag' },
+        },
+      });
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining(
+        'Boot gates: deacon=on source=flag resume=on source=flag',
+      ));
+    });
+
+    it('forces Deacon on and says so when the gate read misses, even with OVERDECK_DISABLE_DEACON in the shell', async () => {
+      process.env.OVERDECK_DISABLE_DEACON = '1';
+      mocks.readRunningDashboardBootGates.mockResolvedValue({ gates: null, reason: 'health timed out' });
+
+      await reloadCommand({ skipBuild: true });
+
+      expect(spawnOptionsOfReload()).toMatchObject({
+        bootGates: {
+          deacon: { enabled: true, source: 'default' },
+          resume: { enabled: true, source: 'default' },
+        },
+      });
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining(
+        "Could not read the running dashboard's resume gate (health timed out); using the default (resume=on)",
+      ));
+      expect(mocks.restartDashboard.mock.calls[0][2]).toMatchObject({
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      });
+      expect(process.exitCode).toBeUndefined();
+    });
   });
 
   it('cleans up the detached worktree and preserves the running server when worktree build fails', async () => {

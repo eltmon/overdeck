@@ -416,6 +416,7 @@ describe('dashboard health ownership', () => {
       {
         healthTimeoutMs: 200,
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+        spawnedPidAlive: async () => true,
       },
     );
     const rejection = expect(restart).rejects.toMatchObject({
@@ -447,6 +448,32 @@ describe('dashboard health ownership', () => {
     )).resolves.toEqual({ ownershipVerified: true, spawnedPid: 7303 });
   });
 
+  it('drops the left-running recovery when the spawned server already exited (PAN-3899)', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    vi.stubGlobal('fetch', fetchMock);
+    const spawnedPidAlive = vi.fn(async () => false);
+    const restart = restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 7505 }),
+      {
+        healthTimeoutMs: 200,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+        spawnedPidAlive,
+      },
+    );
+    const rejection = expect(restart).rejects.toSatisfy((error: StageError) =>
+      error.failure.stage === 'dashboard' &&
+      error.failure.reason.includes('pid 7505) exited before it became healthy') &&
+      error.failure.recovery === undefined);
+    while (fetchMock.mock.calls.length === 0) {
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+
+    await vi.advanceTimersByTimeAsync(300);
+    await rejection;
+    expect(spawnedPidAlive).toHaveBeenCalledWith(7505);
+  });
+
   it('rejects a pre-fix health payload that omits pid when ownership is expected', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -460,6 +487,7 @@ describe('dashboard health ownership', () => {
       {
         healthTimeoutMs: 200,
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+        spawnedPidAlive: async () => true,
       },
     );
     const rejection = expect(restart).rejects.toMatchObject({
