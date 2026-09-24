@@ -8,6 +8,7 @@ import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
 import { listRunningAgents } from '../agents/queries.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
 import { setAgentPaused, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
 import { stopAgent } from '../agents/termination.js';
@@ -328,6 +329,9 @@ interface ShedCandidateAgent {
 
 export interface ShedAgentLike {
   issueId?: string | null;
+  /** The agent has a live pane on the selected terminal backend (Herdr or tmux). */
+  hasLivePane?: boolean;
+  /** @deprecated tmux-only name; read as a fallback when `hasLivePane` is unset. */
   hasLiveTmuxSession?: boolean;
 }
 
@@ -350,7 +354,7 @@ export function selectStackShedCandidates(
 ): ResourceStack[] {
   const liveIssueIds = new Set(
     runningAgents
-      .filter((agent) => agent.hasLiveTmuxSession === true)
+      .filter((agent) => (agent.hasLivePane ?? agent.hasLiveTmuxSession) === true)
       .map((agent) => agent.issueId?.toUpperCase())
       .filter((issueId): issueId is string => Boolean(issueId)),
   );
@@ -398,12 +402,25 @@ export async function shed(): Promise<ShedResult> {
 
   const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
   const stacks = await getResourceStacks(containers);
-  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
-  const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLiveTmuxSession: a.tmuxActive }));
+  // Live = present in the selected backend's inventory (#4109), not the
+  // tmux-only `tmuxActive` flag, which is false for every Herdr agent. A `null`
+  // inventory (backend unreadable) is unknown, never "nothing is running": the
+  // stack shed and the work-agent pause below are skipped rather than risk
+  // stopping a live agent's stack or pausing an agent we cannot see.
+  const liveIds = await listLiveAgentIds();
+  if (liveIds === null) {
+    console.warn('[memory-governor] Terminal backend inventory unreadable — skipping the stack shed and agent pause (liveness unknown)');
+  }
+  const runningAgents = liveIds === null
+    ? []
+    : (await Effect.runPromise(listRunningAgents())).filter((a) => liveIds.has(a.id));
+  const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLivePane: true }));
 
-  for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
-    await stopStackContainers(stack);
-    if (stack.issueId) result.stoppedStacks.push(stack.issueId);
+  if (liveIds !== null) {
+    for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
+      await stopStackContainers(stack);
+      if (stack.issueId) result.stoppedStacks.push(stack.issueId);
+    }
   }
 
   let verdict = await assessMemoryPressure();

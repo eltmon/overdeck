@@ -10,6 +10,7 @@ const listRunningAgentsMock = vi.fn();
 const getAgentRuntimeStateSyncMock = vi.fn();
 const setAgentPausedMock = vi.fn();
 const stopAgentMock = vi.fn();
+const listLiveAgentIdsMock = vi.fn();
 const osMocks = vi.hoisted(() => ({
   cpus: vi.fn(),
   loadavg: vi.fn(),
@@ -40,6 +41,11 @@ vi.mock('../../../../src/lib/cloister/config.js', () => ({
 
 vi.mock('../../../../src/lib/agents/queries.js', () => ({
   listRunningAgents: (...args: unknown[]) => Effect.sync(() => listRunningAgentsMock(...args)),
+}));
+
+// Fake terminal backend: the live inventory the governor reads (#4109).
+vi.mock('../../../../src/lib/terminal-backends/inventory.js', () => ({
+  listLiveAgentIds: (...args: unknown[]) => listLiveAgentIdsMock(...args),
 }));
 
 vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
@@ -622,6 +628,8 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     execFileMock.mockClear();
     setAgentPausedMock.mockClear();
     stopAgentMock.mockClear();
+    listLiveAgentIdsMock.mockReset();
+    listLiveAgentIdsMock.mockResolvedValue(new Set(['agent-pan-3', 'agent-operator']));
   });
 
   it('stops both merged stacks first, then pauses the idle agent only if still HARD afterward (PRD AC-4)', async () => {
@@ -659,5 +667,42 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
 
     expect(result.pausedAgents).toEqual([]);
     expect(setAgentPausedMock).not.toHaveBeenCalled();
+  });
+
+  it('pauses a live Herdr agent (tmuxActive false) and protects its merged stack (#4109)', async () => {
+    const stacks = [mergedStack('PAN-5', 1 * GIB, 'pan-5-svc'), mergedStack('PAN-6', 1 * GIB, 'pan-6-svc')];
+    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
+    listLiveAgentIdsMock.mockResolvedValue(new Set(['agent-pan-5']));
+    listRunningAgentsMock.mockReturnValue([
+      { id: 'agent-pan-5', issueId: 'PAN-5', role: 'work', tmuxActive: false, flywheelRunId: 'run-5' },
+    ]);
+    getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
+    readProcMemoryMock.mockResolvedValueOnce(procMemory(1 * GIB)).mockResolvedValue(procMemory(20 * GIB));
+
+    const result = await shed();
+
+    expect(result.stoppedStacks).toEqual(['PAN-6']);
+    expect(execFileMock).not.toHaveBeenCalledWith('docker', ['stop', '--time', '30', 'pan-5-svc'], expect.anything(), expect.anything());
+    expect(result.pausedAgents).toEqual(['agent-pan-5']);
+    expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-5');
+  });
+
+  it('stops no stack and pauses no agent when the backend inventory is unreadable (#4109)', async () => {
+    const stacks = [mergedStack('PAN-7', 1 * GIB, 'pan-7-svc')];
+    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
+    listLiveAgentIdsMock.mockResolvedValue(null);
+    listRunningAgentsMock.mockReturnValue([
+      { id: 'agent-pan-7', issueId: 'PAN-7', role: 'work', tmuxActive: true, flywheelRunId: 'run-7' },
+    ]);
+    getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
+    readProcMemoryMock.mockResolvedValue(procMemory(1 * GIB)); // stays hard
+
+    const result = await shed();
+
+    expect(result.stoppedStacks).toEqual([]);
+    expect(execFileMock).not.toHaveBeenCalledWith('docker', expect.arrayContaining(['stop']), expect.anything(), expect.anything());
+    expect(result.pausedAgents).toEqual([]);
+    expect(setAgentPausedMock).not.toHaveBeenCalled();
+    expect(stopAgentMock).not.toHaveBeenCalled();
   });
 });
