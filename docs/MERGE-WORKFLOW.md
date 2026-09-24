@@ -218,6 +218,27 @@ label, then the project default, then the global flag — the same tiers
 auto-merge eligibility applies), in which case the one-feature batch
 assembles as before.
 
+## Deploy progress on the project row
+
+The post-merge deploy is `pan reload` (the systemd `post-merge-deploy` unit and
+`/tmp/overdeck-deploy.log` were deleted in PAN-3917, D1). While it runs, the
+owning project's Command Deck row shows a deploy chip next to the CI chip
+(PAN-3751): `Deploying <elapsed>` while it builds, `Deploy: approve restart`
+once it waits on the restart gate, `Deploy: restarting` after approval, and
+`Deploy ✗` for 15 minutes after a failure. The chip's tooltip carries the
+error, the reload's log path and its last lines.
+
+Nothing is stored. [`deploy-progress.ts`](../src/dashboard/server/services/deploy-progress.ts)
+re-derives the projection on a 3-second server tick from runtime files that
+already exist: the restart lock (`caller: 'pan reload'`, live pid), the restart
+gate (a pending request whose requester id ends in that pid), the
+restart-status journal (`phase: 'stopping'`, or a failure), and the reload's
+stdout when it is a regular file (the composer's reload log). The owning
+project is the one containing the reload's cwd, else the active dashboard
+bundle's source repo. It publishes `project.deploy_changed` with `emitOnly`
+when the projection changes, and the frontend reads `deployByProjectKey` from
+the snapshot and those events. The frontend never polls.
+
 ## What This Replaces
 
 This design supersedes the multi-actor "ship-role" pipeline removed in
