@@ -141,7 +141,7 @@ A well-sized task has all of these properties:
 - One snapshot test = one task.
 - One doc migration = one task (per doc or per logical doc cluster, not one task for "update all docs").
 
-**When in doubt, split.** The cost of too-small xBRIEF tasks is mild (more rows to track); the cost of too-large xBRIEF tasks is severe (reviewers can't reason about them, work agents deliver partial results, downstream roles can't pinpoint which acceptance criterion failed, and the `work.inspect` gate can't verify mid-implementation). Err on the side of more xBRIEF tasks.
+**When in doubt, split.** The cost of too-small xBRIEF tasks is mild (more rows to track); the cost of too-large xBRIEF tasks is severe (reviewers can't reason about them, work agents deliver partial results, downstream roles can't pinpoint which acceptance criterion failed, and task-level inspection can't verify mid-implementation). Err on the side of more xBRIEF tasks.
 
 **What this does NOT mean:**
 - It does NOT mean ship partial features. CLAUDE.md's "Deliver Complete Features" rule still applies: every task's acceptance criteria must be fully met before it's marked done, and every task in the plan must ship before the issue itself is marked done. Decomposition is about *reviewability and verifiability*, not about scope reduction.
@@ -181,9 +181,9 @@ For each sub-task, estimate difficulty using this rubric:
 
 ### Inspection Requirement — `metadata.requiresInspection`
 
-**For every task, decide whether it needs the work.inspect gate before subsequent xBRIEF tasks can start.** This is a deliberate, per-task decision — not a default-on, not a default-off. The decision is recorded as `metadata.requiresInspection: true|false` on each plan item.
+**For every task, decide whether it needs task-level inspection before subsequent xBRIEF tasks build on it.** This is a deliberate, per-task decision — not a default-on, not a default-off. The decision is recorded as `metadata.requiresInspection: true|false` on each plan item.
 
-**Why this exists:** PAN-382 introduced the work.inspect gate after MIN-796, where an agent built `KaiaRuntime.ts` on the wrong foundation (React state machine instead of HTTP/SSE service). That single wrong foundation infected 7 subsequent xBRIEF tasks — about 5,800 lines that all had to be redone. Task-level inspection is Overdeck's Jidoka gate: stop the line at each step, never pass a foundation defect downstream.
+**Why this exists:** PAN-382 introduced task-level inspection after MIN-796, where an agent built `KaiaRuntime.ts` on the wrong foundation (React state machine instead of HTTP/SSE service). That single wrong foundation infected 7 subsequent xBRIEF tasks — about 5,800 lines that all had to be redone. Task-level inspection is Overdeck's Jidoka gate: stop the line at each step, never pass a foundation defect downstream.
 
 **But it's not free.** Per-task inspection adds wall-clock time and cost to every step. Applying it indiscriminately turns a 12-task refactor into a 12-step interview. Apply it only where its absence would let a structural defect cascade.
 
@@ -203,7 +203,7 @@ For each sub-task, estimate difficulty using this rubric:
 - A wrong implementation would surface immediately at typecheck, lint, the verification gate, or end-of-MR review — not as silent foundation rot.
 - The task is part of a parallel batch of mechanically identical operations (10 provider flips, 12 doc renames) where each one's correctness is independently obvious.
 
-**Heuristic shortcut:** if you would expect the work.inspect gate to read a 15-line diff and respond "yes that matches the task description" with no judgment call, set `requiresInspection: false`. Inspection's value is in catching the *judgment-call* defects, not in rubber-stamping mechanical ones.
+**Heuristic shortcut:** if you would expect an inspector to read a 15-line diff and respond "yes that matches the task description" with no judgment call, set `requiresInspection: false`. Inspection's value is in catching the *judgment-call* defects, not in rubber-stamping mechanical ones.
 
 **You MUST set this field explicitly on every task.** Omitting it is a planning error — the work prompt requires it. Default to `false` for the typical mechanical task; flip to `true` only when one of the criteria above genuinely applies. Most plans will have 0–2 xBRIEF tasks with `requiresInspection: true`. If a plan has more than 3, ask yourself whether you've under-decomposed — large xBRIEF tasks are more often the actual problem.
 

@@ -38,8 +38,6 @@ Sub-roles are not standalone Overdeck pipeline stages. They are model and instru
 
 | Sub-role | Parent role | Purpose |
 |---|---|---|
-| `work.inspect` | `work` | Per-bead spec verification for beads flagged `metadata.requiresInspection: true` |
-| `work.inspect-deep` | `work` | Stronger inspection path for high-risk beads flagged with `metadata.inspectionDepth: "deep"` |
 | `review.security` | `review` | Security-focused review lens |
 | `review.correctness` | `review` | Correctness and edge-case review lens |
 | `review.performance` | `review` | Performance and scalability review lens |
@@ -53,10 +51,11 @@ A newcomer-friendly way to think about the normal flow is:
 
 1. **`plan`** turns the issue into an xBRIEF plan and beads.
 2. **`work`** implements the planned beads.
-3. **`work.inspect` / `work.inspect-deep`** verify flagged beads during implementation.
-4. **`review`** performs code review and synthesizes the convoy findings.
-5. **`test`** runs project verification and any required browser UAT.
-6. Server-side shipping prepares the branch for human merge.
+3. **`review`** performs code review and synthesizes the convoy findings.
+4. **`test`** runs project verification and any required browser UAT.
+5. Server-side shipping prepares the branch for human merge.
+
+The `work.inspect` and `work.inspect-deep` sub-roles were deleted with the inspection gate and `pan inspect` (PAN-3917 FR-14); see [THE-CUT.md](THE-CUT.md).
 
 Not every project or run will emphasize every sub-role equally, but the spawned roles plus server-side shipping are the core mental model.
 
