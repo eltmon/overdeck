@@ -1,12 +1,13 @@
 ---
 name: pan-conversations
-description: "pan conversations scan/search/list/show/current/cost/enrich/embed/move — discover, index, search, and reassign Claude Code session history"
+description: "pan conversations scan/search/list/show/current/cost/enrich/embed/move/link-pr — discover, index, search, reassign, and link PRs to Claude Code session history"
 triggers:
   - pan conversations
   - pan conv
   - conversations scan
   - conversations search
   - conversations move
+  - conv link-pr
 allowed-tools:
   - Bash
   - Read
@@ -27,6 +28,9 @@ pan conversations list [--workspace <path>] [--model <name>] [--since <time>] [-
 pan conversations show <id> [--json]
 pan conversations jsonl <conv-id> [--json]
 pan conversations move <query> <projectKey>
+pan conversations link-pr <query> <url|#42|owner/repo#42> [--source agent|manual]
+pan conversations unlink-pr <query> <url|#42|owner/repo#42>
+pan conversations prs <query> [--json]
 pan conversations current [--json]
 pan conversations cost [--since <time>] [--workspace <path>] [--by <field>] [--json]
 pan conversations embed [ids...] [--regenerate] [--status] [--provider <name>] [--model <name>] [--max-parallel <n>]
@@ -59,6 +63,12 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   candidates. `<projectKey>` is the project's yaml key (from `projects.yaml`),
   not its display name. Requires the dashboard running (`pan up`) — the command
   PATCHes `/api/conversations/:name/move`.
+- **`link-pr` / `unlink-pr` / `prs`** (PAN-3822) link a pull request to a
+  conversation so its row and header show the PR badge. `<query>` resolves like
+  `move`; `pan conv current` names your own conversation. Only a repository
+  configured for the conversation's project is accepted (`#42` = that repo).
+  Inside an agent the source is `agent`. Unlinking hides the PR from branch
+  detection too. Works with the dashboard down (writes the link directly).
 - **`enrich`**/**`embed`** call out to an LLM/embedding provider and cost money;
   `enrich` prompts for confirmation unless `--yes` is passed. `--tier 3`
   (`--deep`) and `--full` are the expensive, most-thorough options.
