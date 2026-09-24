@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -201,6 +201,28 @@ describe('conversation search indexer', () => {
     expect(result.errors).toEqual([]);
     expect(result.chunksSkipped).toBe(1);
     expect(provider.embed).not.toHaveBeenCalled();
+  });
+
+  it('skips a transcript older than modifiedSince from its stat, before the cursor lookup (PAN-3915)', async () => {
+    const root = makeTmpDir();
+    const projectDir = join(root, '-home-user-project');
+    mkdirSync(projectDir);
+    const oldFile = join(projectDir, '11111111-1111-4111-8111-111111111111.jsonl');
+    const newFile = join(projectDir, '22222222-2222-4222-8222-222222222222.jsonl');
+    writeFileSync(oldFile, line(message('user', 'old transcript')));
+    writeFileSync(newFile, line(message('user', 'new transcript')));
+    const since = Date.now() - 60_000;
+    utimesSync(oldFile, new Date(since - 1), new Date(since - 1));
+    const db = fakeDb();
+    const getCursor = vi.spyOn(db, 'getCursor');
+
+    const result = await indexConversationSearch({ config: config(), db, provider: fakeProvider(), roots: [root], modifiedSince: since });
+
+    expect(result.errors).toEqual([]);
+    expect(result.chunksSkipped).toBe(1);
+    expect(db.chunks.map((chunk) => chunk.text).join('\n')).toContain('new transcript');
+    expect(db.chunks.map((chunk) => chunk.text).join('\n')).not.toContain('old transcript');
+    expect(getCursor).not.toHaveBeenCalledWith(oldFile);
   });
 
   it('no-ops when conversation search is disabled', async () => {

@@ -5,6 +5,7 @@ import {
   recordConversationSearchFailure,
   recordConversationSearchSuccess,
   recordConversationSearchWatcherError,
+  recordConversationSearchWatcherFailed,
   recordConversationSearchWatcherRestarted,
   recordConversationSearchWatcherStarted,
   recordConversationSearchWatcherStopped,
@@ -76,5 +77,18 @@ describe('conversation-search health tracking', () => {
 
     recordConversationSearchWatcherStopped();
     expect(getConversationSearchHealth().watcher).toBeNull();
+  });
+
+  it('marks a watcher whose restarts stopped as failed and points ENOSPC/EMFILE at the inotify limit (PAN-3915)', () => {
+    recordConversationSearchWatcherStarted();
+    recordConversationSearchWatcherRestarted();
+    recordConversationSearchWatcherFailed(Object.assign(new Error('watch failed'), { code: 'EMFILE' }));
+    const failed = getConversationSearchHealth().watcher;
+    expect(failed).toMatchObject({ state: 'failed', restarts: 1, nextRestartAt: null });
+    expect(failed?.lastErrorReason).toBe('watch failed (inotify watch limit reached; raise fs.inotify.max_user_watches)');
+
+    recordConversationSearchWatcherFailed(new Error('Unable to poll: Interrupted system call'));
+    expect(getConversationSearchHealth().watcher?.lastErrorReason).toBe('Unable to poll: Interrupted system call');
+    expect(getConversationSearchHealth().lastErrorAt).toBeNull();
   });
 });

@@ -106,6 +106,30 @@ describe('ConversationSearchBanner', () => {
     expect(screen.getByText(/new transcripts are not indexed/)).toBeInTheDocument();
   });
 
+  it('keeps showing a watcher whose restarts stopped, naming the error (PAN-3915)', () => {
+    mockUseStatus.mockReturnValue({
+      data: makeStatus({
+        health: {
+          lastErrorAt: null,
+          lastErrorReason: null,
+          lastSuccessAt: '2026-09-24T12:06:00.000Z',
+          watcher: {
+            state: 'failed',
+            restarts: 5,
+            lastErrorAt: '2026-09-24T12:05:00.000Z',
+            lastErrorReason: 'ENOSPC: System limit for number of file watchers reached (inotify watch limit reached; raise fs.inotify.max_user_watches)',
+            nextRestartAt: null,
+          },
+        },
+      }),
+    } as ReturnType<typeof useConversationSearchStatus>);
+    render(<ConversationSearchBanner />);
+    expect(screen.getByText(/transcript watcher stopped after repeated failures \(ENOSPC: System limit for number of file watchers reached/)).toBeInTheDocument();
+    expect(screen.getByText(/fs\.inotify\.max_user_watches/)).toBeInTheDocument();
+    expect(screen.getByText(/Restart the dashboard or save the conversation-search settings to retry/)).toBeInTheDocument();
+    expect(screen.queryByText(/restarting/)).not.toBeInTheDocument();
+  });
+
   it('stays hidden once a failed watcher has been restarted (PAN-3915)', () => {
     mockUseStatus.mockReturnValue({
       data: makeStatus({
