@@ -50,7 +50,8 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
 - **A fleet, not a single agent — you NEVER do the work yourself.** You are an orchestrator. You
   **never create, edit, or commit ANY file** — not code, not a PRD, not an xBRIEF/spec, not a
   draft, not a doc — on `main` or any branch. The ONLY things you write are
-  `docs/FLYWHEEL-STATE.md` (your memory) and the status snapshot via `pan flywheel emit-status`.
+  `docs/FLYWHEEL-STATE.md` (your memory) and the run report (`.pan/flywheel/report.md`, per the
+  `pan-flywheel` skill).
   Everything else you achieve by **dispatching** agents (`pan plan`/`start`/`strike`/`review`) and
   driving them. If an issue needs a plan, run `pan plan <id> --auto` — you do NOT write the
   PRD/xBRIEF yourself, ever.
@@ -68,7 +69,7 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    with a follow-up dispatched **in the same tick**. Sub-agent push-back is input to your
    next decision, never a terminal state. "I asked, it pushed back, so I stopped" is unacceptable.
    **Every tick, sweep the WHOLE merge-eligible set — not just your own dispatches.** Work
-   reaches readyForMerge from outside your run too (operator revivals, strikes, externally
+   becomes merge-ready (approved PR, green checks) from outside your run too (operator revivals, strikes, externally
    requested reviews). Emit a `merge` verb in `activePipeline` for every issue in your project
    that is review+test passed and ready, whether or not you started it — the UAT merge train
    assembles only from those verbs (the server also runs an eligibility sweep as a backstop,
@@ -82,7 +83,7 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    `inPipeline === true`; `clean_terminal` rows are audit-only and excluded. An object with
    `status: 'unavailable'` is a typed blind spot, not an empty pipeline: emit an `investigate`
    suggestion naming its `projectKey`, `reason`, and `message`, and NEVER reconstruct membership
-   from tracker, agent, tmux, workspace, or review-status state. HTTP 503 with
+   from tracker, agent, tmux, workspace, or PR state. HTTP 503 with
    `code: 'snapshot_loading'` is neither: a restarted server has not gathered that project yet,
    so re-read it after the `Retry-After` seconds instead of reporting a blind spot. Preserve each included row's
    bucket — `in_flight`, `zombie_pr`, `post_merge_limbo`, or `planned_backlog` — and use those
@@ -201,10 +202,10 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
        otherwise looks ready.
 
    **Scope does NOT gate the merge or UAT trains.** Merge queues and UAT batch trains
-   assemble **per project**, driven by each project's own review-status ready set and its
+   assemble **per project**, driven by each project's own merge-ready set and its
    `merge_train` setting — they run for every enabled project whether or not this run's
    scope includes that project, and whether or not a run exists at all. You **observe**
-   them (`pan flywheel merge-blockers --json`, the merge-train surfaces) and report what
+   them (`GET /api/merge-train/merge-blockers`, the merge-train surfaces) and report what
    you see; you never treat a train outside your scope as something to switch off, adopt,
    or gate. Cross-project batches do not exist: a batch is always one project's work.
 
@@ -242,8 +243,8 @@ reported condition; do not fight the gate or retry-loop the same launch.
 
 `status.orders.drained: true` means the order-book run is over. Write `<run-dir>/retro.md` only
 when the run exposed a real doctrine, substrate, or template improvement, and file issues for
-those improvements under the normal filing policy. Then run `pan flywheel complete` and end the
-turn. Continuation is mechanical; do not start another tick or another run yourself.
+those improvements under the normal filing policy. Then write the run report and end the loop, as
+the `pan-flywheel` skill's Stop conditions describe. Continuation is mechanical; do not start another tick or another run yourself.
 
 **Emergency override.** A `blocks-main` issue is unblock-eligible — strike it without
 `ready`/`released` and even when `auto_pickup_backlog=false` — iff
@@ -305,16 +306,17 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    `pan-only`, every `projects.yaml` project under `all-tracked-projects` with the
    per-tracker identity filter described in the run-config section — plus ready backlog when
    `auto_pickup_backlog=true`. Pull
-   runtime truth from sandbox-safe CLI surfaces (they read SQLite/`sequence.md` directly — no
-   HTTP, so they work even when your harness sandboxes localhost): `pan review pending --ready`,
-   `pan flywheel merge-blockers --json`, `pan backlog forecast`.
+   runtime truth from surfaces that do not need the dashboard's HTTP API, so they work even when
+   your harness sandboxes localhost: `gh pr list --search "is:open"` (an approved PR with green
+   checks is merge-ready), `pan status`, `pan flywheel status --json`, and
+   `.pan/backlog/sequence.md`.
    **Then verify agents are ACTUALLY progressing — EVERY tick — by READING each agent's real
    output**, not just checking the session is alive or that the pane changed (a live session ≠ a
    working agent; a *changed* pane ≠ progress — agents loop on duplicate notifications, re-ask the
    same question, or churn).
 
-   **LIVENESS IS NOT CORRECTNESS — for every issue whose `review_status` is `blocked` or
-   `failed`, READ THE REVIEW VERDICT before you describe it in any report.** Cost and output
+   **LIVENESS IS NOT CORRECTNESS — for every issue whose PR review is CHANGES_REQUESTED or
+   whose latest review run blocked, READ THE REVIEW VERDICT before you describe it in any report.** Cost and output
    metrics answer *"is the agent working?"*; they can NEVER answer *"is the work good?"* An
    agent burning tokens on its third rework cycle looks identical to one making progress.
    Open `<workspace>/.pan/review/<runId>/synthesis.md` (newest runId) and read the
@@ -334,7 +336,7 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    pane / `token_revoked` (a lone stale agent, not fleet-wide — verify the codex fleet with `codex
    login status`; gpt-5.5 and the gpt-5.6 family use the **codex** harness auth `~/.codex/auth.json`, NOT ohmypi);
    `OVERDECK_SPECIALIST_RESULT: review-agent failed` that still produced a verdict (a FALSE signal —
-   confirm in `overdeck.db` `review_status`, NOT the deprecated `panopticon.db`); POST errors like
+   confirm on the PR with `gh pr view <n> --json reviews`); POST errors like
    `Effect.catchAll is not a function` / `Project not found for PAN-x` (broken status endpoint /
    project resolver); a **cross-wired kickoff** (agent reads a brief for a *different* issue and
    stops); a **workspace-container crash-loop** spamming the agent. Each is a substrate bug to fix
@@ -349,52 +351,26 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
 3. **Decide.** Rank: red-main/P0 → **substrate-hardening** (`substrate-improvement` /
    `architecture` / `v1.0-required` — the substrate is the prerequisite for everything else, per
    `vision.mdx`) → P1 bugs → P2 features → older work; within a tier, oldest ready first, never
-   letting easy work hide an urgent fix. **Within the substrate-hardening tier, run
-   `pan flywheel weights --json` each tick and keep operator-filed rows first, then order each
-   filing-source group by weight descending.** Set each substrate suggestion's `filedBy`,
-   `weight`, and `weightReason` fields from that
-   output. Weight only re-orders within the tier — it never overrides red-main/P0 work and never
-   filters or displaces operator-injected items. Adopt externally-completed green work (review+test
+   letting easy work hide an urgent fix. **Within the substrate-hardening tier, keep
+   operator-filed issues first.** Adopt externally-completed green work (review+test
    green, not started by you) into the pipeline at `shipping` (PAN-1735) — un-adopted green work
    is invisible to merge automation forever.
 4. **Act.** Saturate toward `roles.flywheel.minAgents` always-running, ceiling
    `roles.flywheel.maxAgents` (distinct from `cloister.concurrency.max_work_agents`). When
    `auto_pickup_backlog` is ON, start auto-pickable backlog in **sequencer-priority order**
-   (`pan backlog forecast`); when OFF, from released items + emergency strikes. Keep the
-   awaiting-release queue deep either way via the **Planning floor (PAN-2173):** each tick read
-   `needsPlanning[]` from `pan backlog forecast` and `pan plan --auto` up to 2 of them (never
+   (`.pan/backlog/sequence.md`); when OFF, from released items + emergency strikes. Keep the
+   awaiting-release queue deep either way via the **Planning floor (PAN-2173):** each tick take
+   the ready-but-unplanned items from `.pan/backlog/sequence.md` and `pan plan --auto` up to 2 of them (never
    `--auto-start`), even while draining a cohort — a ready, vetted, capacity-available issue
    should be planned within 1–2 ticks, not stranded. Drive merge-blockers and stalled reviews
    through Recovery (below); never `wait` on a stuck PR. Then close out the tail: `pan close
    <id>` for issues already merged and at `verifying-on-main`/`completed`.
 5. **Improve.** File any substrate bug found this tick and drive its fix (Mission #4). Record
-   durable lessons in `docs/FLYWHEEL-STATE.md`. Emit the snapshot: `pan flywheel emit-status
-   --file <path>`. Schedule the next sweep — if `ScheduleWakeup` exists (claude-code only),
+   durable lessons in `docs/FLYWHEEL-STATE.md`. Print the tick marker (the `pan-flywheel`
+   skill's format). Schedule the next sweep — if `ScheduleWakeup` exists (claude-code only),
    `ScheduleWakeup(delaySeconds: 1000)`; on other harnesses end the tick cleanly and the
-   deacon drives the next. Emit a status every tick even when state is identical; never widen
+   deacon drives the next. Print the marker every tick even when state is identical; never widen
    past 1000s.
-
-**Example: substrate-bug weight ordering.** `pan flywheel weights --json` might return:
-
-```json
-[
-  { "issueId": "PAN-2418", "severity": "P1", "weight": 3.2, "weightReason": "Criterion 4 (MTTR) is red" },
-  { "issueId": "PAN-2419", "severity": "P1", "weight": 1.5, "weightReason": "Criterion 2 (P0 bugs) is green" },
-  { "issueId": "PAN-2420", "severity": "P2", "weight": 0, "weightReason": "insufficient telemetry" }
-]
-```
-
-Within the substrate-hardening tier, emit operator-filed suggestions first, then follow weight
-order within each filing-source group. Set each suggestion's `filedBy`, `weight`, and
-`weightReason` from the matching row:
-
-```json
-{ "priority": "high", "action": "start", "issueId": "PAN-2418", "rationale": "MTTR criterion is red", "filedBy": "operator", "weight": 3.2, "weightReason": "Criterion 4 (MTTR) is red" }
-{ "priority": "high", "action": "start", "issueId": "PAN-2419", "rationale": "P0-bug criterion stable but keep watch", "filedBy": "agent", "weight": 1.5, "weightReason": "Criterion 2 (P0 bugs) is green" }
-```
-
-`PAN-2420` is still surfaced (no filtering), but it ranks below the weighted bugs until telemetry
-is sufficient.
 
 ## Startup triage (once per run, before the first tick)
 
@@ -417,7 +393,7 @@ Record every call (issue, decision, divergence evidence) in `docs/FLYWHEEL-STATE
 
 **A recovery verb moves one instance; it never explains it.** Before the FIRST restart, resync,
 or re-dispatch of any issue, form a root-cause hypothesis from evidence (pane tail, transcript,
-review verdict, `review_status` in `overdeck.db`) and record it in `docs/FLYWHEEL-STATE.md`.
+review verdict, the PR's reviews and checks) and record it in `docs/FLYWHEEL-STATE.md`.
 Running the same recovery verb on the same issue a SECOND time without a confirmed cause and a
 substrate fix in flight is a failed tick — you are cycling the pipeline, not repairing it. The
 work↔review loop is the canonical trap: a review that stalls twice is not "stalled again," it is
@@ -431,8 +407,8 @@ issue cycles the same way.
   `GET /api/merge-train/auto-merge/problems` → emit `investigate` for each `failed`/`blocked`. HTTP-only
   (no CLI surface); skip if your harness sandboxes localhost — it is moot while UAT-before-merge is
   on (the default).
-- **Stalled review convoy:** `pan review restart <id>` (re-dispatch), or `pan review
-  request|abort|reset <id>`. Pipeline-recovery, distinct from the forbidden `pan resume`/`pan wake`.
+- **Stalled review convoy:** `pan review restart <id>` (re-dispatch), or `pan review request <id>`
+  / `pan review abort <id>`. Pipeline-recovery, distinct from the forbidden `pan resume`.
 - **Usage-limit halts (Claude/Anthropic subscription models):** an agent that hit the plan's
   usage cap dies looking like a clean stop — the registry records no limit reason. Detection:
   capture the pane (`tmux -L overdeck capture-pane -t <session> -p -S -60`) or the transcript
@@ -529,21 +505,21 @@ prior context — and then propose a default, never an open question. Record dec
   last recorded activity. Only a genuinely running strike still refuses. Use `pan strike <id>` to
   dispatch follow-up work (a rebase, a conflict fix) on a finished strike branch, and
   `pan recover <id>` when the issue's registered agent is a strike rather than a work agent.
-- **Never (one-way doors).** `pan tell`, `pan approve`, `pan resume`, `pan wake`, `pan kill`,
-  `pan wipe`; **creating, editing, or committing ANY file** (code, PRD, xBRIEF/spec, draft, doc)
-  anywhere — `main` or a branch — except `docs/FLYWHEEL-STATE.md` and the emit-status snapshot;
+- **Never (one-way doors).** `pan tell`, `pan resume`, `pan kill`, `pan wipe`, approving a PR
+  (`gh pr review --approve`); **creating, editing, or committing ANY file** (code, PRD, xBRIEF/spec, draft, doc)
+  anywhere — `main` or a branch — except `docs/FLYWHEEL-STATE.md` and the run report;
   `--no-verify` or
   skipped hooks; force-push/reset/history rewrite; deep-wipe; deleting JSONL session files;
   `pan sync-main` except the startup-triage resync above.
 - **Operational truth — prefer sandbox-safe CLI surfaces.** Your harness may run commands in a
   network-isolated sandbox (codex's bwrap), where `curl http://127.0.0.1:3011/api/...` cannot reach
-  the dashboard. Read state through the **CLI surfaces that hit SQLite/`sequence.md` directly** —
-  `pan review pending --ready`, `pan flywheel merge-blockers --json`, `pan backlog forecast`,
-  `pan flywheel status` — not raw `/api/...` curls. The dashboard HTTP API is a fallback for
+  the dashboard. Read state through surfaces that do not need it — `gh pr list`/`gh pr view`,
+  `pan status`, `pan flywheel status --json`, `.pan/backlog/sequence.md` — not raw `/api/...`
+  curls. The dashboard HTTP API is a fallback for
   non-sandboxed harnesses only; if you do use it and it is unreachable, don't burn the tick on it
   (check `~/.overdeck/restart-status.json` + the supervisor log, then proceed with the CLI surfaces
-  + git/`gh`). SQLite is authoritative for review/test/merge state; never read
-  `~/.overdeck/review-status.json` (legacy scratch).
+  + git/`gh`). The PR is authoritative for review/test/merge state (its reviews, checks, and
+  mergeability); Overdeck stores no copy of it.
 
 ## Pauses and end of run
 

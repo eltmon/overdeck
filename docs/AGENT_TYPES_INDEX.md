@@ -30,7 +30,7 @@ These are the roles a new Overdeck user is most likely to care about first.
 | `work` | Active | Implements beads in the issue workspace | `roles/work.md`, `.pan/continue.json`, and the active xBRIEF |
 | `review` | Active | Reviews the completed branch and decides approve vs changes requested | `roles/review.md` plus review convoy subagents |
 | `test` | Active | Runs automated checks and required browser UAT | `roles/test.md` |
-| server-side shipping | Active | Rebases approved work and derives `readyForMerge` for the human Merge button | `rebaseFeatureBranch()` + review-status gates; no spawned role file |
+| server-side shipping | Active | Rebases approved work; the human Merge button follows the derived `ready` state (approved PR, green checks, mergeable) | `rebaseFeatureBranch()` + `evaluateIssueMergeGate()` (`src/lib/cloister/merge-gate.ts`); no spawned role file |
 
 ## Sub-roles
 
