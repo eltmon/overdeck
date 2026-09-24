@@ -16,7 +16,7 @@ import { Effect } from 'effect'
 import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
 import { getBackendPanes } from './backend-inventory.js'
-import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js'
+import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
 import { getEventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
@@ -185,7 +185,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   // changing state — its enrichment is static.
   const activeAgents = runningAgents.filter(a => livePaneIds.has(a.id))
 
-  await withConcurrencyLimitPromise(
+  await withConcurrencyLimit(
     activeAgents.map((agent) => async () => {
       const { id: agentId, issueId, startedAt } = agent
 

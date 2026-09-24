@@ -43,7 +43,7 @@ import {
 
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
-import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
+import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
 import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodeType } from '@overdeck/contracts';
@@ -580,7 +580,7 @@ export async function fetchProjectSessionTree(
       issueId: issueLower.toUpperCase(),
     }));
 
-    const results = await withConcurrencyLimitPromise(
+    const results = await withConcurrencyLimit(
       featureCandidates.map((c) => async () => {
         const agentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}`);
         const planningAgentDir = join(getOverdeckHome(), 'agents', `planning-${c.issueLower}`);
