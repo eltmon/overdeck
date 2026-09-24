@@ -67,12 +67,15 @@ describe('ensureOverdeckTmuxServerSync', () => {
   // the default socket; pin OVERDECK_HOME to the default home (vitest workers
   // otherwise run with an isolated temp home, which now derives its own socket).
   const savedOverdeckHome = process.env.OVERDECK_HOME;
+  const savedSocketName = process.env.OVERDECK_TMUX_SOCKET_NAME;
 
   beforeEach(() => {
     vi.clearAllMocks();
     _resetWarnedManagedServerDirtyForTest();
     process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
     process.env.OVERDECK_HOME = join(homedir(), '.overdeck');
+    // tests/setup/overdeck-home.ts pins a per-worker socket; these need the default one.
+    delete process.env.OVERDECK_TMUX_SOCKET_NAME;
     serverAlive = false;
     systemdAvailable = true;
     setsidAvailable = true;
@@ -153,6 +156,8 @@ describe('ensureOverdeckTmuxServerSync', () => {
     delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
     if (savedOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = savedOverdeckHome;
+    if (savedSocketName === undefined) delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+    else process.env.OVERDECK_TMUX_SOCKET_NAME = savedSocketName;
   });
 
   it('founds the shared server in a dedicated systemd unit', () => {
@@ -250,11 +255,14 @@ describe('ensureOverdeckTmuxServerAsync', () => {
   // PAN-3673: managed-unit founding only applies to the default socket; pin the
   // default home (vitest workers run with an isolated temp OVERDECK_HOME).
   const savedOverdeckHome = process.env.OVERDECK_HOME;
+  const savedSocketName = process.env.OVERDECK_TMUX_SOCKET_NAME;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
     process.env.OVERDECK_HOME = join(homedir(), '.overdeck');
+    // tests/setup/overdeck-home.ts pins a per-worker socket; these need the default one.
+    delete process.env.OVERDECK_TMUX_SOCKET_NAME;
     serverAlive = false;
     systemdAvailable = true;
     setsidAvailable = true;
@@ -304,6 +312,8 @@ describe('ensureOverdeckTmuxServerAsync', () => {
     delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
     if (savedOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = savedOverdeckHome;
+    if (savedSocketName === undefined) delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+    else process.env.OVERDECK_TMUX_SOCKET_NAME = savedSocketName;
   });
 
   it('delegates to the sync helper and founds a dedicated systemd unit', async () => {

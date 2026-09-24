@@ -221,3 +221,56 @@ describe('createWorkspace: workspace row creation (PAN-1990)', () => {
     expect(getWorkspaceForIssue('PAN-7000')).not.toBeNull();
   });
 });
+
+describe('createWorkspace: aborted setup steps report failure (PAN-3905)', () => {
+  const cases = [
+    {
+      step: 'dependency install',
+      failsOn: (command: string, _installed: boolean) => command === 'npm install',
+      error: 'Dependency install failed (npm)',
+      extraConfig: {},
+    },
+    {
+      step: 'pre-rebase hook install',
+      // The worktree step installs the hook too; fail only the reinstall
+      // that runs after dependencies are installed.
+      failsOn: (command: string, installed: boolean) => installed && command === 'git rev-parse --git-path hooks',
+      error: 'Pre-rebase guard install failed',
+      extraConfig: {},
+    },
+    {
+      step: 'workspace package build',
+      failsOn: (command: string, _installed: boolean) => command === 'build-contracts',
+      error: 'Workspace package build failed (packages/contracts)',
+      extraConfig: { workspace_packages: [{ path: 'packages/contracts', build_command: 'build-contracts' }] },
+    },
+  ];
+
+  for (const { step, failsOn, error, extraConfig } of cases) {
+    it(`returns success=false when the ${step} fails`, async () => {
+      upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+      const workspacePath = join(tempDir, 'workspaces', 'feature-pan-3905');
+      let installed = false;
+      mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+        if (isWorktreeAddCall(command, args)) {
+          const { mkdirSync } = await import('node:fs');
+          mkdirSync(workspacePath, { recursive: true });
+        }
+        if (failsOn(String(command), installed)) throw new Error(`${step} exploded`);
+        if (command === 'npm install') installed = true;
+        return { stdout: '', stderr: '' };
+      });
+
+      const result = await createWorkspace({
+        projectConfig: { name: 'Test', path: tempDir, ...extraConfig } as any,
+        featureName: 'pan-3905',
+      });
+
+      // A half-set-up workspace must not look ready to callers, which all
+      // branch on `success`.
+      expect(result.success).toBe(false);
+      expect(result.errors.join(' ')).toContain(error);
+      expect(result.errors.join(' ')).toContain(`${step} exploded`);
+    });
+  }
+});

@@ -272,7 +272,7 @@ export async function finishProjectSetup(args: {
 
   try {
     const { preTrustDirectory } = await import('../workspace-manager.js');
-    preTrustDirectory(canonicalRegistered);
+    await preTrustDirectory(canonicalRegistered);
   } catch {
     // Non-fatal: trust is a convenience, not a correctness requirement.
   }

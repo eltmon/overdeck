@@ -195,8 +195,10 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     const written = allConsoleOutput(consoleLogSpy);
     expect(written).toMatch(/already running/);
     expect(written).toMatch(/pan tell PAN-X/);
-    // The managed socket is `overdeck` or a per-home `overdeck-<hash>` (CI).
-    expect(written).toMatch(/tmux -L overdeck(-[0-9a-f]+)? attach -t agent-pan-x/);
+    // The hint names the managed socket: `overdeck`, a per-home `overdeck-<hash>`,
+    // or the per-worker socket tests/setup/overdeck-home.ts pins.
+    const { getManagedTmuxSocketName } = await import('../../../lib/tmux.js');
+    expect(written).toContain(`tmux -L ${getManagedTmuxSocketName()} attach -t agent-pan-x`);
   });
 
   it('derives flywheel provenance from an inherited run id', async () => {

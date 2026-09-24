@@ -34,6 +34,15 @@ vi.mock('../tmux.js', () => ({
   waitForClaudePrompt: vi.fn(async () => true),
 }));
 
+const { readAgentPaneTextMock } = vi.hoisted(() => ({
+  readAgentPaneTextMock: vi.fn(async (_agentId: string, _lines: number) => ''),
+}));
+
+vi.mock('../terminal-backends/agent-pane-io.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  readAgentPaneText: readAgentPaneTextMock,
+}));
+
 vi.mock('../tmux-dedup.js', () => ({
   sendKeysDedup: vi.fn(async () => 'pasted'),
   completeKeyedSubmit: vi.fn(async () => undefined),
@@ -59,6 +68,7 @@ import { BRIDGE_TOKEN_HEADER, writeBridgeToken } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
 import { deliverAgentMessage, deliverAgentPermissionDecision, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, getAgentDir, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
+import { readySignalTimeoutFailure } from '../agents/ready-timeout-failure.js';
 import {
   SUPERVISOR_CLIENT_MARGIN_MS,
   supervisorInjectionBudgetMs,
@@ -316,6 +326,71 @@ describe('initial kickoff transcript confirmation', () => {
       },
     )).resolves.toMatchObject({ ok: true, path: 'supervisor' });
     expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the blocking prompt when the ready signal times out on a live pane (PAN-3905)', async () => {
+    const trustDialog = [
+      '╭──────────────────────────────╮',
+      'Quick safety check: Is this a project you created or one you trust?',
+      '',
+      '❯ 1. Yes, I trust this folder',
+      '  2. No, exit',
+      '',
+      '',
+    ].join('\n');
+    readAgentPaneTextMock.mockReset();
+    readAgentPaneTextMock.mockImplementation(async () => trustDialog);
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    const result = await deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        waitForReady: vi.fn(async () => false),
+        getState: vi.fn(async () => baseState),
+        deliver,
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.failure).toMatch(/^ready-signal-timeout \(last pane lines: /);
+    expect(result.failure).toContain('Quick safety check: Is this a project you created or one you trust?');
+    expect(result.failure).toContain('❯ 1. Yes, I trust this folder | 2. No, exit');
+    expect(deliver).not.toHaveBeenCalled();
+    expect(readAgentPaneTextMock).toHaveBeenCalledWith(baseState.id, 20);
+  });
+
+  it('keeps the bare ready-signal-timeout when the pane cannot be read', async () => {
+    readAgentPaneTextMock.mockReset();
+    readAgentPaneTextMock.mockImplementation(async () => { throw new Error('herdr holds no pane'); });
+    const result = await deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        waitForReady: vi.fn(async () => false),
+        getState: vi.fn(async () => baseState),
+        deliver: vi.fn(async () => ({ ok: true, path: 'supervisor' as const })),
+      },
+    );
+
+    expect(result).toMatchObject({ ok: false, failure: 'ready-signal-timeout' });
+  });
+
+  it('caps the pane tail in a ready-signal-timeout failure', () => {
+    const pane = Array.from({ length: 20 }, (_, i) => `line ${i} ${'x'.repeat(300)}`).join('\n');
+    const failure = readySignalTimeoutFailure(pane);
+
+    expect(failure.startsWith('ready-signal-timeout (last pane lines: ')).toBe(true);
+    expect(failure).not.toContain('line 13 ');
+    expect(failure).toContain('line 19 ');
+    expect(failure.length).toBeLessThan(700);
+    expect(readySignalTimeoutFailure('\n  \n')).toBe('ready-signal-timeout');
   });
 
   it('skips transcript confirmation for ohmypi and preserves delivery result behavior', async () => {

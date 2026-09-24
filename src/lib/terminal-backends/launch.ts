@@ -113,8 +113,29 @@ export interface LaunchPaneRequest {
 }
 
 /**
+ * Mark an issue pane's cwd trusted in Claude Code before the launch (PAN-3905).
+ * Only workspace creation used to do this, so an agent launched into a
+ * workspace some other path made (the planner, a slot or item worktree, a
+ * resume into an older workspace) stopped at Claude Code's trust dialog and
+ * died with `ready-signal-timeout`. Idempotent; a failure is non-fatal, as it
+ * is in `createWorkspace`: the agent still starts and the prompt is visible.
+ */
+async function preTrustClaudeCodeCwd(request: LaunchPaneRequest): Promise<void> {
+  if (!request.issueId || request.tokens.harness !== 'claude-code') return;
+  try {
+    // Lazy: this module is imported almost everywhere; keep workspace-manager
+    // out of its static import graph.
+    const { preTrustDirectory } = await import('../workspace-manager/worktree-ops.js');
+    await preTrustDirectory(request.cwd);
+  } catch {
+    // Non-fatal.
+  }
+}
+
+/**
  * Place a pane in the issue workspace, run the launcher in it, and stamp its
- * tokens. Behaves exactly as `createSession` did on tmux.
+ * tokens. Behaves exactly as `createSession` did on tmux. A Claude Code pane's
+ * cwd is pre-trusted first (PAN-3905).
  */
 export async function launchAgentPane(
   request: LaunchPaneRequest,
@@ -127,6 +148,7 @@ export async function launchAgentPane(
   if (isUnsupported(workspace)) {
     throw new Error(`${resolved.name} cannot host an issue workspace: ${workspace.reason}`);
   }
+  await preTrustClaudeCodeCwd(request);
   const pane = await Effect.runPromise(
     resolved.startAgent(workspace, {
       kind: request.tokens.harness,
