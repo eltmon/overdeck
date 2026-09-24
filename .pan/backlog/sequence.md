@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:11:32.223Z · model: claude-opus-5 · open: 810_
+_Last sequenced: 2026-09-24T22:14:38.105Z · model: claude-opus-5 · open: 809_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -96,7 +96,6 @@ _Last sequenced: 2026-09-24T22:11:32.223Z · model: claude-opus-5 · open: 810_
 | 120 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
 | 121 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
 | 122 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 123 | PAN-4172 | S | high | ok |  |  | Sequencer done-check clears a run on the mirror 'idle' label alone, against the liveness invariant — a live run can be reaped |
 | 124 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
 | 125 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
 | 126 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
@@ -1125,10 +1124,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:11:32.223Z",
+  "generatedAt": "2026-09-24T22:14:38.105Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 810,
+  "openCount": 809,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11131,19 +11130,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "rationale": "New this run (filed 2026-09-24T21:07:04Z, in the review of #4163/PAN-3905), and it takes the rank-25 slot PAN-3977 vacated when that issue closed. Since #4163, createWorkspace returns success:false when setup aborts after the worktree exists — a failed dependency install, pre-rebase hook install or workspace package build — but the rollback in src/lib/workspace-manager/create.ts deletes the workspace row only when !worktreeCreated, so the half-built worktree stays on disk. Every caller then guards on the directory existing rather than re-calling createWorkspace (workspace-service.ts, swarm.ts, swarm-gates.ts, remote-completion.ts, spawn-planning-session.ts, where any non-.pan file counts as created), so the first pan start fails loudly and the second one starts a work agent in a worktree with no dependencies, no pre-rebase hook and no synced skills. That is worse than the stall it replaces: a stall is visible, whereas this agent runs, burns tokens and produces failing work that looks real. It sits on the paved road (pan start), which is why it ranks critical despite the unlabelled P3 signal. The fix is small and the issue states both options (delete the worktree and its branch on abort, or write an incomplete-setup marker the existence guards check and resume from), with mechanically checkable acceptance criteria and a named test, so size S, condition ok.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4172",
-      "rank": 123,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sequencer done-check clears a run on the mirror 'idle' label alone, against the liveness invariant — a live run can be reaped",
-      "rationale": "New since the prior run, inserted at the rank-123 slot PAN-4160 vacated. It is the last call site left behind by #4162: sequencer-agent.ts (~:69) can still call a run done from the runtime mirror's idle label with a single check, while the repo invariant (CLAUDE.md, src/lib/agents/liveness.ts) is that idleness means stale work activity — never the label alone — so a live sequencer run can be cleared and re-dispatched. Scored high rather than critical because the general role-run reap already requires the allowlist, a 60s idleAgeMs floor and a second Herdr probe, and the fix is specified as reusing that isFinishedRoleRun helper; two smaller notes ride along (a doubled tmux session check with a 2s timeout, and a stopped run with a live idle pane refused on every dispatch).",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12217,13 +12203,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4166",
-      "to": "PAN-4172",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     }
   ]
 }
