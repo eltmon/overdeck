@@ -120,10 +120,10 @@ After completing your analysis, write the SequenceDoc JSON to a temp file and su
 pan backlog write-sequence /tmp/sequence-result.json
 ```
 
-**Do NOT write `backlog/sequence.md` directly.** `pan backlog write-sequence` validates the JSON, renders the human-readable table, writes through the state door, and queues the auto-commit — bypassing it skips FR-1/NFR-3. The command handles:
+**Do NOT write `backlog/sequence.md` directly.** `pan backlog write-sequence` validates the JSON, renders the human-readable table, writes the file, commits it, and pushes it — bypassing it skips FR-1/NFR-3. The command handles:
 - The human-readable header, ranked table, and rationale section.
 - The machine-readable fenced JSON block below the `<!-- machine-readable; do not hand-edit below this line -->` marker.
-- Auto-commit via `queueAutoCommit`.
+- The `chore(workspace): backlog sequence` commit on the plan home's branch (normally `main`), and its push to that branch's upstream. If origin has moved, the command replays the sequence commits onto it and pushes; it never forces, never pushes a local commit outside `.pan/`, and prints a warning when it cannot push safely.
 
 Stamp `pass` and `generatedAt` (current ISO timestamp) in the JSON block.
 

@@ -359,17 +359,17 @@ backlog
       return exitCli(1);
     }
     writeSequenceMd(projectRoot, result.doc);
-    // Whoever writes a .pan/ artifact commits it — no daemon does it for you.
-    const { commitPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
-    const { resolvePlanHome } = await import('../lib/pan-dir/paths.js');
-    const commit = await commitPlanArtifacts({
-      cwd: resolvePlanHome(projectRoot),
-      paths: ['.pan/backlog'],
-      message: 'chore(workspace): backlog sequence',
-    });
+    // Whoever writes a .pan/ artifact commits it; the sequence commit is pushed too (PAN-3923).
+    const { commitPlanArtifacts, pushPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
+    const planHome = (await import('../lib/pan-dir/paths.js')).resolvePlanHome(projectRoot);
+    const commit = await commitPlanArtifacts({ cwd: planHome, paths: ['.pan/backlog'], message: 'chore(workspace): backlog sequence' });
     console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
     if (!commit.committed && commit.reason !== 'nothing to commit') {
       console.error(chalk.yellow(`  ⚠ Could not commit the sequence: ${commit.reason}`));
+    } else {
+      const push = await pushPlanArtifacts(planHome);
+      const warning = push.pushed ? push.warning : push.skipped ? undefined : push.reason;
+      if (warning) console.error(chalk.yellow(`  ⚠ Sequence push: ${warning}`));
     }
   });
 
