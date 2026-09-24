@@ -82,7 +82,9 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    `inPipeline === true`; `clean_terminal` rows are audit-only and excluded. An object with
    `status: 'unavailable'` is a typed blind spot, not an empty pipeline: emit an `investigate`
    suggestion naming its `projectKey`, `reason`, and `message`, and NEVER reconstruct membership
-   from tracker, agent, tmux, workspace, or review-status state. Preserve each included row's
+   from tracker, agent, tmux, workspace, or review-status state. HTTP 503 with
+   `code: 'snapshot_loading'` is neither: a restarted server has not gathered that project yet,
+   so re-read it after the `Retry-After` seconds instead of reporting a blind spot. Preserve each included row's
    bucket — `in_flight`, `zombie_pr`, `post_merge_limbo`, or `planned_backlog` — and use those
    other state sources only as annotations on resolver verdicts.
 4. **Fix at the root, every revolution.** When a Overdeck command, route, gate, or role is
