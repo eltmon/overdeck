@@ -15,7 +15,7 @@
  * `stopAgent` are the real code.
  */
 import { Effect } from 'effect';
-import { rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -343,6 +343,16 @@ function lookedUp(agentId: string): boolean {
 }
 
 describe('killAllReviewSessions (pan down) closes through the terminal backend (#4182)', () => {
+  // The sweep reads every row in this worker's test home; another file's
+  // leftover reviewer row must not leak into the exact assertions below.
+  beforeEach(() => {
+    const agentsDir = join(getOverdeckHome(), 'agents');
+    const ids = existsSync(agentsDir) ? readdirSync(agentsDir) : [];
+    for (const id of ids.filter((name) => name.includes('-review'))) {
+      rmSync(join(agentsDir, id), { recursive: true, force: true });
+    }
+  });
+
   it('herdr: closes every issue\'s reviewer panes and writes stopped rows, never a work or conversation pane', async () => {
     backendSelection.name = 'herdr';
     herdrPanes([
