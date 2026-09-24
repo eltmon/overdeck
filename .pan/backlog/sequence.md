@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T16:41:34.799Z · model: claude-opus-5 · open: 843_
+_Last sequenced: 2026-09-24T16:52:23.032Z · model: claude-opus-5 · open: 840_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -20,7 +20,6 @@ _Last sequenced: 2026-09-24T16:41:34.799Z · model: claude-opus-5 · open: 843_
 | 17 | PAN-3982 | M | medium | ok |  |  | Palette hits 404: PAN-3950 dropped the unregistered-session fallback; subagent transcripts index as agent-* with no row |
 | 18 | PAN-3966 | S | critical | ok |  |  | stopAgent/warm-idle reap are tmux-only: a lingering Herdr pane blocks every role-run re-dispatch with "already running" (749 refusals) |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
-| 20 | PAN-3679 | M | critical | ok |  |  | Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
 | 23 | PAN-3981 | M | critical | ok |  | PAN-3966 | Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision) |
 | 25 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
@@ -36,7 +35,6 @@ _Last sequenced: 2026-09-24T16:41:34.799Z · model: claude-opus-5 · open: 843_
 | 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
 | 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
 | 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
-| 42 | PAN-3685 | S | high | ok |  |  | Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed |
 | 43 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
 | 44 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
 | 45 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
@@ -44,7 +42,6 @@ _Last sequenced: 2026-09-24T16:41:34.799Z · model: claude-opus-5 · open: 843_
 | 47 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
 | 48 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
 | 50 | PAN-3953 | XS | high | ok |  |  | planned label is applied at planning spawn, before any spec exists; five issues labeled planned with no spec on disk |
-| 51 | PAN-3580 | S | critical | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
 | 52 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
 | 53 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
 | 54 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
@@ -911,10 +908,6 @@ The sequencer was refused 749 times over three weeks by its own finished pane; t
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Inserted at rank 19, the first non-pinned slot; ranks 1-18 are in-pipeline and stay pinned. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
 
-### PAN-3679 (rank 20)
-
-Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
-
 ### PAN-3939 (rank 22)
 
 Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.
@@ -975,10 +968,6 @@ New this pass. Main stayed red for about five hours because nothing owns the sta
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
 
-### PAN-3685 (rank 42)
-
-Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
-
 ### PAN-3085 (rank 43)
 
 New this pass and a one-line class of defect with outsized cost. Review feedback is written to the resolved .overdeck/feedback directory but the path handed to the work agent is a hardcoded .pan/feedback that no longer exists after the rebrand, and the deacon merge gate reads the same dead path. Agents are told to fix findings they cannot find, and the gate counts zero feedback files no matter how many exist. Condition changed after the PAN-3917 cut: the deacon merge gate is gone; only the agent-side .pan/feedback path pointer remains to verify — re-scope.
@@ -1006,10 +995,6 @@ New this pass. The test gate records a real 'test failed' verdict for uniform 50
 ### PAN-3953 (rank 50)
 
 Violates the cut's rule that planned is derived from spec existence; a dead planner leaves an issue looking planned forever and the pickup gate mis-reads it. Delete the spawn-time label write. PAN-3961 reported the same bug and was closed as its duplicate on 2026-09-20; this issue is the single owner.
-
-### PAN-3580 (rank 51)
-
-The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.
 
 ### PAN-3500 (rank 52)
 
@@ -1171,6 +1156,18 @@ Triage: idle-at-prompt redrive is now deacon-lite's stuck-work-nudge routine; ve
 
 Scheduler yield never self-clears — yielded work agents stay paused hours after the blocking review merges.
 
+### PAN-2668 (rank 97)
+
+Verification/review feedback silently queued to stopped-by-user agents, never re-driven on delivery.
+
+### PAN-2569 (rank 98)
+
+Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.
+
+### PAN-3899 (rank 99)
+
+Rank held at 99. resolveBootGates is only called from restart.ts; reload and the post-merge deploy path relaunch with no OVERDECK_* gate env, so deacon-lite is silently off after most deploys. The related PAN-3898 closed as obsolete after the cut, so that cross-reference is dropped; nothing in the boot-gate defect depended on it.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1178,10 +1175,10 @@ Scheduler yield never self-clears — yielded work agents stay paused hours afte
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T16:41:34.799Z",
+  "generatedAt": "2026-09-24T16:52:23.032Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 843,
+  "openCount": 840,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1375,19 +1372,6 @@ Scheduler yield never self-clears — yielded work agents stay paused hours afte
       "dependsOn": [],
       "why": "Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick",
       "rationale": "New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Inserted at rank 19, the first non-pinned slot; ranks 1-18 are in-pipeline and stay pinned. Fix is small (reuse the per-project reconciler tick) with mechanical AC.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3679",
-      "rank": 20,
-      "size": "M",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running",
-      "rationale": "Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1589,19 +1573,6 @@ Scheduler yield never self-clears — yielded work agents stay paused hours afte
       "planning": "auto"
     },
     {
-      "issue": "PAN-3685",
-      "rank": 42,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed",
-      "rationale": "Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3085",
       "rank": 43,
       "size": "XS",
@@ -1689,19 +1660,6 @@ Scheduler yield never self-clears — yielded work agents stay paused hours afte
       "dependsOn": [],
       "why": "planned label is applied at planning spawn, before any spec exists; five issues labeled planned with no spec on disk",
       "rationale": "Violates the cut's rule that planned is derived from spec existence; a dead planner leaves an issue looking planned forever and the pickup gate mis-reads it. Delete the spawn-time label write. PAN-3961 reported the same bug and was closed as its duplicate on 2026-09-20; this issue is the single owner.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3580",
-      "rank": 51,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL",
-      "rationale": "The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.",
       "gate": "auto",
       "planning": "auto"
     },
