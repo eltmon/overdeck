@@ -29,7 +29,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
 
     // Auto-recover all crashed agents
     if (options.all || !id) {
-      const crashed = detectCrashedAgents();
+      const crashed = await detectCrashedAgents();
 
       if (crashed.length === 0) {
         spinner.succeed('No crashed agents found');

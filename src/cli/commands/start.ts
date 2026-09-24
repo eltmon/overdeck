@@ -810,7 +810,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exitCode = 0;
     return;
   }
-  const conflict = describeConflictingWorkAgents(id, agentId, { ignoreRegisteredSlots: swarmActive });
+  const conflict = await describeConflictingWorkAgents(id, agentId, { ignoreRegisteredSlots: swarmActive });
   if (conflict) {
     process.stderr.write(chalk.red(conflict));
     return exitCli(1);

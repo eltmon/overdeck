@@ -168,6 +168,8 @@ export const getAgentsRoute = HttpRouter.add(
                 git: state.branch ? { branch: state.branch, uncommittedFiles: 0, latestCommit: '' } : null,
                 type: 'agent',
                 role,
+                hasLivePane: false,
+                // Deprecated alias of `hasLivePane`: true for a pane on either backend, not only tmux (#4105).
                 hasLiveTmuxSession: false,
                 hasPendingQuestion: needsInput,
                 pendingQuestionCount: 0,
@@ -216,6 +218,8 @@ export const getAgentsRoute = HttpRouter.add(
               git: gitStatus,
               type: 'agent',
               role,
+              hasLivePane: true,
+              // Deprecated alias of `hasLivePane`: true for a pane on either backend, not only tmux (#4105).
               hasLiveTmuxSession: true,
               hasPendingQuestion: enrichment.hasPendingQuestion || pane?.state === 'blocked',
               pendingQuestionCount: enrichment.pendingQuestionCount,
