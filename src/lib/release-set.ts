@@ -1,4 +1,4 @@
-import { getReleaseSetFromDb, upsertReleaseSet as dbUpsert } from './overdeck/release-sync.js';
+import { getReleaseSetFromDb, upsertReleaseSetRow } from './overdeck/release-sync.js';
 import { resolveIssueId } from './issue-id.js';
 import type {
   ReleaseCheckStatus,
@@ -19,7 +19,7 @@ export type {
 } from './release-set-types.js';
 
 export function upsertReleaseSet(releaseSet: ReleaseSet): void {
-  dbUpsert({ ...releaseSet, issueId: resolveIssueId(releaseSet.issueId) });
+  upsertReleaseSetRow({ ...releaseSet, issueId: resolveIssueId(releaseSet.issueId) });
 }
 
 export function getReleaseSet(issueId: string): ReleaseSet | null {

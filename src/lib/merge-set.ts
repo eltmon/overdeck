@@ -1,6 +1,6 @@
 import {
   getMergeSetFromDb,
-  upsertMergeSet as dbUpsert,
+  upsertMergeSetRow,
 } from './overdeck/merge-sync.js';
 import type { ForgeType } from './forge.js';
 import { resolveProjectFromIssueSync } from './projects.js';
@@ -41,7 +41,7 @@ export interface MergeSet {
 }
 
 export function upsertMergeSet(mergeSet: MergeSet): void {
-  dbUpsert({ ...mergeSet, issueId: resolveIssueId(mergeSet.issueId) });
+  upsertMergeSetRow({ ...mergeSet, issueId: resolveIssueId(mergeSet.issueId) });
 }
 
 /** Fetch a merge-set by issue id; throws on a merge-set DB failure. */
