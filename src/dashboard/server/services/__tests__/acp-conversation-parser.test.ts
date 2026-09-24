@@ -332,6 +332,45 @@ describe('parseAcpConversationMessages', () => {
     expect(acpParserReadStatsForTests(paths.at(-1)!)).toBeDefined();
   });
 
+  it('shows a stalled turn as an error row without completing the turn (PAN-3890)', async () => {
+    const stall = 'opencode is retrying the turn (attempt 4): Rate limit exceeded. Please try again later.';
+    const path = await writeTranscript([
+      {
+        timestamp: '2026-09-18T04:01:11.000Z',
+        role: 'user',
+        content: 'hello muse',
+        source: 'orchestrator',
+        promptId: 'p1',
+      },
+      {
+        timestamp: '2026-09-18T04:01:20.000Z',
+        role: 'tool',
+        content: 'running',
+        toolCalls: [{ toolCallId: 'tool-pending', title: 'Run command', status: 'inProgress', data: {} }],
+      },
+      {
+        timestamp: '2026-09-18T04:02:11.000Z',
+        role: 'system',
+        content: stall,
+        source: 'watchdog',
+        promptId: 'p1',
+        event: 'prompt_stalled',
+      },
+    ]);
+
+    const result = await parseAcpConversationMessages(path);
+
+    expect(result.messages.map((message) => message.role)).toEqual(['user']);
+    expect(result.workLog.at(-1)).toEqual(expect.objectContaining({
+      createdAt: '2026-09-18T04:02:11.000Z',
+      label: 'Prompt stalled',
+      tone: 'error',
+      result: stall,
+    }));
+    expect(result.lastTurnCompletedAt).toBeUndefined();
+    expect(result.pendingToolUse.size).toBe(1);
+  });
+
   it('clears pending tools when the prompt fails', async () => {
     const path = await writeTranscript([
       {
