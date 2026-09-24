@@ -24,6 +24,17 @@ export function isReadyToMerge(derived: DerivedIssueState | undefined): boolean 
   return derived?.state === 'ready';
 }
 
+/**
+ * The change is on main. A closed-out issue derives as `closed` (the tracker
+ * outranks the PR), so `merged` alone misses every issue `pan close` finished.
+ * The forge attaches only an open or merged PR (a closed-unmerged one is
+ * dropped), and a closed issue's PR is no longer open work, so `closed` with a
+ * PR is shipped; `closed` without one was cancelled (PAN-3420).
+ */
+export function isShipped(derived: DerivedIssueState | undefined): boolean {
+  return derived?.state === 'merged' || (derived?.state === 'closed' && derived.pr !== undefined);
+}
+
 /** Human-readable reason the issue is not moving. */
 export function stuckReason(derived: DerivedIssueState | undefined): string {
   if (derived?.attention === 'api-error') return 'Provider API errors';
@@ -53,7 +64,7 @@ export function sortOperatorNeeds(items: readonly OperatorNeedsYou[]): OperatorN
 /** The merge door's state as the forge reports it. */
 export function deriveShip(derived: DerivedIssueState | undefined): IssueShipModel {
   const status: IssueShipModel['status'] =
-    derived?.state === 'merged' ? 'merged' : derived?.state === 'ready' ? 'ready' : 'pending';
+    isShipped(derived) ? 'merged' : derived?.state === 'ready' ? 'ready' : 'pending';
 
   return {
     status,
