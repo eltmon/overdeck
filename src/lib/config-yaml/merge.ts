@@ -453,6 +453,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.conversations?.title_model) {
       result.conversations.titleModel = resolveModelId(config.conversations.title_model);
     }
+    if (config.conversations?.fork_summary_model) {
+      result.conversations.forkSummaryModel = resolveModelId(config.conversations.fork_summary_model);
+    }
     if (config.conversations?.handoff_author_model) {
       result.conversations.handoffAuthorModel = resolveModelId(config.conversations.handoff_author_model);
     }

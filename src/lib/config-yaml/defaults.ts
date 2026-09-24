@@ -67,6 +67,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     manualCompactMode: 'claude-code',
     richCompaction: true,
     titleModel: 'claude-haiku-4-5',
+    // PAN-4160: the one documented default for fork summaries (replaces two
+    // disagreeing literals in conversation-forks.ts and summary-fork.ts). A
+    // fork summary serializes the whole conversation in one shot, so it needs
+    // a 1M-context model.
+    forkSummaryModel: 'claude-sonnet-5',
     // PAN-3860: deliberately no default here (unlike compactionModel/
     // titleModel above) — the previous default lived as a private literal in
     // summary-fork.ts, which is exactly the hardcoded-fallback pattern the
