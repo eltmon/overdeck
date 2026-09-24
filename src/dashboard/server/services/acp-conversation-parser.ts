@@ -128,6 +128,26 @@ function processTranscriptEntry(state: AcpParserState, entry: AcpTranscriptEntry
 
   if (entry.event === 'prompt_queued') return;
 
+  // PAN-3890: acp-host saw the turn stall (e.g. opencode retrying a provider
+  // 429). The turn is still in flight, so this is an error row that neither
+  // completes the turn nor clears pending tools.
+  if (entry.event === 'prompt_stalled') {
+    const message = entry.content.trim();
+    if (!message) return;
+    state.sequence += 1;
+    state.workLog.push({
+      id: `acp-prompt-stalled-${state.sequence}`,
+      createdAt,
+      label: 'Prompt stalled',
+      toolTitle: 'Prompt stalled',
+      tone: 'error',
+      sequence: state.sequence,
+      detail: message,
+      result: message,
+    });
+    return;
+  }
+
   if (entry.event === 'turn_completed' || entry.event === 'prompt_failed') {
     state.lastTurnCompletedAt = createdAt;
     if (state.currentTurnAssistantIndex !== undefined) {
