@@ -182,6 +182,18 @@ Who uses them:
   cleanup.
 - **`pan kill` / `pan stop` / `pan pause`** — use the async `stopAgent`, and decide "running" and "live
   sibling" with `agentPaneExists`, not `sessionExistsSync`.
+- **`killAllReviewerSessions`** (`pan review abort`, forced review re-dispatch, merge, reset;
+  `src/lib/cloister/review-agent.ts`) — closes each of the issue's reviewers (its `agent-<id>-review*`
+  rows plus any matching tmux session) with `closeAgentPaneDetailed`, then writes `stopped` through
+  `stopAgent` for every reviewer it closed or whose row still claims `running`/`starting`. A failed close
+  is returned in `failed` and that reviewer's row is left alone. It used to list tmux sessions only, so on
+  Herdr it closed nothing and wrote no row (PAN-3939).
+- **The review synthesis dispatch guard** (`spawnReviewRoleForIssue`) — asks `isAlive` for
+  `agent-<id>-review`. A live harness is the review in progress (subject to the run-id and finished-report
+  checks); a confirmed death with a pane left behind (`pane-dead`, `runtime-missing`) is closed and
+  re-dispatched; `runtime-indeterminate` holds the dispatch rather than launch a duplicate. It used to read
+  tmux's session list and `#{pane_dead}`, so a bare shell after the harness exited blocked every later
+  dispatch on tmux, and on Herdr the guard never matched (PAN-3939).
 - **`spawnRun`'s warm-idle reap** (PAN-2579, `reapWarmIdleRoleRun` in `src/lib/agents/warm-idle-reap.ts`) — when
   a role run's pane is still there at dispatch, it asks `isAlive` and reaps through `stopAgent` when
   `isFinishedRoleRun` says the previous run finished. It used to read tmux's `#{pane_dead}`, which a
