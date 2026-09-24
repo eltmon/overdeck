@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T21:55:49.337Z · model: claude-opus-5 · open: 813_
+_Last sequenced: 2026-09-24T22:03:54.905Z · model: claude-opus-5 · open: 810_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
-| 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
-| 4 | PAN-4169 | M | critical | ok |  | PAN-3923 | Herdr reaps only claude-code panes, so finished codex/GPT, kimi, pi and ACP role runs are refused 'already running' on every re-dispatch |
+| 4 | PAN-4169 | M | critical | ok |  |  | Herdr reaps only claude-code panes, so finished codex/GPT, kimi, pi and ACP role runs are refused 'already running' on every re-dispatch |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
@@ -189,7 +188,6 @@ _Last sequenced: 2026-09-24T21:55:49.337Z · model: claude-opus-5 · open: 813_
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 228 | PAN-4145 | S | medium | ok |  |  | restart-fresh, restartAgent and resume relaunch fall back to literal model IDs, so harness policy checks a model pan start will not staff |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
@@ -277,7 +275,6 @@ _Last sequenced: 2026-09-24T21:55:49.337Z · model: claude-opus-5 · open: 813_
 | 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
-| 320 | PAN-3934 | S | medium | ok |  |  | roles/*.md and two docs still name deleted status fields outside the guard’s Markdown roots; PAN-3929 has landed, so this is now free |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1209 | S | low | stale |  |  | bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
@@ -825,13 +822,9 @@ _Last sequenced: 2026-09-24T21:55:49.337Z · model: claude-opus-5 · open: 813_
 
 In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.
 
-### PAN-3923 (rank 3)
-
-In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.
-
 ### PAN-4169 (rank 4)
 
-New this run, filed as the residual gap after PAN-3966 closed and PR #4162 (PAN-3923) went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. Ranked 4, immediately behind its parent PAN-3923 at rank 3, and marked dependsOn PAN-3923 because PR #4162 is still open: the reap path this work extends has not landed yet. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.
+Delta this run: PR #4162 merged as 35ad688c232 and PAN-3923 closed completed, so the sole dependency is satisfied — dependsOn cleared, rank held at 4. Filed as the residual gap after PAN-3966 closed and PR #4162 went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. With its parent landed, this is now the highest-ranked startable issue behind in-pipeline PAN-3921; ranks 2 and 3 stay vacant rather than shifting the rest of the tier. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.
 
 ### PAN-3930 (rank 15)
 
@@ -1121,6 +1114,10 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
 
 Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.
 
+### PAN-1618 (rank 111)
+
+Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1128,10 +1125,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T21:55:49.337Z",
+  "generatedAt": "2026-09-24T22:03:54.905Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 813,
+  "openCount": 810,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1143,19 +1140,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane",
       "rationale": "In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3923",
-      "rank": 3,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed",
-      "rationale": "In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3431,20 +3415,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "planning": "auto"
     },
     {
-      "issue": "PAN-4145",
-      "rank": 228,
-      "size": "S",
-      "importance": "medium",
-      "score": 63,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "restart-fresh, restartAgent and resume relaunch fall back to literal model IDs, so harness policy checks a model pan start will not staff",
-      "rationale": "New since the prior pass; placed in the free rank slot beside its family (PAN-3022 work-spawn override, PAN-3855 stale recorded model) because it is the same spawn-path model-resolution defect, scored lower because the hardcoded literal only fires when no model is recorded.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": false
-    },
-    {
       "issue": "PAN-3527",
       "rank": 229,
       "size": "XS",
@@ -4511,19 +4481,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "Labelled substrate-improvement, so the label floor makes it at least high. Blocker PAN-2077 closed and parent epic PAN-2075 closed. Triage: boot reconciliation, the epic's first producer, is deleted, but the general Inbox-spine idea may still be worth pursuing for other producers (pending AUQ, cost alerts). Lifted from the stale tail; needs a re-scope before pickup. Blocker PAN-2077 closed since the prior run; dependsOn pruned.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-3934",
-      "rank": 320,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "roles/*.md and two docs still name deleted status fields outside the guard’s Markdown roots; PAN-3929 has landed, so this is now free",
-      "rationale": "PAN-3929 merged in this run’s delta, so the blocker is gone and this is directly workable: the widened guard and its Markdown roots are on main, and what remains is the roles/*.md and docs sweep plus a roles/ scan root. Rank held at 320 rather than lifted — clearing a blocker makes the item pickable, it does not raise its impact, and the score-50 band around it is the right neighbourhood for operator-facing doc accuracy.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1219",
@@ -11156,11 +11113,9 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "importance": "critical",
       "score": 86,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-3923"
-      ],
+      "dependsOn": [],
       "why": "Herdr reaps only claude-code panes, so finished codex/GPT, kimi, pi and ACP role runs are refused 'already running' on every re-dispatch",
-      "rationale": "New this run, filed as the residual gap after PAN-3966 closed and PR #4162 (PAN-3923) went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. Ranked 4, immediately behind its parent PAN-3923 at rank 3, and marked dependsOn PAN-3923 because PR #4162 is still open: the reap path this work extends has not landed yet. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.",
+      "rationale": "Delta this run: PR #4162 merged as 35ad688c232 and PAN-3923 closed completed, so the sole dependency is satisfied — dependsOn cleared, rank held at 4. Filed as the residual gap after PAN-3966 closed and PR #4162 went up. Herdr is the default backend and codex is the default harness for GPT role runs, so the pane-bound harnesses - codex, kimi-code, pi/ohmypi, opencode, ACP - cover most non-Claude dispatch. detectionPolicyFor in src/lib/terminal-backends/launch.ts returns 'required' only for claude-code, so every other harness keeps agent_status 'unknown', warm-idle-reap.ts correctly never reaps 'unknown', and the finished run's pane blocks re-dispatch until the process exits. That refuses pipeline work outright, which is critical rather than high despite the empty label set. With its parent landed, this is now the highest-ranked startable issue behind in-pipeline PAN-3921; ranks 2 and 3 stay vacant rather than shifting the rest of the tier. The issue states the fix shape - a finished signal for pane-bound harnesses built on the hook-driven runtime mirror plus stale idleAgeMs in src/lib/agents/liveness.ts and a second probe - so condition is ok. Size M: launch.ts detection policy, warm-idle-reap.ts, and the liveness seam.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12250,13 +12205,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 1
     },
     {
-      "from": "PAN-3022",
-      "to": "PAN-4145",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.55
-    },
-    {
       "from": "PAN-3822",
       "to": "PAN-4151",
       "type": "unblocks",
@@ -12269,20 +12217,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
-    },
-    {
-      "from": "PAN-3923",
-      "to": "PAN-4166",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-3923",
-      "to": "PAN-4169",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
     },
     {
       "from": "PAN-3905",
