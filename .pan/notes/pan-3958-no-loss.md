@@ -2394,3 +2394,7 @@ included, now runs its whole read-modify-write inside a per-plan-directory queue
 resolved `panDir`). `advanceQueue` completes the book through the in-lock `setStatus` body, so it does not wait on
 itself. The lock is in-process only; a CLI write racing a dashboard write was possible on main too and is unchanged.
 Two new tests in `orders-writer.test.ts` fire concurrent mutations. Both failed with the lock disabled and pass with it.
+
+### #4002 follow-up: `work/done-preflight.ts` — deleted twin, not a new ratchet row
+
+`checkIncompletePlanItemsPromise` had no bare twin, so the #4002 rename gave it the bare async name `checkIncompletePlanItems`, landing on the file's existing `checkIncompletePlanItemsSync` as a brand-new Shape C pair — `lint:effect-facades` is a shrink-only ratchet and correctly refused to let a PR raise it. The sync twin's only caller, `runPreflightChecks` in the same file, was already `async`, so there was no synchronous caller to preserve: `runPreflightChecks` now does `...await checkIncompletePlanItems(workspacePath, issueId)` and `checkIncompletePlanItemsSync` (and the now-unused `readWorkspacePlanSync` import in this one file — `readWorkspacePlanSync` itself stays; it has ~30 other production callers) are deleted. `scripts/effect-facades-baseline.txt` needed no change.

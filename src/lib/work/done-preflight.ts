@@ -1,9 +1,3 @@
-/**
- * Sync twins (PAN-3958): `checkIncompletePlanItems` (sync: `checkIncompletePlanItemsSync`)
- * exists because its only caller, `runPreflightChecks` below, calls it without awaiting
- * (PAN-4002 renamed the stale `checkIncompletePlanItemsPromise` to the bare async name; the
- * sync twin's own caller was not touched). Do not add new synchronous callers.
- */
 import { exec } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,7 +6,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { isOverdeckOwnedOnlyStatus } from '../state-plane.js';
-import { readWorkspacePlan, readWorkspacePlanSync } from '../xbrief/io.js';
+import { readWorkspacePlan } from '../xbrief/io.js';
 import { subItemsOf, type XBriefDocument } from '../xbrief/types.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
 
@@ -35,10 +29,6 @@ export function evaluateIncompletePlanItems(doc: XBriefDocument | null): string[
     return lines;
   });
   return incomplete.length === 0 ? [] : [`  Incomplete plan items (${incomplete.length}):`, ...incomplete];
-}
-
-export function checkIncompletePlanItemsSync(workspacePath: string): string[] {
-  return evaluateIncompletePlanItems(readWorkspacePlanSync(workspacePath));
 }
 
 export async function checkIncompletePlanItems(workspacePath: string, _issueId?: string): Promise<string[]> {
@@ -94,7 +84,7 @@ async function checkUncommittedChanges(workspacePath: string): Promise<string[]>
 /** Run the `pan done` preflight checks and return every failure line (empty when clean). */
 export async function runPreflightChecks(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
   return [
-    ...checkIncompletePlanItemsSync(workspacePath),
+    ...await checkIncompletePlanItems(workspacePath, issueId),
     ...await checkUncommittedChanges(workspacePath),
     ...await Effect.runPromise(runTestRequirementCheck(workspacePath, issueId, testWaived)),
   ];

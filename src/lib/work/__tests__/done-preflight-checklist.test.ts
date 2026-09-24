@@ -5,17 +5,14 @@ import type { XBriefDocument } from '../../xbrief/types.js';
 
 const planMocks = vi.hoisted(() => ({
   readWorkspacePlan: vi.fn(),
-  readWorkspacePlanSync: vi.fn(),
 }));
 
 vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlan: planMocks.readWorkspacePlan,
-  readWorkspacePlanSync: planMocks.readWorkspacePlanSync,
 }));
 
 import {
   checkIncompletePlanItems,
-  checkIncompletePlanItemsSync,
   evaluateIncompletePlanItems,
 } from '../done-preflight.js';
 
@@ -61,15 +58,11 @@ function planWithStatus(
 
 beforeEach(() => {
   planMocks.readWorkspacePlan.mockReset();
-  planMocks.readWorkspacePlanSync.mockReset();
 });
 
 describe('plan checklist evaluation', () => {
-  it('uses the asynchronous workspace-plan door for Promise callers', async () => {
+  it('uses the asynchronous workspace-plan door', async () => {
     planMocks.readWorkspacePlan.mockReturnValue(Effect.succeed(planWithStatus('pending')));
-    planMocks.readWorkspacePlanSync.mockImplementation(() => {
-      throw new Error('synchronous plan reader must not run');
-    });
 
     const incomplete = await checkIncompletePlanItems('/project/workspaces/feature-pan-3451', 'PAN-3451');
 
@@ -78,15 +71,6 @@ describe('plan checklist evaluation', () => {
       '    - item-one First item (pending)',
     ]);
     expect(planMocks.readWorkspacePlan).toHaveBeenCalledWith('/project/workspaces/feature-pan-3451');
-    expect(planMocks.readWorkspacePlanSync).not.toHaveBeenCalled();
-  });
-
-  it('keeps the synchronous reader for synchronous callers', () => {
-    planMocks.readWorkspacePlanSync.mockReturnValue(planWithStatus('completed'));
-
-    expect(checkIncompletePlanItemsSync('/project/workspaces/feature-pan-3451')).toEqual([]);
-    expect(planMocks.readWorkspacePlanSync).toHaveBeenCalledWith('/project/workspaces/feature-pan-3451');
-    expect(planMocks.readWorkspacePlan).not.toHaveBeenCalled();
   });
 
   it('treats pending children of a cancelled item as satisfied', () => {

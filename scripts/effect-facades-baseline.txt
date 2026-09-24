@@ -16,7 +16,6 @@ C 1 src/lib/runtimes/ohmypi.ts
 C 1 src/lib/runtimes/storage/muse.ts
 C 1 src/lib/ui-theme.ts
 C 1 src/lib/work-agent-lifecycle.ts
-C 1 src/lib/work/done-preflight.ts
 C 2 src/lib/agents/agent-state.ts
 C 2 src/lib/cloister/config.ts
 C 3 src/lib/projects.ts
