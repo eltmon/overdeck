@@ -268,9 +268,11 @@ Review is configured under `roles.review` in `~/.overdeck/config.yaml`.
 | `full` | Four parallel reviewer lanes (`correctness`, `security`, `performance`, `requirements`) plus a review parent that writes the synthesis. |
 | `none` | No AI review. The verification quality floor still applies. |
 
-Each lane's model is `roles.review.sub.<lane>.model`, falling back to
-`roles.review.model` and then the built-in default (`resolveModel` in
-`src/lib/config-yaml/roles.ts`). The review parent, which writes the synthesis
+Each lane's model is `roles.review.sub.<lane>.model` (`resolveModel` in
+`src/lib/config-yaml/roles.ts`). The built-in defaults give every lane its own
+model (`security` on `workhorse:expensive`, the other three on
+`workhorse:mid`), so setting `roles.review.model` alone does not change the
+lanes. A lane uses `roles.review.model` only when its model is set to `parent`. The review parent, which writes the synthesis
 in `full` mode and does the whole review in `quick` mode, uses
 `roles.review.model`. See [MODEL-CALLS.md](MODEL-CALLS.md) for the defaults.
 
@@ -289,7 +291,8 @@ roles:
 (`name`, `model`, `focus`, `enabled`). Nothing reads it. The reviewer lanes are
 fixed: a lane's model comes from `roles.review.sub.<lane>.model`, and whether
 the lanes run at all comes from `roles.review.mode`. Reviewer dispatch does not
-consult the `review:*` keys in `models.overrides` shown elsewhere on this page.
+consult `review:*` keys in `models.overrides`; that map is retired (see
+[Removed: Presets, Work-Type Overrides, Thinking Levels](#removed-presets-work-type-overrides-thinking-levels)).
 
 ---
 
