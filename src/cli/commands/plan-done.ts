@@ -37,6 +37,8 @@ export async function planDoneCommand(id: string, options: { prd?: boolean } = {
   }
   if (result.workAgentSpawned) {
     console.log(chalk.dim(`  Work agent started${result.workAgentMessage ? ` — ${result.workAgentMessage}` : ''}`));
+  } else if (result.workAgentDeferred) {
+    console.log(chalk.dim('  Work agent start deferred by spawn guardrails; retried automatically for up to 2 hours'));
   } else if (result.workAgentSkipReason) {
     console.log(chalk.dim(`  Work agent not started: ${result.workAgentSkipReason}`));
   }
