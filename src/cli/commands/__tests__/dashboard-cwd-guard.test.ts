@@ -103,6 +103,39 @@ describe('resolvePrimaryDashboardIdentity', () => {
     );
   });
 
+  it('seeds the spawn env with inherited boot gates; explicit flags still win (PAN-3899)', () => {
+    const bundle = createDashboardBundleFixture();
+    const child = { unref: vi.fn() };
+    processMocks.execFileSync.mockImplementation(() => { throw new Error('systemd unavailable'); });
+    processMocks.spawn.mockReturnValue(child);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const config = {
+      dashboardPort: 3010,
+      dashboardApiPort: 3011,
+      traefikEnabled: false,
+      traefikDomain: 'overdeck.localhost',
+    } as Parameters<typeof spawnDashboardDetached>[0];
+    const inheritBootGates = {
+      deacon: { enabled: false, source: 'flag' as const },
+      resume: { enabled: false, source: 'flag' as const },
+    };
+
+    spawnDashboardDetached(config, { ...bundle, inheritBootGates });
+    spawnDashboardDetached(config, { ...bundle, inheritBootGates, deacon: true });
+
+    const inherited = processMocks.spawn.mock.calls[0][2].env as NodeJS.ProcessEnv;
+    expect(inherited).toMatchObject({
+      OVERDECK_DISABLE_DEACON: '1',
+      OVERDECK_DEACON_GATE_SOURCE: 'flag',
+      OVERDECK_NO_RESUME: '1',
+      OVERDECK_RESUME_GATE_SOURCE: 'flag',
+    });
+    expect(inherited.OVERDECK_RESUME).toBeUndefined();
+    const overridden = processMocks.spawn.mock.calls[1][2].env as NodeJS.ProcessEnv;
+    expect(overridden.OVERDECK_DISABLE_DEACON).toBeUndefined();
+    expect(overridden).toMatchObject({ OVERDECK_DEACON_GATE_SOURCE: 'flag', OVERDECK_NO_RESUME: '1' });
+  });
+
   it('returns a handle that stops the spawned systemd unit', () => {
     const bundle = createDashboardBundleFixture();
     processMocks.execFileSync.mockReturnValue(undefined);

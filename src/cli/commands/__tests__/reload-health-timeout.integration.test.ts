@@ -52,6 +52,12 @@ vi.mock('../../../lib/platform-lifecycle.js', async (importActual) => ({
   readPlatformConfig: mocks.readPlatformConfig,
 }));
 
+// PAN-3899: the pre-restart boot-gate read would be the first fetch this test
+// waits on; no old dashboard runs here, so report none.
+vi.mock('../../../lib/deploy/running-boot-gates.js', () => ({
+  readRunningDashboardBootGates: async () => null,
+}));
+
 vi.mock('../restart.js', () => ({
   refuseNonPrimaryDashboardCwd: mocks.refuseNonPrimaryDashboardCwd,
   resolveBundledServerPath: mocks.resolveBundledServerPath,

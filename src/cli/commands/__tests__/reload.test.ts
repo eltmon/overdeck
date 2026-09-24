@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   supervisorDeploymentFailure: vi.fn(),
   dashboardServerBootFailure: vi.fn(),
   waitForRestartApproval: vi.fn(),
+  readRunningDashboardBootGates: vi.fn(),
 }));
 
 vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloadProgress: mocks.reportComposerReloadProgress }));
@@ -42,6 +43,11 @@ vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloa
 vi.mock('../../../lib/dev-supervisor.js', () => ({
   readDevSupervisorMarker: mocks.readDevSupervisorMarker,
   devSupervisorRefusalLines: mocks.devSupervisorRefusalLines,
+}));
+
+// PAN-3899: reload reads the running dashboard's boot gates over HTTP first.
+vi.mock('../../../lib/deploy/running-boot-gates.js', () => ({
+  readRunningDashboardBootGates: mocks.readRunningDashboardBootGates,
 }));
 
 vi.mock('../../../lib/restart-lock.js', () => ({
@@ -224,6 +230,7 @@ describe('reloadCommand', () => {
     mocks.supervisorDeploymentFailure.mockReturnValue(null);
     mocks.dashboardServerBootFailure.mockReturnValue(null);
     mocks.waitForRestartApproval.mockResolvedValue({ proceed: true, reason: 'ungated', detail: 'no gate in tests' });
+    mocks.readRunningDashboardBootGates.mockResolvedValue(null);
     mocks.fsAccess.mockImplementation(async (path: string) => {
       if (path === '/usr/bin/bun') return;
       throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
@@ -666,10 +673,77 @@ describe('reloadCommand', () => {
     spawnFactory();
     expect(mocks.spawnDashboardDetached).toHaveBeenCalledWith(expect.anything(), {
       deacon: undefined,
+      resume: undefined,
+      inheritBootGates: null,
       serverPath,
       repoRoot,
     });
     expect(process.exitCode).toBeUndefined();
+  });
+
+  describe('boot gates (PAN-3899)', () => {
+    const OFF_BY_FLAG = {
+      deacon: { enabled: false, source: 'flag' as const },
+      resume: { enabled: false, source: 'flag' as const },
+    };
+
+    function spawnOptionsOfReload(): Record<string, unknown> {
+      const spawnFactory = mocks.restartDashboard.mock.calls[0][1] as () => unknown;
+      spawnFactory();
+      return mocks.spawnDashboardDetached.mock.calls[0][1] as Record<string, unknown>;
+    }
+
+    it('hands the running dashboard\'s gates to the replacement server', async () => {
+      mocks.readRunningDashboardBootGates.mockResolvedValue(OFF_BY_FLAG);
+
+      await reloadCommand({ skipBuild: true });
+
+      expect(mocks.readRunningDashboardBootGates).toHaveBeenCalledWith(3011);
+      expect(mocks.readRunningDashboardBootGates.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.restartDashboard.mock.invocationCallOrder[0]);
+      expect(spawnOptionsOfReload()).toMatchObject({
+        deacon: undefined,
+        resume: undefined,
+        inheritBootGates: OFF_BY_FLAG,
+      });
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining(
+        'Boot gates: deacon=off source=flag resume=off source=flag (carried from the running dashboard)',
+      ));
+      // A Deacon-off server identifies as a peer; the health wait must expect that.
+      expect(mocks.restartDashboard.mock.calls[0][2]).toMatchObject({
+        expectedIdentity: { repoRoot: '/repo', mode: 'peer' },
+      });
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it('lets explicit --deacon/--resume flags override the carried gates', async () => {
+      mocks.readRunningDashboardBootGates.mockResolvedValue(OFF_BY_FLAG);
+
+      await reloadCommand({ skipBuild: true, deacon: true, resume: true });
+
+      expect(spawnOptionsOfReload()).toMatchObject({
+        deacon: true,
+        resume: true,
+        inheritBootGates: OFF_BY_FLAG,
+      });
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining(
+        'Boot gates: deacon=on source=flag resume=on source=flag',
+      ));
+      expect(mocks.restartDashboard.mock.calls[0][2]).toMatchObject({
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      });
+    });
+
+    it('still reloads when the running dashboard does not report its gates', async () => {
+      mocks.readRunningDashboardBootGates.mockResolvedValue(null);
+
+      await reloadCommand({ skipBuild: true });
+
+      expect(spawnOptionsOfReload()).toMatchObject({ inheritBootGates: null });
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('running dashboard did not report its gates'));
+      expect(process.exitCode).toBeUndefined();
+    });
+
   });
 
   it('cleans up the detached worktree and preserves the running server when worktree build fails', async () => {

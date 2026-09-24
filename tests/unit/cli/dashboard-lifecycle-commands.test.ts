@@ -100,3 +100,17 @@ describe('dashboard lifecycle verbs reject stray positionals (PAN-3912)', () => 
     expect(mocks.upAction).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('pan reload boot-gate flags (PAN-3899)', () => {
+  it('leaves the gates unset without flags, so reload carries the running dashboard\'s gates', async () => {
+    await parse('reload');
+    expect(mocks.reloadCommand.mock.calls[0][0]).toEqual({});
+  });
+
+  it('accepts --no-deacon/--no-resume and --deacon/--resume', async () => {
+    await parse('reload', '--no-deacon', '--no-resume');
+    await parse('reload', '--deacon', '--resume');
+    expect(mocks.reloadCommand.mock.calls[0][0]).toEqual({ deacon: false, resume: false });
+    expect(mocks.reloadCommand.mock.calls[1][0]).toEqual({ deacon: true, resume: true });
+  });
+});
