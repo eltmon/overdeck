@@ -141,6 +141,23 @@ function processTranscriptEntry(state: AcpParserState, entry: AcpTranscriptEntry
     }
     state.pendingToolUse.clear();
     if (entry.event === 'turn_completed') return;
+    // PAN-3890: a rejected prompt (e.g. an opencode provider stream error such
+    // as "Rate limit exceeded") is an error row, not a system/permissions row.
+    const message = entry.content.trim();
+    if (!message) return;
+    state.sequence += 1;
+    state.workLog.push({
+      id: `acp-prompt-failed-${state.sequence}`,
+      createdAt,
+      label: 'Prompt failed',
+      toolTitle: 'Prompt failed',
+      tone: 'error',
+      sequence: state.sequence,
+      detail: message,
+      result: message,
+    });
+    state.lastRole = entry.role;
+    return;
   }
 
   if (entry.role === 'assistant') {

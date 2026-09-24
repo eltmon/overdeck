@@ -357,10 +357,62 @@ describe('parseAcpConversationMessages', () => {
 
     expect(result.pendingToolUse.size).toBe(0);
     expect(result.lastTurnCompletedAt).toBe('2026-07-18T10:00:01.000Z');
-    expect(result.messages.at(-1)).toEqual(expect.objectContaining({
-      role: 'system',
-      text: 'provider rejected prompt',
+    expect(result.workLog.at(-1)).toEqual(expect.objectContaining({
+      tone: 'error',
+      result: 'provider rejected prompt',
     }));
+  });
+
+  it('surfaces an opencode provider stream error as an error row, not a system row (PAN-3890)', async () => {
+    const error = 'Internal error: Error from provider (Console): Rate limit exceeded. Please try again later.';
+    const path = await writeTranscript([
+      {
+        timestamp: '2026-09-18T02:36:40.000Z',
+        role: 'system',
+        content: 'check the build',
+        source: 'orchestrator',
+        promptId: 'p1',
+        event: 'prompt_queued',
+      },
+      {
+        timestamp: '2026-09-18T02:36:40.001Z',
+        role: 'user',
+        content: 'check the build',
+        source: 'orchestrator',
+        promptId: 'p1',
+      },
+      {
+        timestamp: '2026-09-18T02:36:45.000Z',
+        role: 'assistant',
+        content: 'Running typecheck.',
+        source: 'agent',
+      },
+      {
+        timestamp: '2026-09-18T02:39:00.251Z',
+        role: 'system',
+        content: error,
+        source: 'agent',
+        promptId: 'p1',
+        event: 'prompt_failed',
+      },
+    ]);
+
+    const result = await parseAcpConversationMessages(path);
+
+    expect(result.messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    expect(result.messages.some((message) => message.text.includes('Rate limit exceeded'))).toBe(false);
+    expect(result.workLog).toEqual([
+      expect.objectContaining({
+        createdAt: '2026-09-18T02:39:00.251Z',
+        label: 'Prompt failed',
+        tone: 'error',
+        detail: error,
+        result: error,
+      }),
+    ]);
+    expect(result.workLog[0]!.sequence).toBeGreaterThan(result.messages[1]!.sequence!);
+    expect(result.streaming).toBe(false);
+    expect(result.lastTurnCompletedAt).toBe('2026-09-18T02:39:00.251Z');
   });
 
   it('marks completed and failed tool updates terminal', async () => {
