@@ -72,6 +72,7 @@ function isTranscriptEntry(value: unknown): value is AcpTranscriptEntry {
     && typeof entry['content'] === 'string'
     && (entry['role'] === 'user'
       || entry['role'] === 'assistant'
+      || entry['role'] === 'thought'
       || entry['role'] === 'tool'
       || entry['role'] === 'system');
 }
@@ -164,6 +165,32 @@ function processTranscriptEntry(state: AcpParserState, entry: AcpTranscriptEntry
       });
     }
     state.currentTurnAssistantIndex = state.messages.length - 1;
+    state.lastRole = entry.role;
+    return;
+  }
+
+  if (entry.role === 'thought') {
+    // Same work-log shape the Claude Code parser emits for `thinking` blocks,
+    // so the feed renders it as an expandable thinking row.
+    if (!entry.content) return;
+    const previousIndex = state.workLog.length - 1;
+    const previous = state.lastRole === 'thought' ? state.workLog[previousIndex] : undefined;
+    if (previous?.tone === 'thinking') {
+      state.workLog[previousIndex] = {
+        ...previous,
+        detail: (previous.detail ?? '') + entry.content,
+      };
+    } else {
+      state.sequence += 1;
+      state.workLog.push({
+        id: `acp-thinking-${state.sequence}`,
+        createdAt,
+        label: 'thinking',
+        detail: entry.content,
+        tone: 'thinking',
+        sequence: state.sequence,
+      });
+    }
     state.lastRole = entry.role;
     return;
   }

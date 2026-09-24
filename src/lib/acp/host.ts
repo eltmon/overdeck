@@ -433,6 +433,15 @@ export class AcpHost {
       });
       return;
     }
+    if (event._tag === "ThoughtDelta") {
+      await this.transcript.append({
+        role: "thought",
+        content: event.text,
+        sessionId: this.sessionId,
+        source: "agent",
+      });
+      return;
+    }
     if (event._tag === "ToolCallUpdated") {
       await this.transcript.append({
         role: "tool",

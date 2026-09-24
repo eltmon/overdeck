@@ -19,7 +19,9 @@ import {
   type AcpHostRuntime,
   parseAcpHostArgs,
   reserveOpenCodePort} from "../host.js";
+import { parseSessionUpdateEvent } from "../runtime-model.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
+import { parseAcpConversationMessages } from "../../../dashboard/server/services/acp-conversation-parser.js";
 import { readSessionIndex } from "../../session-history.js";
 
 // Moved here from src/lib/acp/host.ts, which no production code called (PAN-3958 CH-8).
@@ -40,6 +42,8 @@ interface StubRuntimeOptions {
   readonly configOptions?: EffectAcpSchema.SessionConfigOption[];
   readonly configError?: Error;
   readonly assistantResponse?: string;
+  /** Streamed as ACP `agent_thought_chunk` updates before the assistant response. */
+  readonly thoughtResponse?: ReadonlyArray<string>;
   readonly updateDuringStart?: string;
   readonly startError?: Error;
   readonly promptError?: Error;
@@ -134,6 +138,16 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
         if (options.promptError && remainingPromptErrors > 0) {
           remainingPromptErrors -= 1;
           return yield* Effect.fail(options.promptError);
+        }
+        for (const thought of options.thoughtResponse ?? []) {
+          const parsed = parseSessionUpdateEvent({
+            sessionId,
+            update: {
+              sessionUpdate: "agent_thought_chunk",
+              content: { type: "text", text: thought },
+            },
+          });
+          for (const event of parsed.events) yield* Queue.offer(events, event);
         }
         if (options.assistantResponse) {
           yield* Queue.offer(events, {
@@ -580,6 +594,48 @@ describe("AcpHost", () => {
     ]);
     expect(output.text()).toContain("[user] hello agent");
     expect(output.text()).toContain("[assistant] hello from kimi");
+  });
+
+  it("records ACP agent thoughts as a thought role that the feed renders as a thinking row", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime({
+      thoughtResponse: ["Weighing the ", "two options"],
+      assistantResponse: "Option B",
+    });
+    const output = makeOutput();
+    const host = new AcpHost({
+      agentId: "agent-thoughts",
+      provider: "opencode",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+      stdout: output.writable,
+    });
+    hosts.push(host);
+    await host.start();
+
+    const agentDir = join(overdeckHome, "agents", "agent-thoughts");
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-thoughts.sock");
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+    await postSocket(socketPath, token, { op: "message", content: "pick one" });
+    await host.waitForIdle();
+
+    const transcriptPath = join(agentDir, "acp-session.jsonl");
+    const transcript = (await readFile(transcriptPath, "utf-8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(transcript.filter((entry) => entry.role === "thought")).toEqual([
+      expect.objectContaining({ content: "Weighing the ", sessionId: "acp-session-1", source: "agent" }),
+      expect.objectContaining({ content: "two options", sessionId: "acp-session-1", source: "agent" }),
+    ]);
+    expect(output.text()).toContain("[thinking] Weighing the ");
+
+    const parsed = await parseAcpConversationMessages(transcriptPath);
+    expect(parsed.workLog).toEqual([
+      expect.objectContaining({ label: "thinking", tone: "thinking", detail: "Weighing the two options" }),
+    ]);
+    expect(parsed.messages.find((message) => message.role === "assistant")?.text).toBe("Option B");
   });
 
   it("injects materialized Overdeck context into the first fresh prompt only", async () => {
