@@ -18,6 +18,11 @@ mkdirSync(overdeckHome, { recursive: true });
 // no-real-home-writes.ts protects it. Kept apart from OVERDECK_HOME so the
 // temp home's `.overdeck` is never the test's Overdeck home.
 process.env.OVERDECK_TEST_REAL_HOME ??= homedir();
+// Browsers installed under the real home's cache stay usable.
+process.env.PLAYWRIGHT_BROWSERS_PATH ??= join(
+  process.env.XDG_CACHE_HOME ?? join(process.env.OVERDECK_TEST_REAL_HOME, '.cache'),
+  'ms-playwright',
+);
 const testHome = join(runRoot, `home-${workerId}`);
 process.env.HOME = testHome;
 mkdirSync(testHome, { recursive: true });
