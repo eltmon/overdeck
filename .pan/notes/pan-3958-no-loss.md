@@ -1525,8 +1525,7 @@ comment). Both had no production caller since the PAN-3917 cut and are deleted, 
 
 ### Tests
 
-The diff removes 443 `it`/`test` calls (1,308 → 865 in the touched files) and adds one (the ported
-`resolveIssueMemoryRoot` check). Every removed test exercised a deleted subject. The ports above keep the tests of
+Across the touched test files, `it`/`test` calls go from 1,308 to 864 (after the #4051 review restores below). Every removed test exercised a deleted subject. The ports above keep the tests of
 live code. Whole test files deleted with a deleted module are exempt from the test-skip gate; the rest need
 `pan verify waive-test-removal 4014 --reason "PAN-3958 deleted subject, see no-loss ledger"` at the pushed HEAD.
 
