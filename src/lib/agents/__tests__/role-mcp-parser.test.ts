@@ -20,7 +20,7 @@ mcpServers:
 Test role body.
 `;
 
-describe('parseRoleMcpServersSync', () => {
+describe('parseRoleMcpServers', () => {
   let tempDir: string;
   let previousOverdeckHome: string | undefined;
   let previousHome: string | undefined;

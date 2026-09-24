@@ -28,7 +28,7 @@ vi.mock('../projects.js', async (importOriginal) => {
 
 import { parseGitHubRepos } from '../tracker-utils.js';
 
-describe('parseGitHubReposSync (PAN-2449)', () => {
+describe('parseGitHubRepos (PAN-2449)', () => {
   beforeEach(() => {
     mocks.envContent = '';
     mocks.projects = {};

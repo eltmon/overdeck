@@ -7,11 +7,11 @@ import { EventStoreService } from '../../services/domain-services.js'
 const mocks = vi.hoisted(() => ({
   getAgentState: vi.fn(),
   wipeAgentStateDirs: vi.fn(),
-  canUseHarnessSync: vi.fn(),
+  canUseHarness: vi.fn(),
   getProviderAuthMode: vi.fn(),
   killSession: vi.fn(),
   detectPendingOperatorDecision: vi.fn(),
-  getIssueStageSync: vi.fn(),
+  getIssueStage: vi.fn(),
   getWorkAgentLifecycleState: vi.fn(),
   appendAgentLifecycleLog: vi.fn(),
   invalidateAgentsCache: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/agents.js')>()
   return {
     ...actual,
-    getAgentStateSync: mocks.getAgentState,
+    getAgentState: mocks.getAgentState,
     wipeAgentStateDirs: mocks.wipeAgentStateDirs,
     getProviderAuthMode: mocks.getProviderAuthMode,
     saveAgentStateSync: mocks.saveAgentStateSync,
@@ -34,7 +34,7 @@ vi.mock('../../../../lib/harness-policy.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/harness-policy.js')>()
   return {
     ...actual,
-    canUseHarnessSync: mocks.canUseHarnessSync,
+    canUseHarness: mocks.canUseHarness,
   }
 })
 
@@ -58,7 +58,7 @@ vi.mock('../../../../lib/overdeck/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/overdeck/agents.js')>()
   return {
     ...actual,
-    getIssueStageSync: mocks.getIssueStageSync,
+    getIssueStage: mocks.getIssueStage,
   }
 })
 
@@ -126,7 +126,7 @@ describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getAgentState.mockReturnValue(agentState as any)
-    mocks.getIssueStageSync.mockReturnValue(null)
+    mocks.getIssueStage.mockReturnValue(null)
     mocks.detectPendingOperatorDecision.mockResolvedValue(null)
     mocks.getWorkAgentLifecycleState.mockResolvedValue({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
@@ -144,7 +144,7 @@ describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837
   })
 
   it('returns 400 with the policy reason and never kills the session or wipes state when the explicit harness/model pair is denied', async () => {
-    mocks.canUseHarnessSync.mockReturnValue({ allowed: false, reason: 'Kimi Code harness runs Kimi models only.' })
+    mocks.canUseHarness.mockReturnValue({ allowed: false, reason: 'Kimi Code harness runs Kimi models only.' })
 
     const response = await postRestartFresh({ spawn: true, harness: 'kimi-code', model: 'claude-sonnet-5' })
 
@@ -159,7 +159,7 @@ describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837
   })
 
   it('kills the session and wipes state only after an allowed harness/model pair', async () => {
-    mocks.canUseHarnessSync.mockReturnValue({ allowed: true })
+    mocks.canUseHarness.mockReturnValue({ allowed: true })
 
     const response = await postRestartFresh({ spawn: false, harness: 'kimi-code', model: 'kimi-code/k3' })
 

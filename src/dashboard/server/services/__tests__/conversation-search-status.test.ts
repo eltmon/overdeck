@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { config, provider, stats } = vi.hoisted(() => ({
   config: vi.fn(), provider: vi.fn(), stats: vi.fn(),
 }));
-vi.mock('../../../../lib/config-yaml.js', () => ({ getConversationSearchConfigSync: config }));
+vi.mock('../../../../lib/config-yaml.js', () => ({ getConversationSearchConfig: config }));
 vi.mock('../../../../lib/conversation-search/embedding-provider.js', () => ({ createConversationEmbeddingProvider: provider }));
 vi.mock('../dashboard-poll-snapshots.js', () => ({ getConversationSearchStatsSnapshot: stats }));
 import { getConversationSearchStatus } from '../conversation-search-status.js';

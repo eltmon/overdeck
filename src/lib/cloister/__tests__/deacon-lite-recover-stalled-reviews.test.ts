@@ -18,14 +18,14 @@ const mocks = vi.hoisted(() => ({
   listWorkspaces: vi.fn(),
   recoverMissingConvoyReviewers: vi.fn(),
   getRequestReviewStarter: vi.fn(),
-  notifyPipelineSync: vi.fn(),
+  notifyPipeline: vi.fn(),
 }));
 
 vi.mock('../../terminal-backends/inventory.js', () => ({ liveAgentInventory: mocks.liveAgentInventory }));
 vi.mock('../../workspaces/resolver.js', () => ({ listWorkspaces: mocks.listWorkspaces }));
 vi.mock('../review-convoy.js', () => ({ recoverMissingConvoyReviewers: mocks.recoverMissingConvoyReviewers }));
 vi.mock('../request-review-pipeline.js', () => ({ getRequestReviewStarter: mocks.getRequestReviewStarter }));
-vi.mock('../../pipeline-notifier.js', () => ({ notifyPipelineSync: mocks.notifyPipelineSync }));
+vi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: mocks.notifyPipeline }));
 
 const { appendPipelineEntry, readPipelineJournal } = await import('../pipeline-journal.js');
 const { recoverStalledReviews, __resetStalledReviewCooldownForTests } = await import('../deacon-lite.js');

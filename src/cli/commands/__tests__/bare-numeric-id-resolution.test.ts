@@ -2,11 +2,11 @@ import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const issueIdMocks = vi.hoisted(() => ({
-  resolveBareNumericIdSync: vi.fn(),
+  resolveBareNumericId: vi.fn(),
 }));
 
 const agentMocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   setAgentPaused: vi.fn(),
   clearAgentPaused: vi.fn(),
   clearAgentTroubled: vi.fn(),
@@ -20,7 +20,7 @@ const tmuxMocks = vi.hoisted(() => ({
 const projectMocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   extractTeamPrefix: vi.fn(),
-  findProjectByTeamSync: vi.fn(),
+  findProjectByTeam: vi.fn(),
 }));
 
 const workspaceMocks = vi.hoisted(() => ({
@@ -47,9 +47,9 @@ const inspectMocks = vi.hoisted(() => ({
 }));
 
 const trackerMocks = vi.hoisted(() => ({
-  resolveTrackerTypeSync: vi.fn(),
-  isGitHubIssueSync: vi.fn(),
-  resolveGitHubIssueSync: vi.fn(),
+  resolveTrackerType: vi.fn(),
+  isGitHubIssue: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
 }));
 
 const fsMocks = vi.hoisted(() => ({
@@ -65,7 +65,7 @@ const childProcessMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../lib/issue-id.js', () => ({
-  resolveBareNumericIdSync: issueIdMocks.resolveBareNumericIdSync,
+  resolveBareNumericId: issueIdMocks.resolveBareNumericId,
 }));
 
 vi.mock('../../../lib/agents.js', () => {
@@ -77,16 +77,16 @@ vi.mock('../../../lib/agents.js', () => {
     return lower === 'flywheel-orchestrator' || AGENT_PREFIXES.some(p => lower.startsWith(p));
   };
   return {
-    getAgentStateSync: agentMocks.getAgentStateSync,
+    getAgentState: agentMocks.getAgentState,
     setAgentPaused: agentMocks.setAgentPaused,
     clearAgentPaused: agentMocks.clearAgentPaused,
     clearAgentTroubled: agentMocks.clearAgentTroubled,
     stopAgent: agentMocks.stopAgent,
     isQualifiedAgentId,
     normalizeAgentId: (id: string) => (isQualifiedAgentId(id) ? id : `agent-${id.toLowerCase()}`),
-    resolveAgentTargetSync: (input: string) => {
+    resolveAgentTarget: (input: string) => {
       if (isQualifiedAgentId(input)) return input.toLowerCase();
-      const issueId = issueIdMocks.resolveBareNumericIdSync(input);
+      const issueId = issueIdMocks.resolveBareNumericId(input);
       return issueId ? `agent-${String(issueId).toLowerCase()}` : null;
     },
   };
@@ -105,7 +105,7 @@ vi.mock('../../../lib/tmux.js', () => ({
 vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssueSync: projectMocks.resolveProjectFromIssueSync,
   extractTeamPrefix: projectMocks.extractTeamPrefix,
-  findProjectByTeamSync: projectMocks.findProjectByTeamSync,
+  findProjectByTeam: projectMocks.findProjectByTeam,
 }));
 
 vi.mock('../../../lib/workspace-manager.js', () => ({
@@ -150,9 +150,9 @@ vi.mock('../../../lib/xbrief/io.js', () => ({
 }));
 
 vi.mock('../../../lib/tracker-utils.js', () => ({
-  resolveTrackerTypeSync: trackerMocks.resolveTrackerTypeSync,
-  isGitHubIssueSync: trackerMocks.isGitHubIssueSync,
-  resolveGitHubIssueSync: trackerMocks.resolveGitHubIssueSync,
+  resolveTrackerType: trackerMocks.resolveTrackerType,
+  isGitHubIssue: trackerMocks.isGitHubIssue,
+  resolveGitHubIssue: trackerMocks.resolveGitHubIssue,
 }));
 
 vi.mock('../../../lib/shadow-utils.js', () => ({
@@ -165,7 +165,7 @@ vi.mock('../../../lib/cloister/work-agent-prompt.js', () => ({
 
 vi.mock('../../../lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/config.js')>()),
-  getDashboardApiUrlSync: vi.fn(() => 'http://dashboard.test'),
+  getDashboardApiUrl: vi.fn(() => 'http://dashboard.test'),
 }));
 
 vi.mock('@overdeck/contracts', () => ({
@@ -199,7 +199,7 @@ vi.mock('child_process', () => ({
   exec: childProcessMocks.exec,
 }));
 
-describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
+describe('resolveBareNumericId rollout (PAN-1173)', () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
   let warnSpy: ReturnType<typeof vi.spyOn>;
@@ -207,10 +207,10 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
   beforeEach(() => {
     vi.resetModules();
-    issueIdMocks.resolveBareNumericIdSync.mockReset();
-    issueIdMocks.resolveBareNumericIdSync.mockReturnValue('PAN-9999');
-    agentMocks.getAgentStateSync.mockReset();
-    agentMocks.getAgentStateSync.mockReturnValue({
+    issueIdMocks.resolveBareNumericId.mockReset();
+    issueIdMocks.resolveBareNumericId.mockReturnValue('PAN-9999');
+    agentMocks.getAgentState.mockReset();
+    agentMocks.getAgentState.mockReturnValue({
       issueId: 'PAN-9999',
       status: 'stopped',
       paused: true,
@@ -231,8 +231,8 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project', projectKey: 'overdeck' });
     projectMocks.extractTeamPrefix.mockReset();
     projectMocks.extractTeamPrefix.mockReturnValue(null);
-    projectMocks.findProjectByTeamSync.mockReset();
-    projectMocks.findProjectByTeamSync.mockReturnValue(null);
+    projectMocks.findProjectByTeam.mockReset();
+    projectMocks.findProjectByTeam.mockReturnValue(null);
     workspaceMocks.stopWorkspaceDocker.mockReset();
     workspaceMocks.stopWorkspaceDocker.mockResolvedValue({ containersFound: false, steps: [] });
     workspaceMocks.findWorkspacePath.mockReset();
@@ -255,12 +255,12 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
       diffCommand: 'git diff abcdef123456...HEAD',
       repos: [],
     }));
-    trackerMocks.resolveTrackerTypeSync.mockReset();
-    trackerMocks.resolveTrackerTypeSync.mockReturnValue('rally');
-    trackerMocks.isGitHubIssueSync.mockReset();
-    trackerMocks.isGitHubIssueSync.mockReturnValue(true);
-    trackerMocks.resolveGitHubIssueSync.mockReset();
-    trackerMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 9999 });
+    trackerMocks.resolveTrackerType.mockReset();
+    trackerMocks.resolveTrackerType.mockReturnValue('rally');
+    trackerMocks.isGitHubIssue.mockReset();
+    trackerMocks.isGitHubIssue.mockReturnValue(true);
+    trackerMocks.resolveGitHubIssue.mockReset();
+    trackerMocks.resolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 9999 });
     fsMocks.existsSync.mockReset();
     fsMocks.existsSync.mockImplementation((path: string) => !path.endsWith('.overdeck.env'));
     fsMocks.readFileSync.mockReset();
@@ -306,7 +306,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     await killCommand('9999', {});
 
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
+    expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
     expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-9999', 'operator');
   });
 
@@ -315,7 +315,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     await pauseCommand('9999', { reason: 'operator' });
 
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
+    expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
     expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-9999', 'operator', false);
   });
 
@@ -324,7 +324,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     await unpauseCommand('9999');
 
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
+    expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
     expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('agent-pan-9999');
   });
 
@@ -333,8 +333,8 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     await expect(reopenCommand('9999', { force: true })).rejects.toThrow('process.exit:1');
 
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
-    expect(trackerMocks.resolveTrackerTypeSync).toHaveBeenCalledWith('PAN-9999');
+    expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
+    expect(trackerMocks.resolveTrackerType).toHaveBeenCalledWith('PAN-9999');
   });
 
   it('resolves bare numeric input before pan close resolves the project', async () => {
@@ -342,7 +342,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     await closeOutCommand('9999', { force: true, json: true });
 
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
+    expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
     expect(lifecycleMocks.closeOut).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-9999' }),
@@ -355,7 +355,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     await openCommand('9999', { editor: 'code' });
 
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
+    expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
     expect(childProcessMocks.spawn).toHaveBeenCalledWith('code', ['/tmp/project/workspaces/feature-pan-9999'], expect.any(Object));
   });
@@ -365,7 +365,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     await reviewRestartCommand('9999');
 
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
+    expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
     expect(fetch).toHaveBeenCalledWith('http://dashboard.test/api/specialists/overdeck/PAN-9999/review/restart', expect.any(Object));
   });
@@ -409,7 +409,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
   });
 
   it('prints the shared unresolved-ID error path for pan kill', async () => {
-    issueIdMocks.resolveBareNumericIdSync.mockReturnValue(null);
+    issueIdMocks.resolveBareNumericId.mockReturnValue(null);
     const { killCommand } = await import('../kill.js');
 
     await expect(killCommand('9999', {})).rejects.toThrow('process.exit:1');
@@ -419,7 +419,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
   });
 
   it('prints the shared unresolved-ID error path for pan pause', async () => {
-    issueIdMocks.resolveBareNumericIdSync.mockReturnValue(null);
+    issueIdMocks.resolveBareNumericId.mockReturnValue(null);
     const { pauseCommand } = await import('../pause.js');
 
     await expect(pauseCommand('9999', {})).rejects.toThrow('process.exit:1');
@@ -429,7 +429,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
   });
 
   it('prints the shared unresolved-ID error path for pan review restart', async () => {
-    issueIdMocks.resolveBareNumericIdSync.mockReturnValue(null);
+    issueIdMocks.resolveBareNumericId.mockReturnValue(null);
     const { reviewRestartCommand } = await import('../review-restart.js');
 
     await expect(reviewRestartCommand('9999')).rejects.toThrow('process.exit:1');

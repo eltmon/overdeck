@@ -44,7 +44,7 @@ vi.mock('../../../../src/lib/agents/messaging.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -75,7 +75,7 @@ vi.mock('../../../../src/lib/cloister/swarm-slot-reconcile.js', () => ({
 }));
 
 // The pipeline journal is real (temp workspaces); only its event fan-out is silenced.
-vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipelineSync: vi.fn() }));
+vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 
 describe('deliverReviewVerdictFeedback', () => {
   beforeEach(() => {

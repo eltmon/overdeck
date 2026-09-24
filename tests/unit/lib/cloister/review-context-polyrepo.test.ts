@@ -10,14 +10,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const repoRootsMock = vi.hoisted(() => ({
-  resolveWorkspaceRepoRootsSync: vi.fn(),
+  resolveWorkspaceRepoRoots: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', async () => {
   const actual = await vi.importActual<typeof import('../../../../src/lib/project-repos.js')>('../../../../src/lib/project-repos.js');
   return {
     ...actual,
-    resolveWorkspaceRepoRootsSync: repoRootsMock.resolveWorkspaceRepoRootsSync,
+    resolveWorkspaceRepoRoots: repoRootsMock.resolveWorkspaceRepoRoots,
   };
 });
 
@@ -64,7 +64,7 @@ describe('buildReviewContext (polyrepo)', () => {
     makeRepo(feDir, 'src/view.tsx', true);
     makeRepo(apiDir, 'src/handler.ts', false); // untouched sub-repo — empty diff
 
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReturnValue([
       { repoKey: 'fe', dir: feDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: true },
       { repoKey: 'api', dir: apiDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: true },
     ]);
@@ -98,7 +98,7 @@ describe('buildReviewContext (polyrepo)', () => {
     const repoDir = join(workspace, 'code');
     makeRepo(repoDir, 'src/index.ts', true);
 
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReturnValue([
       { repoKey: 'code', dir: repoDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: false },
     ]);
 

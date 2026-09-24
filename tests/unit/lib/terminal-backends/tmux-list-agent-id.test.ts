@@ -21,7 +21,7 @@ vi.mock('../../../../src/lib/agents/liveness.js', () => ({
   isIdle: () => false,
 }));
 vi.mock('../../../../src/lib/agents/agent-state-read.js', () => ({
-  getAgentStateSync: (name: string) => (name === 'custom-with-state'
+  getAgentState: (name: string) => (name === 'custom-with-state'
     ? { issueId: 'PAN-2', role: 'work', model: 'm', harness: 'claude-code' }
     : null),
 }));

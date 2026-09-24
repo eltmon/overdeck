@@ -1,6 +1,6 @@
 /**
  * POST /api/internal/pipeline/notify — the cross-process bridge for
- * `notifyPipelineSync()`.
+ * `notifyPipeline()`.
  *
  * Lived in merge-ops.ts by accident of history and has nothing to do with
  * merging; extracted here so the merge god file shrinks and this route reads
@@ -15,11 +15,11 @@ import { readJsonBody } from '../workspaces.js';
 
 // ─── Route: POST /api/internal/pipeline/notify ────────────────────────────────
 //
-// Cross-process bridge for `notifyPipelineSync()` (PAN-891, expanded in PAN-915).
+// Cross-process bridge for `notifyPipeline()` (PAN-891, expanded in PAN-915).
 //
-// `notifyPipelineSync` is an in-process handler registry; only the dashboard server
+// `notifyPipeline` is an in-process handler registry; only the dashboard server
 // registers a handler. CLI processes (e.g. `pan review run`) write to shared
-// state and call `notifyPipelineSync()`, which is a no-op in their own process.
+// state and call `notifyPipeline()`, which is a no-op in their own process.
 // This endpoint lets them poke the dashboard so it re-emits the corresponding
 // domain event into the live event stream.
 //
@@ -43,7 +43,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     // Shared-secret check (PAN-891 review feedback). The dashboard binds 0.0.0.0
     // by default, so this stateful endpoint must be unreachable without the
-    // server-issued token. Same token is read by CLI senders via getInternalTokenSync().
+    // server-issued token. Same token is read by CLI senders via getInternalToken().
     const request = yield* HttpServerRequest.HttpServerRequest;
     const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
       import('../../../../lib/internal-token.js'),
@@ -90,7 +90,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId) {
           return jsonResponse({ ok: false, error: `${type} requires issueId` }, 400);
         }
-        // PAN-1988: this MUST be notifyPipelineSync (the imported function). The bare
+        // PAN-1988: this MUST be notifyPipeline (the imported function). The bare
         // `notifyPipeline` (the Effect variant) is not imported here, so it threw
         // "notifyPipeline is not defined" and silently dropped EVERY forwarded review.approved /
         // test.passed event — breaking the reactive review→test and test→ship handoffs for any

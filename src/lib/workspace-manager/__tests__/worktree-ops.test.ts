@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isPreWorktreeMetadataOnlyDir, stagePreWorktreeMetadata } from '../worktree-ops.js';
 
-describe('isPreWorktreeMetadataOnlyDir / stagePreWorktreeMetadataSync', () => {
+describe('isPreWorktreeMetadataOnlyDir / stagePreWorktreeMetadata', () => {
   let workspacePath: string;
   const cleanup: string[] = [];
 

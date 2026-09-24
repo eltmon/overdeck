@@ -170,7 +170,7 @@ describe('per-repo generation round-trip', () => {
     expect(getUatGeneration(gen.name)!.repos!.map((r) => r.repoKey)).toEqual(['fe', 'api']);
   });
 
-  it('carries repos through listUatGenerationsSync', () => {
+  it('carries repos through listUatGenerations', () => {
     const db = odb.raw();
     seedIssue(db, 'MIN-901');
     seedIssue(db, 'MIN-902');
@@ -248,7 +248,7 @@ describe('legacy and monorepo rows synthesize a single repo', () => {
   });
 });
 
-describe('updateUatGenerationSync with per-repo state', () => {
+describe('updateUatGeneration with per-repo state', () => {
   it('replaces repo rows when repos are patched', () => {
     const db = odb.raw();
     seedIssue(db, 'MIN-901');
@@ -341,7 +341,7 @@ describe('per-repo target branch and merge sha', () => {
   });
 });
 
-describe('markUatGenerationRepoPromotedSync', () => {
+describe('markUatGenerationRepoPromoted', () => {
   it('stamps promoted_at on one repo and leaves the others pending', () => {
     const db = odb.raw();
     seedIssue(db, 'MIN-901');

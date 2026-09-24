@@ -14,7 +14,7 @@ vi.mock('../../../../lib/tmux.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../lib/tmux.js')>('../../../lib/tmux.js');
   return {
     ...actual,
-    findManagedServerPidSync: vi.fn(),
+    findManagedServerPid: vi.fn(),
   };
 });
 

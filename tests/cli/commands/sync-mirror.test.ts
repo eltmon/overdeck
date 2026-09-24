@@ -48,39 +48,29 @@ const mockSpinnerWarn = vi.fn();
 
 vi.mock('../../../src/lib/sync.js', () => ({
   planSync: mockPlanSync,
-  planSyncSync: mockPlanSync,
   executeSync: mockExecuteSync,
-  executeSyncSync: mockExecuteSync,
-  syncContextLayersSync: mockSyncContextLayers,
+  syncContextLayers: mockSyncContextLayers,
   refreshCache: mockRefreshCache,
-  refreshCacheSync: mockRefreshCache,
   migrateStalePersonalContent: mockMigrateStalePersonalContent,
-  migrateStalePersonalContentSync: mockMigrateStalePersonalContent,
   removeLegacySkills070: mockRemoveLegacySkills070,
-  removeLegacySkills070Sync: mockRemoveLegacySkills070,
   planHooksSync: mockPlanHooksSync,
-  planHooksSyncSync: mockPlanHooksSync,
   syncHooks: mockSyncHooks,
-  syncHooksSync: mockSyncHooks,
   syncStatusline: mockSyncStatusline,
-  syncStatuslineSync: mockSyncStatusline,
   mirrorProjectSkills: mockMirrorProjectSkills,
-  mirrorProjectSkillsSync: mockMirrorProjectSkills,
   syncPiSettings: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
-  syncPiSettingsSync: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
-  isStartupSyncNeededSync: mockStartupSyncNeeded,
-  writeSyncManifestSync: vi.fn(),
+  isStartupSyncNeeded: mockStartupSyncNeeded,
+  writeSyncManifest: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/harness-skill-sync.js', () => ({
-  executeAgentSkillsSync: mockExecuteAgentSkillsSync,
+  executeAgentSkills: mockExecuteAgentSkillsSync,
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: mockLoadConfig,
   loadConfigSync: mockLoadConfig,
   checkDevrootDeprecation: mockCheckDevrootDeprecation,
-  getDashboardApiUrlSync: vi.fn().mockReturnValue('http://localhost:3000'),
+  getDashboardApiUrl: vi.fn().mockReturnValue('http://localhost:3000'),
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
@@ -89,32 +79,25 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../src/lib/config-migration.js', () => ({
   cleanupLegacyRuntimeSymlinks: mockCleanupLegacyRuntimeSymlinks,
-  cleanupLegacyRuntimeSymlinksSync: mockCleanupLegacyRuntimeSymlinks,
   migrateSyncTargets: mockMigrateSyncTargets,
-  migrateSyncTargetsSync: mockMigrateSyncTargets,
 }));
 
 vi.mock('../../../src/lib/workspace-manager.js', () => ({
   migrateOverdeckToPan: mockMigrateOverdeckToPan,
-  migrateOverdeckToPanSync: mockMigrateOverdeckToPan,
 }));
 
 vi.mock('../../../src/lib/multi-tool-sync.js', () => ({
   runMultiToolSync: mockRunMultiToolSync,
-  runMultiToolSyncSync: mockRunMultiToolSync,
   resolveAlsoSyncTools: mockResolveAlsoSyncTools,
-  resolveAlsoSyncToolsSync: mockResolveAlsoSyncTools,
 }));
 
 vi.mock('../../../src/lib/claude-mcp.js', () => ({
   ensurePlaywrightIsolation: mockEnsurePlaywrightIsolation,
-  ensurePlaywrightIsolationSync: mockEnsurePlaywrightIsolation,
   ensureExcalidrawMcp: mockEnsureExcalidrawMcp,
-  ensureExcalidrawMcpSync: mockEnsureExcalidrawMcp,
 }));
 
 vi.mock('../../../src/lib/backup.js', () => ({
-  createBackupSync: mockCreateBackup,
+  createBackup: mockCreateBackup,
 }));
 
 vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({

@@ -17,9 +17,7 @@ import { Effect } from 'effect';
 
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
   logDeaconEvent: vi.fn(),
-  logDeaconEventSync: vi.fn(),
   logAgentLifecycle: vi.fn(),
-  logAgentLifecycleSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/review-lifecycle-guard.js', () => ({
@@ -33,7 +31,7 @@ vi.mock('../../../../src/lib/projects.js', async (importOriginal) => ({
 
 vi.mock('../../../../src/lib/agents/activity.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../src/lib/agents/activity.js')>()),
-  resolveLatestSessionIdSync: vi.fn(() => ({
+  resolveLatestSessionId: vi.fn(() => ({
     sessionId: 'sess-123',
     checked: ['mock'],
   })),

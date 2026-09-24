@@ -86,7 +86,7 @@ describe('readSettingsOrAbort', () => {
   });
 });
 
-describe('backupSettingsSync + pruneBackupsSync', () => {
+describe('backupSettings + pruneBackups', () => {
   let h: ReturnType<typeof makeTempDir>;
   beforeEach(() => { h = makeTempDir(); });
   afterEach(() => h.cleanup());
@@ -109,7 +109,7 @@ describe('backupSettingsSync + pruneBackupsSync', () => {
     const path = join(h.dir, 'settings.json');
     writeFileSync(path, '{}', 'utf-8');
     // Create 10 backups with sortable timestamps. We make them by hand
-    // (rather than calling backupSettingsSync 10 times) so the timestamps
+    // (rather than calling backupSettings 10 times) so the timestamps
     // are deterministic and we don't race the per-millisecond resolution.
     for (let i = 0; i < 10; i++) {
       const ts = `2026-05-${String(15 + i).padStart(2, '0')}T00-00-00-000Z`;
@@ -137,7 +137,7 @@ describe('backupSettingsSync + pruneBackupsSync', () => {
   });
 });
 
-describe('atomicWriteJsonSync', () => {
+describe('atomicWriteJson', () => {
   let h: ReturnType<typeof makeTempDir>;
   beforeEach(() => { h = makeTempDir(); });
   afterEach(() => h.cleanup());

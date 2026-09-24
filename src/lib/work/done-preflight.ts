@@ -1,3 +1,9 @@
+/**
+ * Sync twins (PAN-3958): `checkIncompletePlanItems` (sync: `checkIncompletePlanItemsSync`)
+ * exists because its only caller, `runPreflightChecks` below, calls it without awaiting
+ * (PAN-4002 renamed the stale `checkIncompletePlanItemsPromise` to the bare async name; the
+ * sync twin's own caller was not touched). Do not add new synchronous callers.
+ */
 import { exec } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

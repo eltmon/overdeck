@@ -25,7 +25,7 @@ describe('cv', () => {
     }
   });
 
-  it('readAgentCVSync returns null without creating a missing agents directory', async () => {
+  it('readAgentCV returns null without creating a missing agents directory', async () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'pan-2208-cv-'));
     const agentsDir = join(tempRoot, 'home', 'agents');
     const { readAgentCV } = await importCvWithAgentsDir(agentsDir);

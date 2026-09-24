@@ -37,7 +37,7 @@ vi.mock('../../../dashboard/server/services/conversation-eaten-message-watcher.j
   watchForEatenConversationMessage: vi.fn(),
 }));
 vi.mock('../../model-capabilities.js', () => ({
-  modelSupportsImagesSync: vi.fn(() => true),
+  modelSupportsImages: vi.fn(() => true),
 }));
 vi.mock('../../runtimes/behavior.js', () => ({
   getHarnessBehavior: vi.fn(() => ({
@@ -53,7 +53,7 @@ vi.mock('../../transcript-landing.js', () => ({
 }));
 vi.mock('../../agents.js', () => ({
   deliverAgentMessage: mocks.deliverAgentMessage,
-  getAgentStateSync: mocks.getAgentState,
+  getAgentState: mocks.getAgentState,
   injectPiConversationMemory: vi.fn(async (_context, message) => message),
   messageAgent: mocks.messageAgent,
 }));

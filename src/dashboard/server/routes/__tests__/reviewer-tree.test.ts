@@ -13,7 +13,7 @@ import { REVIEWER_ROLES, getReviewerSessionName } from '../../../../lib/cloister
 import { getAgentState } from '../../../../lib/agents.js';
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
 }));
 
 // buildReviewerNodes is gated by isExtendedReviewEnabled() (PAN-1981): convoy lanes
@@ -422,12 +422,12 @@ describe('buildReviewerNodes (PAN-830)', () => {
     expect(nodes.every(n => n.endedAt === undefined)).toBe(true);
   });
 
-  it('uses per-reviewer stoppedAt (via getAgentStateSync) instead of parent endedAt', async () => {
+  it('uses per-reviewer stoppedAt (via getAgentState) instead of parent endedAt', async () => {
     await seedAllStateRows();
     // Sub-reviewer finished early, parent (synthesizer) still active.
     // Without per-node endedAt, the frontend renders "Starting…" over the JSONL.
     const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
-    // PAN-1938: stoppedAt now read via getAgentStateSync (overdeck DB), not state.json directly.
+    // PAN-1938: stoppedAt now read via getAgentState (overdeck DB), not state.json directly.
     vi.mocked(getAgentState).mockImplementation((id) =>
       id === correctness
         ? { id: correctness, issueId: ISSUE_ID, role: 'review', model: 'sonnet', status: 'stopped', startedAt: '2026-01-01T00:00:00Z', workspace: WORKSPACE_PATH, stoppedAt: '2026-01-01T00:05:00Z' } as any

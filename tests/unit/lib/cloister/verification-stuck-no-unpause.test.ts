@@ -25,7 +25,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
-  getAgentStateSync: (id: string) => h.states.get(id) ?? null,
+  getAgentState: (id: string) => h.states.get(id) ?? null,
   messageAgent: h.messageAgent,
   setAgentPaused: (id: string, reason: string) => Effect.sync(() => {
     h.states.set(id, { ...(h.states.get(id) ?? { id }), paused: true, pausedReason: reason });
@@ -41,7 +41,7 @@ vi.mock('../../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
-  getAgentStateSync: (id: string) => h.states.get(id) ?? null,
+  getAgentState: (id: string) => h.states.get(id) ?? null,
   clearAgentPausedSync: (id: string, onlyIf?: (state: Record<string, unknown>) => boolean) => {
     const state = h.states.get(id);
     if (!state) return false;
@@ -72,7 +72,7 @@ vi.mock('../../../../src/lib/cloister/work-agent-start.js', () => ({
   spawnWorkAgentThroughAgentsEndpoint: vi.fn(async () => ({ spawned: false, error: 'not in this test' })),
 }));
 vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({ getPrFacts: vi.fn(async () => ({ merged: false })) }));
-vi.mock('../../../../src/lib/activity-logger.js', () => ({ emitActivityEntrySync: h.emitActivity }));
+vi.mock('../../../../src/lib/activity-logger.js', () => ({ emitActivityEntry: h.emitActivity }));
 
 import {
   deliverVerificationFeedback,

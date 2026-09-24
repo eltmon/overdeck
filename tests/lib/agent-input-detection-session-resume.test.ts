@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { detectAwaitingInputFromPane } from '../../src/lib/agent-input-detection.js'
 
-describe('detectAwaitingInputFromPaneSync — session_resume', () => {
+describe('detectAwaitingInputFromPane — session_resume', () => {
   it('detects "this session is still active" wording', () => {
     const pane = [
       'Starting Claude...',

@@ -115,7 +115,7 @@ describe('drainMailOnce', () => {
   });
 });
 
-describe('listInboxMessagesSync', () => {
+describe('listInboxMessages', () => {
   it('returns read + unread full bodies oldest-first under the limit, moving nothing', async () => {
     writeMail('2026-01-01T00-00-00-000Z.md', '# Message\n\nold\n');
     await drainMailOnce(AGENT_ID, () => {}); // moves "old" into read/

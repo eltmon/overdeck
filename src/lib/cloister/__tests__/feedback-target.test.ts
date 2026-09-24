@@ -36,7 +36,7 @@ vi.mock('../../projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'test', projectPath: '/repo' })),
   getProjectSync: vi.fn(() => null),
   // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByPath: vi.fn(() => null),
   resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
 }));
 
@@ -54,7 +54,7 @@ vi.mock('../deacon-swarm-record.js', () => ({
   readSwarmSlotAssignments: () => swarm.slots,
 }));
 vi.mock('../../agents/agent-state.js', () => ({
-  getAgentStateSync: (id: string) => {
+  getAgentState: (id: string) => {
     const state = agentState.states.get(id) ?? null;
     agentState.afterRead?.(id);
     return state;
@@ -83,9 +83,9 @@ vi.mock('../work-agent-start.js', () => ({
 
 // PAN-3917: surfaceIssueFeedbackNeedsYou announces on the activity stream —
 // there is no stuck flag and no verdict to restore.
-const activity = vi.hoisted(() => ({ emitActivityEntrySync: vi.fn() }));
+const activity = vi.hoisted(() => ({ emitActivityEntry: vi.fn() }));
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: activity.emitActivityEntrySync,
+  emitActivityEntry: activity.emitActivityEntry,
 }));
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -319,8 +319,8 @@ describe('surfaceIssueFeedbackNeedsYou (PAN-3917: an announcement, not a flag)',
   it('announces the reason and the issue on the activity stream', async () => {
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', { agentId: 'agent-pan-9999' });
 
-    expect(activity.emitActivityEntrySync).toHaveBeenCalledTimes(1);
-    expect(activity.emitActivityEntrySync).toHaveBeenCalledWith({
+    expect(activity.emitActivityEntry).toHaveBeenCalledTimes(1);
+    expect(activity.emitActivityEntry).toHaveBeenCalledWith({
       source: 'cloister',
       level: 'warn',
       issueId: ISSUE,
@@ -332,13 +332,13 @@ describe('surfaceIssueFeedbackNeedsYou (PAN-3917: an announcement, not a flag)',
   it('omits the details payload when there is nothing to attach', async () => {
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target');
 
-    expect(activity.emitActivityEntrySync).toHaveBeenCalledWith(
+    expect(activity.emitActivityEntry).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: ISSUE, details: undefined }),
     );
   });
 
   it('never throws when the announcement itself fails', async () => {
-    activity.emitActivityEntrySync.mockImplementationOnce(() => { throw new Error('feed unavailable'); });
+    activity.emitActivityEntry.mockImplementationOnce(() => { throw new Error('feed unavailable'); });
 
     await expect(
       surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', {}),

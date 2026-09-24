@@ -63,7 +63,7 @@ describe('findDraftPrd', () => {
   });
 });
 
-describe('findPrdAnywhereSync', () => {
+describe('findPrdAnywhere', () => {
   it('falls through to the canonical draft when no legacy status PRD exists', () => {
     const draftsDir = getDraftsDir(projectRoot);
     mkdirSync(draftsDir, { recursive: true });

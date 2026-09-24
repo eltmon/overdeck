@@ -34,7 +34,7 @@ describe('classifySessionBucket', () => {
   });
 });
 
-describe('findConversationForCostSessionSync', () => {
+describe('findConversationForCostSession', () => {
   let odb: OverdeckTestDb;
 
   beforeEach(() => {

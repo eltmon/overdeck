@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const notifySpy = vi.fn();
 vi.mock('../../pipeline-notifier.js', () => ({
-  notifyPipelineSync: (event: unknown) => notifySpy(event),
+  notifyPipeline: (event: unknown) => notifySpy(event),
 }));
 
 const {

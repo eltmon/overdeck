@@ -17,7 +17,7 @@ describe('bareKimiModel', () => {
   });
 });
 
-describe('parseKimiSessionSync (PAN-1837 wi8b, against the pinned wi-fixture)', () => {
+describe('parseKimiSession (PAN-1837 wi8b, against the pinned wi-fixture)', () => {
   it('ac1: produces a non-empty normalized summary whose turn count matches the fixture (2 turns)', () => {
     const usage = parseKimiSession(FIXTURE_PATH);
 

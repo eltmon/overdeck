@@ -50,7 +50,7 @@ function write(path: string, content: string): void {
   writeFileSync(path, content, 'utf-8');
 }
 
-describe('isStartupSyncNeededSync', () => {
+describe('isStartupSyncNeeded', () => {
   beforeAll(() => {
     dirs.base = mkdtempSync(join(tmpdir(), 'pan-sync-gate-'));
     dirs.overdeck = join(dirs.base, 'overdeck');

@@ -75,7 +75,7 @@ describe('golden per-agent codex home (PAN-4013)', () => {
     expect(entries.map((entry) => entry.transcriptPath)).toEqual([rollout]);
   });
 
-  it('resolveLatestSessionIdSync reads the thread id from the newest rollout in <agentDir>/codex-home', () => {
+  it('resolveLatestSessionId reads the thread id from the newest rollout in <agentDir>/codex-home', () => {
     const threadId = '019eaaec-4dfa-7ab1-90ba-9104d1650003';
     touch(rolloutFor('agent-golden-c', threadId),
       `${JSON.stringify({ type: 'session_meta', payload: { id: threadId } })}\n`);

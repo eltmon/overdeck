@@ -385,7 +385,7 @@ describe('createSession', () => {
   });
 });
 
-describe('findManagedServerPidSync', () => {
+describe('findManagedServerPid', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

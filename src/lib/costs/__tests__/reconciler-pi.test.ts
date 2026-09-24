@@ -4,7 +4,7 @@ import { extractPiCostEvents } from '../reconciler.js';
 
 // PAN-1935: pi/kimi work agents recorded $0 cost because (a) the reconciler
 // only scanned ~/.claude/projects/ (Claude Code) transcripts and only knew the
-// Anthropic usage shape, and (b) getPricingSync had no rows for glm-5.x /
+// Anthropic usage shape, and (b) getPricing had no rows for glm-5.x /
 // kimi-k2.7-code so even if usage were parsed, events were dropped. These tests
 // pin both the pricing table and the pi-shape extractor.
 
@@ -88,7 +88,7 @@ describe('PAN-1935: pi-harness cost capture', () => {
       expect(ev.sessionId).toBe(sessionId);
     });
 
-    it('computes cost correctly for glm-5.2 (matches calculateCostSync)', () => {
+    it('computes cost correctly for glm-5.2 (matches calculateCost)', () => {
       const usage: TokenUsage = { inputTokens: 18404, outputTokens: 234, cacheReadTokens: 9472, cacheWriteTokens: 0, cacheTTL: '5m' };
       const pricing = getPricing('custom', 'glm-5.2')!;
       const expected = calculateCost(usage, pricing);

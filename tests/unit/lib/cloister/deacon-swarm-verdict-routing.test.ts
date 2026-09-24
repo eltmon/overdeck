@@ -38,7 +38,7 @@ vi.mock('../../../../src/lib/agents/messaging.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({

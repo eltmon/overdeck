@@ -138,7 +138,7 @@ vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: mockResolveProjectReposForIssueSync,
+  resolveProjectReposForIssue: mockResolveProjectReposForIssueSync,
 }));
 
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
@@ -157,7 +157,7 @@ vi.mock('../../../../src/lib/agents/agent-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/agents/agent-state.js')>();
   return {
     ...actual,
-    clearAgentOperatorGatesForIssueSync: mockClearAgentOperatorGatesForIssueSync,
+    clearAgentOperatorGatesForIssue: mockClearAgentOperatorGatesForIssueSync,
   };
 });
 

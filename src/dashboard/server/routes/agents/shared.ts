@@ -274,7 +274,7 @@ function buildStoppedAgentLifecycle(
   const hasAgentState = true;
   const hasLiveTmuxSession = false;
   // claudeSessionId only covers claude-code agents — codex agents keep their
-  // resumable thread in codex-thread-id, which getLatestSessionIdSync resolves
+  // resumable thread in codex-thread-id, which getLatestSessionId resolves
   // (PAN-1988). Without the fallback the listing reports canResumeSession=false
   // for every stopped codex agent and the UI never offers Resume.
   const sessionId = getLatestSessionId(agentId) ?? runtimeData.claudeSessionId ?? null;

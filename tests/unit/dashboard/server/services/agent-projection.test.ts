@@ -14,7 +14,7 @@ import type { AgentState } from '../../../../../src/lib/agents.js';
 import type { LegacyConversation } from '../../../../../src/lib/overdeck/conversations.js';
 
 vi.mock('../../../../../src/lib/persistent-logger.js', () => ({
-  logAgentLifecycleSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
 }));
 
 import {

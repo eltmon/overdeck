@@ -16,7 +16,7 @@ vi.mock('../../../../lib/composer-commands/executors.js', () => ({
   runCapturedCommand: agentMocks.runCapturedCommand,
 }));
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: agentMocks.getAgentState,
+  getAgentState: agentMocks.getAgentState,
   messageAgent: agentMocks.messageAgent,
 }));
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { PROVIDERS } from '../../providers.js';
 import { buildTierFitnessContext } from '../tier-fitness-context.js';
 
-describe('buildTierFitnessContextSync', () => {
+describe('buildTierFitnessContext', () => {
   const ctx = buildTierFitnessContext({ enabledProviders: new Set(['anthropic', 'zai']) });
 
   it('knownModelIds contains claude-haiku-4-5 and every PROVIDERS.anthropic.models id', () => {

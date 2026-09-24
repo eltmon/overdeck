@@ -25,7 +25,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentStateProgram: vi.fn(),
   stopAgent: vi.fn(),
   stopAgentProgram: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('../../services/agent-projection.js', () => ({
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
 }));
 
 vi.mock('../origin-validation.js', () => ({

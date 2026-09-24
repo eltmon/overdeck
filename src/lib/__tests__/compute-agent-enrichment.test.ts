@@ -13,7 +13,7 @@ vi.mock('../agents/agent-state.js', async (importOriginal) => {
   return {
     ...original,
     getAgentDir: vi.fn(),
-    getAgentStateSync: vi.fn(),
+    getAgentState: vi.fn(),
   }
 })
 

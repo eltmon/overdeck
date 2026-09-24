@@ -18,7 +18,7 @@ vi.mock('../../src/lib/runtimes/index.js', () => ({
 }));
 
 vi.mock('../../src/lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
 }));
 
 vi.mock('../../src/lib/cloister/specialists.js', () => ({

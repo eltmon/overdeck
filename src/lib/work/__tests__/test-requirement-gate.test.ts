@@ -28,7 +28,7 @@ vi.mock('@linear/sdk', () => ({
 }));
 
 vi.mock('../../tracker-utils.js', () => ({
-  resolveGitHubIssueSync: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
 }));
 
 vi.mock('../../shadow-utils.js', () => ({

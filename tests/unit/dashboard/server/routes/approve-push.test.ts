@@ -57,7 +57,7 @@ vi.mock('../../../../../src/lib/agents/spawn.js', () => ({
 vi.mock('../../../../../src/lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
-vi.mock('../../../../../src/lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../src/lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
 vi.mock('../../../../../src/dashboard/server/routes/specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -96,7 +96,7 @@ vi.mock('../../../../../src/lib/cloister/service.js', () => ({ getCloisterServic
 vi.mock('../../../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn().mockReturnValue([]),
   listRunningAgentsSync: vi.fn().mockReturnValue([]),
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),

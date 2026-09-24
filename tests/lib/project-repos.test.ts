@@ -130,7 +130,7 @@ describe('project-repos', () => {
   });
 });
 
-describe('computeWorkspaceRepoRootsSync', () => {
+describe('computeWorkspaceRepoRoots', () => {
   const makeRepo = (repoKey: string, overrides: Partial<ResolvedRepoT> = {}): ResolvedRepoT => ({
     projectKey: 'mind-your-now',
     projectPath: '/tmp/myn',
@@ -203,7 +203,7 @@ describe('computeWorkspaceRepoRootsSync', () => {
   });
 });
 
-describe('resolvePrimaryWorkspaceRepoDirSync', () => {
+describe('resolvePrimaryWorkspaceRepoDir', () => {
   let workspace: string;
 
   beforeEach(() => {

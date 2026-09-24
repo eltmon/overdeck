@@ -13,7 +13,7 @@ import type { AgentState } from '../../../../../lib/agents/agent-state.js';
 
 const mocks = vi.hoisted(() => ({
   agentState: null as Partial<AgentState> | null,
-  clearYieldForResumeSync: vi.fn(() => true),
+  clearYieldForResume: vi.fn(() => true),
   saveAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
@@ -36,16 +36,16 @@ vi.mock('../../../../../lib/agents/agent-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../lib/agents/agent-state.js')>();
   return {
     ...actual,
-    getAgentStateSync: () => mocks.agentState,
+    getAgentState: () => mocks.agentState,
     saveAgentStateSync: mocks.saveAgentStateSync,
-    clearYieldForResumeSync: mocks.clearYieldForResumeSync,
+    clearYieldForResume: mocks.clearYieldForResume,
   };
 });
 
 vi.mock('../../../../../lib/agents.js', async () => {
   const { Effect } = await import('effect');
   return {
-    getAgentStateSync: () => mocks.agentState,
+    getAgentState: () => mocks.agentState,
     messageAgent: mocks.messageAgent,
     spawnAgent: mocks.spawnAgent,
   };
@@ -62,7 +62,7 @@ const WORKSPACE = '/tmp/workspaces/feature-min-902';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.clearYieldForResumeSync.mockReturnValue(true);
+  mocks.clearYieldForResume.mockReturnValue(true);
   mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
   mocks.lifecycle = { hasLiveTmuxSession: false, canResumeSession: true, canStartFresh: true };
   mocks.agentState = { id: 'agent-min-902', status: 'stopped' };
@@ -82,7 +82,7 @@ describe('ensureAgentReadyForMerge (PAN-3120)', () => {
 
     const result = await ensureAgentReadyForMerge('MIN-902', WORKSPACE, REBASE_MSG, { agentId: 'agent-min-902' });
 
-    expect(mocks.clearYieldForResumeSync).toHaveBeenCalledWith('agent-min-902');
+    expect(mocks.clearYieldForResume).toHaveBeenCalledWith('agent-min-902');
     expect(mocks.messageAgent).toHaveBeenCalledWith('agent-min-902', REBASE_MSG);
     expect(result.recovered).toBe(true);
     expect(result.detail).toContain('cleared scheduler yield');
@@ -127,7 +127,7 @@ describe('ensureAgentReadyForMerge (PAN-3120)', () => {
 
     const result = await ensureAgentReadyForMerge('MIN-902', WORKSPACE, REBASE_MSG, { agentId: 'agent-min-902' });
 
-    expect(mocks.clearYieldForResumeSync).not.toHaveBeenCalled();
+    expect(mocks.clearYieldForResume).not.toHaveBeenCalled();
     expect(result.detail).toBe('Work agent already running; sent merge preparation request.');
   });
 });

@@ -8,7 +8,7 @@
  * from listRunningAgents to build agentsById).
  *
  * This test exercises the file → parseAgentState path through
- * getAgentStateSync to prove a persisted strike state is returned, not
+ * getAgentState to prove a persisted strike state is returned, not
  * dropped. The Role type in packages/contracts already includes 'strike'.
  */
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';

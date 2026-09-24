@@ -12,7 +12,7 @@ vi.mock('../../../../lib/operator-interventions.js', () => ({
 }));
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: mockGetAgentState,
+  getAgentState: mockGetAgentState,
   clearAgentPaused: mockClearAgentPaused,
   clearAgentTroubled: mockClearAgentTroubled,
   saveAgentState: mockSaveAgentState,

@@ -177,7 +177,7 @@ describe('decideResumeGate', () => {
   });
 });
 
-describe('clearAgentOperatorGatesForIssueSync', () => {
+describe('clearAgentOperatorGatesForIssue', () => {
   let odb: OverdeckTestDb;
   beforeEach(() => { odb = setupOverdeckTestDb(); });
   afterEach(() => { teardownOverdeckTestDb(odb); });
@@ -231,7 +231,7 @@ describe('clearAgentOperatorGatesForIssueSync', () => {
   });
 });
 
-describe('clearAgentOperatorGatesForIssuesSync (batch, PAN-3727 review finding)', () => {
+describe('clearAgentOperatorGatesForIssues (batch, PAN-3727 review finding)', () => {
   let odb: OverdeckTestDb;
   beforeEach(() => { odb = setupOverdeckTestDb(); });
   afterEach(() => { teardownOverdeckTestDb(odb); });

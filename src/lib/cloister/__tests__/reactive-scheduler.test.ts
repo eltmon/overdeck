@@ -71,7 +71,7 @@ vi.mock('../../agents.js', async () => {
   // PAN-1048 P1: activeRoleRunExists is now async and uses listRunningAgentsProgram
   // on the reactive scheduler hot path.
   listRunningAgentsProgram: effectMock([]),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   // PAN-1048 round-5 mechanical fix: resolveWorkspaceForIssue now awaits the
   // async agent-state read, so the mock module must export this symbol or the
   // dynamic call in the scheduler throws before reaching the wrapper spy.
@@ -124,16 +124,13 @@ vi.mock('../merge-verification.js', () => ({
 }));
 
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
   emitActivityTts: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
 }));
 
 vi.mock('../../persistent-logger.js', () => ({
   logDeaconEvent: vi.fn(),
-  logDeaconEventSync: vi.fn(),
   logAgentLifecycle: vi.fn(),
-  logAgentLifecycleSync: vi.fn(),
 }));
 
 vi.mock('../no-resume-mode.js', () => ({
@@ -235,7 +232,7 @@ vi.mock('../../tmux.js', async () => {
   return {
   sessionExists: effectMock(false),
   sessionExistsSync: vi.fn(() => false),
-  querySessionSync: vi.fn(() => ({ status: 'missing', detail: 'mock session absent' })),
+  querySession: vi.fn(() => ({ status: 'missing', detail: 'mock session absent' })),
   capturePane: vi.fn(async () => '❯ '),
   killSession: effectMock(undefined),
   killSessionSync: vi.fn(() => undefined),

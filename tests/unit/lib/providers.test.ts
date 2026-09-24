@@ -44,7 +44,7 @@ describe('providers', () => {
   });
 });
 
-describe('getProviderEnvSync — kimi-code Anthropic-compat gate (PAN-1837 wi7a)', () => {
+describe('getProviderEnv — kimi-code Anthropic-compat gate (PAN-1837 wi7a)', () => {
   it('AC1: omits ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and KIMI_API_KEY for {kimi, kimi-code}', () => {
     const env = getProviderEnv(PROVIDERS.kimi, 'sk-kimi-test-key', 'kimi-code');
     expect(env.ANTHROPIC_BASE_URL).toBeUndefined();

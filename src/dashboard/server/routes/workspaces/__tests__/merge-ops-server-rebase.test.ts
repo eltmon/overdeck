@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 // PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
 // reaches the record plane W3 is deleting. Stub the one constant it needs.
-vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
@@ -51,13 +51,13 @@ vi.mock('node:fs', async importOriginal => ({
   existsSync: mocks.existsSync,
 }));
 vi.mock('../../../../../lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   messageAgent: mocks.messageAgent,
   spawnAgent: vi.fn(),
 }));
 vi.mock('../../../../../lib/agents/agent-state.js', async importOriginal => ({
   ...await importOriginal<typeof import('../../../../../lib/agents/agent-state.js')>(),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
 }));
 vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleStateSync: vi.fn(() => ({
@@ -84,8 +84,8 @@ vi.mock('../../../../../lib/github-app.js', () => ({
   verifyAppCanMerge: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../../../../../lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: vi.fn(() => ({ repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }] })),
-  getMergeSetSync: vi.fn(() => ({ repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }] })),
+  ensureMergeSetForIssue: vi.fn(() => ({ repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }] })),
+  getMergeSet: vi.fn(() => ({ repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }] })),
 }));
 vi.mock('../../../../../lib/overdeck/merge.js', () => ({
   dequeueMerge: vi.fn(() => null),
@@ -95,8 +95,8 @@ vi.mock('../../../../../lib/overdeck/merge.js', () => ({
   markMergeProcessing: vi.fn(),
 }));
 vi.mock('../../../../../lib/projects.js', () => ({
-  findProjectByTeamSync: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByTeam: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
+  findProjectByPath: vi.fn(() => null),
   listProjectsSync: vi.fn(() => []),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/project' })),
 }));

@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
   getPrFacts: vi.fn(),
-  ensureDevcontainerSync: vi.fn(),
+  ensureDevcontainer: vi.fn(),
   collectDockerContainerLifecycleSnapshot: vi.fn(() => []),
   recordDockerContainerLifecycleSnapshot: vi.fn(),
   reconcileTraefikNetworks: vi.fn(() => Promise.resolve()),
@@ -45,7 +45,7 @@ vi.mock('./traefik-connect.js', () => ({
 }));
 
 vi.mock('./ensure-devcontainer.js', () => ({
-  ensureDevcontainerSync: mocks.ensureDevcontainerSync,
+  ensureDevcontainer: mocks.ensureDevcontainer,
 }));
 
 let tmpRoot: string | null = null;
@@ -121,7 +121,7 @@ describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('terminal');
-    expect(mocks.ensureDevcontainerSync).not.toHaveBeenCalled();
+    expect(mocks.ensureDevcontainer).not.toHaveBeenCalled();
   });
 
   it('blocks an open issue whose PR the forge reports merged', async () => {
@@ -134,14 +134,14 @@ describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('terminal');
-    expect(mocks.ensureDevcontainerSync).not.toHaveBeenCalled();
+    expect(mocks.ensureDevcontainer).not.toHaveBeenCalled();
   });
 
   it('proceeds past the guard when neither the issue nor its PR is terminal', async () => {
     const workspacePath = makeWorkspace(null);
     setupProject(workspacePath);
     mocks.isIssueClosed.mockResolvedValue(false);
-    mocks.ensureDevcontainerSync.mockReturnValue({
+    mocks.ensureDevcontainer.mockReturnValue({
       step: { success: true },
     });
 

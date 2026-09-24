@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   acquireRestartLock: vi.fn(),
   readRestartLockHolder: vi.fn(),
-  readPlatformConfigSync: vi.fn(),
+  readPlatformConfig: vi.fn(),
   writeRestartStatus: vi.fn(),
   refuseNonPrimaryDashboardCwd: vi.fn(),
   resolveBundledServerPath: vi.fn(),
@@ -49,7 +49,7 @@ vi.mock('../../../lib/deploy/build-from-origin.js', async (importActual) => ({
 
 vi.mock('../../../lib/platform-lifecycle.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/platform-lifecycle.js')>()),
-  readPlatformConfigSync: mocks.readPlatformConfigSync,
+  readPlatformConfig: mocks.readPlatformConfig,
 }));
 
 vi.mock('../restart.js', () => ({
@@ -150,7 +150,7 @@ describe('reloadCommand health-timeout recovery', () => {
       'import { join } from "node:path";\nexport { join };\n',
     );
 
-    mocks.readPlatformConfigSync.mockReturnValue({
+    mocks.readPlatformConfig.mockReturnValue({
       dashboardPort,
       dashboardApiPort: apiPort,
       traefikEnabled: false,

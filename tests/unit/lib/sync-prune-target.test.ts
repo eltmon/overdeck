@@ -65,7 +65,7 @@ function readTargetManifest(): {
   return JSON.parse(readFileSync(join(dirs.claude, '.overdeck-manifest.json'), 'utf-8'));
 }
 
-describe('executeSyncSync stale target pruning', () => {
+describe('executeSync stale target pruning', () => {
   beforeAll(() => {
     dirs.base = mkdtempSync(join(tmpdir(), 'overdeck-sync-prune-target-'));
     dirs.claude = join(dirs.base, 'home', '.claude');
@@ -155,7 +155,7 @@ describe('executeSyncSync stale target pruning', () => {
   });
 });
 
-describe('executeAgentSkillsSync stale target pruning', () => {
+describe('executeAgentSkills stale target pruning', () => {
   it('deletes and reports a stale manifest-tracked skill', async () => {
     const targetSkillsDir = join(dirs.base, 'agent-home', 'skills');
     const sourceSkillsDir = join(dirs.base, 'source-skills');

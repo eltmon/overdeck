@@ -30,9 +30,7 @@ vi.mock('../../src/lib/providers.js', async (importOriginal) => {
   return {
     ...actual,
     getProviderForModel: mockGetProviderForModel,
-    getProviderForModelSync: mockGetProviderForModel,
     getProviderEnv: mockGetProviderEnv,
-    getProviderEnvSync: mockGetProviderEnv,
   };
 });
 

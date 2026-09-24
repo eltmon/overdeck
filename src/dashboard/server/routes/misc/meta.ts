@@ -104,8 +104,8 @@ const getSyncStatusRoute = HttpRouter.add(
   'GET',
   '/api/sync-status',
   Effect.sync(() => {
-    const { isStartupSyncNeededSync } = require('../../../../lib/sync-startup-gate.js');
-    return jsonResponse(isStartupSyncNeededSync());
+    const { isStartupSyncNeeded } = require('../../../../lib/sync-startup-gate.js');
+    return jsonResponse(isStartupSyncNeeded());
   }),
 );
 

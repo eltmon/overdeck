@@ -325,7 +325,7 @@ rebuild follows. In order:
 
 5. `archiveTerminalIssueWorkspaces()` (PAN-3286) — **archives, never deletes**
    every non-archived `kind='issue'` row whose issue reached a terminal stage.
-   Terminality comes from `isTerminalIssueStage(getIssueStageSync(...))`, the
+   Terminality comes from `isTerminalIssueStage(getIssueStage(...))`, the
    same shared helper `pan admin db gc-agents` uses, so this pass makes no
    tracker call of its own. The rows stay because they own their memory homes;
    they remain readable through `listWorkspaces({ includeArchived: true })` and
@@ -537,7 +537,7 @@ one-commit wrapper repo whose `.gitignore` excludes the real code sub-repos
 (e.g. `fe/`, `api/`) — no review-path git operation may run at that root
 (`docs/REVIEW-AGENT-ARCHITECTURE.md`, "Polyrepo workspaces (PAN-2948)"). The
 wrapper's HEAD never moves, so anything that snapshots it as a review anchor
-reports "no drift" forever (`git-utils.ts`'s `snapshotWorkspaceHeadsPromise`
+reports "no drift" forever (`git-utils.ts`'s `snapshotWorkspaceHeads`
 doc comment; `project-repos.ts`'s `degradedPolyrepo` field). The invariant
 this domain's `workspaces.path` column must respect: **the wrapper repo's
 HEAD is workspace metadata (where the worktree lives on disk), never a

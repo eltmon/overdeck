@@ -23,7 +23,7 @@ afterEach(() => {
   if (existsSync(workspaceRoot)) rmSync(workspaceRoot, { recursive: true, force: true });
 });
 
-describe('checkPrdGateSync', () => {
+describe('checkPrdGate', () => {
   it('passes when an uppercase projectRoot draft has >= MIN_PRD_LINES lines', () => {
     const draftsDir = getDraftsDir(projectRoot);
     mkdirSync(draftsDir, { recursive: true });

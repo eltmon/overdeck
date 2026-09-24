@@ -165,7 +165,7 @@ function mockSpawnDependencies(): void {
       readyPath: join(tmpHome, 'agents', agentId, 'ready.json'),
       fifoPath: join(tmpHome, 'agents', agentId, 'rpc.in'),
     })),
-    writePiCommandSync: vi.fn(),
+    writePiCommand: vi.fn(),
   }));
 
   vi.doMock('../paths.js', async (importOriginal) => {
@@ -221,8 +221,8 @@ function mockSpawnDependencies(): void {
     readWorkspacePlanSync: vi.fn(() => planFixture),
   }));
   vi.doMock('../activity-logger.js', () => ({
-    emitActivityEntrySync: vi.fn(),
-    emitActivityTtsSync: vi.fn(),
+    emitActivityEntry: vi.fn(),
+    emitActivityTts: vi.fn(),
   }));
   vi.doMock('../cloister/work-agent-prompt.js', () => ({
     writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -261,17 +261,17 @@ function mockSpawnDependencies(): void {
   vi.doMock('../provider-health.js', () => ({
     validateProviderHealth: vi.fn(async () => undefined),
   }));
-  // agents.ts now imports getFlywheelActiveRunIdSync from overdeck/control-settings (not database/app-settings)
+  // agents.ts now imports getFlywheelActiveRunId from overdeck/control-settings (not database/app-settings)
   vi.doMock('../overdeck/control-settings.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../overdeck/control-settings.js')>();
     return {
       ...actual,
-      getFlywheelActiveRunIdSync: () => activeFlywheelRunId,
+      getFlywheelActiveRunId: () => activeFlywheelRunId,
     };
   });
   vi.doMock('../projects.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../projects.js')),
-    findProjectByPathSync: vi.fn(() => null),
+    findProjectByPath: vi.fn(() => null),
   }));
 }
 

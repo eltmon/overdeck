@@ -38,7 +38,7 @@ afterEach(() => {
   }
 });
 
-describe('pruneStaleManifestEntriesSync', () => {
+describe('pruneStaleManifestEntries', () => {
   it('deletes a stale unmodified file and drops its manifest entry', () => {
     const targetBase = createTargetBase();
     const filePath = write(targetBase, 'skills/removed/SKILL.md', '# removed\n');

@@ -35,7 +35,7 @@ vi.mock('../../src/lib/agents/agent-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/agents/agent-state.js')>();
   return {
     ...actual,
-    getAgentStateSync: (id: string) => {
+    getAgentState: (id: string) => {
       const workspace = recordedWorkspaces.has(id) ? recordedWorkspaces.get(id) : WORKSPACE;
       return workspace
         ? { id, workspace, startedAt: recordedStartedAt.get(id) ?? '1970-01-01T00:00:00.000Z' }
@@ -54,7 +54,7 @@ vi.mock('../../src/lib/projects.js', async (importOriginal) => {
 
 vi.mock('../../src/lib/agents/activity.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/agents/activity.js')>();
-  return { ...actual, getLatestSessionIdSync: (id: string) => ownSessionIds.get(id) ?? null };
+  return { ...actual, getLatestSessionId: (id: string) => ownSessionIds.get(id) ?? null };
 });
 
 const WORKSPACE = '/home/eltmon/Projects/overdeck';

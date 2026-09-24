@@ -4,7 +4,7 @@ import { modelSupportsImages, MODEL_CAPABILITIES } from '../../src/lib/model-cap
 // PAN-1685: image-attach guard for text-only models. mimo-v2.5-pro is proven
 // text-only on the Xiaomi Token-Plan endpoint (404 "No endpoints found that
 // support image input"); mimo-v2.5 accepts images on the same endpoint.
-describe('modelSupportsImagesSync', () => {
+describe('modelSupportsImages', () => {
   it('returns false for the proven text-only model (mimo-v2.5-pro)', () => {
     expect(MODEL_CAPABILITIES['mimo-v2.5-pro'].supportsImages).toBe(false);
     expect(modelSupportsImages('mimo-v2.5-pro')).toBe(false);

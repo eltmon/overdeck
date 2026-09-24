@@ -8,10 +8,10 @@ const mockSessionExists = vi.fn();
 const mockExistsSync = vi.fn<(path: string) => boolean>();
 
 vi.mock('../agents.js', () => ({
-  getAgentStateSync: () => mockGetAgentState(),
+  getAgentState: () => mockGetAgentState(),
   getAgentRuntimeStateSync: () => mockGetAgentRuntimeState(),
   getAgentRuntimeState: () => Effect.succeed(mockGetAgentRuntimeState()),
-  getLatestSessionIdSync: () => mockGetLatestSessionId(),
+  getLatestSessionId: () => mockGetLatestSessionId(),
   normalizeAgentId: (id: string) => id,
 }));
 

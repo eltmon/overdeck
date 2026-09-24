@@ -27,7 +27,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
   resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
   listProjectsSync: mocks.listProjectsSync,
-  findProjectByPathSync: () => null,
+  findProjectByPath: () => null,
   getProjectSwarmHotspots: () => [],
   getProjectSync: () => null,
   // PAN-3917: these coordination tests fixture the continue file and slot

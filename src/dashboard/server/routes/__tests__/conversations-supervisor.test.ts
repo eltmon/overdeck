@@ -69,7 +69,7 @@ vi.mock('../../../../lib/config-yaml.js', () => ({
 
 vi.mock('../../../../lib/providers.js', () => ({
   UnknownModelError: class UnknownModelError extends Error {},
-  getProviderForModelSync: vi.fn(() => ({ name: resolvedProviderName })),
+  getProviderForModel: vi.fn(() => ({ name: resolvedProviderName })),
   piProviderForModel: vi.fn(() => 'anthropic'),
   qualifyPiModel: vi.fn((m: string) => m),
   // Real implementation maps a legacy Kimi id to its native alias and passes
@@ -124,7 +124,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listSessionNames: vi.fn(() => Effect.succeed(listedSessionNames)),
   // Real implementation asks systemd for the managed tmux server's MainPID and
   // returns undefined when there is none — the shape these tests run under.
-  findManagedServerPidSync: vi.fn(() => undefined),
+  findManagedServerPid: vi.fn(() => undefined),
 }));
 
 // PAN-3974: owner teardown must close the companion terminal first. The spy

@@ -298,7 +298,7 @@ still runs).
 
 Sender identity: the Herdr adapter reads the target's tokens from `agent.get`; on tmux the sender is
 `OVERDECK_AGENT_ID` and the target's tokens come from the agent's launch metadata
-(`getAgentStateSync`), because a tmux pane carries no tokens.
+(`getAgentState`), because a tmux pane carries no tokens.
 
 `deliverAgentMessage` returns the drop or refusal in `DeliveryResult.failure` (`refused: …` /
 `dropped: …`); a refusal is `ok: false`, so `pan tell` exits non-zero.

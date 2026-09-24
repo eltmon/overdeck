@@ -164,7 +164,7 @@ export function findModelDef(modelId: string): ModelDef | undefined {
  * Whether image attachments may be sent to a model. Permissive: returns `false`
  * ONLY for models flagged `supportsImages: false` (proven text-only, e.g.
  * mimo-v2.5-pro); every other model — including unflagged ones — is allowed, so
- * the provider stays the final authority. Mirrors `modelSupportsImagesSync` in
+ * the provider stays the final authority. Mirrors `modelSupportsImages` in
  * src/lib/model-capabilities.ts. PAN-1685.
  */
 export function modelSupportsImages(modelId: string): boolean {

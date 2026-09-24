@@ -1,5 +1,5 @@
 /**
- * PAN-1872 regression test: findProjectByTeamSync must not crash when teamPrefix
+ * PAN-1872 regression test: findProjectByTeam must not crash when teamPrefix
  * is null or undefined. This defends against `Cannot read properties of undefined
  * (reading 'toUpperCase')` during pan start recovery from a sync-main conflict.
  */
@@ -24,7 +24,7 @@ vi.mock('../projects.js', async (importOriginal) => {
 
 import { findProjectByTeam } from '../projects.js';
 
-describe('findProjectByTeamSync PAN-1872 guards', () => {
+describe('findProjectByTeam PAN-1872 guards', () => {
   it('returns null when teamPrefix is undefined', () => {
     expect(findProjectByTeam(undefined as any)).toBeNull();
   });

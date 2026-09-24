@@ -63,7 +63,7 @@ vi.mock('../../../../../src/lib/projects.js', async (importOriginal) => {
   return {
     ...actual,
     extractTeamPrefix: () => 'PAN',
-    findProjectByTeamSync: () => ({ path: mocks.projectPath }),
+    findProjectByTeam: () => ({ path: mocks.projectPath }),
   };
 });
 
@@ -76,12 +76,12 @@ vi.mock('../../../../../src/lib/briefing-freshness.js', () => ({
 }));
 
 vi.mock('../../../../../src/lib/claude-permissions.js', () => ({
-  getClaudePermissionFlagsStringSync: () => '--permission-mode auto',
+  getClaudePermissionFlagsString: () => '--permission-mode auto',
 }));
 
 vi.mock('../../../../../src/lib/settings.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../src/lib/settings.js')>();
-  return { ...actual, getAgentCommandSync: () => ({ command: 'claude', args: [] }) };
+  return { ...actual, getAgentCommand: () => ({ command: 'claude', args: [] }) };
 });
 
 vi.mock('../../../../../src/lib/config-yaml.js', async (importOriginal) => {
@@ -90,7 +90,7 @@ vi.mock('../../../../../src/lib/config-yaml.js', async (importOriginal) => {
 });
 
 vi.mock('../../../../../src/lib/launcher-generator.js', () => ({
-  generateLauncherScriptSync: () => '#!/usr/bin/env bash\n',
+  generateLauncherScript: () => '#!/usr/bin/env bash\n',
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', async (importOriginal) => {

@@ -43,11 +43,11 @@ vi.mock('../../../../src/lib/cloister/verification-check-run.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: mockEmitActivity,
+  emitActivityEntry: mockEmitActivity,
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   clearAgentPaused: vi.fn(() => Effect.succeed(null)),
   setAgentPaused: vi.fn(() => Effect.succeed(null)),
   messageAgent: vi.fn(),
@@ -70,21 +70,21 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/xbrief/acceptance-criteria.js', () => ({
-  getXBriefACStatusSync: vi.fn(() => null),
+  getXBriefACStatus: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/work/done-preflight.js', () => ({
-  checkIncompletePlanItemsPromise: vi.fn(async () => []),
+  checkIncompletePlanItems: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
-  findProjectByPathSync: vi.fn(() => ({ name: 'Overdeck', github_repo: 'eltmon/overdeck' })),
+  findProjectByPath: vi.fn(() => ({ name: 'Overdeck', github_repo: 'eltmon/overdeck' })),
   resolveProjectFromIssueSync: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveWorkspaceRepoRootsSync: mockResolveWorkspaceRepoRootsSync,
-  resolveProjectReposForIssueSync: vi.fn(() => []),
+  resolveWorkspaceRepoRoots: mockResolveWorkspaceRepoRootsSync,
+  resolveProjectReposForIssue: vi.fn(() => []),
 }));
 
 vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
@@ -92,12 +92,12 @@ vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/test-skip-waiver.js', () => ({
-  resolveActiveTestSkipWaiverSync: vi.fn(() => null),
+  resolveActiveTestSkipWaiver: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/git-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/git-utils.js')>();
-  return { ...actual, snapshotWorkspaceHeadsPromise: mockSnapshotHeads };
+  return { ...actual, snapshotWorkspaceHeads: mockSnapshotHeads };
 });
 
 vi.mock('../../../../src/lib/telemetry/pipeline.js', () => ({

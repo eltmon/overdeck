@@ -9,9 +9,9 @@ import { CostArchive, CostArchiveLive, Db, DbLive, EventBus, EventBusLive } from
 import { IssueId, type IssueId as IssueIdType } from './issues.js';
 import {
   getAllBudgets,
-  checkBudget,
-  createBudget,
-  deleteBudget,
+  checkBudget as checkBudgetImpl,
+  createBudget as createBudgetImpl,
+  deleteBudget as deleteBudgetImpl,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
@@ -483,7 +483,7 @@ export const CostResolverLive = Layer.effect(
 
     const checkBudget = (id: string) =>
       Effect.gen(function* () {
-        const result = yield* Effect.sync(() => checkBudget(id));
+        const result = yield* Effect.sync(() => checkBudgetImpl(id));
         if (!result.budget) return yield* Effect.fail(new BudgetNotFound({ id }));
         return {
           budget:      mapBudget(result.budget),
@@ -818,14 +818,14 @@ export const CostWriterLive = Layer.effect(
     const createBudget = (spec: BudgetSpec) =>
       Effect.gen(function* () {
         const created = yield* Effect.sync(() =>
-          createBudget({ ...spec, enabled: true }),
+          createBudgetImpl({ ...spec, enabled: true }),
         );
         return mapBudget(created);
       });
 
     const deleteBudget = (id: string) =>
       Effect.gen(function* () {
-        const deleted = yield* Effect.sync(() => deleteBudget(id));
+        const deleted = yield* Effect.sync(() => deleteBudgetImpl(id));
         if (!deleted) return yield* Effect.fail(new BudgetNotFound({ id }));
       });
 

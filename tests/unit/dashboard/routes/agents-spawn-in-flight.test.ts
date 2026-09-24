@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The projection logs via persistent-logger — fire-and-forget in tests.
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
-  logAgentLifecycleSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
 }));
 
 import {
@@ -70,7 +70,7 @@ describe('claimAgentStart (PAN-3849 W34)', () => {
 });
 
 describe('no-placeholder invariant (AC2)', () => {
-  it('a failed spawn with no state written leaves getAgentStateSync null and pan start proceeds fresh', () => {
+  it('a failed spawn with no state written leaves getAgentState null and pan start proceeds fresh', () => {
     // Simulate the whole W34 flow: claim, spawn fails before the child writes
     // anything, release. Nothing was ever persisted for this agent.
     expect(claimAgentStart(AGENT)).toBe(true);

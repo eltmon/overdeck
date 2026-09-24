@@ -6,14 +6,14 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const repoRootsMock = vi.hoisted(() => ({
-  resolveWorkspaceRepoRootsSync: vi.fn(),
+  resolveWorkspaceRepoRoots: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', async () => {
   const actual = await vi.importActual<typeof import('../../../../src/lib/project-repos.js')>('../../../../src/lib/project-repos.js');
   return {
     ...actual,
-    resolveWorkspaceRepoRootsSync: repoRootsMock.resolveWorkspaceRepoRootsSync,
+    resolveWorkspaceRepoRoots: repoRootsMock.resolveWorkspaceRepoRoots,
   };
 });
 
@@ -65,7 +65,7 @@ describe('workspaceChangesetHasContent (polyrepo)', () => {
   });
 
   function resolveRepos(): void {
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReturnValue([
       { repoKey: 'fe', dir: feDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: true },
       { repoKey: 'api', dir: apiDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: true },
     ]);

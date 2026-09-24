@@ -163,7 +163,7 @@ temp/
 .pan/spec.vbrief.json
 .pan/agent-mcp.json
 # Machine-local Overdeck config (config.yaml, projects.yaml, settings.json) —
-# copied into workspaces by copyOverdeckSettingsToWorkspaceSync, never committed.
+# copied into workspaces by copyOverdeckSettingsToWorkspace, never committed.
 # Spec-writer crash debris — the writer should self-clean these on dead-PID detection.
 # Tracking them lets stale locks contaminate fresh worktrees.
 .pan/specs/*.tmp

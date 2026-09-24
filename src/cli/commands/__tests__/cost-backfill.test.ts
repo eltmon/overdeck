@@ -57,7 +57,7 @@ async function loadBackfill(home: string) {
   const infra = await import('../../../lib/overdeck/infra.js');
   const cost = await import('../cost.js');
   infra.getOverdeckDatabase();
-  return { ...cost, closeOverdeckDatabaseSync: infra.closeOverdeckDatabase };
+  return { ...cost, closeOverdeckDatabase: infra.closeOverdeckDatabase };
 }
 
 describe('pan cost backfill', () => {
@@ -76,9 +76,9 @@ describe('pan cost backfill', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     try {
-      const { runCostBackfill, closeOverdeckDatabaseSync } = await loadBackfill(home);
+      const { runCostBackfill, closeOverdeckDatabase } = await loadBackfill(home);
       const summaries = await runCostBackfill();
-      closeOverdeckDatabaseSync();
+      closeOverdeckDatabase();
 
       expect(summaries[0]).toMatchObject({
         source: 'claude',
@@ -102,14 +102,14 @@ describe('pan cost backfill', () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     try {
-      const { runCostBackfill, closeOverdeckDatabaseSync } = await loadBackfill(home);
+      const { runCostBackfill, closeOverdeckDatabase } = await loadBackfill(home);
       const infra = await import('../../../lib/overdeck/infra.js');
       const first = await runCostBackfill({ write: true });
       const second = await runCostBackfill({ write: true });
       const rows = infra.getOverdeckDatabase()
         .prepare('SELECT request_id, issue_id, model FROM cost_events ORDER BY id')
         .all() as Array<{ request_id: string; issue_id: string; model: string }>;
-      closeOverdeckDatabaseSync();
+      closeOverdeckDatabase();
 
       expect(first[0]).toMatchObject({
         source: 'claude',

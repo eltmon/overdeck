@@ -41,7 +41,7 @@ const FIXTURES = [
   },
 ];
 
-describe('parseCodexSessionSync', () => {
+describe('parseCodexSession', () => {
   it('returns null for a nonexistent file', () => {
     expect(parseCodexSession(NONEXISTENT)).toBeNull();
   });
@@ -196,7 +196,7 @@ describe('parseCodexSessionSync', () => {
   });
 });
 
-describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
+describe('parseCodexSessionCostEvents (PAN-2388)', () => {
   it('returns an empty array for a nonexistent file', () => {
     expect(parseCodexSessionCostEvents(NONEXISTENT)).toEqual([]);
   });

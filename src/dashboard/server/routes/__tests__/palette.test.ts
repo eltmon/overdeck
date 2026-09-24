@@ -22,7 +22,7 @@ vi.mock('../../../../lib/config-yaml.js', async () => {
   const actual = await vi.importActual<typeof import('../../../../lib/config-yaml.js')>('../../../../lib/config-yaml.js');
   return {
     ...actual,
-    getConversationSearchConfigSync: vi.fn(),
+    getConversationSearchConfig: vi.fn(),
   };
 });
 

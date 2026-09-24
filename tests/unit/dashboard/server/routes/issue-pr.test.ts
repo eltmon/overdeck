@@ -50,7 +50,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: (...args: unknown[]) => mockResolveGitHubIssue(...args),
+  resolveGitHubIssue: (...args: unknown[]) => mockResolveGitHubIssue(...args),
   resolveTrackerType: vi.fn(() => 'github'),
 }));
 

@@ -146,7 +146,7 @@ describe('insert + get round-trip', () => {
   });
 });
 
-describe('listUatGenerationsSync', () => {
+describe('listUatGenerations', () => {
   it('orders newest first by created_at', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');
@@ -210,7 +210,7 @@ describe('status transitions', () => {
   });
 });
 
-describe('updateUatGenerationSync patch', () => {
+describe('updateUatGeneration patch', () => {
   it('patches members/heldOut/resolutions/status in one call', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');

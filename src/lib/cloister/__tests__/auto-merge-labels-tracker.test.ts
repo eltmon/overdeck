@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
-  resolveGitHubIssueSync: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
   loadConfigSync: vi.fn(),
   getIssue: vi.fn(),
 }));
@@ -23,7 +23,7 @@ vi.mock('../../projects.js', () => ({
   resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
   getProjectSync: mocks.getProjectSync,
 }));
-vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssueSync: mocks.resolveGitHubIssueSync }));
+vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: mocks.resolveGitHubIssue }));
 vi.mock('../../config.js', () => ({ loadConfigSync: mocks.loadConfigSync }));
 vi.mock('../../tracker/factory.js', () => ({
   createTrackerFromConfig: () => ({ getIssue: mocks.getIssue }),
@@ -40,7 +40,7 @@ function ghLabels(labels: string[]): void {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'lexerra', projectPath: '/p' });
-  mocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'lexerra', prefix: 'LEX', number: 7 });
+  mocks.resolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'lexerra', prefix: 'LEX', number: 7 });
 });
 
 describe('issueHoldsForUat label source', () => {

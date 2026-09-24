@@ -20,7 +20,7 @@ vi.mock('util', async () => {
   };
 });
 
-describe('teardownWorkspaceDockerByNamePromise', () => {
+describe('teardownWorkspaceDockerByName', () => {
   beforeEach(() => {
     mockExecAsync.mockReset();
     mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });

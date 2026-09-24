@@ -9,8 +9,8 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 vi.mock('../../src/lib/overdeck/cost-sync.js', () => ({
   getAgentRollup:          vi.fn(() => []),
   getDailyTrendsSync:      vi.fn(() => []),
-  getCostForIssueSync:     vi.fn(() => null),
-  getAgentDailyCostSync:   vi.fn(() => 0),
+  getCostForIssue:     vi.fn(() => null),
+  getAgentDailyCost:   vi.fn(() => 0),
 }));
 
 import {

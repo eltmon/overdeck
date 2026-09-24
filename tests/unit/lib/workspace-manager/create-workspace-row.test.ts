@@ -95,7 +95,7 @@ describe('createWorkspace: workspace row creation (PAN-1990)', () => {
   });
 
   it('seeds the project row from projects.yaml when boot-seeding has not run yet, then creates the workspace row (FR-6/AC-4)', async () => {
-    // Registered in projects.yaml (registerProjectSync) but deliberately NOT
+    // Registered in projects.yaml (registerProject) but deliberately NOT
     // upserted into the DB — simulates a project the dashboard hasn't
     // boot-seeded against yet.
     registerProject('pan-4000-project', { name: 'Unseeded', path: tempDir });
@@ -124,7 +124,7 @@ describe('createWorkspace: workspace row creation (PAN-1990)', () => {
   });
 
   it('fails workspace creation (never reaching worktree creation) when the project has no projects.yaml entry at all (FR-6/AC-4)', async () => {
-    // Deliberately skip both upsertProjectFromConfig and registerProjectSync.
+    // Deliberately skip both upsertProjectFromConfig and registerProject.
     const result = await createWorkspace({
       projectConfig: { name: 'Unregistered', path: tempDir },
       featureName: 'pan-4001',

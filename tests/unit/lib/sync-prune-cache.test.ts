@@ -66,7 +66,7 @@ function readManifest(): {
   return JSON.parse(readFileSync(dirs.cacheManifest, 'utf-8'));
 }
 
-describe('refreshCacheSync stale cache pruning', () => {
+describe('refreshCache stale cache pruning', () => {
   beforeAll(() => {
     dirs.base = mkdtempSync(join(tmpdir(), 'overdeck-sync-prune-cache-'));
     dirs.claude = join(dirs.base, 'home', '.claude');

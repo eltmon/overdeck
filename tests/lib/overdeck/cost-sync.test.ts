@@ -50,7 +50,7 @@ function costEvent(overrides: Partial<CostEvent> = {}): CostEvent {
   };
 }
 
-describe('getTodayCostSync', () => {
+describe('getTodayCost', () => {
   it('sums cost_events from UTC midnight only', () => {
     insertCostEvent(costEvent({
       ts: '2026-06-24T23:59:59.999Z',
@@ -72,7 +72,7 @@ describe('getTodayCostSync', () => {
   });
 });
 
-describe('getCostsByIssueSync', () => {
+describe('getCostsByIssue', () => {
   it('aggregates totals with per-model and per-stage breakdowns, case-folding issue ids (PAN-472)', () => {
     insertCostEvent(costEvent({
       issueId: 'pan-9', sessionType: 'work', model: 'gpt-test', cost: 1,

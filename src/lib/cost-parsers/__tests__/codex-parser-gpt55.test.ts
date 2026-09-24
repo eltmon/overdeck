@@ -8,7 +8,7 @@ import { parseCodexSession } from '../codex-parser.js';
 
 const GPT55_FIXTURE = join(__dirname, 'fixtures', 'rollout-gpt55-nested.jsonl');
 
-describe('parseCodexSessionSync gpt-5.5 nested rollout fixture', () => {
+describe('parseCodexSession gpt-5.5 nested rollout fixture', () => {
   it('reads model, thread id, latest cumulative usage, and cached-input priced cost', () => {
     const result = parseCodexSession(GPT55_FIXTURE);
     expect(result).not.toBeNull();

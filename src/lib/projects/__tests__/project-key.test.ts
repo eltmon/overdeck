@@ -1,5 +1,5 @@
 /**
- * findProjectKeyByPathSync containment (CodeRabbit follow-up on #4022): `~`
+ * findProjectKeyByPath containment (CodeRabbit follow-up on #4022): `~`
  * roots expand, symlinked paths resolve to their real location, and a sibling
  * that only shares a name prefix is not contained.
  */
@@ -24,7 +24,7 @@ vi.mock('../../projects.js', () => ({
 
 import { findProjectKeyByPath } from '../project-key.js';
 
-describe('findProjectKeyByPathSync', () => {
+describe('findProjectKeyByPath', () => {
   let root: string;
 
   beforeEach(() => {

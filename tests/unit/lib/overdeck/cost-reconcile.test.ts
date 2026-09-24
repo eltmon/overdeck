@@ -23,7 +23,7 @@ vi.mock('../../../../src/lib/cost-parsers/ohmypi-parser.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cost-parsers/codex-parser.js', () => ({
-  parseCodexSessionCostEventsSync: vi.fn(),
+  parseCodexSessionCostEvents: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/costs/skip-cache.js', () => ({

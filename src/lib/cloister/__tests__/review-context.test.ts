@@ -49,7 +49,6 @@ vi.mock('../../xbrief/lifecycle-io.js', () => ({
 }));
 vi.mock('../../config.js', () => ({
   getDevrootPath: vi.fn(() => null),
-  getDevrootPathSync: vi.fn(() => null),
 }));
 
 // ── stub-ui scanner mock ───────────────────────────────────────────────────

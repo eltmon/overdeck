@@ -39,15 +39,15 @@ vi.mock('child_process', () => {
 });
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
-  getMergeSetSync: getMergeSetMock,
-  upsertMergeSetSync: upsertMergeSetMock,
-  withRepoArtifactUrlSync: withRepoArtifactUrlMock,
-  withRepoStateSync: withRepoStateMock,
+  ensureMergeSetForIssue: ensureMergeSetForIssueMock,
+  getMergeSet: getMergeSetMock,
+  upsertMergeSet: upsertMergeSetMock,
+  withRepoArtifactUrl: withRepoArtifactUrlMock,
+  withRepoState: withRepoStateMock,
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: resolveProjectReposForIssueMock,
+  resolveProjectReposForIssue: resolveProjectReposForIssueMock,
 }));
 
 vi.mock('../../../../src/lib/forge.js', () => ({

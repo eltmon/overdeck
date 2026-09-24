@@ -354,7 +354,7 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
     const { recordDockerContainerLifecycleSnapshot } = await import('../docker-stats.js');
     recordDockerContainerLifecycleSnapshot([{
@@ -410,7 +410,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
 
     const { spawnAgent } = await import('../agents.js');
@@ -479,9 +479,8 @@ describe('AgentState role persistence', () => {
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
       emitActivityTts: vi.fn(),
-      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../xbrief/io.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../xbrief/io.js')),
@@ -552,9 +551,8 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
       emitActivityTts: vi.fn(),
-      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../harness-resolve.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../harness-resolve.js')),
@@ -653,7 +651,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
 
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
@@ -681,7 +679,7 @@ describe('AgentState role persistence', () => {
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
 
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
@@ -708,7 +706,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
-      emitActivityEntrySync: emitActivityEntry,
+      emitActivityEntry: emitActivityEntry,
     }));
 
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');

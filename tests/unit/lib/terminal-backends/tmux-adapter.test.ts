@@ -34,7 +34,7 @@ vi.mock('../../../../src/lib/agents/liveness.js', () => ({
 
 // PAN-3917/lint:circular: tmux.ts imports the read-only leaf, not agent-state.ts.
 vi.mock('../../../../src/lib/agents/agent-state-read.js', () => ({
-  getAgentStateSync: () => agentState,
+  getAgentState: () => agentState,
 }));
 
 const { TmuxBackend, toPaneRole, tmuxTargetTokens } = await import('../../../../src/lib/terminal-backends/tmux.js');

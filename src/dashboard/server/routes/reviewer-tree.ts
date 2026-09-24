@@ -358,7 +358,7 @@ export async function buildReviewerNodes(
       const roundMetadata = await readReviewerRounds(sessionId, agentsRoot);
       // A state row is evidence the reviewer was at least spawned (it is written
       // at spawn start, before tmux readiness). Read it from agentsRoot directly —
-      // getAgentStateSync would escape the agentsDirOverride test seam.
+      // getAgentState would escape the agentsDirOverride test seam.
       const hasStateRow = existsSync(join(agentsRoot, sessionId, 'state.json'));
       // Reviewers run inside the workspace (pan review run sets cwd to workspace),
       // so JSONL files land in the workspace-encoded Claude projects dir.

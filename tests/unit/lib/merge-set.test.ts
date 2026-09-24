@@ -1,7 +1,7 @@
 /**
  * Tests for merge-set sync accessors (PAN-399 case-sensitivity follow-up).
  *
- * Verifies that getMergeSetSync normalizes lowercase issue IDs to the
+ * Verifies that getMergeSet normalizes lowercase issue IDs to the
  * canonical uppercase form stored in overdeck.db.
  */
 
@@ -63,7 +63,7 @@ function repo(repoKey: string, patch: Partial<MergeSetRepoState> = {}): MergeSet
 }
 
 describe('merge-set sync accessors', () => {
-  it('getMergeSetSync normalizes lowercase IDs to uppercase', () => {
+  it('getMergeSet normalizes lowercase IDs to uppercase', () => {
     seedIssue('PAN-399');
     upsertMergeSet(makeMergeSet());
 
@@ -73,7 +73,7 @@ describe('merge-set sync accessors', () => {
     expect(loaded!.issueId).toBe('PAN-399');
   });
 
-  it('upsertMergeSetSync stores the canonical uppercase issue ID', () => {
+  it('upsertMergeSet stores the canonical uppercase issue ID', () => {
     seedIssue('PAN-399');
     upsertMergeSet(makeMergeSet({ issueId: 'pan-399' }));
 

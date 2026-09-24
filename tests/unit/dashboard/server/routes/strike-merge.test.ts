@@ -4,13 +4,13 @@ import type { DerivedIssueState, IssueState, PrChecksState, PrReviewState } from
 // merge-strike pulls in lib/agents for the rebase-escalation path, which still
 // reaches the record plane W3 is deleting. These tests exercise pure helpers.
 vi.mock('../../../../../src/lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(), messageAgent: vi.fn(), spawnAgent: vi.fn(),
+  getAgentState: vi.fn(), messageAgent: vi.fn(), spawnAgent: vi.fn(),
 }));
 vi.mock('../../../../../src/lib/agents/agent-state.js', () => ({
-  clearYieldForResumeSync: vi.fn(),
+  clearYieldForResume: vi.fn(),
   decideResumeGate: vi.fn(() => ({ decision: 'proceed' })),
   getAgentResumeGateBlockReason: vi.fn(() => null),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   saveAgentStateSync: vi.fn(),
 }));
 vi.mock('../../../../../src/lib/work-agent-lifecycle.js', () => ({

@@ -1,7 +1,7 @@
 /**
  * PAN-3189: work, strike and review agents are the agents the stash/rebase
  * rules exist for, yet their launchers were the only ones built without an
- * agent id — so `generateLauncherScriptSync` never emitted a git guard for
+ * agent id — so `generateLauncherScript` never emitted a git guard for
  * them and they ran behind whichever guard their spawner happened to have on
  * PATH. These tests lock the guard onto the fresh-spawn and resume paths of
  * `buildAgentLaunchConfig`.

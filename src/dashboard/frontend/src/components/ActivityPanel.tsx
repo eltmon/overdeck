@@ -3,8 +3,8 @@
  *
  * Data flow:
  *   emitActivityEntry()         → event store → WebSocket → recentActivity     (Normal)
- *   emitActivityDetailedSync()  → event store → WebSocket → detailedActivity   (Detailed)
- *   emitActivityTtsSync()       → event store → WebSocket → ttsActivity        (TTS)
+ *   emitActivityDetailed()  → event store → WebSocket → detailedActivity   (Detailed)
+ *   emitActivityTts()       → event store → WebSocket → ttsActivity        (TTS)
  *
  * Also polls GET /api/activity/* as fallback for bootstrap.
  */

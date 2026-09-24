@@ -27,7 +27,7 @@ const mockGetAgentStateSync = vi.fn();
 const mockMessageAgent = vi.fn();
 
 vi.mock('../../../../src/lib/agents.js', () => ({
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentStateSync>) => mockGetAgentStateSync(...args),
+  getAgentState: (...args: Parameters<typeof mockGetAgentStateSync>) => mockGetAgentStateSync(...args),
   messageAgent: (...args: Parameters<typeof mockMessageAgent>) => mockMessageAgent(...args),
 }));
 
@@ -36,7 +36,7 @@ const mockFindProjectByPathSync = vi.fn();
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: (...args: Parameters<typeof mockResolveProjectFromIssueSync>) => mockResolveProjectFromIssueSync(...args),
-  findProjectByPathSync: (...args: Parameters<typeof mockFindProjectByPathSync>) => mockFindProjectByPathSync(...args),
+  findProjectByPath: (...args: Parameters<typeof mockFindProjectByPathSync>) => mockFindProjectByPathSync(...args),
 }));
 
 const mockWriteFeedbackFile = vi.fn();

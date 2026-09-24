@@ -10,7 +10,7 @@ vi.mock('../../project-repos.js', async () => {
   const actual = await vi.importActual<typeof import('../../project-repos.js')>('../../project-repos.js');
   return {
     ...actual,
-    resolveWorkspaceRepoRootsSync: repoRootsMock,
+    resolveWorkspaceRepoRoots: repoRootsMock,
   };
 });
 

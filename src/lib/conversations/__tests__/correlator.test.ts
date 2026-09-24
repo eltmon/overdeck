@@ -18,7 +18,7 @@ afterEach(() => {
   teardownOverdeckTestDb(odb);
 });
 
-describe('buildCorrelationMapSync', () => {
+describe('buildCorrelationMap', () => {
   it('keeps Claude path correlation unchanged', () => {
     seedConversation('conv-claude', 'conv-claude', '/home/user/Projects/app', 'PAN-457', 'claude-sess');
     const path = sessionFilePath('/home/user/Projects/app', 'claude-sess');

@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
 
 const mocks = vi.hoisted(() => ({
-  ensureInternalTokenSync: vi.fn(),
+  ensureInternalToken: vi.fn(),
 }));
 
 vi.mock('../../../lib/internal-token.js', () => ({
   INTERNAL_TOKEN_HEADER: 'x-pan-test-token',
-  ensureInternalTokenSync: mocks.ensureInternalTokenSync,
+  ensureInternalToken: mocks.ensureInternalToken,
 }));
 
 import { mergeCancelCommand, registerMergeCommands } from '../merge.js';
@@ -21,7 +21,7 @@ describe('merge CLI', () => {
     fetchImpl = vi.fn();
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mocks.ensureInternalTokenSync.mockReturnValue('secret-token');
+    mocks.ensureInternalToken.mockReturnValue('secret-token');
     vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://dashboard.test/');
     process.exitCode = undefined;
   });

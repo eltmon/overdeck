@@ -4,7 +4,7 @@ import type { CostEvent } from '../../costs/events.js';
 // Capture cost events instead of writing them to the JSONL/SQLite ledger.
 const captured: CostEvent[] = [];
 vi.mock('../../costs/events.js', () => ({
-  appendCostEventSync: (event: CostEvent) => { captured.push(event); },
+  appendCostEvent: (event: CostEvent) => { captured.push(event); },
 }));
 
 import { recordBackgroundAiCost, backgroundCostSource } from '../cost.js';

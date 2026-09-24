@@ -41,11 +41,11 @@ vi.mock('../../../src/lib/lifecycle/archive-planning.js', () => ({
   findWorkspacePath: findWorkspacePathMock,
 }));
 vi.mock('../../../src/lib/merge-set.js', () => ({
-  buildMergeSetForIssueSync: mergeSetMock,
+  buildMergeSetForIssue: mergeSetMock,
 }));
 vi.mock('../../../src/lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: () => [{ repoKey: 'main', forge: 'github' }],
-  computeWorkspaceRepoRootsSync: () => [{
+  resolveProjectReposForIssue: () => [{ repoKey: 'main', forge: 'github' }],
+  computeWorkspaceRepoRoots: () => [{
     repoKey: 'main',
     dir: '/project/workspaces/feature-min-1',
     sourceBranch: 'feature/min-1',
@@ -56,8 +56,8 @@ vi.mock('../../../src/lib/forge.js', () => ({
   getForgeAdapter: forgeAdapterMock,
 }));
 vi.mock('../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: emitActivityMock,
-  emitActivityTtsSync: emitTtsMock,
+  emitActivityEntry: emitActivityMock,
+  emitActivityTts: emitTtsMock,
 }));
 vi.mock('../../../src/lib/shadow-utils.js', () => ({
   getLinearApiKey: () => Effect.succeed(null),

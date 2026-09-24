@@ -1,7 +1,7 @@
 /**
  * Tests for release-set sync accessors (PAN-399 case-sensitivity follow-up).
  *
- * Verifies that getReleaseSetSync normalizes lowercase issue IDs to the
+ * Verifies that getReleaseSet normalizes lowercase issue IDs to the
  * canonical uppercase form stored in overdeck.db.
  */
 
@@ -56,7 +56,7 @@ function makeReleaseSet(overrides: Partial<ReleaseSet> = {}): ReleaseSet {
 }
 
 describe('release-set sync accessors', () => {
-  it('getReleaseSetSync normalizes lowercase IDs to uppercase', () => {
+  it('getReleaseSet normalizes lowercase IDs to uppercase', () => {
     seedIssue('PAN-399');
     upsertReleaseSet(makeReleaseSet());
 
@@ -66,7 +66,7 @@ describe('release-set sync accessors', () => {
     expect(loaded!.issueId).toBe('PAN-399');
   });
 
-  it('upsertReleaseSetSync stores the canonical uppercase issue ID', () => {
+  it('upsertReleaseSet stores the canonical uppercase issue ID', () => {
     seedIssue('PAN-399');
     upsertReleaseSet(makeReleaseSet({ issueId: 'pan-399' }));
 

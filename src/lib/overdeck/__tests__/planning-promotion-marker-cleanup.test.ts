@@ -19,17 +19,17 @@ vi.mock('../../agent-enrichment.js', () => ({
   countPendingAskUserQuestionsForAgent: async () => 0,
 }));
 vi.mock('../../agents.js', () => ({
-  getAgentStateSync: () => null,
+  getAgentState: () => null,
   saveAgentStateSync: vi.fn(),
 }));
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
+  emitActivityEntry: vi.fn(),
+  emitActivityTts: vi.fn(),
 }));
 vi.mock('../../pan-dir/index.js', () => ({
   WORKSPACE_RUNTIME_DIRNAME: '.overdeck',
   asPanSpecDocument: (doc: Record<string, unknown>) => doc,
-  checkPrdGateSync: vi.fn(),
+  checkPrdGate: vi.fn(),
   findSpecByIssue: () => Effect.succeed(null),
   promoteWorkspacePrdDraft: () => Effect.succeed({ promoted: false, reason: 'no draft' }),
   writeSpecDocument: () => Effect.void,
@@ -43,15 +43,15 @@ vi.mock('../../planning/spawn-planning-session.js', () => ({
 }));
 vi.mock('../../projects.js', () => ({
   extractTeamPrefix: () => 'PAN',
-  findProjectByPathSync: () => null,
-  findProjectByTeamSync: () => null,
+  findProjectByPath: () => null,
+  findProjectByTeam: () => null,
   resolveProjectFromIssueSync: () => null,
 }));
 vi.mock('../../remote/remote-agents.js', () => ({
   loadRemoteAgentState: () => null,
 }));
 vi.mock('../../tracker-utils.js', () => ({
-  resolveGitHubIssueSync: () => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3229 }),
+  resolveGitHubIssue: () => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3229 }),
 }));
 vi.mock('../../tmux.js', () => ({
   killSession: () => Effect.void,
@@ -62,7 +62,7 @@ vi.mock('../../xbrief/quality-lint.js', () => ({
   PlanQualityLintError: class PlanQualityLintError extends Error {},
 }));
 vi.mock('../issue-reads.js', () => ({
-  resolveIssueProjectPathSync: () => testState.projectPath,
+  resolveIssueProjectPath: () => testState.projectPath,
 }));
 
 import { completePlanningForIssue } from '../planning-promotion.js';

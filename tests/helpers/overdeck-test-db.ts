@@ -3,7 +3,7 @@
  *
  * The product code serves conversations/costs/events from a real
  * `overdeck.db` resolved from `OVERDECK_HOME` — the SYNC accessors
- * (`getOverdeckDatabaseSync`, …) resolve the path at CALL time, so they
+ * (`getOverdeckDatabase`, …) resolve the path at CALL time, so they
  * honour a `OVERDECK_HOME` set in `beforeEach`. PAN-3917: agent state is no
  * longer in this DB — `getOverdeckAgentStateSync`/`listOverdeckAgentStatesSync`/
  * `saveOverdeckAgentStateSync` below are compatibility names re-exported from

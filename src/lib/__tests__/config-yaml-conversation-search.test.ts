@@ -60,7 +60,7 @@ describe('conversationSearch configuration', () => {
     });
   });
 
-  it('getConversationSearchConfigSync returns the normalized conversationSearch block', () => {
+  it('getConversationSearchConfig returns the normalized conversationSearch block', () => {
     const result = getConversationSearchConfig();
     const expected = loadConfigSync().config.conversationSearch;
 

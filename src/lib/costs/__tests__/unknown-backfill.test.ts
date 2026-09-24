@@ -24,7 +24,7 @@ interface CostEventRow {
   source_file: string | null;
 }
 
-describe('reclassifyUnknownCostEventsSync', () => {
+describe('reclassifyUnknownCostEvents', () => {
   let odb: OverdeckTestDb;
 
   beforeEach(() => {

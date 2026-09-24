@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('../../../lib/agents.js', () => ({
   spawnRun: vi.fn().mockResolvedValue({ id: 'sequencer-runner', role: 'sequencer' }),
   determineModel: vi.fn().mockReturnValue('claude-opus-4-8'),
-  getAgentStateSync: vi.fn().mockReturnValue(null),
+  getAgentState: vi.fn().mockReturnValue(null),
   getAgentRuntimeStateSync: vi.fn().mockReturnValue(null),
   stopAgent: vi.fn(),
 }));

@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../internal-token.js', () => ({
   INTERNAL_TOKEN_HEADER: 'x-overdeck-internal-token',
   getInternalToken: vi.fn(() => 'test-token'),
-  getInternalTokenSync: vi.fn(() => 'test-token'),
 }));
 
 const originalFetch = globalThis.fetch;

@@ -705,7 +705,7 @@ async function fetchPlanningData(
   }
 
   if (!result.prd) {
-    // findPrdAnywhereSync covers legacy docs/prds roots and canonical
+    // findPrdAnywhere covers legacy docs/prds roots and canonical
     // drafts/<issue>.md on the state branch, which the status-only loop missed,
     // so promoted PRDs were invisible here.
     const prdLocation = findPrdAnywhere(projectPath, issueId);

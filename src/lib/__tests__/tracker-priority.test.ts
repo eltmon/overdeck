@@ -11,7 +11,6 @@ import { Effect } from 'effect';
 // Mock projects module
 vi.mock('../projects.js', () => ({
   findProjectByPath: vi.fn(),
-  findProjectByPathSync: vi.fn(),
   getIssuePrefix: vi.fn(),
 }));
 

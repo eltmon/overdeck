@@ -6,7 +6,7 @@ import { getDashboardApiUrl } from '../config.js';
 // Traefik host (e.g. https://overdeck.localhost) inherited from the dashboard
 // process env. https://overdeck.localhost 404s the API and breaks on the
 // pan→overdeck host rename, so the internal var must win.
-describe('getDashboardApiUrlSync — env precedence', () => {
+describe('getDashboardApiUrl — env precedence', () => {
   const savedOverdeck = process.env.OVERDECK_DASHBOARD_URL;
   const savedDashboard = process.env.DASHBOARD_URL;
 

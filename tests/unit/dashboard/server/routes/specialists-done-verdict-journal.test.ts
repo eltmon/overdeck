@@ -35,7 +35,7 @@ vi.mock('../../../../../src/dashboard/server/services/derived-issue-state.js', (
   getDerivedIssueState: vi.fn(async () => ({ pr: { url: PR_URL }, state: 'in-review' })),
 }));
 
-vi.mock('../../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipelineSync: vi.fn() }));
+vi.mock('../../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 
 vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
   getTmuxSessionName: vi.fn(() => 'review-agent-test'),

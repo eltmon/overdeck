@@ -14,7 +14,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   };
 });
 
-describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
+describe('ensurePolyrepoWorkspaceGitignore', () => {
   let workspacePath: string;
 
   beforeEach(() => {

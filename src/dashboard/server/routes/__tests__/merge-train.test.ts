@@ -15,7 +15,7 @@ const projectsMocks = vi.hoisted(() => ({
   getProjectSync: vi.fn(),
   // PAN-3917 (W6): the derived issue state resolves the owning project from a
   // path before it asks the forge; unregistered here, so it never asks.
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByPath: vi.fn(() => null),
 }));
 
 const mergeOrderMocks = vi.hoisted(() => ({
@@ -25,7 +25,7 @@ const mergeOrderMocks = vi.hoisted(() => ({
 
 const mergeSyncMocks = vi.hoisted(() => ({
   isMergeTrainEnabledForProject: vi.fn(() => true),
-  getUatGenerationSync: vi.fn(() => ({
+  getUatGeneration: vi.fn(() => ({
     name: 'uat/pan-otter-0610',
     projectRoot: '/repos/overdeck',
     status: 'promoted',

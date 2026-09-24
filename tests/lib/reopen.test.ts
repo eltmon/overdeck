@@ -24,13 +24,11 @@ vi.mock('../../src/lib/cloister/issue-closed.js', () => ({
 
 vi.mock('../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
-  notifyPipelineSync: vi.fn(),
 }));
 
 vi.mock('../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
   emitActivityTts: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
 }));
 
 // PAN-946 regression: the reopen flow now resolves the project path so it can

@@ -38,15 +38,11 @@ const mockCleanupAllLogs = vi.fn();
 
 vi.mock('../../../../src/lib/cloister/specialist-logs.js', () => ({
   listRunLogs: mockListRunLogs,
-  listRunLogsSync: mockListRunLogs,
   getRunLog: mockGetRunLog,
-  getRunLogSync: mockGetRunLog,
   parseLogMetadata: vi.fn(),
   getRunLogPath: vi.fn(),
   cleanupOldLogs: mockCleanupOldLogs,
-  cleanupOldLogsSync: mockCleanupOldLogs,
   cleanupAllLogs: mockCleanupAllLogs,
-  cleanupAllLogsSync: mockCleanupAllLogs,
 }));
 
 // Mock specialists module

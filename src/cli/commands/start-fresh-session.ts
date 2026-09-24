@@ -76,9 +76,9 @@ export async function prepareFreshWorkAgentSession(
   const messages: string[] = [];
 
   const { getAgentState, stopAgent, wipeAgentStateDirs } = await import('../../lib/agents.js');
-  const { assertCanStartFresh } = await import('../../lib/work-agent-lifecycle.js');
+  const { assertCanStartFresh: assertCanStartFreshImpl } = await import('../../lib/work-agent-lifecycle.js');
   const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
-  const assertCanStartFresh = deps.assertCanStartFresh ?? assertCanStartFresh;
+  const assertCanStartFresh = deps.assertCanStartFresh ?? assertCanStartFreshImpl;
   const sessionLive = deps.sessionLive ?? agentSessionLive;
   const stop = deps.stopAgent ?? ((id: string) => Effect.runPromise(stopAgent(id)));
 

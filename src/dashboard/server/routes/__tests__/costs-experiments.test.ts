@@ -11,10 +11,10 @@ import { jsonResponse } from '../../http-helpers.js';
 
 type HttpServerResponse = HttpServerResponseModule.HttpServerResponse;
 
-// Mock getCavemanExperimentDataSync so tests don't require a real DB
+// Mock getCavemanExperimentData so tests don't require a real DB
 vi.mock('../../../../lib/overdeck/cost-sync.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/overdeck/cost-sync.js')>();
-  return { ...actual, getCavemanExperimentDataSync: vi.fn() };
+  return { ...actual, getCavemanExperimentData: vi.fn() };
 });
 
 import { getCavemanExperimentData } from '../../../../lib/overdeck/cost-sync.js';

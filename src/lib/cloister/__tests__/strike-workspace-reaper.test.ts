@@ -9,7 +9,7 @@ vi.mock('child_process', async (importOriginal) => {
 
 const sessionExistsMock = vi.hoisted(() => vi.fn((_session: string) => Effect.succeed(false)));
 vi.mock('../../tmux.js', () => ({ sessionExists: sessionExistsMock }));
-vi.mock('../../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn() }));
+vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
 
 import { reapMergedStrikeWorkspaces } from '../strike-workspace-reaper.js';
 

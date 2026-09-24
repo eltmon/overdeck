@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../tracker-utils.js', () => ({
-  resolveGitHubIssueSync: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -45,7 +45,7 @@ describe('applyIssueParkedLabel – FR-15 parked label on gate=blocked', () => {
     expect(mockExec).not.toHaveBeenCalled();
   });
 
-  it('resolves the issueId via resolveGitHubIssueSync', async () => {
+  it('resolves the issueId via resolveGitHubIssue', async () => {
     mockResolve.mockReturnValue({ isGitHub: true, owner: 'acme', repo: 'myproject', prefix: 'ACME', number: 42 });
 
     await applyIssueParkedLabel('ACME-42');

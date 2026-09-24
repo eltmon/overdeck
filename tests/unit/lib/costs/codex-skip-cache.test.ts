@@ -6,8 +6,8 @@ import { Effect, Layer } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../src/lib/cost-parsers/codex-parser.js', () => ({
-  parseCodexSessionCostEventsSync: vi.fn(),
-  parseCodexSessionSync: vi.fn(() => null),
+  parseCodexSessionCostEvents: vi.fn(),
+  parseCodexSession: vi.fn(() => null),
 }));
 
 import { parseCodexSessionCostEvents } from '../../../../src/lib/cost-parsers/codex-parser.js';

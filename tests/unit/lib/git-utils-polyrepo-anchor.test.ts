@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const repoRootsMock = vi.hoisted(() => ({
-  resolveWorkspaceRepoRootsSync: vi.fn(),
+  resolveWorkspaceRepoRoots: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/project-repos.js', async () => {
   const actual = await vi.importActual<typeof import('../../../src/lib/project-repos.js')>('../../../src/lib/project-repos.js');
   return {
     ...actual,
-    resolveWorkspaceRepoRootsSync: repoRootsMock.resolveWorkspaceRepoRootsSync,
+    resolveWorkspaceRepoRoots: repoRootsMock.resolveWorkspaceRepoRoots,
   };
 });
 
@@ -31,7 +31,7 @@ function acceptsHeadAnchor(_anchor: HeadAnchor): void {}
 
 describe('polyrepo workspace head anchors', () => {
   beforeEach(() => {
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReset();
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReset();
   });
 
   it('only accepts producer-issued values as head anchors', () => {
@@ -54,12 +54,12 @@ describe('polyrepo workspace head anchors', () => {
       gitShow,
     )).resolves.toBe('plain diff\n');
 
-    expect(repoRootsMock.resolveWorkspaceRepoRootsSync).not.toHaveBeenCalled();
+    expect(repoRootsMock.resolveWorkspaceRepoRoots).not.toHaveBeenCalled();
     expect(gitShow).toHaveBeenCalledWith('/workspace', FE_SHA, ['--stat']);
   });
 
   it('runs git show once per sub-repo and labels the concatenated diffs', async () => {
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReturnValue([
       {
         repoKey: 'fe',
         dir: '/workspace/fe',
@@ -110,7 +110,7 @@ describe('polyrepo workspace head anchors', () => {
   });
 
   it('reports an unresolved repo instead of passing the composite to git', async () => {
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([]);
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReturnValue([]);
     const gitShow = vi.fn();
 
     await expect(renderWorkspaceGitShow(

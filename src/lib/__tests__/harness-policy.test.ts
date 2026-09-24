@@ -83,7 +83,7 @@ describe('canUseHarness', () => {
     }
   })
 
-  it('explicitly allows canUseHarnessSync("codex", ...) — no ToS block', () => {
+  it('explicitly allows canUseHarness("codex", ...) — no ToS block', () => {
     expect(canUseHarness('codex', MODEL_BY_PROVIDER.anthropic, 'subscription')).toEqual({ allowed: true })
     expect(canUseHarness('codex', MODEL_BY_PROVIDER.openai, 'api-key')).toEqual({ allowed: true })
     expect(canUseHarness('codex', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })

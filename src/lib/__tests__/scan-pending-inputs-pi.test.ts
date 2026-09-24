@@ -1,5 +1,5 @@
 /**
- * PAN-3766 — scanPendingInputsPromise must recognize ohmypi transcripts. Pi's
+ * PAN-3766 — scanPendingInputs must recognize ohmypi transcripts. Pi's
  * `ask` tool is the AskUserQuestion analogue: an assistant `toolCall` content
  * item opens the question, a `toolResult` message (including pi's synthetic
  * interrupt-skip) resolves it. Detection is per-line, so these fixtures use the
@@ -110,7 +110,7 @@ function claudeAskUserQuestion(): string {
   })
 }
 
-describe('scanPendingInputsPromise — ohmypi transcripts (PAN-3766)', () => {
+describe('scanPendingInputs — ohmypi transcripts (PAN-3766)', () => {
   let dir: string
   let file: string
 

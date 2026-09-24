@@ -19,7 +19,7 @@ const { mockFindProject, mockRunQualityGates } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
-  findProjectByPathSync: mockFindProject,
+  findProjectByPath: mockFindProject,
   resolveProjectFromIssueSync: vi.fn(() => null),
 }));
 
@@ -46,7 +46,7 @@ vi.mock('../../../../src/lib/cloister/test-skip-run.js', () => ({
 vi.mock('../../../../src/lib/cloister/verification-check-run.js', () => ({
   postVerificationCheckRun: vi.fn(async () => null),
 }));
-vi.mock('../../../../src/lib/activity-logger.js', () => ({ emitActivityEntrySync: vi.fn() }));
+vi.mock('../../../../src/lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
 vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
   resolveIssueFeedbackTarget: vi.fn(async () => ({ needsYou: true, reason: 'no agent in this test' })),
   surfaceIssueFeedbackNeedsYou: vi.fn(async () => undefined),
@@ -57,7 +57,7 @@ const { mockSetAgentPaused, mockStopAgent } = vi.hoisted(() => ({
 }));
 vi.mock('../../../../src/lib/agents.js', () => ({
   clearAgentPaused: vi.fn(() => Effect.void),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   messageAgent: vi.fn(async () => ({ delivered: true, queuedToMail: false })),
   setAgentPaused: (...args: unknown[]) => { mockSetAgentPaused(...args); return Effect.void; },
   stopAgent: (...args: unknown[]) => { mockStopAgent(...args); return Effect.void; },
@@ -67,8 +67,8 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
 }));
 vi.mock('../../../../src/lib/telemetry/pipeline.js', () => ({ capturePipelineStageForIssue: vi.fn() }));
 vi.mock('../../../../src/lib/github-app.js', () => ({ postOverdeckTestsStatus: vi.fn(async () => undefined) }));
-vi.mock('../../../../src/lib/xbrief/acceptance-criteria.js', () => ({ getXBriefACStatusSync: vi.fn(() => null) }));
-vi.mock('../../../../src/lib/work/done-preflight.js', () => ({ checkIncompletePlanItemsPromise: vi.fn(async () => []) }));
+vi.mock('../../../../src/lib/xbrief/acceptance-criteria.js', () => ({ getXBriefACStatus: vi.fn(() => null) }));
+vi.mock('../../../../src/lib/work/done-preflight.js', () => ({ checkIncompletePlanItems: vi.fn(async () => []) }));
 
 import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
 import { readVerificationArtifact, writeVerificationArtifact } from '../../../../src/lib/cloister/verification-artifact.js';

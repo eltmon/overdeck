@@ -18,24 +18,24 @@ const mocks = vi.hoisted(() => ({
   loadCloisterConfigSync: vi.fn(),
   listRunningAgents: vi.fn(),
   listAgentStates: vi.fn(),
-  setAgentYieldedSync: vi.fn(),
-  clearYieldForResumeSync: vi.fn(),
+  setAgentYielded: vi.fn(),
+  clearYieldForResume: vi.fn(),
   stopAgent: vi.fn(),
   resumeAgent: vi.fn(),
   getReviewStatusSync: vi.fn(),
   listSessions: vi.fn(),
   isAgentIdleForNudge: vi.fn(),
   assessMemoryPressure: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
-  logDeaconEventSync: vi.fn(),
+  emitActivityEntry: vi.fn(),
+  logDeaconEvent: vi.fn(),
   countRunningAgents: vi.fn(async () => ({ work: 0, advancing: 0, swarm: 0, total: 0 })),
 }));
 
 vi.mock('../../agents.js', () => ({
   listRunningAgents: mocks.listRunningAgents,
   listAgentStates: mocks.listAgentStates,
-  setAgentYieldedSync: mocks.setAgentYieldedSync,
-  clearYieldForResumeSync: mocks.clearYieldForResumeSync,
+  setAgentYielded: mocks.setAgentYielded,
+  clearYieldForResume: mocks.clearYieldForResume,
   stopAgent: mocks.stopAgent,
   resumeAgent: mocks.resumeAgent,
 }));
@@ -52,11 +52,11 @@ vi.mock('../../tmux.js', () => ({
 }));
 
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: mocks.emitActivityEntrySync,
+  emitActivityEntry: mocks.emitActivityEntry,
 }));
 
 vi.mock('../../persistent-logger.js', () => ({
-  logDeaconEventSync: mocks.logDeaconEventSync,
+  logDeaconEvent: mocks.logDeaconEvent,
 }));
 
 vi.mock('../config.js', () => ({
@@ -81,8 +81,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.stopAgent.mockReturnValue(Effect.void);
   mocks.listSessions.mockReturnValue(Effect.succeed([]));
-  mocks.setAgentYieldedSync.mockReturnValue(true);
-  mocks.clearYieldForResumeSync.mockReturnValue(true);
+  mocks.setAgentYielded.mockReturnValue(true);
+  mocks.clearYieldForResume.mockReturnValue(true);
   mocks.resumeAgent.mockResolvedValue({ success: true });
   mocks.assessMemoryPressure.mockResolvedValue({ band: 'ok', availableBytes: 8e9 });
   mocks.getReviewStatusSync.mockReturnValue(null);
@@ -111,7 +111,7 @@ describe('resumeYieldedAgents', () => {
       const resumed = await pending;
 
       expect(resumed).toEqual(['agent-older', 'agent-newer']);
-      expect(mocks.clearYieldForResumeSync).toHaveBeenNthCalledWith(1, 'agent-older');
+      expect(mocks.clearYieldForResume).toHaveBeenNthCalledWith(1, 'agent-older');
       expect(mocks.resumeAgent).toHaveBeenNthCalledWith(1, 'agent-older');
     } finally {
       vi.useRealTimers();

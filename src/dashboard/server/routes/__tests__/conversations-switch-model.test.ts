@@ -55,7 +55,7 @@ vi.mock('../../../../lib/conversations/smart-compaction.js', () => ({
 }));
 
 vi.mock('../../../../lib/providers.js', () => ({
-  getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
+  getProviderForModel: vi.fn(() => ({ name: 'anthropic' })),
   piProviderForModel: vi.fn(() => 'anthropic'),
   qualifyPiModel: vi.fn((m: string) => m),
 }));

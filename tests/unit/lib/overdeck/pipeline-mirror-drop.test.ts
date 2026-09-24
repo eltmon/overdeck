@@ -52,7 +52,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe('dropPipelineStateMirrorTablesSync', () => {
+describe('dropPipelineStateMirrorTables', () => {
   it('leaves every table alone in peer mode', () => {
     const result = dropPipelineStateMirrorTables(db, PEER_ENV);
 
@@ -103,6 +103,6 @@ describe('dropPipelineStateMirrorTablesSync', () => {
       source.indexOf('function ensureRuntimeIndexesSync'),
       source.indexOf('PIPELINE_MIRROR_DROPPED_SETTING'),
     );
-    expect(ensureBody).not.toContain('dropPipelineStateMirrorTablesSync');
+    expect(ensureBody).not.toContain('dropPipelineStateMirrorTables');
   });
 });

@@ -16,19 +16,19 @@ describe('providers-ohmypi: new omp-routable providers in registry', () => {
     expect(PROVIDERS.mistral.defaultHarness).toBe('ohmypi');
   });
 
-  it('getProviderForModelSync resolves a groq model to the groq provider', () => {
+  it('getProviderForModel resolves a groq model to the groq provider', () => {
     const p = getProviderForModel('llama-3.3-70b-versatile');
     expect(p.name).toBe('groq');
     expect(p.defaultHarness).toBe('ohmypi');
   });
 
-  it('getProviderForModelSync resolves a cerebras model to the cerebras provider', () => {
+  it('getProviderForModel resolves a cerebras model to the cerebras provider', () => {
     const p = getProviderForModel('llama3.3-70b');
     expect(p.name).toBe('cerebras');
     expect(p.defaultHarness).toBe('ohmypi');
   });
 
-  it('getProviderForModelSync resolves a mistral model to the mistral provider', () => {
+  it('getProviderForModel resolves a mistral model to the mistral provider', () => {
     const p = getProviderForModel('mistral-large-latest');
     expect(p.name).toBe('mistral');
     expect(p.defaultHarness).toBe('ohmypi');

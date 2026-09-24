@@ -242,7 +242,7 @@ describe('normalizeIssueId', () => {
 
 
 
-describe('resolveBareNumericIdSync (PAN-1173 regression)', () => {
+describe('resolveBareNumericId (PAN-1173 regression)', () => {
   it('returns null when no agent state matches the bare number', () => {
     const overdeckHome = makeOverdeckHome();
     writeAgentState(overdeckHome, 'PAN-4');

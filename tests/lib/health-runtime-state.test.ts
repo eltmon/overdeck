@@ -42,7 +42,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
 vi.mock('../../src/lib/agents.js', () => ({
   recoverAgent: recoverAgentMock,
   stopAgent: stopAgentMock,
-  getAgentStateSync: getAgentStateMock,
+  getAgentState: getAgentStateMock,
   getAgentRuntimeState: getAgentRuntimeStateMock,
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));
