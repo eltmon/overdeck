@@ -22,11 +22,14 @@ export const LEGACY_TMUX_PROBE_TIMEOUT_MS = 2_000;
  * the exit code in `code` (only the sync call sets `status`), and with
  * `killed` when its timeout fired. A tmux server that is not running, or whose
  * socket is gone, holds no session: that is `missing`, not `error` — on a
- * Herdr host with no tmux server, every probe lands there.
+ * Herdr host with no tmux server, every probe lands there. A host with no
+ * tmux binary at all (`ENOENT`) holds none either.
  */
 export function classifyHasSessionFailure(cause: unknown): Exclude<TmuxSessionAnswer, 'exists'> {
   const error = cause as { stderr?: string | Buffer; code?: string | number; killed?: boolean };
   if (error?.killed) return 'error';
+  // No tmux binary on this host: it can hold no tmux session (PAN-3923 review).
+  if (error?.code === 'ENOENT') return 'missing';
   const stderr = String(error?.stderr ?? '');
   const noSuchSession = /can't find session:|no server running on|error connecting to .*\(No such file or directory\)/i;
   return error?.code === 1 && noSuchSession.test(stderr) ? 'missing' : 'error';

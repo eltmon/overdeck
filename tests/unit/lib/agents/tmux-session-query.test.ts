@@ -20,6 +20,10 @@ describe('classifyHasSessionFailure', () => {
     })).toBe('missing');
   });
 
+  it('reads a host with no tmux binary as missing: it can hold no session', () => {
+    expect(classifyHasSessionFailure({ code: 'ENOENT', stderr: '' })).toBe('missing');
+  });
+
   it('reads a timeout (the probe was killed) as error', () => {
     expect(classifyHasSessionFailure({ killed: true, stderr: '' })).toBe('error');
   });
@@ -29,7 +33,6 @@ describe('classifyHasSessionFailure', () => {
       code: 1,
       stderr: 'error connecting to /tmp/tmux-1000/overdeck (Permission denied)\n',
     })).toBe('error');
-    expect(classifyHasSessionFailure({ code: 'ENOENT', stderr: '' })).toBe('error');
     expect(classifyHasSessionFailure(new Error('boom'))).toBe('error');
   });
 });

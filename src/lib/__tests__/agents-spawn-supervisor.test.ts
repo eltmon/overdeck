@@ -123,6 +123,12 @@ function mockSpawnDependencies(): void {
     };
   });
 
+  // The tmux liveness path re-asks a false sessionExists through the
+  // three-part probe; with tmux.js mocked it has no real tmux to ask.
+  vi.doMock('../agents/tmux-session-query.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../agents/tmux-session-query.js')),
+    queryTmuxSession: vi.fn(async () => 'missing'),
+  }));
   vi.doMock('../tmux.js', () => ({
     createSessionSync: vi.fn(),
     createSession: vi.fn((...args: unknown[]) => Effect.sync(() => createSessionMock(...args))),
@@ -247,6 +253,7 @@ afterEach(() => {
   vi.doUnmock('../runtimes/pi-fifo.js');
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
+  vi.doUnmock('../agents/tmux-session-query.js');
   vi.doUnmock('../workspace/stack-health.js');
   vi.doUnmock('../terminal-backends/select.js');
   vi.doUnmock('../xbrief/io.js');
@@ -596,6 +603,41 @@ describe('spawnAgent PTY supervisor wiring', () => {
       paneId: expect.any(String),
       terminalId: expect.any(String),
     });
+  });
+
+  // PAN-3923 review (F2): both roles sit idle at their prompt on Herdr while
+  // their work is in progress. A re-dispatch of the role (reDispatchVerification,
+  // the tier hooks' ensureSupervisor) must refuse, never reap them.
+  it('refuses a re-dispatch over an idle review parent or tier supervisor on Herdr, and never stops them', async () => {
+    const isAliveMock = vi.fn(async () => ({ alive: true as const, paneAlive: true as const, backendState: 'idle' as const }));
+    vi.doMock('../terminal-backends/launch.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../terminal-backends/launch.js')),
+      agentPaneExists: vi.fn(async () => true),
+    }));
+    vi.doMock('../agents/liveness.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../agents/liveness.js')),
+      isAlive: isAliveMock,
+      // Work activity long stale: only the role allowlist keeps them.
+      idleAgeMs: vi.fn(() => 60 * 60_000),
+    }));
+    const { spawnRun, saveAgentStateSync } = await import('../agents.js');
+    saveAgentStateSync(baseState({ id: 'agent-pan-1405-review', role: 'review', status: 'running', reviewRunId: 'run-1' }));
+    saveAgentStateSync(baseState({
+      id: 'agent-pan-1405-review-supervisor', role: 'review', status: 'running', reviewSubRole: 'supervisor',
+    }));
+
+    await expect(spawnRun('PAN-1405', 'review', { workspace, model: 'claude-sonnet-4-6' }))
+      .rejects.toThrow('Role run agent-pan-1405-review already running');
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace, model: 'claude-sonnet-4-6', agentId: 'agent-pan-1405-review-supervisor', subRole: 'supervisor',
+    })).rejects.toThrow('Role run agent-pan-1405-review-supervisor already running');
+
+    expect(isAliveMock).toHaveBeenCalledWith('agent-pan-1405-review');
+    expect(isAliveMock).toHaveBeenCalledWith('agent-pan-1405-review-supervisor');
+    expect(stopAgentMock).not.toHaveBeenCalled();
+    expect(createSessionMock).not.toHaveBeenCalled();
+    vi.doUnmock('../terminal-backends/launch.js');
+    vi.doUnmock('../agents/liveness.js');
   });
 
   it('persists fresh role-run session origin beside the Claude session id', async () => {
