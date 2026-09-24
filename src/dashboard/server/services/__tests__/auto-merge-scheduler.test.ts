@@ -360,14 +360,36 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     expect(outcomes[0]).toMatchObject({ scheduled: false, reason: `auto-merge already ${status}` });
   });
 
-  it.each(['cancelled', 'failed'] as const)('keeps a %s auto-merge for the same PR head', async (status) => {
-    const { deps, insert } = world({ labels: ['auto-merge'], latest: row(status, { headSha: 'abc123' }) });
+  it('keeps a failed auto-merge for the same PR head', async () => {
+    const { deps, insert } = world({ labels: ['auto-merge'], latest: row('failed', { headSha: 'abc123' }) });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
+    expect(outcomes[0]).toMatchObject({ scheduled: false, reason: 'auto-merge failed for this PR head' });
+  });
+
+  it.each([
+    ['the same head', { headSha: 'abc123' }],
+    ['an older head', { headSha: 'old999' }],
+    ['another PR', { prUrl: `${PR_URL}0`, headSha: 'old999' }],
+  ] as const)('keeps an operator cancel on %s until the operator re-schedules, with no forge read', async (_label, where) => {
+    const { deps, insert, factsReads } = world({ labels: ['auto-merge'], latest: row('cancelled', where) });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
+    expect(factsReads).not.toHaveBeenCalled();
+    expect(outcomes[0]).toMatchObject({
+      scheduled: false,
+      reason: 'auto-merge cancelled by the operator; re-schedule it to resume',
+    });
+  });
+
+  it.each(['blocked', 'failed'] as const)('does not re-arm a %s row written before heads were recorded', async (status) => {
+    const { deps, insert } = world({ labels: ['auto-merge'], latest: row(status) });
     const outcomes = await scheduleReadyAutoMerges(deps);
     expect(insert).not.toHaveBeenCalled();
     expect(outcomes[0]).toMatchObject({ scheduled: false, reason: `auto-merge ${status} for this PR head` });
   });
 
-  it.each(['cancelled', 'failed', 'blocked'] as const)('re-arms a %s auto-merge once the PR has a new head', async (status) => {
+  it.each(['failed', 'blocked'] as const)('re-arms a %s auto-merge once the PR has a new head', async (status) => {
     const { deps, insert } = world({ labels: ['auto-merge'], latest: row(status, { headSha: 'old999' }) });
     const outcomes = await scheduleReadyAutoMerges(deps);
     expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
@@ -429,12 +451,20 @@ describe('latestAutoMergeAllowsSchedule (#3983)', () => {
     expect(latestAutoMergeAllowsSchedule(row('merged', { headSha: 'abc123' }), pr)).toBe(true);
   });
 
-  it('holds a cancel for its own PR and head only', () => {
+  it('holds an operator cancel for the whole issue, whatever the PR or head', () => {
     expect(latestAutoMergeAllowsSchedule(row('cancelled', { headSha: 'abc123' }), pr)).toBe(false);
     expect(latestAutoMergeAllowsSchedule(row('cancelled'), pr)).toBe(false);
-    expect(latestAutoMergeAllowsSchedule(row('cancelled', { headSha: 'abc' }), pr)).toBe(false);
-    expect(latestAutoMergeAllowsSchedule(row('cancelled', { headSha: 'def456' }), pr)).toBe(true);
-    expect(latestAutoMergeAllowsSchedule(row('cancelled', { prUrl: `${PR_URL}0`, headSha: 'abc123' }), pr)).toBe(true);
+    expect(latestAutoMergeAllowsSchedule(row('cancelled', { headSha: 'def456' }), pr)).toBe(false);
+    expect(latestAutoMergeAllowsSchedule(row('cancelled', { prUrl: `${PR_URL}0`, headSha: 'abc123' }), pr)).toBe(false);
+  });
+
+  it('re-arms blocked and failed rows only on a head it can compare', () => {
+    expect(latestAutoMergeAllowsSchedule(row('blocked'), pr)).toBe(false);
+    expect(latestAutoMergeAllowsSchedule(row('failed'), pr)).toBe(false);
+    expect(latestAutoMergeAllowsSchedule(row('failed', { headSha: 'abc' }), pr)).toBe(false);
+    expect(latestAutoMergeAllowsSchedule(row('failed', { headSha: 'def456' }), pr)).toBe(true);
+    expect(latestAutoMergeAllowsSchedule(row('blocked', { headSha: 'abc123' }), pr)).toBe(true);
+    expect(latestAutoMergeAllowsSchedule(row('failed', { prUrl: `${PR_URL}0` }), pr)).toBe(true);
   });
 });
 

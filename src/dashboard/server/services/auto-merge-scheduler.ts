@@ -21,8 +21,8 @@
  *   - the one merge gate, `evaluateIssueMergeGate`, says the PR is ready: its
  *     approval is a forge review or a trusted verdict marker comment;
  *   - the issue's latest auto-merge row allows a new one
- *     ({@link latestAutoMergeAllowsSchedule}): nothing pending or merging, and
- *     no cancel or failed merge for this same PR head;
+ *     ({@link latestAutoMergeAllowsSchedule}): nothing pending or merging, no
+ *     operator cancel on the issue, and no failed merge at this same PR head;
  *   - the schedule door accepts it (the gate again, and no blocker label). The
  *     insert re-checks the latest row in its transaction, so a cancel that
  *     lands during the pass is never overwritten.
@@ -125,22 +125,27 @@ function sameCommit(a: string, b: string): boolean {
  *
  *   - none, or `merged`: yes;
  *   - `pending` / `merging`: no, it is already scheduled;
- *   - a row for another PR, or for this PR at another head: yes, a new push
- *     re-arms whatever held the old one;
- *   - this PR and head (or a row that predates head tracking): `cancelled`
- *     and `failed` (a merge was attempted) stay; `blocked` (the executor's
- *     pre-merge refusal) re-arms, because the gate passing now means the
- *     block's reason has cleared.
+ *   - `cancelled`: no, for the whole issue, whatever PR or head it now has. An
+ *     operator's cancel means stop; only the operator re-schedules it (the
+ *     schedule endpoint), which writes a newer row;
+ *   - `blocked` / `failed` for another PR, or for this PR at another head: yes,
+ *     the new push re-arms it;
+ *   - `blocked` / `failed` without a recorded head (written before heads were
+ *     tracked): no, a new head cannot be told apart from the old one;
+ *   - the same head: `failed` (a merge was attempted) stays; `blocked` (the
+ *     executor's pre-merge refusal) re-arms, because the gate passing now means
+ *     the block's reason has cleared.
  */
 export function latestAutoMergeAllowsSchedule(
   latest: PendingAutoMerge | null,
   pr: Pick<PrFacts, 'url' | 'headSha'>,
 ): boolean {
   if (!latest || latest.status === 'merged') return true;
-  if (latest.status === 'pending' || latest.status === 'merging') return false;
+  if (latest.status === 'pending' || latest.status === 'merging' || latest.status === 'cancelled') return false;
   const samePr = !pr.url || latest.prUrl.replace(/\/+$/, '').toLowerCase() === pr.url.replace(/\/+$/, '').toLowerCase();
   if (!samePr) return true;
-  if (latest.headSha && pr.headSha && !sameCommit(latest.headSha, pr.headSha)) return true;
+  if (!latest.headSha) return false;
+  if (pr.headSha && !sameCommit(latest.headSha, pr.headSha)) return true;
   return latest.status === 'blocked';
 }
 
@@ -229,6 +234,10 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
         const latest = latestAutoMerge(issueId);
         if (latest?.status === 'pending' || latest?.status === 'merging') {
           skip(`auto-merge already ${latest.status}`);
+          continue;
+        }
+        if (latest?.status === 'cancelled') {
+          skip('auto-merge cancelled by the operator; re-schedule it to resume');
           continue;
         }
 
