@@ -14,33 +14,26 @@
  * liveness and is read live.
  */
 
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { Effect } from 'effect';
 
 import { exitCli } from '../exit.js';
-import { resolveIssueIdSync } from '../../lib/issue-id.js';
+import { resolveIssueId } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
-// Adapters register themselves at import time (registry.ts) -- pull both in
-// for their side effect, same as terminal-backends/launch.ts, so the real
-// defaultResolveBackend() below has something to resolve.
-import '../../lib/terminal-backends/herdr.js';
-import '../../lib/terminal-backends/tmux.js';
-import { resolveTerminalBackend } from '../../lib/terminal-backends/registry.js';
-import { selectTerminalBackend } from '../../lib/terminal-backends/select.js';
+import { createItemWorktree } from '../../lib/workspaces/item-worktree.js';
+// launch.js registers both adapters at import time and owns the one backend
+// resolution (policy + Herdr availability probe, PAN-3956).
+import { resolveLaunchBackend } from '../../lib/terminal-backends/launch.js';
 import {
   isUnsupported,
   type AgentPaneRef,
   type TerminalBackend,
 } from '../../lib/terminal-backends/types.js';
-
-const execFileAsync = promisify(execFile);
 
 export interface SpawnOptions {
   issue?: string;
@@ -56,40 +49,12 @@ export interface SpawnDeps {
   readonly createWorktree?: (workspacePath: string, itemId: string) => Promise<string>;
 }
 
-async function defaultResolveBackend(): Promise<TerminalBackend> {
-  const { loadConfigSync } = await import('../../lib/config-yaml/load.js');
-  const selection = await selectTerminalBackend(loadConfigSync().config);
-  return resolveTerminalBackend(selection.backend);
-}
-
 /**
- * `<workspace>/.swarm/<item>/` as a git worktree on its own item branch, cut
- * from the issue's feature branch. The branch matters: a detached worktree
- * orphans everything the worker commits. An existing worktree is reused.
- * Async git only.
+ * The same resolution every launcher uses: an unavailable Herdr is a
+ * `TerminalBackendUnavailableError` naming `pan install`, not a raw socket error.
  */
-async function defaultCreateWorktree(workspacePath: string, itemId: string): Promise<string> {
-  const path = join(workspacePath, '.swarm', itemId);
-  if (existsSync(path)) return path;
-
-  const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: workspacePath });
-  const featureBranch = stdout.trim();
-  const itemBranch = `${featureBranch}/${itemId}`;
-
-  const branchExists = await execFileAsync(
-    'git',
-    ['rev-parse', '--verify', '--quiet', `refs/heads/${itemBranch}`],
-    { cwd: workspacePath },
-  ).then(() => true, () => false);
-
-  await execFileAsync(
-    'git',
-    branchExists
-      ? ['worktree', 'add', path, itemBranch]
-      : ['worktree', 'add', '-b', itemBranch, path, featureBranch],
-    { cwd: workspacePath },
-  );
-  return path;
+async function defaultResolveBackend(): Promise<TerminalBackend> {
+  return resolveLaunchBackend();
 }
 
 export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}): Promise<void> {
@@ -106,7 +71,7 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
     return exitCli(1);
   }
 
-  const issueId = resolveIssueIdSync(options.issue);
+  const issueId = resolveIssueId(options.issue);
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved?.projectPath) {
     console.error(chalk.red(`Could not resolve a registered project for ${issueId}.`));
@@ -129,7 +94,7 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
   const harness = options.harness ?? 'claude-code';
   const filesScope = item.metadata?.files_scope;
   const cwd = filesScope?.length
-    ? await (deps.createWorktree ?? defaultCreateWorktree)(workspacePath, item.id)
+    ? await (deps.createWorktree ?? createItemWorktree)(workspacePath, item.id)
     : workspacePath;
 
   const backend = await (deps.resolveBackend ?? defaultResolveBackend)();

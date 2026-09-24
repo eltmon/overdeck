@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const projectMocks = vi.hoisted(() => ({
   getProjectSync: vi.fn(),
-  findProjectByPathSync: vi.fn(),
+  findProjectByPath: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
@@ -29,11 +29,11 @@ vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
   return {
     ...actual,
     getProjectSync: (...args: unknown[]) => projectMocks.getProjectSync(...args),
-    findProjectByPathSync: (...args: unknown[]) => projectMocks.findProjectByPathSync(...args),
+    findProjectByPath: (...args: unknown[]) => projectMocks.findProjectByPath(...args),
   };
 });
 
-import { getBook, getBookAsync, listBooks } from '../../../../src/lib/orders/resolver.js';
+import { getBookAsync, listBooks } from '../../../../src/lib/orders/resolver.js';
 import { addItems, removeItem } from '../../../../src/lib/orders/writer.js';
 
 const at = '2026-08-09T12:00:00.000Z';
@@ -88,47 +88,45 @@ afterEach(() => {
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
   rmSync(fakeHome, { recursive: true, force: true });
   projectMocks.getProjectSync.mockReset();
-  projectMocks.findProjectByPathSync.mockReset();
+  projectMocks.findProjectByPath.mockReset();
 });
 
 describe('order-book issue id normalization', () => {
   it('expands bare-number items and prereqs through the read door', async () => {
     const root = panRoot();
-    projectMocks.findProjectByPathSync.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
+    projectMocks.findProjectByPath.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
     writeBook(root, book([item('2351', ['2350']), item('PAN-1166')]));
 
-    const read = getBook(root, '2026-08-09-anywhere');
+    const read = await getBookAsync(root, '2026-08-09-anywhere');
     expect(read?.items.map((entry) => entry.issue)).toEqual(['PAN-2351', 'PAN-1166']);
     expect(read?.items[0]?.prereqs).toEqual(['PAN-2350']);
     expect(listBooks(root)[0]?.items.map((entry) => entry.issue)).toEqual(['PAN-2351', 'PAN-1166']);
-    const asyncRead = await getBookAsync(root, '2026-08-09-anywhere');
-    expect(asyncRead?.items.map((entry) => entry.issue)).toEqual(['PAN-2351', 'PAN-1166']);
     // The stored file is untouched — read-door normalization is not surgery.
     expect(storedBook(root, '2026-08-09-anywhere').items.map((entry) => entry.issue)).toEqual(['2351', 'PAN-1166']);
   });
 
-  it('leaves ids untouched when no project prefix is derivable', () => {
+  it('leaves ids untouched when no project prefix is derivable', async () => {
     const root = panRoot();
-    projectMocks.findProjectByPathSync.mockReturnValue(null);
+    projectMocks.findProjectByPath.mockReturnValue(null);
     writeBook(root, book([item('2351')]));
 
-    expect(getBook(root, '2026-08-09-anywhere')?.items.map((entry) => entry.issue)).toEqual(['2351']);
+    expect((await getBookAsync(root, '2026-08-09-anywhere'))?.items.map((entry) => entry.issue)).toEqual(['2351']);
   });
 
-  it('derives the prefix from the checkout that contains the pan directory', () => {
+  it('derives the prefix from the checkout that contains the pan directory', async () => {
     const root = join(fakeHome, 'Projects', 'legacy-checkout', '.pan');
     roots.push(root);
     mkdirSync(join(root, 'orders'), { recursive: true });
     writeFileSync(join(root, 'orders', 'index.json'), '[]', 'utf8');
-    projectMocks.findProjectByPathSync.mockReturnValue({ name: 'legacy', path: root, issue_prefix: 'LEG' });
+    projectMocks.findProjectByPath.mockReturnValue({ name: 'legacy', path: root, issue_prefix: 'LEG' });
     writeBook(root, book([item('42')]));
 
-    expect(getBook(root, '2026-08-09-anywhere')?.items[0]?.issue).toBe('LEG-42');
+    expect((await getBookAsync(root, '2026-08-09-anywhere'))?.items[0]?.issue).toBe('LEG-42');
   });
 
   it('canonicalizes bare numbers at the write door (addItems)', async () => {
     const root = panRoot();
-    projectMocks.findProjectByPathSync.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
+    projectMocks.findProjectByPath.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
     writeBook(root, book([]));
 
     await addItems(root, '2026-08-09-anywhere', [item('2351'), item('pan-2352')], 'operator');
@@ -138,7 +136,7 @@ describe('order-book issue id normalization', () => {
 
   it('matches per-issue verbs by canonical id (removeItem accepts bare numbers)', async () => {
     const root = panRoot();
-    projectMocks.findProjectByPathSync.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
+    projectMocks.findProjectByPath.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
     writeBook(root, book([item('2351'), item('2352')]));
 
     const updated = await removeItem(root, '2026-08-09-anywhere', '2351');

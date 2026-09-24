@@ -9,7 +9,6 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { Effect } from 'effect';
 
 const mockGenerateSmartSummary = vi.fn();
 const mockGenerateFallbackSummary = vi.fn();
@@ -38,7 +37,7 @@ let sessionFilePath: (workspace: string, sessionId: string) => string;
 
 beforeAll(async () => {
   ({ buildCompactRecoverySeed } = await import('../../src/lib/agents.js'));
-  ({ sessionFilePath } = await import('../../src/lib/paths.js'));
+  ({ sessionFilePath } = await import('../../src/lib/runtimes/storage/claude-code.js'));
 });
 
 function writeAgent(opts: { workspace?: string; sessionId?: string }): void {
@@ -57,13 +56,13 @@ function writeAgent(opts: { workspace?: string; sessionId?: string }): void {
 }
 
 beforeEach(() => {
-  mockGenerateSmartSummary.mockReset().mockReturnValue(Effect.succeed({
+  mockGenerateSmartSummary.mockReset().mockResolvedValue({
     summary: 'Recovered session summary',
     tokensBefore: 1,
     boundaryUuid: 'b',
     model: 'm',
-  }));
-  mockGenerateFallbackSummary.mockReset().mockReturnValue(Effect.succeed('Fallback session summary'));
+  });
+  mockGenerateFallbackSummary.mockReset().mockResolvedValue('Fallback session summary');
   HOME_DIR = join(tmpdir(), `pan-compact-session-${process.pid}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(HOME_DIR, { recursive: true });
   process.env.OVERDECK_HOME = HOME_DIR;
@@ -98,7 +97,7 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
 
   it('falls back to a heuristic summary when smart summary generation rejects', async () => {
     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });
-    mockGenerateSmartSummary.mockReturnValue(Effect.fail(new Error('boom')));
+    mockGenerateSmartSummary.mockRejectedValue(new Error('boom'));
 
     const result = await buildCompactRecoverySeed(AGENT_ID);
 
@@ -109,8 +108,8 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
 
   it('returns a reseed-only prompt without throwing when both summary paths fail', async () => {
     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });
-    mockGenerateSmartSummary.mockReturnValue(Effect.fail(new Error('boom')));
-    mockGenerateFallbackSummary.mockReturnValue(Effect.fail(new Error('fallback boom')));
+    mockGenerateSmartSummary.mockRejectedValue(new Error('boom'));
+    mockGenerateFallbackSummary.mockRejectedValue(new Error('fallback boom'));
 
     const result = await buildCompactRecoverySeed(AGENT_ID);
 

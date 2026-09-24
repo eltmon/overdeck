@@ -72,7 +72,7 @@ vi.mock('../../../../../lib/cloister/review-agent.js', () => ({
 }));
 
 vi.mock('../../../../../lib/review-artifacts.js', () => ({
-  createReviewArtifactsForIssue: vi.fn(() => Effect.succeed({ mergeSet: { repos: [] } })),
+  createReviewArtifactsForIssue: vi.fn(async () => ({ mergeSet: { repos: [] } })),
 }));
 
 

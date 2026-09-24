@@ -8,6 +8,7 @@ export type Tab =
   | 'command-deck'
   | 'agents'
   | 'orders'
+  | 'flywheel'
   | 'backlog'
   | 'resources'
   | 'knowledge'

@@ -114,7 +114,7 @@ function updateHashFromFile(hash: Hash, filePath: string): void {
  * the current input hash. Any uncertainty (missing input, unreadable manifest,
  * hash computation error) falls back to `{ needed: true }`.
  */
-export function isStartupSyncNeededSync(): { needed: boolean; reason: string } {
+export function isStartupSyncNeeded(): { needed: boolean; reason: string } {
   const manifestPath = join(OVERDECK_HOME, '.sync-manifest.json');
   try {
     const currentHash = computeSyncInputHash();
@@ -134,7 +134,7 @@ export function isStartupSyncNeededSync(): { needed: boolean; reason: string } {
  * Write the current sync input hash to ~/.overdeck/.sync-manifest.json.
  * Call after a full sync so the next startup skip gate can succeed.
  */
-export function writeSyncManifestSync(): void {
+export function writeSyncManifest(): void {
   const manifestPath = join(OVERDECK_HOME, '.sync-manifest.json');
   const hash = computeSyncInputHash();
   writeFileSync(

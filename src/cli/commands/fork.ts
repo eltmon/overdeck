@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/overdeck/conversations.js';
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
 import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
-import { sessionFilePath } from '../../lib/paths.js';
+import { sessionFilePath } from '../../lib/runtimes/storage/claude-code.js';
 
 interface ForkOptions {
   model?: string;

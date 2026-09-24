@@ -33,24 +33,17 @@
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
 
-## Planning artifacts (xBRIEF v0.8, PAN-1124; relocated to `.pan/` by PAN-3917)
-- Everything lives under `.pan/` in the project repo (or the configured plan-home
-  repo for polyrepo projects), committed on the feature branch. The legacy
-  `${OVERDECK_HOME}/state/<project>/` worktree and the `overdeck-state` branch are
-  retired (archived, never deleted).
-- PRD drafts: `.pan/drafts/<issue-lowercase>.md` (human-mutable narrative; legacy
-  uppercase names are resolved in place, new drafts are lowercase — PAN-3287).
-- Spec: `.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning
-  except `plan.status`.
-- Project continue state: `.pan/continues/<ISSUE>.xbrief.json` (item status, written
-  by `pan task`).
-- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); the
-  workspace xBRIEF working copy is `<workspace>/.overdeck/spec.vbrief.json` and
-  `pan plan finalize` promotes it.
+## Planning artifacts (xBRIEF v0.8, PAN-1124; relocated under `.pan/` by PAN-3917)
+- PRD drafts: `<planHome>/.pan/drafts/<issue>.md` (human-mutable narrative), committed on the feature branch.
+- Spec: `<planHome>/.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status`.
+- Project continue state: `<planHome>/.pan/continues/<issue>.xbrief.json` (written by `pan task`).
+- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
+- Legacy `${OVERDECK_HOME}/state/<project>/…` and the `overdeck-state` branch are retired (branch archived, never delete it).
+- Agent transcripts: `sessions.json` under `~/.overdeck/agents/<id>/` is the append-only session index; `session.id` is gone (PAN-3950). One async resolver, `src/lib/agents/transcript-resolver.ts`, interprets agent directories; per-harness path formulas live only in `src/lib/runtimes/*`.
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
 - Frontend tests co-located under `components/**/__tests__/`.
 
-<!-- last-verified: 2026-09-19 -->
+<!-- last-verified: 2026-09-20 -->

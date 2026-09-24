@@ -21,7 +21,7 @@ import {
   type YamlConfig,
 } from './schema.js';
 
-export function resolveConversationWatchDirs(config: RuntimeConversationsConfig): RuntimeConversationsConfig {
+function resolveConversationWatchDirs(config: RuntimeConversationsConfig): RuntimeConversationsConfig {
   return {
     ...config,
     watchDirs: config.watchDirs.map((dir) =>
@@ -30,16 +30,7 @@ export function resolveConversationWatchDirs(config: RuntimeConversationsConfig)
   };
 }
 
-export function getConversationsConfigSync(): RuntimeConversationsConfig {
-  const { config } = loadConfigSync();
-  return resolveConversationWatchDirs({
-    ...config.conversations,
-    apiKeys: config.apiKeys,
-    enabledProviders: config.enabledProviders,
-  });
-}
-
-export function getConversationSearchConfigSync(): NormalizedConversationSearchConfig {
+export function getConversationSearchConfig(): NormalizedConversationSearchConfig {
   const { config } = loadConfigSync();
   return config.conversationSearch;
 }
@@ -381,7 +372,12 @@ async function getMtimeFromDisk(filePath: string): Promise<number> {
   }
 }
 
-async function loadConfigWithoutMigration(): Promise<ConfigLoadResult> {
+/**
+ * Read global and project config, merge with defaults and apply env fallbacks,
+ * without running config migrations. Cached by file mtime. Rejects on a parse
+ * error or on an I/O failure reading either config file.
+ */
+export async function loadConfigNoMigration(): Promise<ConfigLoadResult> {
   const mtimes = await getConfigMtimesFromDisk();
   if (
     configCache &&
@@ -529,7 +525,7 @@ export function isClaudeCodeChannelsMcpEnabled(): boolean {
  * started at spawn. Read at session launch — a change only affects sessions
  * launched/resumed after it. Defaults to true when unset.
  */
-export function isTldrEnabledSync(): boolean {
+export function isTldrEnabled(): boolean {
   try {
     return loadConfigSync().config.tldr.enabled;
   } catch {
@@ -544,61 +540,39 @@ export function isTldrEnabledSync(): boolean {
  *
  * Async on purpose — dashboard request handlers read this, and the sync loader
  * stats and parses config files on the event loop, which would stall HTTP and
- * terminal traffic on a slow filesystem. It shares `loadConfigWithoutMigration`'s
+ * terminal traffic on a slow filesystem. It shares `loadConfigNoMigration`'s
  * cache, so a warm read costs one async mtime check.
  */
 export const getOpenInEditorCommand = (): Effect.Effect<string | null> =>
   Effect.tryPromise({
-    try: async () => (await loadConfigWithoutMigration()).config.ui.openInEditorCommand,
+    try: async () => (await loadConfigNoMigration()).config.ui.openInEditorCommand,
     catch: (cause) => cause,
   }).pipe(Effect.catchCause(() => Effect.succeed(DEFAULT_CONFIG.ui.openInEditorCommand)));
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 /**
- * Effect-native loadConfigWithoutMigration. Reads global + project config,
- * merges with defaults, applies env fallbacks. Fails with ConfigParseError
- * for malformed YAML or ConfigError for other I/O failures.
+ * The conversations config block with API keys and enabled providers merged in and `~/` watch dirs resolved.
+ * Reads config without running the deprecated-model migration; fails with `ConfigError` on a read or parse error.
  */
-export const loadConfigNoMigration = (): Effect.Effect<
-  ConfigLoadResult,
-  ConfigError | ConfigParseError
-> =>
-  Effect.tryPromise({
-    try: () => loadConfigWithoutMigration(),
-    catch: (cause) =>
-      new ConfigError({
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
 export const getConversationsConfig = (): Effect.Effect<
   RuntimeConversationsConfig,
   ConfigError | ConfigParseError
 > =>
   Effect.gen(function* () {
-    const { config } = yield* loadConfigNoMigration();
+    const { config } = yield* Effect.tryPromise({
+      try: () => loadConfigNoMigration(),
+      catch: (cause) =>
+        new ConfigError({
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
     return resolveConversationWatchDirs({
       ...config.conversations,
       apiKeys: config.apiKeys,
       enabledProviders: config.enabledProviders,
     });
-  });
-
-/**
- * Effect-native loadConfig — sync read, wraps any failure (parse / fs) as
- * ConfigError. Use this from Effect contexts that need merged config without
- * forcing the codebase to migrate every loadConfig call site.
- */
-export const loadConfig = (): Effect.Effect<ConfigLoadResult, ConfigError> =>
-  Effect.try({
-    try: () => loadConfigSync(),
-    catch: (cause) =>
-      new ConfigError({
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
   });
 
 /**
@@ -611,7 +585,7 @@ export const updateConversationsConfig = (
 ): Effect.Effect<void, ConfigError | ConfigParseError> =>
   Effect.tryPromise({
     try: async () => {
-      await loadConfigWithoutMigration();
+      await loadConfigNoMigration();
       let existingContent = '{}\n';
       try {
         const content = await readFileAsync(GLOBAL_CONFIG_PATH, 'utf-8');

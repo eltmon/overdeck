@@ -11,10 +11,10 @@ import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig, getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { getAgentState } from '../agents.js';
-import { extractPrefixSync } from '../issue-id.js';
+import { extractPrefix } from '../issue-id.js';
 import { reopenWorkspaceState } from '../reopen.js';
 import { removeCompletionMarker } from './workspace-hygiene.js';
 
@@ -27,7 +27,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -65,7 +65,7 @@ function getIssueDataService() {
   return getSharedIssueService();
 }
 
-export async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Overdeck'): Promise<string[]> {
+async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Overdeck'): Promise<string[]> {
   const githubCheck = isGitHubIssue(issueId);
   if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
     return ['No GitHub PR to close'];
@@ -105,10 +105,10 @@ export async function closeIssuePullRequest(issueId: string, reason = 'Canceled 
   }
 }
 
-export function buildLifecycleContext(id: string, issueSource: string | undefined) {
+function buildLifecycleContext(id: string, issueSource: string | undefined) {
   const issuePrefix = extractTeamPrefix(id);
   const projectPath = getProjectPath(undefined, issuePrefix ?? undefined);
-  const projectConfig = issuePrefix ? findProjectByTeamSync(issuePrefix) : null;
+  const projectConfig = issuePrefix ? findProjectByTeam(issuePrefix) : null;
   const githubCheck = isGitHubIssue(id);
 
   const ctx: any = {
@@ -199,13 +199,13 @@ export async function runDestructiveIssueLifecycle(
   if (mode === 'cancel') {
     try {
       const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
-      const tx = await Effect.runPromise(transitionXBriefOnMain(
+      const tx = await transitionXBriefOnMain(
         ctx.projectPath,
         id,
         'cancelled',
         'cancelled',
         `scope: cancel ${id.toUpperCase()} xBRIEF`,
-      ));
+      );
       if (tx.moved) cleanupLog.push(`xBRIEF moved ${tx.fromDir} → cancelled`);
       if (tx.committed) cleanupLog.push(`Committed xBRIEF cancellation on main`);
     } catch (err: any) {
@@ -223,7 +223,7 @@ export async function runDestructiveIssueLifecycle(
     const resolved = resolveProjectFromIssueSync(id);
     const projectKey = resolved?.projectKey;
     if (projectKey) {
-      const { killed } = await Effect.runPromise(killAllReviewerSessions(projectKey, id.toUpperCase()));
+      const { killed } = await killAllReviewerSessions(projectKey, id.toUpperCase());
       if (killed.length > 0) {
         cleanupLog.push(`Killed ${killed.length} reviewer session(s)`);
       }
@@ -259,7 +259,7 @@ export function closeIssueTransition(options: {
   return Effect.gen(function* () {
     const { issueId, body, eventStore } = options;
     const { reason } = body as any;
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const { close: closeWorkflow } = yield* Effect.promise(() => import('../lifecycle/index.js'));
@@ -332,7 +332,7 @@ export function abortIssueTransition(options: {
     // be projected through the transactional boundary after the reset succeeds.
     const workAgentId = `agent-${id.toLowerCase()}`;
     const planningAgentId = `planning-${id.toLowerCase()}`;
-    const workAgentStateBeforeAbort = yield* getAgentState(workAgentId);
+    const workAgentStateBeforeAbort = getAgentState(workAgentId);
 
     const result = yield* Effect.promise(() => runDestructiveIssueLifecycle(id, 'reset', { deleteWorkspace: true }));
 
@@ -389,7 +389,7 @@ export function resetIssueTransition(options: {
     // be projected through the transactional boundary after the reset succeeds.
     const workAgentId = `agent-${id.toLowerCase()}`;
     const planningAgentId = `planning-${id.toLowerCase()}`;
-    const workAgentStateBeforeReset = yield* getAgentState(workAgentId);
+    const workAgentStateBeforeReset = getAgentState(workAgentId);
 
     const encoder = new TextEncoder();
     const nodeStream = new ReadableStream<Uint8Array>({
@@ -574,13 +574,13 @@ export function reopenIssueTransition(options: {
       // via reopenWorkspaceState (shared logic with `pan reopen` CLI command)
       try {
         const teamPrefix = extractTeamPrefix(id);
-        const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+        const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
         const projectPath = projectConfig?.path || '';
         const workspacePath = projectPath
           ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
           : '';
         if (workspacePath) {
-          await Effect.runPromise(reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason }));
+          await reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason });
         }
       } catch { /* non-fatal */ }
 
@@ -639,14 +639,23 @@ export function moveIssueStatus(options: {
       );
     }
 
-    const { updateShadowState } = yield* Effect.promise(() => import('../shadow-state.js'));
+    const { updateShadowState, ShadowStateError } = yield* Effect.promise(() => import('../shadow-state.js'));
 
     const canonicalToIssueState: Record<string, 'open' | 'in_progress' | 'closed'> = {
       backlog: 'open', todo: 'open', in_progress: 'in_progress', in_review: 'in_progress', done: 'closed',
     };
     const issueState = canonicalToIssueState[targetStatus];
 
-    const shadowResult = yield* updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus);
+    const shadowResult = yield* Effect.tryPromise({
+      try: () => updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus),
+      catch: (cause) =>
+        new ShadowStateError({
+          operation: 'updateShadowState',
+          issueId: id,
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
 
     const issueDataService = getIssueDataService();
     // Refresh the in-memory shadow-state cache so subsequent getIssues() calls

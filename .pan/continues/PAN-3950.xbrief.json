@@ -1,0 +1,133 @@
+{
+  "version": "1",
+  "issueId": "PAN-3950",
+  "created": "2026-09-20T13:53:05.511Z",
+  "updated": "2026-09-20T14:53:17.694Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w6-watcher-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3950",
+      "claimedAt": "2026-09-20T13:53:05.511Z",
+      "doneAt": "2026-09-20T14:02:42.519Z"
+    },
+    "w7-reset-marker-fails-loud": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3950",
+      "claimedAt": "2026-09-20T14:02:52.842Z",
+      "doneAt": "2026-09-20T14:12:40.516Z"
+    },
+    "w8-adapters-use-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3950",
+      "claimedAt": "2026-09-20T14:12:46.183Z",
+      "doneAt": "2026-09-20T14:22:14.253Z"
+    },
+    "w9-pi-tiebreak-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3950",
+      "claimedAt": "2026-09-20T14:22:19.955Z",
+      "doneAt": "2026-09-20T14:23:58.433Z"
+    },
+    "w10-docs-fix-pass": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3950",
+      "claimedAt": "2026-09-20T14:24:05.335Z",
+      "doneAt": "2026-09-20T14:29:27.975Z"
+    },
+    "w11-net-negative-lines": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3950",
+      "claimedAt": "2026-09-20T14:29:32.808Z",
+      "doneAt": "2026-09-20T14:41:56.778Z"
+    },
+    "w6-watcher-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:49:29.383Z"
+    },
+    "w6-watcher-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:50:01.750Z"
+    },
+    "w6-watcher-retry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:50:13.076Z"
+    },
+    "w6-watcher-retry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:50:23.504Z"
+    },
+    "w7-reset-marker-fails-loud.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:50:33.480Z"
+    },
+    "w7-reset-marker-fails-loud.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:50:44.027Z"
+    },
+    "w7-reset-marker-fails-loud.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:50:54.281Z"
+    },
+    "w7-reset-marker-fails-loud.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:51:04.280Z"
+    },
+    "w8-adapters-use-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:51:14.288Z"
+    },
+    "w8-adapters-use-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:51:24.760Z"
+    },
+    "w8-adapters-use-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:51:34.986Z"
+    },
+    "w8-adapters-use-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:51:45.526Z"
+    },
+    "w9-pi-tiebreak-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:51:55.994Z"
+    },
+    "w9-pi-tiebreak-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:06.112Z"
+    },
+    "w9-pi-tiebreak-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:16.264Z"
+    },
+    "w10-docs-fix-pass.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:26.747Z"
+    },
+    "w10-docs-fix-pass.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:36.673Z"
+    },
+    "w10-docs-fix-pass.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:46.899Z"
+    },
+    "w11-net-negative-lines.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:57.662Z"
+    },
+    "w11-net-negative-lines.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:53:07.547Z"
+    },
+    "w11-net-negative-lines.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:53:17.694Z"
+    }
+  }
+}

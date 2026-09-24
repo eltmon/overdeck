@@ -1,7 +1,7 @@
 import type { AuthMode, SubscriptionPlan } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelProvider } from '../model-fallback.js';
-import { resolveModelIdSync } from '../model-capabilities.js';
+import { resolveModelId } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { isTerminalBackendName } from '@overdeck/contracts';
@@ -442,7 +442,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge conversation configuration
     if (config.conversations?.compaction_model) {
-      result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
+      result.conversations.compactionModel = resolveModelId(config.conversations.compaction_model);
     }
     if (config.conversations?.manual_compact_mode) {
       result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
@@ -451,10 +451,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       result.conversations.richCompaction = config.conversations.rich_compaction;
     }
     if (config.conversations?.title_model) {
-      result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
+      result.conversations.titleModel = resolveModelId(config.conversations.title_model);
     }
     if (config.conversations?.handoff_author_model) {
-      result.conversations.handoffAuthorModel = resolveModelIdSync(config.conversations.handoff_author_model);
+      result.conversations.handoffAuthorModel = resolveModelId(config.conversations.handoff_author_model);
     }
     if (config.conversations?.watch_dirs) {
       result.conversations.watchDirs = config.conversations.watch_dirs;
@@ -692,7 +692,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.ttsSummarizer.enabled = s.enabled;
       }
       if (s.model) {
-        result.ttsSummarizer.model = resolveModelIdSync(s.model) as ModelId;
+        result.ttsSummarizer.model = resolveModelId(s.model) as ModelId;
       }
       if (s.batch_window_seconds !== undefined) {
         result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;

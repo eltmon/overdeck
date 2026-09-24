@@ -130,14 +130,111 @@ describe('isAlive on the Herdr backend', () => {
     expect(deps.listPaneRows).not.toHaveBeenCalled();
   });
 
+  it('reports a PANE-BOUND agent alive on its pane alone, state and all', async () => {
+    // A codex / ACP / kimi agent runs behind a host process, so Herdr detects
+    // nothing in its pane and reports `unknown`. The probe answers from the
+    // token-stamped pane; "Herdr has no agent record" is not a death.
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'alive' as const, paneId: 'wE:p2', state: 'unknown' as const })),
+    });
+    await expect(isAlive('agent-pan-3705-review', deps)).resolves.toEqual({ alive: true, paneAlive: true });
+  });
+
   it('reports an agent Herdr does not know as no-session (a confirmed death)', async () => {
     const deps = aliveDeps({
       backend: 'herdr' as const,
       probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+      sessionExists: vi.fn(async () => false),
     });
     const verdict = await isAlive('agent-x', deps);
     expect(verdict).toEqual({ alive: false, reason: 'no-session' });
     expect(isConfirmedDead(verdict)).toBe(true);
+  });
+
+  // Review of #3992 (M3): an agent launched before the host moved to Herdr
+  // still runs in a tmux session Herdr knows nothing about.
+  it('reports a live legacy tmux agent alive when Herdr does not know it', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+    });
+    const verdict = await isAlive('agent-legacy', deps);
+    expect(verdict).toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
+    expect(deps.sessionExists).toHaveBeenCalledWith('agent-legacy');
+  });
+
+  it('a legacy tmux session whose probe cannot answer is indeterminate, never a death', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+      findRuntimePid: vi.fn(async () => 'indeterminate' as const),
+    });
+    const verdict = await isAlive('agent-legacy', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    expect(isConfirmedDead(verdict)).toBe(false);
+  });
+
+  it('a legacy tmux corpse (session up, harness gone) stays a confirmed death', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+      findRuntimePid: vi.fn(async () => null),
+    });
+    const verdict = await isAlive('agent-legacy', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'no-session' });
+    expect(isConfirmedDead(verdict)).toBe(true);
+  });
+
+  // Review of #4018 (L2): the legacy check answers in three parts and is bounded.
+  it('a legacy tmux probe that errors is indeterminate, never no-session', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+      queryTmuxSession: vi.fn(async () => 'error' as const),
+    });
+    const verdict = await isAlive('agent-legacy', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    expect(isConfirmedDead(verdict)).toBe(false);
+    expect(deps.listPaneRows).not.toHaveBeenCalled();
+  });
+
+  it('a legacy tmux probe reporting no session keeps the Herdr death', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+      queryTmuxSession: vi.fn(async () => 'missing' as const),
+    });
+    expect(await isAlive('agent-x', deps)).toEqual({ alive: false, reason: 'no-session' });
+  });
+
+  it('a hung tmux server cannot stall isAlive: the legacy check times out as indeterminate', async () => {
+    vi.useFakeTimers();
+    try {
+      const deps = aliveDeps({
+        backend: 'herdr' as const,
+        probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+        queryTmuxSession: vi.fn(() => new Promise<never>(() => {})),
+        legacyTmuxTimeoutMs: 3_000,
+      });
+      let settled = false;
+      const pending = isAlive('agent-legacy', deps).finally(() => { settled = true; });
+      await vi.advanceTimersByTimeAsync(2_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(pending).resolves.toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not consult tmux when Herdr itself answers (exited)', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'exited' as const, paneId: 'wE:p2' })),
+    });
+    await isAlive('agent-x', deps);
+    expect(deps.sessionExists).not.toHaveBeenCalled();
   });
 
   it('reports an exited pane as pane-dead', async () => {

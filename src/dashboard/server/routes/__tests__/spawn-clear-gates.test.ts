@@ -73,7 +73,7 @@ describe('resolveStartAgentGateForRoute', () => {
   });
 
   it('returns null when no persistent gate is set', async () => {
-    mockGetAgentState.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
+    mockGetAgentState.mockReturnValue(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' }));
 
     const result = await Effect.runPromise(
       resolveStartAgentGateForRoute({
@@ -90,9 +90,7 @@ describe('resolveStartAgentGateForRoute', () => {
   });
 
   it('returns the paused gate reason when clearGates is false', async () => {
-    mockGetAgentState.mockReturnValue(
-      Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' })),
-    );
+    mockGetAgentState.mockReturnValue(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' }));
 
     const result = await Effect.runPromise(
       resolveStartAgentGateForRoute({
@@ -116,9 +114,7 @@ describe('resolveStartAgentGateForRoute', () => {
   });
 
   it('returns the troubled gate reason when clearGates is false', async () => {
-    mockGetAgentState.mockReturnValue(
-      Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', troubled: true, consecutiveFailures: 3 })),
-    );
+    mockGetAgentState.mockReturnValue(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', troubled: true, consecutiveFailures: 3 }));
 
     const result = await Effect.runPromise(
       resolveStartAgentGateForRoute({
@@ -142,8 +138,8 @@ describe('resolveStartAgentGateForRoute', () => {
 
   it('clears a paused gate and emits an operator intervention when clearGates is true', async () => {
     mockGetAgentState
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' })))
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' }))
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' }));
     mockClearAgentPaused.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
 
     const result = await Effect.runPromise(
@@ -166,8 +162,8 @@ describe('resolveStartAgentGateForRoute', () => {
 
   it('clears a troubled gate and emits an operator intervention when clearGates is true', async () => {
     mockGetAgentState
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', troubled: true, consecutiveFailures: 3 })))
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', troubled: true, consecutiveFailures: 3 }))
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' }));
     mockClearAgentTroubled.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
 
     const result = await Effect.runPromise(
@@ -191,11 +187,9 @@ describe('resolveStartAgentGateForRoute', () => {
   it('clears both gates when an agent is paused and has failure tracking', async () => {
     mockGetAgentState
       .mockReturnValueOnce(
-        Effect.succeed(
-          makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'yielded', troubled: false, consecutiveFailures: 2 }),
-        ),
+        makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'yielded', troubled: false, consecutiveFailures: 2 }),
       )
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' }));
     mockClearAgentPaused.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
     mockClearAgentTroubled.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
 
@@ -215,9 +209,7 @@ describe('resolveStartAgentGateForRoute', () => {
   });
 
   it('ignores clearGates when the request origin is not trusted', async () => {
-    mockGetAgentState.mockReturnValue(
-      Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' })),
-    );
+    mockGetAgentState.mockReturnValue(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' }));
 
     const result = await Effect.runPromise(
       resolveStartAgentGateForRoute({
@@ -236,8 +228,8 @@ describe('resolveStartAgentGateForRoute', () => {
   it('re-evaluates the gate after clearing and returns it if the agent is still blocked', async () => {
     // First read: paused; clearing function succeeds but second read still sees paused.
     mockGetAgentState
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' })))
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'still paused' })));
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' }))
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'still paused' }));
     mockClearAgentPaused.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
 
     const result = await Effect.runPromise(

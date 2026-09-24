@@ -15,12 +15,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   cvMock, contextMock, healthMock,
   derivedIssueStateMock, pingAgentMock, getAgentCVMock, getAgentRuntimeStateMock, getAgentStateMock,
+  backendNameMock, isAliveMock, lastActivityMock,
 } = vi.hoisted(() => ({
   cvMock: vi.fn().mockResolvedValue(undefined),
   contextMock: vi.fn().mockResolvedValue(undefined),
   healthMock: vi.fn().mockResolvedValue(undefined),
   derivedIssueStateMock: vi.fn(),
   pingAgentMock: vi.fn(),
+  backendNameMock: vi.fn(),
+  isAliveMock: vi.fn(),
+  lastActivityMock: vi.fn(),
   getAgentCVMock: vi.fn(),
   getAgentRuntimeStateMock: vi.fn(),
   getAgentStateMock: vi.fn(),
@@ -44,15 +48,22 @@ vi.mock('../../../src/lib/health.js', () => ({
 }));
 vi.mock('../../../src/lib/cv.js', () => ({
   getAgentCV: getAgentCVMock,
-  readAgentCVSync: getAgentCVMock,
+  readAgentCV: getAgentCVMock,
+}));
+vi.mock('../../../src/lib/terminal-backends/select.js', () => ({
+  hostTerminalBackendName: backendNameMock,
+}));
+vi.mock('../../../src/lib/agents/liveness.js', () => ({
+  isAlive: isAliveMock,
+  getAgentEffectiveLastActivityMs: lastActivityMock,
 }));
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentStateSync: getAgentStateMock,
+  getAgentState: getAgentStateMock,
   getAgentRuntimeState: getAgentRuntimeStateMock,
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));
 
-import { showCommand } from '../../../src/cli/commands/show.js';
+import { describeLiveness, showCommand } from '../../../src/cli/commands/show.js';
 
 describe('showCommand', () => {
   beforeEach(() => {
@@ -90,6 +101,9 @@ describe('showCommand', () => {
       skillsUsed: [],
       recentWork: [],
     });
+    backendNameMock.mockResolvedValue('tmux');
+    isAliveMock.mockResolvedValue({ alive: true, paneAlive: true });
+    lastActivityMock.mockReturnValue(Date.now());
     getAgentRuntimeStateMock.mockReturnValue(null);
     getAgentStateMock.mockReturnValue({
       id: 'agent-pan-6',
@@ -247,6 +261,74 @@ describe('showCommand', () => {
       expect(payload).toHaveProperty('cv');
     });
 
+    // PAN-3917 W12: `pingAgent` asks tmux directly, so a Herdr-hosted agent read
+    // as dead ("tmux session is not running") while Herdr had it working.
+    describe('backend-aware health (PAN-3917 W12)', () => {
+      beforeEach(() => {
+        backendNameMock.mockResolvedValue('herdr');
+      });
+
+      it('on a Herdr host it asks the liveness oracle, never pingAgent', async () => {
+        isAliveMock.mockResolvedValue({ alive: true, paneAlive: true });
+
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        await showCommand('PAN-3705');
+        const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+        logSpy.mockRestore();
+
+        expect(pingAgentMock).not.toHaveBeenCalled();
+        expect(isAliveMock).toHaveBeenCalledWith('agent-pan-3705');
+        expect(output).toContain('alive');
+        expect(output).not.toContain('tmux session is not running');
+      });
+
+      it('reports a confirmed death with the backend that confirmed it', async () => {
+        isAliveMock.mockResolvedValue({ alive: false, reason: 'no-session' });
+
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        await showCommand('PAN-3705');
+        const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+        logSpy.mockRestore();
+
+        expect(output).toContain('dead');
+        expect(output).toContain('herdr: no agent by that name');
+      });
+
+      it('an unreadable probe is unknown, never dead', async () => {
+        isAliveMock.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        await showCommand('PAN-3705');
+        const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+        logSpy.mockRestore();
+
+        expect(output).toContain('unknown');
+        expect(output).not.toContain('dead');
+      });
+
+      it('--json carries the liveness verdict and its backend', async () => {
+        isAliveMock.mockResolvedValue({ alive: true, paneAlive: true });
+
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        await showCommand('PAN-3705', { json: true });
+        const payload = JSON.parse(String(logSpy.mock.calls[0][0]));
+        logSpy.mockRestore();
+
+        expect(payload.liveness).toEqual({ backend: 'herdr', alive: true, paneAlive: true });
+        expect(payload.health).toBeNull();
+      });
+
+      it('does not probe liveness when there is no agent at all', async () => {
+        getAgentStateMock.mockReturnValue(null);
+        getAgentRuntimeStateMock.mockReturnValue(null);
+
+        await showCommand('PAN-3705');
+
+        expect(isAliveMock).not.toHaveBeenCalled();
+        expect(pingAgentMock).not.toHaveBeenCalled();
+      });
+    });
+
     it('shows in-progress work with started time instead of never and uses lastActivity instead of lastPing', async () => {
       const now = new Date().toISOString();
       pingAgentMock.mockReturnValue(Effect.succeed({
@@ -296,5 +378,19 @@ describe('showCommand', () => {
       expect(output).not.toContain('in_progress never');
       expect(output).not.toContain('last activity 0s ago');
     });
+  });
+});
+
+describe('describeLiveness (PAN-3917 W12)', () => {
+  it('a stopped agent reads stopped whatever the probe says', () => {
+    expect(describeLiveness({ alive: false, reason: 'no-session' }, 'stopped').status).toBe('stopped');
+    expect(describeLiveness({ alive: true, paneAlive: true }, undefined, 'stopped').status).toBe('stopped');
+  });
+
+  it('maps each verdict to a status', () => {
+    expect(describeLiveness({ alive: true, paneAlive: true }).status).toBe('alive');
+    expect(describeLiveness({ alive: false, reason: 'pane-dead' }).status).toBe('dead');
+    expect(describeLiveness({ alive: false, reason: 'runtime-missing' }).status).toBe('dead');
+    expect(describeLiveness({ alive: false, reason: 'runtime-indeterminate' }).status).toBe('unknown');
   });
 });

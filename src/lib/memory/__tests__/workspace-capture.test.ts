@@ -12,7 +12,7 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../tests/helpers/overdeck-test-db.js';
 import { createWorkspace, pinDoc, upsertProjectFromConfig } from '../../workspaces/writer.js';
 import { createConversation } from '../../overdeck/conversations.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 import { handleMemorySessionStartBody, type HandleMemorySessionStartBodyResult } from '../../../dashboard/server/routes/hooks.js';
 import { injectPromptTimeMemory } from '../injection.js';
 import { TranscriptPoller } from '../poller.js';

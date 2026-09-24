@@ -29,7 +29,7 @@ import {
 import type { DiscoveredSession, ConversationFilter } from '../overdeck/discovered-sessions.js';
 import { embed } from './embeddings/providers.js';
 import type { EmbeddingProviderName } from './embeddings/providers.js';
-import { getConversationsConfigSync } from '../config-yaml.js';
+import { getConversationsConfig } from '../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../config-yaml.js';
 import { Effect } from 'effect';
 
@@ -197,7 +197,7 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
   const start = Date.now();
   const limit = query.limit ?? 50;
   const offset = query.offset ?? 0;
-  const config = query.config ?? getConversationsConfigSync();
+  const config = query.config ?? await Effect.runPromise(getConversationsConfig());
   const embeddingModel = query.embeddingModel ?? config.embeddingModel ?? 'text-embedding-3-small';
 
   // ── Semantic free-text query path ─────────────────────────────────────────

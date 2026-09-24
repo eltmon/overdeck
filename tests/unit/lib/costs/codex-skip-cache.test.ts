@@ -6,17 +6,17 @@ import { Effect, Layer } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../src/lib/cost-parsers/codex-parser.js', () => ({
-  parseCodexSessionCostEventsSync: vi.fn(),
-  parseCodexSessionSync: vi.fn(() => null),
+  parseCodexSessionCostEvents: vi.fn(),
+  parseCodexSession: vi.fn(() => null),
 }));
 
-import { parseCodexSessionCostEventsSync } from '../../../../src/lib/cost-parsers/codex-parser.js';
+import { parseCodexSessionCostEvents } from '../../../../src/lib/cost-parsers/codex-parser.js';
 import { CostWriter, CostWriterLive } from '../../../../src/lib/overdeck/cost.js';
 import {
-  closeOverdeckDatabaseSync,
+  closeOverdeckDatabase,
   CostArchiveLive,
   EventBusLive,
-  getOverdeckDatabaseSync,
+  getOverdeckDatabase,
   makeDbLive,
 } from '../../../../src/lib/overdeck/infra.js';
 
@@ -63,13 +63,13 @@ beforeEach(() => {
   mkdirSync(sessionDir, { recursive: true });
   sessionFile = join(sessionDir, 'rollout.jsonl');
   writeFileSync(sessionFile, '{}\n');
-  getOverdeckDatabaseSync();
-  closeOverdeckDatabaseSync();
-  vi.mocked(parseCodexSessionCostEventsSync).mockReturnValue([usageEvent()]);
+  getOverdeckDatabase();
+  closeOverdeckDatabase();
+  vi.mocked(parseCodexSessionCostEvents).mockReturnValue([usageEvent()]);
 });
 
 afterEach(() => {
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
   vi.restoreAllMocks();
@@ -84,7 +84,7 @@ describe('codex reconcile skip cache', () => {
 
     expect(first).toMatchObject({ sessionsScanned: 1, cacheSkipped: 0 });
     expect(second).toMatchObject({ sessionsScanned: 1, cacheSkipped: 1 });
-    expect(parseCodexSessionCostEventsSync).toHaveBeenCalledTimes(1);
+    expect(parseCodexSessionCostEvents).toHaveBeenCalledTimes(1);
     expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('[cost-reconcile] skipped'));
   });
 
@@ -96,17 +96,17 @@ describe('codex reconcile skip cache', () => {
     const result = await reconcile();
 
     expect(result.cacheSkipped).toBe(0);
-    expect(parseCodexSessionCostEventsSync).toHaveBeenCalledTimes(2);
+    expect(parseCodexSessionCostEvents).toHaveBeenCalledTimes(2);
   });
 
   it('does not cache parse failures', async () => {
-    vi.mocked(parseCodexSessionCostEventsSync).mockImplementation(() => {
+    vi.mocked(parseCodexSessionCostEvents).mockImplementation(() => {
       throw new Error('broken transcript');
     });
 
     await reconcile();
     await reconcile();
 
-    expect(parseCodexSessionCostEventsSync).toHaveBeenCalledTimes(2);
+    expect(parseCodexSessionCostEvents).toHaveBeenCalledTimes(2);
   });
 });

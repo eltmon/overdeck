@@ -3,7 +3,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { messageAgent } from '../agents/messaging.js';
 import type { ReconciledSlotItem } from './swarm-slot-reconcile.js';
-import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
 import { loadCloisterConfigSync, type SwarmInferCompletionMode } from './config.js';
 import type { ClassifiedSwarmSlot, ClassifyInFlightSlotsOptions, CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
 import {
@@ -158,7 +158,7 @@ export async function defaultGetSlotBranchAheadCount(
   const slotWorkspace = branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)
     ? `${workspacePath}-slot-${branch.match(/-slot-(\d+)(?:-attempt-\d+)?$/)![1]}`
     : workspacePath;
-  const roots = resolveWorkspaceRepoRootsSync(issueId, slotWorkspace);
+  const roots = resolveWorkspaceRepoRoots(issueId, slotWorkspace);
   let total = 0;
   for (const root of roots) {
     if (root.degradedPolyrepo) return 0;
@@ -174,7 +174,7 @@ export async function defaultGetSlotBranchAheadCount(
 
 export async function defaultIsSlotWorktreeClean(slotWorkspacePath: string): Promise<boolean> {
   const match = /feature-([a-z]+-\d+)-slot-\d+$/.exec(slotWorkspacePath);
-  const roots = match ? resolveWorkspaceRepoRootsSync(match[1].toUpperCase(), slotWorkspacePath) : [];
+  const roots = match ? resolveWorkspaceRepoRoots(match[1].toUpperCase(), slotWorkspacePath) : [];
   if (roots.some(root => root.degradedPolyrepo)) return false;
   const statuses = roots.length > 0
     ? await Promise.all(roots.map(root => execAsync('git status --porcelain', { cwd: root.dir }).then(result => result.stdout)))

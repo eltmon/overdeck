@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildReviewContextPromise, formatTier1Summary } from '../review-context.js';
+import { buildReviewContext, formatTier1Summary } from '../review-context.js';
 
 vi.mock('../coderabbit-ingestion.js', () => ({
   fetchCodeRabbitFindings: vi.fn(() => Promise.resolve([])),
@@ -66,7 +66,7 @@ describe('buildReviewContext stubUiFindings integration', () => {
       ].join('\n') + '\n',
     );
 
-    const manifest = await buildReviewContextPromise({
+    const manifest = await buildReviewContext({
       runId: 'test-run',
       issueId: 'PAN-STUB-TEST',
       workspace,
@@ -100,7 +100,7 @@ describe('buildReviewContext stubUiFindings integration', () => {
       ].join('\n') + '\n',
     );
 
-    const manifest = await buildReviewContextPromise({
+    const manifest = await buildReviewContext({
       runId: 'test-run',
       issueId: 'PAN-STUB-TEST',
       workspace,

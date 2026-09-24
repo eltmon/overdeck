@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
-import { registerProjectSync, unregisterProjectSync } from '../../../src/lib/projects.js';
+import { registerProject, unregisterProject } from '../../../src/lib/projects.js';
 import { getProjectByKey, listWorkspaces } from '../../../src/lib/workspaces/resolver.js';
 import { addProjectTarget, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
 import { resolveMemoryRoot } from '../../../src/lib/memory/paths.js';
@@ -33,12 +33,12 @@ function mockExit() {
 beforeEach(() => {
   odb = setupOverdeckTestDb();
   projectRoot = mkdtempSync(join(tmpdir(), 'pan-3286-workspace-new-target-'));
-  registerProjectSync(PROJECT_KEY, { name: 'Target path test project', path: projectRoot });
+  registerProject(PROJECT_KEY, { name: 'Target path test project', path: projectRoot });
   targetDir = mkdtempSync(join(tmpdir(), 'pan-3286-target-dir-'));
 });
 
 afterEach(() => {
-  unregisterProjectSync(PROJECT_KEY);
+  unregisterProject(PROJECT_KEY);
   teardownOverdeckTestDb(odb);
   rmSync(projectRoot, { recursive: true, force: true });
   rmSync(targetDir, { recursive: true, force: true });

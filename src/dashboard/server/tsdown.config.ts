@@ -58,11 +58,10 @@ function cliEntrypointExclusionAssertion() {
 // are imported by both `main.ts` and `deacon-main.ts` through the shared
 // Cloister service, so they legitimately land in shared chunks rather than a
 // deacon-exclusive one — there is nothing left to assert isolation for.
-// `deacon-strike-landing.ts` (the original subject of this assertion) has no
-// importers left anywhere in src/ after the W4/W5 cut, so it produces zero
-// chunks; asserting its placement no longer means anything. If a future
-// patrol module is deliberately forked into deacon-only code again, add an
-// assertion for that module here.
+// The original subject of this assertion, the Deacon strike-landing patrol,
+// was deleted (PAN-3973: strikes now open a PR the operator merges). If a
+// future patrol module is deliberately forked into deacon-only code again,
+// add an assertion for that module here.
 function deaconEntryChunkAssertion() {
   return {
     name: 'deacon-entry-chunk-assertion',

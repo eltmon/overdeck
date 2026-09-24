@@ -12,6 +12,14 @@
  * branch must not be ahead of its upstream.
  */
 
+/**
+ * Sync twins (PAN-3958): `readItemStatuses` (async: `readItemStatusesAsync`) exists because these callers
+ * run in synchronous contexts and cannot await: src/lib/xbrief/io.ts:331 (behind `readWorkspacePlanSync`)
+ * and src/lib/cloister/swarm-slot-lifecycle.ts:20 (the sync `isTerminalSwarmSlotAgent`, which the sync
+ * counters in cloister/concurrency.ts call, kept sync by the #4048 decision).
+ * Do not add new synchronous callers; server-reachable code uses the async variant.
+ */
+
 import { execFile } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -104,8 +112,8 @@ export type TierOverridesMap = Record<string, TierOverride>;
 
 /**
  * Retry attempts at the current effective difficulty (PAN-3858). Recorded by
- * the escalation handlers when decideEscalation returns `retry`; cleared by a
- * promotion. An entry whose difficulty no longer matches the item's effective
+ * the escalation handlers when an escalation decides to retry at the same
+ * difficulty; cleared by a promotion. An entry whose difficulty no longer matches the item's effective
  * difficulty is treated as zero attempts.
  */
 export interface TierRetryEntry {

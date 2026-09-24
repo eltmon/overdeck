@@ -13,7 +13,7 @@ import { resolveProjectForIssue } from '../overdeck/issue-projects.js';
 import { readContinueState } from '../xbrief/continue-state.js';
 
 /** Decision id prefix the waiver is recorded under on the continue file. */
-export const TEST_SKIP_WAIVER_DECISION_PREFIX = 'D-test-removal-waived:';
+const TEST_SKIP_WAIVER_DECISION_PREFIX = 'D-test-removal-waived:';
 
 export interface TestSkipWaiver {
   /** Head anchor the waiver was granted against (`snapshotWorkspaceHeadsPromise` format). */
@@ -39,7 +39,7 @@ export function waiverCoversHead(waiver: TestSkipWaiver | undefined, head: strin
  * a decision id of `D-test-removal-waived:<sha>`. Read-only and best-effort:
  * an unreadable continue file simply means no waiver.
  */
-export function resolveActiveTestSkipWaiverSync(issueId: string, head: string | undefined): TestSkipWaiver | null {
+export function resolveActiveTestSkipWaiver(issueId: string, head: string | undefined): TestSkipWaiver | null {
   if (!head) return null;
   try {
     const project = resolveProjectForIssue(issueId);

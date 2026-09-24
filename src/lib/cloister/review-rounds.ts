@@ -34,7 +34,7 @@ function reviewRootFor(workspacePath: string): string | null {
 }
 
 /** Every review run directory in a workspace, oldest first. */
-export function listReviewRunDirs(workspacePath: string): string[] {
+function listReviewRunDirs(workspacePath: string): string[] {
   const root = reviewRootFor(workspacePath);
   if (!root) return [];
   try {
@@ -53,7 +53,7 @@ export function listReviewRunDirs(workspacePath: string): string[] {
  * Rounds with no readable artifacts are skipped — they carry no evidence either
  * way and must not be counted as "zero findings".
  */
-export function reviewCycleSeries(workspacePath: string): ReviewRound[] {
+function reviewCycleSeries(workspacePath: string): ReviewRound[] {
   const rounds: ReviewRound[] = [];
   for (const runDir of listReviewRunDirs(workspacePath)) {
     const blockingCount = countBlockingFindingsForRun(runDir);

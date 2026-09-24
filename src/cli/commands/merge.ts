@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
+import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 
 function dashboardBaseUrl(): string {
   return (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
@@ -28,7 +28,7 @@ export async function mergeCancelCommand(issueId: string, fetchImpl: typeof fetc
     const res = await fetchImpl(`${dashboardBaseUrl()}/api/flywheel/auto-merge/${encodeURIComponent(normalizedIssueId)}`, {
       method: 'DELETE',
       headers: {
-        [INTERNAL_TOKEN_HEADER]: ensureInternalTokenSync(),
+        [INTERNAL_TOKEN_HEADER]: ensureInternalToken(),
       },
     });
 

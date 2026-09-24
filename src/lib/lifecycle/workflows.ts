@@ -28,13 +28,12 @@ import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
 import { loadCloisterConfig } from '../cloister/config.js';
-import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
+import { extractNumber, extractPrefix } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { getForgeAdapter } from '../forge.js';
-import { resolveProjectReposForIssueSync } from '../project-repos.js';
-import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
+import { resolveProjectReposForIssue } from '../project-repos.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
-import { clearAgentOperatorGatesForIssueSync } from '../agents/agent-state.js';
+import { clearAgentOperatorGatesForIssue } from '../agents/agent-state.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
 import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './pr-residue.js';
 import {
@@ -198,7 +197,7 @@ export function closeOut(
       }
 
       // Resolve forge coordinates and close stale PRs/MRs
-      const prRepos = resolveProjectReposForIssueSync(ctx.issueId);
+      const prRepos = resolveProjectReposForIssue(ctx.issueId);
       if (!prRepos || prRepos.length === 0) {
         allSteps.push(stepFailed('close-out:residue-precondition', 'Could not resolve any configured repositories for residue cleanup'));
         return buildResult('close-out', ctx.issueId, allSteps, start);
@@ -382,11 +381,6 @@ export function closeOut(
     ]);
     allSteps.push(markTerminal);
     {
-      const pruned = yield* Effect.promise(() => pruneStoppedAgentsForIssue(ctx.issueId));
-      allSteps.push(pruned.preserved.length > 0
-        ? stepSkipped('close-out:prune-agent-rows', [`Preserved live agents or terminal rows with retained transcripts: ${pruned.preserved.join(', ')}`])
-        : stepOk('close-out:prune-agent-rows', [`Pruned ${pruned.removed.length} stopped agent row(s)`]));
-
       // PAN-3727: clear operator-gate residue (stoppedByUser/paused/troubled)
       // so a terminal issue's preserved agent rows stop reappearing in the
       // parked population. Non-blocking — a bookkeeping failure must never
@@ -399,7 +393,7 @@ export function closeOut(
         let gates: string[] = [];
         let gatesError: string | undefined;
         try {
-          gates = clearAgentOperatorGatesForIssueSync(ctx.issueId);
+          gates = clearAgentOperatorGatesForIssue(ctx.issueId);
         } catch (err) {
           gatesError = (err as Error).message ?? String(err);
         }
@@ -577,13 +571,13 @@ async function completeXBriefStep(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:vbrief-completed';
   try {
     const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       ctx.projectPath,
       ctx.issueId,
       'completed',
       'completed',
       `scope: complete ${ctx.issueId.toUpperCase()} xBRIEF`,
-    ));
+    );
     const details = [
       result.moved ? 'Updated xBRIEF lifecycle to completed' : 'xBRIEF lifecycle already completed',
       result.statusUpdated ? 'Updated plan.status to completed' : 'plan.status already completed',
@@ -647,7 +641,7 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
       // Forge unreachable — continue with the local git ancestry checks below.
     }
 
-    const resolvedRoots = resolveProjectReposForIssueSync(ctx.issueId)
+    const resolvedRoots = resolveProjectReposForIssue(ctx.issueId)
       ?.filter((repo) => repo.required)
       .map((repo): MergeVerificationRoot => ({
         repoKey: repo.repoKey,
@@ -1052,8 +1046,8 @@ async function resetIssueToTodoImpl(ctx: LifecycleContext): Promise<StepResult> 
     if (linearApiKey) {
       const { LinearClient } = await import('@linear/sdk');
       const client = new LinearClient({ apiKey: linearApiKey });
-      const issueNum = extractNumberSync(ctx.issueId);
-      const teamKey = extractPrefixSync(ctx.issueId);
+      const issueNum = extractNumber(ctx.issueId);
+      const teamKey = extractPrefix(ctx.issueId);
       if (issueNum === null || teamKey === null) {
         return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
       }
@@ -1130,8 +1124,8 @@ async function resetIssueToCanceledImpl(ctx: LifecycleContext): Promise<StepResu
     if (linearApiKey) {
       const { LinearClient } = await import('@linear/sdk');
       const client = new LinearClient({ apiKey: linearApiKey });
-      const issueNum = extractNumberSync(ctx.issueId);
-      const teamKey = extractPrefixSync(ctx.issueId);
+      const issueNum = extractNumber(ctx.issueId);
+      const teamKey = extractPrefix(ctx.issueId);
       if (issueNum === null || teamKey === null) {
         return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
       }

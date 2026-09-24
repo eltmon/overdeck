@@ -31,7 +31,7 @@ export interface EmbedOptions {
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
-export class EmbedHttpError extends Data.TaggedError('EmbedHttpError')<{
+class EmbedHttpError extends Data.TaggedError('EmbedHttpError')<{
   readonly provider: EmbeddingProviderName;
   readonly status: number;
   readonly message: string;

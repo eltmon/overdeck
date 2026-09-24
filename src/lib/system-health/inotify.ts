@@ -37,7 +37,7 @@ export interface InotifyScanAdapters {
   readFile(path: string): Promise<string>;
 }
 
-export const INOTIFY_TOP_CONSUMER_COUNT = 5;
+const INOTIFY_TOP_CONSUMER_COUNT = 5;
 
 /** Pids scanned concurrently; keeps the /proc walk from monopolizing the fd table. */
 const PID_SCAN_CONCURRENCY = 32;

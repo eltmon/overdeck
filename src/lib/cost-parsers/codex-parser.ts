@@ -20,7 +20,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import type { SessionUsage } from './jsonl-parser.js';
-import { getPricingSync } from '../cost.js';
+import { getPricing } from '../cost.js';
 import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 
 interface CodexTokenUsageFields {
@@ -50,7 +50,7 @@ function pickUsage(...candidates: (number | undefined)[]): number | undefined {
  * Parse a Codex rollout JSONL file into the shared SessionUsage shape.
  * Returns null if the file cannot be read or contains no valid token_count records.
  */
-export function parseCodexSessionSync(sessionFile: string): SessionUsage | null {
+export function parseCodexSession(sessionFile: string): SessionUsage | null {
   if (!existsSync(sessionFile)) return null;
   let raw: string;
   try {
@@ -143,7 +143,7 @@ export function createCodexSessionParser(sessionFile: string) {
     if (!hasUsage && messageCount === 0) return null;
     if (!model) model = 'unknown';
 
-    const pricing = getPricingSync('openai', model);
+    const pricing = getPricing('openai', model);
     // total_token_usage.input_tokens includes the cached portion, so charge only
     // the non-cached remainder at the full input rate.
     const nonCachedInput = Math.max(0, totalInput - totalCachedInput);
@@ -222,7 +222,7 @@ function normalizeUsageFields(usage: CodexTokenUsageFields | undefined): Normali
 }
 
 function computeCodexEventCost(input: number, cacheRead: number, output: number, model: string): number {
-  const pricing = getPricingSync('openai', model);
+  const pricing = getPricing('openai', model);
   const nonCachedInput = Math.max(0, input - cacheRead);
   const inputCost = (nonCachedInput / 1000) * (pricing?.inputPer1k ?? 0);
   const cachedCost = (cacheRead / 1000) * (pricing?.cacheReadPer1k ?? 0);
@@ -241,7 +241,7 @@ function computeCodexEventCost(input: number, cacheRead: number, output: number,
  * sum to the final total_token_usage, and falls back to last_token_usage only
  * for files where the values do sum (such as the committed test fixture).
  */
-export function parseCodexSessionCostEventsSync(sessionFile: string): CodexCostEventUsage[] {
+export function parseCodexSessionCostEvents(sessionFile: string): CodexCostEventUsage[] {
   if (!existsSync(sessionFile)) return [];
   let raw: string;
   try {

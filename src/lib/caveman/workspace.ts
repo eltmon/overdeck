@@ -15,9 +15,7 @@ import { existsSync } from 'fs';
 import { chmod, mkdir, readFile, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Effect } from 'effect';
 import type { NormalizedCavemanConfig } from '../config-yaml.js';
-import { FsError } from '../errors.js';
 import { areMemoryObservationsEnabled } from '../memory/settings.js';
 import { getCavemanHooksDir } from './setup.js';
 
@@ -78,7 +76,10 @@ export async function injectMemoryHookSettings(workspacePath: string): Promise<v
   upsertHook(hooks, 'UserPromptSubmit', `node "${scriptPath}" prompt-inject`, 2);
 
   await writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-}async function injectCavemanSettingsPromise(workspacePath: string, variant: CavemanVariant): Promise<void> {
+}
+
+/** Install the caveman hooks and variant into a workspace's Claude settings. */
+export async function injectCavemanSettings(workspacePath: string, variant: CavemanVariant): Promise<void> {
   const claudeDir = join(workspacePath, '.claude');
   await mkdir(claudeDir, { recursive: true });
 
@@ -222,7 +223,10 @@ function internalToken() {
   return readFileSync(path, 'utf8').trim();
 }
 `;
-}async function readCavemanVariantPromise(workspacePath: string): Promise<CavemanVariant> {
+}
+
+/** Read the caveman variant a workspace was set up with. */
+export async function readCavemanVariant(workspacePath: string): Promise<CavemanVariant> {
   const variantFile = join(workspacePath, '.claude', CAVEMAN_VARIANT_FILE);
   if (!existsSync(variantFile)) return 'off';
   const content = (await readFile(variantFile, 'utf-8')).trim();
@@ -231,37 +235,3 @@ function internalToken() {
   }
   return 'off';
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel variants. Sync callers keep working; new Effect-based
-// composers can chain without round-tripping through `Effect.tryPromise`.
-
-/** Effect variant of `injectCavemanSettings`. */
-export const injectCavemanSettings = (
-  workspacePath: string,
-  variant: CavemanVariant,
-): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: () => injectCavemanSettingsPromise(workspacePath, variant),
-    catch: (cause) =>
-      new FsError({
-        path: workspacePath,
-        operation: 'injectCavemanSettings',
-        cause,
-      }),
-  });
-
-/** Effect variant of `readCavemanVariant`. */
-export const readCavemanVariant = (
-  workspacePath: string,
-): Effect.Effect<CavemanVariant, FsError> =>
-  Effect.tryPromise({
-    try: () => readCavemanVariantPromise(workspacePath),
-    catch: (cause) =>
-      new FsError({
-        path: workspacePath,
-        operation: 'readCavemanVariant',
-        cause,
-      }),
-  });

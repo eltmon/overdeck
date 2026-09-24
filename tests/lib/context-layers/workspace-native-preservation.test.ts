@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect } from 'vitest';
 import { copyProjectTemplateDirs } from '../../../src/lib/workspace-manager/worktree-ops.js';
-import { applyProjectTemplateOverlaySync } from '../../../src/lib/skills-merge.js';
+import { applyProjectTemplateOverlay } from '../../../src/lib/skills-merge.js';
 import { isHarnessNativeTarget } from '../../../src/lib/context-layers/native-instructions.js';
 
 describe('workspace template instruction boundary', () => {
@@ -24,8 +24,8 @@ describe('workspace template instruction boundary', () => {
       writeFileSync(join(source, '.claude', 'settings.json'), '{}');
       writeFileSync(join(target, '.claude', 'CLAUDE.md'), 'user');
       copyProjectTemplateDirs(source, target, ['.claude']);
-      applyProjectTemplateOverlaySync(target, source);
-      applyProjectTemplateOverlaySync(target, source, [
+      applyProjectTemplateOverlay(target, source);
+      applyProjectTemplateOverlay(target, source, [
         { source: '.claude/CLAUDE.md', target: '.claude/CLAUDE.md' },
         { source: '.claude/rules/example.md', target: '.claude/rules/example.md' },
       ]);

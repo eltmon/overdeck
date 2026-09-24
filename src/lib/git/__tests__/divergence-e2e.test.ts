@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * PAN-653: End-to-end divergence guard integration tests.
  *
@@ -30,8 +29,8 @@ vi.mock('child_process', async (importOriginal) => {
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 function installExecMock(responses: Record<string, string | Error>) {
@@ -108,7 +107,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     const { gitPush, MainDivergedError } = await import('../operations.js');
 
     // First push succeeds
-    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FIRST' })))
+    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FIRST' }))
       .resolves.not.toThrow();
 
     // Now origin/main has advanced (hotfix landed)
@@ -121,8 +120,8 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     // Second push throws MainDivergedError
-    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-SECOND' })))
-      .rejects.toMatchObject({ cause: expect.any(MainDivergedError) });
+    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-SECOND' }))
+      .rejects.toBeInstanceOf(MainDivergedError);
   });
 
   it('Full flow: divergence → mark stuck → Deacon skips → restart persists → unstick clears', async () => {
@@ -138,11 +137,10 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     let divergedErr: InstanceType<typeof MainDivergedError> | undefined;
 
     try {
-      await Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FLOW' }));
+      await gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FLOW' });
     } catch (err) {
-      const cause = (err as { cause?: unknown }).cause;
-      if (cause instanceof MainDivergedError) {
-        divergedErr = cause;
+      if (err instanceof MainDivergedError) {
+        divergedErr = err;
       }
     }
 
@@ -151,8 +149,8 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     expect(divergedErr!.remoteSha).toBe('remoteXYZ');
 
     // Step 4: main_diverged event was written to git_operations
-    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
-    const ops = listGitOperationsSync({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
+    const ops = listGitOperations({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
     expect(ops.length).toBeGreaterThan(0);
     expect(ops[0].status).toBe('aborted');
     expect(ops[0].beforeSha).toBe('localABC');
@@ -160,7 +158,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
 
     // The main_diverged record survives a dashboard restart.
     await resetDb();
-    const opsAfterRestart = listGitOperationsSync({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
+    const opsAfterRestart = listGitOperations({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
     expect(opsAfterRestart.length).toBeGreaterThan(0);
   });
 
@@ -173,12 +171,12 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
-    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' })))
+    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' }))
       .rejects.toThrow();
 
-    const allOps = listGitOperationsSync({ issueId: 'PAN-OPS' });
+    const allOps = listGitOperations({ issueId: 'PAN-OPS' });
     // fetch and main_diverged should be recorded (rev_parse is unfiltered by issueId)
     const opTypes = allOps.map((o) => o.operation);
     expect(opTypes).toContain('fetch');

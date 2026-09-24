@@ -34,11 +34,11 @@ export type { RemoteAgentState, SpawnRemoteAgentOptions } from './remote-agents.
 
 // Workspace metadata management
 export {
-  saveWorkspaceMetadataSync,
-  loadWorkspaceMetadataSync,
-  listWorkspaceMetadataSync,
-  deleteWorkspaceMetadataSync,
-  findRemoteWorkspaceMetadataSync,
+  saveWorkspaceMetadata,
+  loadWorkspaceMetadata,
+  listWorkspaceMetadata,
+  deleteWorkspaceMetadata,
+  findRemoteWorkspaceMetadata,
   WORKSPACES_DIR,
 } from './workspace-metadata.js';
 
@@ -47,21 +47,6 @@ import { FlyProvider, createFlyProvider } from './fly-provider.js';
 import type { RemoteProvider, RemoteProviderConfig } from './interface.js';
 
 export type ProviderType = 'fly';
-
-/**
- * Get a remote provider by type
- */
-export function getRemoteProvider(
-  type: ProviderType,
-  config?: RemoteProviderConfig
-): RemoteProvider {
-  switch (type) {
-    case 'fly':
-      return createFlyProvider();
-    default:
-      throw new Error(`Unknown remote provider type: ${type}`);
-  }
-}
 
 /**
  * Check if remote providers are available

@@ -2,11 +2,10 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { getForgeAdapter, type ForgeType } from '../forge.js';
 import {
-  ensureMergeSetForIssueSync,
-  getMergeSetSync,
+  ensureMergeSetForIssue,
   type MergeSet,
 } from '../merge-set.js';
-import { resolveProjectReposForIssueSync } from '../project-repos.js';
+import { resolveProjectReposForIssue } from '../project-repos.js';
 
 const execAsync = promisify(exec);
 
@@ -84,10 +83,10 @@ function resolveRepos(
   issueId: string,
   labels: string[],
 ): { mergeSet: MergeSet | null; repos: RepoToAssess[] | null } {
-  const mergeSet = ensureMergeSetForIssueSync(issueId, labels);
+  const mergeSet = ensureMergeSetForIssue(issueId, labels);
   return {
     mergeSet,
-    repos: mergeSet?.repos ?? resolveProjectReposForIssueSync(issueId, labels),
+    repos: mergeSet?.repos ?? resolveProjectReposForIssue(issueId, labels),
   };
 }
 
@@ -204,69 +203,4 @@ export async function assessMergeCompleteness(
   const repos = await Promise.all(resolved.repos.map(assessRepoMergeCompleteness));
   const complete = repos.every((repo) => repo.state === 'merged' || repo.state === 'no-changes');
   return { complete, repos, summary: buildSummary(repos, complete) };
-}
-
-/**
- * Find every required repo of a polyrepo issue whose merge cannot be proven,
- * discovering a missing review artifact from the forge on the way.
- *
- * PAN-3917: this used to write its findings back into the merge-set's per-repo
- * the merge verdict and then read those same fields to decide what to re-check —
- * the drift loop this issue removes. The forge and git now answer every
- * question at read time; the merge set contributes only plan data (which repos,
- * which branches, which are required). The returned merge set carries the
- * artifact URLs discovered during this pass, in memory, for the caller's use.
- */
-export async function reconcileStrandedRepos(
-  initialMergeSet: MergeSet,
-): Promise<StrandedRepoReconciliationResult> {
-  const issueId = initialMergeSet.issueId;
-  let mergeSet = getMergeSetSync(issueId) ?? initialMergeSet;
-  const blockers: MergeCompletenessRepoResult[] = [];
-
-  const withArtifact = (repoKey: string, artifactUrl?: string, artifactId?: string): void => {
-    mergeSet = {
-      ...mergeSet,
-      repos: mergeSet.repos.map((repo) => (
-        repo.repoKey === repoKey ? { ...repo, artifactUrl, artifactId } : repo
-      )),
-    };
-  };
-
-  for (const repo of mergeSet.repos.filter((candidate) => candidate.required)) {
-    const artifactUrl = repo.artifactUrl;
-    const artifactId = repo.artifactId;
-
-    if (!artifactUrl) {
-      try {
-        const discovered = await getForgeAdapter(repo.forge).discoverArtifact({
-          sourceBranch: repo.sourceBranch,
-          cwd: repo.repoPath,
-        });
-        if (discovered?.url) {
-          // The strand was a missing review artifact, and the forge has one:
-          // the repo is no longer stranded and merges on the normal path.
-          withArtifact(repo.repoKey, discovered.url, discovered.id);
-          continue;
-        }
-      } catch (error) {
-        blockers.push({
-          repoKey: repo.repoKey,
-          state: 'unverifiable',
-          aheadCount: 0,
-          reason: `${repo.repoKey} artifact discovery is unverifiable: ${errorMessage(error)}`,
-        });
-        continue;
-      }
-    }
-
-    const result = await assessRepoMergeCompleteness({ ...repo, artifactUrl, artifactId });
-    if (result.state === 'merged' && result.artifactUrl) {
-      withArtifact(repo.repoKey, result.artifactUrl, result.artifactId);
-    } else if (result.state === 'unmerged' || result.state === 'unverifiable') {
-      blockers.push(result);
-    }
-  }
-
-  return { mergeSet, blockers };
 }

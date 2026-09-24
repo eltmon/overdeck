@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../tmux.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../tmux.js')>(),
-  capturePaneText: mocks.capturePaneText,
+  capturePane: mocks.capturePaneText,
   capturePaneViewport: mocks.capturePaneViewport,
   sendKeysAsync: mocks.sendKeysAsync,
 }));
@@ -29,7 +29,7 @@ import {
   getConversationByName,
   recordConversationHandoff,
 } from '../conversations.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 import * as forks from '../conversation-forks.js';
 
 const conversation = {
@@ -190,13 +190,13 @@ describe('runForkPipeline stranded status', () => {
     process.env.HOME = testHome;
     process.env.OVERDECK_HOME = testHome;
     mkdirSync(testHome, { recursive: true });
-    const { closeOverdeckDatabaseSync } = await import('../infra.js');
-    closeOverdeckDatabaseSync();
+    const { closeOverdeckDatabase } = await import('../infra.js');
+    closeOverdeckDatabase();
   });
 
   afterEach(async () => {
-    const { closeOverdeckDatabaseSync } = await import('../infra.js');
-    closeOverdeckDatabaseSync();
+    const { closeOverdeckDatabase } = await import('../infra.js');
+    closeOverdeckDatabase();
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
     delete process.env.OVERDECK_HOME;

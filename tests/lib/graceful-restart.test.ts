@@ -4,6 +4,8 @@ import { Effect } from 'effect';
 const tmuxMocks = vi.hoisted(() => ({
   sendEscapeKeyAsync: vi.fn(),
   sendKeys: vi.fn(),
+  host: 'tmux' as 'tmux' | 'herdr',
+  deliverAgentMessage: vi.fn(async () => ({ ok: true, path: 'herdr' })),
 }));
 
 vi.mock('../../src/lib/tmux.js', () => ({
@@ -11,9 +13,14 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sendKeys: tmuxMocks.sendKeys,
 }));
 
+vi.mock('../../src/lib/terminal-backends/select.js', () => ({
+  hostTerminalBackendName: vi.fn(async () => tmuxMocks.host),
+}));
+
 describe('sendGracefulRestartWarning', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    tmuxMocks.host = 'tmux';
     tmuxMocks.sendEscapeKeyAsync.mockResolvedValue(undefined);
     tmuxMocks.sendKeys.mockReturnValue(Effect.void);
   });
@@ -53,6 +60,25 @@ describe('sendGracefulRestartWarning', () => {
 
     expect(tmuxMocks.sendEscapeKeyAsync).not.toHaveBeenCalled();
     expect(tmuxMocks.sendKeys).toHaveBeenCalledWith('agent-pan-1787', expect.stringContaining('Restarting in 60s'));
+
+    await vi.advanceTimersByTimeAsync(GRACEFUL_RESTART_GRACE_MS);
+    await result;
+  });
+
+  it('delivers the warning through the backend-aware door on a Herdr host (PAN-3960)', async () => {
+    tmuxMocks.host = 'herdr';
+    const { GRACEFUL_RESTART_GRACE_MS, sendGracefulRestartWarning } = await import('../../src/lib/graceful-restart.js');
+
+    const result = sendGracefulRestartWarning('agent-pan-3960', 'claude-code', '/tmp/workspace', tmuxMocks.deliverAgentMessage);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(tmuxMocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'agent-pan-3960',
+      expect.stringContaining('Restarting in 60s'),
+      'graceful-restart-warning',
+    );
+    expect(tmuxMocks.sendEscapeKeyAsync).not.toHaveBeenCalled();
+    expect(tmuxMocks.sendKeys).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(GRACEFUL_RESTART_GRACE_MS);
     await result;

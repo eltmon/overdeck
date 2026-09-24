@@ -91,6 +91,19 @@ describe('guard-flywheel-orchestrator-commit.sh', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('allows the orchestrator to stage its .pan/flywheel/ state and report (PAN-3964)', () => {
+    const root = makeTempRepo();
+    installScript(root);
+    stageFile(root, '.pan/flywheel/state.md');
+    stageFile(root, '.pan/flywheel/report.md');
+
+    const result = runGuard(root, {
+      OVERDECK_AGENT_ID: 'flywheel-orchestrator',
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it('blocks orchestrator-staged source paths', () => {
     const root = makeTempRepo();
     installScript(root);

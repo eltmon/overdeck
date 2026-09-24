@@ -1,10 +1,11 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
-  resolveAgentTargetSync: vi.fn(),
-  getAgentStateSync: vi.fn(),
-  setAgentPausedSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  resolveAgentTarget: vi.fn(),
+  getAgentState: vi.fn(),
+  setAgentPaused: vi.fn(),
+  stopAgent: vi.fn(),
   // PAN-3917: agents/slot-reconcile.ts (listSlotAgents) is gone; pause.ts
   // inlines the swarm-slot pattern match over listAgentStates instead.
   listAgentStates: vi.fn((): Array<{ id: string }> => []),
@@ -24,6 +25,12 @@ vi.mock('../../../../src/lib/agents.js', async (importOriginal) => {
   return { ...actual, ...agentMocks };
 });
 
+// PAN-3947: pan kill/pause probe liveness through the terminal backend;
+// the fake mirrors the tmux session mock so each case sets liveness once.
+vi.mock('../../../../src/lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: vi.fn(async (id: string) => (tmuxMocks.sessionExistsSync as (name: string) => boolean)(id)),
+}));
+
 vi.mock('../../../../src/lib/tmux.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/tmux.js')>();
   return {
@@ -38,7 +45,9 @@ vi.mock('../../../../src/lib/operator-interventions.js', () => ({
 }));
 
 beforeEach(() => {
+  agentMocks.setAgentPaused.mockReturnValue(Effect.succeed(null));
   vi.clearAllMocks();
+  agentMocks.stopAgent.mockReturnValue(Effect.void);
   tmuxMocks.sessionExistsSync.mockReturnValue(false);
   tmuxMocks.listSessionNamesSync.mockReturnValue([]);
   agentMocks.listAgentStates.mockReturnValue([]);
@@ -55,8 +64,8 @@ function stderrText(): string {
 
 describe('pan pause on a swarm issue (PAN-2214)', () => {
   it('exits non-zero and names pan swarm stop and pan swarm freeze when slot agents exist', async () => {
-    agentMocks.resolveAgentTargetSync.mockReturnValue('agent-pan-1791');
-    agentMocks.getAgentStateSync.mockReturnValue(null);
+    agentMocks.resolveAgentTarget.mockReturnValue('agent-pan-1791');
+    agentMocks.getAgentState.mockReturnValue(null);
     agentMocks.listAgentStates.mockReturnValue([
       { id: 'agent-pan-1791-slot-1' },
       { id: 'agent-pan-1791-slot-2' },
@@ -70,13 +79,13 @@ describe('pan pause on a swarm issue (PAN-2214)', () => {
     expect(stderr).toContain('pan swarm freeze PAN-1791');
     expect(stderr).toContain('swarm of 2 slot agent(s)');
     expect(stderr).toContain('no single agent');
-    expect(agentMocks.setAgentPausedSync).not.toHaveBeenCalled();
-    expect(agentMocks.stopAgentSync).not.toHaveBeenCalled();
+    expect(agentMocks.setAgentPaused).not.toHaveBeenCalled();
+    expect(agentMocks.stopAgent).not.toHaveBeenCalled();
   });
 
   it('detects slot agents from live tmux sessions when the registry has no rows', async () => {
-    agentMocks.resolveAgentTargetSync.mockReturnValue('agent-pan-1791');
-    agentMocks.getAgentStateSync.mockReturnValue(null);
+    agentMocks.resolveAgentTarget.mockReturnValue('agent-pan-1791');
+    agentMocks.getAgentState.mockReturnValue(null);
     tmuxMocks.listSessionNamesSync.mockReturnValue(['agent-pan-1791-slot-3', 'agent-pan-9999-slot-1']);
 
     const { pauseCommand } = await import('../../../../src/cli/commands/pause.js');
@@ -88,8 +97,8 @@ describe('pan pause on a swarm issue (PAN-2214)', () => {
   });
 
   it('keeps the plain not-found error for a non-swarm issue with no agent', async () => {
-    agentMocks.resolveAgentTargetSync.mockReturnValue('agent-pan-9');
-    agentMocks.getAgentStateSync.mockReturnValue(null);
+    agentMocks.resolveAgentTarget.mockReturnValue('agent-pan-9');
+    agentMocks.getAgentState.mockReturnValue(null);
 
     const { pauseCommand } = await import('../../../../src/cli/commands/pause.js');
     await expect(pauseCommand('PAN-9', {})).rejects.toThrow('process.exit:1');
@@ -102,15 +111,15 @@ describe('pan pause on a swarm issue (PAN-2214)', () => {
 
 describe('pan pause single-agent regression (PAN-2214)', () => {
   it('pauses and stops a running agent exactly as before', async () => {
-    agentMocks.resolveAgentTargetSync.mockReturnValue('agent-pan-1723');
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-1723', status: 'running' });
+    agentMocks.resolveAgentTarget.mockReturnValue('agent-pan-1723');
+    agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-1723', status: 'running' });
     tmuxMocks.sessionExistsSync.mockReturnValue(true);
 
     const { pauseCommand } = await import('../../../../src/cli/commands/pause.js');
     await pauseCommand('PAN-1723', { reason: 'ram' });
 
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('agent-pan-1723', 'ram', true);
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-1723', 'operator');
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1723', 'ram', true);
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-1723', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),
     );

@@ -37,16 +37,20 @@ const KNOWN_CALL_SITES = new Set([
   'dashboard/server/routes/agents/lifecycle-stop.ts|.then(({ resumeAgent }) => resumeAgent(id))',
   'dashboard/server/routes/agents/messaging.ts|await messageAgent(id, message, \'dashboard:user-message\');',
   'dashboard/server/routes/agents/messaging.ts|yield* Effect.promise(() => messageAgent(id, pokeMsg));',
+  // PAN-3960: a live planner's user message goes through the backend-aware
+  // delivery door (it was a raw tmux sendKeys, which cannot reach a Herdr pane).
+  'dashboard/server/routes/misc/planning.ts|const delivery = await deliverAgentMessage(sessionName, message, \'planning user message\');',
   'dashboard/server/routes/agents/permissions.ts|yield* Effect.promise(() => deliverAgentMessage(id, message, \'ask-user-question-answer\'));',
   'dashboard/server/routes/linear-mcp-auth.ts|yield* Effect.promise(() => messageAgent(',
   'dashboard/server/routes/specialists/legacy-routes.ts|await messageAgent(workAgentId, rebaseMsg);',
   'dashboard/server/routes/workspaces.ts|await messageAgent(agentId, message);',
   'dashboard/server/routes/workspaces/merge-strike.ts|assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));',
   'dashboard/server/services/agent-spawner.ts|await messageAgent(agentId, msg);',
-  'lib/cloister/ci-failure-feedback.ts|await messageAgent(agentId, message);',
+  // PAN-3965: the generic CI-failure message reads the delivery outcome; a CI
+  // test-gate failure goes through the verification door (verification-escalation).
+  'lib/cloister/ci-failure-feedback.ts|const outcome = await messageAgent(agentId, message, \'internal\', {});',
   'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(pane.agentId, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
   'lib/cloister/deacon-lite.ts|await deliverAgentMessage(',
-  'lib/cloister/deacon-strike-landing.ts|deliverRecovery: (agentId, message, dedupKey) => messageAgent(agentId, message, \'deacon-strike-landing\', { owesRework: true, dedupKey }),',
   'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',
   'lib/cloister/deacon-swarm.ts|sendStallEvent: (agentId, message) => messageAgent(agentId, message, \'deacon:swarm-stall\'),',
   'lib/cloister/feedback-target.ts|const result = await resumeAgent(agentId);',
@@ -60,8 +64,13 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/service-reactive.ts|await (await import(\'../agents/messaging.js\')).messageAgent(',
   'lib/cloister/specialists-feedback.ts|await messageAgent(agentSession, msg);',
   'lib/cloister/swarm-foreman.ts|await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, \'pan-swarm\');',
-  'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
-  'lib/cloister/verification-runner.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
+  // PAN-4030: UAT feedback is keyed per failing anchor, with review's unkeyed fallback for ACP/Channels.
+  'lib/cloister/uat-failure-feedback.ts|return await messageAgent(agentId, message, \'internal\', dedupKey ? { ...baseOpts, dedupKey } : baseOpts);',
+  'lib/cloister/uat-failure-feedback.ts|return messageAgent(agentId, message, \'internal\', baseOpts);',
+  // PAN-3965: verification feedback delivery moved to verification-escalation, shared with the CI test gate.
+  'lib/cloister/verification-escalation.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
+  // PAN-3705 follow-up: verification PASS is told to the work agent (no rework owed, no needs-you).
+  'lib/cloister/verification-runner.ts|const outcome = await messageAgent(target.agentId, message, \'internal\');',
 ]);
 
 function* walkTs(dir: string): Generator<string> {
@@ -95,7 +104,7 @@ describe('delivery call-site inventory (W7 no-loss audit)', () => {
 });
 
 const mocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentRuntimeStateSync: vi.fn(),
   deliverAgentMessage: vi.fn(),
   sessionExists: vi.fn(),
@@ -103,9 +112,9 @@ const mocks = vi.hoisted(() => ({
   waitForAgentIdle: vi.fn(),
   getCodexAppServerStatus: vi.fn(),
   appendOperatorInterventionEvent: vi.fn(),
-  logAgentLifecycleSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
   resumeAgent: vi.fn(),
-  getLatestSessionIdSync: vi.fn(),
+  getLatestSessionId: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
   hasAgentRuntimeInSubtree: vi.fn(),
@@ -151,7 +160,7 @@ vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
     }
     return { decision: 'block', reason: block.reason, clearStoppedByUser: false };
   },
-  getAgentStateSync: mocks.getAgentStateSync,
+  getAgentState: mocks.getAgentState,
   markAgentRunning: vi.fn(),
   saveAgentStateSync: vi.fn(),
 }));
@@ -210,7 +219,7 @@ vi.mock('../../../../src/lib/agents/runtime-command.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/activity.js', () => ({
-  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
+  getLatestSessionId: mocks.getLatestSessionId,
 }));
 
 vi.mock('../../../../src/lib/agents/supervisor-channels.js', () => ({
@@ -224,11 +233,11 @@ vi.mock('../../../../src/lib/operator-interventions.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
-  logAgentLifecycleSync: mocks.logAgentLifecycleSync,
+  logAgentLifecycle: mocks.logAgentLifecycle,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -241,13 +250,13 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 
 vi.mock('../../../../src/lib/providers.js', () => ({
-  clearCredentialFileAuthSync: vi.fn(),
-  getProviderForModelSync: vi.fn(),
-  setupCredentialFileAuthSync: vi.fn(),
+  clearCredentialFileAuth: vi.fn(),
+  getProviderForModel: vi.fn(),
+  setupCredentialFileAuth: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/launcher-generator.js', () => ({
-  generateLauncherScriptSync: vi.fn(),
+  generateLauncherScript: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/child-env.js', () => ({
@@ -295,11 +304,12 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
     mocks.messageAgentDispatch.mockImplementation((...args: unknown[]) => mocks.realMessageAgent!(...args));
     mocks.getAgentRuntimeStateSync.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
     mocks.sessionExists.mockReturnValue(Effect.succeed(true));
-    mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+    mocks.listPaneValues.mockResolvedValue(['4242\t0']);
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
     mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
-    mocks.getLatestSessionIdSync.mockReturnValue(undefined);
+    mocks.getLatestSessionId.mockImplementation((agentId, options) =>
+      options?.getAgentState?.(agentId)?.sessionId);
     mocks.captureTranscriptUserRecordSnapshot.mockResolvedValue({
       sessionFile: '/tmp/session.jsonl',
       userRecordCount: 0,
@@ -319,7 +329,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   describe('(a) idle Claude Code session whose transcript grows', () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      mocks.getAgentStateSync.mockReturnValue({
+      mocks.getAgentState.mockReturnValue({
         id: 'agent-pan-3846',
         issueId: 'PAN-3846',
         status: 'running',
@@ -351,7 +361,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   describe('(b) session whose transcript never grows', () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      mocks.getAgentStateSync.mockReturnValue({
+      mocks.getAgentState.mockReturnValue({
         id: 'agent-pan-3846',
         issueId: 'PAN-3846',
         status: 'running',
@@ -375,7 +385,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   });
 
   it('(c) dead pane never reports delivered', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-3846',
       issueId: 'PAN-3846',
       status: 'running',
@@ -383,7 +393,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
       harness: 'claude-code',
       sessionId: 'session-3846',
     });
-    mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242']));
+    mocks.listPaneValues.mockResolvedValue(['4242']);
     mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
     mocks.resumeAgent.mockResolvedValue({ success: false, error: 'session not found' });
 
@@ -401,7 +411,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   });
 
   it('(d) stoppedByUser with a completion marker and owesRework clears the gate and resumes (PAN-2668)', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-3846',
       issueId: 'PAN-3846',
       status: 'stopped',
@@ -420,7 +430,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   });
 
   it('(e) paused agent is not delivered, with the pause reason', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-3846',
       issueId: 'PAN-3846',
       status: 'stopped',
@@ -443,7 +453,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
       // deleted review_status row, so there is no flag left to clear. What the
       // eight parked issues (PAN-3679, 3677, 3685, 3689, 3690, 3740, 3810,
       // 3814) needed is what survives: the redelivery itself is confirmed.
-      mocks.getAgentStateSync.mockReturnValue({
+      mocks.getAgentState.mockReturnValue({
         id: 'agent-pan-3679',
         issueId: 'PAN-3679',
         status: 'running',
@@ -475,7 +485,7 @@ describe('W7 caller escalation fixtures (scenario b callers)', () => {
     mocks.resolveProjectFromIssueSync.mockReturnValue(undefined);
     mocks.resolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-3846' });
     mocks.surfaceIssueFeedbackNeedsYou.mockResolvedValue(undefined);
-    mocks.writeFeedbackFile.mockReturnValue(Effect.succeed({ success: true, filePath: '/tmp/feedback.md' }));
+    mocks.writeFeedbackFile.mockResolvedValue({ success: true, filePath: '/tmp/feedback.md' });
   });
 
   it('uat-failure-feedback surfaces a needs-you when delivery is not confirmed', async () => {
@@ -485,11 +495,9 @@ describe('W7 caller escalation fixtures (scenario b callers)', () => {
       confirmed: false,
       reason: 'message was injected but no turn appeared in transcript session-1 within the confirmation window (2 attempts)',
     });
-    const { relayUatFailureFeedbackPromise, resetUatFailureFeedbackStateForTests } =
-      await import('../../../../src/lib/cloister/uat-failure-feedback.js');
-    resetUatFailureFeedbackStateForTests();
+    const { relayUatFailureFeedback } = await import('../../../../src/lib/cloister/uat-failure-feedback.js');
 
-    const result = await relayUatFailureFeedbackPromise({
+    const result = await relayUatFailureFeedback({
       issueId: 'PAN-3846',
       uatNotes: 'login flow broken',
       workspacePath: '/tmp/ws',
@@ -514,12 +522,12 @@ describe('W7 caller escalation fixtures (scenario b callers)', () => {
     mocks.findVerdictReport.mockResolvedValue(null);
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
 
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-3846',
       verdict: 'blocked',
       notes: 'two findings',
       workspacePath: '/tmp/ws',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(false);
     expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(

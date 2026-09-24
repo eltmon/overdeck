@@ -1,15 +1,7 @@
 import http from 'http';
-import { Data, Effect } from 'effect';
 
 const HOST = '127.0.0.1';
 const PORT = 12436;
-
-/** Tagged error for openai-compatible proxy Effect variants. */
-export class OpenAICompatibleProxyError extends Data.TaggedError('OpenAICompatibleProxyError')<{
-  readonly operation: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
 
 const UPSTREAMS: Record<string, string> = {
   nous: 'https://inference-api.nousresearch.com/v1',
@@ -36,7 +28,10 @@ export function getOpenAICompatibleProxyBaseUrl(provider: string): string {
 
 export function getProxyPathname(url: string | undefined): string {
   return new URL(url ?? '/', `http://${HOST}:${PORT}`).pathname;
-}async function ensureOpenAICompatibleProxyRunningPromise(): Promise<void> {
+}
+
+/** Start the OpenAI-compatible proxy sidecar if it is not already running. */
+export async function ensureOpenAICompatibleProxyRunning(): Promise<void> {
   if (started && server?.listening) return;
   if (await isPortOpen()) {
     started = true;
@@ -61,18 +56,6 @@ export function getProxyPathname(url: string | undefined): string {
     });
   });
 }
-
-/** Effect variant of {@link ensureOpenAICompatibleProxyRunning}. */
-export const ensureOpenAICompatibleProxyRunning = (): Effect.Effect<void, OpenAICompatibleProxyError> =>
-  Effect.tryPromise({
-    try: () => ensureOpenAICompatibleProxyRunningPromise(),
-    catch: (cause) =>
-      new OpenAICompatibleProxyError({
-        operation: 'ensureOpenAICompatibleProxyRunning',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
 
 async function isPortOpen(): Promise<boolean> {
   return new Promise((resolve) => {

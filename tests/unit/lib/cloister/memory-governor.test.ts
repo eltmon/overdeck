@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const readProcMemoryMock = vi.fn();
@@ -5,10 +6,10 @@ const loadConfigSyncMock = vi.fn();
 const getStatsMock = vi.fn();
 const resolveProjectFromIssueSyncMock = vi.fn();
 const loadCloisterConfigSyncMock = vi.fn();
-const listRunningAgentsSyncMock = vi.fn();
+const listRunningAgentsMock = vi.fn();
 const getAgentRuntimeStateSyncMock = vi.fn();
-const setAgentPausedSyncMock = vi.fn();
-const stopAgentSyncMock = vi.fn();
+const setAgentPausedMock = vi.fn();
+const stopAgentMock = vi.fn();
 const osMocks = vi.hoisted(() => ({
   cpus: vi.fn(),
   loadavg: vi.fn(),
@@ -38,7 +39,7 @@ vi.mock('../../../../src/lib/cloister/config.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/queries.js', () => ({
-  listRunningAgentsSync: (...args: unknown[]) => listRunningAgentsSyncMock(...args),
+  listRunningAgents: (...args: unknown[]) => Effect.sync(() => listRunningAgentsMock(...args)),
 }));
 
 vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
@@ -46,12 +47,12 @@ vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
-  setAgentPausedSync: (...args: unknown[]) => setAgentPausedSyncMock(...args),
+  setAgentPaused: (...args: unknown[]) => Effect.sync(() => { setAgentPausedMock(...args); return null; }),
   GOVERNOR_SLOT_PAUSE_REASON_PREFIX: '[governor-slot]',
 }));
 
 vi.mock('../../../../src/lib/agents/termination.js', () => ({
-  stopAgentSync: (...args: unknown[]) => stopAgentSyncMock(...args),
+  stopAgent: (...args: unknown[]) => Effect.sync(() => { stopAgentMock(...args); }),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -64,24 +65,21 @@ vi.mock('node:os', async (importOriginal) => ({
   loadavg: (...args: unknown[]) => osMocks.loadavg(...args),
 }));
 
-import {
-  assessMemoryPressure,
-  classifyMemoryPressure,
-  nextGovernorMode,
-  resetGovernorModeForTests,
-  computeLearnedFootprintBytes,
-  estimateFootprint,
-  canAdmit,
-  getCachedMemoryVerdict,
-  selectStackShedCandidates,
-  selectAgentToPause,
-  shed,
-  type GovernorReserves,
-} from '../../../../src/lib/cloister/memory-governor.js';
+import { assessMemoryPressure, classifyMemoryPressure, nextGovernorMode, resetGovernorModeForTests, getCachedMemoryVerdict, selectStackShedCandidates, selectAgentToPause, shed, type GovernorReserves, readGovernorReserves } from '../../../../src/lib/cloister/memory-governor.js';
 import {
   type ResourceStack,
   type StackContainerResource,
 } from '../../../../src/dashboard/server/routes/resources/stacks.js';
+
+// Moved here from src/lib/cloister/memory-governor.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Admission predicate (PRD AC-3, pinned public shape — specialist-budget,
+ * tiered-eviction, and memory-paced-boot all call this exact signature):
+ * fits only if the footprint leaves the SOFT reserve intact.
+ */
+function canAdmit(footprintBytes: number, availableBytes: number): boolean {
+  return footprintBytes <= availableBytes - readGovernorReserves().softBytes;
+}
 
 const GIB = 1024 ** 3;
 const GOVERNOR_RESOURCES = {
@@ -536,48 +534,7 @@ function stack(issueId: string, memoryBytes: number): ResourceStack {
   };
 }
 
-describe('computeLearnedFootprintBytes (PAN-2500 footprint-budget)', () => {
-  it('returns null when no stack exists yet for the project (cold start)', () => {
-    resolveProjectFromIssueSyncMock.mockReturnValue(null);
-    expect(computeLearnedFootprintBytes([stack('PAN-1', 3 * GIB)], 'overdeck')).toBeNull();
-  });
 
-  it('averages live memoryBytes across the project\'s current stacks', () => {
-    resolveProjectFromIssueSyncMock.mockReturnValue({ projectKey: 'overdeck' });
-    const stacks = [stack('PAN-1', 2 * GIB), stack('PAN-2', 4 * GIB)];
-    expect(computeLearnedFootprintBytes(stacks, 'overdeck')).toBe(3 * GIB);
-  });
-});
-
-describe('estimateFootprint (PAN-2500 footprint-budget)', () => {
-  beforeEach(() => {
-    loadConfigSyncMock.mockReturnValue({
-      config: {
-        resources: {
-          ...GOVERNOR_RESOURCES,
-          governorFootprintDefaultWorkGb: 2,
-          governorFootprintDefaultReviewGb: 1,
-          governorFootprintDefaultTestGb: 1,
-        },
-      },
-    });
-  });
-
-  it('returns a learned per-stack value from a stubbed docker-stats map when available', async () => {
-    resolveProjectFromIssueSyncMock.mockReturnValue({ projectKey: 'overdeck' });
-    getStatsMock.mockReturnValue([{ id: 'c1', name: 'feature-pan-1-svc-1', memoryUsage: 5 * GIB }]);
-    const footprint = await estimateFootprint('work', 'overdeck');
-    expect(footprint).toBe(5 * GIB);
-  });
-
-  it('falls back to the configured cold-start default per role otherwise', async () => {
-    resolveProjectFromIssueSyncMock.mockReturnValue(null);
-    getStatsMock.mockReturnValue([]);
-    expect(await estimateFootprint('work', 'overdeck')).toBe(2 * GIB);
-    expect(await estimateFootprint('review', 'overdeck')).toBe(1 * GIB);
-    expect(await estimateFootprint('test', 'overdeck')).toBe(1 * GIB);
-  });
-});
 
 describe('canAdmit (PAN-2500 footprint-budget)', () => {
   beforeEach(() => {
@@ -663,8 +620,8 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     });
     loadCloisterConfigSyncMock.mockReturnValue({ concurrency: { exempt_operator_started: true } });
     execFileMock.mockClear();
-    setAgentPausedSyncMock.mockClear();
-    stopAgentSyncMock.mockClear();
+    setAgentPausedMock.mockClear();
+    stopAgentMock.mockClear();
   });
 
   it('stops both merged stacks first, then pauses the idle agent only if still HARD afterward (PRD AC-4)', async () => {
@@ -672,7 +629,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     const stacks = [mergedStack('PAN-1', 1 * GIB, 'pan-1-svc'), mergedStack('PAN-2', 1 * GIB, 'pan-2-svc')];
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
 
-    listRunningAgentsSyncMock.mockReturnValue([
+    listRunningAgentsMock.mockReturnValue([
       { id: 'agent-pan-3', issueId: 'PAN-3', role: 'work', tmuxActive: true, flywheelRunId: 'run-1' },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
@@ -686,13 +643,13 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     expect(execFileMock).toHaveBeenCalledWith('docker', ['stop', '--time', '30', 'pan-2-svc'], expect.anything(), expect.anything());
     expect(execFileMock).not.toHaveBeenCalledWith('docker', expect.arrayContaining(['pause']), expect.anything(), expect.anything());
     expect(result.pausedAgents).toEqual(['agent-pan-3']);
-    expect(setAgentPausedSyncMock).toHaveBeenCalledWith('agent-pan-3', expect.stringContaining('[governor-slot]'), true);
-    expect(stopAgentSyncMock).toHaveBeenCalledWith('agent-pan-3');
+    expect(setAgentPausedMock).toHaveBeenCalledWith('agent-pan-3', expect.stringContaining('[governor-slot]'), true);
+    expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-3');
   });
 
   it('never sheds an operator-attached (no flywheelRunId) agent even under sustained HARD pressure', async () => {
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue([]);
-    listRunningAgentsSyncMock.mockReturnValue([
+    listRunningAgentsMock.mockReturnValue([
       { id: 'agent-operator', issueId: 'PAN-4', role: 'work', tmuxActive: true, flywheelRunId: undefined },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
@@ -701,6 +658,6 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     const result = await shed();
 
     expect(result.pausedAgents).toEqual([]);
-    expect(setAgentPausedSyncMock).not.toHaveBeenCalled();
+    expect(setAgentPausedMock).not.toHaveBeenCalled();
   });
 });

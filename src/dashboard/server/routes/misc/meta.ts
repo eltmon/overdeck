@@ -9,9 +9,8 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getGitHubConfig as getGitHubConfigShared } from '../../services/tracker-config.js';
 import type { IssueDataService } from '../../services/issue-data-service.js';
-import { extractPrefixSync } from '../../../../lib/issue-id.js';
+import { extractPrefix } from '../../../../lib/issue-id.js';
 import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
 import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import { sendKeys } from '../../../../lib/tmux.js';
@@ -68,8 +67,8 @@ const getVersionRoute = HttpRouter.add(
     // is healthy, then use it as a fallback when the dashboard is dead.
     let supervisorUrl: string | null = null;
     try {
-      const { getSupervisorUrlSync } = await import('../../../../lib/supervisor.js');
-      supervisorUrl = getSupervisorUrlSync();
+      const { getSupervisorUrl } = await import('../../../../lib/supervisor.js');
+      supervisorUrl = getSupervisorUrl();
     } catch {
       // supervisor module not available in this build — benign
     }
@@ -105,8 +104,8 @@ const getSyncStatusRoute = HttpRouter.add(
   'GET',
   '/api/sync-status',
   Effect.sync(() => {
-    const { isStartupSyncNeededSync } = require('../../../../lib/sync-startup-gate.js');
-    return jsonResponse(isStartupSyncNeededSync());
+    const { isStartupSyncNeeded } = require('../../../../lib/sync-startup-gate.js');
+    return jsonResponse(isStartupSyncNeeded());
   }),
 );
 
@@ -116,7 +115,9 @@ const postRunSyncRoute = HttpRouter.add(
   Effect.promise(async () => {
     try {
       const invocation = panCliInvocation(['sync']);
-      const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, { encoding: 'utf-8', timeout: 180_000 });
+      // Light Herdr pass: no minutes-long update/installs that the timeout would orphan (PAN-3956).
+      const env = { ...process.env, OVERDECK_HERDR_SYNC_LIGHT: '1' };
+      const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, { encoding: 'utf-8', timeout: 180_000, env });
       return jsonResponse({ ok: true, output: `${stdout}${stderr}`.trim() });
     } catch (error: any) {
       const detail = String(error?.stderr || error?.message || error);

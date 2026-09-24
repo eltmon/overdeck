@@ -11,7 +11,6 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { listProjectsSync } from '../projects.js';
-import { FsError } from '../errors.js';
 import type { CostEvent } from './events.js';
 import { CostDoorLive, CostWriter, type CostEvent as OverdeckCostEvent } from '../overdeck/cost.js';
 import type { IssueId } from '../overdeck/issues.js';
@@ -29,7 +28,13 @@ export interface SyncResult {
   byProject: Record<string, { imported: number; duplicates: number; files: number }>;
   /** Any errors encountered (non-fatal) */
   errors: string[];
-}async function syncWalFromAllProjectsPromise(): Promise<SyncResult> {
+}
+
+/**
+ * Import every project's cost WAL into the cost store. Per-file errors are
+ * collected in `result.errors` rather than thrown.
+ */
+export async function syncWalFromAllProjects(): Promise<SyncResult> {
   const result: SyncResult = {
     imported: 0,
     duplicates: 0,
@@ -81,35 +86,6 @@ export interface SyncResult {
   }
 
   return result;
-}async function syncWalFromDirPromise(eventsDir: string): Promise<{ imported: number; duplicates: number; files: number; errors: string[] }> {
-  const stats = { imported: 0, duplicates: 0, files: 0, errors: [] as string[] };
-
-  if (!existsSync(eventsDir)) return stats;
-
-  let files: string[];
-  try {
-    files = (await readdir(eventsDir)).filter(f => f.endsWith('.jsonl'));
-  } catch (err) {
-    stats.errors.push(`Failed to read dir ${eventsDir}: ${err}`);
-    return stats;
-  }
-
-  for (const file of files) {
-    const filePath = join(eventsDir, file);
-    const events = await parseWalFile(filePath, stats.errors);
-    if (events.length === 0) continue;
-
-    try {
-      const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, filePath);
-      stats.imported += inserted;
-      stats.duplicates += duplicates;
-      stats.files++;
-    } catch (err) {
-      stats.errors.push(`${file}: import failed: ${err}`);
-    }
-  }
-
-  return stats;
 }
 
 // ============== Helpers ==============
@@ -150,28 +126,6 @@ async function recordCostEventsThroughOverdeck(
   }
   return { inserted, duplicates };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect variant of syncWalFromAllProjects. The underlying impl already
- * collects per-file errors in `result.errors` rather than throwing, so the
- * Effect channel only sees catastrophic failures (e.g. listProjects throwing).
- */
-export const syncWalFromAllProjects = (): Effect.Effect<SyncResult, FsError> =>
-  Effect.tryPromise({
-    try: () => syncWalFromAllProjectsPromise(),
-    catch: (cause) => new FsError({ path: '<all projects>', operation: 'syncWalFromAllProjects', cause }),
-  });
-
-/** Effect variant of syncWalFromDir. */
-export const syncWalFromDir = (
-  eventsDir: string,
-): Effect.Effect<{ imported: number; duplicates: number; files: number; errors: string[] }, FsError> =>
-  Effect.tryPromise({
-    try: () => syncWalFromDirPromise(eventsDir),
-    catch: (cause) => new FsError({ path: eventsDir, operation: 'syncWalFromDir', cause }),
-  });
 
 async function parseWalFile(filePath: string, errors: string[]): Promise<CostEvent[]> {
   let content: string;

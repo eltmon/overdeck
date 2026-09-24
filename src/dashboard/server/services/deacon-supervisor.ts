@@ -1,12 +1,12 @@
 import { fork, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
-import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { readCloisterStateFile } from '../../../lib/cloister/service.js';
 
 export interface DeaconSupervisorDeps {
   fork?: typeof fork;
   readState?: typeof readCloisterStateFile;
-  emitActivity?: typeof emitActivityEntrySync;
+  emitActivity?: typeof emitActivityEntry;
   now?: () => number;
   setTimeout?: typeof setTimeout;
   clearTimeout?: typeof clearTimeout;
@@ -59,7 +59,7 @@ function buildChildEnv(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}): DeaconSupervisor {
   const forkImpl = deps.fork ?? fork;
   const readState = deps.readState ?? readCloisterStateFile;
-  const emitActivity = deps.emitActivity ?? emitActivityEntrySync;
+  const emitActivity = deps.emitActivity ?? emitActivityEntry;
   const now = deps.now ?? Date.now;
   const setTimer = deps.setTimeout ?? setTimeout;
   const clearTimer = deps.clearTimeout ?? clearTimeout;

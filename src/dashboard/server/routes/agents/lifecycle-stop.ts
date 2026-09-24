@@ -12,10 +12,11 @@ import {
   setAgentPaused,
   stopAgent,
 } from '../../../../lib/agents.js';
-import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { stopWorkspaceDocker } from '../../../../lib/workspace-manager.js';
-import { killSession, sessionExists } from '../../../../lib/tmux.js';
+import { sessionExists } from '../../../../lib/tmux.js';
+import { agentPaneExists, closeAgentPane } from '../../../../lib/terminal-backends/launch.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -45,7 +46,7 @@ export function createAgentStopHandler(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    const stateBeforeStop = yield* getAgentState(id);
+    const stateBeforeStop = getAgentState(id);
     yield* Effect.promise(() => appendAgentLifecycleLog(id, lifecycleEvent));
     yield* stopAgent(id, 'operator');
 
@@ -68,7 +69,7 @@ export function createAgentStopHandler(
           const projectPath = project?.projectPath ?? process.cwd();
           const workspacePath = findWorkspacePath(projectPath, issueLower);
           if (workspacePath) {
-            const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
+            const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
             if (dockerResult.containersFound) {
               console.log(`[agents] ✓ Stopped Docker stack for ${id}: ${dockerResult.steps.join('; ')}`);
             }
@@ -87,7 +88,7 @@ export function createAgentStopHandler(
     // PAN-1908: write-through projection — re-upsert the stopped row and append
     // the lifecycle event in one SQLite transaction. stopAgent already saved
     // state, but repeating the upsert here makes the event append atomic.
-    const stateAfterStop = yield* getAgentState(id);
+    const stateAfterStop = getAgentState(id);
     if (stateAfterStop) {
       yield* saveAgentStateAndEmitEventProgram(stateAfterStop, {
         type: 'agent.stopped',
@@ -98,7 +99,7 @@ export function createAgentStopHandler(
     const issueId = stateBeforeStop?.issueId;
     // PAN-1048: derive label from role; legacy state.phase no longer exists.
     const phaseLabel = stateBeforeStop?.role === 'plan' ? 'planning' : 'work';
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'info',
       message: issueId
@@ -149,8 +150,9 @@ export const postAgentSuspendRoute = HttpRouter.add(
     saveSessionId(id, effectiveSessionId);
     // PAN-1048 review feedback 004 (C1): resolve issueId before kill so we can
     // include it on the agent.stopped payload (the contract requires it).
-    const suspendIssueId = (yield* getAgentState(id))?.issueId ?? '';
-    yield* killSession(id).pipe(Effect.catch(() => Effect.void));
+    const suspendIssueId = (getAgentState(id))?.issueId ?? '';
+    // PAN-3947: close through the terminal backend (tmux session or Herdr pane).
+    yield* Effect.promise(() => closeAgentPane(id));
     saveAgentRuntimeState(id, {
       state: 'suspended',
       lastActivity: new Date().toISOString(),
@@ -159,7 +161,7 @@ export const postAgentSuspendRoute = HttpRouter.add(
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
     // append in one SQLite transaction. Preserve the existing agent-table status
     // (suspend does not flip it to stopped).
-    const stateAfterSuspend = yield* getAgentState(id);
+    const stateAfterSuspend = getAgentState(id);
     if (stateAfterSuspend) {
       yield* saveAgentStateAndEmitEventProgram(stateAfterSuspend, {
         type: 'agent.stopped',
@@ -195,13 +197,16 @@ export const postAgentPauseRoute = HttpRouter.add(
       return jsonResponse({ error: 'reason must be a string' }, { status: 400 });
     }
 
-    const stateBeforePause = yield* getAgentState(id);
+    const stateBeforePause = getAgentState(id);
     if (!stateBeforePause) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
 
     const previousStatus = toAgentStatusPayload(stateBeforePause.status);
-    const hasLiveSession = yield* sessionExists(id);
+    // PAN-3947: a live terminal on the host's backend — a tmux session or a
+    // Herdr pane. `sessionExists` alone is always false on Herdr, so a paused
+    // agent's pane and harness used to stay alive.
+    const hasLiveSession = yield* Effect.promise(() => agentPaneExists(id).catch(() => false));
     const stoppedByPause = hasLiveSession || stateBeforePause.status === 'running' || stateBeforePause.status === 'starting';
     let updatedState = yield* setAgentPaused(id, reason, stoppedByPause);
     if (!updatedState) {
@@ -210,7 +215,7 @@ export const postAgentPauseRoute = HttpRouter.add(
 
     if (hasLiveSession) {
       yield* Effect.promise(() => captureAgentOutputBeforeKill(id));
-      yield* killSession(id);
+      yield* Effect.promise(() => closeAgentPane(id));
     }
 
     if (hasLiveSession || updatedState.status === 'running' || updatedState.status === 'starting') {
@@ -260,7 +265,7 @@ export const postAgentUnpauseRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    const stateBeforeUnpause = yield* getAgentState(id);
+    const stateBeforeUnpause = getAgentState(id);
     if (!stateBeforeUnpause) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
@@ -298,7 +303,7 @@ export const postAgentUnpauseRoute = HttpRouter.add(
     // lifecycle says there is actually a session to resume — a plain stopped
     // agent with no session is left for the Start button, same as before.
     let resumeTriggered = false;
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     // Troubled agents are quarantined from auto-resume (the deacon skips them
     // too) — firing resumeAgent would just hit its gate and make
     // resumeTriggered a lie. untroubled + start is the path for those.

@@ -21,8 +21,8 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import type { ProcessSpawnError } from '../../../../lib/errors.js';
-import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
+import { ProcessSpawnError, VcsError } from '../../../../lib/errors.js';
+import { parseIssueId, extractPrefix } from '../../../../lib/issue-id.js';
 import {
   listStashes,
   isSalvageableStash,
@@ -51,7 +51,15 @@ export type WorkspaceRemovalGuard =
 export const checkWorkspaceRemovalGuard = (
   workspacePath: string,
 ): Effect.Effect<WorkspaceRemovalGuard> =>
-  getContainersReferencingWorkspacePath(workspacePath).pipe(
+  Effect.tryPromise({
+    try: () => getContainersReferencingWorkspacePath(workspacePath),
+    catch: (cause) => new ProcessSpawnError({
+      command: 'workspace-manager',
+      args: ['getContainersReferencingWorkspacePath'],
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    }),
+  }).pipe(
     Effect.map((orphanedContainers) => {
       if (orphanedContainers.length > 0) {
         return {
@@ -69,6 +77,18 @@ export const checkWorkspaceRemovalGuard = (
     })),
   );
 
+/**
+ * Map a rejected stash operation to a typed failure that keeps git's error text,
+ * which httpHandler returns in the 500 body.
+ */
+function stashFailure(op: string): (cause: unknown) => VcsError {
+  return (cause) => new VcsError({
+    operation: `git stash ${op}`,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+}
+
 function resolveWorkspacePath(issueId: string): string | null {
   const info = getWorkspaceInfoForIssue(issueId);
   if (info.isRemote || !info.localPath) return null;
@@ -80,7 +100,7 @@ const getWorkspaceStashesRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const workspacePath = resolveWorkspacePath(issueId);
@@ -89,7 +109,7 @@ const getWorkspaceStashesRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise({ try: () => listStashes(workspacePath), catch: stashFailure('list') });
     const salvageableStashes = stashes
       .filter(isSalvageableStash)
       .filter((entry) => entry.issueId === issueId.toUpperCase())
@@ -115,7 +135,7 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
@@ -125,18 +145,21 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise({ try: () => listStashes(workspacePath), catch: stashFailure('list') });
     const stash = stashes.find((entry) => entry.ref === stashRef);
     if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
       return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
     }
 
-    const branchName = yield* createRecoveryBranchFromStash(
-      workspacePath,
-      stash.ref,
-      stash.issueId,
-      stash.shortDescription,
-    );
+    const branchName = yield* Effect.tryPromise({
+      try: () => createRecoveryBranchFromStash(
+        workspacePath,
+        stash.ref,
+        stash.issueId,
+        stash.shortDescription,
+      ),
+      catch: stashFailure('branch'),
+    });
 
     return jsonResponse({ success: true, branchName });
   }))
@@ -151,7 +174,7 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
@@ -161,13 +184,13 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise({ try: () => listStashes(workspacePath), catch: stashFailure('list') });
     const stash = stashes.find((entry) => entry.ref === stashRef);
     if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
       return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
     }
 
-    yield* dropStash(workspacePath, stash.ref);
+    yield* Effect.tryPromise({ try: () => dropStash(workspacePath, stash.ref), catch: stashFailure('drop') });
     return jsonResponse({ success: true });
   }))
 );
@@ -179,10 +202,10 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
@@ -353,13 +376,13 @@ const postWorkspaceCleanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
     const { createBackup } = body as { createBackup?: boolean };
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;

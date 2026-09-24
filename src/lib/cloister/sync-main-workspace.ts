@@ -1,4 +1,4 @@
-import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
 
 export interface SyncMainRepoResult {
   repoKey: string;
@@ -40,7 +40,7 @@ export async function syncMainAcrossWorkspaceRepos(
   console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
   logActivity('sync_main_start', `Starting sync for ${issueId}`);
 
-  const roots = resolveWorkspaceRepoRootsSync(issueId, projectPath);
+  const roots = resolveWorkspaceRepoRoots(issueId, projectPath);
   const repos: SyncMainRepoResult[] = [];
   let failedRepoKey: string | undefined;
 

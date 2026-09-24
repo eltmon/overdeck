@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { AppServerTransport } from '../app-server-transport.js';
 
 export interface FakeAppServer {
   child: ChildProcessWithoutNullStreams;
@@ -34,5 +35,38 @@ export function createFakeAppServer(onMessage?: (message: Record<string, unknown
       onMessage?.(message, fake);
     }
   });
+  return fake;
+}
+
+export interface FakeNativeTransport {
+  transport: AppServerTransport;
+  messages: Array<Record<string, unknown>>;
+  send(message: unknown): void;
+  close(reason?: string): void;
+  closedByClient: boolean;
+}
+
+/** An in-memory native (WebSocket-framed) transport for manager tests (PAN-3835). */
+export function createFakeNativeTransport(
+  onMessage?: (message: Record<string, unknown>, fake: FakeNativeTransport) => void,
+): FakeNativeTransport {
+  let handler: ((text: string) => void) | undefined;
+  let closeHandler: ((reason: string) => void) | undefined;
+  const fake: FakeNativeTransport = {
+    messages: [],
+    closedByClient: false,
+    transport: {
+      send(message) {
+        const record = JSON.parse(JSON.stringify(message)) as Record<string, unknown>;
+        fake.messages.push(record);
+        queueMicrotask(() => onMessage?.(record, fake));
+      },
+      onMessage(next) { handler = next; },
+      onClose(next) { closeHandler = next; },
+      close() { fake.closedByClient = true; },
+    },
+    send(message) { handler?.(JSON.stringify(message)); },
+    close(reason = 'websocket closed (1006)') { closeHandler?.(reason); },
+  };
   return fake;
 }

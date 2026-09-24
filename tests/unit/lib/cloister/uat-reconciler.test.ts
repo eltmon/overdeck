@@ -53,6 +53,7 @@ function makeDeps(projectRoot: string, options: {
   headShas?: Record<string, string>;
   assembleStatus?: UatGenerationStatus;
   containedNames?: string[];
+  holdsForUat?: boolean;
 } = {}): UatReconcilerDeps & {
   rows: Map<string, UatGeneration>;
   assembled: ReadyFeature[][];
@@ -96,6 +97,7 @@ function makeDeps(projectRoot: string, options: {
     },
     teardownStack: async (g) => { teardowns.push(g.name); },
     cleanup: async () => { cleanups.push(1); },
+    ...(options.holdsForUat !== undefined ? { holdsForUat: () => options.holdsForUat! } : {}),
     now: () => T0,
     log: (message) => { logs.push(message); },
   };
@@ -398,6 +400,60 @@ describe('single-flight, stuck assemblies, backoff', () => {
   });
 });
 
+describe('consecutive-failure cutoff (PAN-3963)', () => {
+  const failedRow = (proj: string, name: string, hour: number) =>
+    gen(proj, name, 'failed', {
+      createdAt: `2026-06-10T0${hour}:00:00.000Z`,
+      updatedAt: `2026-06-10T0${hour}:00:00.000Z`,
+    });
+
+  it('stops re-assembling after three consecutive failed assemblies', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, {
+      rows: [
+        failedRow(proj, 'uat/pan-f1-0610', 6),
+        failedRow(proj, 'uat/pan-f2-0610', 7),
+        failedRow(proj, 'uat/pan-f3-0610', 8),
+      ],
+    });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembly-blocked');
+    expect(deps.assembled).toHaveLength(0);
+    expect(deps.logs.some((m) => m.includes('BLOCKED') && m.includes('uat/pan-f3-0610'))).toBe(true);
+  });
+
+  it('still assembles below the cutoff, and a newer non-failed row breaks the streak', async () => {
+    const proj = freshProject();
+    const twoFailures = makeDeps(proj, {
+      rows: [failedRow(proj, 'uat/pan-f1-0610', 6), failedRow(proj, 'uat/pan-f2-0610', 7)],
+    });
+    expect((await reconcileUatGenerations(proj, twoFailures)).action).toBe('assembled');
+
+    const proj2 = freshProject();
+    const brokenStreak = makeDeps(proj2, {
+      rows: [
+        failedRow(proj2, 'uat/pan-f1-0610', 6),
+        failedRow(proj2, 'uat/pan-f2-0610', 7),
+        failedRow(proj2, 'uat/pan-f3-0610', 8),
+        gen(proj2, 'uat/pan-otter-0610', 'invalidated', { createdAt: '2026-06-10T09:00:00.000Z' }),
+      ],
+    });
+    expect((await reconcileUatGenerations(proj2, brokenStreak)).action).toBe('assembled');
+  });
+
+  it('force bypasses the cutoff — the operator retry lever after the cause is fixed', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, {
+      rows: [
+        failedRow(proj, 'uat/pan-f1-0610', 6),
+        failedRow(proj, 'uat/pan-f2-0610', 7),
+        failedRow(proj, 'uat/pan-f3-0610', 8),
+      ],
+    });
+    expect((await reconcileUatGenerations(proj, deps, { force: true })).action).toBe('assembled');
+  });
+});
+
 describe('empty queue', () => {
   it('is idle (after invalidation rules) when the ready set is empty', async () => {
     const proj = freshProject();
@@ -415,5 +471,84 @@ describe('empty queue', () => {
     const result = await reconcileUatGenerations(proj, deps);
     expect(result.invalidated).toEqual(['uat/pan-leftover-0610']);
     expect(result.action).toBe('idle');
+  });
+});
+
+describe('PAN-3965 no batch for a single ready feature', () => {
+  it('assembles no generation when exactly one feature is ready and the project does not hold for UAT', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: [READY[0]!], holdsForUat: false });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('single-feature');
+    expect(result.generation).toBeUndefined();
+    expect(deps.assembled).toEqual([]);
+    expect(deps.rows.size).toBe(0);
+    expect(deps.logs.join('\n')).toContain('merges directly');
+  });
+
+  it('a project that holds merges for UAT still gets a batch for one ready feature', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: [READY[0]!], holdsForUat: true });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toHaveLength(1);
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1']);
+  });
+
+  it('asks about the lone ready feature, so a per-issue UAT hold gets its batch (review of #3993, M4)', async () => {
+    const proj = freshProject();
+    const asked: string[] = [];
+    const deps = {
+      ...makeDeps(proj, { readySet: [READY[0]!] }),
+      // An async per-issue decision: the issue carries `hold-for-uat` in an `auto` project.
+      holdsForUat: async (feature: ReadyFeature) => {
+        asked.push(feature.issueId);
+        return true;
+      },
+    };
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(asked).toEqual(['PAN-1']);
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1']);
+  });
+
+  it('assembles exactly one generation when two features are ready, held or not', async () => {
+    for (const holdsForUat of [false, true]) {
+      const proj = freshProject();
+      const deps = makeDeps(proj, { readySet: READY, holdsForUat });
+
+      const result = await reconcileUatGenerations(proj, deps);
+
+      expect(result.action).toBe('assembled');
+      expect(deps.assembled).toHaveLength(1);
+      expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    }
+  });
+
+  it('assembles exactly one generation when two features are ready', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: READY });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toHaveLength(1);
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1', 'PAN-2']);
+  });
+
+  it('a forced rebuild with one ready feature still assembles nothing', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: [READY[0]!] });
+
+    const result = await reconcileUatGenerations(proj, deps, { force: true });
+
+    expect(result.action).toBe('single-feature');
+    expect(deps.assembled).toEqual([]);
   });
 });

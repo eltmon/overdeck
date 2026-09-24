@@ -12,15 +12,15 @@ import {
   sanitizeResourceAllocatedIssues,
 } from '../../dashboard/server/services/resource-discovery.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
-import { extractPrefixSync, parseIssueIdSync } from '../issue-id.js';
+import { extractPrefix, parseIssueId } from '../issue-id.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
-import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { readContinueState } from '../xbrief/continue-state.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
-import { findPrdAnywhereSync, readPrdContent } from '../prd-locations.js';
+import { findPrdAnywhere, readPrdContent } from '../prd-locations.js';
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -28,7 +28,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -75,7 +75,7 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return join(homedir(), 'Projects');
 }
 
-export function resolveIssueProjectPathSync(id: string): string {
+export function resolveIssueProjectPath(id: string): string {
   const githubCheck = isGitHubIssue(id);
   let projectPath = '';
   if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
@@ -83,7 +83,7 @@ export function resolveIssueProjectPathSync(id: string): string {
     projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
   }
   if (!projectPath) {
-    const issuePrefix = extractPrefixSync(id) ?? id.split('-')[0];
+    const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
     try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
   }
   return projectPath;
@@ -101,7 +101,7 @@ export function getIssueTasks(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
     const resolvedProject = resolveProjectFromIssueSync(id);
-    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPathSync(id);
+    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPath(id);
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
 
     // Check for remote workspace (reads non-fatal state files)
@@ -165,8 +165,8 @@ export function getIssueTasks(id: string) {
 export function getIssuePrd(id: string) {
   return Effect.gen(function* () {
     const resolvedProject = resolveProjectFromIssueSync(id);
-    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPathSync(id);
-    const location = projectPath ? findPrdAnywhereSync(projectPath, id) : null;
+    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPath(id);
+    const location = projectPath ? findPrdAnywhere(projectPath, id) : null;
     if (!location) {
       return jsonResponse({ hasPrd: false, error: `No PRD draft for ${id}.` }, { status: 404 });
     }
@@ -198,7 +198,7 @@ export function getResourceAllocatedIssues() {
 
 export function getIssueResourceDetails(rawId: string) {
   return Effect.gen(function* () {
-    const parsedIssueId = parseIssueIdSync(rawId);
+    const parsedIssueId = parseIssueId(rawId);
     if (!parsedIssueId) {
       return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
     }

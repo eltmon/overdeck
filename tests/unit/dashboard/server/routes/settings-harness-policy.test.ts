@@ -30,7 +30,7 @@ const OPENAI_MODEL = 'gpt-5.4';
 /** Build a resolver that returns a fixed auth mode for the Anthropic provider. */
 function authModeResolver(anthropicAuthMode: AuthMode | undefined): Resolver {
   return async (model) => {
-    // Mirror getProviderForModelSync routing for the two test providers.
+    // Mirror getProviderForModel routing for the two test providers.
     if (model === ANTHROPIC_MODEL) return anthropicAuthMode;
     return undefined;
   };

@@ -7,6 +7,7 @@ const HEAD_SHA = 'b'.repeat(40);
 
 const mocks = vi.hoisted(() => ({
   completePendingOperation: vi.fn(),
+  evaluateIssueMergeGate: vi.fn(),
   exec: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   execFile: vi.fn<[string, string[], any?], Promise<{ stdout: string; stderr: string }>>(),
   existsSync: vi.fn(() => true),
@@ -21,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 // PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
 // reaches the record plane W3 is deleting. Stub the one constant it needs.
-vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
@@ -50,13 +51,13 @@ vi.mock('node:fs', async importOriginal => ({
   existsSync: mocks.existsSync,
 }));
 vi.mock('../../../../../lib/agents.js', () => ({
-  getAgentState: vi.fn(() => Effect.succeed(null)),
+  getAgentState: vi.fn(() => null),
   messageAgent: mocks.messageAgent,
   spawnAgent: vi.fn(),
 }));
 vi.mock('../../../../../lib/agents/agent-state.js', async importOriginal => ({
   ...await importOriginal<typeof import('../../../../../lib/agents/agent-state.js')>(),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
 }));
 vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleStateSync: vi.fn(() => ({
@@ -74,7 +75,7 @@ vi.mock('../../../../../lib/cloister/merge-agent.js', () => ({
 }));
 vi.mock('../../../../../lib/cloister/ship-log.js', () => ({ appendShipLog: vi.fn(), beginShipLog: vi.fn() }));
 vi.mock('../../../../../lib/github-app.js', () => ({
-  getCiCheckRunsStatePromise: vi.fn(async () => ({ green: true, total: 2, successCount: 2, verdict: 'success' })),
+  getCiCheckRunsState: vi.fn(async () => ({ green: true, total: 2, successCount: 2, verdict: 'success' })),
   getPullRequestState: (...args: unknown[]) => mocks.getPullRequestState(...args),
   isGitHubAppConfigured: vi.fn(() => true),
   isIntegrationPermissionError: vi.fn(() => false),
@@ -83,8 +84,8 @@ vi.mock('../../../../../lib/github-app.js', () => ({
   verifyAppCanMerge: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../../../../../lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: vi.fn(() => ({ repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }] })),
-  getMergeSetSync: vi.fn(() => ({ repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }] })),
+  ensureMergeSetForIssue: vi.fn(() => ({ repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }] })),
+  getMergeSet: vi.fn(() => ({ repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }] })),
 }));
 vi.mock('../../../../../lib/overdeck/merge.js', () => ({
   dequeueMerge: vi.fn(() => null),
@@ -94,8 +95,8 @@ vi.mock('../../../../../lib/overdeck/merge.js', () => ({
   markMergeProcessing: vi.fn(),
 }));
 vi.mock('../../../../../lib/projects.js', () => ({
-  findProjectByTeamSync: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByTeam: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
+  findProjectByPath: vi.fn(() => null),
   listProjectsSync: vi.fn(() => []),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/project' })),
 }));
@@ -110,7 +111,9 @@ vi.mock('../../../services/derived-issue-state.js', () => ({
 vi.mock('../../../../../lib/tmux.js', () => ({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
  sessionExists: mocks.sessionExists }));
 vi.mock('../../../../../lib/forge.js', () => ({
   getForgeAdapter: vi.fn(() => ({ commentOnArtifact: vi.fn(), mergeReviewArtifact: mocks.mergeReviewArtifact })),
@@ -130,6 +133,12 @@ vi.mock('../../../services/merge-queue-service.js', () => ({
   clearMergeRun: vi.fn(),
 }));
 
+// #4016/#4021/#4036: the forge-facts merge gate is exercised by its own tests
+// (pr-facts, merge-gate, merge-queue-advance); here it lets the merge through.
+vi.mock('../../../../../lib/cloister/merge-gate.js', () => ({
+  evaluateIssueMergeGate: mocks.evaluateIssueMergeGate,
+}));
+
 vi.mock('../../specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
 
 import { triggerMerge } from '../merge-ops.js';
@@ -147,7 +156,8 @@ describe('triggerMerge server rebase escalation', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     mocks.existsSync.mockReturnValue(true);
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
+    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110' } });
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState());
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, newHead: HEAD_SHA }));
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
     mocks.messageAgent.mockResolvedValue({ delivered: true });
@@ -165,6 +175,26 @@ describe('triggerMerge server rebase escalation', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('refuses before claiming the merge slot when the forge-facts merge gate says no (#4021/#4036)', async () => {
+    mocks.evaluateIssueMergeGate.mockResolvedValue({
+      ready: false,
+      reason: `no CI test job reported on PR HEAD ${HEAD_SHA} (verification.tests: ci)`,
+      facts: { headBranch: 'feature/pan-3110' },
+    });
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual({
+      success: false,
+      statusCode: 400,
+      error: `Cannot merge: no CI test job reported on PR HEAD ${HEAD_SHA} (verification.tests: ci)`,
+      state: 'ready',
+    });
+    expect(mocks.setMergeRun).not.toHaveBeenCalled();
+    expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
   });
 
   it('queues a retry when the local workspace is missing', async () => {
@@ -244,7 +274,7 @@ describe('triggerMerge server rebase escalation', () => {
   });
 
   it('keeps failing CI as a non-retryable content failure', async () => {
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState({ checksFailed: true })));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ checksFailed: true }));
 
     const result = await triggerMerge('PAN-3110');
 

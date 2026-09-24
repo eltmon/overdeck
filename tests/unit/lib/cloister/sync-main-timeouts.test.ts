@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const execMock = vi.hoisted(() =>
@@ -103,7 +102,7 @@ describe('sync-main git timeouts', () => {
     vi.clearAllMocks();
     operationHeads.clear();
     operationHeadErrors.clear();
-    cleanupStaleLocksMock.mockReturnValue(Effect.succeed({ found: [], removed: [], errors: [] }));
+    cleanupStaleLocksMock.mockResolvedValue({ found: [], removed: [], errors: [] });
     execMock.mockImplementation(async (command) => {
       if (command.startsWith('git grep ')) throw noConflictMarkers();
       return { stdout: '', stderr: '' };
@@ -290,14 +289,14 @@ describe('sync-main git timeouts', () => {
         options: typeof cleanupOptions,
       ) => {
         cleanupOptions = options;
-        return Effect.promise(() => new Promise((resolve) => {
+        return new Promise((resolve) => {
           finishCleanup = () => resolve({
             found: [`${PROJECT_PATH}/.git/index.lock`],
             removed: [],
             errors: [{ file: 'N/A', error: 'process probe cancelled' }],
           });
           options?.signal?.addEventListener('abort', finishCleanup, { once: true });
-        }));
+        });
       });
 
       const cleanupPromise = ensureSyncGitQuiescent(PROJECT_PATH, false, 1_000);
@@ -323,9 +322,9 @@ describe('sync-main git timeouts', () => {
   it('shares one cleanup deadline across lock and operation probes', async () => {
     vi.useFakeTimers();
     try {
-      cleanupStaleLocksMock.mockReturnValue(Effect.promise(() => new Promise((resolve) => {
+      cleanupStaleLocksMock.mockImplementation(() => new Promise((resolve) => {
         setTimeout(() => resolve({ found: [], removed: [], errors: [] }), 700);
-      })));
+      }));
       operationHeads.add('MERGE_HEAD');
       let finishAbort!: (value: { stdout: string; stderr: string }) => void;
       execMock.mockImplementation(() => new Promise((resolve) => {

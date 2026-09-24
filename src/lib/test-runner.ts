@@ -10,9 +10,7 @@ import { join, basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
-import { Effect } from 'effect';
-import { ProjectConfig, TestConfig, TemplatePlaceholders, replacePlaceholdersSync } from './workspace-config.js';
-import { ProcessSpawnError } from './errors.js';
+import { ProjectConfig, TestConfig, TemplatePlaceholders, replacePlaceholders } from './workspace-config.js';
 
 const execAsync = promisify(exec);
 
@@ -134,13 +132,13 @@ async function runTestSuite(
 
   if (testConfig.env) {
     for (const [key, value] of Object.entries(testConfig.env)) {
-      env[key] = replacePlaceholdersSync(value, placeholders);
+      env[key] = replacePlaceholders(value, placeholders);
     }
   }
 
   // If running in container, wrap command
   if (testConfig.container && testConfig.container_name) {
-    const containerName = replacePlaceholdersSync(testConfig.container_name, placeholders);
+    const containerName = replacePlaceholders(testConfig.container_name, placeholders);
     command = `docker exec "${containerName}" ${command}`;
   }
 
@@ -254,7 +252,14 @@ export interface RunTestsOptions {
   featureName?: string;
   testNames?: string[];
   notify?: boolean;
-}async function runTestsPromise(options: RunTestsOptions): Promise<TestRunResult> {
+}
+
+/**
+ * Run the configured test suites (maven, vitest, jest, playwright, ...) for a
+ * project. Spawn / wiring failures reject; individual test failures stay
+ * inside `TestRunResult`.
+ */
+export async function runTests(options: RunTestsOptions): Promise<TestRunResult> {
   const { projectConfig, featureName, testNames, notify = true } = options;
 
   const workspaceConfig = projectConfig.workspace;
@@ -379,24 +384,3 @@ export interface RunTestsOptions {
 
   return result;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Run the configured test suites (maven, vitest, jest, playwright, ...) for a
- * project. Wraps the Promise variant; spawn / wiring failures surface as
- * ProcessSpawnError, but individual test failures stay inside `TestRunResult`.
- */
-export const runTests = (
-  options: RunTestsOptions,
-): Effect.Effect<TestRunResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => runTestsPromise(options),
-    catch: (cause) =>
-      new ProcessSpawnError({
-        command: 'test-runner',
-        args: [options.featureName ?? ''],
-        message: 'runTests failed',
-        cause,
-      }),
-  });

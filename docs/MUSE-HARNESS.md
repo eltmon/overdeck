@@ -22,7 +22,7 @@ recheck it when upgrading Muse. Native instruction files are not rewritten. Muse
 ## Session and transcript ownership
 
 `XDG_DATA_HOME` points to `<overdeck-home>/agents/<agent-id>/muse-data`.
-The canonical Muse session resolver in `src/lib/runtimes/muse-session.ts`
+The canonical Muse session resolver in `src/lib/runtimes/storage/muse.ts`
 reads root logs at `muse/sessions/YYYY/MM/DD/<uuid>/session.jsonl`. It excludes
 nested subagent logs and chooses the newest root UUIDv7 by creation order.
 Resume passes that native UUID, never the generic Claude session identity.

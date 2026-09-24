@@ -11,7 +11,7 @@ const homeDir = homedir();
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn((id: string) => Effect.succeed(mockRuntimeStates.get(id) ?? null)),
-  getAgentStateSync: vi.fn((id: string) => mockAgentStates.get(id) ?? null),
+  getAgentState: vi.fn((id: string) => mockAgentStates.get(id) ?? null),
   listRunningAgents: vi.fn(() => []),
 }));
 
@@ -19,14 +19,16 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
   // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   listSessionNames: vi.fn(() => Effect.succeed([])),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
 }));
 
 vi.mock('../../../../../src/lib/agent-input-detection.js', () => ({
-  detectAwaitingInputFromPaneSync: vi.fn(() => null),
-  detectAwaitingInputForAgent: vi.fn(() => Effect.succeed(null)),
+  detectAwaitingInputFromPane: vi.fn(() => null),
+  detectAwaitingInputForAgent: vi.fn(async () => null),
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/session-presence.js', () => ({
@@ -49,7 +51,7 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
   // PAN-3917 (W6): the derived issue state resolves the owning project from a
   // path before it asks the forge; unregistered here, so it never asks.
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByPath: vi.fn(() => null),
 }));
 
 const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
@@ -57,7 +59,7 @@ vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
   readWorkspacePlan: vi.fn(),
   // The FR-6 spec lookup reads the specs directory through this resolver.
-  findSpecByIssueSync: vi.fn(() => null),
+  findSpecByIssue: vi.fn(() => null),
 }));
 
 vi.mock('node:fs/promises', async () => {

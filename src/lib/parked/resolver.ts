@@ -79,7 +79,7 @@ export const IDLE_RUNNING_THRESHOLD_MS = 6 * 60 * 60_000;
  * new dispatch for 90 minutes. A "stopped orchestrator" is not a freed slot;
  * it is the pipeline going silent.
  */
-export const IDLE_EXEMPT_ROLES: ReadonlySet<string> = new Set(['flywheel', 'sequencer', 'conversation', 'knowledge']);
+const IDLE_EXEMPT_ROLES: ReadonlySet<string> = new Set(['flywheel', 'sequencer', 'conversation', 'knowledge']);
 
 /** Per-issue gathered signals — the classifier's entire input. Gathered through read doors, never stores. */
 export interface ParkedSignals {
@@ -111,7 +111,7 @@ function isoOr(ts: string | number | null | undefined, fallback: number): string
  * 00:02:26Z, self-cleared 80s later by the rework resume). A completed
  * handoff marker means finished, not parked.
  */
-export function hasCompletedHandoffMarker(agentId: string): boolean {
+function hasCompletedHandoffMarker(agentId: string): boolean {
   const dir = join(getOverdeckHome(), 'agents', agentId);
   return existsSync(join(dir, 'completed')) || existsSync(join(dir, 'completed.processed'));
 }
@@ -122,7 +122,7 @@ export function hasCompletedHandoffMarker(agentId: string): boolean {
  * review-status row and trip enrichment. Uppercase always; for bare numerics
  * that fail project resolution, retry with the PAN- prefix.
  */
-export function normalizeParkedIssueId(raw: string): string {
+function normalizeParkedIssueId(raw: string): string {
   const upper = raw.trim().toUpperCase();
   if (!/^\d+$/.test(upper)) return upper;
   if (resolveProjectFromIssueSync(upper)) return upper;

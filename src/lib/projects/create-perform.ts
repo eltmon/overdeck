@@ -271,8 +271,8 @@ export async function finishProjectSetup(args: {
   const seededContextLayer = ensureProjectLayer(canonicalRegistered);
 
   try {
-    const { preTrustDirectorySync } = await import('../workspace-manager.js');
-    preTrustDirectorySync(canonicalRegistered);
+    const { preTrustDirectory } = await import('../workspace-manager.js');
+    preTrustDirectory(canonicalRegistered);
   } catch {
     // Non-fatal: trust is a convenience, not a correctness requirement.
   }

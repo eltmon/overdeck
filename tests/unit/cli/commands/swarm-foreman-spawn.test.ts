@@ -6,7 +6,7 @@ import {
 
 function deps(sessions: string[] = []): EnsureSwarmForemanDeps {
   return {
-    listSessionNamesSync: vi.fn(() => sessions),
+    listSessionNames: vi.fn(async () => sessions),
     messageAgent: vi.fn(async () => undefined),
     buildWorkAgentPrompt: vi.fn(async () => 'foreman kickoff'),
     spawnRun: vi.fn(async (_issueId, _role, options) => ({

@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/overdeck/conversations.js';
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
-import { parseIssueIdSync } from '../../lib/issue-id.js';
+import { parseIssueId } from '../../lib/issue-id.js';
 import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
 import { resolveSessionFile } from '../../lib/overdeck/conversation-reads.js';
 
@@ -90,7 +90,7 @@ export async function handoffCommand(
   }
   let issueId: string | undefined;
   if (options.issue !== undefined) {
-    const parsed = parseIssueIdSync(options.issue.trim());
+    const parsed = parseIssueId(options.issue.trim());
     if (!parsed) {
       console.log(chalk.yellow(`Invalid --issue: ${options.issue}. Expected an issue ID like PAN-123.`));
       return exitCli(1);

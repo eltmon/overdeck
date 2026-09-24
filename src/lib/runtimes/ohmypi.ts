@@ -46,10 +46,11 @@ import { OHMYPI_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, createSession, listSessionsSync, getManagedTmuxSocketName } from '../tmux.js'
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
-import { generateLauncherScriptSync } from '../launcher-generator.js'
+import { generateLauncherScript } from '../launcher-generator.js'
 import { createOhmypiFifo, destroyOhmypiFifoSync, writeOhmypiCommandSync, ohmypiFifoPaths, OhmypiNotReady } from './ohmypi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
 import { getOverdeckHome } from '../paths.js'
+import { readLatestIndexedSessionId } from '../session-history.js'
 
 const execAsync = promisify(exec)
 
@@ -108,23 +109,12 @@ function readyPathFor(agentId: string): string {
   return ohmypiFifoPaths(agentId).readyPath
 }
 
-function sessionIdPathFor(agentId: string): string {
-  return join(agentDirFor(agentId), 'session.id')
-}
-
 /**
  * Read the persisted omp session id for resume.
  * Returns null when the file is absent or unreadable.
  */
 function readStoredSessionId(agentId: string): string | null {
-  const path = sessionIdPathFor(agentId)
-  if (!existsSync(path)) return null
-  try {
-    const raw = readFileSync(path, 'utf8').trim()
-    return raw || null
-  } catch {
-    return null
-  }
+  return readLatestIndexedSessionId(agentId)
 }
 
 /**
@@ -133,7 +123,7 @@ function readStoredSessionId(agentId: string): string | null {
  *
  * Exported (PAN-2098) so the generic recovery path in agents.ts
  * (`getLatestSessionIdSync`) can resume a crashed ohmypi agent — omp never
- * writes a `session.id` file, so without this fallback the deacon reports
+ * may have no indexed id, so without this fallback the deacon reports
  * "no saved session id" and can only respawn fresh, losing context.
  */
 export function resolveLatestOhmypiSessionId(agentId: string): string | null {
@@ -342,7 +332,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
 
     const promptFile = config.prompt ? writeAgentPromptFile(agentId, config.prompt) : undefined
 
-    // Resume from the stored session.id when present, else recover from the
+    // Resume from the stored session index when present, else recover from the
     // freshest session JSONL (PAN-1988 parity). omp uses --resume (not --session).
     const resumeSessionId = readStoredSessionId(agentId) ?? resolveLatestOhmypiSessionId(agentId) ?? undefined
     if (!resumeSessionId && hadPriorSpawn) {
@@ -351,7 +341,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       )
     }
 
-    const launcherScript = generateLauncherScriptSync({
+    const launcherScript = generateLauncherScript({
       role: 'work',
       workingDir: config.workspace,
       harness: 'ohmypi',

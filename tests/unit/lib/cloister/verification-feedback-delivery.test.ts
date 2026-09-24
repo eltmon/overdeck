@@ -25,7 +25,7 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   messageAgent: mocks.messageAgent,
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   setAgentPaused: vi.fn(),
   stopAgent: vi.fn(),
 }));
@@ -50,7 +50,8 @@ describe('deliverVerificationFeedback (PR #3874 review)', () => {
   it('logs success only when the delivery was confirmed', async () => {
     mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: true, confirmed: true });
 
-    await deliverVerificationFeedback('PAN-3874', 'gate failed', {}, 'verification');
+    // Review of #3993 (L2): the door reports whether the message was delivered.
+    await expect(deliverVerificationFeedback('PAN-3874', 'gate failed', {}, 'verification')).resolves.toBe(true);
 
     expect(console.log).toHaveBeenCalledWith('[verification] Sent verification feedback for PAN-3874 to agent-pan-3874');
     expect(mocks.surfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
@@ -64,7 +65,7 @@ describe('deliverVerificationFeedback (PR #3874 review)', () => {
       reason: 'cannot confirm delivery: no Claude transcript identifiable for agent-pan-3874 (workspace: none, sessionId: none)',
     });
 
-    await deliverVerificationFeedback('PAN-3874', 'gate failed', { gate: 'test' }, 'verification');
+    await expect(deliverVerificationFeedback('PAN-3874', 'gate failed', { gate: 'test' }, 'verification')).resolves.toBe(false);
 
     expect(console.log).not.toHaveBeenCalledWith(expect.stringContaining('Sent verification feedback'));
     expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
@@ -77,7 +78,7 @@ describe('deliverVerificationFeedback (PR #3874 review)', () => {
   it('escalates when messageAgent throws', async () => {
     mocks.messageAgent.mockRejectedValue(new Error('MessageDeliveryFailed: pane-dead'));
 
-    await deliverVerificationFeedback('PAN-3874', 'gate failed', {}, 'verification');
+    await expect(deliverVerificationFeedback('PAN-3874', 'gate failed', {}, 'verification')).resolves.toBe(false);
 
     expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
       'PAN-3874',

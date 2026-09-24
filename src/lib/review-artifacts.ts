@@ -2,20 +2,19 @@ import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Data, Effect } from 'effect';
 import { findPlanSync } from './xbrief/io.js';
 import { promisify } from 'node:util';
 import { getForgeAdapter } from './forge.js';
-import { extractNumberSync } from './issue-id.js';
+import { extractNumber } from './issue-id.js';
 import {
-  ensureMergeSetForIssueSync,
-  upsertMergeSetSync,
-  withRepoArtifactUrlSync,
-  withRepoStateSync,
+  ensureMergeSetForIssue,
+  upsertMergeSet,
+  withRepoArtifactUrl,
+  withRepoState,
   type MergeSet,
   type MergeSetRepoState,
 } from './merge-set.js';
-import { emitActivityEntrySync } from './activity-logger.js';
+import { emitActivityEntry } from './activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -28,7 +27,10 @@ export interface ReviewArtifactCreationResult {
     url?: string;
     id?: string;
   }>;
-}async function buildRichReviewArtifactBodyPromise(issueId: string, workspacePath: string): Promise<string> {
+}
+
+/** Build the markdown body of an issue's review artifact (PR description). */
+async function buildRichReviewArtifactBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
   // Non-closing reference on purpose: a closing keyword ("Closes #N") hands
@@ -36,7 +38,7 @@ export interface ReviewArtifactCreationResult {
   // reachable from main and races the pipeline's verifying_on_main → close-out
   // lifecycle (the first UAT batch promote closed 2 of 3 member issues
   // mid-handoff, 2026-06-11). Overdeck's close-out owns issue closing.
-  lines.push(`**Issue:** #${extractNumberSync(issueId) ?? issueId}`);
+  lines.push(`**Issue:** #${extractNumber(issueId) ?? issueId}`);
   lines.push('');
 
   try {
@@ -92,16 +94,19 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
     if (typeof err?.code === 'number' && err.code === 1) return true;
     return true;
   }
-}async function createReviewArtifactsForIssuePromise(
+}
+
+/** Create or update the review artifacts (PRs/MRs) for every repo in an issue's merge set. */
+export async function createReviewArtifactsForIssue(
   issueId: string,
   workspacePath: string
 ): Promise<ReviewArtifactCreationResult> {
-  let mergeSet = ensureMergeSetForIssueSync(issueId);
+  let mergeSet = ensureMergeSetForIssue(issueId);
   if (!mergeSet) {
     return { mergeSet: null, artifacts: [] };
   }
 
-  const body = await Effect.runPromise(buildRichReviewArtifactBody(issueId, workspacePath));
+  const body = await buildRichReviewArtifactBody(issueId, workspacePath);
   const artifacts: ReviewArtifactCreationResult['artifacts'] = [];
 
   for (const repo of mergeSet.repos) {
@@ -109,7 +114,7 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
     const hasChanges = await repoHasChanges(repoWorkspacePath, repo.targetBranch);
 
     if (!hasChanges) {
-      mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
+      mergeSet = withRepoState(mergeSet, repo.repoKey, {
         repoReview: 'skipped',
         repoTests: 'skipped',
         rebaseStatus: 'skipped',
@@ -130,9 +135,9 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
     });
 
     if (artifact.url) {
-      mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, artifact.url, artifact.id);
+      mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifact.url, artifact.id);
     }
-    mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
+    mergeSet = withRepoState(mergeSet, repo.repoKey, {
       artifactId: artifact.id,
       repoReview: 'pending',
       repoTests: 'pending',
@@ -142,7 +147,7 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
     });
     if (artifact.created) {
       const repoSuffix = mergeSet.repos.length > 1 ? ` (${repo.repoKey})` : '';
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'ship',
         level: 'info',
         message: `Merge request created for ${issueId}${repoSuffix}`,
@@ -164,49 +169,7 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
     status: 'reviewing',
     updatedAt: new Date().toISOString(),
   };
-  upsertMergeSetSync(mergeSet);
+  upsertMergeSet(mergeSet);
 
   return { mergeSet, artifacts };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Tagged error for review-artifacts Effect variants. */
-export class ReviewArtifactError extends Data.TaggedError('ReviewArtifactError')<{
-  readonly issueId: string;
-  readonly stage: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `buildRichReviewArtifactBody`. */
-export const buildRichReviewArtifactBody = (
-  issueId: string,
-  workspacePath: string,
-): Effect.Effect<string, ReviewArtifactError> =>
-  Effect.tryPromise({
-    try: () => buildRichReviewArtifactBodyPromise(issueId, workspacePath),
-    catch: (cause) =>
-      new ReviewArtifactError({
-        issueId,
-        stage: 'buildRichReviewArtifactBody',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `createReviewArtifactsForIssue`. */
-export const createReviewArtifactsForIssue = (
-  issueId: string,
-  workspacePath: string,
-): Effect.Effect<ReviewArtifactCreationResult, ReviewArtifactError> =>
-  Effect.tryPromise({
-    try: () => createReviewArtifactsForIssuePromise(issueId, workspacePath),
-    catch: (cause) =>
-      new ReviewArtifactError({
-        issueId,
-        stage: 'createReviewArtifactsForIssue',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

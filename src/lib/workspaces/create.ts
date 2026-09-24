@@ -34,7 +34,7 @@ import { stat } from 'fs/promises';
 import { join, resolve } from 'path';
 import { promisify } from 'util';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
-import { getDefaultWorkspaceConfigSync } from '../workspace-config.js';
+import { getDefaultWorkspaceConfig } from '../workspace-config.js';
 import { validateFeatureName } from '../workspace-manager/worktree-ops.js';
 import { listProjectTargets, resolveWorkspaceForCwd } from './resolver.js';
 import { createWorkspace, upsertProjectFromConfig } from './writer.js';
@@ -324,7 +324,7 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
       intent.isGitRepository = await looksLikeGitRepository(resolvedTarget);
     }
   } else if (input.isolated) {
-    const workspaceConfig = config.workspace || getDefaultWorkspaceConfigSync();
+    const workspaceConfig = config.workspace || getDefaultWorkspaceConfig();
     const workspacesDir = join(config.path, workspaceConfig.workspaces_dir || 'workspaces');
     const worktreePath = join(workspacesDir, `scratch-${name}`);
     if (await pathExists(worktreePath)) {
@@ -377,8 +377,8 @@ export async function performWorkspaceCreate(intent: ResolvedWorkspaceIntent): P
     // a local main can be stale or ahead and silently mis-root the workspace.
     // CWE-78 residual: validate the branch before it reaches any refspec position.
     const parent = intent.parentBranch ?? 'main';
-    const { assertValidBranchNamePromise } = await import('../git-utils.js');
-    await assertValidBranchNamePromise(parent.replace(/^origin\//, ''), 'workspace parent branch');
+    const { assertValidBranchName } = await import('../git-utils.js');
+    await assertValidBranchName(parent.replace(/^origin\//, ''), 'workspace parent branch');
     let baseRef = parent.startsWith('origin/') ? parent : `origin/${parent}`;
     try {
       await execFileAsync('git', ['fetch', 'origin', parent.replace(/^origin\//, '')], { cwd: project.config.path });

@@ -22,8 +22,8 @@ let TEST_HOME: string;
 async function resetDb() {
   // PAN-3917: git_operations moved to the overdeck DB; its handle is the one
   // to close between cases so the next OVERDECK_HOME opens a fresh file.
-  const { closeOverdeckDatabaseSync } = await import('../../../src/lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../src/lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 beforeEach(() => {
@@ -99,49 +99,49 @@ describe('GET /api/git-activity — query param parsing', () => {
 
 describe('GET /api/git-activity — end-to-end DB filtering', () => {
   it('?issueId filters results to only matching rows', async () => {
-    const { appendGitOperationSync, listGitOperationsSync } = await import(
+    const { appendGitOperation, listGitOperations } = await import(
       '../../../src/lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
-    appendGitOperationSync({ operation: 'push', issueId: 'PAN-1', status: 'success', ts });
-    appendGitOperationSync({ operation: 'fetch', issueId: 'PAN-2', status: 'success', ts });
+    appendGitOperation({ operation: 'push', issueId: 'PAN-1', status: 'success', ts });
+    appendGitOperation({ operation: 'fetch', issueId: 'PAN-2', status: 'success', ts });
 
     const { issueId } = parseGitActivityParams(new URLSearchParams('issueId=PAN-1'));
-    const ops = listGitOperationsSync({ issueId });
+    const ops = listGitOperations({ issueId });
     expect(ops).toHaveLength(1);
     expect(ops[0].issueId).toBe('PAN-1');
   });
 
   it('?since filters out rows before the timestamp', async () => {
-    const { appendGitOperationSync, listGitOperationsSync } = await import(
+    const { appendGitOperation, listGitOperations } = await import(
       '../../../src/lib/git-activity.js'
     );
 
     const old = new Date('2026-01-01T00:00:00.000Z').toISOString();
     const recent = new Date('2026-04-01T00:00:00.000Z').toISOString();
 
-    appendGitOperationSync({ operation: 'push', issueId: 'PAN-1', status: 'success', ts: old });
-    appendGitOperationSync({ operation: 'fetch', issueId: 'PAN-1', status: 'success', ts: recent });
+    appendGitOperation({ operation: 'push', issueId: 'PAN-1', status: 'success', ts: old });
+    appendGitOperation({ operation: 'fetch', issueId: 'PAN-1', status: 'success', ts: recent });
 
     const { since } = parseGitActivityParams(new URLSearchParams('since=2026-03-01T00:00:00Z'));
-    const ops = listGitOperationsSync({ since });
+    const ops = listGitOperations({ since });
     expect(ops).toHaveLength(1);
     expect(ops[0].ts).toBe(recent);
   });
 
   it('?limit caps the number of rows returned', async () => {
-    const { appendGitOperationSync, listGitOperationsSync } = await import(
+    const { appendGitOperation, listGitOperations } = await import(
       '../../../src/lib/git-activity.js'
     );
 
     const ts = new Date().toISOString();
     for (let i = 0; i < 5; i++) {
-      appendGitOperationSync({ operation: 'push', issueId: `PAN-${i}`, status: 'success', ts });
+      appendGitOperation({ operation: 'push', issueId: `PAN-${i}`, status: 'success', ts });
     }
 
     const { limit } = parseGitActivityParams(new URLSearchParams('limit=3'));
-    const ops = listGitOperationsSync({ limit });
+    const ops = listGitOperations({ limit });
     expect(ops).toHaveLength(3);
   });
 });

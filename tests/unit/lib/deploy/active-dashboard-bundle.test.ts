@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   activeDashboardBundleFile,
-  readActiveDashboardBundleSync,
+  readActiveDashboardBundle,
   writeActiveDashboardBundle,
 } from '../../../../src/lib/deploy/active-dashboard-bundle.js';
 
@@ -37,7 +37,7 @@ describe('active dashboard bundle', () => {
 
     await writeActiveDashboardBundle({ repoRoot, deployRoot, serverPath });
 
-    expect(readActiveDashboardBundleSync()).toEqual({ repoRoot, deployRoot, serverPath });
+    expect(readActiveDashboardBundle()).toEqual({ repoRoot, deployRoot, serverPath });
   });
 
   it('rejects missing bundle files and paths outside the deployment root', async () => {
@@ -47,11 +47,11 @@ describe('active dashboard bundle', () => {
       deployRoot,
       serverPath: join(repoRoot, 'untrusted-server.js'),
     }));
-    expect(readActiveDashboardBundleSync()).toBeNull();
+    expect(readActiveDashboardBundle()).toBeNull();
 
     await fs.writeFile(activeDashboardBundleFile(), JSON.stringify({ repoRoot, deployRoot, serverPath }));
     await fs.rm(serverPath);
-    expect(readActiveDashboardBundleSync()).toBeNull();
+    expect(readActiveDashboardBundle()).toBeNull();
   });
 
   it('removes the marker when restoring a pre-deployment state', async () => {
@@ -60,6 +60,6 @@ describe('active dashboard bundle', () => {
 
     await writeActiveDashboardBundle(null);
 
-    expect(readActiveDashboardBundleSync()).toBeNull();
+    expect(readActiveDashboardBundle()).toBeNull();
   });
 });

@@ -1,26 +1,17 @@
 /**
- * Agent enrichment utilities (PAN-440 / PAN-1048)
- *
- * Shared functions for computing enrichment fields:
- *   role, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
- *
- * Used by both the legacy REST /api/agents endpoint and the new
- * AgentEnrichmentService background poller.
- *
- * PAN-1048: replaced the legacy `agentPhase` string with the role primitive —
- * the dashboard derives label/status from `role` + lifecycle state.
+ * Agent read-model enrichment and synchronous transcript resolution.
+ * Transcript candidates mirror the dashboard's asynchronous adapter so every
+ * consumer observes the same harness-aware session authority.
  */
-
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { basename, join } from 'path'
-import { encodeClaudeProjectDir } from './paths.js'
+import { claudeProjectDir } from './runtimes/storage/claude-code.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
-import { FsError } from './errors.js'
-import { getAgentDir, getAgentStateSync } from './agents/agent-state.js'
+import { getAgentState } from './agents/agent-state.js'
 import { getAgentRuntimeState } from './agents/runtime-state.js'
 import {
   detectAwaitingInputForAgent,
@@ -29,8 +20,9 @@ import {
 } from './agent-input-detection.js'
 import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
-import { extractPrefixSync } from './issue-id.js'
-import { getLatestSessionIdSync } from './agents/activity.js'
+import { extractPrefix } from './issue-id.js'
+import { getLatestSessionId } from './agents/activity.js'
+import { resolveAgentTranscriptCandidate } from './agents/transcript-resolver.js'
 
 const execAsync = promisify(exec)
 
@@ -184,38 +176,7 @@ export function isInteractiveRoleAgent(agentId: string, role?: string): boolean 
 // ─── JSONL path helpers ───────────────────────────────────────────────────────
 
 export function getClaudeProjectDir(workspacePath: string): string {
-  return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspacePath))
-}
-
-export async function getActiveSessionPath(projectDir: string): Promise<string | null> {
-  if (!existsSync(projectDir)) return null
-  try {
-    const entries = await readdir(projectDir)
-    const jsonlFiles = entries.filter(f => f.endsWith('.jsonl'))
-    if (jsonlFiles.length === 0) return null
-    // Claude Code rotates/renames JSONL session files, so a file present at
-    // readdir() can vanish before stat(). Stat each file independently and DROP
-    // the ones that disappear — never let a single ENOENT reject the whole batch
-    // and collapse the result to null. (PAN: the null path made the
-    // complete-planning pending-AskUserQuestion guard scan nothing → it
-    // completed planning while the operator's question was still open.)
-    const withMtime = (
-      await Promise.all(
-        jsonlFiles.map(async f => {
-          try {
-            return { name: f, path: join(projectDir, f), mtime: (await stat(join(projectDir, f))).mtime.getTime() }
-          } catch {
-            return null
-          }
-        }),
-      )
-    ).filter((x): x is { name: string; path: string; mtime: number } => x !== null)
-    if (withMtime.length === 0) return null
-    withMtime.sort((a, b) => b.mtime - a.mtime)
-    return withMtime[0].path
-  } catch {
-    return null
-  }
+  return claudeProjectDir(workspacePath)
 }
 
 function getProjectPathByPrefix(issuePrefix: string): string {
@@ -239,8 +200,11 @@ function getProjectPathByPrefix(issuePrefix: string): string {
     }
   }
   return join(homedir(), 'Projects')
-}async function getAgentWorkspacePromise(agentId: string): Promise<string | null> {
-  const workspace = getAgentStateSync(agentId)?.workspace;
+}
+
+/** Resolve the workspace path for an agent (null when unknown). */
+export async function getAgentWorkspace(agentId: string): Promise<string | null> {
+  const workspace = getAgentState(agentId)?.workspace;
   if (workspace) return workspace;
   try {
     const { stdout: paneCwd } = await execAsync(
@@ -252,7 +216,7 @@ function getProjectPathByPrefix(issuePrefix: string): string {
   } catch {}
   const isStrikeAgent = agentId.startsWith('strike-')
   const issueId = agentId.replace(/^(agent-|planning-|strike-)/, '').toUpperCase()
-  const prefix = extractPrefixSync(issueId)
+  const prefix = extractPrefix(issueId)
   if (!prefix) return null
   try {
     const projectPath = getProjectPathByPrefix(prefix)
@@ -267,31 +231,13 @@ function getProjectPathByPrefix(issuePrefix: string): string {
   } catch {
     return null
   }
-}/**
- * Resolve the transcript belonging to THIS agent.
- *
- * A Claude project dir is keyed on the cwd, so every session that ever ran in
- * the same cwd shares one directory. Agents whose cwd is the primary repo — the
- * flywheel orchestrator, conversations, any `--cwd <repo>` handoff — therefore
- * sit in a directory alongside each other's transcripts. Picking the freshest
- * file there attributes whichever session wrote last to whoever asks, so the
- * flywheel was observed reporting a conversation's open question as its own.
- *
- * The agent's own session id is recorded at spawn, so resolve that first and
- * only fall back to freshest-wins when the agent has no identifiable transcript
- * of its own (codex/omp keep their history elsewhere, and their thread ids are
- * not `.jsonl` files here).
- */
-async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
-  const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
+}
+
+/** Resolve the active JSONL session path for an agent (null when unknown). */
+export async function getAgentJsonlPath(agentId: string): Promise<string | null> {
+  const workspace = await getAgentWorkspace(agentId)
   if (!workspace) return null
-  const projectDir = getClaudeProjectDir(workspace)
-  const sessionId = getLatestSessionIdSync(agentId)
-  if (sessionId) {
-    const ownPath = join(projectDir, `${sessionId}.jsonl`)
-    if (existsSync(ownPath)) return ownPath
-  }
-  return await getActiveSessionPath(projectDir)
+  return (await resolveAgentTranscriptCandidate(agentId, workspace))?.path ?? null
 }
 
 /**
@@ -302,8 +248,8 @@ async function getAgentJsonlPathPromise(agentId: string): Promise<string | null>
  * the active file let TIN-1 complete planning while the operator's question was
  * still open. Returns 0 only when no file has an unanswered AUQ.
  */
-async function countPendingAskUserQuestionsForAgentPromise(agentId: string): Promise<number> {
-  const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
+export async function countPendingAskUserQuestionsForAgent(agentId: string): Promise<number> {
+  const workspace = await getAgentWorkspace(agentId)
   if (!workspace) return 0
   const projectDir = getClaudeProjectDir(workspace)
   if (!existsSync(projectDir)) return 0
@@ -316,7 +262,7 @@ async function countPendingAskUserQuestionsForAgentPromise(agentId: string): Pro
   let total = 0
   for (const f of files) {
     try {
-      const scan = await scanPendingInputsPromise(join(projectDir, f))
+      const scan = await scanPendingInputs(join(projectDir, f))
       total += scan.askUserQuestions.length
     } catch {
       // A file vanishing mid-scan (rotation) is not "no question" — but we
@@ -326,29 +272,23 @@ async function countPendingAskUserQuestionsForAgentPromise(agentId: string): Pro
   return total
 }
 
-/** Effect-native: count pending AskUserQuestions across all of an agent's JSONL files. */
-export const countPendingAskUserQuestionsForAgent = (
-  agentId: string,
-): Effect.Effect<number> =>
-  Effect.promise(() => countPendingAskUserQuestionsForAgentPromise(agentId))
-
 /**
  * Count pending AskUserQuestions only in the current agent session generation.
  * A forced fresh start preserves historical JSONLs while replacing the agent
  * state directory, so an unpinned fallback transcript older than startedAt
  * belongs to the discarded generation and must not recreate the decision gate.
  */
-async function countPendingAskUserQuestionsForCurrentAgentSessionPromise(
+export async function countPendingAskUserQuestionsForCurrentAgentSession(
   agentId: string,
 ): Promise<number> {
-  const jsonlPath = await getAgentJsonlPathPromise(agentId)
+  const jsonlPath = await getAgentJsonlPath(agentId)
   if (!jsonlPath) return 0
 
-  const currentSessionId = getLatestSessionIdSync(agentId)
+  const currentSessionId = getLatestSessionId(agentId)
   const isPinnedCurrentSession = currentSessionId !== null
     && basename(jsonlPath) === `${currentSessionId}.jsonl`
   if (!isPinnedCurrentSession) {
-    const startedAtMs = Date.parse(getAgentStateSync(agentId)?.startedAt ?? '')
+    const startedAtMs = Date.parse(getAgentState(agentId)?.startedAt ?? '')
     if (Number.isFinite(startedAtMs)) {
       try {
         if ((await stat(jsonlPath)).mtimeMs < startedAtMs) return 0
@@ -359,18 +299,12 @@ async function countPendingAskUserQuestionsForCurrentAgentSessionPromise(
   }
 
   try {
-    const scan = await scanPendingInputsPromise(jsonlPath)
+    const scan = await scanPendingInputs(jsonlPath)
     return scan.askUserQuestions.length
   } catch {
     return 0
   }
 }
-
-/** Effect-native: count pending AskUserQuestions in the current agent session generation. */
-export const countPendingAskUserQuestionsForCurrentAgentSession = (
-  agentId: string,
-): Effect.Effect<number> =>
-  Effect.promise(() => countPendingAskUserQuestionsForCurrentAgentSessionPromise(agentId))
 
 // ─── JSONL scanning ───────────────────────────────────────────────────────────
 
@@ -431,8 +365,9 @@ function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error
   return askUserQuestionDenySignalPresent(item.content)
 }
 
-async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQuestion[]> {
-  const detection = await scanPendingInputsPromise(jsonlPath)
+/** Parse pending questions from a JSONL session file. */
+export async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
+  const detection = await scanPendingInputs(jsonlPath)
   return detection.askUserQuestions
 }
 
@@ -567,7 +502,7 @@ function scanPiEntry(entry: unknown, state: AskScanState): void {
  * and claude plan-mode state. Format is detected per line, so a transcript
  * resolves correctly even when the recorded harness is stale.
  */
-export async function scanPendingInputsPromise(jsonlPath: string): Promise<PendingInputsScan> {
+export async function scanPendingInputs(jsonlPath: string): Promise<PendingInputsScan> {
   if (!existsSync(jsonlPath)) {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
   }
@@ -670,21 +605,31 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
   } catch {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
   }
-}async function getAgentPendingQuestionsPromise(agentId: string): Promise<PendingQuestion[]> {
-  const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
-  if (!jsonlPath) return []
-  return [...(await Effect.runPromise(getPendingQuestions(jsonlPath)))]
 }
 
-async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null> {
-  const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
+/** Get the pending questions for an agent by id. */
+export async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
+  const jsonlPath = await getAgentJsonlPath(agentId)
+  if (!jsonlPath) return []
+  return [...(await getPendingQuestions(jsonlPath))]
+}
+
+/** Get the mtime of the agent's active JSONL session file (null when unknown). */
+export async function getAgentJsonlMtime(agentId: string): Promise<number | null> {
+  const jsonlPath = await getAgentJsonlPath(agentId)
   if (!jsonlPath || !existsSync(jsonlPath)) return null
   try {
     return (await stat(jsonlPath)).mtime.getTime()
   } catch {
     return null
   }
-}async function computeAgentEnrichmentPromise(
+}
+
+/**
+ * Compute an agent's enrichment (pending input, runtime resolution, JSONL scan).
+ * Rejects only when a filesystem read fails outside the swallowed branches.
+ */
+export async function computeAgentEnrichment(
   agentId: string,
   startedAt?: string,
   hasActiveSpecialist?: boolean,
@@ -693,7 +638,7 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   const isPlanning = agentId.startsWith('planning-')
 
   // Read persisted role for enrichment projection.
-  const stateRole = getAgentStateSync(agentId)?.role
+  const stateRole = getAgentState(agentId)?.role
 
   const role: AgentEnrichment['role'] =
     (stateRole === 'plan' || stateRole === 'work' || stateRole === 'review' ||
@@ -715,8 +660,8 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   if (cachedScan) {
     scan = cachedScan
   } else {
-    const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
-    if (jsonlPath) scan = await scanPendingInputsPromise(jsonlPath)
+    const jsonlPath = await getAgentJsonlPath(agentId)
+    if (jsonlPath) scan = await scanPendingInputs(jsonlPath)
   }
 
   let pendingQuestions: PendingQuestion[] = [...scan.askUserQuestions]
@@ -752,7 +697,7 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     : null
 
   const paneDetection = !questionDetection && !runtimeDetection
-    ? await Effect.runPromise(detectAwaitingInputForAgent(agentId, { isPlanning }))
+    ? await detectAwaitingInputForAgent(agentId, { isPlanning })
     : null
 
   // Resolution is a stop-hook verdict and can outlive the stop that produced it.
@@ -874,55 +819,3 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     jsonlScan: scan,
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native variant of computeAgentEnrichment. Fails with FsError if any
- * underlying filesystem read fails outside the swallowed branches.
- */
-export const computeAgentEnrichment = (
-  agentId: string,
-  startedAt?: string,
-  hasActiveSpecialist?: boolean,
-  cachedScan?: PendingInputsScan | null,
-): Effect.Effect<AgentEnrichment, FsError> =>
-  Effect.tryPromise({
-    try: () => computeAgentEnrichmentPromise(agentId, startedAt, hasActiveSpecialist, cachedScan),
-    catch: (cause) =>
-      new FsError({
-        path: getAgentDir(agentId),
-        operation: 'computeAgentEnrichment',
-        cause,
-      }),
-  })
-
-/** Effect-native: resolve the workspace path for an agent (null on failure). */
-export const getAgentWorkspace = (
-  agentId: string,
-): Effect.Effect<string | null> =>
-  Effect.promise(() => getAgentWorkspacePromise(agentId))
-
-/** Effect-native: resolve the active JSONL session path for an agent (null on failure). */
-export const getAgentJsonlPath = (
-  agentId: string,
-): Effect.Effect<string | null> =>
-  Effect.promise(() => getAgentJsonlPathPromise(agentId))
-
-/** Effect-native: get the mtime of the agent's active JSONL session file. */
-export const getAgentJsonlMtime = (
-  agentId: string,
-): Effect.Effect<number | null> =>
-  Effect.promise(() => getAgentJsonlMtimePromise(agentId))
-
-/** Effect-native: parse pending questions from a JSONL file. */
-export const getPendingQuestions = (
-  jsonlPath: string,
-): Effect.Effect<readonly PendingQuestion[]> =>
-  Effect.promise(() => getPendingQuestionsPromise(jsonlPath))
-
-/** Effect-native: get pending questions for an agent by id. */
-export const getAgentPendingQuestions = (
-  agentId: string,
-): Effect.Effect<readonly PendingQuestion[]> =>
-  Effect.promise(() => getAgentPendingQuestionsPromise(agentId))

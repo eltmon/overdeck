@@ -1,4 +1,3 @@
-import { join } from 'path'
 import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
@@ -35,12 +34,4 @@ export function writeWorkspaceContext(
     )
     return contextPath
   }).pipe(Effect.provide(NodeFileSystem.layer))
-}
-
-/**
- * The tmp file used for atomic context writes. Exported for use by other modules
- * that need to coordinate temp-file naming.
- */
-export function workspaceContextTmpPath(contextPath: string): string {
-  return join(contextPath + '.tmp')
 }

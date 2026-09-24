@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  buildClaudeUserSettingsSync,
-  bypassPrefixForAgentFlagSync,
-  ensureClaudePermissionFlagSync,
-  getClaudePermissionFlagsSync,
-  getClaudePermissionFlagsStringSync,
+  buildClaudeUserSettings,
+  bypassPrefixForAgentFlag,
+  ensureClaudePermissionFlag,
+  getClaudePermissionFlags,
+  getClaudePermissionFlagsString,
   readYoloEnv,
-  resolvePermissionModeSync,
+  resolvePermissionMode,
 } from '../claude-permissions.js';
 
 const ORIGINAL_YOLO = process.env.PAN_YOLO;
@@ -42,19 +42,19 @@ describe('claude-permissions', () => {
 
   describe('getClaudePermissionFlags', () => {
     it('emits --permission-mode default for auto mode (auto is not a Claude Code flag value)', () => {
-      expect(getClaudePermissionFlagsSync('auto')).toEqual(['--permission-mode', 'default']);
+      expect(getClaudePermissionFlags('auto')).toEqual(['--permission-mode', 'default']);
     });
 
     it('returns bypass permission-mode flags for explicit bypass mode', () => {
-      expect(getClaudePermissionFlagsSync('bypass')).toEqual([
+      expect(getClaudePermissionFlags('bypass')).toEqual([
         '--permission-mode',
         'bypassPermissions',
       ]);
     });
 
     it('joins the array as a single string for shell construction', () => {
-      expect(getClaudePermissionFlagsStringSync('auto')).toBe('--permission-mode default');
-      expect(getClaudePermissionFlagsStringSync('bypass')).toBe(
+      expect(getClaudePermissionFlagsString('auto')).toBe('--permission-mode default');
+      expect(getClaudePermissionFlagsString('bypass')).toBe(
         '--permission-mode bypassPermissions',
       );
     });
@@ -68,29 +68,29 @@ describe('claude-permissions', () => {
     // and aborts the launch on anything else.
 
     it('appends --permission-mode default under auto, never the literal "auto"', () => {
-      const cmd = ensureClaudePermissionFlagSync("claude --model 'claude-fable-5'", 'auto');
+      const cmd = ensureClaudePermissionFlag("claude --model 'claude-fable-5'", 'auto');
       expect(cmd).toBe("claude --model 'claude-fable-5' --permission-mode default");
       expect(cmd).not.toMatch(/--permission-mode auto\b/);
     });
 
     it('appends --permission-mode bypassPermissions under bypass', () => {
-      expect(ensureClaudePermissionFlagSync("claude --model 'claude-fable-5'", 'bypass')).toBe(
+      expect(ensureClaudePermissionFlag("claude --model 'claude-fable-5'", 'bypass')).toBe(
         "claude --model 'claude-fable-5' --permission-mode bypassPermissions",
       );
     });
 
     it('leaves a command that already carries the flag untouched', () => {
       const cmd = 'claude --permission-mode default --model x';
-      expect(ensureClaudePermissionFlagSync(cmd, 'bypass')).toBe(cmd);
+      expect(ensureClaudePermissionFlag(cmd, 'bypass')).toBe(cmd);
     });
 
     it('resolves from PAN_YOLO when no explicit mode is passed', () => {
       process.env.PAN_YOLO = 'true';
-      expect(ensureClaudePermissionFlagSync('claude --model x')).toBe(
+      expect(ensureClaudePermissionFlag('claude --model x')).toBe(
         'claude --model x --permission-mode bypassPermissions',
       );
       process.env.PAN_YOLO = 'false';
-      expect(ensureClaudePermissionFlagSync('claude --model x')).toBe(
+      expect(ensureClaudePermissionFlag('claude --model x')).toBe(
         'claude --model x --permission-mode default',
       );
     });
@@ -98,21 +98,21 @@ describe('claude-permissions', () => {
 
   describe('bypassPrefixForAgentFlag', () => {
     it('returns empty string under auto', () => {
-      expect(bypassPrefixForAgentFlagSync('auto')).toBe('');
+      expect(bypassPrefixForAgentFlag('auto')).toBe('');
     });
 
     it('returns empty string under bypass (DSP flag removed)', () => {
-      expect(bypassPrefixForAgentFlagSync('bypass')).toBe('');
+      expect(bypassPrefixForAgentFlag('bypass')).toBe('');
     });
 
     it('honors PAN_YOLO=false even with no explicit arg', () => {
       process.env.PAN_YOLO = 'false';
-      expect(bypassPrefixForAgentFlagSync()).toBe('');
+      expect(bypassPrefixForAgentFlag()).toBe('');
     });
 
     it('does not inject DSP even when PAN_YOLO=true', () => {
       process.env.PAN_YOLO = 'true';
-      expect(bypassPrefixForAgentFlagSync()).toBe('');
+      expect(bypassPrefixForAgentFlag()).toBe('');
     });
   });
 
@@ -125,14 +125,14 @@ describe('claude-permissions', () => {
     // forgotten spawn site) silently runs in bypass — a P0 trust violation.
 
     it('emits defaultMode "default" under auto', () => {
-      expect(buildClaudeUserSettingsSync('auto')).toEqual({
+      expect(buildClaudeUserSettings('auto')).toEqual({
         theme: 'dark',
         permissions: { defaultMode: 'default' },
       });
     });
 
     it('emits defaultMode "bypassPermissions" under bypass', () => {
-      expect(buildClaudeUserSettingsSync('bypass')).toEqual({
+      expect(buildClaudeUserSettings('bypass')).toEqual({
         theme: 'dark',
         permissions: { defaultMode: 'bypassPermissions' },
       });
@@ -140,7 +140,7 @@ describe('claude-permissions', () => {
 
     it('honors PAN_YOLO=false → default', () => {
       process.env.PAN_YOLO = 'false';
-      expect(buildClaudeUserSettingsSync()).toEqual({
+      expect(buildClaudeUserSettings()).toEqual({
         theme: 'dark',
         permissions: { defaultMode: 'default' },
       });
@@ -148,7 +148,7 @@ describe('claude-permissions', () => {
 
     it('honors PAN_YOLO=true → bypassPermissions', () => {
       process.env.PAN_YOLO = 'true';
-      expect(buildClaudeUserSettingsSync()).toEqual({
+      expect(buildClaudeUserSettings()).toEqual({
         theme: 'dark',
         permissions: { defaultMode: 'bypassPermissions' },
       });
@@ -156,7 +156,7 @@ describe('claude-permissions', () => {
 
     it('JSON serialization under auto does NOT contain the bypass token', () => {
       process.env.PAN_YOLO = 'false';
-      const json = JSON.stringify(buildClaudeUserSettingsSync());
+      const json = JSON.stringify(buildClaudeUserSettings());
       expect(json).not.toMatch(/bypassPermissions/);
       expect(json).not.toMatch(/dangerously-skip-permissions/);
     });
@@ -165,16 +165,16 @@ describe('claude-permissions', () => {
   describe('resolvePermissionMode precedence', () => {
     it('PAN_YOLO env wins over the explicit argument', () => {
       process.env.PAN_YOLO = 'false';
-      expect(resolvePermissionModeSync('bypass')).toBe('auto');
+      expect(resolvePermissionMode('bypass')).toBe('auto');
     });
 
     it('PAN_YOLO env wins over config when no explicit argument is passed', () => {
       process.env.PAN_YOLO = 'true';
-      expect(resolvePermissionModeSync()).toBe('bypass');
+      expect(resolvePermissionMode()).toBe('bypass');
     });
 
     it('falls back to the explicit argument when env is unset', () => {
-      expect(resolvePermissionModeSync('bypass')).toBe('bypass');
+      expect(resolvePermissionMode('bypass')).toBe('bypass');
     });
 
     it("defaults to 'bypass' when env, argument, and config are all unset (operator decision, 2026-07-12)", async () => {

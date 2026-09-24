@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 
-import { getAgentStateSync, markAgentStoppedState, saveAgentStateSync } from '../../../lib/agents/agent-state.js';
-import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
+import { getAgentState, markAgentStoppedState, saveAgentStateSync } from '../../../lib/agents/agent-state.js';
+import { logAgentLifecycle } from '../../../lib/persistent-logger.js';
 
 /**
  * PAN-3848 (W26, FR-21): `pan admin agents exited <agentId> --code <n>` — the
@@ -14,7 +14,7 @@ import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
  */
 export async function agentsExitedCommand(agentId: string, options: { code: string }): Promise<void> {
   const exitCode = Number.parseInt(options.code, 10);
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (!state) {
     console.warn(`[admin agents exited] no agent state for ${agentId} — nothing to mark (exit code ${options.code})`);
     return;
@@ -22,7 +22,7 @@ export async function agentsExitedCommand(agentId: string, options: { code: stri
   if (state.status === 'stopped') return;
   markAgentStoppedState(state, 'system');
   saveAgentStateSync(state);
-  logAgentLifecycleSync(
+  logAgentLifecycle(
     state.id,
     `process exited with code ${Number.isNaN(exitCode) ? options.code : exitCode} (launcher-reported, PAN-3848)`,
   );

@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,7 +21,6 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/config-yaml.js')>();
   return {
     ...actual,
-    loadConfig: mockLoadYamlConfig,
     loadConfigSync: mockLoadYamlConfig,
   };
 });
@@ -32,21 +30,17 @@ vi.mock('../../src/lib/providers.js', async (importOriginal) => {
   return {
     ...actual,
     getProviderForModel: mockGetProviderForModel,
-    getProviderForModelSync: mockGetProviderForModel,
     getProviderEnv: mockGetProviderEnv,
-    getProviderEnvSync: mockGetProviderEnv,
   };
 });
 
 vi.mock('../../src/lib/openai-auth.js', () => ({
-  getOpenAIAuthStatusSync: mockOpenAIAuthStatus,
-  getOpenAIAuthStatus: (...args: unknown[]) => Effect.succeed(mockOpenAIAuthStatus(...args)),
+  getOpenAIAuthStatus: async (...args: unknown[]) => mockOpenAIAuthStatus(...args),
 }));
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
   CLIPROXY_BASE_URL: 'http://127.0.0.1:8317',
-  bridgeGeminiAuthToCliproxy: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
-  bridgeGeminiAuthToCliproxyProgram: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
+  bridgeGeminiAuthToCliproxy: (...args: Parameters<typeof mockBridgeGeminiAuth>) => mockBridgeGeminiAuth(...args),
   getCliproxyClientEnv: () => ({
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
     ANTHROPIC_AUTH_TOKEN: 'overdeck-local-cliproxy-key',
@@ -54,7 +48,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
-import { generateLauncherScriptSync } from '../../src/lib/launcher-generator.js';
+import { generateLauncherScript } from '../../src/lib/launcher-generator.js';
 import { buildSpawnEnvForModel, getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, roleAgentDefinitionPath } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
@@ -291,7 +285,7 @@ describe('agents auth routing', () => {
       expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"');
       expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="272000"');
 
-      const launcher = generateLauncherScriptSync({
+      const launcher = generateLauncherScript({
         role: 'work',
         workingDir: '/workspace/project',
         providerExports,
@@ -357,7 +351,7 @@ describe('agents auth routing', () => {
     expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
     expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
 
-    const launcher = generateLauncherScriptSync({
+    const launcher = generateLauncherScript({
       role: 'work',
       workingDir: '/workspace/project',
       providerExports,
@@ -385,7 +379,7 @@ describe('agents auth routing', () => {
     expect(providerExports).toContain(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextWindow}"`);
     expect(providerExports).toContain(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextWindow}"`);
 
-    const launcher = generateLauncherScriptSync({
+    const launcher = generateLauncherScript({
       role: 'work',
       workingDir: '/workspace/project',
       providerExports,

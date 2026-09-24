@@ -49,7 +49,8 @@ function resolveShowTarget(id: number): Resolved | null {
   // 2. Fallback: raw discovered-session scan-order index (pre-PAN-2018 behavior).
   const session = getDiscoveredSessionById(id);
   if (session) {
-    return { source: 'session', displayId: session.id, conversation: null, session };
+    const { id: displayId } = session;
+    return { source: 'session', displayId, conversation: null, session };
   }
 
   return null;

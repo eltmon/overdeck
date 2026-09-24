@@ -5,7 +5,8 @@ const { systemdUserAvailableMock, isSupervisorUnitActiveMock } = vi.hoisted(() =
   isSupervisorUnitActiveMock: vi.fn(),
 }));
 
-vi.mock('../../../lib/systemd.js', () => ({
+vi.mock('../../../lib/systemd.js', async (importOriginal) => ({
+  supervisorUnitAllowed: (await importOriginal<typeof import('../../../lib/systemd.js')>()).supervisorUnitAllowed,
   systemdUserAvailable: systemdUserAvailableMock,
   isSupervisorUnitActive: isSupervisorUnitActiveMock,
 }));
@@ -31,6 +32,15 @@ describe('shouldRunManualSupervisorCycle', () => {
     isSupervisorUnitActiveMock.mockResolvedValue(false);
 
     await expect(shouldRunManualSupervisorCycle({})).resolves.toBe(true);
+  });
+
+  it('runs the manual cycle for a non-canonical home even when the shared unit is active', async () => {
+    systemdUserAvailableMock.mockResolvedValue(true);
+    isSupervisorUnitActiveMock.mockResolvedValue(true);
+
+    await expect(shouldRunManualSupervisorCycle({ OVERDECK_HOME: '/tmp/throwaway-home' })).resolves.toBe(true);
+    await expect(shouldRunManualSupervisorCycle({ OVERDECK_HOME: '/tmp/throwaway-home', OVERDECK_SUPERVISOR_UNIT: '1' }))
+      .resolves.toBe(false);
   });
 
   it('preserves the existing explicit skip environment guard', async () => {

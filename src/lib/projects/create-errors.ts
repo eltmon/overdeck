@@ -135,7 +135,6 @@ const UNREACHABLE_MESSAGE =
   'The repository could not be reached from this server. Check the URL and connection, then check again.';
 const DESTINATION_MESSAGE = 'The destination already contains files.';
 const INTERNAL_MESSAGE = 'Project setup failed on the server.';
-const TIMEOUT_MESSAGE = 'The clone took too long and was stopped on this server.';
 const CANCELLED_MESSAGE = 'The clone was cancelled.';
 
 /**
@@ -196,11 +195,6 @@ export function cancelledFailure(detail?: string): ProjectCreateFailure {
   return { code: 'cancelled', message: CANCELLED_MESSAGE, detail: boundedDetail(detail), retrySafe: true };
 }
 
-/** A clone that ran past its deadline and was killed. */
-export function timedOutFailure(detail?: string): ProjectCreateFailure {
-  return { code: 'timed-out', message: TIMEOUT_MESSAGE, detail: boundedDetail(detail), retrySafe: true };
-}
-
 /**
  * The repository exists and the project is registered, but setup did not finish.
  *
@@ -218,16 +212,6 @@ export function setupIncompleteFailure(args: {
     detail: boundedDetail(describeCause(args.cause)),
     retrySafe: false,
     recovery: { action: 'finish-setup', key: args.key, path: args.path },
-  };
-}
-
-/** Neither success nor failure has been proved — the client or the job lost contact. */
-export function unknownOutcomeFailure(detail?: string): ProjectCreateFailure {
-  return {
-    code: 'operation-unknown',
-    message: 'The result of this operation is not known on this server.',
-    detail: boundedDetail(detail),
-    retrySafe: false,
   };
 }
 

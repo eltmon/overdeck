@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'fs';
 import { mkdirSync } from 'fs';
 import type { Command } from 'commander';
-import { resolveAgentTargetSync } from '../../lib/agents.js';
+import { resolveAgentTarget } from '../../lib/agents.js';
 import { inboxCommand } from './inbox.js';
 import {
   agentMailDir,
@@ -39,7 +39,7 @@ export async function monitorCommand(id: string | undefined): Promise<void> {
     console.error('pan monitor: pass an agent id or set OVERDECK_AGENT_ID');
     process.exit(1);
   }
-  const agentId = resolveAgentTargetSync(rawTarget) ?? rawTarget;
+  const agentId = resolveAgentTarget(rawTarget) ?? rawTarget;
 
   const mailDir = agentMailDir(agentId);
   mkdirSync(mailDir, { recursive: true });

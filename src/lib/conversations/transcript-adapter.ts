@@ -1,4 +1,4 @@
-import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
+import { resolveMuseSessionPath } from '../runtimes/storage/muse.js';
 import { parseMuseRecords } from '../cost-parsers/muse-parser.js';
 /**
  * Conversation transcript adapter.
@@ -21,23 +21,27 @@ import { parseMuseRecords } from '../cost-parsers/muse-parser.js';
  * one thing from each harness: a canonical "<conversation>...</conversation>"
  * text it can feed the authoring model.
  *
- * This module provides that abstraction. Adding a new harness is two short
- * functions (resolveSessionFile + serialize) plus a registry entry — the
- * fork pipeline never needs to learn about the new harness.
+ * This module provides that abstraction over serialization and summarization.
+ * Session-file resolution itself is delegated to the single shared resolver
+ * (../agents/transcript-resolver.js) — no adapter here re-derives an agent's
+ * on-disk layout. Adding a new harness is two short functions
+ * (resolveSessionFile + serialize) plus a registry entry — the fork pipeline
+ * never needs to learn about the new harness.
  */
 import { existsSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { Effect } from 'effect';
+import { readFile } from 'node:fs/promises';
 
 import { readCodexRolloutMessage } from '../codex-rollout-message.js';
-import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
+import {
+  resolveAcpTranscriptPath,
+  resolveCodexRolloutPath,
+  resolveKimiWirePath,
+  resolvePiSessionPath,
+} from '../agents/transcript-resolver.js';
 import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/transcript.js';
 import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { getOverdeckHome, sessionFilePath } from '../paths.js';
-import { findKimiWirePathAsync } from '../runtimes/kimi-code.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import {
   parseEntries as parseClaudeCodeEntries,
   serializeConversation as serializeClaudeCodeConversation,
@@ -123,42 +127,19 @@ const claudeCodeAdapter: ConversationTranscriptAdapter = {
     // Claude Code keeps the entry-aware smart-compaction flow: it parses the
     // JSONL into typed entries, finds compact boundaries, and carries file-op
     // detail into the summary. This is richer than text-only chunking.
-    const result = await Effect.runPromise(
-      generateSmartSummary({
+    const result = await generateSmartSummary({
         jsonlPath: sessionFile,
         model: options?.model,
         richMode: options?.richMode ?? false,
         mode: 'fork',
         includeThinkingInSummary: options?.includeThinking ?? true,
         harness: options?.harness ?? 'claude-code',
-      }),
-    );
+      });
     return { summary: result.summary, summaryModel: result.summaryModel };
   },
 };
 
 // ─── Pi ───────────────────────────────────────────────────────────────────
-
-/**
- * Pi sessions live at:
- *   `~/.overdeck/agents/<tmuxSession>/sessions/<iso-timestamp>_<id>.jsonl`
- *
- * Pi may rotate session files (e.g. on resume), so we pick the
- * newest by filename — filenames sort lexicographically by their
- * ISO timestamp prefix so this is deterministic.
- */
-async function resolvePiSessionFileFromTmux(tmuxSession: string): Promise<string | null> {
-  const sessionDir = join(getOverdeckHome(), 'agents', tmuxSession, 'sessions');
-  if (!existsSync(sessionDir)) return null;
-  try {
-    const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));
-    if (entries.length === 0) return null;
-    entries.sort();
-    return join(sessionDir, entries[entries.length - 1]!);
-  } catch {
-    return null;
-  }
-}
 
 interface PiEntry {
   type?: string;
@@ -212,7 +193,7 @@ const piAdapter: ConversationTranscriptAdapter = {
   supportsSourceAuthoredHandoff: false,
 
   async resolveSessionFile(conv) {
-    return resolvePiSessionFileFromTmux(conv.tmuxSession);
+    return resolvePiSessionPath(conv.tmuxSession);
   },
 
   async serializeTranscript(sessionFile, options) {
@@ -310,8 +291,7 @@ const acpAdapter: ConversationTranscriptAdapter = {
   supportsSourceAuthoredHandoff: false,
 
   async resolveSessionFile(conv) {
-    const path = join(getOverdeckHome(), 'agents', conv.tmuxSession, 'acp-session.jsonl');
-    return existsSync(path) ? path : null;
+    return resolveAcpTranscriptPath(conv.tmuxSession);
   },
 
   async serializeTranscript(sessionFile) {
@@ -355,23 +335,6 @@ const acpAdapter: ConversationTranscriptAdapter = {
 // text (assistant; 'think' parts are hidden reasoning, included only when
 // includeThinking), and tool.call (work log). tool.result is intentionally
 // skipped, matching the pi/acp adapters above.
-
-/**
- * Resolve the native Kimi Code CLI wire.jsonl for a conversation. Mirrors
- * jsonl-resolver.ts's resolveKimiWirePath, reimplemented locally (rather than
- * imported) to avoid a circular import this module would otherwise close:
- * jsonl-resolver.js -> agents.js -> agents/resume.js ->
- * conversation-compaction.js -> summary-fork.js -> transcript-adapter.js.
- * Fast path: the captured `kimi-session-id` for this conversation's tmux
- * session maps directly to the wire.jsonl path; fallback (no captured id):
- * the newest session directory under the workspace's bucket.
- */
-async function resolveKimiWireFileFromTmux(tmuxSession: string, workspace: string): Promise<string | null> {
-  const kimiHome = join(homedir(), '.kimi-code');
-  const sessionIdPath = join(getOverdeckHome(), 'agents', tmuxSession, 'kimi-session-id');
-  const sessionId = await readFile(sessionIdPath, 'utf-8').then((s) => s.trim(), () => null);
-  return findKimiWirePathAsync(kimiHome, workspace, sessionId);
-}
 
 interface KimiWireLoopEvent {
   type?: string;
@@ -460,7 +423,7 @@ const kimiCodeAdapter: ConversationTranscriptAdapter = {
   supportsSourceAuthoredHandoff: false,
 
   async resolveSessionFile(conv) {
-    return resolveKimiWireFileFromTmux(conv.tmuxSession, conv.cwd);
+    return resolveKimiWirePath(conv.tmuxSession, { workspaceOverride: conv.cwd });
   },
 
   async serializeTranscript(sessionFile, options) {

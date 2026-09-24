@@ -288,12 +288,12 @@ describe('conversation route helpers', () => {
     });
   });
 
-  it('maps the Order Book URL to its tab and no longer knows /flywheel', () => {
+  it('maps the Order Book and restored Flywheel URLs to their tabs (PAN-3964)', () => {
     window.history.replaceState(null, '', '/orders');
     expect(getConversationRouteState()).toMatchObject({ tab: 'orders', convId: null });
 
     window.history.replaceState(null, '', '/flywheel');
-    expect(getConversationRouteState()).toMatchObject({ tab: 'home', convId: null });
+    expect(getConversationRouteState()).toMatchObject({ tab: 'flywheel', convId: null });
   });
 
   it('resolves Home as the default route, Pipeline as /pipeline, Board as /board, and Context as /context', () => {

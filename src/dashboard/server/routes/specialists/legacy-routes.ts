@@ -7,7 +7,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, getAgentRuntimeState, messageAgent, transitionIssueToInProgress } from '../../../../lib/agents.js';
-import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
+import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { commentOnArtifact, parseArtifactRef } from '../../../../lib/forge.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -26,6 +26,22 @@ import {
   type SpecialistAgentName,
   type SpecialistAutoCompleteBody,
 } from './shared.js';
+
+/**
+ * Append a specialist verdict to the issue's pipeline journal, where the
+ * verdict-feedback relays read the pass episode from (#4035). No workspace, no
+ * entry: the journal dies with the workspace.
+ */
+function journalVerdict(
+  issueId: string,
+  entry: { type: 'review.verdict' | 'uat.verdict'; data: Record<string, unknown> },
+): void {
+  const project = resolveProjectFromIssueSync(issueId);
+  if (!project) return;
+  const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  if (!existsSync(workspacePath)) return;
+  appendPipelineEntry(workspacePath, { ...entry, issueId, source: 'dashboard-specialists-done' });
+}
 
 // ─── Route: GET /api/specialists ─────────────────────────────────────────────
 
@@ -60,7 +76,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       isRunning,
       getTmuxSessionName,
     } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    const { clearHookSync } = yield* Effect.promise(() => import('../../../../lib/hooks.js'));
+    const { clearHook } = yield* Effect.promise(() => import('../../../../lib/hooks.js'));
 
     const specialists = getAllSpecialists();
     const results: { name: string; killed: boolean; sessionCleared: boolean; queueCleared: boolean }[] = [];
@@ -78,7 +94,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
         killed = killResult;
       }
 
-      clearHookSync(name);
+      clearHook(name);
       results.push({ name, killed, sessionCleared: false, queueCleared: true });
     }
 
@@ -188,12 +204,34 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         return jsonResponse({ error: `Pull request URL for ${normalizedIssueId} is not a recognized forge artifact` }, { status: 422 });
       }
       const heading = status === 'passed' ? 'Review passed' : 'Changes requested';
-      yield* commentOnArtifact(artifactRef.forge, {
+      const posted = yield* commentOnArtifact(artifactRef.forge, {
         ...artifactRef,
         body: `## ${heading}\n\n${notes ?? (status === 'passed' ? 'No blocking findings.' : 'See the review artifacts for details.')}`,
-      }).pipe(Effect.catch((error) => Effect.sync(() => {
-        console.warn(`[specialists/done] Could not post the review verdict to ${prUrl}: ${String(error)}`);
-      })));
+      }).pipe(
+        Effect.as(true),
+        Effect.catch((error) => Effect.sync(() => {
+          console.warn(`[specialists/done] Could not post the review verdict to ${prUrl}: ${String(error)}`);
+          return false;
+        })),
+      );
+      // Journal the posted verdict as `pan admin specialists done` does: a
+      // journaled approval starts the next review-feedback episode (#4035).
+      if (posted) {
+        journalVerdict(normalizedIssueId, {
+          type: 'review.verdict',
+          data: {
+            verdict: status === 'passed' ? 'APPROVED' : 'CHANGES_REQUESTED',
+            subRole: 'review',
+            via: 'comment',
+            ...(runId ? { runId } : {}),
+          },
+        });
+      }
+    }
+
+    // A browser UAT verdict reported here also starts the next UAT episode.
+    if (specialist === 'uat') {
+      journalVerdict(normalizedIssueId, { type: 'uat.verdict', data: { status, subRole: 'uat' } });
     }
 
     // Clear the registry write-scope so the next specialist can claim the
@@ -231,12 +269,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
         // Update specialist handoff log so success-rate metrics reflect actual outcome
         const { updateSpecialistHandoffStatus } = await import('../../../../lib/cloister/specialist-handoff-logger.js');
-        const updated = await Effect.runPromise(updateSpecialistHandoffStatus(
+        const updated = await updateSpecialistHandoffStatus(
           normalizedIssueId,
           `${specialist}-agent`,
           status === 'passed' ? 'completed' : 'failed',
           status === 'passed' ? 'success' : 'failure',
-        ));
+        );
         if (updated) {
           console.log(`[specialists/done] Updated handoff log: ${specialist}-agent ${normalizedIssueId} → ${status}`);
         }
@@ -345,7 +383,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           try {
             const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
             const { sessionExists } = await import('../../../../lib/tmux.js');
-            const { messageAgent, spawnAgent, getAgentStateSync } = await import('../../../../lib/agents.js');
+            const { messageAgent, spawnAgent, getAgentState } = await import('../../../../lib/agents.js');
 
             if (await Effect.runPromise(sessionExists(workAgentId))) {
               // Agent is running — send rebase instructions directly
@@ -375,14 +413,14 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           const { deliverReviewVerdictFeedback } = await import(
             '../../../../lib/cloister/review-verdict-feedback.js'
           );
-          const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+          const result = await deliverReviewVerdictFeedback({
             issueId: normalizedIssueId,
             verdict: status === 'failed' ? 'failed' : 'blocked',
             notes,
             workspacePath,
             ...(prUrl ? { prUrl } : {}),
             ...(runId ? { runId } : {}),
-          }));
+          });
           console.log(
             `[specialists/done] Delivered review verdict feedback for ${normalizedIssueId}` +
               ` (feedback=${result.feedbackPath ?? 'none'}, synthesis=${result.synthesisPath ?? 'none'}, prComment=${result.prCommentPosted})`,
@@ -431,8 +469,8 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/logs/cleanup-all',
   httpHandler(Effect.gen(function* () {
-    const { cleanupAllLogsSync } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-    const results = cleanupAllLogsSync();
+    const { cleanupAllLogs } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
+    const results = cleanupAllLogs();
 
     return jsonResponse({
       success: true,
@@ -595,7 +633,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const { issueId: requestIssueId, status: requestStatus, agentId } = body;
 
-    const agentState = agentId ? yield* getAgentState(agentId) : null;
+    const agentState = agentId ? getAgentState(agentId) : null;
     const runtimeState = agentId ? yield* getAgentRuntimeState(agentId) : null;
     const metadata = validateSpecialistAutoCompleteMetadata(name, body, agentState, runtimeState);
     if (!metadata.ok) {

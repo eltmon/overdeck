@@ -3,9 +3,9 @@ import { stat } from 'node:fs/promises';
 
 import { Effect } from 'effect';
 
-import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
+import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
-import { withConcurrencyLimit } from '../concurrency.js';
+import { withConcurrencyLimitPromise } from '../concurrency.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { isHarnessProcessAlive, listSessionNames } from '../tmux.js';
 import { resolveConversationGitInfo } from '../../dashboard/server/services/git-info.js';
@@ -103,8 +103,8 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   ]);
   const ledgerCosts = new Map(ledgerEntries);
   const liveSessionNames = new Set(sessionNames);
-  return Effect.runPromise(withConcurrencyLimit(
-    conversations.map((conv) => Effect.promise(async () => {
+  return withConcurrencyLimitPromise(
+    conversations.map((conv) => async () => {
       let row = conv;
       const tmuxSessionAlive = liveSessionNames.has(conv.tmuxSession);
       let sessionAlive = conversationSessionAliveFromState(row, tmuxSessionAlive);
@@ -118,14 +118,17 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
       }
       let isWorking = false;
       let currentTool: string | null = null;
+      let stalledSince: string | undefined;
       const convSf = await resolveSessionFile(row);
       if (sessionAlive) {
         const rt = getAgentRuntimeStateSync(row.tmuxSession);
-        if (getHarnessBehavior(row.harness).transcriptKind === 'codex-rollout-jsonl' && convSf && existsSync(convSf)) {
+        const transcriptKind = getHarnessBehavior(row.harness).transcriptKind;
+        if ((transcriptKind === 'codex-rollout-jsonl' || transcriptKind === 'acp-jsonl') && convSf && existsSync(convSf)) {
           try {
             const summary = await summarizeConversationActivity(convSf, { harness: row.harness });
             isWorking = summary.isWorking;
             currentTool = summary.currentTool;
+            stalledSince = summary.stalledSince;
           } catch {
             if (rt && rt.state !== 'uninitialized') {
               isWorking = rt.state === 'active';
@@ -150,7 +153,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
       let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
       if (sessionAlive && convSf && existsSync(convSf)) {
         try {
-          const scan = await scanPendingInputsPromise(convSf);
+          const scan = await scanPendingInputs(convSf);
           const kinds: PendingInputKind[] = [];
           const auqSnapshot = askUserQuestionSnapshotFromScan(scan);
           if (auqSnapshot) {
@@ -195,6 +198,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         sessionAlive,
         isWorking,
         currentTool,
+        stalledSince,
         isFavorited: favoritedNames.has(row.name),
         compacting,
         contextUsage: null,
@@ -207,7 +211,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         transcriptMissing: conversationTranscriptMissing(row, sessionAlive, convSf),
         needsTerminal: await conversationNeedsTerminal(row, sessionAlive, convSf),
       };
-    })),
+    }),
     CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
-  ));
+  );
 }

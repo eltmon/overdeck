@@ -1,8 +1,8 @@
 import { Effect } from 'effect'
 
-import { countPendingAskUserQuestionsForCurrentAgentSession as countPendingAskUserQuestionsForCurrentAgentSessionEffect } from '../agent-enrichment.js'
+import { countPendingAskUserQuestionsForCurrentAgentSession as countPendingAskUserQuestionsForCurrentAgentSessionDefault } from '../agent-enrichment.js'
 import {
-  detectAwaitingInputForAgent as detectAwaitingInputForAgentEffect,
+  detectAwaitingInputForAgent as detectAwaitingInputForAgentDefault,
   type AwaitingInputDetection,
   type AwaitingInputReason,
 } from '../agent-input-detection.js'
@@ -38,9 +38,12 @@ export async function detectPendingOperatorDecision(
   const sessionExists = deps.sessionExists
     ?? ((id: string) => Effect.runPromise(sessionExistsEffect(id)))
   const detectAwaitingInputForAgent = deps.detectAwaitingInputForAgent
-    ?? ((id: string) => Effect.runPromise(detectAwaitingInputForAgentEffect(id)))
+    // A failed pane read surfaces as TmuxError, which the check below fails open on.
+    ?? ((id: string) => detectAwaitingInputForAgentDefault(id).catch((cause: unknown) => {
+      throw new TmuxError({ command: 'capture-pane', message: `failed to detect awaiting input for ${id}`, cause })
+    }))
   const countPendingAskUserQuestionsForCurrentAgentSession = deps.countPendingAskUserQuestionsForCurrentAgentSession
-    ?? ((id: string) => Effect.runPromise(countPendingAskUserQuestionsForCurrentAgentSessionEffect(id)))
+    ?? ((id: string) => countPendingAskUserQuestionsForCurrentAgentSessionDefault(id))
   const warn = deps.warn ?? console.warn
 
   let liveSession = false

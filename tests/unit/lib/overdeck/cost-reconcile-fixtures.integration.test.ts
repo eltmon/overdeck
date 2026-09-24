@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Effect, Layer } from 'effect';
 
-import { CostArchiveLive, EventBusLive, makeDbLive, getOverdeckDatabaseSync, closeOverdeckDatabaseSync } from '../../../../src/lib/overdeck/infra.js';
+import { CostArchiveLive, EventBusLive, makeDbLive, getOverdeckDatabase, closeOverdeckDatabase } from '../../../../src/lib/overdeck/infra.js';
 import { CostResolver, CostResolverLive, CostWriter, CostWriterLive } from '../../../../src/lib/overdeck/cost.js';
 import type { IssueId } from '../../../../src/lib/overdeck/issues.js';
 
@@ -17,7 +17,7 @@ describe('CostWriter.reconcile fixture-backed readback', () => {
   let tempHome: string | undefined;
 
   afterEach(() => {
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
     if (tempHome) rmSync(tempHome, { recursive: true, force: true });
     if (previousHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = previousHome;
@@ -43,8 +43,8 @@ describe('CostWriter.reconcile fixture-backed readback', () => {
     );
 
     const dbPath = join(tempHome, 'overdeck.db');
-    getOverdeckDatabaseSync(dbPath);
-    closeOverdeckDatabaseSync();
+    getOverdeckDatabase(dbPath);
+    closeOverdeckDatabase();
 
     const dbLayer = makeDbLive(dbPath);
     const layer = Layer.mergeAll(CostWriterLive, CostResolverLive).pipe(

@@ -13,5 +13,4 @@
 2 tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts
 1 tests/unit/lib/agents/dispatch-tier.test.ts
 1 tests/unit/lib/cloister/coderabbit-ingestion.test.ts
-1 tests/unit/lib/overdeck/process-services.test.ts
 1 tests/unit/lib/overdeck/sacred-file-invariant.test.ts

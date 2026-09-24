@@ -33,7 +33,7 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('../../src/lib/tmux.js', () => ({
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   listSessionNames: vi.fn(() => Effect.succeed([])),
   sessionExists: (name: string) => Effect.promise(() => sessionExistsAsyncMock(name)),
   sessionExistsSync: (name: string) => Effect.promise(() => sessionExistsAsyncMock(name)),
@@ -43,7 +43,6 @@ vi.mock('../../src/lib/agents.js', () => ({
   recoverAgent: recoverAgentMock,
   stopAgent: stopAgentMock,
   getAgentState: getAgentStateMock,
-  getAgentStateSync: getAgentStateMock,
   getAgentRuntimeState: getAgentRuntimeStateMock,
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));

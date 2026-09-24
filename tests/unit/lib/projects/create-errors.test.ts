@@ -14,9 +14,6 @@ import {
   boundedDetail,
   sanitizeCreationFailure,
   setupIncompleteFailure,
-  cancelledFailure,
-  timedOutFailure,
-  unknownOutcomeFailure,
   MAX_DETAIL_BYTES,
 } from '../../../../src/lib/projects/create-errors';
 
@@ -160,16 +157,7 @@ describe('typed failure constructors', () => {
     expect(failure.message).toContain('/home/op/Projects/widget');
   });
 
-  it('cancelled and timed-out are retry-safe once settled', () => {
-    expect(cancelledFailure().retrySafe).toBe(true);
-    expect(timedOutFailure().retrySafe).toBe(true);
-  });
 
-  it('an unknown outcome is not retry-safe', () => {
-    // Nothing proved the operation stopped, so a second attempt could double-run.
-    expect(unknownOutcomeFailure().retrySafe).toBe(false);
-    expect(unknownOutcomeFailure().code).toBe('operation-unknown');
-  });
 
   it('sanitizeCreationFailure never leaks a stack', () => {
     const err = new Error('fatal: something nobody has seen before');

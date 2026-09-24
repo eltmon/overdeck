@@ -6,6 +6,7 @@
  * in the test environment. Need to refactor the service to be more testable.
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   CloisterService,
@@ -18,7 +19,7 @@ import { DEFAULT_CLOISTER_CONFIG } from '../../../src/lib/cloister/config.js';
 
 // Mock runtime and dependencies
 vi.mock('../../../src/lib/agents.js', () => ({
-  listRunningAgents: vi.fn(() => []),
+  listRunningAgents: vi.fn(() => Effect.succeed([])),
   listRunningAgentsSync: vi.fn(() => []),
 }));
 
@@ -125,37 +126,6 @@ describe.skip('CloisterService', () => {
     });
   });
 
-  describe('getStatus', () => {
-    it('should return correct status when not running', () => {
-      const status = service.getStatus();
-
-      expect(status.running).toBe(false);
-      expect(status.lastCheck).toBeNull();
-      expect(status.summary.total).toBe(0);
-      expect(status.agentsNeedingAttention).toEqual([]);
-    });
-
-    it('should include config in status', () => {
-      const status = service.getStatus();
-
-      expect(status.config).toBeDefined();
-      expect(status.config.thresholds).toBeDefined();
-      expect(status.config.auto_actions).toBeDefined();
-      expect(status.config.monitoring).toBeDefined();
-    });
-
-    it('should update lastCheck after health check', async () => {
-      service.start();
-
-      // Wait for first health check
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const status = service.getStatus();
-      expect(status.lastCheck).not.toBeNull();
-
-      service.stop();
-    });
-  });
 
   describe('getAgentHealth', () => {
     it('should return null for agent with no runtime', () => {
@@ -165,74 +135,15 @@ describe.skip('CloisterService', () => {
   });
 
   describe('getAllAgentHealth', () => {
-    it('should return empty array when no agents running', () => {
-      const healths = service.getAllAgentHealth();
+    it('should return empty array when no agents running', async () => {
+      const healths = await service.getAllAgentHealth();
       expect(healths).toEqual([]);
     });
   });
 
   // TODO(PAN-48): Fix config tests - service doesn't maintain running state in test mode
-  describe.skip('reloadConfig', () => {
-    it('should reload configuration', () => {
-      const statusBefore = service.getStatus();
-      const configBefore = statusBefore.config;
-
-      // Reload config (loads from disk, which will have default check_interval)
-      service.reloadConfig();
-
-      const statusAfter = service.getStatus();
-      const configAfter = statusAfter.config;
-
-      // Config should be reloaded - check_interval will be 60 (default) instead of 1 (test config)
-      expect(configAfter.monitoring.check_interval).toBe(60);
-      expect(configBefore.monitoring.check_interval).toBe(1);
-
-      // Other values should match defaults
-      expect(configAfter.thresholds).toEqual(DEFAULT_CLOISTER_CONFIG.thresholds);
-    });
-
-    it('should restart monitoring loop if running', async () => {
-      service.start();
-
-      const statusBefore = service.getStatus();
-      const lastCheckBefore = statusBefore.lastCheck;
-
-      // Wait a bit
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      service.reloadConfig();
-
-      // Wait for new check
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const statusAfter = service.getStatus();
-      const lastCheckAfter = statusAfter.lastCheck;
-
-      // Last check should be updated after reload
-      expect(lastCheckAfter).not.toEqual(lastCheckBefore);
-
-      service.stop();
-    });
-  });
 
   describe.skip('updateConfig', () => {
-    it('should update configuration', () => {
-      const newConfig: CloisterConfig = {
-        ...DEFAULT_CLOISTER_CONFIG,
-        thresholds: {
-          stale: 10,
-          warning: 20,
-          stuck: 40,
-        },
-      };
-
-      service.updateConfig(newConfig);
-
-      const status = service.getStatus();
-      expect(status.config.thresholds.stale).toBe(10);
-      expect(status.config.thresholds.warning).toBe(20);
-      expect(status.config.thresholds.stuck).toBe(40);
-    });
 
     it('should restart monitoring loop with new interval', async () => {
       service.start();

@@ -81,6 +81,8 @@ export interface ConversationActivitySummary {
   isWorking: boolean;
   /** Tool name of the most recently pending tool call, if any (e.g. "Bash", "Read"). */
   currentTool: string | null;
+  /** Transcript mtime when an ACP turn has remained open without activity past the stall threshold. */
+  stalledSince?: string;
 }
 
 /** Maximum bytes to read in a single incremental chunk (10 MB). */

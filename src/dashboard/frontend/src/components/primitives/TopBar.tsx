@@ -38,18 +38,21 @@ export default function TopBar({
         className,
       )}
     >
-      <div data-component="top-bar-breadcrumb" className="min-w-0">
+      <div data-component="top-bar-breadcrumb" className={cn('min-w-0', !title && 'shrink-0')}>
         {breadcrumb ?? eyebrow ? (
-          <div className="mb-[4px] truncate text-[10px] font-medium uppercase leading-none tracking-[0.08em] text-muted-foreground">
+          <div className={cn(
+            'mb-[4px] text-[10px] font-medium uppercase leading-none tracking-[0.08em] text-muted-foreground',
+            title ? 'truncate' : 'whitespace-nowrap',
+          )}>
             {breadcrumb ?? eyebrow}
           </div>
         ) : null}
         {title && <h1 className="truncate text-[18px] font-semibold leading-none text-foreground">{title}</h1>}
       </div>
       {meta && <div data-component="top-bar-meta" className="min-w-0 text-[12px] text-muted-foreground">{meta}</div>}
-      {search && <div data-component="top-bar-search" className="min-w-[220px] flex-1">{search}</div>}
+      {search && <div data-component="top-bar-search" className="min-w-0 flex-1">{search}</div>}
       {segmentedControl && <div data-component="top-bar-segmented-control" className="shrink-0">{segmentedControl}</div>}
-      {actionSlot && <div data-component="top-bar-actions" className="ml-auto min-w-0">{actionSlot}</div>}
+      {actionSlot && <div data-component="top-bar-actions" className="ml-auto shrink-0 whitespace-nowrap">{actionSlot}</div>}
     </header>
   );
 }

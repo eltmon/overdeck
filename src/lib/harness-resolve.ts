@@ -1,10 +1,10 @@
-import { canUseHarnessSync, canUseModelWithAuthSync } from './harness-policy.js';
+import { canUseHarness, canUseModelWithAuth } from './harness-policy.js';
 import {
   configuredHarnessBinaryPath,
   harnessBinaryName,
   resolveHarnessBinary,
 } from './harness-binary.js';
-import { getBuiltInDefaultHarness, getProviderForModelSync } from './providers.js';
+import { getBuiltInDefaultHarness, getProviderForModel } from './providers.js';
 import type { RuntimeName } from './runtimes/types.js';
 import type { Role } from './agents.js';
 import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
@@ -24,7 +24,7 @@ export type ResolveHarnessInput = {
   model: string;
 };
 
-export class HarnessResolutionError extends Error {
+class HarnessResolutionError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'HarnessResolutionError';
@@ -67,7 +67,7 @@ function logBuiltInDefaultNotice(provider: string, harness: RuntimeName): void {
 }
 
 export async function resolveHarness(input: ResolveHarnessInput): Promise<RuntimeName> {
-  const provider = getProviderForModelSync(input.model).name;
+  const provider = getProviderForModel(input.model).name;
   const { config } = loadYamlConfig();
   // Harness is provider-default UNLESS an explicit pick arrives (PAN-1984 plus
   // the 2026-08-02 explicit-pick refinement). Without `input.explicit`, the
@@ -96,12 +96,12 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
   }
 
   const authMode = await getProviderAuthModeForModel(input.model);
-  const modelDecision = canUseModelWithAuthSync(input.model, authMode);
+  const modelDecision = canUseModelWithAuth(input.model, authMode);
   if (!modelDecision.allowed) {
     throw new HarnessResolutionError(modelDecision.reason ?? `Model ${input.model} is not allowed with the current auth mode`);
   }
 
-  const decision = canUseHarnessSync(winner, input.model, authMode);
+  const decision = canUseHarness(winner, input.model, authMode);
   if (!decision.allowed) {
     if (explicit) {
       throw new HarnessResolutionError(
@@ -119,7 +119,7 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
       );
     }
 
-    const fallbackDecision = canUseHarnessSync('claude-code', input.model, authMode);
+    const fallbackDecision = canUseHarness('claude-code', input.model, authMode);
     if (!fallbackDecision.allowed) {
       throw new HarnessResolutionError(decision.reason ?? fallbackDecision.reason ?? `Harness ${winner} is not allowed for ${input.model}`);
     }

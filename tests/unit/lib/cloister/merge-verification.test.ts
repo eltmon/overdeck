@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -39,7 +38,7 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  getMergeSetSync: getMergeSetMock,
+  getMergeSet: getMergeSetMock,
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -47,7 +46,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: resolveGitHubIssueMock,
+  resolveGitHubIssue: resolveGitHubIssueMock,
 }));
 
 vi.mock('../../../../src/lib/cloister/merge-completeness.js', () => ({
@@ -71,14 +70,14 @@ describe('verifyMergedBeforeLifecycle', () => {
     vi.clearAllMocks();
     isGitHubAppConfiguredMock.mockReturnValue(true);
     resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck' });
-    listPullRequestsForHeadMock.mockReturnValue(Effect.succeed([
+    listPullRequestsForHeadMock.mockResolvedValue([
       {
         number: 2467,
         merged: true,
         mergedAt: '2026-07-25T12:00:00Z',
         mergeCommit: 'abc123',
       },
-    ]));
+    ]);
     getMergeSetMock.mockReturnValue(mergeSet(1));
     assessMergeCompletenessMock.mockResolvedValue({
       complete: true,

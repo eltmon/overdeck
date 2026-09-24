@@ -15,8 +15,6 @@ import type {
   writeSwarmCompletionObservation,
   writeSwarmForemanTakeover,
 } from './deacon-swarm-record.js';
-import type { ensureSwarmForeman } from './swarm-foreman.js';
-import type { SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
 
 export interface ArchivedBlockedSlot {
   archivedBranch: string;
@@ -82,7 +80,7 @@ export interface CoordinateSwarmSlotsDeps {
    */
   getIssueHold?: (issueId: string, workspacePath: string) => { reason: string } | null;
   /** Item id → status from the issue's continue file — the one home for item progress. */
-  readItemStatuses?: (workspacePath: string, issueId: string) => Record<string, string>;
+  readItemStatuses?: (workspacePath: string, issueId: string) => Promise<Record<string, string>>;
   /** Per-slot completion marker written by `pan done`. */
   readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => SwarmSlotCompletion | undefined;
   /** Delete a stale durable marker that does not belong to the active item. */
@@ -96,11 +94,6 @@ export interface CoordinateSwarmSlotsDeps {
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
   listReleasedSlotIndexes?: (issueId: string, workspacePath: string) => number[];
   recordForemanTakeover?: typeof writeSwarmForemanTakeover;
-  ensureSwarmForeman?: typeof ensureSwarmForeman;
-  workResumeSlotsAvailable?: SwarmForemanLivenessDeps['workResumeSlotsAvailable'];
-  writeSwarmHold?: SwarmForemanLivenessDeps['writeSwarmHold'];
-  emitActivityEntry?: SwarmForemanLivenessDeps['emitActivityEntry'];
-  sendStallEvent?: (agentId: string, message: string) => Promise<unknown>;
   resolveAutomaticSwarmPolicy?: typeof resolveAutomaticSwarmPolicy;
   getReleasedSlotBranch?: (issueId: string, workspacePath: string, slotIndex: number) => string | undefined;
   clearReleasedSlot?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;

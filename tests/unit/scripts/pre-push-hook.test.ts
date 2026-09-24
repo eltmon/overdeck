@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,12 +30,11 @@ function runHook(
   input: string,
   remoteUrl = 'git@github.com:eltmon/overdeck.git',
 ): { ok: boolean; output: string } {
-  try {
-    const output = execFileSync('sh', [hook, 'origin', remoteUrl], { cwd: root, input, encoding: 'utf-8' });
-    return { ok: true, output };
-  } catch (err: any) {
-    return { ok: false, output: [err.stdout ?? '', err.stderr ?? ''].join('\n') };
-  }
+  // Judge by exit status: a hook that exits without reading stdin (the
+  // foreign-remote skip) races node's write of `input`, and execFileSync
+  // reported that EPIPE as a failure even though the hook exited 0.
+  const result = spawnSync('sh', [hook, 'origin', remoteUrl], { cwd: root, input, encoding: 'utf-8' });
+  return { ok: result.status === 0, output: [result.stdout ?? '', result.stderr ?? ''].join('\n') };
 }
 
 describe('.husky/pre-push', () => {

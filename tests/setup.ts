@@ -21,6 +21,13 @@ process.env.OVERDECK_TEST_POLL_MS = '10';
 // locally with `process.env.PAN_YOLO = 'true'` in their beforeEach.
 delete process.env.PAN_YOLO;
 
+// PAN-3956: Herdr is the strict default terminal backend — no binary/socket
+// means launches throw instead of falling back to tmux. Test workers use a tmp
+// OVERDECK_HOME whose Herdr session socket never exists, so they run on the
+// explicit tmux policy (as every isolated stack does). Tests that exercise the
+// Herdr policy set the env var themselves or mock `hostTerminalBackendName`.
+process.env.OVERDECK_TERMINAL_BACKEND ??= 'tmux';
+
 // Clean up temp directory before each test
 beforeEach(() => {
   try {

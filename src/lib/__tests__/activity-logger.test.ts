@@ -4,9 +4,9 @@ import {
   appendDomainEventAsync,
   emitActivityEntryDurable,
   emitActivityEntryOnce,
-  emitActivityEntrySync,
-  emitActivityTtsSync,
-  emitDashboardLifecycleSync,
+  emitActivityEntry,
+  emitActivityTts,
+  emitDashboardLifecycle,
   setActivityEventStoreProvider,
 } from '../activity-logger.js';
 
@@ -26,8 +26,8 @@ describe('activity logger', () => {
   });
 
   it('persists activity events asynchronously', () => {
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'review started', issueId: 'PAN-829' });
-    emitActivityTtsSync({ utterance: 'PAN-829 review started', issueId: 'PAN-829' });
+    emitActivityEntry({ source: 'cloister', level: 'info', message: 'review started', issueId: 'PAN-829' });
+    emitActivityTts({ utterance: 'PAN-829 review started', issueId: 'PAN-829' });
 
     expect(store.append).not.toHaveBeenCalled();
     expect(store.appendAsync).toHaveBeenCalledTimes(2);
@@ -131,7 +131,7 @@ describe('activity logger', () => {
   });
 
   it('mirrors dashboard lifecycle events into the ActivityPanel feed', () => {
-    emitDashboardLifecycleSync('started', {
+    emitDashboardLifecycle('started', {
       reason: 'post-merge',
       issueId: 'PAN-1744',
       trigger: 'deploy-script',

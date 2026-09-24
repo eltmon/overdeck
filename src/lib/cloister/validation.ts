@@ -10,10 +10,9 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
-import { existsSync } from 'fs';
 import { Effect } from 'effect';
 import type { QualityGateConfig, TemplatePlaceholders } from '../workspace-config.js';
-import { replacePlaceholdersSync } from '../workspace-config.js';
+import { replacePlaceholders } from '../workspace-config.js';
 import { loadConfigSync } from '../config.js';
 import { GitError } from '../errors.js';
 import {
@@ -65,20 +64,6 @@ function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJ
 }
 
 /**
- * Context for validation execution
- */
-export interface ValidationContext {
-  /** Project root path */
-  projectPath: string;
-  /** Issue ID for logging */
-  issueId?: string;
-  /** Custom validation script path (defaults to scripts/validate-merge.sh) */
-  validationScript?: string;
-  /** Baseline test failure count for comparison mode (pre-existing failures) */
-  baselineTestFailures?: number;
-}
-
-/**
  * Detailed validation failure information
  */
 export interface ValidationFailure {
@@ -114,180 +99,7 @@ export interface ValidationResult {
   error?: string;
 }
 
-/**
- * Parse validation script output to extract structured results
- */
-function parseValidationOutput(output: string, exitCode: number): ValidationResult {
-  const lines = output.split('\n');
-
-  const failures: ValidationFailure[] = [];
-  let conflictMarkersFound = false;
-  let buildPassed: boolean | null = null;
-  let testsPassed: boolean | null = null;
-
-  // Track what stage we're in
-  let inConflictCheck = false;
-  let inBuildCheck = false;
-  let inTestCheck = false;
-
-  const conflictFiles: string[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    // Detect stages
-    if (trimmed.startsWith('Checking for conflict markers')) {
-      inConflictCheck = true;
-      inBuildCheck = false;
-      inTestCheck = false;
-    } else if (trimmed.startsWith('Running build')) {
-      inConflictCheck = false;
-      inBuildCheck = true;
-      inTestCheck = false;
-    } else if (trimmed.startsWith('Running tests')) {
-      inConflictCheck = false;
-      inBuildCheck = false;
-      inTestCheck = true;
-    }
-
-    // Parse conflict markers
-    if (inConflictCheck) {
-      if (trimmed.startsWith('ERROR: Conflict')) {
-        conflictMarkersFound = true;
-      } else if (trimmed.includes('/') && !trimmed.startsWith('ERROR')) {
-        // File path listed
-        conflictFiles.push(trimmed);
-      } else if (trimmed.startsWith('✓ No conflict markers found')) {
-        conflictMarkersFound = false;
-      }
-    }
-
-    // Parse build result
-    if (inBuildCheck) {
-      if (trimmed.startsWith('✓ Build passed')) {
-        buildPassed = true;
-      } else if (trimmed.startsWith('ERROR: Build failed') ||
-                 trimmed.includes('VALIDATION FAILED: Build errors detected')) {
-        buildPassed = false;
-      } else if (trimmed.includes('skipping build check')) {
-        buildPassed = null; // Not applicable
-      }
-    }
-
-    // Parse test result
-    if (inTestCheck) {
-      if (trimmed.startsWith('✓ Tests passed')) {
-        testsPassed = true;
-      } else if (trimmed.startsWith('ERROR: Tests failed') ||
-                 trimmed.includes('VALIDATION FAILED: Test failures detected')) {
-        testsPassed = false;
-      } else if (trimmed.includes('skipping test check')) {
-        testsPassed = null; // Not applicable
-      }
-    }
-  }
-
-  // Build failures list
-  if (conflictMarkersFound) {
-    failures.push({
-      type: 'conflict',
-      files: conflictFiles.length > 0 ? conflictFiles : undefined,
-      message: 'Conflict markers detected in merged code',
-    });
-  }
-
-  if (buildPassed === false) {
-    failures.push({
-      type: 'build',
-      message: 'Build failed after merge',
-    });
-  }
-
-  if (testsPassed === false) {
-    failures.push({
-      type: 'test',
-      message: 'Tests failed after merge',
-    });
-  }
-
-  // Determine overall validity
-  const valid = exitCode === 0 &&
-                !conflictMarkersFound &&
-                (buildPassed === null || buildPassed === true) &&
-                (testsPassed === null || testsPassed === true);
-
-  return {
-    success: true, // Script ran successfully
-    valid,
-    conflictMarkersFound,
-    buildPassed,
-    testsPassed,
-    failures,
-    output,
-  };
-}async function runMergeValidationPromise(
-  context: ValidationContext
-): Promise<ValidationResult> {
-  const { projectPath, validationScript } = context;
-
-  // Determine validation script path
-  const scriptPath = validationScript || join(projectPath, 'scripts', 'validate-merge.sh');
-
-  // No validation script = skip validation (specialist already ran build + tests)
-  if (!existsSync(scriptPath)) {
-    console.log(`[validation] No validation script at ${scriptPath}, skipping (specialist already validated)`);
-    return {
-      success: true,
-      valid: true,
-      skipped: true,
-      conflictMarkersFound: false,
-      buildPassed: null,
-      testsPassed: null,
-      failures: [],
-      output: '',
-    };
-  }
-
-  console.log(`[validation] Running validation script: ${scriptPath}`);
-  console.log(`[validation] Project path: ${projectPath}`);
-
-  try {
-    // Run validation script
-    // Pass baseline failures as env var for baseline comparison mode
-    const env = { ...process.env };
-    if (context.baselineTestFailures !== undefined) {
-      env.BASELINE_FAILURES = String(context.baselineTestFailures);
-      console.log(`[validation] Baseline comparison mode: ${context.baselineTestFailures} pre-existing failures`);
-    }
-
-    const { stdout, stderr } = await execAsync(
-      `bash "${scriptPath}" "${projectPath}"`,
-      {
-        cwd: projectPath,
-        env,
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large outputs
-        timeout: 10 * 60 * 1000, // 10 minute timeout
-      }
-    );
-
-    const output = stdout + stderr;
-
-    console.log(`[validation] ✓ Validation passed`);
-
-    return parseValidationOutput(output, 0);
-  } catch (error: any) {
-    // Validation script exited with non-zero code (validation failed)
-    const exitCode = error.code || 1;
-    const output = (error.stdout || '') + (error.stderr || '');
-
-    console.log(`[validation] ✗ Validation failed (exit code ${exitCode})`);
-
-    // Parse the output to understand what failed
-    const result = parseValidationOutput(output, exitCode);
-
-    return result;
-  }
-}async function autoRevertMergePromise(projectPath: string): Promise<boolean> {
+async function autoRevertMergeBody(projectPath: string): Promise<boolean> {
   console.log(`[validation] Auto-reverting merge in ${projectPath}`);
 
   try {
@@ -421,7 +233,14 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   test: {
     command: 'OVERDECK_VERIFICATION=1 npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx',
   },
-};async function runQualityGatesPromise(
+};
+
+/**
+ * Run the configured quality gates for a phase. Per-gate failures are
+ * aggregated into the returned array; it rejects only on invalid remote
+ * options (missing or unsafe `vmName`/`projectPath`).
+ */
+export async function runQualityGates(
   gates: Record<string, QualityGateConfig>,
   projectPath: string,
   phase: 'pre_push' | 'post_push' = 'pre_push',
@@ -479,7 +298,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     // only the tests affected by the PR and skips pre-existing failures in files
     // the change never touched.
     const command = opts.placeholders
-      ? replacePlaceholdersSync(gate.command, opts.placeholders)
+      ? replacePlaceholders(gate.command, opts.placeholders)
       : gate.command;
 
     // For remote workspaces, build and validate the SSH command BEFORE entering
@@ -504,7 +323,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       // Run inside Docker container — resolve container name from placeholders
       let containerName = gate.container_name;
       if (opts.placeholders) {
-        containerName = replacePlaceholdersSync(containerName, opts.placeholders);
+        containerName = replacePlaceholders(containerName, opts.placeholders);
       }
       // PAN-2461: a missing container previously burned verification attempts as a
       // fake check failure ("frontend-lint failed" in 33ms because docker exec had
@@ -740,17 +559,7 @@ async function runHttpHealthGate(
   }
 }
 
-// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
-
-/**
- * Effect variant of {@link runMergeValidation}. The Promise version swallows
- * its own errors and returns a structured {@link ValidationResult}, so the
- * Effect form simply lifts it via `Effect.promise`.
- */
-export const runMergeValidation = (
-  context: ValidationContext,
-): Effect.Effect<ValidationResult> =>
-  Effect.promise(() => runMergeValidationPromise(context));
+// ─── Effect API ──────────────────────────────────────────────────────────────
 
 /**
  * Effect variant of {@link autoRevertMerge}. Surfaces git failure through a
@@ -761,7 +570,7 @@ export const autoRevertMerge = (
 ): Effect.Effect<void, GitError> =>
   Effect.tryPromise({
     try: async () => {
-      const ok = await autoRevertMergePromise(projectPath);
+      const ok = await autoRevertMergeBody(projectPath);
       if (!ok) throw new Error('autoRevertMerge returned false');
     },
     catch: (cause) =>
@@ -772,16 +581,3 @@ export const autoRevertMerge = (
         cause,
       }),
   });
-
-/**
- * Effect variant of {@link runQualityGates}. Wraps the Promise implementation
- * with `Effect.promise` because the existing function already aggregates per-
- * gate failures into the returned array — it does not throw on gate failure.
- */
-export const runQualityGates = (
-  gates: Record<string, QualityGateConfig>,
-  projectPath: string,
-  phase: 'pre_push' | 'post_push' = 'pre_push',
-  opts: QualityGateRunOptions = {},
-): Effect.Effect<QualityGateResult[]> =>
-  Effect.promise(() => runQualityGatesPromise(gates, projectPath, phase, opts));

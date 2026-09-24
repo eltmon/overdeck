@@ -47,7 +47,7 @@ vi.mock('../../../dashboard/server/services/conversation-eaten-message-watcher.j
   watchForEatenConversationMessage: vi.fn(),
 }));
 vi.mock('../../model-capabilities.js', () => ({
-  modelSupportsImagesSync: vi.fn(() => true),
+  modelSupportsImages: vi.fn(() => true),
 }));
 vi.mock('../../runtimes/behavior.js', () => ({
   getHarnessBehavior: mocks.getHarnessBehavior,

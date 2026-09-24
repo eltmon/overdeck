@@ -1,7 +1,5 @@
 import { renameSync, writeFileSync } from 'node:fs';
 
-import { Effect } from 'effect';
-
 import {
   runVerificationForIssueInProcess,
   type VerificationRunnerOptions,
@@ -28,13 +26,13 @@ if (!raw) throw new Error('Verification worker request is required');
 const request = JSON.parse(raw) as WorkerRequest;
 
 try {
-  const result = await Effect.runPromise(runVerificationForIssueInProcess(
+  const result = await runVerificationForIssueInProcess(
     request.issueId,
     request.workspacePath,
     request.workspaceInfo,
     request.logPrefix,
     request.options,
-  ));
+  );
   writeResult(request.resultPath, result);
 } catch (error) {
   writeResult(request.resultPath, {

@@ -16,11 +16,11 @@ import { Effect } from 'effect'
 import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
 import { getBackendPanes } from './backend-inventory.js'
-import { withConcurrencyLimit } from '../../../lib/concurrency.js'
+import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js'
 import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
 import { getEventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js'
+import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js'
 import type { AgentEnrichmentChangedEvent, AgentCreatedEvent } from '@overdeck/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 
@@ -185,8 +185,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   // changing state — its enrichment is static.
   const activeAgents = runningAgents.filter(a => livePaneIds.has(a.id))
 
-  await Effect.runPromise(withConcurrencyLimit(
-    activeAgents.map((agent) => Effect.promise(async () => {
+  await withConcurrencyLimitPromise(
+    activeAgents.map((agent) => async () => {
       const { id: agentId, issueId, startedAt } = agent
 
       // If this agent hasn't been seen since server start, emit agent.created so the
@@ -235,9 +235,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       // Replay the previous JSONL scan while the file's mtime is unchanged
       // (avoids I/O on static sessions).
-      // getAgentJsonlMtime returns an Effect — it MUST be run, not awaited directly
-      // (awaiting a non-thenable Effect yields the Effect object, never the value).
-      const currentMtime = await Effect.runPromise(getAgentJsonlMtime(agentId))
+      const currentMtime = await getAgentJsonlMtime(agentId)
       const previousEnrichment = state.lastEnrichment.get(agentId)
       const previousScan = state.lastScan.get(agentId)
       const cachedScan =
@@ -245,11 +243,11 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       let enrichment: AgentEnrichment
       try {
-        // computeAgentEnrichment returns an Effect — it MUST be run, not awaited
-        // directly (awaiting a non-thenable Effect yields the Effect object, so
-        // every enrichment field came back undefined → hasPendingQuestion/
-        // pendingAskUserQuestion silently dropped for every agent). PAN-1395.
-        enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, cachedScan))
+        // computeAgentEnrichment is a plain async function (PAN-3958 CH-3). It
+        // used to return an Effect, and awaiting that non-thenable value yielded
+        // the Effect object, so every enrichment field came back undefined
+        // (PAN-1395).
+        enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, cachedScan)
       } catch {
         return
       }
@@ -265,8 +263,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       if (isAwaitingInputRisingEdge(previousEnrichment, enrichment)) {
         const message = buildAwaitingInputActivityMessage(agentId, issueId, enrichment.pendingInputKinds)
         const source = toRole(agent.role) ?? 'work'
-        emitActivityEntrySync({ source, level: 'warn', message, issueId })
-        emitActivityTtsSync({ utterance: message, priority: 1, issueId, source, eventType: 'awaiting_input' })
+        emitActivityEntry({ source, level: 'warn', message, issueId })
+        emitActivityTts({ utterance: message, priority: 1, issueId, source, eventType: 'awaiting_input' })
       }
 
       // PAN-2633 — a stop-shaped status_changed event may have wiped the read
@@ -306,9 +304,9 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       } catch {
         // Non-fatal — event store may not be initialized yet at startup
       }
-    })),
+    }),
     4,
-  ))
+  )
 
   // Clean up stale entries for agents that have stopped
   const activeIds = new Set(activeAgents.map(a => a.id))
@@ -324,7 +322,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         }
 
         const issueId = reapIssueId
-        emitActivityEntrySync({
+        emitActivityEntry({
           source: toRole(agentRecord?.role) ?? 'work',
           level: 'info',
           message: buildExpiredQuestionActivityMessage(id, issueId),

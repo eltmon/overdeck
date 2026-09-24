@@ -26,7 +26,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Effect } from 'effect';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -58,7 +57,7 @@ vi.mock('../../../../../src/lib/agents/spawn.js', () => ({
 vi.mock('../../../../../src/lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
-vi.mock('../../../../../src/lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../src/lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
 vi.mock('../../../../../src/dashboard/server/routes/specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -84,10 +83,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 vi.mock('../../../../../src/lib/git/operations.js', () => ({
-  gitPush: (...args: unknown[]) => Effect.tryPromise({
-    try: () => Promise.resolve(mockGitPush(...args)),
-    catch: (cause) => cause as any,
-  }),
+  gitPush: async (...args: unknown[]) => mockGitPush(...args),
   MainDivergedError: MainDivergedErrorClass,
   gitFetch: vi.fn(),
   gitForcePush: vi.fn(),
@@ -101,7 +97,6 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn().mockReturnValue([]),
   listRunningAgentsSync: vi.fn().mockReturnValue([]),
   getAgentState: vi.fn(),
-  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),

@@ -41,21 +41,6 @@ export function isLinearIssue(issueId: string): boolean {
 }
 
 /**
- * Format state for display with colors
- */
-export function formatState(state: string): string {
-  const colors: Record<string, (s: string) => string> = {
-    'open': chalk.blue,
-    'in_progress': chalk.yellow,
-    'closed': chalk.green,
-  };
-
-  const display = state.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-  const colorFn = colors[state] || chalk.white;
-  return colorFn(display);
-}
-
-/**
  * Format a date string for display with relative time
  */
 export function formatDate(dateStr: string): string {

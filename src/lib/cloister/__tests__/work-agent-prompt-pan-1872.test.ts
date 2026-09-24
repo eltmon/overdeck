@@ -14,7 +14,7 @@ vi.mock('../prompts.js', () => ({
 }));
 
 vi.mock('../config-yaml.js', () => ({
-  isTldrEnabledSync: vi.fn(() => false),
+  isTldrEnabled: vi.fn(() => false),
 }));
 
 import { buildWorkAgentPrompt, type WorkAgentPromptContext } from '../work-agent-prompt.js';

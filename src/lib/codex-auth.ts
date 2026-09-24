@@ -2,9 +2,8 @@ import { open, readFile, stat } from 'fs/promises';
 import { readFileSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Effect, Data } from 'effect';
+import { Data } from 'effect';
 import { decodeJwtPayload, getCliproxyAuthDir, getCliproxyLogPath } from './cliproxy.js';
-import { getProviderForModelSync } from './providers.js';
 
 /**
  * Which store a codex auth status came from (PAN-2285). 'native' = the codex
@@ -55,7 +54,7 @@ export interface CodexAuthUnknown {
 
 export type CodexAuthStatus = CodexAuthValid | CodexAuthExpired | CodexAuthBurned | CodexAuthMissing | CodexAuthUnknown;
 
-interface CheckCodexAuthOptions {
+export interface CheckCodexAuthOptions {
   ignoreBurnBefore?: number;
   agentStates?: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>;
 }
@@ -67,7 +66,7 @@ interface CliproxyCodexCredentials {
 }// ─── Native ~/.codex/auth.json store (PAN-2285) ────────────────────────────────
 
 /** Absolute path to the codex CLI's own global credential file. */
-export function getNativeCodexAuthPath(): string {
+function getNativeCodexAuthPath(): string {
   return join(homedir(), '.codex', 'auth.json');
 }
 
@@ -143,7 +142,7 @@ async function probeNativeCodexAuth(now: number = Date.now()): Promise<NativeCod
 }
 
 /** Sync native-store probe used by the spawn gate. */
-export function probeNativeCodexAuthSync(now: number = Date.now()): NativeCodexAuthResult {
+function probeNativeCodexAuthSync(now: number = Date.now()): NativeCodexAuthResult {
   let raw: string | null;
   try {
     raw = readFileSync(getNativeCodexAuthPath(), 'utf8');
@@ -179,60 +178,6 @@ function nativeCodexAuthMtimeSync(): number {
 // table — and read back through the agents-table door
 // (listOverdeckAgentStatesSync). No new store, no in-memory registry.
 
-/**
- * The revoked-token markers that appear in a burned codex agent's pane.
- *
- * The first three are the NATIVE codex CLI's own error text. PAN-3528: a
- * gpt-5.x agent on the claude-code harness never emits them — CLIProxy absorbs
- * the upstream 401 and re-surfaces it as a 503 that reads like a transient
- * server hiccup ("usually temporary — try again in a moment"), so the agent
- * retries against a permanently dead credential while the pane detector sees
- * nothing. The last two are that CLIProxy signature; `no auth available
- * (providers=codex` means CLIProxy has disabled the codex provider outright,
- * which is the same dead-credential condition as a native revoke.
- */
-const CODEX_AUTH_BURN_MARKERS = [
-  'could not be refreshed because your refresh token was revoked',
-  'token_invalidated',
-  'token_revoked',
-  'auth_unavailable',
-  'no auth available (providers=codex',
-];
-
-/**
- * Pure classifier over a codex agent's pane tail (PAN-2285). True when the pane
- * shows the revoked/invalidated refresh-token error. Exported so it is testable
- * without tmux.
- */
-export function paneShowsCodexAuthBurn(paneText: string): boolean {
-  return CODEX_AUTH_BURN_MARKERS.some((marker) => paneText.includes(marker));
-}
-
-/**
- * Is this agent's traffic authenticated by the codex credential family (PAN-3528)?
- *
- * Two routes share one credential: the native `codex` harness reads
- * ~/.codex/auth.json directly, and an openai-provider model under any other
- * harness reaches OpenAI through CLIProxy, which serves the SAME token bridged
- * into codex-primary.json. A revoked refresh token kills both. The pane patrols
- * used to check burn markers only for `harness === 'codex'`, so the CLIProxy
- * route — the standing routing for GPT models on machines that set
- * `openai.harness: claude-code` — was never scanned at all.
- *
- * An unset or unregistered model resolves to "not codex-routed" rather than
- * throwing: this runs inside deacon patrols that sweep every tmux session, and
- * one stale agent row must not kill the sweep.
- */
-export function isCodexAuthRouted(harness: string | undefined, model: string | undefined): boolean {
-  if (harness === 'codex') return true;
-  if (!model) return false;
-  try {
-    return getProviderForModelSync(model).name === 'openai';
-  } catch {
-    return false;
-  }
-}
-
 /** lastFailureReason prefix that marks an agent as codex-auth-burned. */
 export const CODEX_AUTH_BURNED_REASON_PREFIX = 'codex-auth-burned';
 
@@ -247,31 +192,6 @@ export interface CodexAuthBurnFlagState {
   troubledAt?: string;
   lastFailureReason?: string;
   lastFailureAt?: string;
-}
-
-/**
- * Mark an agent state as codex-auth-burned (PAN-2285). Pure mutation — the
- * caller persists via the agent-state write door (saveAgentStateSync), which
- * mirrors into the shared agents table so the flag crosses the deacon/server
- * process boundary. Returns true only when the state was newly flagged
- * (idempotent: an already-flagged state is left untouched), so callers can emit
- * a single operator notice instead of one per patrol tick. The flag time is
- * embedded in the reason (`codex-auth-burned[<ISO>]`) because the agents table
- * has no dedicated column for it and `troubledAt` may predate the burn when the
- * agent was already troubled for another reason.
- */
-export function applyCodexAuthBurnFlag(state: CodexAuthBurnFlagState, nowMs: number = Date.now()): boolean {
-  if (state.troubled && state.lastFailureReason?.startsWith(CODEX_AUTH_BURNED_REASON_PREFIX)) {
-    return false;
-  }
-  const nowIso = new Date(nowMs).toISOString();
-  state.troubled = true;
-  if (!state.troubledAt) state.troubledAt = nowIso;
-  state.lastFailureReason =
-    `${CODEX_AUTH_BURNED_REASON_PREFIX}[${nowIso}]: Codex refresh token was revoked — ` +
-    're-authenticate (dashboard Codex-auth banner has a Re-authenticate button, or run `codex login`)';
-  state.lastFailureAt = nowIso;
-  return true;
 }
 
 /**
@@ -315,7 +235,7 @@ export function filterCodexAuthBurnedAgentIds(
  * Agents currently flagged codex-auth-burned. Callers supply states read through
  * the agent resolver so this pure auth module does not create a spawn-time cycle.
  */
-export function listCodexAuthBurnedAgentsSync(
+function listCodexAuthBurnedAgentsSync(
   nativeMtimeMs: number,
   states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
 ): string[] {
@@ -323,7 +243,7 @@ export function listCodexAuthBurnedAgentsSync(
 }
 
 /** Sync convenience for the spawn gate: are any agents still burned right now? */
-export function hasActiveBurnedCodexAgentsSync(
+function hasActiveBurnedCodexAgentsSync(
   states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
 ): boolean {
   return listCodexAuthBurnedAgentsSync(nativeCodexAuthMtimeSync(), states).length > 0;
@@ -372,10 +292,15 @@ export function combineCodexAuthStatuses(
   return cliproxySev > nativeSev ? withSource(cliproxy, 'cliproxy') : native;
 }
 
-async function checkCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
+/**
+ * Check the Codex (ChatGPT subscription) auth state. I/O errors are swallowed and
+ * reported through the status union; it rejects only if the check itself throws
+ * unexpectedly.
+ */
+export async function checkCodexAuthStatus(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
   const now = Date.now();
   const native = await probeNativeCodexAuth(now);
-  const cliproxy = await checkCliproxyCodexAuthStatusPromise(options);
+  const cliproxy = await checkCliproxyCodexAuthStatus(options);
 
   // Live pane-burn is the strongest signal for the native store: the JWT can
   // still be unexpired while the refresh token is revoked, so it beats the
@@ -423,7 +348,7 @@ export function assertCodexNativeAuthForSpawn(
   );
 }
 
-async function checkCliproxyCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
+async function checkCliproxyCodexAuthStatus(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
   const credPath = join(getCliproxyAuthDir(), 'codex-primary.json');
 
   let raw: string;
@@ -623,24 +548,3 @@ export function evaluateBurnedFromLog(
 
   return { status: 'burned', email, expiresAt };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native checkCodexAuthStatus. The Promise version is designed to
- * swallow all I/O errors and report the auth state through the typed status
- * union. The Effect variant wraps that to make it composable; it only fails
- * with CodexAuthCheckError if the underlying call itself throws unexpectedly
- * (i.e., not from the documented "missing/unknown" branches).
- */
-export const checkCodexAuthStatus = (
-  options: CheckCodexAuthOptions = {},
-): Effect.Effect<CodexAuthStatus, CodexAuthCheckError> =>
-  Effect.tryPromise({
-    try: () => checkCodexAuthStatusPromise(options),
-    catch: (cause) =>
-      new CodexAuthCheckError({
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

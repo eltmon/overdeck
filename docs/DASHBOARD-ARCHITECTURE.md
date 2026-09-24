@@ -36,6 +36,13 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - Attach uses a deterministic snapshot protocol: the server sends a `snapshot` control frame,
   the client acks `ready`, and only then does live data flow (`readyForLiveData` in XTerminal.tsx);
   unready clients are closed with `terminal-ready-timeout`
+- Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
+  streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
+  `codex resume --remote` against the conversation's own runtime, opened through
+  `POST /api/conversations/:name/companion-terminal/open|close`
+  (`routes/conversation-companion-terminal.ts`) and rendered by `ConversationTerminalView.tsx`.
+  The browser names only the conversation. See "Companion terminals" in
+  [TERMINAL-BACKENDS.md](TERMINAL-BACKENDS.md).
 
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
@@ -162,10 +169,50 @@ door that does not exist; a real record read door would be a separate change.
 **Conversation loading and delivery:**
 - A `/conv/<id>` deep link loads that conversation directly, independently of the
   sidebar list. Favorites, pending-input state, and normal list navigation remain intact.
+- Issue Session tabs load agent transcripts through
+  `GET /api/agents/:agentId/conversation`. For Claude agents, the route checks the
+  durable `sessions.json` index from newest to oldest until it finds an existing
+  JSONL. Legacy launcher/runtime/state pointers are eligible only when the index is
+  absent. A 404 names the agent and every path checked. Since PAN-3959, each
+  harness's capture point records the transcript's absolute path in the entry it
+  writes at session start, so resolution is a newest-first lookup over recorded
+  paths; per-harness path formulas apply only to pre-PAN-3959 entries that predate
+  that recording.
+- `src/lib/agents/transcript-resolver.ts` is the single resolver: the agent
+  conversation route above, the `/ws/rpc` synthetic-agent stream, enrichment, and
+  the summary-fork/handoff transcript adapters all call it — no other path re-derives
+  an agent's on-disk transcript layout.
+- The `/ws/rpc` synthetic-agent stream watches every root a transcript could still
+  appear under. A root whose watch attachment fails (e.g. the directory does not
+  exist yet) is retried on the next event fired by a surviving watcher — there is no
+  timer or poll. If every watch attempt fails, the stream stays in `discovering`
+  until an operator or later launch creates one of the watched roots.
+- `GET /api/conversations/:name/messages` serves registered conversations only. It
+  never scans agent directories or global session UUIDs to resolve an agent-backed row.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
   120 seconds, and reconciles late echoes using message identity or text/time matching.
+- The PTY supervisor reports what it observes about its harness to
+  `POST /api/agents/:id/lifecycle`, authenticated by the session's pty-token. It emits
+  `session-started`, `turn-started` (on a confirmed injection) and `exited`. The route
+  also accepts `turn-ended`, but the supervisor does not emit it: it sees only the PTY
+  byte stream. A turn's `idle` comes from the harness's own hook (claude-code's Stop
+  hook), so a hookless harness stays `working` until its next edge. Each post carries
+  `launchedAt`, the supervisor's start time, as its launch generation. `:id` is the
+  supervised session id, so one route serves agents and conversations (`conv-<name>`).
+  For an agent it appends `agent.started`/`agent.activity_changed`/`agent.stopped`.
+  For a conversation, the row is the non-archived one whose `tmux_session` is `:id`,
+  preferring a post-/clear sibling over its cleared parent. `session-started` marks
+  that row active, unless it is a /clear-ended parent or the start is older than the
+  row's `ended_at`. `exited` marks it ended at the exit time and runs attachment
+  cleanup once, only if the row was not already ended. Each edge appends
+  `agent.activity_changed` under the session id its hooks report under. An exit from a
+  launch older than the in-flight respawn, or older than the newest launch that reported
+  `session-started`, is acknowledged and not recorded. A new harness that dies inside the
+  respawn window still ends the row (PAN-3962). The 10-second conversation poller stays
+  as the backstop. It does not resurrect a row whose end is newer than its census
+  snapshot, or whose harness a fresh probe finds gone.
 - Conversation sends carry `clientMessageId`; retries preserve it and set `retry: true`.
   The server coalesces matching concurrent requests and retains their result, including
   ambiguous failures. Changed text or command confirmation requires a new ID. Receipts
@@ -189,3 +236,72 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - The planning launcher script MUST export TERM/COLORTERM/LANG for Claude Code rendering.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
+
+## Agents Directory (PAN-3920)
+
+`/agents` opens the Agents Directory by default: a tree (location → project → issue, plus one
+"Conversations" group per project), a list of the selected node's entries, and a detail pane
+with the entry's transcript and issue context. The card grid, table and timeline stay behind
+`?view=grid|table|timeline`. The page is still behind the experimental-features gate.
+
+**Derived on read; stores nothing.** `GET /api/agent-directory?windowHours=<1..168>` (default
+24) recomputes the entries from `~/.overdeck/agents/*/state.json`, the backend pane inventory,
+the conversation list (500 rows, the same enrichment `GET /api/conversations` shares), transcript files and `remote-state.json`
+(`src/dashboard/server/services/agent-directory.ts`). Nothing it computes is written, and no
+`agent_directory.*` event exists. The server memoizes each window's response for 3 s and shares
+one in-flight build between concurrent callers. `windowHours` outside 1–168 answers 400.
+
+Each entry with an issue carries `issueTitle` from the shared issue service's tracker cache
+(never a live tracker call; `null` when the cache does not hold the issue). A subagent's `model`
+is read from the tail of its own transcript (`src/lib/conversations/transcript-model.ts`,
+memoized per file mtime), else its parent's. The row badge adds the issue's derived attention on
+top of the entry state: the issue's idle work agent shows `stuck` or `API error` exactly when
+`deriveIssueState` reports that attention. The UI never prints `unknown`.
+
+Sources: native agents (every `state.json` except `conv-*` dirs), pane-only agents (panes with an
+`agentId` or `issue` token but no `state.json`, i.e. `pan spawn` panes), conversations, the
+Claude/Codex subagents of every non-stopped conversation and agent, and external agents (every
+`~/.overdeck/agents/ext-*/registration.json`, `src/dashboard/server/services/agent-directory-external.ts`).
+An external agent's `parentId` naming a conversation's tmux session nests it under that
+conversation, like a worker's. Agents are joined to panes by
+`BackendPane.agentId` (see TERMINAL-BACKENDS.md "Pane metadata").
+
+| Entry | `working` / `idle` / `blocked` / `done` / `unknown` | `stopped` |
+| --- | --- | --- |
+| Agent (native or pane-only) | the pane's state; a remote agent is `unknown` | pane `exited`, or no pane; a remote agent whose `remote-state.json` status is `stopped` or `error` |
+| Conversation | `blocked` when input is pending, else `working` when a turn runs, else `idle` | session not alive |
+| Subagent | `working` when its transcript changed in the last 120 s and the parent is not stopped; else `done` | — |
+| External agent | `working` when the recorded pid is alive with its recorded start time (D21); else `done` when the transcript's last turn is complete; a pid-less registration is `working` while its transcript changed in the last 120 s | dead pid (or none) and an incomplete transcript |
+
+Live entries (not `stopped`/`done`) are always listed; the rest only when their last activity is
+inside the window, and a parent is kept whenever one of its children is. The frontend polls every
+5 s while the tab is visible and refetches (at most every 2 s) when the pane inventory changes.
+Transcripts reuse existing routes: `/api/agents/:id/conversation` (with `?subagentId=` for an
+agent's subagent) and the conversation routes. User guide: `reference/agents-directory.mdx`.
+
+**External agents (PAN-3920 Phase C).** An agent another tool launched is recorded, never
+inferred, by a write-once `~/.overdeck/agents/ext-<source>-<slug>/registration.json` (flag `wx`)
+plus the append-only `sessions.json`, whose `path` makes the agent transcript route serve it
+unchanged (the route takes the registration's `cwd` as the workspace and makes no tmux lookup).
+The registration holds facts only: who launched it, the external id, harness, model, cwd, issue,
+parent, label, pid and the pid's start time (field 22 of `/proc/<pid>/stat`). Liveness (D21) is
+`/proc/<pid>/stat` existing with the same start time, `kill(pid, 0)` without `/proc`, and no
+subprocess. Two writers share one core (`src/lib/agents/external-register.ts`,
+`external-registry.ts`): `pan worker register` / `POST /api/workers/register` (internal-token
+auth; the `codex-plugin` source is reserved), and the Codex-plugin adapter
+(`services/codex-plugin-importer.ts`), which the primary dashboard starts from `main.ts`. The
+adapter scans `~/.claude/plugins/data/codex-openai-codex/state/*/jobs/*.json` every 15 s
+(`OVERDECK_CODEX_PLUGIN_DATA` overrides the root), registers each job the first time it sees it
+with the parent resolved then (conversation by Claude session, else the agent or conversation
+whose `sessions.json` holds that session, else `claude-session:<uuid>`), and links the job's
+Codex rollout once its thread id is known. It never writes under `~/.claude/plugins`. Cleanup
+keeps `ext-*` directories (`isExternalAgentDirectory`).
+
+File safety (`src/lib/agents/external-paths.ts`): every file another tool names is `realpath`ed
+and must be a regular file under its root, checked at registration and again before every read,
+because it can be replaced later. Transcripts: `~/.claude/projects`, `$CODEX_HOME/sessions`
+(default `~/.codex/sessions`), `~/.overdeck/agents`; the job log: the plugin data root. Reads
+open with `O_NONBLOCK` and re-check the descriptor with `fstat`, so a FIFO never pins a libuv
+thread. A registration is written to a temp file, fsynced and `link()`ed to `registration.json`,
+so the name only appears with complete content; a file that does not parse counts as absent and
+is replaced. The transcript link is appended with the async `appendSessionIdToHistoryAsync`.

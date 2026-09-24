@@ -1,9 +1,9 @@
 import { exitCli } from '../exit.js';
 import { Command } from 'commander';
 import chalk, { type ChalkInstance } from 'chalk';
-import { parseIssueIdSync, resolveIssueIdSync } from '../../lib/issue-id.js';
+import { parseIssueId, resolveIssueId } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { getReleaseSetSync, type ReleaseSet } from '../../lib/release-set.js';
+import { getReleaseSet, type ReleaseSet } from '../../lib/release-set.js';
 import { runRelease } from '../../lib/release/release-engine.js';
 
 export function registerRolloutCommands(program: Command): void {
@@ -55,11 +55,11 @@ function formatReleaseSet(releaseSet: ReleaseSet): string {
 }
 
 export async function rolloutStatusCommand(issueId: string): Promise<void> {
-  if (!parseIssueIdSync(issueId)) {
+  if (!parseIssueId(issueId)) {
     console.error(chalk.red(`Invalid issue ID: ${issueId}`));
     return exitCli(1);
   }
-  const canonicalIssueId = resolveIssueIdSync(issueId);
+  const canonicalIssueId = resolveIssueId(issueId);
 
   const resolved = resolveProjectFromIssueSync(canonicalIssueId);
   if (!resolved) {
@@ -67,7 +67,7 @@ export async function rolloutStatusCommand(issueId: string): Promise<void> {
     return exitCli(1);
   }
 
-  const releaseSet = getReleaseSetSync(canonicalIssueId);
+  const releaseSet = getReleaseSet(canonicalIssueId);
   if (!releaseSet) {
     console.log(`No release set found for ${canonicalIssueId}.`);
     return;
@@ -77,11 +77,11 @@ export async function rolloutStatusCommand(issueId: string): Promise<void> {
 }
 
 export async function rolloutRetryCommand(issueId: string): Promise<void> {
-  if (!parseIssueIdSync(issueId)) {
+  if (!parseIssueId(issueId)) {
     console.error(chalk.red(`Invalid issue ID: ${issueId}`));
     return exitCli(1);
   }
-  const canonicalIssueId = resolveIssueIdSync(issueId);
+  const canonicalIssueId = resolveIssueId(issueId);
 
   const resolved = resolveProjectFromIssueSync(canonicalIssueId);
   if (!resolved) {

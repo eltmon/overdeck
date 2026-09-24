@@ -100,6 +100,7 @@ export async function updateMemoryHealth(
   return next;
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export async function readMemoryHealthSnapshot(identity: { projectId: string; workspaceId: string }): Promise<MemoryHealthSnapshot> {
   return readMemoryHealth(getMemoryHealthPath(identity));
 }

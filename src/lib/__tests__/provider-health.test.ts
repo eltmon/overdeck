@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const proxyMocks = vi.hoisted(() => ({
@@ -10,20 +9,20 @@ vi.mock('../openai-compatible-proxy.js', () => ({
   getOpenAICompatibleProxyBaseUrl: vi.fn((provider: string) => `http://127.0.0.1:12436/${provider}`),
 }));
 
-const { invalidateProbeCacheSync, probeProvider } = await import('../provider-health.js');
+const { invalidateProbeCache, probeProvider } = await import('../provider-health.js');
 const { PROVIDERS } = await import('../providers.js');
 
 describe('provider health Nous probe path (PAN-1168)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    invalidateProbeCacheSync();
-    proxyMocks.ensureOpenAICompatibleProxyRunning.mockReturnValue(Effect.succeed(undefined));
+    invalidateProbeCache();
+    proxyMocks.ensureOpenAICompatibleProxyRunning.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    invalidateProbeCacheSync();
+    invalidateProbeCache();
     vi.useRealTimers();
   });
 
@@ -31,11 +30,11 @@ describe('provider health Nous probe path (PAN-1168)', () => {
     const fetchMock = vi.fn(async () => new Response('{"data":[]}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(Effect.runPromise(probeProvider(
+    await expect(probeProvider(
       { ...PROVIDERS.nous, baseUrl: 'http://proxy.test/nous' },
       'sk-nous-test',
       'qwen/qwen3.6-plus',
-    ))).resolves.toEqual({ ok: true });
+    )).resolves.toEqual({ ok: true });
 
     expect(proxyMocks.ensureOpenAICompatibleProxyRunning).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
@@ -58,11 +57,11 @@ describe('provider health Nous probe path (PAN-1168)', () => {
     const fetchMock = vi.fn(async () => new Response('{"error":{"message":"bad token"}}', { status: 401 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(Effect.runPromise(probeProvider(
+    await expect(probeProvider(
       { ...PROVIDERS.nous, baseUrl: 'http://proxy.test/nous' },
       'sk-nous-auth-fails',
       'qwen/qwen3.6-plus',
-    ))).resolves.toEqual({
+    )).resolves.toEqual({
       ok: false,
       kind: 'auth',
       status: 401,
@@ -79,11 +78,11 @@ describe('provider health Nous probe path (PAN-1168)', () => {
     const fetchMock = vi.fn(async () => new Response('{"content":[]}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(Effect.runPromise(probeProvider(
+    await expect(probeProvider(
       PROVIDERS.minimax,
       'sk-minimax-test',
       'minimax-m2.7',
-    ))).resolves.toEqual({ ok: true });
+    )).resolves.toEqual({ ok: true });
 
     expect(proxyMocks.ensureOpenAICompatibleProxyRunning).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(

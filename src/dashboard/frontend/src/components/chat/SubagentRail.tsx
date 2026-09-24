@@ -139,7 +139,7 @@ function AgentRow({ label, description, status, halo = false, depth, selected, o
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
         )}
         <span
-          className={`relative inline-flex rounded-full ${status === 'running' ? 'h-2.5 w-2.5 bg-primary' : 'h-2 w-2 bg-muted-foreground/40'}`}
+          className={`relative inline-flex rounded-full ${status === 'running' ? 'h-2.5 w-2.5 bg-primary' : 'h-2 w-2 bg-muted-foreground/70'}`}
         />
       </span>
       <span className="min-w-0 flex-1">

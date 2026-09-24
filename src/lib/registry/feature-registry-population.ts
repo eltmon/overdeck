@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { Effect, Result, Schema } from 'effect';
+import { Result, Schema } from 'effect';
 import type { FeatureRegistryEntry, FeatureRegistryStatus, FeatureRegistryOwnershipUpdate, MemoryIdentity } from '@overdeck/contracts';
 import { loadConfigNoMigration, type NormalizedFeatureRegistryConfig } from '../config-yaml.js';
 import { extractWithProviderPolicy, type MemoryExtractionPolicyResult } from '../memory/providers/index.js';
@@ -81,7 +81,7 @@ export interface ApplyIssueFeatureClassificationDeps {
 }
 
 export async function classifyIssueFeatures(input: IssueFeatureClassificationInput): Promise<IssueFeatureClassificationResult> {
-  const config = input.config ?? (await Effect.runPromise(loadConfigNoMigration())).config.registry.classification;
+  const config = input.config ?? (await loadConfigNoMigration()).config.registry.classification;
   if (!config.enabled) return { status: 'disabled', features: [] };
 
   const classify = input.classify ?? ((prompt, jsonSchema, options) => extractWithProviderPolicy(prompt, jsonSchema, {
@@ -186,11 +186,11 @@ export async function recordFeatureRegistryLifecycle(input: FeatureRegistryLifec
   }
 }
 
-export function workspaceIdFromPath(workspacePath?: string | null): string | undefined {
+function workspaceIdFromPath(workspacePath?: string | null): string | undefined {
   return workspacePath ? basename(workspacePath) : undefined;
 }
 
-export function buildFeatureClassificationPrompt(input: Pick<IssueFeatureClassificationInput, 'issueId' | 'title' | 'body'>): string {
+function buildFeatureClassificationPrompt(input: Pick<IssueFeatureClassificationInput, 'issueId' | 'title' | 'body'>): string {
   return [
     'Classify this Overdeck tracker issue into low-cardinality product feature names for a knowledge registry.',
     'Prefer stable product areas or user-visible capabilities over implementation details, branch names, or one-off bug wording.',

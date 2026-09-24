@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ApiSettingsConfig } from '../settings-api.js';
 
@@ -29,6 +28,7 @@ vi.mock('../config-yaml.js', () => ({
     strike: 'workhorse:expensive',
     sequencer: 'workhorse:expensive',
     knowledge: 'workhorse:expensive',
+    worker: 'workhorse:mid',
   },
   DEFAULT_WORKHORSES: {
     expensive: 'claude-opus-4-7',
@@ -44,10 +44,10 @@ vi.mock('../config-yaml.js', () => ({
     strike: { model: 'workhorse:expensive' },
     sequencer: { model: 'workhorse:expensive' },
     knowledge: { model: 'workhorse:expensive' },
+    worker: { model: 'workhorse:mid' },
     flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
-  loadConfig: () => mockLoadConfig(),
   loadConfigSync: () => mockLoadConfig(),
   getGlobalConfigPath: () => '/tmp/config.yaml',
   clearConfigCache: () => mockClearConfigCache(),
@@ -68,7 +68,6 @@ vi.mock('../model-capabilities.js', () => ({
     'claude-opus-4-6': 'claude-opus-4-7',
   },
   getModelCapability: vi.fn(),
-  getModelCapabilitySync: vi.fn(),
   hasModelCapability: (modelId: string) => [
     'claude-opus-4-7',
     'claude-sonnet-4-6',
@@ -78,18 +77,8 @@ vi.mock('../model-capabilities.js', () => ({
     'minimax-m2.7-highspeed',
     'qwen3-coder-plus',
   ].includes(modelId),
-  hasModelCapabilitySync: (modelId: string) => [
-    'claude-opus-4-7',
-    'claude-sonnet-4-6',
-    'claude-haiku-4-5',
-    'gpt-5.5',
-    'gpt-5.5-mini',
-    'minimax-m2.7-highspeed',
-    'qwen3-coder-plus',
-  ].includes(modelId),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
-  resolveModelIdSync: (modelId: string) => mockResolveModelId(modelId),
-  getModelEffortLevelsSync: (modelId: string) => (({
+  getModelEffortLevels: (modelId: string) => (({
     'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
     'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
     'claude-sonnet-4-6': ['low', 'medium', 'high', 'max'],
@@ -308,39 +297,16 @@ describe('loadSettingsApi', () => {
     expect(settings.roles?.work?.sub?.inspect?.model).toBe('claude-haiku-4-5');
   });
 
-  it('exposes flywheel role config helpers', async () => {
-    mockReadFile.mockResolvedValue('{}\n');
-    const { getRoleConfig, setRoleConfig } = await import('../settings-api.js');
-
-    expect(getRoleConfig('flywheel')).toEqual({
-      model: 'claude-opus-4-7',
-      effort: 'high',
-      maxAgents: 8,
-      scope: 'pan-only',
-    });
-
-    await Effect.runPromise(setRoleConfig('flywheel', {
-      harness: 'ohmypi',
-      model: 'claude-sonnet-4-6',
-      effort: 'medium',
-      maxAgents: 4,
-      scope: 'all-tracked-projects',
-    }));
-
-    const written = String(mockWriteFile.mock.calls[0]?.[1]);
-    expect(written).toContain('flywheel:');
-    expect(written).toContain('harness: ohmypi');
-    expect(written).toContain('maxAgents: 4');
-  });
-
   it('removes role harness overrides when saved as null or empty', async () => {
+    // The config file this save rewrites (the deleted getRoleConfig test used to leave this mock set).
+    mockReadFile.mockResolvedValue('{}\n');
     mockLoadConfig.mockReturnValue(baseConfig({
       roles: { work: { model: 'workhorse:mid', harness: 'ohmypi' } },
     }));
-    const { loadSettingsApi, saveSettingsApi, setRoleConfig } = await import('../settings-api.js');
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       roles: {
         ...settings.roles,
@@ -349,21 +315,11 @@ describe('loadSettingsApi', () => {
           harness: null,
         },
       },
-    } as never));
+    } as never);
 
-    let written = String(mockWriteFile.mock.calls[0]?.[1]);
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).not.toContain('harness: ohmypi');
     expect(written).not.toContain('harness: null');
-
-    mockWriteFile.mockClear();
-    await Effect.runPromise(setRoleConfig('work', {
-      model: 'workhorse:mid',
-      harness: '',
-    } as never));
-
-    written = String(mockWriteFile.mock.calls[0]?.[1]);
-    expect(written).not.toContain('harness: ohmypi');
-    expect(written).not.toContain('harness: ""');
   });
 
   it('loads tts daemon settings from normalized config', async () => {
@@ -454,7 +410,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       workhorses: { ...settings.workhorses, mid: 'gpt-5.5-mini' },
       roles: {
@@ -476,7 +432,7 @@ describe('saveSettingsApi', () => {
         rollup_pending_threshold: 6,
         sidebar_refresh_interval_ms: 15000,
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('# user comment');
@@ -499,13 +455,13 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         provider_harnesses: { openai: 'ohmypi' },
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('openai:');
@@ -520,26 +476,26 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         provider_harnesses: { openai: '' },
       },
-    }));
+    });
 
     let written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).not.toContain('harness: ohmypi');
     expect(written).not.toContain('harness: ""');
 
     mockWriteFile.mockClear();
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         provider_harnesses: {},
       },
-    }));
+    });
 
     written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).not.toContain('harness: ohmypi');
@@ -549,7 +505,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       roles: {
         ...settings.roles,
@@ -562,7 +518,7 @@ describe('saveSettingsApi', () => {
           },
         },
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('security:');
@@ -584,7 +540,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       experimental: {
         ...settings.experimental,
@@ -592,7 +548,7 @@ describe('saveSettingsApi', () => {
         streamdownRenderer: true,
         showHarnessModelPermutations: true,
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('experimental:');
@@ -607,7 +563,7 @@ describe('saveSettingsApi', () => {
 
     expect(settings.conversationSearch?.enabled).toBe(false);
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       conversationSearch: {
         enabled: true,
@@ -616,7 +572,7 @@ describe('saveSettingsApi', () => {
         apiKeyRef: 'OPENAI_SEARCH_KEY',
         dbPath: '/tmp/search.db',
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('conversationSearch:');
@@ -630,7 +586,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
@@ -643,7 +599,7 @@ describe('saveSettingsApi', () => {
         ...settings.api_keys,
         dashscope: 'dashscope-test-key',
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('dashscope: true');
@@ -658,10 +614,10 @@ describe('saveSettingsApi', () => {
 
     expect(settings.agents?.rtk?.enabled).toBe(true);
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       agents: { rtk: { enabled: false } },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('caveman:');
@@ -673,13 +629,13 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await expect(Effect.runPromise(saveSettingsApi({
+    await expect(saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
         daemonHost: '169.254.169.254',
       } as typeof settings.tts,
-    }))).rejects.toThrow('Unknown tts setting(s): daemonHost');
+    })).rejects.toThrow('Unknown tts setting(s): daemonHost');
 
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
@@ -689,7 +645,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
@@ -704,7 +660,7 @@ describe('saveSettingsApi', () => {
         utteranceTemplates: { mergeReady: '{issueId} ready' },
         mutedIssues: ['PAN-123'],
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('summarizer:');
@@ -719,7 +675,7 @@ describe('saveSettingsApi', () => {
   it('saveDesignLanguage persists a valid ui.theme value (PAN-3410)', async () => {
     const { saveDesignLanguage } = await import('../settings-api.js');
 
-    await Effect.runPromise(saveDesignLanguage('ledger'));
+    await saveDesignLanguage('ledger');
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('ui:');
@@ -740,10 +696,10 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       ui: { theme: 'broadsheet' },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('theme: ledger');
@@ -756,7 +712,7 @@ describe('saveSettingsApi', () => {
     }));
     const { saveDesignLanguage } = await import('../settings-api.js');
 
-    await Effect.runPromise(saveDesignLanguage('broadsheet'));
+    await saveDesignLanguage('broadsheet');
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('open_in_editor_command: cursor {path}');
@@ -776,7 +732,7 @@ describe('saveSettingsApi', () => {
     }));
     const { saveDesignLanguage } = await import('../settings-api.js');
 
-    await Effect.runPromise(saveDesignLanguage('ledger'));
+    await saveDesignLanguage('ledger');
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('mid: gpt-5.5');
@@ -812,8 +768,8 @@ describe('saveSettingsApi', () => {
     const settings = loadSettingsApi();
 
     await Promise.all([
-      Effect.runPromise(saveSettingsApi({ ...settings, workhorses: { ...settings.workhorses, mid: 'gpt-5.5' } })),
-      Effect.runPromise(saveDesignLanguage('ledger')),
+      saveSettingsApi({ ...settings, workhorses: { ...settings.workhorses, mid: 'gpt-5.5' } }),
+      saveDesignLanguage('ledger'),
     ]);
 
     expect(state.workhorses.mid).toBe('gpt-5.5');
@@ -839,13 +795,13 @@ describe('saveSettingsApi', () => {
 
     expect(settings.conversations?.handoff_author_model).toBe('claude-sonnet-4-6');
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         providers: { ...settings.models.providers, openai: true },
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('handoff_author_model: claude-sonnet-4-6');
@@ -873,13 +829,13 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         providers: { ...settings.models.providers, openai: true },
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('future_swarm_key: keep-me');
@@ -1194,11 +1150,8 @@ describe('getAvailableModelsApi — MODEL_DEPRECATIONS filter (PAN-1122 follow-u
         'o4-mini': 'gpt-5.4-mini',
       },
       getModelCapability: vi.fn(),
-      getModelCapabilitySync: vi.fn(),
       hasModelCapability: () => true,
-      hasModelCapabilitySync: () => true,
       resolveModelId: (modelId: string) => modelId,
-      resolveModelIdSync: (modelId: string) => modelId,
     }));
 
     const { getAvailableModelsApi } = await import('../settings-api.js');
@@ -1237,11 +1190,8 @@ describe('getAvailableModelsApi — Kimi harness annotations (2026-08-02 harness
       },
       MODEL_DEPRECATIONS: {},
       getModelCapability: vi.fn(),
-      getModelCapabilitySync: vi.fn(),
       hasModelCapability: () => true,
-      hasModelCapabilitySync: () => true,
       resolveModelId: (modelId: string) => modelId,
-      resolveModelIdSync: (modelId: string) => modelId,
     }));
 
     const { getAvailableModelsApi } = await import('../settings-api.js');

@@ -8,8 +8,8 @@ import { Effect } from 'effect';
  */
 
 const agentMocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  getAgentState: vi.fn(),
+  stopAgent: vi.fn(),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -32,7 +32,7 @@ const projectMocks = vi.hoisted(() => ({
 }));
 
 const issueIdMocks = vi.hoisted(() => ({
-  resolveBareNumericIdSync: vi.fn((id: string) => id.toUpperCase()),
+  resolveBareNumericId: vi.fn((id: string) => id.toUpperCase()),
 }));
 
 const fsMocks = vi.hoisted(() => ({
@@ -53,11 +53,17 @@ vi.mock('../../../lib/agents.js', () => {
     return lower === 'flywheel-orchestrator' || AGENT_PREFIXES.some(p => lower.startsWith(p));
   };
   return {
-    getAgentStateSync: agentMocks.getAgentStateSync,
-    stopAgentSync: agentMocks.stopAgentSync,
+    getAgentState: agentMocks.getAgentState,
+    stopAgent: agentMocks.stopAgent,
     isQualifiedAgentId,
   };
 });
+
+// PAN-3947: pan kill/pause probe liveness through the terminal backend;
+// the fake mirrors the tmux session mock so each case sets liveness once.
+vi.mock('../../../lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: vi.fn(async (id: string) => (tmuxMocks.sessionExistsSync as (name: string) => boolean)(id)),
+}));
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsSync: tmuxMocks.sessionExistsSync,
@@ -85,7 +91,7 @@ vi.mock('../../../lib/projects.js', () => ({
 }));
 
 vi.mock('../../../lib/issue-id.js', () => ({
-  resolveBareNumericIdSync: issueIdMocks.resolveBareNumericIdSync,
+  resolveBareNumericId: issueIdMocks.resolveBareNumericId,
 }));
 
 vi.mock('fs', () => ({
@@ -115,8 +121,9 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    agentMocks.getAgentStateSync.mockReset();
-    agentMocks.stopAgentSync.mockReset();
+    agentMocks.getAgentState.mockReset();
+    agentMocks.stopAgent.mockReset();
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
     tmuxMocks.sessionExistsSync.mockReset();
     remoteMocks.isRemoteAvailable.mockReset();
     remoteMocks.killRemoteAgent.mockReset();
@@ -125,8 +132,8 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     workspaceMocks.stopWorkspaceDocker.mockReset();
     workspaceMocks.findWorkspacePath.mockReset();
     projectMocks.resolveProjectFromIssueSync.mockReset();
-    issueIdMocks.resolveBareNumericIdSync.mockReset();
-    issueIdMocks.resolveBareNumericIdSync.mockImplementation((id: string) => id.toUpperCase());
+    issueIdMocks.resolveBareNumericId.mockReset();
+    issueIdMocks.resolveBareNumericId.mockImplementation((id: string) => id.toUpperCase());
     fsMocks.existsSync.mockReset();
     fsMocks.readdirSync.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockReset();
@@ -136,17 +143,17 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     // read the same directory listing, so this must not be a one-shot mock.
     fsMocks.existsSync.mockReturnValue(true);
     fsMocks.readdirSync.mockReturnValue(['agent-pan-3680', 'agent-pan-3680-test']);
-    agentMocks.getAgentStateSync.mockImplementation((agentId: string) => ({
+    agentMocks.getAgentState.mockImplementation((agentId: string) => ({
       issueId: 'PAN-3680',
       status: 'running',
       role: agentId.endsWith('-test') ? 'test' : 'work',
     }));
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/overdeck' });
     workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/overdeck/workspaces/feature-pan-3680');
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({
       containersFound: true,
       steps: ['docker compose down'],
-    }));
+    });
 
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -167,8 +174,8 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     await killCommand('agent-pan-3680-test', {});
 
     // The kill itself still happens — only the shared stack is left alone.
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-3680-test', 'operator');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledTimes(1);
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3680-test', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledTimes(1);
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-3680',
       kind: 'pause',
@@ -203,8 +210,8 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-3680', {});
 
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-3680', 'operator');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-3680-test', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3680', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3680-test', 'operator');
     expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledTimes(1);
     expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledWith(
       '/tmp/overdeck/workspaces/feature-pan-3680',

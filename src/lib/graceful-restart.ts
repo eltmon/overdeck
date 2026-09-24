@@ -4,21 +4,32 @@ import { Effect } from 'effect';
 import { sendEscapeKeyAsync, sendKeys } from './tmux.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
+import { hostTerminalBackendName } from './terminal-backends/select.js';
 
 export const GRACEFUL_RESTART_GRACE_MS = 60_000;
+
+/** The backend-aware delivery door (`deliverAgentMessage`), injected to keep this leaf cycle-free. */
+export type GracefulWarningDelivery = (agentId: string, message: string, caller: string) => Promise<unknown>;
 
 export async function sendGracefulRestartWarning(
   agentId: string,
   harness: RuntimeName | undefined,
   workspace: string,
+  deliver?: GracefulWarningDelivery,
 ): Promise<void> {
   const warning = 'Restarting in 60s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
   try {
-    if (harness && !getHarnessBehavior(harness).usesRpcFifo) {
-      await sendEscapeKeyAsync(agentId, 2);
-      await new Promise((r) => setTimeout(r, 1_000));
+    // PAN-3960: a Herdr agent has no tmux session to type into — the warning
+    // goes through the backend-aware delivery door the caller passes instead.
+    if (deliver && (await hostTerminalBackendName()) === 'herdr') {
+      await deliver(agentId, warning, 'graceful-restart-warning');
+    } else {
+      if (harness && !getHarnessBehavior(harness).usesRpcFifo) {
+        await sendEscapeKeyAsync(agentId, 2);
+        await new Promise((r) => setTimeout(r, 1_000));
+      }
+      await Effect.runPromise(sendKeys(agentId, warning));
     }
-    await Effect.runPromise(sendKeys(agentId, warning));
   } catch { /* non-fatal — session may already be dead */ }
 
   await new Promise(r => setTimeout(r, GRACEFUL_RESTART_GRACE_MS));

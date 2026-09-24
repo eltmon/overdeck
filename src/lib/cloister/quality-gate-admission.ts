@@ -9,11 +9,11 @@ import { getOverdeckHome } from '../paths.js'
  * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
  */
 
-export const QUALITY_GATE_CPU_START_THRESHOLD = 0.75
-export const QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1
-export const QUALITY_GATE_ADMISSION_POLL_MS = 1_000
-export const QUALITY_GATE_ADMISSION_SETTLE_MS = 1_500
-export const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
+const QUALITY_GATE_CPU_START_THRESHOLD = 0.75
+const QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1
+const QUALITY_GATE_ADMISSION_POLL_MS = 1_000
+const QUALITY_GATE_ADMISSION_SETTLE_MS = 1_500
+const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
 
 export interface QualityGatePressureSample {
   cpuUtilization: number
@@ -98,7 +98,7 @@ function cpuTotals() {
   return { idle, total, cores: Math.max(1, records.length) }
 }
 
-export async function sampleQualityGatePressure(
+async function sampleQualityGatePressure(
   sleep: (ms: number) => Promise<void> = delay,
 ): Promise<QualityGatePressureSample> {
   const before = cpuTotals()

@@ -1,3 +1,8 @@
+/**
+ * Sync twins (PAN-3958): `readOrderBook` (async: `readOrderBookAsync`) exists because this caller runs
+ * in a synchronous context and cannot await: src/lib/orders/resolver.ts:153 (`listBooks`, the sync
+ * order-book read door). Do not add new synchronous callers; server-reachable code uses the async variant.
+ */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -13,7 +18,7 @@ const decodeIndex = Schema.decodeUnknownSync(Schema.Array(OrderBookIndexEntrySch
  * Order books, the index, and the backlog sequence live under the project's
  * plan directory: pass `getProjectPanPaths(projectRoot).panDir` (PAN-3917).
  */
-export function ordersDirectory(panDir: string): string {
+function ordersDirectory(panDir: string): string {
   return join(panDir, 'orders');
 }
 
@@ -131,7 +136,7 @@ export async function writeOrderBookState(
   nextBook: OrderBook,
   queueOrder?: readonly string[],
 ): Promise<OrderBook> {
-  const prior = readOrderBook(panDir, nextBook.id);
+  const prior = await readOrderBookAsync(panDir, nextBook.id);
   const book = preserveOperatorOwnedState(prior, nextBook);
   const bookPath = orderBookPath(panDir, book.id);
   const indexPath = orderBookIndexPath(panDir);

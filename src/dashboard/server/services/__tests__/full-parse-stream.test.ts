@@ -96,4 +96,17 @@ describe('full parser stream lifecycle', () => {
     expect(events).toEqual([]);
   });
 
+  it('treats work-log-only parses as content and stops transcript discovery', async () => {
+    const resolve = vi.fn(async () => '/tmp/rollout.jsonl');
+    const result = {
+      ...parsed(),
+      messages: [],
+      workLog: [{ id: 'tool-1', label: 'Read', tone: 'tool' as const, createdAt: '2026-09-09' }],
+    };
+    start(async () => result, resolve);
+    await flush();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(resolve).toHaveBeenCalledTimes(1);
+  });
+
 });

@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -20,7 +21,7 @@ vi.mock('../../../../../lib/agents.js', () => ({
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
 }));
-vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
@@ -60,7 +61,7 @@ vi.mock('../../../../../lib/overdeck/merge.js', () => ({
 }));
 
 vi.mock('../../../../../lib/projects.js', () => ({
-  findProjectByTeamSync: vi.fn(() => ({
+  findProjectByTeam: vi.fn(() => ({
     workspace: {
       type: 'polyrepo',
       repos: [
@@ -70,7 +71,7 @@ vi.mock('../../../../../lib/projects.js', () => ({
     },
     quality_gates: {},
   })),
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByPath: vi.fn(() => null),
   listProjectsSync: vi.fn(() => []),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/project' })),
 }));
@@ -88,7 +89,9 @@ vi.mock('../../../../../lib/tmux.js', () => ({
   // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   sessionExists: vi.fn(),
 }));
 
@@ -105,9 +108,9 @@ vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
   advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: vi.fn(),
+  forgeMergeGateRefusal: vi.fn(async () => null),
   mergeVerificationOptions: vi.fn(() => ({})),
   normalMergeEligibility: vi.fn(() => null),
-  readStrikeHead: vi.fn(async () => null),
   validateStrikeMergeRequest: vi.fn(() => null),
 }));
 
@@ -123,53 +126,19 @@ vi.mock('../../../services/merge-queue-service.js', () => ({
 }));
 
 vi.mock('../../../../../lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: vi.fn(() => mocks.mergeSet),
-  getMergeSetSync: vi.fn(() => mocks.mergeSet),
-  patchMergeSetRepoSync: vi.fn((_issueId: string, repoKey: string, expected: any, patch: any) => {
-    const current = mocks.mergeSet?.repos.find((repo: any) => repo.repoKey === repoKey);
-    if (!current
-      || current.sourceBranch !== expected.sourceBranch
-      || current.targetBranch !== expected.targetBranch
-      || current.artifactUrl !== expected.artifactUrl
-      || current.artifactId !== expected.artifactId) return false;
-    mocks.mergeSet = {
-      ...mocks.mergeSet,
-      repos: mocks.mergeSet.repos.map((repo: any) => (
-        repo.repoKey === repoKey ? { ...repo, ...patch } : repo
-      )),
-    };
-    return true;
-  }),
-  patchMergeSetReposSync: vi.fn((_issueId: string, patches: any[]) => {
-    const matches = patches.every(({ repoKey, expected }) => {
-      const current = mocks.mergeSet?.repos.find((repo: any) => repo.repoKey === repoKey);
-      return current
-        && current.sourceBranch === expected.sourceBranch
-        && current.targetBranch === expected.targetBranch
-        && current.artifactUrl === expected.artifactUrl
-        && current.artifactId === expected.artifactId;
-    });
-    if (!matches) return false;
-    mocks.mergeSet = {
-      ...mocks.mergeSet,
-      repos: mocks.mergeSet.repos.map((repo: any) => {
-        const planned = patches.find(({ repoKey }) => repoKey === repo.repoKey);
-        return planned ? { ...repo, ...planned.patch } : repo;
-      }),
-    };
-    return true;
-  }),
-  upsertMergeSetSync: (mergeSet: any) => {
+  ensureMergeSetForIssue: vi.fn(() => mocks.mergeSet),
+  getMergeSet: vi.fn(() => mocks.mergeSet),
+  upsertMergeSet: (mergeSet: any) => {
     mocks.mergeSet = mergeSet;
     mocks.upsertMergeSet(mergeSet);
   },
-  withRepoArtifactUrlSync: vi.fn((mergeSet: any, repoKey: string, artifactUrl: string, artifactId?: string) => ({
+  withRepoArtifactUrl: vi.fn((mergeSet: any, repoKey: string, artifactUrl: string, artifactId?: string) => ({
     ...mergeSet,
     repos: mergeSet.repos.map((repo: any) => (
       repo.repoKey === repoKey ? { ...repo, artifactUrl, artifactId } : repo
     )),
   })),
-  withRepoStateSync: vi.fn((mergeSet: any, repoKey: string, patch: Record<string, unknown>) => ({
+  withRepoState: vi.fn((mergeSet: any, repoKey: string, patch: Record<string, unknown>) => ({
     ...mergeSet,
     repos: mergeSet.repos.map((repo: any) => (
       repo.repoKey === repoKey ? { ...repo, ...patch } : repo

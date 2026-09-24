@@ -55,7 +55,14 @@ The frontend keeps parent and subagent transcripts in separate React Query cache
 
 ## Status derivation
 
-Metadata files do not contain runtime status. While the parent stream is live, Overdeck marks a subagent `running` when its `toolUseId` remains in the parser's `pendingToolUse` map. It marks all other entries `done`.
+Metadata files do not contain runtime status. While the parent stream is live, Overdeck derives it from the launch shape in the metadata (`requestShape`):
+
+- A foreground subagent is `running` while its `toolUseId` remains in the parser's `pendingToolUse` map, and `done` otherwise.
+- A background subagent (`requestShape: "background"`) gets its `Agent` tool result as soon as it launches, so that map cannot track it. It is `running` until the parent transcript has a `<task-notification>` naming it. The first notification carries `<tool-use-id>` equal to its `toolUseId`. Notifications after a `SendMessage` resume carry only `<task-id>`, which equals its `agentId`. Both ids are matched exactly. Claude Code writes each notification as a `queue-operation` `enqueue` record when the subagent stops, and again as a `user` record with `origin.kind: "task-notification"` when the parent takes it. Text that only quotes a notification, such as assistant text, a tool result or a pasted message, does not count.
+- A notified background subagent is `running` again when its transcript or metadata changed more than 5 seconds after its latest notification. That means it was resumed. Its last write normally lands within 0.1 s of the notification.
+- A background subagent with no notification after its last write, for example because the parent crashed, becomes `done` once its transcript and metadata files have not changed for `BACKGROUND_SUBAGENT_IDLE_MS` (30 minutes).
+
+The notification scan reads only the parent transcript bytes appended since the previous poll. It rescans from the start when the transcript gets shorter.
 
 A watcher delta triggers an immediate status refresh. The two-second metadata poll catches new subagent files. REST responses for ended conversations mark every discovered subagent `done`.
 
@@ -98,3 +105,27 @@ Selection accepts only safe IDs and requires membership in the parent's verified
 descendant tree. It never interprets an ID as a path, follows directory/file
 symlinks during discovery, or searches another Codex home. Missing or unrelated
 IDs cannot fall back to the parent transcript. All discovery and reads are asynchronous.
+
+Jobs launched through the Codex plugin for Claude Code (`codex:codex-rescue` and friends) are
+not subagents: they are separate `codex` processes with their own rollouts, outside the
+conversation's transcript. Overdeck records them as **external agents** (`~/.overdeck/agents/ext-*`)
+and lists them in the Agents Directory under the conversation that launched them. See
+`reference/workers.mdx` "Externally spawned agents" and DASHBOARD-ARCHITECTURE.md "Agents Directory".
+
+## Agent subagents (PAN-3920)
+
+Overdeck agents (work, review, plan, …) spawn subagents too — the foreman's same-family workers
+among them. Two routes read them, beside the agent's own transcript as the session index
+resolves it (`resolveAgentTranscriptCandidate`):
+
+- `GET /api/agents/:id/subagents` lists `{ subagents: [...] }` with each subagent's summary and
+  transcript `mtimeMs`. Transcript paths stay on the server.
+- `GET /api/agents/:id/conversation?subagentId=<id>` returns one subagent transcript in the
+  agent conversation response shape. An id that fails `^[A-Za-z0-9_-]+$` answers 400; an id that
+  is not that agent's subagent answers 404.
+
+A Claude subagent is `running` while its transcript changed in the last 120 s and `done`
+otherwise; a Codex child keeps the rollout's own task status. Only `claude` and `codex`
+transcripts have subagents; other harnesses answer an empty list. The Agents Directory lists
+these as `subagent` entries under their parent (`src/dashboard/server/services/agent-subagents.ts`).
+

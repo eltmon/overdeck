@@ -19,9 +19,19 @@
 
 import { Effect } from 'effect';
 import { getEventStore, type EventStore } from '../event-store.js';
-import { getAgentStateSync, type AgentState } from '../../../lib/agents.js';
-import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
+import { getAgentState, type AgentState } from '../../../lib/agents.js';
+import { logAgentLifecycle } from '../../../lib/persistent-logger.js';
+import { sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
+import {
+  getSupervisedConversationByTmuxSession,
+  markConversationEnded,
+  markConversationRunning,
+  type LegacyConversation,
+} from '../../../lib/overdeck/conversations.js';
 import { getBackendPanes } from './backend-inventory.js';
+import { cleanupUnreferencedConversationAttachments } from './conversation-attachments.js';
+import { respawnStartedAt } from './pending-respawn.js';
+import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 export interface AgentProjectionResult {
@@ -43,7 +53,7 @@ export function saveAgentStateAndEmitEventWithDeps(
   event: Omit<DomainEvent, 'sequence'>,
 ): AgentProjectionResult {
   const sequence = eventStore.append(event);
-  logAgentLifecycleSync(
+  logAgentLifecycle(
     state.id,
     `projected ${event.type} (seq=${sequence}) for ${state.id}`,
   );
@@ -68,12 +78,16 @@ export function saveAgentStateAndEmitEventProgram(
   return Effect.sync(() => saveAgentStateAndEmitEvent(state, event));
 }
 
-// ─── PTY-supervisor lifecycle events (PAN-3849 W33) ─────────────────────────
+// ─── PTY-supervisor lifecycle events (PAN-3849 W33, PAN-3962) ───────────────
 //
 // The PTY supervisor observes the harness process directly (it owns the PTY
 // master), so ITS events are the source for running/stopped transitions of
-// supervisor-launched agents. Each one appends an event; none of them writes a
-// status anywhere.
+// supervisor-launched sessions. The supervised id is the terminal session
+// name: an agent id (`agent-…`, `planning-…`) or a conversation's tmux session
+// (`conv-<name>`). Agents append an event and write no status anywhere.
+// Conversations still keep `status`/`ended_at` on their overdeck.db row, so a
+// conversation's lifecycle event writes that row and appends the runtime
+// activity keyed by the same id its hooks report under.
 
 export type AgentLifecycleEventName = 'session-started' | 'turn-started' | 'turn-ended' | 'exited';
 
@@ -81,11 +95,16 @@ export interface AgentLifecycleEventInput {
   event: AgentLifecycleEventName;
   at: string;
   exitCode?: number;
+  /** The posting supervisor's start time: its launch generation (PAN-3962). */
+  launchedAt?: string;
 }
 
 export type AgentLifecycleApplyResult =
   | { applied: true; status: 'running' | 'stopped' | 'unknown' }
-  | { applied: false; reason: 'no-state' | 'already-stopped' | 'duplicate' };
+  | {
+    applied: false;
+    reason: 'no-state' | 'already-stopped' | 'duplicate' | 'respawn-pending' | 'superseded-launch';
+  };
 
 /**
  * The event payload's agent snapshot. `status` is the event's own meaning at
@@ -127,9 +146,28 @@ function rememberLifecycleKey(key: string): boolean {
   return true;
 }
 
-/** Test seam: forget the dedupe ring between cases. */
+/**
+ * Newest supervisor launch (epoch ms) seen per conversation session, from its
+ * `session-started`. An exit from an older launch belongs to a harness a
+ * respawn already replaced (PAN-3962). Bounded like the dedupe ring.
+ */
+const latestConversationLaunch = new Map<string, number>();
+
+function rememberConversationLaunch(sessionId: string, launchedAtMs: number): void {
+  const previous = latestConversationLaunch.get(sessionId);
+  if (previous !== undefined && previous >= launchedAtMs) return;
+  latestConversationLaunch.delete(sessionId);
+  latestConversationLaunch.set(sessionId, launchedAtMs);
+  if (latestConversationLaunch.size > RECENT_LIFECYCLE_KEYS_MAX) {
+    const oldest = latestConversationLaunch.keys().next().value;
+    if (oldest !== undefined) latestConversationLaunch.delete(oldest);
+  }
+}
+
+/** Test seam: forget the dedupe ring and launch generations between cases. */
 export function _resetAgentLifecycleDedupeForTests(): void {
   recentLifecycleKeys.clear();
+  latestConversationLaunch.clear();
 }
 
 export interface AgentLifecycleDeps {
@@ -137,6 +175,44 @@ export interface AgentLifecycleDeps {
   readonly readAgentState?: (agentId: string) => AgentState | null;
   /** True when the backend reports this agent's pane already exited. */
   readonly hasExited?: (agentId: string) => Promise<boolean>;
+  /** The conversation supervised under this terminal session id, if any. */
+  readonly readConversation?: (sessionId: string) => LegacyConversation | null;
+  /** When the in-flight respawn of this session began (epoch ms), or null. */
+  readonly respawnStartedAt?: (sessionId: string) => number | null;
+  readonly markConversationRunning?: (name: string) => void;
+  readonly markConversationEnded?: (name: string, endedAtMs?: number) => void;
+  /** Attachment cleanup for a conversation that just ended (the poller's cleanup). */
+  readonly cleanupEndedConversation?: (conversation: LegacyConversation) => Promise<void>;
+  /** Owner teardown for the conversation's companion terminal (PAN-3974). Never throws. */
+  readonly closeCompanionTerminal?: (ownerSession: string) => Promise<void>;
+}
+
+/**
+ * The cleanup the conversation poller runs on rows it marks ended. The
+ * supervisor's exit now marks the row ended first, and the poller skips rows
+ * already ended, so the exit path must run it. Never throws.
+ */
+async function cleanupEndedConversationAttachments(conversation: LegacyConversation): Promise<void> {
+  const sessionFile = conversation.claudeSessionId
+    ? sessionFilePath(conversation.cwd, conversation.claudeSessionId)
+    : null;
+  await cleanupUnreferencedConversationAttachments({ name: conversation.name, sessionFile });
+}
+
+/**
+ * The conversation whose supervised tmux session is `sessionId`. A post-/clear
+ * sibling shares its parent's session, so the lookup is by session and prefers
+ * the live sibling over the /clear-ended parent. Only an exact tmux-session
+ * match counts: a lifecycle event must never land on a row it does not own.
+ */
+function readSupervisedConversation(sessionId: string): LegacyConversation | null {
+  const conversation = getSupervisedConversationByTmuxSession(sessionId);
+  return conversation && conversation.tmuxSession === sessionId ? conversation : null;
+}
+
+/** Epoch ms of an ISO timestamp, or NaN when absent or unparseable. */
+function isoToMs(value: string | null | undefined): number {
+  return value ? Date.parse(value) : Number.NaN;
 }
 
 async function paneAlreadyExited(agentId: string): Promise<boolean> {
@@ -151,8 +227,12 @@ export async function applyAgentLifecycleEventWithDeps(
   input: AgentLifecycleEventInput,
   deps: AgentLifecycleDeps = {},
 ): Promise<AgentLifecycleApplyResult> {
-  const state = (deps.readAgentState ?? getAgentStateSync)(agentId);
-  if (!state) return { applied: false, reason: 'no-state' };
+  const state = (deps.readAgentState ?? getAgentState)(agentId);
+  if (!state) {
+    const conversation = (deps.readConversation ?? readSupervisedConversation)(agentId);
+    if (!conversation) return { applied: false, reason: 'no-state' };
+    return applyConversationLifecycleEvent(eventStore, agentId, conversation, input, deps);
+  }
   const at = input.at;
 
   if (!rememberLifecycleKey(`${agentId}:${input.event}:${at}`)) {
@@ -193,6 +273,112 @@ export async function applyAgentLifecycleEventWithDeps(
           ...(state.sessionId ? { sessionId: state.sessionId } : {}),
         },
       });
+      return { applied: true, status: 'stopped' };
+    }
+  }
+}
+
+/**
+ * A supervised conversation's lifecycle (PAN-3962). The row's `status` is the
+ * conversation's recorded state, so the supervisor's own observation writes
+ * it: `session-started` marks it active, `exited` marks it ended at the exit
+ * time. Start, turn-start and exit edges are also appended as
+ * `agent.activity_changed` keyed by the tmux session id — the id the
+ * conversation's hooks already report activity under. The supervisor does not
+ * emit `turn-ended`; `idle` after a turn comes from the harness's own hook
+ * (claude-code's Stop hook). `agent.started`/`agent.stopped` are not emitted:
+ * conversations are not agents and carry no issue id.
+ */
+async function applyConversationLifecycleEvent(
+  eventStore: AgentProjectionEventStore,
+  sessionId: string,
+  conversation: LegacyConversation,
+  input: AgentLifecycleEventInput,
+  deps: AgentLifecycleDeps,
+): Promise<AgentLifecycleApplyResult> {
+  const at = input.at;
+  if (!rememberLifecycleKey(`${sessionId}:${input.event}:${at}`)) {
+    return { applied: false, reason: 'duplicate' };
+  }
+
+  const appendActivity = (activity: 'working' | 'idle' | 'stopped') => {
+    const sequence = eventStore.append({
+      type: 'agent.activity_changed',
+      timestamp: at,
+      payload: { agentId: sessionId, activity },
+    });
+    logAgentLifecycle(
+      sessionId,
+      `projected agent.activity_changed(${activity}) (seq=${sequence}) for conversation ${conversation.name}`,
+    );
+  };
+
+  switch (input.event) {
+    case 'session-started': {
+      // A /clear-ended parent is never revived: its session now belongs to
+      // the post-/clear sibling.
+      if (conversation.clearedToConvId != null) {
+        return { applied: false, reason: 'already-stopped' };
+      }
+      // A late (retried or stalled) start must not revive a conversation that
+      // ended after it: every end — the harness's exit, an operator stop, the
+      // poller — stamps ended_at later than the start of the launch it ends.
+      // The backend pane inventory cannot answer this for conversations: a
+      // Herdr host lists no tmux conv-* sessions, and a tmux pane is held
+      // open by the launcher's keep-alive loop.
+      if (conversation.status === 'ended' && isoToMs(at) <= isoToMs(conversation.endedAt)) {
+        return { applied: false, reason: 'already-stopped' };
+      }
+      const launchedAtMs = isoToMs(input.launchedAt);
+      if (!Number.isNaN(launchedAtMs)) rememberConversationLaunch(sessionId, launchedAtMs);
+      (deps.markConversationRunning ?? markConversationRunning)(conversation.name);
+      appendActivity('idle');
+      return { applied: true, status: 'running' };
+    }
+    case 'turn-started':
+    case 'turn-ended': {
+      appendActivity(input.event === 'turn-started' ? 'working' : 'idle');
+      return { applied: true, status: 'unknown' };
+    }
+    case 'exited': {
+      // A respawn (resume, restart-all) spawns a new harness under the same
+      // session name. Only an exit of the generation being replaced is
+      // ignored: one from a supervisor launched before the respawn began. The
+      // new harness dying at startup (bad auth, bad model) must end the row.
+      // A supervisor that predates `launchedAt` is dated by its exit instead.
+      const launchedAtMs = isoToMs(input.launchedAt);
+      const generationMs = Number.isNaN(launchedAtMs) ? isoToMs(at) : launchedAtMs;
+      const respawnStartMs = (deps.respawnStartedAt ?? respawnStartedAt)(sessionId);
+      if (respawnStartMs !== null && !(generationMs >= respawnStartMs)) {
+        return { applied: false, reason: 'respawn-pending' };
+      }
+      // An exit from a launch older than the newest one that reported
+      // session-started belongs to a harness already replaced. Only a
+      // supervisor that predates `launchedAt` omits it, so once any launch
+      // has reported one, an exit without it is from an older launch.
+      const latestLaunchMs = latestConversationLaunch.get(sessionId);
+      if (latestLaunchMs !== undefined && (Number.isNaN(launchedAtMs) || launchedAtMs < latestLaunchMs)) {
+        return { applied: false, reason: 'superseded-launch' };
+      }
+      const exitedAtMs = isoToMs(at);
+      // PAN-3974: the companion terminal goes with its owner, before the row is
+      // marked ended (later writers skip ended rows). Best-effort, never blocks.
+      await (deps.closeCompanionTerminal ?? closeCompanionTerminalForOwner)(conversation.tmuxSession)
+        .catch(() => undefined);
+      (deps.markConversationEnded ?? markConversationEnded)(
+        conversation.name,
+        Number.isNaN(exitedAtMs) ? undefined : exitedAtMs,
+      );
+      appendActivity('stopped');
+      // A row something else already ended (operator stop, the poller) had its
+      // cleanup run by that writer; only the exit itself is recorded here.
+      if (conversation.status === 'ended') return { applied: true, status: 'stopped' };
+      try {
+        await (deps.cleanupEndedConversation ?? cleanupEndedConversationAttachments)(conversation);
+      } catch (err: unknown) {
+        // The exit is recorded; a cleanup failure must never fail the route.
+        console.error(`[agent-projection] Attachment cleanup failed for conversation ${conversation.name}:`, err);
+      }
       return { applied: true, status: 'stopped' };
     }
   }

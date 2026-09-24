@@ -184,7 +184,3 @@ export function renderPrompt({ name, vars }: RenderPromptOptions): Effect.Effect
     return Mustache.render(body, vars);
   });
 }
-
-export function loadPromptFrontmatter(name: string): Effect.Effect<PromptFrontmatter, PromptError> {
-  return parsePrompt(name).pipe(Effect.map(({ frontmatter }) => frontmatter));
-}

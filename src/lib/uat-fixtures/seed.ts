@@ -14,7 +14,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { getOverdeckHome } from '../paths.js';
-import { registerProjectSync } from '../projects.js';
+import { registerProject } from '../projects.js';
 import { saveAgentStateSync } from '../agents/agent-state.js';
 import { emitActivityEntryOnce } from '../activity-logger.js';
 import { serializeXBriefDocument } from '../xbrief/io.js';
@@ -45,7 +45,7 @@ export interface SeedReport {
  * src/dashboard/server/identity.ts:86-89 uses, rather than an
  * environment variable a host process could set by hand.
  */
-export function isRunningInContainer(): boolean {
+function isRunningInContainer(): boolean {
   return existsSync('/.dockerenv') || existsSync('/run/.containerenv');
 }
 
@@ -93,7 +93,7 @@ export async function seedUatFixturesLocal(options: SeedUatFixturesOptions = {})
   const home = getOverdeckHome();
   await mkdir(home, { recursive: true });
 
-  registerProjectSync(FIXTURE_PROJECT_KEY, fixtureProjectConfig());
+  registerProject(FIXTURE_PROJECT_KEY, fixtureProjectConfig());
 
   const { CacheService } = await import('../../dashboard/server/services/cache-service.js');
   const cache = new CacheService();

@@ -1,0 +1,89 @@
+{
+  "version": "1",
+  "issueId": "PAN-3968",
+  "created": "2026-09-21T00:11:40.860Z",
+  "updated": "2026-09-21T00:51:01.720Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "remove-close-out-row-gc": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3968",
+      "claimedAt": "2026-09-21T00:11:40.860Z",
+      "doneAt": "2026-09-21T00:22:14.326Z"
+    },
+    "delete-prune-stopped-agents-for-issue": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3968",
+      "claimedAt": "2026-09-21T00:22:34.461Z",
+      "doneAt": "2026-09-21T00:25:06.462Z"
+    },
+    "delete-dead-execute-close-out": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3968",
+      "claimedAt": "2026-09-21T00:25:09.946Z",
+      "doneAt": "2026-09-21T00:26:49.578Z"
+    },
+    "docs-close-out-no-row-gc": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3968",
+      "claimedAt": "2026-09-21T00:26:56.171Z",
+      "doneAt": "2026-09-21T00:35:01.487Z"
+    },
+    "remove-close-out-row-gc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:48:29.845Z"
+    },
+    "remove-close-out-row-gc.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:48:57.989Z"
+    },
+    "remove-close-out-row-gc.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:49:07.673Z"
+    },
+    "remove-close-out-row-gc.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:49:16.951Z"
+    },
+    "delete-prune-stopped-agents-for-issue.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:49:26.466Z"
+    },
+    "delete-prune-stopped-agents-for-issue.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:49:36.274Z"
+    },
+    "delete-prune-stopped-agents-for-issue.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:49:47.412Z"
+    },
+    "delete-dead-execute-close-out.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:50:00.768Z"
+    },
+    "delete-dead-execute-close-out.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:50:13.922Z"
+    },
+    "delete-dead-execute-close-out.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:50:26.584Z"
+    },
+    "delete-dead-execute-close-out.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:50:38.932Z"
+    },
+    "docs-close-out-no-row-gc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:50:50.692Z"
+    },
+    "docs-close-out-no-row-gc.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:51:01.719Z"
+    }
+  }
+}

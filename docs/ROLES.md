@@ -14,9 +14,10 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 |------|------|---------|
 | `plan` | `roles/plan.md` | Read issue, research codebase, write xBRIEF, create xBRIEF tasks. Instruction source: `roles/plan.md` (system prompt) plus `src/lib/cloister/prompts/planning.md` (issue inputs and plan formats); no other file instructs the planner. |
 | `work` | `roles/work.md` | The foreman for the issue. Claims xBRIEF items, writes code, commits one item at a time with an `Item: <item-id>` trailer. When the plan has parallel waves, dispatches same-family workers as in-harness subagents and cross-family workers as terminal-backend panes via `pan spawn` — see the `pan-foreman` skill and [FOREMAN.md](./FOREMAN.md). |
-| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and signals the spawner to review and land it. Bypasses the plan/work/review/test pipeline and server-side shipping. |
+| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and opens a PR against `main` that the operator merges. Bypasses the plan/work/review/test pipeline and server-side shipping. |
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes as a PR review |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
+| `worker` | `roles/worker.md` | A registered worker (`pan worker run`, PAN-3920): one agent or conversation, its parent, gives it one bounded brief for an issue. It does only the brief, never runs `pan done`, `pan review` or `pan task done`, and ends by writing a report with `pan worker report`. It stays warm after reporting. See [reference/workers.mdx](../reference/workers.mdx). |
 
 ### Conversation kickoff templates (not roles)
 
@@ -83,6 +84,8 @@ A sub-role is a configuration slot under a role, not a separate pipeline stage. 
 | Role | Sub-roles | Shape |
 |------|-----------|-------|
 | `review` | `security`, `correctness`, `performance`, `requirements` | Harness-agnostic prompt templates the orchestrator inlines into each convoy spawn message. See `roles/review-<subRole>.md`. |
+
+The operator's "worker sub-role" is realized as its own `Role` literal, `worker`, not as a sub-role of `work`: pipeline patrols that filter `role === 'work'` (deacon, auto-resume, stall sweeper) must never act on a worker, and a separate literal keeps them out without touching each one (PAN-3920 Q1).
 
 All sub-roles share the same delivery shape: **workflow-injected prompts orchestrated by Overdeck**, never ambient subagents auto-discovered by Claude Code. The prompts live in Overdeck's own files and are inlined at spawn time. This is a deliberate choice — see "Why no ambient subagents" below.
 

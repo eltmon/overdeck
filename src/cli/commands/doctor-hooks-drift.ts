@@ -12,7 +12,7 @@
 import { join } from 'path';
 
 import { isDeploymentGenerationRoot, packageRoot, SYNC_SOURCES } from '../../lib/paths.js';
-import { planHooksSyncSync } from '../../lib/sync-hooks.js';
+import { planHooksSync } from '../../lib/sync-hooks.js';
 
 // Structurally identical to doctor.ts's CheckResult; re-declared (like
 // doctor-inotify.ts) because importing it would create a module cycle.
@@ -27,7 +27,7 @@ interface CheckResult {
 const MAX_NAMED = 5;
 
 export function checkDeployedHooksDrift(
-  plan: { name: string; status: 'new' | 'updated' | 'current' }[] = planHooksSyncSync(),
+  plan: { name: string; status: 'new' | 'updated' | 'current' }[] = planHooksSync(),
 ): CheckResult {
   const name = 'Deployed Hooks';
 

@@ -24,6 +24,14 @@ export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" 
 export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse"
 export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse"
 
+const AGENT_SESSION_PREFIXES = ["agent-", "planning-", "specialist-", "strike-", "inspect-"] as const
+const AGENT_SESSION_SINGLETONS = new Set(["flywheel-orchestrator", "conv-flywheel-orchestrator"])
+
+/** Canonical synthetic agent-session identity shared by dashboard client/server. */
+export function isAgentSessionName(name: string): boolean {
+  return AGENT_SESSION_SINGLETONS.has(name) || AGENT_SESSION_PREFIXES.some((prefix) => name.startsWith(prefix))
+}
+
 export interface HarnessNativeCommand {
   readonly name: string
   readonly description: string

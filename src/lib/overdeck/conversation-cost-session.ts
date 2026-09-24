@@ -1,10 +1,10 @@
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 
-export function findConversationForCostSessionSync(input: {
+export function findConversationForCostSession(input: {
   sessionId?: string | null;
   agentId?: string | null;
 }): { name: string } | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   if (input.sessionId) {
     const row = db.prepare(
       `SELECT c.name

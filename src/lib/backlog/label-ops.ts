@@ -1,6 +1,6 @@
 import { promisify } from 'node:util';
 import { exec } from 'node:child_process';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { PARKED_LABEL, VETOED_LABEL, BLOCKS_MAIN_LABEL, READY_LABEL, RELEASED_LABEL, OBJECTION_LABEL } from './pickup.js';
 
 const execAsync = promisify(exec);
@@ -12,15 +12,15 @@ export { PARKED_LABEL, VETOED_LABEL, BLOCKS_MAIN_LABEL, READY_LABEL, RELEASED_LA
  * skipped; the `|| true` keeps a missing-label / already-applied no-op non-fatal.
  */
 async function editIssueLabel(issueId: string, op: 'add' | 'remove', label: string): Promise<void> {
-  const resolution = resolveGitHubIssueSync(issueId);
+  const resolution = resolveGitHubIssue(issueId);
   if (!resolution.isGitHub) return;
   const { owner, repo, number } = resolution;
   const flag = op === 'add' ? '--add-label' : '--remove-label';
   await execAsync(`gh issue edit ${number} --repo ${owner}/${repo} ${flag} "${label}" 2>/dev/null || true`);
 }
 
-export const addIssueLabel = (issueId: string, label: string): Promise<void> => editIssueLabel(issueId, 'add', label);
-export const removeIssueLabel = (issueId: string, label: string): Promise<void> => editIssueLabel(issueId, 'remove', label);
+const addIssueLabel = (issueId: string, label: string): Promise<void> => editIssueLabel(issueId, 'add', label);
+const removeIssueLabel = (issueId: string, label: string): Promise<void> => editIssueLabel(issueId, 'remove', label);
 
 // PAN-2006 pipeline-state labels.
 export const applyIssueParkedLabel = (id: string): Promise<void> => addIssueLabel(id, PARKED_LABEL);

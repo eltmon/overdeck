@@ -24,7 +24,6 @@ import { existsSync, mkdirSync, openSync, readFileSync } from 'fs';
 import { open as openFile, stat } from 'fs/promises';
 import { join } from 'path';
 import { parse as parseToml } from '@iarna/toml';
-import { Effect } from 'effect';
 import { LOGS_DIR, OVERDECK_HOME, TRAEFIK_DIR, CONFIG_FILE } from './paths.js';
 import { readDevSupervisorMarker } from './dev-supervisor.js';
 
@@ -37,7 +36,7 @@ const execAsync = promisify(exec);
  * leaving ZERO listeners (#3099, 2026-07-26 dashboard-down incident caused by
  * `--health-timeout 120` being read as 120ms).
  */
-export const MIN_HEALTH_TIMEOUT_MS = 1000;
+const MIN_HEALTH_TIMEOUT_MS = 1000;
 
 /**
  * Parse the operator-facing `--health-timeout` flag. Bare numbers are
@@ -130,7 +129,7 @@ type DashboardStopOptions = {
   pidSurvivorProbe?: PidSurvivorProbe;
 };
 
-export function readPlatformConfigSync(): PlatformConfig {
+export function readPlatformConfig(): PlatformConfig {
   const defaults: PlatformConfig = {
     dashboardPort: 3010,
     dashboardApiPort: 3011,
@@ -349,7 +348,7 @@ function createEaddrinuseProbe(
   };
 }
 
-async function stopDashboardPromise(
+async function stopDashboardBody(
   config: PlatformConfig,
   opts: DashboardStopOptions = {},
 ): Promise<void> {
@@ -417,7 +416,9 @@ async function stopDashboardPromise(
       reason: failures.join('; '),
     });
   }
-}async function waitForDashboardHealthPromise(
+}
+
+async function waitForDashboardHealthBody(
   apiPort: number,
   opts: {
     timeoutMs?: number;
@@ -483,7 +484,10 @@ async function stopDashboardPromise(
       `health check at ${url} did not pass within ${formatTimeoutMs(timeoutMs)} ` +
       `(last: ${lastError}${responderDetails})`,
   });
-}async function waitForTraefikHealthPromise(
+}
+
+/** Poll until Traefik serves 200 at the domain; resolves false on timeout. Never rejects. */
+export async function waitForTraefikHealth(
   traefikDomain: string,
   opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
 ): Promise<boolean> {
@@ -502,16 +506,9 @@ async function stopDashboardPromise(
     await sleep(pollIntervalMs);
   }
   return false;
-}async function isTraefikContainerRunningPromise(): Promise<boolean> {
-  try {
-    const { stdout } = await execAsync(
-      'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
-    );
-    return stdout.trim().includes('overdeck-traefik');
-  } catch {
-    return false;
-  }
-}async function startTraefikPromise(config: PlatformConfig): Promise<void> {
+}
+
+async function startTraefikBody(config: PlatformConfig): Promise<void> {
   if (!config.traefikEnabled) return;
   if (!existsSync(config.traefikDir)) {
     throw new StageError({
@@ -527,7 +524,10 @@ async function stopDashboardPromise(
       reason: `docker compose up failed: ${err?.stderr || err?.message || String(err)}`,
     });
   }
-}async function stopTraefikPromise(config: PlatformConfig): Promise<void> {
+}
+
+/** Stop the Traefik container (best effort). Never rejects. */
+export async function stopTraefik(config: PlatformConfig): Promise<void> {
   if (!existsSync(config.traefikDir)) return;
   try {
     await execAsync('docker compose down', { cwd: config.traefikDir });
@@ -554,7 +554,7 @@ export interface DashboardRestartResult {
   spawnedPid: number | null;
 }
 
-async function restartDashboardPromise(
+async function restartDashboardBody(
   config: PlatformConfig,
   startDashboardFn: () => Promise<DashboardSpawnHandle | void> | DashboardSpawnHandle | void,
   opts: {
@@ -567,7 +567,7 @@ async function restartDashboardPromise(
   } = {},
 ): Promise<DashboardRestartResult> {
   try {
-    await stopDashboardPromise(config, {
+    await stopDashboardBody(config, {
       portOwnerProbe: opts.portOwnerProbe,
       pidSurvivorProbe: opts.pidSurvivorProbe,
     });
@@ -589,7 +589,7 @@ async function restartDashboardPromise(
       )
     : undefined;
   try {
-    await waitForDashboardHealthPromise(config.dashboardApiPort, {
+    await waitForDashboardHealthBody(config.dashboardApiPort, {
       timeoutMs: opts.healthTimeoutMs,
       expectedIdentity: opts.expectedIdentity,
       expectedPid: spawnedPid ?? undefined,
@@ -613,16 +613,18 @@ async function restartDashboardPromise(
     });
   }
   return { ownershipVerified: spawnedPid !== null, spawnedPid };
-}async function restartCliproxyPromise(
+}
+
+async function restartCliproxyBody(
   cliproxy: {
-    stopCliproxy: () => void;
-    startCliproxy: () => void;
-    isCliproxyRunning: () => boolean;
-    installCliproxy?: (force?: boolean) => void;
+    stopCliproxy: () => Promise<void>;
+    startCliproxy: () => Promise<void>;
+    isCliproxyRunning: () => Promise<boolean>;
+    installCliproxy?: (force?: boolean) => Promise<void>;
   },
   opts: { verifyTimeoutMs?: number; force?: boolean } = {},
 ): Promise<void> {
-  cliproxy.stopCliproxy();
+  await cliproxy.stopCliproxy();
   // Small wait so the port releases before we re-bind.
   await sleep(200);
 
@@ -633,49 +635,43 @@ async function restartDashboardPromise(
         reason: 'force=true was requested but cliproxy module does not export installCliproxy',
       });
     }
-    cliproxy.installCliproxy(true);
+    await cliproxy.installCliproxy(true);
   }
 
-  cliproxy.startCliproxy();
+  await cliproxy.startCliproxy();
 
   const timeoutMs = opts.verifyTimeoutMs ?? 5000;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (cliproxy.isCliproxyRunning()) return;
+    if (await cliproxy.isCliproxyRunning()) return;
     await sleep(100);
   }
   throw new StageError({
     stage: 'cliproxy',
     reason: `CLIProxy did not come back up within ${timeoutMs}ms — check ${join(OVERDECK_HOME, 'cliproxy', 'cliproxy.log')}`,
   });
-}async function restartTraefikPromise(config: PlatformConfig): Promise<void> {
+}
+
+async function restartTraefikBody(config: PlatformConfig): Promise<void> {
   if (!config.traefikEnabled) {
     throw new StageError({
       stage: 'traefik',
       reason: 'Traefik is not enabled in config.toml',
     });
   }
-  await Effect.runPromise(stopTraefik(config));
-  await Effect.runPromise(startTraefik(config));
-}
-
-/**
- * Best-effort: leave the system in a recoverable state if a staged start fails.
- *
- * Specifically — if the dashboard fails to start but CLIProxy was already
- * running before we touched anything, DO NOT stop CLIProxy on our way out.
- * This is the explicit recovery contract from the task brief.
- */
-export function describeStageFailure(err: unknown): StageFailure | null {
-  if (err instanceof StageError) return err.failure;
-  return null;
+  await stopTraefik(config);
+  await startTraefik(config);
 }
 
 export function leavesDashboardRunning(err: unknown): boolean {
   return err instanceof StageError && err.failure.recovery === 'dashboard-left-running';
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Stage-error guard ───────────────────────────────────────────────────────
+//
+// The restart and reload commands branch on `err instanceof StageError` to print
+// `[stage] reason` and the recovery hint. These entry points keep that contract:
+// any other throw from the body is re-wrapped as a StageError.
 
 const stageErrorOf = (op: string) => (cause: unknown): StageError => {
   if (cause instanceof StageError) return cause;
@@ -685,15 +681,21 @@ const stageErrorOf = (op: string) => (cause: unknown): StageError => {
   });
 };
 
-/** Effect variant of {@link stopDashboard}. */
-export const stopDashboard = (
-  config: PlatformConfig,
-  opts: DashboardStopOptions = {},
-): Effect.Effect<void, StageError> =>
-  Effect.tryPromise({ try: () => stopDashboardPromise(config, opts), catch: stageErrorOf('stopDashboard') });
+async function asStage<T>(op: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (cause) {
+    throw stageErrorOf(op)(cause);
+  }
+}
 
-/** Effect variant of {@link waitForDashboardHealth}. */
-export const waitForDashboardHealth = (
+/** Stop the dashboard. Rejects only with {@link StageError}. */
+export function stopDashboard(config: PlatformConfig, opts: DashboardStopOptions = {}): Promise<void> {
+  return asStage('stopDashboard', () => stopDashboardBody(config, opts));
+}
+
+/** Poll the dashboard API until it is healthy. Rejects only with {@link StageError}. */
+export function waitForDashboardHealth(
   apiPort: number,
   opts: {
     timeoutMs?: number;
@@ -701,30 +703,17 @@ export const waitForDashboardHealth = (
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
     expectedPid?: number;
   } = {},
-): Effect.Effect<void, StageError> =>
-  Effect.tryPromise({ try: () => waitForDashboardHealthPromise(apiPort, opts), catch: stageErrorOf('waitForDashboardHealth') });
+): Promise<void> {
+  return asStage('waitForDashboardHealth', () => waitForDashboardHealthBody(apiPort, opts));
+}
 
-/** Effect variant of {@link waitForTraefikHealth}. Returns true when Traefik serves 200. */
-export const waitForTraefikHealth = (
-  traefikDomain: string,
-  opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
-): Effect.Effect<boolean, never> =>
-  Effect.promise(() => waitForTraefikHealthPromise(traefikDomain, opts));
+/** Start the Traefik container. Rejects only with {@link StageError}. */
+export function startTraefik(config: PlatformConfig): Promise<void> {
+  return asStage('startTraefik', () => startTraefikBody(config));
+}
 
-/** Effect variant of {@link isTraefikContainerRunning}. */
-export const isTraefikContainerRunning = (): Effect.Effect<boolean, never> =>
-  Effect.promise(() => isTraefikContainerRunningPromise());
-
-/** Effect variant of {@link startTraefik}. */
-export const startTraefik = (config: PlatformConfig): Effect.Effect<void, StageError> =>
-  Effect.tryPromise({ try: () => startTraefikPromise(config), catch: stageErrorOf('startTraefik') });
-
-/** Effect variant of {@link stopTraefik}. */
-export const stopTraefik = (config: PlatformConfig): Effect.Effect<void, never> =>
-  Effect.promise(() => stopTraefikPromise(config));
-
-/** Effect variant of {@link restartDashboard}. */
-export const restartDashboard = (
+/** Restart the dashboard and wait for it to be healthy. Rejects only with {@link StageError}. */
+export function restartDashboard(
   config: PlatformConfig,
   startDashboardFn: () => Promise<DashboardSpawnHandle | void> | DashboardSpawnHandle | void,
   opts: {
@@ -735,28 +724,27 @@ export const restartDashboard = (
     pidDescriptor?: (pid: number) => Promise<string>;
     pidSurvivorProbe?: PidSurvivorProbe;
   } = {},
-): Effect.Effect<DashboardRestartResult, StageError> =>
-  Effect.tryPromise({
-    try: () => restartDashboardPromise(config, startDashboardFn, opts),
-    catch: stageErrorOf('restartDashboard'),
-  });
+): Promise<DashboardRestartResult> {
+  return asStage('restartDashboard', () => restartDashboardBody(config, startDashboardFn, opts));
+}
 
-/** Effect variant of {@link restartCliproxy}. */
-export const restartCliproxy = (
+/**
+ * Restart CLIProxy through the supplied async primitives and verify it comes back.
+ * Rejects only with {@link StageError}.
+ */
+export function restartCliproxy(
   cliproxy: {
-    stopCliproxy: () => void;
-    startCliproxy: () => void;
-    isCliproxyRunning: () => boolean;
-    installCliproxy?: (force?: boolean) => void;
+    stopCliproxy: () => Promise<void>;
+    startCliproxy: () => Promise<void>;
+    isCliproxyRunning: () => Promise<boolean>;
+    installCliproxy?: (force?: boolean) => Promise<void>;
   },
   opts: { verifyTimeoutMs?: number; force?: boolean } = {},
-): Effect.Effect<void, StageError> =>
-  Effect.tryPromise({ try: () => restartCliproxyPromise(cliproxy, opts), catch: stageErrorOf('restartCliproxy') });
+): Promise<void> {
+  return asStage('restartCliproxy', () => restartCliproxyBody(cliproxy, opts));
+}
 
-/** Effect variant of {@link restartTraefik}. */
-export const restartTraefik = (config: PlatformConfig): Effect.Effect<void, StageError> =>
-  Effect.tryPromise({ try: () => restartTraefikPromise(config), catch: stageErrorOf('restartTraefik') });
-
-/** Effect variant of {@link readPlatformConfigSync}. Pure config read; cannot fail. */
-export const readPlatformConfig = (): Effect.Effect<PlatformConfig, never> =>
-  Effect.sync(() => readPlatformConfigSync());
+/** Restart the Traefik container. Rejects only with {@link StageError}. */
+export function restartTraefik(config: PlatformConfig): Promise<void> {
+  return asStage('restartTraefik', () => restartTraefikBody(config));
+}

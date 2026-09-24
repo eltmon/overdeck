@@ -1,4 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RuntimeName } from '../../runtimes/types.js';
+import { findAgentRuntimePidInSubtree } from '../runtime-pid-probe.js';
+
+// Moved here from src/lib/agents/runtime-command.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * True when the pane's process subtree contains the expected harness runtime.
+ * The walk lives in runtime-pid-probe.ts (PAN-3849) so the liveness oracle and
+ * its no-loss audit share one mockable boundary.
+ */
+async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
+  return (await findAgentRuntimePidInSubtree(rootPid, harness)) !== null;
+}
 
 /**
  * PAN-3879 — `hasAgentRuntimeInSubtree` must know the runtime binaries per
@@ -63,7 +75,6 @@ function installProcTable(nextProcs: Record<string, ProcInfo>, nextChildren: Rec
   });
 }
 
-import { hasAgentRuntimeInSubtree } from '../runtime-command.js';
 
 describe('hasAgentRuntimeInSubtree (PAN-3879)', () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
 import { buildFilterSql, ensureDiscoveredSessionsSchema, type ConversationFilter } from './discovered-sessions.js';
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 
 export type SessionsFeedSource = 'discovered' | 'managed-archived';
 
@@ -366,7 +366,7 @@ export function listSessionsFeed(filter: SessionsFeedFilter = {}): SessionsFeedP
   const limit = Number.isFinite(filter.limit) && filter.limit! > 0 ? Math.floor(filter.limit!) : 50;
   const pageSize = Math.min(limit, 200);
   const { cte, cteParams, whereParams, where } = feedSql(filter, true);
-  const rows = getOverdeckDatabaseSync().prepare(`
+  const rows = getOverdeckDatabase().prepare(`
     ${cte}
     SELECT * FROM feed
     ${where}
@@ -389,7 +389,7 @@ function bucketRows<T extends string | number>(rows: { value: T; count: number }
 export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): SessionsFeedFacets {
   ensureDiscoveredSessionsSchema();
   const { cte, cteParams, whereParams, where } = feedSql({ ...filter, cursor: undefined }, false);
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
 

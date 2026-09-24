@@ -16,6 +16,7 @@ import {
 import {
   getAgentOutputRoute,
   getAgentConversationRoute,
+  getAgentSubagentsRoute,
   getAgentActivityRoute,
   getAgentFilesRoute,
   getAgentTimelineRoute,
@@ -90,7 +91,7 @@ export {
   agentHasResolvableWorkspace,
   UNRESOLVABLE_AGENT_GIT_INFO,
 } from './agents/listing.js';
-export { buildConversationResponse } from './agents/conversation.js';
+export { buildAgentConversationResult, buildConversationResponse } from './agents/conversation.js';
 export { validateAgentMessageOrigin } from './agents/messaging.js';
 export { createAgentStopHandler } from './agents/lifecycle-stop.js';
 export { validateAgentDeliveryMethodOrigin } from './agents/control.js';
@@ -99,6 +100,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentsRoute,
   getAgentOutputRoute,
   getAgentConversationRoute,
+  getAgentSubagentsRoute,
   postAgentMessageRoute,
   postAgentTellRoute,
   deleteAgentRoute,

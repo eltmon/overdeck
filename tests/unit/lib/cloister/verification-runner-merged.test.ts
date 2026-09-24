@@ -34,7 +34,7 @@ vi.mock('../../../../src/lib/cloister/verification-check-run.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: mockEmitActivity,
+  emitActivityEntry: mockEmitActivity,
 }));
 
 vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
@@ -43,7 +43,7 @@ vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/validation.js', () => ({
   DEFAULT_GATES: {},
-  runQualityGates: (...args: unknown[]) => Effect.sync(() => mockRunQualityGates(...args)),
+  runQualityGates: async (...args: unknown[]) => mockRunQualityGates(...args),
 }));
 
 vi.mock('../../../../src/lib/cloister/verification-artifact.js', () => ({
@@ -61,7 +61,7 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
-  findProjectByPathSync: vi.fn(() => ({
+  findProjectByPath: vi.fn(() => ({
     name: 'Overdeck',
     path: '/tmp/overdeck',
     workspace: { type: 'polyrepo', default_branch: 'main' },
@@ -71,11 +71,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/xbrief/acceptance-criteria.js', () => ({
-  getXBriefACStatusSync: vi.fn(() => null),
+  getXBriefACStatus: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/work/done-preflight.js', () => ({
-  checkIncompletePlanItemsPromise: vi.fn(async () => []),
+  checkIncompletePlanItems: vi.fn(async () => []),
 }));
 
 import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
@@ -95,7 +95,7 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
     vi.clearAllMocks();
     mockRunQualityGates.mockReturnValue([]);
     mockGetPrFacts.mockResolvedValue(prFacts());
-    mockWriteFeedbackFile.mockReturnValue(Effect.succeed({ success: false, error: 'not written' }));
+    mockWriteFeedbackFile.mockResolvedValue({ success: false, error: 'not written' });
     mockRebuildWorkspaceStack.mockReturnValue(Effect.succeed({ success: true }));
     mkdirSync(`${workspacePath}/repo/.git`, { recursive: true });
   });
@@ -107,13 +107,13 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
   it('skips pre-merge verification when the forge says the PR merged', async () => {
     mockGetPrFacts.mockResolvedValue(prFacts({ merged: true, open: false }));
 
-    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+    const result = await runVerificationForIssueInProcess(
       'PAN-2901',
       workspacePath,
       workspaceInfo,
       'test',
       { syncTargetBranch: false },
-    ));
+    );
 
     expect(result).toEqual({
       outcome: 'skipped',
@@ -143,13 +143,13 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
     }));
 
     let settled = false;
-    const verification = Effect.runPromise(runVerificationForIssueInProcess(
+    const verification = runVerificationForIssueInProcess(
       'PAN-2901',
       workspacePath,
       workspaceInfo,
       'test',
       { syncTargetBranch: false },
-    )).finally(() => { settled = true; });
+    ).finally(() => { settled = true; });
 
     await rebuildStarted;
     expect(settled).toBe(false);
@@ -172,13 +172,13 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
       durationMs: 10,
     }]);
 
-    await Effect.runPromise(runVerificationForIssueInProcess(
+    await runVerificationForIssueInProcess(
       'PAN-2901',
       workspacePath,
       workspaceInfo,
       'test',
       { syncTargetBranch: false },
-    ));
+    );
 
     const fullOutputPath = `${workspacePath}/.overdeck/verification-latest.json`;
     // PAN-3847: terminal writes carry the run timestamp (and head8 when the
@@ -213,13 +213,13 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
       durationMs: 10,
     }]);
 
-    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+    const result = await runVerificationForIssueInProcess(
       'PAN-2901',
       workspacePath,
       workspaceInfo,
       'test',
       { syncTargetBranch: false },
-    ));
+    );
 
     expect(result).toEqual({
       outcome: 'skipped',

@@ -6,11 +6,11 @@ const mocks = vi.hoisted(() => ({
   spawnRun: vi.fn(),
   saveAgentStateProgram: vi.fn(),
   getAgentStateProgram: vi.fn(),
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentStateFileSync: vi.fn(),
-  listAgentIdsByPrefixSync: vi.fn(),
+  listAgentIdsByPrefix: vi.fn(),
   removeAgent: vi.fn(),
-  getLatestSessionIdSync: vi.fn(),
+  getLatestSessionId: vi.fn(),
   resumeAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(),
   listSessionNames: vi.fn(),
@@ -18,16 +18,13 @@ const mocks = vi.hoisted(() => ({
   killSession: vi.fn(),
   killSessionSync: vi.fn(),
   emitActivityEntry: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
   setReviewStatus: vi.fn(),
   setReviewStatusSync: vi.fn(),
   buildReviewContext: vi.fn(),
   formatTier1Summary: vi.fn(),
-  archiveFeedbackFiles: vi.fn(),
   clearFeedbackFiles: vi.fn(),
   convergeRowFromVerdictOfRecord: vi.fn(),
   notifyPipeline: vi.fn(),
-  notifyPipelineSync: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -39,21 +36,20 @@ vi.mock('../../agents.js', () => ({
   spawnRun: mocks.spawnRun,
   saveAgentState: mocks.saveAgentStateProgram,
   saveAgentStateProgram: mocks.saveAgentStateProgram,
-  getAgentState: mocks.getAgentStateProgram,
   getAgentStateProgram: mocks.getAgentStateProgram,
-  getAgentStateSync: mocks.getAgentStateSync,
-  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
+  getAgentState: mocks.getAgentState,
+  getLatestSessionId: mocks.getLatestSessionId,
   resumeAgent: mocks.resumeAgent,
   wipeAgentStateDirs: mocks.wipeAgentStateDirs,
   messageAgent: vi.fn(),
 }));
 
 vi.mock('../../agents/agent-state.js', () => ({
-  getAgentStateSync: mocks.getAgentStateFileSync,
+  getAgentState: mocks.getAgentStateFileSync,
 }));
 
 vi.mock('../../overdeck/agents.js', () => ({
-  listAgentIdsByPrefixSync: mocks.listAgentIdsByPrefixSync,
+  listAgentIdsByPrefix: mocks.listAgentIdsByPrefix,
 }));
 
 vi.mock('../../agents/removal.js', () => ({
@@ -69,7 +65,6 @@ vi.mock('../../tmux.js', () => ({
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: mocks.emitActivityEntry,
-  emitActivityEntrySync: mocks.emitActivityEntry,
 }));
 
 // PAN-3917: the conflict gate asks the forge; keep the subprocess out of the test.
@@ -83,7 +78,6 @@ vi.mock('../pr-facts.js', () => ({
 }));
 
 vi.mock('../../config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: vi.fn(() => ({ config: {} })),
   resolveModel: vi.fn(() => 'sonnet'),
 }));
@@ -98,7 +92,6 @@ vi.mock('../review-monitor.js', () => ({
 }));
 
 vi.mock('../feedback-writer.js', () => ({
-  archiveFeedbackFiles: mocks.archiveFeedbackFiles,
   clearFeedbackFiles: mocks.clearFeedbackFiles,
 }));
 
@@ -137,12 +130,12 @@ describe('spawnReviewRoleForIssue', () => {
       startedAt: '2026-05-18T00:00:00.000Z',
     }));
     mocks.saveAgentStateProgram.mockReturnValue(Effect.void);
-    mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
+    mocks.getAgentState.mockImplementation((id: string) => (id === 'agent-pan-1194' ? { hostOverride: true } : undefined));
     mocks.getAgentStateFileSync.mockReturnValue(undefined);
     mocks.getAgentStateFileSync.mockReturnValue(undefined);
-    mocks.listAgentIdsByPrefixSync.mockReturnValue([]);
+    mocks.listAgentIdsByPrefix.mockReturnValue([]);
     mocks.removeAgent.mockResolvedValue({ removedDir: false, preservedTranscripts: 1 });
-    mocks.getLatestSessionIdSync.mockReturnValue(undefined);
+    mocks.getLatestSessionId.mockReturnValue(undefined);
     mocks.resumeAgent.mockResolvedValue({ success: false, reason: 'no session' });
     mocks.wipeAgentStateDirs.mockResolvedValue(undefined);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
@@ -150,7 +143,7 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.killSession.mockReturnValue(Effect.void);
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
-    mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
+    mocks.clearFeedbackFiles.mockResolvedValue(undefined);
     mocks.convergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
   });
 
@@ -196,7 +189,7 @@ describe('spawnReviewRoleForIssue', () => {
     }));
 
     expect(result.success).toBe(true);
-    expect(mocks.getAgentStateProgram).toHaveBeenCalledWith('agent-pan-1194');
+    expect(mocks.getAgentState).toHaveBeenCalledWith('agent-pan-1194');
     expect(mocks.spawnRun).toHaveBeenCalledWith(
       'PAN-1194',
       'review',
@@ -287,7 +280,6 @@ describe('spawnReviewRoleForIssue', () => {
     expect(result.success).toBe(false);
     expect(result.message).toContain('already running');
     // A duplicate dispatch must not delete feedback the skipped cycle still owns.
-    expect(mocks.archiveFeedbackFiles).not.toHaveBeenCalled();
     expect(mocks.clearFeedbackFiles).not.toHaveBeenCalled();
     expect(mocks.spawnRun).not.toHaveBeenCalled();
   });
@@ -300,7 +292,7 @@ describe('spawnReviewRoleForIssue', () => {
     }));
 
     expect(result.success).toBe(true);
-    expect(mocks.archiveFeedbackFiles).toHaveBeenCalledWith('/tmp/pan-review-fresh');
+    expect(mocks.clearFeedbackFiles).toHaveBeenCalledWith('/tmp/pan-review-fresh');
   });
 
 
@@ -312,7 +304,7 @@ describe('spawnReviewRoleForIssue', () => {
     await writeFile(`${reviewDir}/synthesis.md`, '# Review complete\n');
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
     mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
-    mocks.listAgentIdsByPrefixSync.mockReturnValue(['agent-pan-1194-review']);
+    mocks.listAgentIdsByPrefix.mockReturnValue(['agent-pan-1194-review']);
     mocks.getAgentStateFileSync.mockReturnValue({
       id: 'agent-pan-1194-review',
       issueId: 'PAN-1194',
@@ -333,7 +325,7 @@ describe('spawnReviewRoleForIssue', () => {
   });
 
   it('purges every reviewer through canonical transcript-preserving removal', async () => {
-    mocks.listAgentIdsByPrefixSync.mockReturnValue([
+    mocks.listAgentIdsByPrefix.mockReturnValue([
       'agent-pan-1194-review',
       'agent-pan-1194-review-correctness',
     ]);

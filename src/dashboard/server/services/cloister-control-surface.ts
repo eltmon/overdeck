@@ -1,9 +1,10 @@
-import { listRunningAgentsSync } from '../../../lib/agents.js';
+import { Effect } from 'effect';
+import { listRunningAgents } from '../../../lib/agents.js';
 import { loadCloisterConfigSync } from '../../../lib/cloister/config.js';
 import { getDeaconLiteStatus, type DeaconLiteStatus } from '../../../lib/cloister/deacon-lite.js';
 import { generateHealthSummary, getAgentHealth, getAgentsNeedingAttention } from '../../../lib/cloister/health.js';
 import { readCloisterStateFile, type CloisterStatus } from '../../../lib/cloister/service.js';
-import { isCloisterSpawnsPausedSync, setCloisterSpawnsPausedSync } from '../../../lib/overdeck/control-settings.js';
+import { isCloisterSpawnsPaused, setCloisterSpawnsPaused } from '../../../lib/overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 import {
   isChildRunning,
@@ -21,8 +22,8 @@ export interface CloisterControlDeps {
   reloadDeaconConfig?: typeof reloadDeaconConfig;
   isChildRunning?: typeof isChildRunning;
   readDeaconLiteStatus?: typeof getDeaconLiteStatus;
-  readSpawnPaused?: typeof isCloisterSpawnsPausedSync;
-  writeSpawnPaused?: typeof setCloisterSpawnsPausedSync;
+  readSpawnPaused?: typeof isCloisterSpawnsPaused;
+  writeSpawnPaused?: typeof setCloisterSpawnsPaused;
 }
 
 /**
@@ -30,10 +31,10 @@ export interface CloisterControlDeps {
  * aggregation, so status here is derived from its in-memory
  * running/lastRunAt/lastRunError only — never from a stored artifact.
  */
-export function readDurableCloisterStatus(deps: CloisterControlDeps = {}): CloisterStatus {
+export async function readDurableCloisterStatus(deps: CloisterControlDeps = {}): Promise<CloisterStatus> {
   const cloisterState = (deps.readCloisterStateFile ?? readCloisterStateFile)();
   const deaconLite = (deps.readDeaconLiteStatus ?? getDeaconLiteStatus)();
-  const agentHealths = listRunningAgentsSync()
+  const agentHealths = (await Effect.runPromise(listRunningAgents()))
     .filter((agent) => agent.tmuxActive)
     .flatMap((agent) => {
       const runtime = getRuntimeForAgent(agent.id);
@@ -59,11 +60,11 @@ export async function stopDurableCloister(deps: CloisterControlDeps = {}): Promi
 }
 
 export function resumeDurableSpawns(deps: CloisterControlDeps = {}): void {
-  (deps.writeSpawnPaused ?? setCloisterSpawnsPausedSync)(false);
+  (deps.writeSpawnPaused ?? setCloisterSpawnsPaused)(false);
 }
 
 export function areDurableSpawnsPaused(deps: CloisterControlDeps = {}): boolean {
-  return (deps.readSpawnPaused ?? isCloisterSpawnsPausedSync)();
+  return (deps.readSpawnPaused ?? isCloisterSpawnsPaused)();
 }
 
 export function readDurableDeaconStatus(deps: CloisterControlDeps = {}): {

@@ -14,10 +14,10 @@ import { rm } from 'fs/promises';
 import { isAbsolute, relative, resolve } from 'path';
 import { promisify } from 'util';
 import {
-  insertUatGenerationSync,
-  listUatGenerationNamesSync,
-  listUatGenerationsSync,
-  updateUatGenerationSync,
+  insertUatGeneration,
+  listUatGenerationNames,
+  listUatGenerations,
+  updateUatGeneration,
 } from '../overdeck/merge-sync.js';
 import type { GenerationGitDeps, GenerationStorePort } from './uat-generation-engine.js';
 import type { PolyrepoRepoGit } from './uat-polyrepo-engine.js';
@@ -63,11 +63,11 @@ export function safeGenerationWorktreePath(projectRoot: string, worktreePath: st
 /** Store port backed by uat-generations-db. */
 export function buildUatGenerationStore(): GenerationStorePort {
   return {
-    insert: (gen) => { insertUatGenerationSync(gen); },
-    update: (name, patch) => { updateUatGenerationSync(name, patch); },
-    listNames: () => listUatGenerationNamesSync(),
+    insert: (gen) => { insertUatGeneration(gen); },
+    update: (name, patch) => { updateUatGeneration(name, patch); },
+    listNames: () => listUatGenerationNames(),
     listChain: (projectRoot, statuses) =>
-      listUatGenerationsSync({ projectRoot, ...(statuses ? { statuses } : {}) }),
+      listUatGenerations({ projectRoot, ...(statuses ? { statuses } : {}) }),
   };
 }
 

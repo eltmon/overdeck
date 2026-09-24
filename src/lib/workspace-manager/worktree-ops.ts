@@ -1,10 +1,10 @@
 import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
-import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, statSync, renameSync, rmSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, statSync, renameSync, rmSync } from 'fs';
 import { join, dirname, extname, relative, resolve } from 'path';
 import { homedir } from 'os';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
-import { TemplatePlaceholders, replacePlaceholdersSync } from '../workspace-config.js';
+import { TemplatePlaceholders, replacePlaceholders } from '../workspace-config.js';
 import { PRE_WORKTREE_METADATA_DIRS } from './types.js';
 
 const execAsync = promisify(exec);
@@ -155,9 +155,9 @@ export async function createWorktree(
     // CWE-78 residual: validate the config-supplied branch BEFORE any git call —
     // a refspec payload ('+refs/heads/a:refs/heads/b') passes argv safely but
     // would still make git update a local ref.
-    const { assertValidBranchNamePromise } = await import('../git-utils.js');
+    const { assertValidBranchName } = await import('../git-utils.js');
     try {
-      await assertValidBranchNamePromise(defaultBranch, 'createWorktree defaultBranch');
+      await assertValidBranchName(defaultBranch, 'createWorktree defaultBranch');
     } catch (invalid) {
       return { success: false, message: invalid instanceof Error ? invalid.message : String(invalid) };
     }
@@ -282,34 +282,6 @@ export function releasePort(portFile: string, featureFolder: string): boolean {
 }
 
 /**
- * @deprecated Use copyProjectTemplateDirs instead. Kept for non-.claude paths.
- */
-export function createSymlinks(
-  sourceDir: string,
-  targetDir: string,
-  symlinks: string[]
-): string[] {
-  const steps: string[] = [];
-
-  for (const symlink of symlinks) {
-    const sourcePath = join(sourceDir, symlink);
-    const targetPath = join(targetDir, symlink);
-
-    if (existsSync(sourcePath)) {
-      mkdirSync(dirname(targetPath), { recursive: true });
-      try {
-        symlinkSync(sourcePath, targetPath);
-        steps.push(`Created symlink: ${symlink}`);
-      } catch {
-        // Symlink might already exist
-      }
-    }
-  }
-
-  return steps;
-}
-
-/**
  * Copy project template directories into workspace (replaces symlinks).
  * Recursively copies all files from each source directory.
  */
@@ -324,7 +296,7 @@ export function isPreWorktreeMetadataOnlyDir(path: string): boolean {
   );
 }
 
-export function stagePreWorktreeMetadataSync(workspacePath: string): string | null {
+export function stagePreWorktreeMetadata(workspacePath: string): string | null {
   if (!existsSync(workspacePath)) return null;
   if (!isPreWorktreeMetadataOnlyDir(workspacePath)) return null;
 
@@ -333,7 +305,7 @@ export function stagePreWorktreeMetadataSync(workspacePath: string): string | nu
   return stagedPath;
 }
 
-export function mergeDirectoryWithoutOverwriteSync(source: string, target: string): void {
+function mergeDirectoryWithoutOverwriteSync(source: string, target: string): void {
   if (!existsSync(source)) return;
   mkdirSync(target, { recursive: true });
 
@@ -349,7 +321,7 @@ export function mergeDirectoryWithoutOverwriteSync(source: string, target: strin
   }
 }
 
-export function restorePreWorktreeMetadataSync(stagedPath: string | null, workspacePath: string): void {
+export function restorePreWorktreeMetadata(stagedPath: string | null, workspacePath: string): void {
   if (!stagedPath || !existsSync(stagedPath)) return;
   mergeDirectoryWithoutOverwriteSync(stagedPath, workspacePath);
   rmSync(stagedPath, { recursive: true, force: true });
@@ -384,7 +356,7 @@ export function copyProjectTemplateDirs(
           const ext = extname(entry.name).toLowerCase();
           if (placeholders && TEXT_EXTENSIONS.has(ext)) {
             const content = readFileSync(srcEntry, 'utf-8');
-            writeFileSync(destEntry, replacePlaceholdersSync(content, placeholders));
+            writeFileSync(destEntry, replacePlaceholders(content, placeholders));
           } else {
             copyFileSync(srcEntry, destEntry);
           }
@@ -425,7 +397,7 @@ export function copyProjectTemplateDirs(
  * Claude Code binary — strings(claude.exe) confirms it as the persistence
  * key checked by both the bypass-mode dialog and the headless --bg gate.
  */
-export function preTrustDirectorySync(dirPath: string): void {
+export function preTrustDirectory(dirPath: string): void {
   const claudeJsonPath = join(homedir(), '.claude.json');
   if (!existsSync(claudeJsonPath)) return;
 

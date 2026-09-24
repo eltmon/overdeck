@@ -7,12 +7,12 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 const internalTokenMocks = vi.hoisted(() => ({
-  getInternalTokenSync: vi.fn(() => 'test-internal-token'),
+  getInternalToken: vi.fn(() => 'test-internal-token'),
 }));
 
 vi.mock('../../../../lib/internal-token.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../../lib/internal-token.js')>(),
-  getInternalTokenSync: internalTokenMocks.getInternalTokenSync,
+  getInternalToken: internalTokenMocks.getInternalToken,
 }));
 
 import { INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
@@ -22,12 +22,11 @@ import {
   completePlanningArtifacts,
   completePlanningAutoSpawn,
   completePlanningAutoSpawnAndKill,
-  completePlanningFilesToStage,
   completePlanningWorkspaceGitAddCommands,
   recordPlanningAutoHandoffFailure,
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
-import { readAutoSpawnOnFinalizeFlag, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
+import { readAutoSpawnOnFinalizeFlagAsync, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
@@ -265,23 +264,6 @@ describe('completePlanningArtifacts', () => {
     expect(commands.flat()).not.toContain('-f');
   });
 
-  it('includes codebase map changes in the main-side promote commit pathspec', async () => {
-    const issueId = 'PAN-1150';
-    const { projectPath } = makeProject(issueId);
-    await mkdir(join(projectPath, '.pan', 'context', 'codebase'), { recursive: true });
-    writeFileSync(join(projectPath, '.pan', 'context', 'codebase', 'conventions.md'), [
-      '# Conventions',
-      '',
-      'Use project-local patterns.',
-      '<!-- last-verified: 2026-06-12 -->',
-      '',
-    ].join('\n'));
-
-    expect(completePlanningFilesToStage(projectPath, '2026-06-12-PAN-1150-plan.xbrief.json')).toEqual([
-      '.pan/specs/2026-06-12-PAN-1150-plan.xbrief.json',
-      '.pan/context/codebase/',
-    ]);
-  });
 
   it('promotes a first-run workspace draft and reports one xBRIEF task per plan item', async () => {
     const issueId = 'PAN-1143';
@@ -485,7 +467,7 @@ describe('completePlanningArtifacts', () => {
       workAgentSkipReason: 'unauthorized',
     });
     expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
-    expect(readAutoSpawnOnFinalizeFlag('PAN-1146')).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1146')).resolves.toBe(true);
   });
 
   // PAN-3917: there is no stored pipeline state to mark stuck — the failure is

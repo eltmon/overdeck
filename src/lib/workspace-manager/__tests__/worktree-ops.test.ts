@@ -4,9 +4,9 @@ import { dirname } from 'node:path';
 import { mkdtempSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { isPreWorktreeMetadataOnlyDir, stagePreWorktreeMetadataSync } from '../worktree-ops.js';
+import { isPreWorktreeMetadataOnlyDir, stagePreWorktreeMetadata } from '../worktree-ops.js';
 
-describe('isPreWorktreeMetadataOnlyDir / stagePreWorktreeMetadataSync', () => {
+describe('isPreWorktreeMetadataOnlyDir / stagePreWorktreeMetadata', () => {
   let workspacePath: string;
   const cleanup: string[] = [];
 
@@ -27,7 +27,7 @@ describe('isPreWorktreeMetadataOnlyDir / stagePreWorktreeMetadataSync', () => {
 
     expect(isPreWorktreeMetadataOnlyDir(workspacePath)).toBe(true);
 
-    const stagedPath = stagePreWorktreeMetadataSync(workspacePath);
+    const stagedPath = stagePreWorktreeMetadata(workspacePath);
     expect(stagedPath).not.toBeNull();
     cleanup.push(stagedPath!);
     expect(existsSync(stagedPath!)).toBe(true);
@@ -39,7 +39,7 @@ describe('isPreWorktreeMetadataOnlyDir / stagePreWorktreeMetadataSync', () => {
     mkdirSync(join(workspacePath, '.git'));
 
     expect(isPreWorktreeMetadataOnlyDir(workspacePath)).toBe(false);
-    expect(stagePreWorktreeMetadataSync(workspacePath)).toBeNull();
+    expect(stagePreWorktreeMetadata(workspacePath)).toBeNull();
   });
 
   it('does not stage a directory containing a plain file', () => {
@@ -47,7 +47,7 @@ describe('isPreWorktreeMetadataOnlyDir / stagePreWorktreeMetadataSync', () => {
     mkdirSync(join(workspacePath, 'src'));
 
     expect(isPreWorktreeMetadataOnlyDir(workspacePath)).toBe(false);
-    expect(stagePreWorktreeMetadataSync(workspacePath)).toBeNull();
+    expect(stagePreWorktreeMetadata(workspacePath)).toBeNull();
   });
 });
 
@@ -183,13 +183,13 @@ describe('createWorktree — CWE-78: branch config never reaches a shell', () =>
   });
 
   it('shared validator accepts real branch names and rejects refspecs', async () => {
-    const { isValidBranchNamePromise } = await import('../../git-utils.js');
+    const { isValidBranchName } = await import('../../git-utils.js');
 
-    await expect(isValidBranchNamePromise('main')).resolves.toBe(true);
-    await expect(isValidBranchNamePromise('feature/pan-3847')).resolves.toBe(true);
-    await expect(isValidBranchNamePromise('release/1.2.x')).resolves.toBe(true);
-    await expect(isValidBranchNamePromise('+refs/heads/main:refs/heads/pwned')).resolves.toBe(false);
-    await expect(isValidBranchNamePromise('main:refs/heads/pwned')).resolves.toBe(false);
-    await expect(isValidBranchNamePromise('')).resolves.toBe(false);
+    await expect(isValidBranchName('main')).resolves.toBe(true);
+    await expect(isValidBranchName('feature/pan-3847')).resolves.toBe(true);
+    await expect(isValidBranchName('release/1.2.x')).resolves.toBe(true);
+    await expect(isValidBranchName('+refs/heads/main:refs/heads/pwned')).resolves.toBe(false);
+    await expect(isValidBranchName('main:refs/heads/pwned')).resolves.toBe(false);
+    await expect(isValidBranchName('')).resolves.toBe(false);
   });
 });

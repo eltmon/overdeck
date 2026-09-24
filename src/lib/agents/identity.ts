@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { resolveBareNumericIdSync } from '../issue-id.js';
+import { resolveBareNumericId } from '../issue-id.js';
 import { AGENTS_DIR, getOverdeckHome } from '../paths.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 
@@ -9,7 +9,7 @@ function agentStateFilePath(agentId: string): string {
 }
 
 /**
- * Minimal directory scan for {@link resolveAgentTargetSync}'s issueId fallback.
+ * Minimal directory scan for {@link resolveAgentTarget}'s issueId fallback.
  * Deliberately does not import agent-state.ts's full parse/typing (that would
  * close an identity.ts <-> agent-state.ts import cycle — agent-state.ts
  * already imports normalizeAgentId from here).
@@ -74,9 +74,9 @@ function agentStateExistsSync(agentId: string): boolean {
  * for that issue. If no single fallback exists, preserves the historical
  * canonical agent-* target.
  */
-export function resolveAgentTargetSync(input: string): string | null {
+export function resolveAgentTarget(input: string): string | null {
   if (isQualifiedAgentId(input)) return input.toLowerCase();
-  const issueId = resolveBareNumericIdSync(input);
+  const issueId = resolveBareNumericId(input);
   if (!issueId) return null;
 
   const canonicalAgentId = normalizeAgentId(issueId);

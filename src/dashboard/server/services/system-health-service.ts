@@ -20,7 +20,7 @@ import { getBackendPanes } from './backend-inventory.js';
 import { getDerivedIssueState } from './derived-issue-state.js';
 import { classifyAgentHealth } from '../../../lib/agents/health.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
+import { isSmeeConfigured, isSmeeProcessRunning } from '../../../lib/smee.js';
 import { descendantPidsForSession, getRuntimeCensus } from '../../../lib/runtime-census.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import { getBuildInfo } from '../../../lib/deploy/build-info.js';
@@ -511,7 +511,7 @@ export function evaluateSeverity(
 
 function collectSmeeRelayHealth(): SmeeRelayHealth {
   try {
-    if (!isSmeeConfiguredSync()) {
+    if (!isSmeeConfigured()) {
       return {
         configured: false,
         running: false,
@@ -520,7 +520,7 @@ function collectSmeeRelayHealth(): SmeeRelayHealth {
       };
     }
 
-    const running = isSmeeProcessRunningSync();
+    const running = isSmeeProcessRunning();
     return running
       ? {
           configured: true,

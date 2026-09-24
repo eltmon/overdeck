@@ -20,7 +20,6 @@ const mockGetStatus = vi.fn().mockResolvedValue({ running: false, healthy: false
 
 vi.mock('../../src/lib/tldr-daemon.js', () => ({
   getTldrDaemonService: () => ({ getStatus: mockGetStatus }),
-  getTldrDaemonServiceSync: () => ({ getStatus: mockGetStatus }),
 }));
 
 // Import the module once at the top level (after mocks are in place)
