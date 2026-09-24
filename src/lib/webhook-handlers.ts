@@ -313,6 +313,19 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
         postMergeLifecycle(issueId, project.projectPath, branchName).catch(err =>
           console.warn(`[webhook] postMergeLifecycle failed for ${issueId} (${branchName}): ${err?.message ?? err}`),
         );
+        // PAN-3981: a merged strike cleans up after itself — stop the strike
+        // agent through the terminal backend, remove its worktree, and delete
+        // `strike/<id>` once its content is on main. The deacon strike reaper
+        // is only the fallback for what this misses.
+        if (branchName.toLowerCase().startsWith('strike/')) {
+          const { finishStrike } = await import('./cloister/strike-completion.js');
+          finishStrike(issueId, project.projectPath, {
+            source: 'webhook',
+            ...(pr.number != null ? { prRef: prUrlFor(repo, pr.number) } : {}),
+          }).catch(err =>
+            console.warn(`[webhook] finishStrike failed for ${issueId} (${branchName}): ${err?.message ?? err}`),
+          );
+        }
       }
     } catch (err: any) {
       console.warn(`[webhook] Failed to dispatch postMergeLifecycle for ${issueId}: ${err?.message ?? err}`);

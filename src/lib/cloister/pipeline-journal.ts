@@ -34,7 +34,8 @@ export type PipelineJournalEntryType =
   | 'verification.started' | 'verification.passed' | 'verification.failed'
   | 'review.requested' | 'review.dispatched' | 'review.redispatched' | 'review.verdict'
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
-  | 'merge.attempted' | 'merge.completed' | 'merge.failed';
+  | 'merge.attempted' | 'merge.completed' | 'merge.failed'
+  | 'strike.landed';
 
 export interface PipelineJournalEntry {
   /** ISO timestamp, stamped at append time. */
