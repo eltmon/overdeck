@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T16:33:14.858Z · model: claude-opus-5 · open: 846_
+_Last sequenced: 2026-09-24T16:35:44.350Z · model: claude-opus-5 · open: 846_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1181,7 +1181,7 @@ Triage: verify whether a provider-capacity zombie can still read as running unde
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T16:33:14.858Z",
+  "generatedAt": "2026-09-24T16:35:44.350Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 846,
