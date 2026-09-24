@@ -97,7 +97,7 @@ vi.mock('../../tmux.js', async (importOriginal) => {
 
 import { resumeAgent } from '../resume.js';
 import { saveAgentStateSync, getAgentDir } from '../agent-state.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 
 let tempHome: string;
 let prevHome: string | undefined;

@@ -1,5 +1,5 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
-import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { randomUUID } from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
@@ -63,7 +63,8 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { claudeSystemPromptFiles, getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
 import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
-import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
+import { getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { buildResumeContract } from '../resume-contract.js';
 import { readLatestIndexedSessionIdSync } from '../session-history.js';
@@ -79,6 +80,9 @@ import {
   deliverMandatoryKimiResumeContext,
   deliverResumeContractUnlessGated,
 } from './resume-contract-delivery.js';
+import { kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/storage/kimi-code.js';
+import { codexSessionsRoot, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
+import { piSessionsRoot } from '../runtimes/storage/pi.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -619,7 +623,7 @@ export async function spawnConversationSession(
         }
       }
       const paths = piFifoPaths(tmuxSession);
-      const piSessionDir = join(paths.agentDir, 'sessions');
+      const piSessionDir = piSessionsRoot(paths.agentDir);
       await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
       await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
       const storedPiSessionId = resume
@@ -644,7 +648,7 @@ export async function spawnConversationSession(
         : codexPermMode === 'read-only' ? 'read-only'
         : 'workspace-write';
       const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
-      const { initCodexHome, extractThreadIdFromRollout } = await import('../runtimes/codex.js');
+      const { initCodexHome } = await import('../runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
         model,
@@ -662,7 +666,7 @@ export async function spawnConversationSession(
         codexMode: codexTransport,
         codexEffort: effort ?? 'high',
         codexHome,
-        codexSessionDir: join(codexHome, 'sessions'),
+        codexSessionDir: codexSessionsRoot(codexHome),
         ...(codexTransport === 'app-server' ? { codexNativeEndpoint: true } : {}),
         resumeSessionId,
       };
@@ -677,9 +681,7 @@ export async function spawnConversationSession(
         const kimiSessionIdPath = join(getOverdeckHome(), 'agents', tmuxSession, 'kimi-session-id');
         const pinnedId = await readFile(kimiSessionIdPath, 'utf-8').then((value) => value.trim() || undefined).catch(() => undefined);
         if (pinnedId) {
-          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-          const candidateWire = join(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd), pinnedId, 'agents', 'main', 'wire.jsonl');
-          const wireExists = await stat(candidateWire).then(() => true, () => false);
+          const wireExists = await stat(kimiWirePath(kimiHomeDefault(), cwd, pinnedId)).then(() => true, () => false);
           if (wireExists) kimiResumeSessionId = pinnedId;
         }
       }
@@ -745,8 +747,7 @@ export async function spawnConversationSession(
     let kimiExistingSessionsBefore: Set<string> | undefined;
     if (kimiCodeFields && !kimiCodeFields.resumeSessionId) {
       try {
-        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-        kimiExistingSessionsBefore = new Set(await readdir(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd)));
+        kimiExistingSessionsBefore = new Set(await readdir(kimiSessionsRoot(kimiHomeDefault(), cwd)));
       } catch {
         kimiExistingSessionsBefore = new Set();
       }
@@ -821,8 +822,7 @@ export async function spawnConversationSession(
       const codexHomeDir = codexFields.codexHome;
       void (async () => {
         try {
-          const { waitForCodexRollout, extractThreadIdFromRollout, recordCodexRolloutSession } =
-            await import('../runtimes/codex.js');
+          const { waitForCodexRollout, recordCodexRolloutSession } = await import('../runtimes/codex.js');
           const rollout = await waitForCodexRollout(codexHomeDir, 120_000);
           if (rollout) {
             const threadId = extractThreadIdFromRollout(rollout);
@@ -846,7 +846,7 @@ export async function spawnConversationSession(
       // under this identity. Require a real captured id or fail the launch,
       // same fail-closed contract as spawnAgent/restartAgent/recoverAgent.
       const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
-      const sessionId = await waitForNewKimiSessionAsync(join(homedir(), '.kimi-code'), cwd, kimiExistingSessionsBefore);
+      const sessionId = await waitForNewKimiSessionAsync(kimiHomeDefault(), cwd, kimiExistingSessionsBefore);
       if (!sessionId) {
         throw new Error(
           `kimi-code session capture timed out for ${tmuxSession} — no new session directory appeared under the workspace bucket`,
@@ -858,7 +858,7 @@ export async function spawnConversationSession(
 
   if (kimiCodeFields) {
     const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
-    await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), cwd, launchTmuxAndCaptureSession);
+    await withKimiSessionCaptureLock(kimiHomeDefault(), cwd, launchTmuxAndCaptureSession);
   } else {
     await launchTmuxAndCaptureSession();
   }

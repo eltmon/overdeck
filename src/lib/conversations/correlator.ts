@@ -7,7 +7,7 @@
  */
 
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 
 export interface CorrelationResult {
   overdeckManaged: boolean;

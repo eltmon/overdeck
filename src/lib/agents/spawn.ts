@@ -1,5 +1,5 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
-import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
@@ -1003,8 +1003,8 @@ async function spawnAgentWithoutConsentClaim(
     const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
     void (async () => {
       try {
-        const { waitForCodexRollout, extractThreadIdFromRollout, recordCodexRolloutSession } =
-          await import('../runtimes/codex.js');
+        const { waitForCodexRollout, recordCodexRolloutSession } = await import('../runtimes/codex.js');
+        const { extractThreadIdFromRollout } = await import('../runtimes/storage/codex.js');
         const rollout = await waitForCodexRollout(codexHomeForAgent, 120_000);
         if (rollout) {
           const threadId = extractThreadIdFromRollout(rollout);

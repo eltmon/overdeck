@@ -21,7 +21,7 @@ import { Effect } from 'effect';
 import { getEventStore, type EventStore } from '../event-store.js';
 import { getAgentStateSync, type AgentState } from '../../../lib/agents.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
-import { sessionFilePath } from '../../../lib/paths.js';
+import { sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
 import {
   getSupervisedConversationByTmuxSession,
   markConversationEnded,

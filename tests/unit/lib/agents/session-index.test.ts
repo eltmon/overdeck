@@ -9,8 +9,8 @@ import { getLatestSessionIdSync, saveSessionId } from '../../../../src/lib/agent
 import { restartAgent } from '../../../../src/lib/agents/recovery.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 import { markAgentRunning } from '../../../../src/lib/agents/agent-state.js';
-import { encodeClaudeProjectDir } from '../../../../src/lib/paths.js';
-import { kimiSessionsRoot } from '../../../../src/lib/runtimes/kimi-code.js';
+import { encodeClaudeProjectDir } from '../../../../src/lib/runtimes/storage/claude-code.js';
+import { kimiSessionsRoot } from '../../../../src/lib/runtimes/storage/kimi-code.js';
 import {
   appendSessionIdToHistory,
   clearSessionResetMarker,

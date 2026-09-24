@@ -835,7 +835,7 @@ describe('Muse lifecycle review regressions', () => {
     const kickoff = deliverInitialPromptWithRetryMock;
     const recMod = await import('../agents/recovery.js');
     const { recoverAgent } = recMod;
-    const { museDataHome } = await import('../runtimes/muse-session.js');
+    const { museDataHome } = await import('../runtimes/storage/muse.js');
     const state = baseState({ harness: 'muse', model: 'muse-spark-1.3-contributor', status: 'stopped' });
     saveAgentStateSync(state);
     const nativeId = '01a081d0-8263-7782-b2ef-0c7f4e1b948c';

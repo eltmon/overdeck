@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { buildCorrelationMapSync } from '../correlator.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 import {
   setupOverdeckTestDb,
   teardownOverdeckTestDb,

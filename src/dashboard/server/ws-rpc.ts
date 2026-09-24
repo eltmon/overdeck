@@ -1,4 +1,4 @@
-import { resolveMuseSessionPath } from '../../lib/runtimes/muse-session.js';
+import { resolveMuseSessionPath } from '../../lib/runtimes/storage/muse.js';
 /**
  * WebSocket RPC handlers — implements PanRpcGroup using Effect (PAN-428 B5)
  *
@@ -31,7 +31,8 @@ import {
   resolveKimiWirePath,
   resolvePiSessionPath,
 } from '../../lib/agents/transcript-resolver.js';
-import { getOverdeckHome, sessionFilePath } from '../../lib/paths.js';
+import { getOverdeckHome } from '../../lib/paths.js';
+import { sessionFilePath } from '../../lib/runtimes/storage/claude-code.js';
 import type { TranscriptCandidate } from '../../lib/session-history.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';

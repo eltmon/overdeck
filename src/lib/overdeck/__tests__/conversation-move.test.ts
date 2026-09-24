@@ -24,7 +24,7 @@ vi.mock('../../../dashboard/server/services/dashboard-poll-snapshots.js', () => 
 
 const { handleConversationMove } = await import('../conversation-reads.js');
 const { createConversation, getConversationByName, setConversationClaudeSessionId } = await import('../conversations.js');
-const { sessionFilePath } = await import('../../paths.js');
+const { sessionFilePath } = await import('../../runtimes/storage/claude-code.js');
 const { getEnrichedConversationList, invalidateConversationListEnrichmentCache } = await import('../conversation-list.js');
 
 async function resetDb() {

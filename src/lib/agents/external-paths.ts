@@ -18,22 +18,19 @@
  */
 import { constants } from 'node:fs';
 import { open, realpath, stat, type FileHandle } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
 import { getOverdeckHome } from '../paths.js';
+import { codexHomeDir, codexSessionsRoot } from '../runtimes/storage/codex.js';
+import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
 
 export type PathCheck = { ok: true; path: string } | { ok: false; error: string };
-
-export function codexHomeDir(): string {
-  return process.env.CODEX_HOME?.trim() || join(homedir(), '.codex');
-}
 
 /** The directories a registered transcript may live under. */
 export function externalTranscriptRoots(): string[] {
   return [
-    join(homedir(), '.claude', 'projects'),
-    join(codexHomeDir(), 'sessions'),
+    claudeProjectsRoot(),
+    codexSessionsRoot(codexHomeDir()),
     join(getOverdeckHome(), 'agents'),
   ];
 }

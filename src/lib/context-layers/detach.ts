@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { backupFileSync, createBackupTimestamp } from '../backup.js';
 import { getOverdeckHome } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
+import { codexAgentHome } from '../runtimes/storage/codex.js';
 
 const BEGIN_MARKERS = [
   '<!-- BEGIN OVERDECK CONTEXT',
@@ -85,7 +86,7 @@ function historicalCodexHomes(): string[] {
   if (!existsSync(agentsRoot)) return [];
   return readdirSync(agentsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .map((entry) => join(agentsRoot, entry.name, 'codex-home', 'AGENTS.md'))
+    .map((entry) => join(codexAgentHome(join(agentsRoot, entry.name)), 'AGENTS.md'))
     .filter(existsSync)
     .sort();
 }

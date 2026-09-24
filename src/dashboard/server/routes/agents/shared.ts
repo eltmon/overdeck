@@ -12,7 +12,8 @@ import type { AgentStatus } from '@overdeck/contracts';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
-import { claudeSessionTranscriptExists, getOverdeckHome } from '../../../../lib/paths.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
+import { claudeSessionTranscriptExists } from '../../../../lib/runtimes/storage/claude-code.js';
 import { resolvePrimaryWorkspaceRepoDirSync } from '../../../../lib/project-repos.js';
 import {
   appendAgentLifecycleLog,

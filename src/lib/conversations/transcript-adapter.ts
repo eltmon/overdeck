@@ -1,4 +1,4 @@
-import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
+import { resolveMuseSessionPath } from '../runtimes/storage/muse.js';
 import { parseMuseRecords } from '../cost-parsers/muse-parser.js';
 /**
  * Conversation transcript adapter.
@@ -41,7 +41,7 @@ import {
 import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/transcript.js';
 import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import {
   parseEntries as parseClaudeCodeEntries,
   serializeConversation as serializeClaudeCodeConversation,

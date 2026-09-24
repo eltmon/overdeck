@@ -26,8 +26,9 @@ import { CLAUDE_CODE_BEHAVIOR } from './behavior.js';
 import { getAgentStateSync, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentStateSync, saveAgentRuntimeState, determineModel } from '../agents.js';
 import { sessionExistsSync, killSessionSync, sendKeys, getAgentSessionsSync } from '../tmux.js';
 import { parseClaudeSessionSync, getSessionFilesSync, getProjectDirsSync } from '../cost-parsers/jsonl-parser.js';
+import { claudeProjectsRoot } from './storage/claude-code.js';
 
-const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
+const CLAUDE_PROJECTS_DIR = claudeProjectsRoot();
 
 /**
  * Claude Code session index entry

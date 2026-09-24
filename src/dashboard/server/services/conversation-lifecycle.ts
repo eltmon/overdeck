@@ -38,7 +38,8 @@ import {
 } from '../../../lib/runtime-census.js';
 import { isRespawnPending } from './pending-respawn.js';
 import { isHarnessProcessAlive } from '../../../lib/tmux.js';
-import { encodeClaudeProjectDir, sessionFilePath, getOverdeckHome } from '../../../lib/paths.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
+import { claudeProjectDir, sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import type { HarnessName } from '../../../lib/runtimes/types.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
@@ -387,7 +388,7 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
   }
 
   for (const [cwd, convs] of cwdGroups) {
-    const projectDir = join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(cwd));
+    const projectDir = claudeProjectDir(cwd);
     let entries: string[];
     try {
       entries = await readdir(projectDir);
@@ -550,7 +551,7 @@ async function readFirstClearTimestamp(
  * worktree).
  */
 async function findClaudeSessionUuid(workspaceCwd: string, startedAt?: string): Promise<string | undefined> {
-  const projectDir = join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspaceCwd));
+  const projectDir = claudeProjectDir(workspaceCwd);
   let entries: string[];
   try {
     entries = await readdir(projectDir);

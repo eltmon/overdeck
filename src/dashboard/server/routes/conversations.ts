@@ -159,7 +159,7 @@ import {
   compactConversationNative,
   shouldInterceptManualCompact,
 } from '../services/conversation-compaction.js';
-import { encodeClaudeProjectDir, packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../../../lib/paths.js';
+import { packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../../../lib/paths.js';
 import {
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,

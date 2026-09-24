@@ -1,6 +1,6 @@
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { sessionFilePath } from './paths.js';
+import { sessionFilePath } from './runtimes/storage/claude-code.js';
 
 const DEFAULT_TAIL_BYTES = 512 * 1024;
 

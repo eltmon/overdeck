@@ -1,8 +1,7 @@
-import { resolveMuseSessionPathSync, museSessionId } from '../runtimes/muse-session.js';
+import { resolveMuseSessionPathSync, museSessionId } from '../runtimes/storage/muse.js';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { readdir as readdirAsync } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getLatestSessionIdSync } from './activity.js';
@@ -57,6 +56,7 @@ import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './s
 import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity } from '../session-history.js';
+import { kimiHomeDefault } from '../runtimes/storage/kimi-code.js';
 
 export type RecoverAgentResult =
   | { action: 'respawned'; state: AgentState }
@@ -305,8 +305,8 @@ export async function restartAgent(
       if (effectiveHarness === 'kimi-code') {
         try { unlinkSync(join(getAgentDir(normalizedId), 'kimi-session-id')); } catch { /* absent or already cleared */ }
         try {
-          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), agentState.workspace)));
+          const { kimiSessionsRoot } = await import('../runtimes/storage/kimi-code.js');
+          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(kimiHomeDefault(), agentState.workspace)));
         } catch {
           kimiExistingSessionsBefore = new Set();
         }
@@ -334,7 +334,7 @@ export async function restartAgent(
       if (kimiExistingSessionsBefore) {
         const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
         const sessionId = await waitForNewKimiSessionAsync(
-          join(homedir(), '.kimi-code'),
+          kimiHomeDefault(),
           agentState.workspace,
           kimiExistingSessionsBefore,
         );
@@ -349,7 +349,7 @@ export async function restartAgent(
 
     if (effectiveHarness === 'kimi-code') {
       const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
-      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), agentState.workspace, launchAndCaptureKimiSession);
+      await withKimiSessionCaptureLock(kimiHomeDefault(), agentState.workspace, launchAndCaptureKimiSession);
     } else {
       await launchAndCaptureKimiSession();
     }
@@ -666,8 +666,8 @@ export async function recoverAgent(
       let kimiExistingSessionsBefore: Set<string> | undefined;
       if (!resumeSessionId) {
         try {
-          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), state.workspace)));
+          const { kimiSessionsRoot } = await import('../runtimes/storage/kimi-code.js');
+          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(kimiHomeDefault(), state.workspace)));
         } catch {
           kimiExistingSessionsBefore = new Set();
         }
@@ -693,7 +693,7 @@ export async function recoverAgent(
       if (kimiExistingSessionsBefore) {
         const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
         const sessionId = await waitForNewKimiSessionAsync(
-          join(homedir(), '.kimi-code'),
+          kimiHomeDefault(),
           state.workspace,
           kimiExistingSessionsBefore,
         );
@@ -715,7 +715,7 @@ export async function recoverAgent(
 
     const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
     try {
-      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), state.workspace, launchAndCaptureKimiSession);
+      await withKimiSessionCaptureLock(kimiHomeDefault(), state.workspace, launchAndCaptureKimiSession);
     } catch (err) {
       await Effect.runPromise(stopAgent(normalizedId)).catch(() => undefined);
       throw err;

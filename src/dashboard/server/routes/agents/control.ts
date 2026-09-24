@@ -14,7 +14,7 @@ import { checkAllTriggers } from '../../../../lib/cloister/triggers.js';
 import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../../lib/cost.js';
 import { normalizeModelName } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { requireModelOverrideSync } from '../../../../lib/model-validation.js';
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
+import { claudeProjectsRoot, encodeClaudeProjectDir } from '../../../../lib/runtimes/storage/claude-code.js';
 import { getRuntimeForAgent } from '../../../../lib/runtimes/index.js';
 import {
   getAgentStateSync,
@@ -164,7 +164,7 @@ export const getAgentCostRoute = HttpRouter.add(
     const countedUsageIds = new Set<string>();
 
     const homeDir = process.env.HOME || homedir();
-    const claudeProjectsDir = join(homeDir, '.claude', 'projects');
+    const claudeProjectsDir = claudeProjectsRoot(homeDir);
     const workspacePath = agentState.workspace;
 
     if (workspacePath) {

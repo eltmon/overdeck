@@ -9,21 +9,21 @@
  * second filesystem interpretation.
  */
 import { access, readFile, readdir, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { claudeProjectDir, getOverdeckHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
+import { claudeProjectDir, claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
-import { acpTranscriptPath } from '../acp/transcript.js';
-import { findLatestRollout, findRolloutPath } from '../runtimes/codex.js';
-import { findKimiWirePathAsync, kimiSessionsRoot } from '../runtimes/kimi-context-envelope.js';
+import { acpTranscriptPath } from '../runtimes/storage/acp.js';
+import { codexSessionsRoot, findLatestRollout, findRolloutPath } from '../runtimes/storage/codex.js';
+import { findKimiWirePathAsync, kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/storage/kimi-code.js';
 import {
   listMuseSessionPaths,
   museSessionId,
   museSessionsRoot,
   resolveMuseSessionPath,
-} from '../runtimes/muse-session.js';
-import { findPiTranscriptPath, piSessionsRoot } from '../runtimes/pi.js';
+} from '../runtimes/storage/muse.js';
+import { findPiTranscriptPath, piSessionsRoot } from '../runtimes/storage/pi.js';
 import {
   latestSessionResetTime,
   orderedTranscriptCandidates,
@@ -183,7 +183,7 @@ export async function resolveKimiWirePath(
   const workspace = opts.workspaceOverride ?? (await readRecordedState(agentId, opts)).workspace;
   if (!workspace) return null;
   const sessionId = (await readOptional(join(agentsRoot(opts), agentId, 'kimi-session-id')))?.trim() || null;
-  const kimiHome = opts.kimiHomeOverride ?? join(homedir(), '.kimi-code');
+  const kimiHome = opts.kimiHomeOverride ?? kimiHomeDefault();
   return findKimiWirePathAsync(kimiHome, workspace, sessionId);
 }
 
@@ -206,16 +206,16 @@ export async function listAgentTranscriptWatchRoots(
   const workspace = recorded.workspace ?? workspacePath;
   const kind = transcriptCandidateKind(recorded.harness);
   if (kind === 'claude') {
-    const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
+    const projectsRoot = opts.claudeProjectsDirOverride ?? claudeProjectsRoot();
     return workspace ? [claudeProjectDir(workspace, projectsRoot)] : [];
   }
   if (kind === 'kimi') {
-    const kimiHome = opts.kimiHomeOverride ?? join(homedir(), '.kimi-code');
+    const kimiHome = opts.kimiHomeOverride ?? kimiHomeDefault();
     return workspace ? [kimiSessionsRoot(kimiHome, workspace)] : [];
   }
   if (kind === 'codex') {
     const homes = await codexHomes(agentDir);
-    return homes.length > 0 ? homes.map(home => join(home, 'sessions')) : [agentDir];
+    return homes.length > 0 ? homes.map(home => codexSessionsRoot(home)) : [agentDir];
   }
   if (kind === 'pi' || kind === 'ohmypi') return [piSessionsRoot(agentDir)];
   if (kind === 'muse') return [museSessionsRoot(agentId, root)];
@@ -234,9 +234,9 @@ export async function listAgentTranscriptCandidates(
   const recorded = await readRecordedState(agentId, opts);
   const currentHarness = recorded.harness;
   const effectiveWorkspace = recorded.workspace ?? workspacePath;
-  const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
+  const projectsRoot = opts.claudeProjectsDirOverride ?? claudeProjectsRoot();
   const projectDir = claudeProjectDir(effectiveWorkspace, projectsRoot);
-  const kimiHome = opts.kimiHomeOverride ?? join(homedir(), '.kimi-code');
+  const kimiHome = opts.kimiHomeOverride ?? kimiHomeDefault();
   const index = await readIndexedSessionEntries(agentDir);
   const entries = [...index.entries];
   if (!index.exists) {
@@ -256,7 +256,7 @@ export async function listAgentTranscriptCandidates(
       let path: string | null = null;
       if (kind === 'claude') path = join(projectDir, `${entry.sessionId}.jsonl`);
       else if (kind === 'kimi') {
-        path = join(kimiSessionsRoot(kimiHome, effectiveWorkspace), entry.sessionId, 'agents', 'main', 'wire.jsonl');
+        path = kimiWirePath(kimiHome, effectiveWorkspace, entry.sessionId);
       } else if (kind === 'codex') {
         for (const home of homes) {
           path = findRolloutPath(home, entry.sessionId);

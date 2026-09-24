@@ -60,7 +60,7 @@ import {
   type SummaryForkMode,
 } from '../conversations/summary-fork.js';
 import { UnknownModelError } from '../providers.js';
-import { sessionFilePath } from '../paths.js';
+import { claudeProjectsRoot, sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
@@ -90,7 +90,7 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
     }
   }
   try {
-    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const claudeProjects = claudeProjectsRoot();
     const dirs = await readdir(claudeProjects);
     const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
     const candidates = dirs

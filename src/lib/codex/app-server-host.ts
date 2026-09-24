@@ -21,7 +21,8 @@ import {
 import { CODEX_NATIVE_ENDPOINT_FILE, codexNativeSocketPath } from './native-endpoint.js';
 import { SubAgentSpawns } from './sub-agent-spawns.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
-import { codexHome, waitForCodexRollout } from '../runtimes/codex.js';
+import { waitForCodexRollout } from '../runtimes/codex.js';
+import { codexHome } from '../runtimes/storage/codex.js';
 import { calculateCostSync, getPricingSync } from '../cost.js';
 import { recordAgentActivitySync } from '../agents/agent-state.js';
 import { appendSessionIdToHistory } from '../session-history.js';

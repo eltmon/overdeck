@@ -46,7 +46,7 @@
  */
 import { readFileSync } from 'fs';
 import { resolveLatestSessionIdSync } from '../agents/activity.js';
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 
 /** Terminal background-task statuses recognized in notifications / TaskOutput results. */
 const TERMINAL_TASK_STATUSES = new Set(['completed', 'failed', 'cancelled', 'killed', 'error']);

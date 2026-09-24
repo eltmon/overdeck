@@ -465,7 +465,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     process.env.HOME = overdeckHome;
 
     try {
-      const { kimiSessionsRoot } = await import('../../../../lib/runtimes/kimi-code.js');
+      const { kimiSessionsRoot } = await import('../../../../lib/runtimes/storage/kimi-code.js');
       const kimiHome = join(overdeckHome, '.kimi-code');
       const wireDir = join(kimiSessionsRoot(kimiHome, workspace), pinnedSessionId, 'agents', 'main');
       mkdirSync(wireDir, { recursive: true });

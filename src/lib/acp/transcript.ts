@@ -1,13 +1,5 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { getOverdeckHome } from "../paths.js";
-
-export function acpTranscriptPath(
-  agentId: string,
-  agentsRoot = join(getOverdeckHome(), "agents"),
-): string {
-  return join(agentsRoot, agentId, "acp-session.jsonl");
-}
+import { dirname } from "node:path";
 
 export type AcpTranscriptRole = "user" | "assistant" | "tool" | "system";
 export type AcpTranscriptStopReason =

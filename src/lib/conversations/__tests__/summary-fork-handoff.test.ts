@@ -9,7 +9,7 @@ import { createConversation } from '../../overdeck/conversations.js';
 import { createOverdeckDatabase } from '../../../../scripts/create-overdeck-db.js';
 import { closeOverdeckDatabaseSync } from '../../overdeck/infra.js';
 import { resetDiscoveredSessionsSchemaBootstrap } from '../../overdeck/discovered-sessions.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 import { createHandoffPaths } from '../handoff-paths.js';
 import {
   HandoffAuthorModelNotConfiguredError,

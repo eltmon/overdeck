@@ -18,14 +18,14 @@
  * per-home discovery location.
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, chmodSync, openSync, readSync, closeSync, copyFileSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, chmodSync, copyFileSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
 import { getManagedTmuxSocketName } from '../tmux.js';
-import { dirname, join, basename } from 'node:path'
+import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { request as httpRequest } from 'node:http'
-import { findRolloutPath } from './codex-rollout-path.js'
+import { codexAgentHome, codexAgentSessionsDir, codexDefaultHome, codexHome, codexSessionsRoot, extractThreadIdFromRollout, findLatestRollout, findRolloutPath } from './storage/codex.js'
 import yaml from 'js-yaml'
 import type {
   AgentRuntimeSync,
@@ -44,7 +44,6 @@ import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
 import { appendSessionIdToHistory } from '../session-history.js'
 
-export { findRolloutPath }
 
 const execAsync = promisify(exec)
 
@@ -193,11 +192,6 @@ function readCodexTransportFromYaml(filePath: string): unknown {
   }
 }
 
-/** Resolve $CODEX_HOME: env var → ~/.codex fallback. */
-export function codexHome(): string {
-  return process.env.CODEX_HOME ?? join(homedir(), '.codex')
-}
-
 /** Read the persisted Codex thread-id for session lookup. */
 function readThreadId(agentId: string): string | null {
   const p = threadIdPathFor(agentId)
@@ -272,14 +266,14 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   if (codexHomeDir.endsWith('/codex-home-v2')) {
     // Keep transcript data in the established private root while using a new
     // config root that cannot discover historical codex-home/AGENTS.md.
-    const persistentSessions = join(dirname(codexHomeDir), 'codex-home', 'sessions')
+    const persistentSessions = codexAgentSessionsDir(dirname(codexHomeDir))
     mkdirSync(persistentSessions, { recursive: true, mode: 0o700 })
-    const sessionsLink = join(codexHomeDir, 'sessions')
+    const sessionsLink = codexSessionsRoot(codexHomeDir)
     if (!existsSync(sessionsLink)) {
       symlinkSync(persistentSessions, sessionsLink, 'dir')
     }
   } else {
-    mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
+    mkdirSync(codexSessionsRoot(codexHomeDir), { recursive: true, mode: 0o700 })
   }
 
   const configPath = join(codexHomeDir, 'config.toml')
@@ -363,7 +357,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   // `codex login` heals everyone. Best-effort: if the user has never signed in
   // to Codex globally there is nothing to link, and onboarding will (correctly)
   // prompt for a real first-time login.
-  const globalCodexHome = join(homedir(), '.codex')
+  const globalCodexHome = codexDefaultHome()
   const homeAuthPath = join(codexHomeDir, 'auth.json')
   const globalAuthPath = join(globalCodexHome, 'auth.json')
   seedCodexAuthSymlink(homeAuthPath, globalAuthPath)
@@ -490,103 +484,6 @@ export async function waitForCodexRollout(codexHomeDir: string, timeoutMs: numbe
   return null
 }
 
-/**
- * Extract the thread-id from a rollout filename.
- *
- * Codex names rollouts `rollout-<timestamp>-<threadId>.jsonl`, where threadId
- * is the session UUID (8-4-4-4-12) — e.g.
- * `rollout-2026-06-09T01-47-53-019eaaec-4dfa-7ab1-90ba-9104d16534d1.jsonl`
- * → `019eaaec-4dfa-7ab1-90ba-9104d16534d1`. Extract the trailing UUID;
- * splitting on `-` and taking the last segment truncates the id to its final
- * group, which breaks `codex exec resume <threadId>` and findRolloutPath.
- */
-export function extractThreadIdFromRollout(rolloutPath: string): string | null {
-  const name = basename(rolloutPath, '.jsonl')
-  const m = name.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i)
-  return m ? m[1]! : null
-}
-
-/**
- * Read the first line (the session_meta record) of a rollout file without
- * loading the whole multi-megabyte JSONL.
- */
-function readRolloutMetaLine(path: string, maxBytes = 131072): string | null {
-  let fd: number
-  try {
-    fd = openSync(path, 'r')
-  } catch {
-    return null
-  }
-  try {
-    const buf = Buffer.alloc(maxBytes)
-    const n = readSync(fd, buf, 0, maxBytes, 0)
-    const text = buf.subarray(0, n).toString('utf-8')
-    const nl = text.indexOf('\n')
-    return nl === -1 ? text : text.slice(0, nl)
-  } catch {
-    return null
-  } finally {
-    closeSync(fd)
-  }
-}
-
-/**
- * True when a rollout belongs to a Codex-internal subagent thread (e.g. the
- * guardian approval supervisor), per the session_meta `thread_source` field.
- * Subagent rollouts live in the same per-agent CODEX_HOME as the main thread
- * and are written concurrently, so raw mtime cannot tell them apart
- * (PAN-1805). Unknown/unparseable meta is treated as a user thread — older
- * Codex versions predate `thread_source`.
- */
-function isSubagentRollout(path: string): boolean {
-  const line = readRolloutMetaLine(path)
-  if (!line) return false
-  try {
-    const meta = JSON.parse(line) as { payload?: { thread_source?: unknown } }
-    return meta.payload?.thread_source === 'subagent'
-  } catch {
-    return false
-  }
-}
-
-/**
- * Return the most-recently-modified *user-thread* rollout JSONL under
- * <codexHomeDir>/sessions, or null. A per-conversation/-agent CODEX_HOME holds
- * only that session's rollouts, so the newest user thread is its current
- * conversation. Subagent (guardian) rollouts are skipped — they interleave
- * writes with the main thread and would otherwise win the mtime race
- * (PAN-1805). Used to resolve the transcript when no thread-id was persisted —
- * the spawn-time capture is a one-shot window, but Codex only writes its
- * rollout on the first turn.
- */
-export function findLatestRollout(codexHomeDir: string): string | null {
-  const sessionsRoot = join(codexHomeDir, 'sessions')
-  const paths: string[] = []
-  const walk = (dir: string): void => {
-    let entries: string[]
-    try { entries = readdirSync(dir) } catch { return }
-    for (const entry of entries) {
-      const full = join(dir, entry)
-      let isDir = false
-      try { isDir = statSync(full).isDirectory() } catch { continue }
-      if (isDir) walk(full)
-      else if (entry.startsWith('rollout-') && entry.endsWith('.jsonl')) paths.push(full)
-    }
-  }
-  walk(sessionsRoot)
-  const byMtimeDesc = paths
-    .map((p) => {
-      try { return { p, mtimeMs: statSync(p).mtimeMs } } catch { return null }
-    })
-    .filter((e): e is { p: string; mtimeMs: number } => e !== null)
-    .sort((a, b) => b.mtimeMs - a.mtimeMs)
-  for (const { p } of byMtimeDesc) {
-    if (!isSubagentRollout(p)) return p
-  }
-  // All rollouts are subagent threads — better to show one than nothing.
-  return byMtimeDesc[0]?.p ?? null
-}
-
 // ─── Sync runtime ─────────────────────────────────────────────────────────────
 
 export class CodexRuntimeSync implements AgentRuntimeSync {
@@ -601,7 +498,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (!threadId) return null
     // Use per-agent CODEX_HOME, not the global ~/.codex; each agent's rollouts
     // are written to ~/.overdeck/agents/<id>/codex-home/sessions/.
-    return findRolloutPath(join(agentDirFor(agentId), 'codex-home'), threadId)
+    return findRolloutPath(codexAgentHome(agentDirFor(agentId)), threadId)
   }
 
   getLastActivity(agentId: string): Date | null {
@@ -802,7 +699,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
 
   listSessions(_workspace?: string): Session[] {
     const sessions: Session[] = []
-    const sessionsRoot = join(codexHome(), 'sessions')
+    const sessionsRoot = codexSessionsRoot(codexHome())
     if (!existsSync(sessionsRoot)) return sessions
     collectRollouts(sessionsRoot, sessions)
     return sessions

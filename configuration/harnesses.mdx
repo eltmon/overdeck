@@ -717,6 +717,34 @@ using the OS-bundled `curl` and `tar` tools.
 - `src/lib/runtimes/kimi-code.ts` — `KimiCodeRuntimeSync` (native Kimi Code adapter)
 - `src/lib/cost-parsers/kimi-parser.ts` — Kimi `wire.jsonl` usage/cost parser
 
+## Storage paths
+
+Each harness has one module that knows where it keeps transcripts and
+sessions: `src/lib/runtimes/storage/<harness>.ts`. Everything else asks that
+module for a path instead of building one.
+
+| Module | What it owns |
+| --- | --- |
+| `storage/claude-code.ts` | `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl` (`claudeProjectsRoot`, `claudeProjectDir`, `sessionFilePath`) |
+| `storage/codex.ts` | `$CODEX_HOME/sessions/**/rollout-*.jsonl`, the per-conversation `CODEX_HOME`, and each agent's `<agentDir>/codex-home/sessions` (`codexHome`, `codexSessionsRoot`, `codexAgentHome`, `codexAgentSessionsDir`, `findRolloutPath`) |
+| `storage/kimi-code.ts` | `~/.kimi-code/sessions/<work-dir-key>/<session-id>/agents/main/wire.jsonl` (`kimiHomeDefault`, `kimiSessionsRoot`, `kimiWirePath`) |
+| `storage/pi.ts` | `<agentDir>/sessions/**.jsonl` and the user's own `~/.pi/agent` (`piSessionsRoot`, `findPiTranscriptPath`) |
+| `storage/acp.ts` | `<agentDir>/acp-session.jsonl`, the transcript for ACP agents including OpenCode (`ACP_TRANSCRIPT_FILE`, `acpTranscriptPath`) |
+| `storage/muse.ts` | `<agentDir>/muse-data/muse/sessions/…/session.jsonl` (`museSessionsRoot`, `resolveMuseSessionPath`) |
+
+These modules import only `node:*` and `src/lib/paths.ts`, so any layer can
+use them without an import cycle. The transcript resolver
+(`src/lib/agents/transcript-resolver.ts`) still prefers the absolute path
+recorded in `sessions.json`; it uses these modules only for entries recorded
+before PAN-3959.
+
+`npm run lint:harness-storage` (part of `npm run lint`) fails when a storage
+path literal appears in `src/` outside `src/lib/runtimes/storage/`. A line that
+needs one for another reason, such as a permission rule, goes in the allowlist
+at the top of `scripts/lint-harness-storage.sh` as `file|anchor # reason`. The
+anchor is a fixed piece of the allowed line's text, so edits elsewhere in the
+file don't break the row.
+
 ## See also
 
 - [Harness Landscape](/reference/harness-landscape) — survey of coding-agent

@@ -11,7 +11,7 @@ import {
 import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../src/lib/agent-runtime-mirror.js';
 import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../src/lib/work-agent-lifecycle.js';
-import * as paths from '../../src/lib/paths.js';
+import * as claudeStorage from '../../src/lib/runtimes/storage/claude-code.js';
 import * as tmux from '../../src/lib/tmux.js';
 import * as liveness from '../../src/lib/agents/liveness.js';
 
@@ -66,7 +66,7 @@ describe('work-agent-lifecycle', () => {
     saveSessionId(agentId, 'session-123');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const transcriptExistsSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.canResumeSession).toBe(true);
@@ -107,7 +107,7 @@ describe('work-agent-lifecycle', () => {
     writeFileSync(join(getAgentDir(agentId), 'completed'), '');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const transcriptExistsSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.handedOff).toBe(true);
@@ -388,7 +388,7 @@ describe('work-agent-lifecycle', () => {
     const agentId = setUpHandedOffAgentOwingRework('handoff-resting');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
-    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const transcriptExistsSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
 
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 

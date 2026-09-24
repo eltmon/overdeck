@@ -13,8 +13,8 @@ import {
   resolveKimiWirePath,
   resolvePiSessionPath,
 } from '../jsonl-resolver.js';
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
-import { kimiSessionsRoot } from '../../../../lib/runtimes/kimi-code.js';
+import { encodeClaudeProjectDir } from '../../../../lib/runtimes/storage/claude-code.js';
+import { kimiSessionsRoot } from '../../../../lib/runtimes/storage/kimi-code.js';
 
 const AGENT_ID = 'agent-pan-830';
 const WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-830';

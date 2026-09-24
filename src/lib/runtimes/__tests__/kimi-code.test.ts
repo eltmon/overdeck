@@ -25,19 +25,21 @@ vi.mock('../../agents/agent-state.js', () => ({
 
 import {
   createKimiCodeRuntimeSync,
-  findKimiWirePath,
-  findKimiWirePathAsync,
-  findLatestKimiSession,
-  findLatestKimiSessionAsync,
   kimiCaptureLockPath,
-  kimiSessionsRoot,
-  kimiWorkDirKey,
   launchAndCaptureManagedKimiSession,
   KimiCodeRuntimeSync,
   waitForNewKimiSessionAsync,
   withKimiSessionCaptureLock,
   writeKimiSessionId,
 } from '../kimi-code.js';
+import {
+  findKimiWirePath,
+  findKimiWirePathAsync,
+  findLatestKimiSession,
+  findLatestKimiSessionAsync,
+  kimiSessionsRoot,
+  kimiWorkDirKey,
+} from '../storage/kimi-code.js';
 import { readSessionIndexSync } from '../../session-history.js';
 
 const tempHomes: string[] = [];

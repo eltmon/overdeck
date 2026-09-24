@@ -1,9 +1,9 @@
 import { promises as fs } from 'node:fs';
-import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
-import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
+import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../overdeck/conversations-search.js';
 import { chunkConversationJsonl, getLastCompleteJsonlOffset, type ConversationChunkRecord } from './chunker.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
@@ -366,7 +366,7 @@ function openIndexerResources(config: NormalizedConversationSearchConfig, option
 }
 
 function defaultConversationRoots(): string[] {
-  return [join(homedir(), '.claude', 'projects')];
+  return [claudeProjectsRoot()];
 }
 
 export function sessionIdFromPath(filePath: string): string {

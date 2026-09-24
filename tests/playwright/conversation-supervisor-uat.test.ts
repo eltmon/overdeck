@@ -296,7 +296,7 @@ function launcherFor(session: string): string {
 }
 
 async function writeConversationSessionFile(conv: { cwd: string; claudeSessionId: string }): Promise<void> {
-  const { sessionFilePath } = await import('../../src/lib/paths.js');
+  const { sessionFilePath } = await import('../../src/lib/runtimes/storage/claude-code.js');
   const sessionFile = sessionFilePath(conv.cwd, conv.claudeSessionId);
   mkdirSync(dirname(sessionFile), { recursive: true });
   writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'parent context' } })}\n`);

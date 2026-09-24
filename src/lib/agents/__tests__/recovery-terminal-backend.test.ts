@@ -133,7 +133,7 @@ import { recoverAgent, restartAgent } from '../recovery.js';
 import { registerTerminalBackend } from '../../terminal-backends/registry.js';
 import { getAgentDir, getAgentStateSync, saveAgentStateSync } from '../agent-state.js';
 import { appendSessionIdToHistory } from '../../session-history.js';
-import { sessionFilePath } from '../../paths.js';
+import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 
 /**
  * Drive a promise whose path waits on a real `setTimeout` (restartAgent's 500ms

@@ -5,7 +5,7 @@
  * - `capturePaneSync` (async: `capturePane`): src/lib/agents/termination.ts:170.
  * - `getAgentSessionsSync` (async: `getAgentSessions`): src/cli/commands/doctor.ts:511.
  * - `killSessionSync` (async: `killSession`): src/lib/agents/termination.ts:180,
- *   src/lib/runtimes/claude-code.ts:331.
+ *   src/lib/runtimes/claude-code.ts:332.
  * - `listPaneValuesSync` (async: `listPaneValues`): src/lib/agents/liveness.ts:161,326.
  * - `listSessionNamesSync` (async: `listSessionNames`): 9 sites in cli/commands/doctor.ts, cli/commands/pause.ts,
  *   cli/commands/swarm-status.ts, cli/commands/swarm.ts.

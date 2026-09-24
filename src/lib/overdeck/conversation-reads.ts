@@ -3,7 +3,7 @@
  * use `/api/agents/:id/conversation`; this module never scans agent state or
  * global transcript directories to make a missing conversation row succeed.
  */
-import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
+import { isMuseSessionPath, resolveMuseSessionPath } from '../runtimes/storage/muse.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
 import { existsSync } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
@@ -18,7 +18,7 @@ import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
 import { capturePane, listSessionNames } from '../tmux.js';
 import { paneShowsClaudeBootBlockingScreen } from '../cloister/modal-detector.js';
-import { sessionFilePath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
 import {
   CONVERSATION_TITLE_MODEL,
@@ -68,6 +68,8 @@ import { parseKimiConversationMessages } from '../../dashboard/server/services/k
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
 import { findClaudeSessionFileById } from './claude-session-file-search.js';
+import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
+import { isKimiWirePath } from '../runtimes/storage/kimi-code.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -216,12 +218,12 @@ function isCodexSessionFile(sessionFile: string): boolean {
 }
 
 function isAcpSessionFile(sessionFile: string): boolean {
-  return basename(sessionFile) === 'acp-session.jsonl';
+  return basename(sessionFile) === ACP_TRANSCRIPT_FILE;
 }
 
 /** Native Kimi Code CLI's own wire.jsonl, under .../agents/main/wire.jsonl. */
 function isKimiWireSessionFile(sessionFile: string): boolean {
-  return sessionFile.endsWith('/agents/main/wire.jsonl');
+  return isKimiWirePath(sessionFile);
 }
 
 export async function getCachedMessages(
@@ -243,7 +245,7 @@ export async function getCachedMessages(
     parsed = await parseAcpConversationMessages(sessionFile);
   } else if (isOhmypiSessionFile(sessionFile)) {
     parsed = await parseOhmypiConversationMessages(sessionFile);
-  } else if (sessionFile.includes('/muse-data/muse/sessions/') && sessionFile.endsWith('/session.jsonl')) {
+  } else if (isMuseSessionPath(sessionFile)) {
     parsed = await parseMuseConversationMessages(sessionFile);
   } else if (isKimiWireSessionFile(sessionFile)) {
     parsed = await parseKimiConversationMessages(sessionFile);

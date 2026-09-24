@@ -1,5 +1,3 @@
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
@@ -7,6 +5,7 @@ import { recordConversationSearchFailure, recordConversationSearchSuccess } from
 import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
 import { ConversationDirectoryWatcher } from './conversation-directory-watcher.js';
+import { claudeProjectsRoot } from '../../../lib/runtimes/storage/claude-code.js';
 
 interface WatcherLike {
   on(event: 'add' | 'change' | 'unlink', callback: (filePath: string) => void): WatcherLike;
@@ -286,7 +285,7 @@ export async function syncConversationSearchWatcher(options: ConversationSearchW
 }
 
 function defaultConversationRoots(): string[] {
-  return [join(homedir(), '.claude', 'projects')];
+  return [claudeProjectsRoot()];
 }
 
 function isAbortError(error: unknown): boolean {

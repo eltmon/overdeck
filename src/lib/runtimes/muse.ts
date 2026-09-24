@@ -13,7 +13,7 @@ import { writePtyToken } from '../pty-token.js';
 import { getOverdeckHome } from '../paths.js';
 import { getPricingSync } from '../cost.js';
 import { parseMuseSessionSync } from '../cost-parsers/muse-parser.js';
-import { museSessionId, resolveMuseSessionPath, resolveMuseSessionPathSync } from './muse-session.js';
+import { museSessionId, resolveMuseSessionPath, resolveMuseSessionPathSync } from './storage/muse.js';
 import { getRuntimeBehavior } from './behavior.js';
 import { appendSessionIdToHistory } from '../session-history.js';
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';

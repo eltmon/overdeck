@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { basename, join } from 'path'
-import { encodeClaudeProjectDir } from './paths.js'
+import { claudeProjectDir } from './runtimes/storage/claude-code.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
@@ -176,7 +176,7 @@ export function isInteractiveRoleAgent(agentId: string, role?: string): boolean 
 // ─── JSONL path helpers ───────────────────────────────────────────────────────
 
 export function getClaudeProjectDir(workspacePath: string): string {
-  return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspacePath))
+  return claudeProjectDir(workspacePath)
 }
 
 function getProjectPathByPrefix(issuePrefix: string): string {

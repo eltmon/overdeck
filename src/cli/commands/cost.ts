@@ -28,6 +28,8 @@ import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
 import { reconcile as reconcileClaudeTranscripts, type ReconcileResult } from '../../lib/costs/reconciler.js';
 import { CostDoorLive, CostWriter, type CostReconcileSummary } from '../../lib/overdeck/cost.js';
 import { getAgentRollup, getCostForIssueAggregateSync, type IssueAggregate } from '../../lib/overdeck/cost-sync.js';
+import { codexHome, codexSessionsRoot } from '../../lib/runtimes/storage/codex.js';
+import { piSessionsRoot, piUserAgentDir } from '../../lib/runtimes/storage/pi.js';
 
 /**
  * Run the cost sync action (shared by `pan cost sync` and `pan sync-costs`).
@@ -127,8 +129,8 @@ function printBackfillSummary(summaries: BackfillSourceSummary[], write: boolean
 
 export async function runCostBackfill(options: { write?: boolean } = {}): Promise<BackfillSourceSummary[]> {
   const dryRun = !options.write;
-  const codexSessionRoot = join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions');
-  const piSessionRoot = join(homedir(), '.pi', 'agent', 'sessions');
+  const codexSessionRoot = codexSessionsRoot(codexHome());
+  const piSessionRoot = piSessionsRoot(piUserAgentDir());
   const legacyPiAgentsRoot = join(homedir(), '.panopticon', 'agents');
   const claude = await reconcileClaudeTranscripts({ dryRun, includePi: false });
   const ohmypi = await Effect.runPromise(
