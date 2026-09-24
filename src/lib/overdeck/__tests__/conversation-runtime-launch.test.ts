@@ -19,7 +19,8 @@ const closeConversationPane = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock('../../harness-binary.js', () => ({
   prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/usr/bin/claude', pathExport: "export PATH='/usr/bin':\"$PATH\"" })),
 }));
-vi.mock('../../launcher-generator.js', () => ({
+vi.mock('../../launcher-generator.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../launcher-generator.js')>()),
   generateLauncherScript: vi.fn((config: Record<string, unknown>) => {
     launcherConfigs.push(config);
     return '#!/bin/bash\n';
