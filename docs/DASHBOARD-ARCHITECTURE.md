@@ -285,14 +285,16 @@ door that does not exist; a real record read door would be a separate change.
   finished run before it spawns, on the operator route and the auto-trigger alike.
   `getSequencerRunStatus` decides through `isAlive` in `src/lib/agents/liveness.ts`: a run is
   done when its pane has no live harness (`pane-dead`), it wrote a fresh `sequence.md`
-  (`fresh-sequence`), the runtime mirror reads idle (`idle`), or its Herdr pane is idle or done
-  at its prompt after the prompt was delivered, with work activity older than 60 s
-  (`pane-finished`, PAN-3923). The last one covers a dashboard restart, which empties the
+  (`fresh-sequence`), or its Herdr pane is idle or done at its prompt after the prompt was
+  delivered, with work activity older than 60 s (`pane-finished`, PAN-3923). When the backend
+  has no per-pane state (tmux), the runtime mirror's idle label stands in for Herdr's and passes
+  the same `isFinishedRoleRun` rule (`idle`, PAN-4172); the label alone never finishes a run.
+  `pane-finished` covers a dashboard restart, which empties the
   in-process mirror, and a pass that failed before writing. After a restart the activity age
   rests on the transcript heartbeat; if no activity signal resolves, the run is refused, never
   reaped. `clearFinishedSequencerRun` probes a
-  `pane-finished` run a second time 5 s later and stops it only if it still reads done; after the
-  stop it waits up to 3 s for the backend to drop the pane.
+  `pane-finished` or `idle` run a second time 5 s later and stops it only if it still reads done;
+  after the stop it waits up to 3 s for the backend to drop the pane.
 
 **Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
 `docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared
