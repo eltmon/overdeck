@@ -656,7 +656,8 @@ export async function messageAgent(
   // Codex's notify hook writes turn-completed at every idle boundary. Claiming
   // that marker makes the idle signal one-shot: the next message starts a turn,
   // and further messages queue until the hook reports the next completion.
-  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594).
+  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594);
+  // on Herdr the pane's agent_status answers as well (PAN-4186).
   const promptReady = await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);

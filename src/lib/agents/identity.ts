@@ -2,6 +2,8 @@ import { existsSync, readFileSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { resolveBareNumericId } from '../issue-id.js';
 import { AGENTS_DIR, getOverdeckHome } from '../paths.js';
+import { hostTerminalBackendName } from '../terminal-backends/select.js';
+import type { AgentState as BackendAgentState, TerminalBackendName } from '../terminal-backends/types.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 
 function agentStateFilePath(agentId: string): string {
@@ -139,6 +141,24 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
   return isReadySignalPresent(readyPath);
 }
 
+/** Test seams for {@link waitForAgentIdle}. Production callers pass nothing. */
+export interface WaitForAgentIdleDeps {
+  /** Terminal backend the agent runs on. Defaults to the host's selection. */
+  backend?: TerminalBackendName;
+  /**
+   * The backend's own state for the agent's pane, or undefined when it cannot
+   * tell. Only consulted on Herdr; defaults to Herdr's `agent_status` read
+   * through `probeHerdrAgentLiveness`.
+   */
+  probeBackendState?: (agentId: string) => Promise<BackendAgentState | undefined>;
+}
+
+async function probeHerdrAgentState(agentId: string): Promise<BackendAgentState | undefined> {
+  const { probeHerdrAgentLiveness } = await import('../terminal-backends/herdr.js');
+  const probe = await probeHerdrAgentLiveness(agentId);
+  return probe.kind === 'alive' ? probe.state : undefined;
+}
+
 /**
  * Wait until a hook-instrumented agent reports it is idle at the prompt, via the
  * runtime mirror (Stop / SessionStart hook → activity 'idle'), or the timeout
@@ -150,16 +170,34 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
  * feed the runtime mirror once their heartbeat POSTs authenticate (PAN-1596). No
  * dependency on tmux output or permission mode.
  *
+ * PAN-4186: on Herdr the backend answers too. Herdr's `agent_status` for the
+ * pane (`idle`, or `done` for a finished turn at its prompt) counts as idle;
+ * `working`/`blocked` keep the wait going. When Herdr cannot tell (`unknown`,
+ * a pane-bound host pane, a failed probe) the runtime mirror alone decides, as
+ * on tmux.
+ *
  * Distinct from waitForReadySignal: that answers the one-time "has this
  * (re)launched session reached the prompt" (ready.json gate, used by the
  * conversation reattach/fork paths); this answers "is the running agent idle at
  * the prompt right now".
  */
-export async function waitForAgentIdle(agentId: string, timeoutMs = 5000): Promise<boolean> {
+export async function waitForAgentIdle(
+  agentId: string,
+  timeoutMs = 5000,
+  deps: WaitForAgentIdleDeps = {},
+): Promise<boolean> {
+  const backend = deps.backend ?? (await hostTerminalBackendName());
+  const probeBackendState = backend === 'herdr' ? (deps.probeBackendState ?? probeHerdrAgentState) : null;
+  const isIdleNow = async (): Promise<boolean> => {
+    if (getAgentRuntimeStateSync(agentId)?.state === 'idle') return true;
+    if (!probeBackendState) return false;
+    const state = await probeBackendState(agentId).catch(() => undefined);
+    return state === 'idle' || state === 'done';
+  };
   const deadline = Date.now() + timeoutMs;
   do {
-    if (getAgentRuntimeStateSync(agentId)?.state === 'idle') return true;
+    if (await isIdleNow()) return true;
     await new Promise(r => setTimeout(r, 250));
   } while (Date.now() < deadline);
-  return getAgentRuntimeStateSync(agentId)?.state === 'idle';
+  return isIdleNow();
 }
