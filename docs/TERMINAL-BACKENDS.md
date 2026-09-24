@@ -276,6 +276,11 @@ commands, plain dashboard terminals and the codex auth login are not agents.
 `capture-pane`). On a Herdr host a miss tries the legacy tmux session once, then the saved
 `output.log` (#4097).
 
+`pan status` reports each agent's `alive` from `isAlive` (`src/lib/agents/liveness.ts`), plus
+`livenessReason` when it is not alive; `runtime-indeterminate` prints as `unknown`, not `stopped`.
+`pan status --json` still carries `tmuxActive` for compatibility, but it is deprecated: it is tmux
+session presence only and is always `false` for a Herdr agent (#4097).
+
 A graceful restart's 60-second warning reaches a Herdr agent through `deliverAgentMessage`; on tmux
 it is still Escape twice and a tmux paste (`src/lib/graceful-restart.ts`).
 
