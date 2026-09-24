@@ -7,8 +7,8 @@
  * promotion, drafts, continue files) on the issue's feature branch inside the
  * issue workspace; project-level artifacts (order books, notes, the parked
  * list, the backlog sequence) on `main` in the project's plan home. The backlog
- * sequence verb pushes that commit too (`pushPlanArtifacts`, PAN-3923), so the
- * plan home does not drift ahead of origin.
+ * sequence and order-book verbs push that commit too (`pushPlanArtifacts`,
+ * PAN-3923, #4108), so the plan home does not drift ahead of origin.
  *
  * Async git only — this runs from the CLI and from server-reachable code.
  */

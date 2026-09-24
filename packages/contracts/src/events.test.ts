@@ -359,6 +359,52 @@ describe("Agent lifecycle events", () => {
       expect(changed.agentsById["agent-pan-1908"].pausedReason).toBe("paused-by-operator")
     })
 
+    it("mirrors the deprecated hasLiveTmuxSession into hasLivePane (#4105)", () => {
+      const started = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({
+        type: "agent.started" as const,
+        sequence: 1,
+        timestamp: "2026-06-15T12:00:00.000Z",
+        payload: {
+          agentId: "agent-pan-1908",
+          issueId: "PAN-1908",
+          agent: baseAgentSnapshot({ status: "running", hasLiveTmuxSession: true }),
+        },
+      }))
+      expect(started.agentsById["agent-pan-1908"]).toMatchObject({ hasLivePane: true, hasLiveTmuxSession: true })
+
+      const changed = applyEvent(started, decodeDomainEvent({
+        type: "agent.status_changed" as const,
+        sequence: 2,
+        timestamp: "2026-06-15T12:01:00.000Z",
+        payload: { agentId: "agent-pan-1908", status: "stopped", hasLiveTmuxSession: false },
+      }))
+      expect(changed.agentsById["agent-pan-1908"]).toMatchObject({ hasLivePane: false, hasLiveTmuxSession: false })
+    })
+
+    it("mirrors hasLivePane into the deprecated hasLiveTmuxSession and keeps pending input on a live pane (#4105)", () => {
+      const started = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({
+        type: "agent.started" as const,
+        sequence: 1,
+        timestamp: "2026-06-15T12:00:00.000Z",
+        payload: {
+          agentId: "agent-pan-1908",
+          issueId: "PAN-1908",
+          agent: baseAgentSnapshot({ status: "running", hasPendingQuestion: true }),
+        },
+      }))
+      const changed = applyEvent(started, decodeDomainEvent({
+        type: "agent.status_changed" as const,
+        sequence: 2,
+        timestamp: "2026-06-15T12:01:00.000Z",
+        payload: { agentId: "agent-pan-1908", status: "stopped", hasLivePane: true },
+      }))
+      expect(changed.agentsById["agent-pan-1908"]).toMatchObject({
+        hasLivePane: true,
+        hasLiveTmuxSession: true,
+        hasPendingQuestion: true,
+      })
+    })
+
     it("merges spawn-time columns carried by a status change (phase, workType, roleRunHead)", () => {
       const agent = baseAgentSnapshot({ status: "starting" })
       const started = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({

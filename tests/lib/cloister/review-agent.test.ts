@@ -473,7 +473,7 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     );
 
     const dispatchBlock = agentSrc.match(
-      /const fullReview = isExtendedReviewEnabled\(opts\.issueId\);[\s\S]*?Review role \(self-review\) spawned/,
+      /const fullReview = reviewMode === 'full';[\s\S]*?Review role \(self-review\) spawned/,
     );
     expect(dispatchBlock).not.toBeNull();
     const block = dispatchBlock![0];
@@ -492,6 +492,55 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     // The fan-out itself (params.inScope.map -> spawnReviewSubRoleForIssue) lives in
     // review-convoy.ts and is exercised behaviorally by the review-rerun-scope and
     // convoy tests — no extra source introspection here (lint:source-introspection).
+  });
+
+  // #4118: the dashboard's Request review menu passes a mode for THIS run. It
+  // wins over roles.review.mode for that run and is never written anywhere, so
+  // the next dispatch without a mode resolves config again.
+  it('a requested full mode runs the convoy parent even when config says quick', async () => {
+    await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, reviewMode: 'full' }));
+
+    const parentCall = mockSpawnRun.mock.calls.find(([, , options]) => !options.subRole);
+    expect(parentCall).toBeDefined();
+    expect(parentCall![2].prompt).toContain('STANDBY — REVIEW SYNTHESIS for PAN-1982');
+    expect(parentCall![2].prompt).not.toContain('you are the sole reviewer');
+
+    // Config is unchanged: resolution still says quick, and a dispatch with no
+    // requested mode takes the quick self-review path.
+    expect(resolveReviewMode('PAN-1982')).toBe('quick');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
+    mockSpawnRun.mockClear();
+    const next = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+    expect(next).toEqual({ success: true, message: 'Self-review spawned: agent-pan-1982-review' });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    expect(mockSpawnRun.mock.calls[0][2].prompt).toContain('you are the sole reviewer');
+  });
+
+  it('a requested quick mode runs a single self-review even when config says full', async () => {
+    const fullConfig = { config: { roles: { review: { mode: 'full' as const } } } };
+    mockLoadConfigSync.mockReturnValue(fullConfig);
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, reviewMode: 'quick' }));
+
+    expect(result).toEqual({ success: true, message: 'Self-review spawned: agent-pan-1982-review' });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    expect(mockSpawnRun.mock.calls[0][2].prompt).toContain('you are the sole reviewer');
+    expect(fullConfig).toEqual({ config: { roles: { review: { mode: 'full' } } } });
+    expect(resolveReviewMode('PAN-1982')).toBe('full');
+  });
+
+  it('a requested none mode skips the AI review for this run only', async () => {
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, reviewMode: 'none' }));
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('(mode=none)');
+    expect(result.message).toContain('by request');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(resolveReviewMode('PAN-1982')).toBe('quick');
+
+    const next = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+    expect(next).toEqual({ success: true, message: 'Self-review spawned: agent-pan-1982-review' });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
   });
 
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {

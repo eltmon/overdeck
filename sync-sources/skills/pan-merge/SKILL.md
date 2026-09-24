@@ -26,7 +26,7 @@ pan merge cancel <id>
 pan merge cancel PAN-123
 ```
 
-Cancels one actionable Flywheel auto-merge row for the issue id. The command calls the dashboard `DELETE /api/flywheel/auto-merge/:id` endpoint, removes that row from the active or problems list, and announces `auto-merge cancelled for <issueId>`.
+Cancels one actionable Flywheel auto-merge row for the issue id. The command calls the dashboard `DELETE /api/merge-train/auto-merge/:id` endpoint, removes that row from the active or problems list, and announces `auto-merge cancelled for <issueId>`.
 
 An issue can hold duplicate rows from separate scheduling attempts. When more actionable rows remain, the success message reports the count and tells you to re-run `pan merge cancel <id>` to clear the next row; repeat until the normal success message contains no remaining-row notice.
 

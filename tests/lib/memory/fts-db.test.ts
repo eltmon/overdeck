@@ -17,6 +17,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await __testInternals.terminateWorker();
   closeMemoryFtsDatabases();
   process.chdir(originalCwd);
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
@@ -180,4 +181,23 @@ describe('memory FTS database', () => {
 
     expect(tableCount.count).toBe(3);
   });
+});
+
+// PAN-3930: every source run takes the inline path, so this goes through the
+// worker path directly. From source the worker is a `.ts` file whose imports use
+// `.js` specifiers; spawned as a raw Node worker it died with ERR_MODULE_NOT_FOUND
+// on its first relative import. The worker copies process.env when it spawns, so
+// OVERDECK_HOME (set in beforeEach) points it at this test's temp dir.
+describe('memory FTS worker under a source run', () => {
+  const { requestViaWorker } = __testInternals;
+
+  it('opens the project database and runs a statement through the real worker thread', async () => {
+    await requestViaWorker('initialize', 'overdeck');
+    await expect(requestViaWorker('statement', 'overdeck', {
+      statement: { sql: 'SELECT COUNT(*) AS count FROM memory_fts', method: 'get' },
+    })).resolves.toEqual({ count: 0 });
+
+    const dbFile = await stat(resolveFtsDbPath('overdeck'));
+    expect(dbFile.isFile()).toBe(true);
+  }, 30_000);
 });

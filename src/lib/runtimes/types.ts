@@ -253,11 +253,14 @@ export interface AgentRuntimeSync {
   /**
    * Check if an agent is running.
    *
-   * May be sync or async depending on the runtime; new runtimes should
-   * prefer async to avoid blocking the dashboard event loop.
+   * Every shipped runtime answers through the backend-aware liveness oracle
+   * (`isAlive` in `src/lib/agents/liveness.ts`), never a tmux-only probe: a
+   * Herdr agent has no tmux session (#4116). An unknown answer
+   * (`runtime-indeterminate`) reads as `false` here, so a caller that must not
+   * act on unknown liveness (crash handling, pokes) asks `isAlive` itself.
    *
    * @param agentId - The agent identifier
-   * @returns True if agent has an active tmux session
+   * @returns True only when the oracle confirms the agent is alive
    */
   isRunning(agentId: string): boolean | Promise<boolean>;
 }

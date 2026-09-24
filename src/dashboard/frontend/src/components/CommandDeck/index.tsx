@@ -941,7 +941,7 @@ export function CommandDeck({
           ...(harness ? { harness } : {}),
         }),
       });
-      const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean; isRunning?: boolean } };
+      const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLivePane?: boolean; isRunning?: boolean } };
       if (resumeRes.ok) {
         toast.success('Agent resumed');
         await refreshDashboardState(queryClient);
@@ -969,7 +969,7 @@ export function CommandDeck({
         return;
       }
       // Only fall through to start-fresh when there is genuinely no session to resume.
-      const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLiveTmuxSession;
+      const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLivePane;
       if (!noSession) {
         // A gate/resumable 409 opens the recovery dialog instead of toasting CLI text.
         if (openRecoveryForStartBlock(resumeRes.status, resumeData, issueId)) return;

@@ -51,6 +51,32 @@ describe('deriveServedAgentStatuses', () => {
     });
   });
 
+  it('clears the pane liveness flags with a trusted downgrade and fills hasLivePane from the old name (#4105)', () => {
+    const served = deriveServedAgentStatuses(
+      [
+        row('agent-pan-dead', 'running', { hasLiveTmuxSession: true }),
+        row('agent-pan-live', 'running', { hasLiveTmuxSession: true }),
+        row('agent-pan-idle', 'stopped', { hasLiveTmuxSession: true }),
+      ],
+      panesById(pane('agent-pan-live')),
+      'trusted',
+    );
+    const byId = Object.fromEntries(served.map((a) => [a.id, a]));
+    expect(byId['agent-pan-dead']).toMatchObject({ status: 'stopped', hasLivePane: false, hasLiveTmuxSession: false });
+    expect(byId['agent-pan-live']).toMatchObject({ status: 'running', hasLivePane: true, hasLiveTmuxSession: true });
+    // A stored stop is intent, not a downgrade: an idle-alive Herdr pane keeps its flag.
+    expect(byId['agent-pan-idle']).toMatchObject({ status: 'stopped', hasLivePane: true, hasLiveTmuxSession: true });
+  });
+
+  it('leaves the pane liveness flags alone while the inventory has never answered (#4105)', () => {
+    const served = deriveServedAgentStatuses(
+      [row('agent-pan-1', 'running', { hasLiveTmuxSession: true })],
+      {},
+      'unavailable',
+    );
+    expect(served[0]).toMatchObject({ status: 'unknown', hasLivePane: true, hasLiveTmuxSession: true });
+  });
+
   it('serves an exited pane as stopped', () => {
     const served = deriveServedAgentStatuses(
       [row('agent-pan-1', 'running')],

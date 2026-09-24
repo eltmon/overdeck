@@ -11,7 +11,13 @@
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 
-import { hashFile } from './manifest.js';
+import {
+  hashFile,
+  pruneStaleManifestEntries,
+  readManifest,
+  setManifestEntry,
+  writeManifest,
+} from './manifest.js';
 import { BIN_DIR, SYNC_SOURCES } from './paths.js';
 
 /**
@@ -33,6 +39,19 @@ export interface HooksSyncResult {
   unchanged: string[];
   /** The tree the hooks were distributed from, for operator-facing output. */
   sourceRoot: string;
+  /** Previously synced hooks whose source was deleted, removed from the bin dir. */
+  pruned: string[];
+  /** Previously synced hooks whose source was deleted but were edited on disk; kept. */
+  keptModified: string[];
+}
+
+/**
+ * Records which files in ~/.overdeck/bin/ `syncHooks()` wrote (PAN-3881), so a
+ * hook deleted from `sync-sources/hooks/` is removed on the next sync without
+ * ever touching a file sync did not write.
+ */
+function hooksManifestPath(): string {
+  return join(BIN_DIR, '.overdeck-manifest.json');
 }
 
 /**
@@ -77,21 +96,48 @@ export function syncHooks(): HooksSyncResult {
     changed: [],
     unchanged: [],
     sourceRoot: SYNC_SOURCES.hooks,
+    pruned: [],
+    keptModified: [],
   };
 
   // Ensure bin directory exists
   mkdirSync(BIN_DIR, { recursive: true });
 
-  for (const hook of planHooksSync()) {
+  const manifestPath = hooksManifestPath();
+  const manifest = readManifest(manifestPath);
+  const plan = planHooksSync();
+
+  for (const hook of plan) {
     try {
       copyFileSync(hook.sourcePath, hook.targetPath);
       chmodSync(hook.targetPath, 0o755); // Make executable
+      setManifestEntry(manifest, hook.name, hashFile(hook.targetPath), 'overdeck');
       result.synced.push(hook.name);
       if (hook.status === 'current') result.unchanged.push(hook.name);
       else result.changed.push(hook.name);
     } catch (error) {
       result.errors.push(`${hook.name}: ${error}`);
     }
+  }
+
+  // Remove hooks this sync wrote earlier whose source is gone. Only manifest
+  // entries are candidates, and a copy edited since it was written is kept.
+  // An unreadable sources dir yields an empty plan; never treat that as
+  // "every hook was deleted".
+  if (existsSync(SYNC_SOURCES.hooks)) {
+    try {
+      const prune = pruneStaleManifestEntries(BIN_DIR, manifest, new Set(plan.map((hook) => hook.name)));
+      result.pruned.push(...prune.pruned);
+      result.keptModified.push(...prune.keptModified);
+    } catch (error) {
+      result.errors.push(`prune: ${error}`);
+    }
+  }
+
+  try {
+    writeManifest(manifestPath, manifest);
+  } catch (error) {
+    result.errors.push(`manifest: ${error}`);
   }
 
   return result;

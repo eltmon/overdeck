@@ -264,6 +264,14 @@ function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
 }
 
 /**
+ * Printed by a conversation launcher once its harness exits; the keep-alive
+ * loop then holds the pane open. Readiness waits read it as "the harness
+ * exited" (PAN-3827).
+ */
+export const CONVERSATION_SESSION_ENDED_MARKER =
+  'Conversation session ended. Close this panel or click Resume to start a new session.';
+
+/**
  * Canonical launcher script generator.
  *
  * Takes a typed LauncherConfig and returns a bash script string.
@@ -475,7 +483,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
 
   if (config.spawnMode === 'conversation') {
     lines.push('echo ""');
-    lines.push('echo "Conversation session ended. Close this panel or click Resume to start a new session."');
+    lines.push(`echo "${CONVERSATION_SESSION_ENDED_MARKER}"`);
   }
 
   // Keep-alive loop

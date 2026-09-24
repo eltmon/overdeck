@@ -151,6 +151,9 @@ export const AgentHealthSnapshot = Schema.Struct({
   kind: Schema.optional(AgentHealthKind),
   status: AgentHealthStatus,
   lifecycle: Schema.optional(SpecialistLifecycle),
+  /** The agent has a live pane on the selected terminal backend (Herdr or tmux). */
+  hasLivePane: Schema.optional(Schema.Boolean),
+  /** @deprecated Alias of `hasLivePane` kept for existing readers; true on either backend, not only tmux. */
   tmuxActive: Schema.optional(Schema.Boolean),
   memoryBytes: Schema.optional(Schema.Number),
   memoryGb: Schema.optional(Schema.Number),

@@ -54,6 +54,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { waitForClaudeReady } from './claude-readiness.js';
 import { claudeSystemPromptFiles, getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
 import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
@@ -231,18 +232,6 @@ async function validateCwdContainment(cwd: string): Promise<boolean> {
 async function readConversationPane(tmuxSession: string, lines: number): Promise<string> {
   const { readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
   return readAgentPaneText(tmuxSession, lines, undefined, 'visible').catch(() => '');
-}
-async function waitForClaudeReady(tmuxSession: string): Promise<void> {
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    const output = await readConversationPane(tmuxSession, 200);
-    if (output.includes('❯')) {
-      console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
-      return;
-    }
-    await new Promise<void>((r) => setTimeout(r, 500));
-  }
-  console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 function isPiTuiInputReady(snapshot: string): boolean {
   return /^\s*[❯›>]\s/m.test(snapshot)
