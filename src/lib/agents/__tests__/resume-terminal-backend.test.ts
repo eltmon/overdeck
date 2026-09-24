@@ -230,6 +230,33 @@ describe('resumeAgent relaunches on the host backend (PAN-3960)', () => {
   });
 });
 
+describe('resumeAgent marks the relaunch as starting (PAN-3923 review, F3)', () => {
+  it('holds status starting while the relaunched harness boots, then running once the message lands', async () => {
+    mocks.host = 'herdr';
+    const agentId = 'agent-pan-3923-resume-starting';
+    writeStoppedAgent(agentId, 'herdr');
+    const statusAtLaunch: Array<string | undefined> = [];
+    const statusWhileBooting: Array<string | undefined> = [];
+    const realStart = herdr.startAgent;
+    vi.spyOn(herdr, 'startAgent').mockImplementation((workspaceRef, spec) => {
+      statusAtLaunch.push(getAgentState(agentId)?.status);
+      return realStart(workspaceRef, spec);
+    });
+    mocks.waitForPromptReady.mockImplementation(async () => {
+      statusWhileBooting.push(getAgentState(agentId)?.status);
+      return true;
+    });
+
+    const result = await resumeAgent(agentId);
+
+    expect(result).toEqual({ success: true, messageDelivered: true });
+    // A concurrent same-id dispatch reads `starting` for the whole boot and never reaps.
+    expect(statusAtLaunch).toEqual(['starting']);
+    expect(statusWhileBooting.every((status) => status === 'starting')).toBe(true);
+    expect(getAgentState(agentId)?.status).toBe('running');
+  });
+});
+
 describe('resumeAgent on a Herdr host (review of #3992)', () => {
   it('reads and keys the relaunched Herdr pane for the resume-summary gate (M2)', async () => {
     mocks.host = 'herdr';

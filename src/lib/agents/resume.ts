@@ -443,6 +443,13 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
 
+    // PAN-3923 review (F3): the relaunched harness sits idle at its prompt
+    // until the continue message lands. Mark the run `starting`, as
+    // restartAgent does, so a concurrent same-id dispatch never reaps it.
+    // markAgentRunning below flips it back once the message is delivered.
+    agentState.status = 'starting';
+    saveAgentStateSync(agentState);
+
     // PAN-3960: relaunch through the terminal backend the host selects NOW —
     // never the backend the agent's previous pane used — with the same four
     // pane tokens spawn.ts stamps.
