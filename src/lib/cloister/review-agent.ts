@@ -43,7 +43,8 @@ import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
+import { killSession, listSessionNames } from '../tmux.js';
+import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
 import { listAgentIdsByPrefix } from '../overdeck/agents.js';
@@ -306,8 +307,8 @@ async function spawnReviewRoleForIssueBody(
     return { success: true, message };
   }
 
-  // Idempotency: if a review role agent for this issue already has an alive
-  // tmux pane, treat the current dispatch as a no-op. spawnRun has its own
+  // Idempotency: if a review role agent for this issue already has a live
+  // harness, treat the current dispatch as a no-op. spawnRun has its own
   // session-exists check but it throws — we want soft "already running"
   // semantics so callers can keep their existing success-path messaging.
   //
@@ -324,10 +325,23 @@ async function spawnReviewRoleForIssueBody(
     }
   }
 
+  // PAN-3939: liveness comes from the backend-aware oracle, never from a tmux
+  // session list. On tmux a bare shell left after the harness exited passed the
+  // old session-exists check and blocked every later dispatch; on Herdr there is
+  // no tmux session at all, so the guard never matched. A probe that cannot
+  // answer holds the dispatch: spawning on top of a live reviewer duplicates it.
+  const verdict: LivenessVerdict | null = opts.force
+    ? null
+    : await isAlive(reviewSessionName).catch((): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }));
+  if (verdict && !verdict.alive && !isConfirmedDead(verdict)) {
+    const message = `Review dispatch held — could not determine whether ${reviewSessionName} is alive`;
+    console.log(`[review-agent] ${message} (${verdict.reason})`);
+    return { success: false, message };
+  }
+
   try {
-    const sessions = opts.force ? [] : await Effect.runPromise(listSessionNames());
-    if (sessions.includes(reviewSessionName)) {
-      const paneDead = await Effect.runPromise(isPaneDead(reviewSessionName));
+    if (verdict && (verdict.alive || verdict.reason !== 'no-session')) {
+      const paneDead = !verdict.alive;
 
       // A synthesis agent that has finished its verdict does NOT terminate:
       // its role prompt tells it to "exit", but it runs `Bash(exit)` which
@@ -397,7 +411,7 @@ async function spawnReviewRoleForIssueBody(
       // convoy tmux and respawn (the spawn path resumes the saved session, so a
       // warm reviewer keeps its context).
       const reason = opts.force ? 'force-killed for re-review'
-        : paneDead ? 'pane is dead'
+        : !verdict.alive ? `harness is gone (${verdict.reason})`
         : staleRunId ? 'stale runId'
         : 'finished-idle (warm reuse for new cycle)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
@@ -656,7 +670,15 @@ export { isReviewSessionForIssue };
  *
  * Matches the parent review role, convoy children, and legacy coordinator
  * sessions so callers do not need to know which review phase has started.
- * Session-kill failures are aggregated into `failed`; this never rejects.
+ *
+ * PAN-3939: every close goes through the host's terminal backend
+ * (`closeAgentPaneDetailed`), so on Herdr the reviewer panes close too — the
+ * tmux-only kill found no sessions there and closed nothing. Candidates are the
+ * issue's reviewer agent rows plus any matching tmux session (legacy names
+ * carry no row). A reviewer whose close succeeded, or whose row still claims
+ * it is live, gets a `stopped` row through `stopAgent`. A failed close lands
+ * in `failed` and its row is left alone: the reviewer may still be running.
+ * This never rejects.
  */
 export async function killAllReviewerSessions(
   projectKey: string | undefined,
@@ -664,28 +686,35 @@ export async function killAllReviewerSessions(
 ): Promise<{ killed: string[]; failed: string[] }> {
   const killed: string[] = [];
   const failed: string[] = [];
-  let allSessions: readonly string[];
 
-  try {
-    allSessions = await Effect.runPromise(listSessionNames());
-  } catch (err) {
+  const tmuxSessions = await Effect.runPromise(listSessionNames()).catch((err: unknown) => {
     console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
-    return {
-      killed,
-      failed: [`agent-${issueId.toLowerCase()}-review`],
-    };
-  }
+    return [] as readonly string[];
+  });
+  const candidates = [...new Set([
+    ...tmuxSessions,
+    ...listAgentIdsByPrefix(`agent-${issueId.toLowerCase()}-review`),
+  ])].filter(s => isReviewSessionForIssue(s, projectKey, issueId));
 
-  const sessionsToKill = allSessions.filter(s => isReviewSessionForIssue(s, projectKey, issueId));
+  const { closeAgentPaneDetailed } = await import('../terminal-backends/launch.js');
+  const { stopAgent } = await import('../agents.js');
   await Promise.all(
-    sessionsToKill.map(async (sessionName) => {
-      try {
-        await Effect.runPromise(killSession(sessionName));
+    candidates.map(async (sessionName) => {
+      const result = await closeAgentPaneDetailed(sessionName);
+      if (result.outcome === 'failed') {
+        console.warn(`[review-agent] Could not stop reviewer ${sessionName}: ${result.reason}`);
+        failed.push(sessionName);
+        return;
+      }
+      if (result.outcome === 'closed') {
         console.log(`[review-agent] Killed reviewer session ${sessionName}`);
         killed.push(sessionName);
-      } catch (err) {
-        console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
-        failed.push(sessionName);
+      }
+      const status = getAgentState(sessionName)?.status;
+      if (result.outcome === 'closed' || status === 'running' || status === 'starting') {
+        await Effect.runPromise(stopAgent(sessionName)).catch((err: unknown) => {
+          console.warn(`[review-agent] Could not write stopped state for ${sessionName}: ${err instanceof Error ? err.message : String(err)}`);
+        });
       }
     }),
   );
