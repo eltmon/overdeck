@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T16:23:28.263Z · model: claude-opus-5 · open: 847_
+_Last sequenced: 2026-09-24T16:33:14.858Z · model: claude-opus-5 · open: 846_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -43,13 +43,11 @@ _Last sequenced: 2026-09-24T16:23:28.263Z · model: claude-opus-5 · open: 847_
 | 46 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
 | 47 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
 | 48 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
-| 49 | PAN-3967 | XS | high | ok |  |  | Every strike agent ends on `pan strike-ready`, a verb PAN-3917 cut; 4 prompt/recovery refs still name it. Push is the signal. |
 | 50 | PAN-3953 | XS | high | ok |  |  | planned label is applied at planning spawn, before any spec exists; five issues labeled planned with no spec on disk |
 | 51 | PAN-3580 | S | critical | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
 | 52 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
 | 53 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
 | 54 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
-| 55 | PAN-3898 | M | critical | needs-refinement |  |  | First post-epic strike: salvage re-arms a landed strike, close-out records zero merges, no post-merge deploy fires |
 | 56 | PAN-3905 | S | critical | ok |  |  | Planner-created workspaces are not pre-trusted; first agent spawned into them dies at the Claude trust dialog |
 | 57 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
 | 58 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
@@ -57,9 +55,7 @@ _Last sequenced: 2026-09-24T16:23:28.263Z · model: claude-opus-5 · open: 847_
 | 60 | PAN-2700 | S | high | needs-refinement |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
 | 61 | PAN-1560 | XS | high | needs-refinement |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
 | 62 | PAN-3936 | S | high | ok |  |  | muse and kimi-code runtimes still call tmuxCreateSession with the supervisor hardcoded; route through launchAgentPane like spawn.ts |
-| 63 | PAN-2828 | S | critical | ok |  |  | pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash) |
-| 64 | PAN-2874 | M | critical | ok |  | PAN-2828 | Strike landing pipeline cannot merge strikes: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback deli… |
-| 65 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
+| 65 | PAN-4061 | S | high | ok |  |  | Harness ToS gate fails open: an unlisted harness (or a raw legacy pi) skips the Anthropic subscription block at all three layers. |
 | 66 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
@@ -195,7 +191,6 @@ _Last sequenced: 2026-09-24T16:23:28.263Z · model: claude-opus-5 · open: 847_
 | 198 | PAN-3190 | XS | high | ok |  |  | pan merge cancel has a 0% success rate: Commander binds its options object into the injectable fetchImpl parameter. |
 | 199 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
 | 200 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
-| 201 | PAN-2995 | XS | high | ok |  |  | pan done --strike gates on branch ancestry, which a squash-merge breaks, so it refuses strikes that pan close proves merged. |
 | 202 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
 | 203 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
 | 204 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
@@ -210,12 +205,13 @@ _Last sequenced: 2026-09-24T16:23:28.263Z · model: claude-opus-5 · open: 847_
 | 213 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 214 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
 | 215 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
-| 216 | PAN-3047 | XS | high | ok |  | PAN-2828 | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
+| 216 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 220 | PAN-4046 | S | high | ok |  |  | findProjectByPathSync ignores ~, symlinks and path boundaries, so a path under ~/Projects/overdeck-knowledge matches project overdeck |
 | 221 | PAN-4052 | M | high | ok |  |  | Metrics cost panels, specialist run and handoff logs and the boot stamp have live readers but no writer post-Cut; restore or delete each |
+| 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
@@ -526,6 +522,7 @@ _Last sequenced: 2026-09-24T16:23:28.263Z · model: claude-opus-5 · open: 847_
 | 538 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
 | 539 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
 | 540 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 541 | PAN-4059 | S | medium | ok |  |  | Leftovers from the #4002 suffix rename: a stale Promise suffix, three same-named export pairs, and stale codebase-context docs. |
 | 542 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
 | 543 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
 | 544 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
@@ -852,6 +849,8 @@ _Last sequenced: 2026-09-24T16:23:28.263Z · model: claude-opus-5 · open: 847_
 | 868 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
 | 869 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
 | 870 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
+| 871 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
+| 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 
 ## Rationale detail
 
@@ -925,7 +924,7 @@ Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked eve
 
 ### PAN-3981 (rank 23)
 
-PAN-3973 (strike opens its own PR on completion) closed since the prior run, removing one of this issue's two blockers and freeing rank 23; the remaining blocker PAN-3966 (Herdr-aware stopAgent) still sits above it at rank 18, so the pair stays in build order. The operator-decision framing in the prior rationale is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, and the strike-workspace reaper stays a fallback that must also recognise squash merges.
+Rank held at 23, still behind its blocker PAN-3966 (Herdr-aware stopAgent, in pipeline at rank 18). The three issues it was cross-referenced with — PAN-2828, PAN-3898 and PAN-3967 — all closed since the prior run, so those informs edges drop. The squash blindness the body cites as 'same as PAN-2828' is now solved code rather than an open dependency: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) is the check the reaper's ahead-of-origin/main guard should adopt. The operator-decision framing is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, with the reaper as fallback.
 
 ### PAN-3977 (rank 25)
 
@@ -1007,10 +1006,6 @@ New this pass. Under concurrent review convoys the PTY supervisor returns 502 'i
 
 New this pass. The test gate records a real 'test failed' verdict for uniform 5000ms timeout signatures under host load, proven on multiple branches where the same files pass in isolation in about 19 seconds. Every false verdict costs a full rework cycle and another saturated re-test, so this is both a correctness and a cost fix. Retrying timeout-only failures in isolation before writing a verdict is the minimal change.
 
-### PAN-3967 (rank 49)
-
-New issue filed from strike RUN-92 (discovered in PAN-3963). The pushed strike/<issue> branch is already the readiness signal post-cut, so landing still works; the defect is that the strike prompt template, deacon landing recovery message, merge-ops landing request, and roles/strike.md all instruct agents to run a command that does not exist, so every otherwise-clean strike ends in an error. Four exact file:line refs are in the body; rewrite them (or restore the verb) is an XS change. Ranked high rather than critical because the underlying signal lands; placed below PAN-3963 (rank 17), which hard-blocks the merge train.
-
 ### PAN-3953 (rank 50)
 
 Violates the cut's rule that planned is derived from spec existence; a dead planner leaves an issue looking planned forever and the pickup gate mis-reads it. Delete the spawn-time label write. PAN-3961 reported the same bug and was closed as its duplicate on 2026-09-20; this issue is the single owner.
@@ -1030,10 +1025,6 @@ New this pass. A transient upstream stream error benches CLIProxy's only auth en
 ### PAN-3282 (rank 54)
 
 New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.
-
-### PAN-3898 (rank 55)
-
-Strike landing and salvage re-arm survive in deacon-strike-landing.ts; triage asks to verify the zero-merges close-out and missing post-merge deploy against that current file rather than the old patrol loop. Still blocks-main + pipeline; rank held in the critical band.
 
 ### PAN-3905 (rank 56)
 
@@ -1063,17 +1054,9 @@ Triage: review_status is gone but verification still writes a check run to the P
 
 Split out of PAN-3921 at planning time. On a Herdr host these specialist-rotation and crash-respawn paths land on tmux, where isAliveOnHerdr reads them as dead. Do after PAN-3921 lands so the pattern is settled.
 
-### PAN-2828 (rank 63)
+### PAN-4061 (rank 65)
 
-pan done --strike structurally refuses every squash-merged strike — the landing path doctrine mandates is rejected by its own ancestry check.
-
-### PAN-2874 (rank 64)
-
-Strike landing cannot merge: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback wedges on exited strike agents.
-
-### PAN-2883 (rank 65)
-
-Close-out deploy row fails for every strike-landed issue — PR resolver hardcodes feature/ and cannot find strike/ PRs.
+New issue filed 2026-09-24, placed at the rank freed by the PAN-2828 closure. canUseHarness (src/lib/harness-policy.ts:145-146) returns ALLOWED for anything its explicit branches miss, HarnessPolicyDecisionMap keys the inner record by string so an omitted RuntimeName still compiles, and ModelPicker.tsx:46 defaults a missing decision row to { allowed: true }. All three default open, so a harness added without a policy entry silently bypasses the Anthropic-subscription ToS block that protects the account every agent runs on — and a raw legacy 'pi' that escaped normalization is allowed today where 'ohmypi' is blocked. The fix is small and mechanical: type the map Record<RuntimeName, ...> so the omission is a compile error, deny unrecognised harnesses with a reason, and map legacy 'pi' onto the ohmypi rules. High rather than critical because nothing is blocked on it and the hole needs an unlisted harness or an unnormalized config to open.
 
 ### PAN-2806 (rank 66)
 
@@ -1175,6 +1158,22 @@ Reload/build atomicity — an in-place npm run build under a live dashboard brea
 
 Rebuilding dist under a live server breaks lazy chunk imports (Cannot find module), wedging boots.
 
+### PAN-2699 (rank 91)
+
+npm run build regenerates the committed record-cost-event.js bundle, dirtying every workspace tree and blocking clean-workspace gates.
+
+### PAN-2957 (rank 92)
+
+npm run build intermittently produces stale frontend bundles, deploying pre-edit code.
+
+### PAN-2850 (rank 93)
+
+npm test fails in clean checkout — pretest removes the dashboard bundle the test spawns against.
+
+### PAN-2758 (rank 94)
+
+Triage: verify whether a provider-capacity zombie can still read as running under the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1182,10 +1181,10 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T16:23:28.263Z",
+  "generatedAt": "2026-09-24T16:33:14.858Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 847,
+  "openCount": 846,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1419,7 +1418,7 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
         "PAN-3966"
       ],
       "why": "Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision)",
-      "rationale": "PAN-3973 (strike opens its own PR on completion) closed since the prior run, removing one of this issue's two blockers and freeing rank 23; the remaining blocker PAN-3966 (Herdr-aware stopAgent) still sits above it at rank 18, so the pair stays in build order. The operator-decision framing in the prior rationale is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, and the strike-workspace reaper stays a fallback that must also recognise squash merges.",
+      "rationale": "Rank held at 23, still behind its blocker PAN-3966 (Herdr-aware stopAgent, in pipeline at rank 18). The three issues it was cross-referenced with — PAN-2828, PAN-3898 and PAN-3967 — all closed since the prior run, so those informs edges drop. The squash blindness the body cites as 'same as PAN-2828' is now solved code rather than an open dependency: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) is the check the reaper's ahead-of-origin/main guard should adopt. The operator-decision framing is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, with the reaper as fallback.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1684,19 +1683,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-3967",
-      "rank": 49,
-      "size": "XS",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Every strike agent ends on `pan strike-ready`, a verb PAN-3917 cut; 4 prompt/recovery refs still name it. Push is the signal.",
-      "rationale": "New issue filed from strike RUN-92 (discovered in PAN-3963). The pushed strike/<issue> branch is already the readiness signal post-cut, so landing still works; the defect is that the strike prompt template, deacon landing recovery message, merge-ops landing request, and roles/strike.md all instruct agents to run a command that does not exist, so every otherwise-clean strike ends in an error. Four exact file:line refs are in the body; rewrite them (or restore the verb) is an XS change. Ranked high rather than critical because the underlying signal lands; placed below PAN-3963 (rank 17), which hard-blocks the merge train.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3953",
       "rank": 50,
       "size": "XS",
@@ -1758,19 +1744,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "dependsOn": [],
       "why": "Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it.",
       "rationale": "New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3898",
-      "rank": 55,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "First post-epic strike: salvage re-arms a landed strike, close-out records zero merges, no post-merge deploy fires",
-      "rationale": "Strike landing and salvage re-arm survive in deacon-strike-landing.ts; triage asks to verify the zero-merges close-out and missing post-merge deploy against that current file rather than the old patrol loop. Still blocks-main + pipeline; rank held in the critical band.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1866,45 +1839,28 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "planning": "auto"
     },
     {
-      "issue": "PAN-2828",
-      "rank": 63,
-      "size": "S",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash)",
-      "rationale": "pan done --strike structurally refuses every squash-merged strike — the landing path doctrine mandates is rejected by its own ancestry check.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-2874",
-      "rank": 64,
+      "rank": 222,
       "size": "M",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2828"
-      ],
-      "why": "Strike landing pipeline cannot merge strikes: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback deli…",
-      "rationale": "Strike landing cannot merge: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback wedges on exited strike agents.",
+      "importance": "high",
+      "score": 45,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope.",
+      "rationale": "Demoted from rank 64 (critical/92) because the closure of its blocker PAN-2828 and of PAN-3898 falsified most of the premise. Defect 1 — the verification gate demanding a vBRIEF checklist strikes never have — is fixed: src/dashboard/server/routes/workspaces/merge-strike.ts:36 sets skipPlanChecklist: true for request.kind === 'strike', and verification-runner.ts:775 honours it, so the incomplete-plan-items gate no longer fires for a strike. Defect 3 — the landing loop leaving strike_landing_state: 'recovering' after a transient fetch failure — describes deacon-strike-landing.ts, which the PAN-3917 cut deleted; no stored strike landing state remains to retry. Only defect 2 may survive: feedback delivery can still strand on feedback_delivery_needs_you (src/lib/cloister/review-verdict-feedback.ts:276) when the target agent has exited, although the strike carve-out removes the failure that used to trigger it. Held above the obsolete tail rather than sent to it, because that residual needs a rescope against the current code rather than a close.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-2883",
-      "rank": 65,
+      "rank": 871,
       "size": "M",
       "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2828"
-      ],
-      "why": "Close-out deploy row fails for every strike-landed issue",
-      "rationale": "Close-out deploy row fails for every strike-landed issue — PR resolver hardcodes feature/ and cannot find strike/ PRs.",
+      "score": 20,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close.",
+      "rationale": "Demoted from rank 65 because clearing the closed PAN-2828 dependency prompted a reread, and the fix has landed: src/lib/overdeck/pull-requests.ts:200-209 probes feature/<id> then strike/<id>, so a strike PR resolves and close-out's deploy row gets its mergedAt. The issue body itself records this under 'Fix (landed)' with live verification across six strikes. Nothing here is workable; it needs an operator verification and a close, not an agent.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2352,7 +2308,7 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "condition": "ok",
       "dependsOn": [],
       "why": "pan reload drops the Deacon/resume boot gates chosen at the last restart, so every deploy relaunches with the Deacon off",
-      "rationale": "resolveBootGates is only called from restart.ts; reload and the post-merge deploy path relaunch with no OVERDECK_* gate env, so deacon-lite is silently off after most deploys. Related to PAN-3898 (same landing).",
+      "rationale": "Rank held at 99. resolveBootGates is only called from restart.ts; reload and the post-merge deploy path relaunch with no OVERDECK_* gate env, so deacon-lite is silently off after most deploys. The related PAN-3898 closed as obsolete after the cut, so that cross-reference is dropped; nothing in the boot-gate defect depended on it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3637,13 +3593,14 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
     },
     {
       "issue": "PAN-2995",
-      "rank": 201,
+      "rank": 872,
       "size": "XS",
       "importance": "high",
-      "score": 76,
-      "condition": "ok",
+      "score": 20,
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "pan done --strike gates on branch ancestry, which a squash-merge breaks, so it refuses strikes that pan close proves merged.",
+      "why": "Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content.",
+      "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3822,11 +3779,9 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "importance": "high",
       "score": 74,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-2828"
-      ],
+      "dependsOn": [],
       "why": "Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue.",
-      "rationale": "Rank held at 224. The body re-confirms the same --is-ancestor-versus-squash root cause that PAN-2828 fixes on the pan done path, so this pass records the dependency rather than moving the rank: teardown should reuse the squash-aware containment check once PAN-2828 lands. 96 strike/* branches of residue is real but inert cleanup, so it stays below the availability and merge-integrity tier.",
+      "rationale": "Rank held at 216. The blocker PAN-2828 closed as a duplicate of the already-fixed #2907, so the squash-aware containment check this issue was waiting on now exists and can simply be reused: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) resolves merged-PR and content equivalence. The defect itself is unchanged and still live — localBranchMergedState at src/lib/lifecycle/teardown-workspace.ts:466 and the remote check at :529 both still gate on git merge-base --is-ancestor, which no squash merge can satisfy, so every strike branch is preserved as residue. It stays below the availability and merge-integrity tier because 96 stale branches are inert, but it is now an unblocked XS reuse rather than blocked work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11688,6 +11643,31 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "rationale": "PAN-4003 (opened 2026-09-23) names this issue as a close-as-won't-do or fold-in candidate under the standing operator decision to drop the Oh My Pi harness, so it must not be picked up on its old rank until PAN-4003 is scheduled and decides its fate. gate and planning preserved verbatim.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4061",
+      "rank": 65,
+      "size": "S",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Harness ToS gate fails open: an unlisted harness (or a raw legacy pi) skips the Anthropic subscription block at all three layers.",
+      "rationale": "New issue filed 2026-09-24, placed at the rank freed by the PAN-2828 closure. canUseHarness (src/lib/harness-policy.ts:145-146) returns ALLOWED for anything its explicit branches miss, HarnessPolicyDecisionMap keys the inner record by string so an omitted RuntimeName still compiles, and ModelPicker.tsx:46 defaults a missing decision row to { allowed: true }. All three default open, so a harness added without a policy entry silently bypasses the Anthropic-subscription ToS block that protects the account every agent runs on — and a raw legacy 'pi' that escaped normalization is allowed today where 'ohmypi' is blocked. The fix is small and mechanical: type the map Record<RuntimeName, ...> so the omission is a compile error, deny unrecognised harnesses with a reason, and map legacy 'pi' onto the ohmypi rules. High rather than critical because nothing is blocked on it and the hole needs an unlisted harness or an unnormalized config to open.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4059",
+      "rank": 541,
+      "size": "S",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Leftovers from the #4002 suffix rename: a stale Promise suffix, three same-named export pairs, and stale codebase-context docs.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11743,20 +11723,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
     {
       "from": "PAN-2642",
       "to": "PAN-570",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-2828",
-      "to": "PAN-2874",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
-      "from": "PAN-2828",
-      "to": "PAN-2883",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
@@ -12028,13 +11994,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "confidence": 0.6
     },
     {
-      "from": "PAN-2828",
-      "to": "PAN-3047",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
       "from": "PAN-3062",
       "to": "PAN-3505",
       "type": "informs",
@@ -12082,13 +12041,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-2828",
-      "to": "PAN-2995",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
     },
     {
       "from": "PAN-3015",
@@ -12238,13 +12190,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "confidence": 0.7
     },
     {
-      "from": "PAN-2828",
-      "to": "PAN-3047",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-3517",
       "to": "PAN-3518",
       "type": "unblocks",
@@ -12320,13 +12265,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
-    },
-    {
-      "from": "PAN-3898",
-      "to": "PAN-3899",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
     },
     {
       "from": "PAN-3833",
@@ -12777,35 +12715,7 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "confidence": 0.7
     },
     {
-      "from": "PAN-3967",
-      "to": "PAN-3898",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-2828",
-      "to": "PAN-3981",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3898",
-      "to": "PAN-3981",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-3966",
-      "to": "PAN-3981",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3967",
       "to": "PAN-3981",
       "type": "informs",
       "source": "github-ref",
@@ -12815,13 +12725,6 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "from": "PAN-3966",
       "to": "PAN-3981",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3981",
-      "to": "PAN-2828",
-      "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
     },
@@ -12978,6 +12881,13 @@ Rebuilding dist under a live server breaks lazy chunk imports (Cannot find modul
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-3981",
+      "to": "PAN-3047",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.75
     }
   ]
 }
