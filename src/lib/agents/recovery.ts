@@ -42,7 +42,7 @@ import {
   type PendingOperatorDecision,
 } from './pending-decision-gate.js';
 import { listAgentStates } from './queries.js';
-import { getProviderEnvForModel, getProviderExportsForModel } from './provider-env.js';
+import { determineModel, getProviderEnvForModel, getProviderExportsForModel } from './provider-env.js';
 import { saveAgentRuntimeState } from './runtime-state.js';
 import {
   claudeSystemPromptFiles,
@@ -52,12 +52,39 @@ import {
   writeLauncherScriptAtomic,
   writeOhmypiAgentPrompt,
 } from './runtime-command.js';
-import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './spawn-prep.js';
-import { resolveRoutedSpawnModel } from './routed-spawn-model.js';
+import {
+  assertWorkspaceStackHealthyForSpawn,
+  buildAgentLaunchConfig,
+  resolveSingleWorkTierSpawnParams,
+} from './spawn-prep.js';
 import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity } from '../session-history.js';
 import { kimiHomeDefault } from '../runtimes/storage/kimi-code.js';
+
+/**
+ * The model a fresh spawn of `role` for `issueId` is staffed with when no
+ * model is chosen: the single-work tier resolver (work role with a workspace
+ * plan), else `roles.<role>` routing — the same pair spawnAgent runs. Callers
+ * that need a model before `pan start` resolves it (policy checks, relaunches
+ * of an agent with no recorded model) use this instead of a literal. Throws a
+ * "no default model configured" error when routing cannot resolve (PAN-4145).
+ */
+export function resolveRoutedSpawnModel(input: { role: Role; issueId: string; workspace?: string }): string {
+  const spawnKey = `${input.role}:${input.issueId}`;
+  try {
+    const tierParams = input.role === 'work' && input.workspace
+      ? resolveSingleWorkTierSpawnParams(input.workspace, undefined, spawnKey)
+      : {};
+    return determineModel({ model: tierParams.model, role: input.role, spawnKey });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `No default model configured for role "${input.role}" (${input.issueId}): ${reason}. ` +
+      `Set roles.${input.role}.model in config.yaml or pass an explicit model.`,
+    );
+  }
+}
 
 export type RecoverAgentResult =
   | { action: 'respawned'; state: AgentState }

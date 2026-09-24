@@ -5,10 +5,16 @@ const mocks = vi.hoisted(() => ({
   resolveSingleWorkTierSpawnParams: vi.fn(),
 }))
 
-vi.mock('../provider-env.js', () => ({ determineModel: mocks.determineModel }))
-vi.mock('../spawn-prep.js', () => ({ resolveSingleWorkTierSpawnParams: mocks.resolveSingleWorkTierSpawnParams }))
+vi.mock('../provider-env.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../provider-env.js')>()),
+  determineModel: mocks.determineModel,
+}))
+vi.mock('../spawn-prep.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../spawn-prep.js')>()),
+  resolveSingleWorkTierSpawnParams: mocks.resolveSingleWorkTierSpawnParams,
+}))
 
-import { resolveRoutedSpawnModel } from '../routed-spawn-model.js'
+import { resolveRoutedSpawnModel } from '../recovery.js'
 
 describe('resolveRoutedSpawnModel (PAN-4145)', () => {
   beforeEach(() => {
