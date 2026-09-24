@@ -203,7 +203,11 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const project = params['project'] as string;
     const issueId = params['issueId'] as string;
     const body = yield* readJsonBody;
-    const { model, harness } = body as { model?: string; harness?: 'claude-code' | 'pi' | 'codex' };
+    const { model, harness, callerKind } = body as {
+      model?: string;
+      harness?: 'claude-code' | 'pi' | 'codex';
+      callerKind?: string;
+    };
 
     const { killAllReviewerSessions } = yield* Effect.promise(
       () => import('../../../../lib/cloister/review-agent.js'),
@@ -249,8 +253,11 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       prUrl,
       model,
       harness,
-      // #3853: `pan review restart` is an explicit request for this run.
-      operatorRequested: true,
+      // #3853: an operator's restart is an explicit request for this run. An
+      // agent's (`pan review restart` from a managed pane, e.g. the flywheel
+      // recovering a stalled convoy) is not. The dashboard button sends no
+      // caller, and a browser is the operator.
+      operatorRequested: callerKind !== 'agent',
     });
 
     if (result.gated) {
