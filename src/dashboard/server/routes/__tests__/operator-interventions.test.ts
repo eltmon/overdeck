@@ -60,13 +60,15 @@ const sharedMocks = vi.hoisted(() => ({
   })),
 }));
 
-const terminationMocks = vi.hoisted(() => ({
-  stopIssueSpecialistAgents: vi.fn(async () => [] as string[]),
+const issuePauseMocks = vi.hoisted(() => ({
+  haltIssueSpecialistsForPause: vi.fn(),
+  restartIssueAfterUnpause: vi.fn(),
 }));
 
-vi.mock('../../../../lib/agents/termination.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../lib/agents/termination.js')>()),
-  stopIssueSpecialistAgents: terminationMocks.stopIssueSpecialistAgents,
+vi.mock('../../../../lib/agents/issue-pause.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/agents/issue-pause.js')>()),
+  haltIssueSpecialistsForPause: issuePauseMocks.haltIssueSpecialistsForPause,
+  restartIssueAfterUnpause: issuePauseMocks.restartIssueAfterUnpause,
 }));
 
 vi.mock('../../../../lib/operator-interventions.js', () => ({
@@ -342,6 +344,10 @@ describe('operator.intervention dashboard routes', () => {
     // and the request reaches the start-gate (clearGates) logic under test.
     issueServiceMock.getIssues.mockReturnValue([]);
     dashboardAuthMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+    issuePauseMocks.haltIssueSpecialistsForPause.mockReset();
+    issuePauseMocks.haltIssueSpecialistsForPause.mockResolvedValue(null);
+    issuePauseMocks.restartIssueAfterUnpause.mockReset();
+    issuePauseMocks.restartIssueAfterUnpause.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -359,7 +365,53 @@ describe('operator.intervention dashboard routes', () => {
       payload: { issueId: 'PAN-1', kind: 'pause', source: 'dashboard' },
     }));
     // PAN-3911: pausing the work agent stops the issue's review/test agents.
-    expect(terminationMocks.stopIssueSpecialistAgents).toHaveBeenCalledWith('PAN-1');
+    expect(issuePauseMocks.haltIssueSpecialistsForPause).toHaveBeenCalledWith(
+      'agent-pan-1', expect.objectContaining({ issueId: 'PAN-1' }), 'dashboard',
+    );
+  });
+
+  it('reports review/test agents the pause could not stop in the pause response (PAN-3911)', async () => {
+    issuePauseMocks.haltIssueSpecialistsForPause.mockResolvedValue({
+      stopped: ['agent-pan-1-review'],
+      failed: [{ agentId: 'agent-pan-1-review-security', reason: 'herdr could not close pane p_9' }],
+      unknown: [],
+      closedPanes: [],
+    });
+
+    const { response } = await requestAgents('/api/agents/agent-pan-1/pause', { body: JSON.stringify({}) });
+
+    expect(response.status).toBe(200);
+    const body = await HttpServerResponse.toWeb(response).json() as {
+      specialists?: { stopped: string[] };
+      warnings?: string[];
+    };
+    expect(body.specialists?.stopped).toEqual(['agent-pan-1-review']);
+    expect(body.warnings).toEqual(['could not stop agent-pan-1-review-security: herdr could not close pane p_9']);
+  });
+
+  it('re-requests the review through the registered review door when unpause finds reviewers the pause stopped (PAN-3911)', async () => {
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pauseStoppedAgents: ['agent-pan-1-review'] });
+    issuePauseMocks.restartIssueAfterUnpause.mockResolvedValue({ clearedStopGates: [], review: { requested: true } });
+    const starter = vi.fn(async () => ({ started: true as const }));
+    const { registerRequestReviewStarter } = await import('../../../../lib/cloister/request-review-pipeline.js');
+    registerRequestReviewStarter(starter);
+
+    try {
+      const { response } = await requestAgents('/api/agents/agent-pan-1/unpause', { body: JSON.stringify({}) });
+
+      expect(response.status).toBe(200);
+      const body = await HttpServerResponse.toWeb(response).json() as { restart?: unknown };
+      expect(body.restart).toEqual({ clearedStopGates: [], review: { requested: true } });
+      const [stateBefore, deps] = issuePauseMocks.restartIssueAfterUnpause.mock.calls[0] as [
+        { pauseStoppedAgents?: string[] },
+        { requestReview: (issueId: string) => Promise<unknown> },
+      ];
+      expect(stateBefore.pauseStoppedAgents).toEqual(['agent-pan-1-review']);
+      expect(await deps.requestReview('PAN-1')).toEqual({ requested: true });
+      expect(starter).toHaveBeenCalledWith('PAN-1', expect.objectContaining({ source: 'pan-unpause' }));
+    } finally {
+      registerRequestReviewStarter(null);
+    }
   });
 
   it('emits restart from the successful dashboard restart route and forwards harness overrides', async () => {
