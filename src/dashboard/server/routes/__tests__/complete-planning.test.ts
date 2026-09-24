@@ -417,8 +417,9 @@ describe('completePlanningArtifacts', () => {
         role: 'work',
         startedBy: 'planning-auto-handoff',
         autoSpawnConsentRequired: true,
-        // PAN-3977: the launch-time consent covers advisory health warnings.
-        guardrailAcknowledged: true,
+        // PAN-3977: an unattended start acknowledges tight RAM and a high
+        // agent count only, never the ceiling or leaked specialists.
+        guardrailAcknowledgedWarnings: ['memory_tight', 'agent_count_high'],
       });
       return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 });
     };

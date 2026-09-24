@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../../../lib/activity-logger.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../lib/activity-logger.js')>(),
+  emitActivityEntry: vi.fn(),
+}));
+
 import { evaluateAgentStartGate, evaluateSpawnGuardrails, hasActiveAgentGateOrRetry } from '../agents.js';
+import {
+  AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT,
+  parseSpawnGuardrailAcknowledgement,
+} from '../agents/shared.js';
+import { resolveSpawnGuardrailRefusal } from '../agents/spawn.js';
 import {
   countAdmittedWorkAgents,
   readGlobalResourceConfig,
@@ -372,5 +382,103 @@ describe('evaluateSpawnGuardrails', () => {
         }),
       ]),
     );
+  });
+});
+
+// PAN-3977: the planning auto-handoff starts work agents with nobody watching.
+// Its acknowledgement covers tight RAM and a high agent count, nothing else.
+describe('resolveSpawnGuardrailRefusal (POST /api/agents guardrail step)', () => {
+  const automaticBody = {
+    issueId: 'PAN-3977',
+    role: 'work',
+    startedBy: 'planning-auto-handoff',
+    autoSpawnConsentRequired: true,
+    guardrailAcknowledgedWarnings: AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT,
+  };
+  const operatorBody = { issueId: 'PAN-3977', guardrailAcknowledged: true };
+  const leaked = [
+    { name: 'specialist-pan-1', currentIssue: 'PAN-1', reason: 'parent agent missing' },
+  ];
+
+  function refuse(body: unknown, health: SystemHealthSnapshot) {
+    // Round-trip through JSON: the route sees the body the way fetch sent it.
+    const parsed = JSON.parse(JSON.stringify(body)) as unknown;
+    return resolveSpawnGuardrailRefusal('PAN-3977', health, parseSpawnGuardrailAcknowledgement(parsed));
+  }
+
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    await readGlobalResourceConfig();
+  });
+
+  it('lets the automatic acknowledgement past tight RAM', () => {
+    const health = createHealthSnapshot({ summary: { availableMemoryBytes: 3 * GIB } });
+
+    expect(refuse({ issueId: 'PAN-3977' }, health)).toMatchObject({ status: 409 });
+    expect(refuse(automaticBody, health)).toBeNull();
+  });
+
+  it('lets the automatic acknowledgement past a high agent count below the ceiling', async () => {
+    vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
+    vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
+    await readGlobalResourceConfig();
+
+    expect(refuse(automaticBody, createHealthSnapshot({ admission: { admittedWorkAgentCount: 5 } }))).toBeNull();
+  });
+
+  it('refuses the automatic acknowledgement at the agent ceiling', async () => {
+    vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
+    vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
+    await readGlobalResourceConfig();
+    const health = createHealthSnapshot({ admission: { admittedWorkAgentCount: 6 } });
+
+    expect(refuse(automaticBody, health)).toMatchObject({
+      status: 409,
+      body: {
+        success: false,
+        requiresAcknowledgement: true,
+        error: expect.stringContaining('Work agent count is at the configured ceiling (6/6).'),
+        unacknowledgedWarnings: [expect.objectContaining({ kind: 'agent_count_ceiling' })],
+      },
+    });
+    // The operator's confirm dialog still covers it.
+    expect(refuse(operatorBody, health)).toBeNull();
+  });
+
+  it('refuses the automatic acknowledgement when leaked specialists are present', () => {
+    const health = createHealthSnapshot({
+      summary: { leakedSpecialistCount: 1 },
+      leakedSpecialists: leaked,
+    });
+
+    expect(refuse(automaticBody, health)).toMatchObject({
+      status: 409,
+      body: {
+        requiresAcknowledgement: true,
+        unacknowledgedWarnings: [expect.objectContaining({ kind: 'leaked_specialists' })],
+      },
+    });
+    expect(refuse(operatorBody, health)).toBeNull();
+  });
+
+  it('refuses every acknowledgement under critical RAM', () => {
+    const health = createHealthSnapshot({
+      severity: 'critical',
+      summary: { availableMemoryBytes: Math.floor(1.5 * GIB) },
+    });
+
+    for (const body of [automaticBody, operatorBody]) {
+      expect(refuse(body, health)).toMatchObject({
+        status: 429,
+        body: { blocked: true, error: 'Available RAM is critically low (1.5 GB).' },
+      });
+    }
+  });
+
+  it('ignores unknown acknowledgement kinds', () => {
+    const health = createHealthSnapshot({ summary: { availableMemoryBytes: 3 * GIB } });
+
+    expect(refuse({ guardrailAcknowledgedWarnings: ['everything', 'memory_pressure'] }, health))
+      .toMatchObject({ status: 409 });
   });
 });
