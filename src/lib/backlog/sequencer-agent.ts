@@ -53,7 +53,8 @@ export async function getSequencerRunStatus(projectRoot: string): Promise<Sequen
   // A pane whose harness has exited is still a pane `spawnRun` refuses over.
   const paneDead = !verdict.alive && verdict.reason === 'pane-dead';
   const alive = verdict.alive || paneDead;
-  const startedAt = alive ? (getAgentState(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
+  const run = alive ? getAgentState(SEQUENCER_AGENT_ID) ?? undefined : undefined;
+  const startedAt = alive ? (run?.startedAt ?? null) : null;
   const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
 
   let freshSequence = false;
@@ -65,18 +66,24 @@ export async function getSequencerRunStatus(projectRoot: string): Promise<Sequen
     }
   }
 
+  // PAN-3923/PAN-4172: an idle label never finishes a run on its own. Herdr's
+  // per-pane state, or the runtime mirror's label when the backend has none
+  // (tmux), only counts through `isFinishedRoleRun`: the one-shot role, its
+  // prompt delivered, work activity older than 60 s (`idleAgeMs`), and a
+  // second probe in clearFinishedSequencerRun. A Herdr `unknown` or `working`
+  // wins over the mirror. The mirror is empty after a dashboard restart, and a
+  // pass that failed before writing leaves no fresh sequence; Herdr still knows.
   const runtimeState = alive ? getAgentRuntimeStateSync(SEQUENCER_AGENT_ID)?.state ?? null : null;
-  const idle = runtimeState === 'idle' || runtimeState === 'stopped' || runtimeState === 'suspended';
-  // PAN-3923: the runtime mirror is in-process and empty after a dashboard
-  // restart, and a pass that failed before writing leaves no fresh sequence.
-  // The backend still knows: a Herdr harness idle at its prompt after its
-  // prompt was delivered, with stale work activity, has finished (the same
-  // rule spawnRun's reap uses; clearFinishedSequencerRun probes it twice).
-  const paneFinished = verdict.alive
-    && isFinishedRoleRun(verdict, getAgentState(SEQUENCER_AGENT_ID) ?? undefined, idleAgeMs(SEQUENCER_AGENT_ID));
+  const mirrorIdle = runtimeState === 'idle' || runtimeState === 'stopped' || runtimeState === 'suspended';
+  const mirrorHinted = verdict.alive && verdict.backendState === undefined && mirrorIdle;
+  const finished = verdict.alive && isFinishedRoleRun(
+    mirrorHinted ? { ...verdict, backendState: 'idle' } : verdict,
+    run,
+    idleAgeMs(SEQUENCER_AGENT_ID),
+  );
   const doneReason = paneDead
     ? 'pane-dead'
-    : freshSequence ? 'fresh-sequence' : idle ? 'idle' : paneFinished ? 'pane-finished' : null;
+    : freshSequence ? 'fresh-sequence' : finished ? (mirrorHinted ? 'idle' : 'pane-finished') : null;
   const done = alive && doneReason !== null;
 
   return {
@@ -106,8 +113,8 @@ export async function clearFinishedSequencerRun(
 ): Promise<SequencerRunStatus> {
   const status = await getSequencerRunStatus(projectRoot);
   if (!status.done) return status;
-  if (status.doneReason === 'pane-finished') {
-    // A Herdr idle label must hold on a second probe before it kills the pane.
+  if (status.doneReason === 'pane-finished' || status.doneReason === 'idle') {
+    // An idle label must hold on a second probe before it kills the pane.
     await new Promise((resolve) => setTimeout(resolve, FINISHED_REPROBE_DELAY_MS));
     const again = await getSequencerRunStatus(projectRoot);
     if (!again.done) return again;
