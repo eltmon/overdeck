@@ -110,7 +110,17 @@ export async function stopIssueSpecialistAgents(issueId: string): Promise<IssueS
 
   if (sweep.unknown.length === 0) {
     const closed = await closeIssuePanes(upperIssueId, { roles: SPECIALIST_ROLES }).catch(() => [] as string[]);
-    sweep.closedPanes.push(...closed.filter((id) => !sweep.stopped.includes(id)));
+    for (const id of closed) {
+      if (sweep.stopped.includes(id)) continue;
+      // The first close of this agent failed, but its pane is gone now.
+      const failedAt = sweep.failed.findIndex((problem) => problem.agentId === id);
+      if (failedAt >= 0) {
+        sweep.failed.splice(failedAt, 1);
+        sweep.stopped.push(id);
+      } else {
+        sweep.closedPanes.push(id);
+      }
+    }
   }
   return sweep;
 }
@@ -126,7 +136,7 @@ export async function haltIssueSpecialistsForPause(
   source: string,
 ): Promise<IssueSpecialistSweep | null> {
   const issueId = state.issueId?.trim().toUpperCase();
-  if (!issueId || state.role !== 'work' || agentId !== issuePauseAgentId(issueId)) return null;
+  if (!issueId || state.role !== 'work' || agentId.trim().toLowerCase() !== issuePauseAgentId(issueId)) return null;
 
   const sweep = await stopIssueSpecialistAgents(issueId);
   if (sweep.stopped.length === 0) return sweep;

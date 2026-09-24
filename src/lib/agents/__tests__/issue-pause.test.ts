@@ -253,6 +253,20 @@ describe('stopIssueSpecialistAgents', () => {
     expect(new Set(sweep.stopped)).toEqual(new Set([TEST_AGENT, PARENT]));
   });
 
+  it('counts a reviewer as stopped once the Herdr second pass closes the pane its first close missed', async () => {
+    seedConvoy();
+    mocks.closeAgentPaneDetailed.mockImplementation(async (id: string) => (
+      id === LANE ? { outcome: 'failed', reason: 'herdr could not close pane p_7' } : { outcome: 'closed' }
+    ));
+    mocks.closeIssuePanes.mockResolvedValue([LANE]);
+
+    const sweep = await stopIssueSpecialistAgents(ISSUE);
+
+    expect(sweep.failed).toEqual([]);
+    expect(new Set(sweep.stopped)).toEqual(new Set([LANE, PARENT]));
+    expect(sweep.closedPanes).toEqual([]);
+  });
+
   it('leaves an agent of unknown liveness alone and skips the Herdr second pass', async () => {
     seedConvoy();
     mocks.isAlive.mockImplementation(async (id: string) => (
