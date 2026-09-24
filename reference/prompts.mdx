@@ -357,19 +357,12 @@ Short templates used during specialist **initialization** — not part of any pe
 |----------|---------|---------|
 | `identity-wake.md` | `initializeSpecialist` | Short identity prompt — tells a newly-initialized specialist who it is and to wait for tasks. |
 
-### Legacy (ad-hoc) templates
-
-Templates still on the **pre-loader ad-hoc pattern**. They work, but new edits should migrate to `renderPrompt` — see the [Legacy templates](#legacy-templates) section below for migration guidance.
-
-| Template | Used by | Purpose |
-|----------|---------|---------|
-| `inspect-agent.md` | Inspect specialist (`buildInspectPrompt`) | Per-task spec verification mid-implementation. Still uses the legacy `readFileSync` + `String.replace` path. |
-
 ### Deleted (replaced by the loader)
 
 These files used to live under `prompts/` or were built inline by dead code.
 They no longer exist:
 
+- `inspect-agent.md` → the `pan inspect` verb and its inspect specialist were deleted in PAN-3917
 - `merge-agent.md` → replaced by `merge.md` with `DO_PUSH`/`DO_BUILD` flags
 - `review-agent.md` → replaced by `review.md`
 - `test-agent.md` → replaced by `test.md`
@@ -379,27 +372,9 @@ They no longer exist:
 If you find references to any of those paths in comments, PRD docs, or old
 commits, they are stale.
 
-### Legacy templates
-
-`inspect-agent.md` still uses the pre-loader pattern: `inspect-agent.ts`
-reads it via `readFileSync` and does ad-hoc `String.replace` for a fixed set
-of `{{variable}}` placeholders. It also wraps its output in the
-orchestration markers that the dashboard uses to collapse context.
-
-It works and it's in active use, so it hasn't been migrated. If you're
-editing it, either:
-
-1. Keep using the ad-hoc pattern (add your new variable, update the
-   `replace` chain in `inspect-agent.ts`), or
-2. Migrate it to `renderPrompt`, wire the migration into
-   `buildInspectPrompt`, and delete the ad-hoc replace chain.
-
-Option 2 is strongly preferred for any non-trivial change, but a small
-one-line tweak can stay on the legacy path.
-
 ## Orchestration markers
 
-Two templates wrap their output in HTML comments:
+One template wraps its output in HTML comments:
 
 ```
 <!-- overdeck:orchestration-context-start -->
@@ -410,8 +385,6 @@ Two templates wrap their output in HTML comments:
 - `planning.md` — marks the orchestration-context block so that session
   summarizers and the dashboard know which part of the planning prompt is
   Overdeck setup vs. the agent's actual work.
-- `inspect-agent.ts` — wraps its rendered prompt in the same markers via a
-  wrapping template literal.
 
 Do **not** add these markers to new templates unless you have a specific
 dashboard-display reason and you've checked the code that consumes them. For
