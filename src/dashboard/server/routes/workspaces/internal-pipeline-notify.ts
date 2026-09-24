@@ -90,11 +90,11 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId) {
           return jsonResponse({ ok: false, error: `${type} requires issueId` }, 400);
         }
-        // PAN-1988: this MUST be notifyPipeline (the imported function). The bare
-        // `notifyPipeline` (the Effect variant) is not imported here, so it threw
-        // "notifyPipeline is not defined" and silently dropped EVERY forwarded review.approved /
-        // test.passed event — breaking the reactive review→test and test→ship handoffs for any
-        // CLI-originated verdict. The in-process dashboard handler routes these to reactive Cloister.
+        // PAN-1988: this MUST call the imported notifyPipeline. An earlier version called a
+        // name that wasn't imported here, which threw "is not defined" and silently dropped EVERY
+        // forwarded review.approved / test.passed event — breaking the reactive review→test and
+        // test→ship handoffs for any CLI-originated verdict. The in-process dashboard handler
+        // routes these to reactive Cloister.
         notifyPipeline({ type, issueId });
         return jsonResponse({ ok: true });
       }

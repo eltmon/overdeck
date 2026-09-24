@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 
 import { isOverdeckOwnedOnlyStatus } from '../state-plane.js';
 import { readWorkspacePlan } from '../xbrief/io.js';
@@ -32,7 +32,11 @@ export function evaluateIncompletePlanItems(doc: XBriefDocument | null): string[
 }
 
 export async function checkIncompletePlanItems(workspacePath: string, _issueId?: string): Promise<string[]> {
-  return evaluateIncompletePlanItems(await Effect.runPromise(readWorkspacePlan(workspacePath)));
+  // Rethrow the plan reader's own error (e.g. XBriefMergeConflictError with its path and
+  // fix instructions) instead of Effect.runPromise's wrapper, whose message is empty.
+  const exit = await Effect.runPromiseExit(readWorkspacePlan(workspacePath));
+  if (Exit.isFailure(exit)) throw Cause.squash(exit.cause);
+  return evaluateIncompletePlanItems(exit.value);
 }
 
 /**

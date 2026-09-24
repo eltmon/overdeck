@@ -12,7 +12,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
   CACHE_RULES_DIR: cacheDirs.rules,
 }));
 
-let mergeSkillsIntoWorkspace: typeof import('../../../src/lib/skills-merge.js').mergeSkillsIntoWorkspacemergeSkillsIntoWorkspaceSyncmergeSkillsIntoWorkspace;
+let mergeSkillsIntoWorkspace: typeof import('../../../src/lib/skills-merge.js').mergeSkillsIntoWorkspace;
 
 function hash(content: string): string {
   return `sha256:${createHash('sha256').update(content).digest('hex')}`;

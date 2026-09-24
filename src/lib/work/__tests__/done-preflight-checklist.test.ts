@@ -73,6 +73,14 @@ describe('plan checklist evaluation', () => {
     expect(planMocks.readWorkspacePlan).toHaveBeenCalledWith('/project/workspaces/feature-pan-3451');
   });
 
+  it('rethrows the plan reader error unwrapped so pan done shows its message', async () => {
+    const conflict = new Error('xBRIEF document at /p/plan.json contains unresolved git merge conflict markers.');
+    conflict.name = 'XBriefMergeConflictError';
+    planMocks.readWorkspacePlan.mockReturnValue(Effect.fail(conflict));
+
+    await expect(checkIncompletePlanItems('/project/workspaces/feature-pan-3451')).rejects.toBe(conflict);
+  });
+
   it('treats pending children of a cancelled item as satisfied', () => {
     const doc = planWithStatus('completed');
     doc.plan.items = [{
