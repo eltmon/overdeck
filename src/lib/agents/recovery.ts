@@ -53,6 +53,7 @@ import {
   writeOhmypiAgentPrompt,
 } from './runtime-command.js';
 import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './spawn-prep.js';
+import { resolveRoutedSpawnModel } from './routed-spawn-model.js';
 import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity } from '../session-history.js';
@@ -88,6 +89,7 @@ export interface RestartAgentDeps {
   sendGracefulRestartWarning?: typeof sendGracefulRestartWarning;
   stopAgent?: (agentId: string) => Promise<unknown>;
   allocateSessionIdentity?: typeof createFreshSessionIdentity;
+  resolveRoutedSpawnModel?: typeof resolveRoutedSpawnModel;
 }
 
 function prepareRestartSessionIdentity(
@@ -224,7 +226,22 @@ export async function restartAgent(
     return { success: false, error: reason };
   }
 
-  const effectiveModel = newModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
+  // PAN-4145: an agent with no recorded model restarts on its routed role
+  // model — never a literal fallback. Unresolvable routing fails the restart.
+  let effectiveModel: string;
+  try {
+    effectiveModel = newModel || (agentState.model
+      ? requireModelOverride(agentState.model)
+      : (deps.resolveRoutedSpawnModel ?? resolveRoutedSpawnModel)({
+        role: agentState.role ?? 'work',
+        issueId: agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+        workspace: agentState.workspace,
+      }));
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
   const effectiveHarness = await resolveRestartHarness({
     explicit: newHarness ?? agentState.harness,
     role: agentState.role,

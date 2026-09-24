@@ -43,6 +43,7 @@ export {
   type SpawnRunOptions,
 } from './agents/spawn-prep.js';
 
+export { resolveRoutedSpawnModel } from './agents/routed-spawn-model.js';
 export { spawnAgent, spawnRun } from './agents/spawn.js';
 
 export { listRunningAgentsSync, listAgentStates, listRunningAgents, warnOnBareNumericIssueIds, dropLegacyAgentStatesMissingRoleAsync } from './agents/queries.js';

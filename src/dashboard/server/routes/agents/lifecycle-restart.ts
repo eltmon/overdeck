@@ -22,6 +22,7 @@ import {
   restartAgent,
   getProviderAuthMode,
   listRunningAgents,
+  resolveRoutedSpawnModel,
   wipeAgentStateDirs,
 } from '../../../../lib/agents.js';
 import { canUseHarness } from '../../../../lib/harness-policy.js';
@@ -483,14 +484,28 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     // afterward — an invalid selection destroyed the work agent's session
     // pointers and runtime files without spawning a replacement. Resolve
     // spawnModel and check policy here, before killSession/wipeAgentStateDirs.
-    const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-5';
+    const projectPath = agentState.workspace
+      ? dirname(agentState.workspace)
+      : undefined;
+    const projectConfig = resolveProjectFromIssueSync(issueId);
+    const projectRoot = projectConfig?.projectPath ?? projectPath ?? process.cwd();
+    const workspacePath = agentState.workspace ?? join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    // PAN-4145: no explicit/recorded model → the model `pan start` staffs via
+    // role/tier routing, never a literal; routing failure 400s before the wipe.
+    let spawnModel: string | undefined;
+    try {
+      spawnModel = wantsSpawn ? newModel ?? agentState.model ?? resolveRoutedSpawnModel({ role: 'work', issueId, workspace: workspacePath }) : undefined;
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
     let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null = null;
-    if (wantsSpawn && harness) {
+    if (wantsSpawn && harness && spawnModel) {
+      const policyModel = spawnModel;
       const harnessDecision = yield* Effect.promise(async () =>
-        canUseHarness(harness, spawnModel, await getProviderAuthMode(spawnModel)),
+        canUseHarness(harness, policyModel, await getProviderAuthMode(policyModel)),
       );
       if (!harnessDecision.allowed) {
-        return jsonResponse({ error: harnessDecision.reason ?? `Harness "${harness}" is not allowed for model "${spawnModel}".` }, { status: 400 });
+        return jsonResponse({ error: harnessDecision.reason ?? `Harness "${harness}" is not allowed for model "${policyModel}".` }, { status: 400 });
       }
       effectiveHarness = harness;
     }
@@ -551,12 +566,6 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     // (spawnModel/effectiveHarness were already resolved and validated above,
     // before the kill/wipe mutations.)
     const agentSessionName = `agent-${issueId.toLowerCase()}`;
-    const projectPath = agentState.workspace
-      ? dirname(agentState.workspace)
-      : undefined;
-    const projectConfig = resolveProjectFromIssueSync(issueId);
-    const projectRoot = projectConfig?.projectPath ?? projectPath ?? process.cwd();
-    const workspacePath = agentState.workspace ?? join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
 
     const args = buildPanStartArgs({
       issueId,
