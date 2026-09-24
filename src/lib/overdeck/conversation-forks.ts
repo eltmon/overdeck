@@ -66,6 +66,9 @@ import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '
 import { activeComposerRegion } from '../pane-composer.js';
 import { capturePane, capturePaneViewport, deliveryVerifyLine, sendKeysAsync } from '../tmux.js';
 import { conversationHarnessAlive, conversationSessionAlive } from './conversation-liveness.js';
+import { writeConversationPaneRole } from './conversation-pane-role.js';
+import { getIssueWorkspacePath } from './issue-projects.js';
+import { isAgentRole, type AgentRole } from '@overdeck/contracts';
 import {
   readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
@@ -704,6 +707,13 @@ export async function resolveForkProjectKey(
   return { projectKey: await resolveProjectKeyForCwdAsync(source.cwd) ?? undefined };
 }
 
+/** The issue's workspace directory when it exists on disk. */
+async function existingIssueWorkspace(issueId: string): Promise<string | undefined> {
+  const workspace = getIssueWorkspacePath(issueId);
+  if (!workspace) return undefined;
+  return (await stat(workspace).then((info) => info.isDirectory(), () => false)) ? workspace : undefined;
+}
+
 export async function handleConversationSummaryFork(
   name: string,
   body: Record<string, unknown>,
@@ -751,6 +761,11 @@ export async function handleConversationSummaryFork(
       }
       explicitIssueId = requestedIssueId.trim();
     }
+    const requestedRole = body['role'];
+    if (requestedRole !== undefined && !isAgentRole(requestedRole)) {
+      return jsonResponse({ error: 'Invalid role' }, { status: 400 });
+    }
+    const paneRole: AgentRole = isAgentRole(requestedRole) ? requestedRole : 'conversation';
     const requestedProject = body['projectKey'];
     if (requestedProject !== undefined && (typeof requestedProject !== 'string' || !requestedProject.trim())) {
       return jsonResponse({ error: 'Invalid projectKey' }, { status: 400 });
@@ -801,7 +816,10 @@ export async function handleConversationSummaryFork(
     if (typeof body['summaryModel'] === 'string' && summaryModel && !SAFE_MODEL_PATTERN.test(summaryModel)) {
       return jsonResponse({ error: 'Invalid summaryModel' }, { status: 400 });
     }
-    const effectiveCwd = cwd || conv.cwd || process.cwd();
+    // PAN-3921 FR-6: a handoff for an issue is placed in the issue's workspace
+    // when it exists; an explicit cwd still wins.
+    const issueWorkspaceCwd = !cwd && explicitIssueId ? await existingIssueWorkspace(explicitIssueId) : undefined;
+    const effectiveCwd = cwd || issueWorkspaceCwd || conv.cwd || process.cwd();
     if (forkMode === 'handoff' && !(await isInsideGitWorkTree(effectiveCwd))) {
       return jsonResponse({
         error: `Handoff cwd is not inside a git repository: ${effectiveCwd}. Run the handoff from a git working tree.`,
@@ -836,7 +854,7 @@ export async function handleConversationSummaryFork(
     const newConv = createConversation({
       name: newName,
       tmuxSession: newTmux,
-      cwd: cwd || conv.cwd || process.cwd(),
+      cwd: effectiveCwd,
       issueId: explicitIssueId ?? conv.issueId ?? branchIssueId ?? undefined,
       projectKey: projectResult.projectKey,
       title: customTitle || defaultTitle,
@@ -867,6 +885,8 @@ export async function handleConversationSummaryFork(
       ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
       ...(customTitle !== undefined ? { title: customTitle } : {}),
     });
+    // Every later spawn of this conversation reads its pane role from here.
+    await writeConversationPaneRole(newTmux, paneRole);
     setForkRequest(newConv.name, JSON.stringify(forkRequest));
     markConversationActive(newConv.name);
     registerInFlightForkPipeline(
