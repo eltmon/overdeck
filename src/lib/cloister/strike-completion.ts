@@ -226,13 +226,21 @@ async function runFinishStrike(
   const worktreePath = await strikeWorktreePath(projectRoot, branch);
   if (worktreePath) {
     let dirty = '';
+    let statusUnknown = false;
     try {
       const { stdout } = await execAsync('git status --porcelain --untracked-files=no', { ...opts, cwd: worktreePath });
       dirty = stdout.trim();
-    } catch {
-      // The directory is gone or unreadable; `worktree remove --force` or prune handles it.
+    } catch (err) {
+      // A vanished directory is handled by prune below; any other status failure
+      // (index lock, permissions) means we cannot prove the tree is clean.
+      if (existsSync(worktreePath)) {
+        statusUnknown = true;
+        notes.push(`kept ${worktreePath}: could not read its status (${err instanceof Error ? err.message.split('\n')[0] : String(err)})`);
+      }
     }
-    if (dirty) {
+    if (statusUnknown) {
+      // Never force-remove a worktree whose cleanliness is unknown.
+    } else if (dirty) {
       notes.push(`kept ${worktreePath}: it has uncommitted changes to tracked files`);
     } else {
       try {
