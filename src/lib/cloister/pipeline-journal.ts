@@ -32,7 +32,7 @@ import { notifyPipeline } from '../pipeline-notifier.js';
 
 export type PipelineJournalEntryType =
   | 'verification.started' | 'verification.passed' | 'verification.failed'
-  | 'review.requested' | 'review.dispatched' | 'review.redispatched' | 'review.verdict'
+  | 'review.requested' | 'review.dispatched' | 'review.redispatched' | 'review.halted' | 'review.verdict'
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed';

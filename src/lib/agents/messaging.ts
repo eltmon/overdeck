@@ -25,11 +25,13 @@ import {
   decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
+  getIssuePause,
   getAgentState,
   markAgentRunning,
   saveAgentStateSync,
   type AgentState,
   type MessageAgentRedriveOptions,
+  type ResumeGateDecision,
   type Role,
 } from './agent-state.js';
 import { getLatestSessionId } from './activity.js';
@@ -253,7 +255,16 @@ export async function messageAgent(
   // is a re-drive, not a casual message. Consult the intent policy so the
   // documented completed-handoff exception can clear stoppedByUser and deliver,
   // instead of silently mailing feedback to a queue nothing drains.
-  const decideMessageGate = () => {
+  const decideMessageGate = (): ResumeGateDecision => {
+    // PAN-3911: an issue pause stops the issue's review and test agents with
+    // no per-agent gate; the issue gate is the hold. A message must not resume
+    // one of them while the issue is paused (or its pause cannot be read).
+    if (agentState && agentState.role !== 'work' && agentState.issueId) {
+      const issuePause = getIssuePause(agentState.issueId);
+      if (issuePause.status !== 'unpaused') {
+        return { decision: 'queue-message', reason: `issue ${agentState.issueId.toUpperCase()} is paused` };
+      }
+    }
     const block = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
     const agentDir = getAgentDir(normalizedId);
     const hasCompletedHandoff = existsSync(join(agentDir, 'completed'))

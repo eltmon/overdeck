@@ -18,7 +18,7 @@ const MERGED_LIVE_SLOT_IDLE_MS = 30 * 60 * 1000;
 export async function reapMergedSlotAgent(
   issueId: string,
   slot: Pick<ReconciledSlotItem, 'slotIndex' | 'agentId'>,
-  stopSlotAgent: (agentId: string) => Promise<void> = id => Effect.runPromise(stopAgent(id)),
+  stopSlotAgent: (agentId: string) => Promise<void> = async (id) => { await Effect.runPromise(stopAgent(id)); },
 ): Promise<string> {
   const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
   try {

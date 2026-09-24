@@ -34,6 +34,7 @@ import {
   capturePane,
 } from '../tmux.js';
 import { FsError, TmuxError } from '../errors.js';
+import type { CloseAgentPaneResult } from '../terminal-backends/launch.js';
 
 const execAsync = promisify(exec);
 
@@ -210,11 +211,16 @@ export function stopAgentSync(agentId: string, cause: AgentStopCause = 'system')
   });
 }
 
-/** Async twin of `stopAgentSync`. Same `cause` semantics — see `AgentStopCause`. */
+/**
+ * Async twin of `stopAgentSync`. Same `cause` semantics — see `AgentStopCause`.
+ * Resolves what the terminal-backend close did (PAN-3911): a caller that tells
+ * an operator the agent stopped must check for `failed`, because the state is
+ * rewritten to stopped either way.
+ */
 export const stopAgent = (
   agentId: string,
   cause: AgentStopCause = 'system',
-): Effect.Effect<void, FsError | TmuxError> => {
+): Effect.Effect<CloseAgentPaneResult, FsError | TmuxError> => {
   const normalizedId = normalizeAgentId(agentId);
 
   return Effect.gen(function* () {
@@ -242,13 +248,16 @@ export const stopAgent = (
     // in it). Before this, a Herdr stop only rewrote state.json and the pane
     // stayed alive, so liveness readers kept seeing the agent and the next start
     // was refused as "already running".
-    yield* Effect.promise(async () => {
+    const close = yield* Effect.promise(async (): Promise<CloseAgentPaneResult> => {
       try {
-        const { closeAgentPane } = await import('../terminal-backends/launch.js');
-        return await closeAgentPane(normalizedId);
+        const { closeAgentPaneDetailed } = await import('../terminal-backends/launch.js');
+        const result = await closeAgentPaneDetailed(normalizedId);
+        if (result.outcome === 'failed') console.warn(`[agents] Backend close failed for ${normalizedId}: ${result.reason}`);
+        return result;
       } catch (err) {
-        console.warn(`[agents] Backend close failed for ${normalizedId} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-        return false;
+        const reason = err instanceof Error ? err.message : String(err);
+        console.warn(`[agents] Backend close failed for ${normalizedId} (non-fatal): ${reason}`);
+        return { outcome: 'failed', reason };
       }
     });
 
@@ -285,42 +294,6 @@ export const stopAgent = (
       kind: 'activity',
       activity: 'stopped',
     }));
+    return close;
   });
 };
-
-/**
- * PAN-3911: an issue pause holds the whole issue, so pausing the work agent
- * also stops the issue's live review and test agents. They are not paused
- * themselves — a fresh spawn rewrites state.json and drops a per-agent pause —
- * so the issue gate (`getIssuePause`) is what keeps dispatchers off them.
- * Returns the ids it stopped. Best-effort per agent: one failed stop must not
- * leave the rest running.
- */
-export async function stopIssueSpecialistAgents(issueId: string): Promise<string[]> {
-  const upperIssueId = issueId.trim().toUpperCase();
-  if (!upperIssueId) return [];
-  const { listAgentStates } = await import('./queries.js');
-  const { agentPaneExists } = await import('../terminal-backends/launch.js');
-  let agents: ReturnType<typeof listAgentStates>;
-  try {
-    agents = listAgentStates();
-  } catch (err) {
-    console.warn(`[agents] Could not list agents to stop for paused ${upperIssueId}: ${err instanceof Error ? err.message : String(err)}`);
-    return [];
-  }
-  const stopped: string[] = [];
-  for (const agent of agents) {
-    if (agent.role !== 'review' && agent.role !== 'test') continue;
-    if ((agent.issueId ?? '').trim().toUpperCase() !== upperIssueId) continue;
-    const claimsLive = agent.status === 'running' || agent.status === 'starting';
-    const hasPane = await agentPaneExists(agent.id).catch(() => false);
-    if (!claimsLive && !hasPane) continue;
-    try {
-      await Effect.runPromise(stopAgent(agent.id, 'operator'));
-      stopped.push(agent.id);
-    } catch (err) {
-      console.warn(`[agents] Could not stop ${agent.id} for paused ${upperIssueId}: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-  return stopped;
-}

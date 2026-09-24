@@ -5,7 +5,7 @@ import { getAgentState, listAgentStates, resolveAgentTarget, setAgentPaused, sto
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
-import { stopIssueSpecialistAgents } from '../../lib/agents/termination.js';
+import { describeSweepProblems, haltIssueSpecialistsForPause } from '../../lib/agents/issue-pause.js';
 
 interface PauseOptions {
   reason?: string;
@@ -37,22 +37,34 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
   const shouldStop = hasLivePane || state.status === 'running' || state.status === 'starting';
 
   try {
-    await Effect.runPromise(setAgentPaused(agentId, options.reason, shouldStop));
-    if (shouldStop) {
-      // Async stop terminates through the terminal backend, so a Herdr pane
-      // closes too — the sync variant could only reach a tmux session.
-      await Effect.runPromise(stopAgent(agentId, 'operator'));
-    }
-    // PAN-3911: pausing the work agent pauses the issue — its review and test
-    // agents stop too, and dispatchers read the issue gate before relaunching.
-    const stoppedSpecialists = state.role === 'work' && issueId ? await stopIssueSpecialistAgents(issueId) : [];
+    await Effect.runPromise(setAgentPaused(agentId, options.reason, shouldStop, true));
+    // Async stop terminates through the terminal backend, so a Herdr pane
+    // closes too — the sync variant could only reach a tmux session. A failed
+    // close is reported, never printed as a stop.
+    const close = shouldStop ? await Effect.runPromise(stopAgent(agentId, 'operator')) : null;
+    // PAN-3911: pausing the issue's work agent pauses the issue, so its review
+    // and test agents stop too. Never throws.
+    const sweep = await haltIssueSpecialistsForPause(agentId, state, 'pan-pause');
     await appendOperatorInterventionEvent({ issueId, kind: 'pause', source: 'pan pause' });
 
     const reason = options.reason ? ` (${options.reason})` : '';
-    const stopped = shouldStop ? ' and stopped' : '';
-    console.log(chalk.green(`Paused${stopped} agent: ${agentId}${reason}`));
-    if (stoppedSpecialists.length > 0) {
-      console.log(chalk.green(`Stopped ${issueId} review/test agent(s): ${stoppedSpecialists.join(', ')}`));
+    if (close?.outcome === 'failed') {
+      console.error(chalk.red(`Paused agent: ${agentId}${reason}, but its terminal could not be closed: ${close.reason}`));
+      process.exitCode = 1;
+    } else {
+      const stopped = shouldStop ? ' and stopped' : '';
+      console.log(chalk.green(`Paused${stopped} agent: ${agentId}${reason}`));
+    }
+    if (sweep) {
+      if (sweep.stopped.length > 0) {
+        console.log(chalk.green(`Stopped ${issueId} review/test agent(s): ${sweep.stopped.join(', ')}`));
+      }
+      if (sweep.closedPanes.length > 0) {
+        console.log(chalk.green(`Closed ${issueId} review/test pane(s) with no agent row: ${sweep.closedPanes.join(', ')}`));
+      }
+      const problems = describeSweepProblems(sweep);
+      for (const problem of problems) console.error(chalk.red(`  ${problem}`));
+      if (problems.length > 0) process.exitCode = 1;
     }
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));

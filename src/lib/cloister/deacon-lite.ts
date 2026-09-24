@@ -240,13 +240,17 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     const at = Date.parse(last.at);
     if (Number.isNaN(at) || now - at < STALLED_REVIEW_MIN_AGE_MS) continue;
 
-    // An issue pause holds the whole issue, reviewers included (PAN-3911).
+    // An operator issue pause holds the whole issue, reviewers included
+    // (PAN-3911). An unreadable pause is a hold too. getIssuePause never throws.
     const pause = getIssuePause(issueId);
-    if (pause) {
-      const key = pause.pausedAt ?? 'paused';
+    if (pause.status !== 'unpaused') {
+      const key = pause.status === 'paused' ? `paused:${pause.pausedAt ?? ''}` : `unknown:${pause.reason}`;
       if (loggedPausedSkip.get(issueId) !== key) {
         loggedPausedSkip.set(issueId, key);
-        console.log(`[deacon-lite] ${issueId} is paused (${pause.agentId}${pause.pausedReason ? `: ${pause.pausedReason}` : ''}) — not re-dispatching its stalled review`);
+        const why = pause.status === 'paused'
+          ? `is paused (${pause.agentId}${pause.pausedReason ? `: ${pause.pausedReason}` : ''})`
+          : `has an unreadable pause state (${pause.agentId}: ${pause.reason})`;
+        console.log(`[deacon-lite] ${issueId} ${why} — not re-dispatching its stalled review`);
       }
       continue;
     }

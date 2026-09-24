@@ -612,7 +612,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const { message } = body as { message?: string };
     const rawSource = (body as { source?: unknown }).source;
     const requestSource: RequestReviewSource =
-      rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'webhook'
+      rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'pan-unpause' || rawSource === 'webhook'
         ? rawSource
         : 'api';
     const eventStore = yield* EventStoreService;
