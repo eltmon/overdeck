@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents';
+import { useBackendOutage } from '../lib/backendOutageState';
 
 interface BackendConnectionBoundaryProps {
   backendDown: boolean;
@@ -41,6 +42,12 @@ export function BackendConnectionBoundary({ backendDown, restarting, children }:
     if (wasOutage.current && !outage) void queryClient.invalidateQueries();
     wasOutage.current = outage;
   }, [outage, queryClient]);
+
+  // Hidden pages keep their global keydown listeners; they check this flag.
+  useEffect(() => {
+    useBackendOutage.getState().setOutage(outage);
+    return () => useBackendOutage.getState().setOutage(false);
+  }, [outage]);
 
   // A transient stream reconnect keeps the UI visible too — data is at most a
   // few seconds stale, so a banner is enough.
