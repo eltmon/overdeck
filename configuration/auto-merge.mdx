@@ -76,6 +76,26 @@ Leave `require_uat_before_merge` at its default (`true`, auto-merge OFF) when yo
 want a human to UAT each batch before promoting it.
 </Note>
 
+## Per-issue override
+
+An issue can carry one of two tracker labels that take precedence over both the
+project default and the global setting:
+
+- `auto-merge`: this issue auto-merges when eligible, whatever the project or
+  global setting says.
+- `hold-for-uat`: this issue waits for a human batch review, whatever the
+  project or global setting says.
+
+Add or remove the label in the tracker (for GitHub, `gh issue edit <n>
+--add-label auto-merge` or `--remove-label auto-merge`). The dashboard reads it
+from its cached tracker issues, so a change shows up after the next tracker
+refresh.
+
+The dashboard's auto-merge indicator (the ⚡ Auto / 🔒 Hold control on an
+in-flight issue) shows the result of this resolution: issue label, then project
+default, then global setting. It is read-only. Change the policy at the tier you
+mean, not by clicking the indicator.
+
 ## Eligibility
 
 A PR is eligible for auto-merge only when **all** of these are true:

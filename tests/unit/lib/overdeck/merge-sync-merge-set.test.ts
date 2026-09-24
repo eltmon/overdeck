@@ -14,7 +14,7 @@ import {
 } from '../../../helpers/overdeck-test-db.js';
 import {
   getMergeSetFromDb,
-  upsertMergeSet,
+  upsertMergeSetRow,
 } from '../../../../src/lib/overdeck/merge-sync.js';
 import type { MergeSet } from '../../../../src/lib/merge-set.js';
 
@@ -80,7 +80,7 @@ function makeMergeSet(overrides: Partial<MergeSet> = {}): MergeSet {
 describe('merge-sync merge sets', () => {
   it('persists a merge set and its repos', () => {
     seedIssue(odb.raw(), 'PAN-632');
-    upsertMergeSet(makeMergeSet());
+    upsertMergeSetRow(makeMergeSet());
 
     const row = odb.raw().prepare('SELECT * FROM merge_sets WHERE issue_id = ?').get('PAN-632') as any;
     const repos = odb.raw().prepare('SELECT * FROM merge_set_repos WHERE issue_id = ? ORDER BY merge_order ASC').all('PAN-632') as any[];
@@ -93,7 +93,7 @@ describe('merge-sync merge sets', () => {
 
   it('ISO timestamps round-trip correctly via integer storage', () => {
     seedIssue(odb.raw(), 'PAN-632');
-    upsertMergeSet(makeMergeSet({ createdAt: '2026-04-11T12:00:00.000Z', updatedAt: '2026-04-11T13:00:00.000Z' }));
+    upsertMergeSetRow(makeMergeSet({ createdAt: '2026-04-11T12:00:00.000Z', updatedAt: '2026-04-11T13:00:00.000Z' }));
 
     const loaded = getMergeSetFromDb('PAN-632');
     expect(loaded).not.toBeNull();
@@ -103,8 +103,8 @@ describe('merge-sync merge sets', () => {
 
   it('replaces repo rows on update', () => {
     seedIssue(odb.raw(), 'PAN-632');
-    upsertMergeSet(makeMergeSet());
-    upsertMergeSet(makeMergeSet({
+    upsertMergeSetRow(makeMergeSet());
+    upsertMergeSetRow(makeMergeSet({
       status: 'ready',
       repos: [
         {

@@ -77,7 +77,7 @@ export function recordFeedbackDelivered(
 /**
  * Record that a relay skipped re-delivering an already-delivered verdict, and
  * return how many times this key has been skipped since its last delivery
- * (this skip included). The review relay's loop detector reads this count, so
+ * (this skip included). The review and UAT relays' loop detectors read this count, so
  * it holds across `pan admin specialists done` processes. Returns undefined
  * when there is no workspace to journal to (the caller counts in memory).
  */

@@ -5,15 +5,21 @@
  * pipeline row, Awaiting Merge).
  *
  * PAN-3917 (D3): the per-issue routing key was a record field and the record is
- * gone. The train now gates on the project default plus the global
- * `require_uat_before_merge`, so this is a READ-ONLY indicator of the effective
- * key, resolved by GET /api/merge-train/auto-merge. Change the policy on the
- * project (Settings → project → auto-merge default) or globally.
+ * gone. The per-issue override is now the issue's `auto-merge` / `hold-for-uat`
+ * tracker label, then the project default, then the global
+ * `require_uat_before_merge`. This is a READ-ONLY indicator of the effective
+ * key, resolved by GET /api/merge-train/auto-merge. Change the policy through
+ * the tracker label, the project (Settings → project → auto-merge default), or
+ * globally.
  */
 import { Zap, Lock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 const AUTO_MERGE_POLICY_KEY = ['merge-train', 'auto-merge-policy'];
+
+/** PAN-3932: where the value comes from, since clicking the indicator changes nothing. */
+const AUTO_MERGE_SOURCE =
+  'Read-only. Set by the issue\'s auto-merge or hold-for-uat tracker label, else the project\'s auto-merge default, else the global require-UAT-before-merge setting.';
 
 /** Effective routing key per in-flight issue, shared across every mounted indicator. */
 export function useAutoMergePolicyMap(): Record<string, boolean> {
@@ -54,10 +60,10 @@ export function AutoMergeToggle({
   const autoMerge = useAutoMergePolicy(issueId);
   const iconSize = compact ? 'w-3 h-3' : 'w-3.5 h-3.5';
   const title = autoMerge === undefined
-    ? 'Not routed yet — the issue has no open pull request.'
+    ? `Not routed yet — the issue has no open pull request. ${AUTO_MERGE_SOURCE}`
     : autoMerge
-      ? 'Auto-merge — the train ships this when it is green. Set by the project default.'
-      : 'Hold for UAT — waits for a human batch review. Set by the project default.';
+      ? `Auto-merge — the train ships this when it is green. ${AUTO_MERGE_SOURCE}`
+      : `Hold for UAT — waits for a human batch review. ${AUTO_MERGE_SOURCE}`;
 
   if (variant === 'badge') {
     const tone = autoMerge === true

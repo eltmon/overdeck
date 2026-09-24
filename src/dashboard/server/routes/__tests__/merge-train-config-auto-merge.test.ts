@@ -15,7 +15,8 @@ vi.mock('../../../../lib/cloister/merge-eligibility.js', () => ({
   gatherMergeEligibility: vi.fn(async () => []),
   isMergeEligible: vi.fn(() => false),
 }));
-vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', () => ({
+vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', async (importOriginal) => ({
+  autoMergeFromLabels: (await importOriginal<typeof import('../../../../lib/cloister/auto-merge-eligibility.js')>()).autoMergeFromLabels,
   isAutoMergeEligible: vi.fn(async () => ({ eligible: true })),
 }));
 vi.mock('../../../../lib/cloister/merge-blockers.js', () => ({ getMergeBlockersPayload: vi.fn(() => []) }));
@@ -67,6 +68,7 @@ const baseDeps = {
   isMergeTrainEnabled: () => true,
   isEligible: async () => ({ eligible: true }) as const,
   getProjectAutoMergeDefault: () => null,
+  getIssueLabels: () => [],
   resolveProject: () => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/repos/overdeck' }),
   announce: vi.fn(),
 };
@@ -107,6 +109,33 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(412);
+  });
+
+  it('schedules an issue labeled auto-merge even while its project holds for UAT (PAN-3932)', async () => {
+    const schedule = vi.fn(() => ({ created: true, entry: { id: 1, issueId: 'PAN-3917', status: 'pending' } }));
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
+      ...baseDeps,
+      isRequireUatBeforeMerge: () => true,
+      getProjectAutoMergeDefault: () => 'hold',
+      getIssueLabels: () => ['auto-merge'],
+      derivedState: async () => derived(),
+      schedule: schedule as never,
+    });
+    expect(result.status).toBe(200);
+    expect(schedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an issue labeled hold-for-uat even when nothing else holds it (PAN-3932)', async () => {
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
+      ...baseDeps,
+      isRequireUatBeforeMerge: () => false,
+      getProjectAutoMergeDefault: () => 'auto',
+      getIssueLabels: () => ['hold-for-uat'],
+      derivedState: async () => derived(),
+      schedule: vi.fn() as never,
+    });
+    expect(result.status).toBe(412);
+    expect(result.body).toEqual({ error: 'UAT is still required before merge' });
   });
 
   it('refuses while the merge train is disabled', async () => {
