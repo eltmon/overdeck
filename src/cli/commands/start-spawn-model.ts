@@ -3,7 +3,9 @@
  *
  * Only two inputs may choose the spawn model: an explicit `--model` flag and,
  * for a plain (non-`--fresh`) restart, the prior agent's model as resume
- * continuity. A stored `record.workModel` is NOT read back here — staffing
+ * continuity. A pending `pan reset-session` drops that continuity like
+ * `--fresh` does: the operator discarded the session, so there is nothing to
+ * stay continuous with and a retuned tier must apply (PAN-3855). A stored `record.workModel` is NOT read back here — staffing
  * honors it through the issue-override tier in resolveStaffing, and reading
  * it back made every stamped default count as an explicit override, which
  * skipped tier resolution and re-stamped the record on every start
@@ -23,11 +25,13 @@ export function resolveSpawnModel(
 }
 
 /** The model `pan start` hands to the spawn: explicit --model, else the prior
- * agent's model for resume continuity (dropped by --fresh). */
+ * agent's model for resume continuity (dropped by --fresh and by a pending
+ * session reset, PAN-3855). */
 export function resolveStartSpawnModel(
   explicitModel: string | undefined,
   fresh: boolean | undefined,
   priorAgentModel: string | undefined,
+  sessionReset = false,
 ): string | undefined {
-  return explicitModel ?? resolveSpawnModel(undefined, fresh, priorAgentModel);
+  return explicitModel ?? resolveSpawnModel(undefined, fresh || sessionReset, priorAgentModel);
 }
