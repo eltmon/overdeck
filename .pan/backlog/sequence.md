@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:46:23.199Z · model: claude-opus-5 · open: 804_
+_Last sequenced: 2026-09-24T22:49:42.145Z · model: claude-opus-5 · open: 803_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,6 @@ _Last sequenced: 2026-09-24T22:46:23.199Z · model: claude-opus-5 · open: 804_
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
-| 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
 | 23 | PAN-4134 | S | critical | ok |  |  | All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -824,10 +823,6 @@ In pipeline — rank pinned.
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
 
-### PAN-3939 (rank 22)
-
-Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.
-
 ### PAN-4134 (rank 23)
 
 New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where "unknown" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two. PAN-3914 closed this pass when PR #4133 merged, so its informs edge drops and the false review.redispatched journaling it caused is gone; the synthesis-recovery gap described here is untouched, so rank, score and condition hold.
@@ -1112,6 +1107,10 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 
 New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
 
+### PAN-2639 (rank 115)
+
+codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1119,10 +1118,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:46:23.199Z",
+  "generatedAt": "2026-09-24T22:49:42.145Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 804,
+  "openCount": 803,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1160,19 +1159,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "dependsOn": [],
       "why": "Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick",
       "rationale": "New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3939",
-      "rank": 22,
-      "size": "S",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive",
-      "rationale": "Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11920,13 +11906,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "confidence": 1
     },
     {
-      "from": "PAN-3939",
-      "to": "PAN-3921",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3935",
       "to": "PAN-3930",
       "type": "informs",
@@ -11939,20 +11918,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-3939",
-      "to": "PAN-3084",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3939",
-      "to": "PAN-3278",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-3935",
@@ -12090,13 +12055,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
     {
       "from": "PAN-1676",
       "to": "PAN-2424",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3939",
-      "to": "PAN-4134",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
