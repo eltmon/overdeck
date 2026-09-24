@@ -663,18 +663,6 @@ async function restartTraefikBody(config: PlatformConfig): Promise<void> {
   await startTraefik(config);
 }
 
-/**
- * Best-effort: leave the system in a recoverable state if a staged start fails.
- *
- * Specifically — if the dashboard fails to start but CLIProxy was already
- * running before we touched anything, DO NOT stop CLIProxy on our way out.
- * This is the explicit recovery contract from the task brief.
- */
-export function describeStageFailure(err: unknown): StageFailure | null {
-  if (err instanceof StageError) return err.failure;
-  return null;
-}
-
 export function leavesDashboardRunning(err: unknown): boolean {
   return err instanceof StageError && err.failure.recovery === 'dashboard-left-running';
 }

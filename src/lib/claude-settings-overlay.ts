@@ -15,8 +15,6 @@ const PROVIDER_ENV_KEYS = [
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
 ];
 
-const BACKUP_PREFIX = 'settings.local.json.pan-backup-';
-
 export interface ProviderEnvConflict {
   key: string;
   userValue: string;
@@ -110,45 +108,6 @@ function atomicWrite(
   });
 }
 
-function findNewestBackup(
-  claudeDir: string,
-): Effect.Effect<string | undefined, never, FileSystem.FileSystem> {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const entries = yield* fs.readDirectory(claudeDir).pipe(
-      Effect.catch(() => Effect.succeed([] as ReadonlyArray<string>)),
-    );
-    const backups = [...entries]
-      .filter(e => e.startsWith(BACKUP_PREFIX))
-      .sort()
-      .reverse();
-    return backups.length > 0 ? join(claudeDir, backups[0]) : undefined;
-  });
-}
-
-function backupIfNeeded(
-  claudeDir: string,
-  currentContent: string,
-): Effect.Effect<boolean, FsError, FileSystem.FileSystem> {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const newest = yield* findNewestBackup(claudeDir);
-    if (newest) {
-      const backupContent = yield* fs.readFileString(newest, 'utf-8').pipe(
-        Effect.catch(() => Effect.succeed(null as string | null)),
-      );
-      if (backupContent === currentContent) return false;
-    }
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupPath = join(claudeDir, `${BACKUP_PREFIX}${timestamp}`);
-    yield* fs.writeFileString(backupPath, currentContent).pipe(
-      Effect.mapError(e => new FsError({ path: backupPath, operation: 'writeFileString', cause: e })),
-    );
-    return true;
-  });
-}
-
 /**
  * Inject Overdeck-infrastructure permission deny rules into the workspace's
  * .claude/settings.local.json. Idempotent — re-running merges patterns into
@@ -188,119 +147,6 @@ export function injectOverdeckInfraDeny(workingDir: string): Effect.Effect<void,
     existing.permissions = permissions;
 
     yield* atomicWrite(settingsPath, JSON.stringify(existing, null, 2) + '\n');
-  }).pipe(Effect.provide(NodeFileSystem.layer));
-}
-
-/**
- * Inject provider env vars into .claude/settings.local.json.
- *
- * Claude Code's settings.json `env` block overrides process-level env vars,
- * so launcher script exports are insufficient when users have provider env
- * vars (like ANTHROPIC_BASE_URL) in their ~/.claude/settings.json. Project-level
- * settings.local.json has higher precedence than user-level settings.json,
- * so injecting here guarantees our provider config wins.
- *
- * Creates a timestamped backup before modifying, unless an identical backup
- * already exists.
- */
-export function injectProviderEnvOverlay(
-  workingDir: string,
-  providerEnv: Record<string, string>,
-): Effect.Effect<OverlayResult, FsError> {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const claudeDir = join(workingDir, '.claude');
-    const settingsPath = join(claudeDir, 'settings.local.json');
-
-    yield* fs.makeDirectory(claudeDir, { recursive: true }).pipe(
-      Effect.mapError(e => new FsError({ path: claudeDir, operation: 'makeDirectory', cause: e })),
-    );
-
-    const settingsExists = yield* fs.exists(settingsPath).pipe(Effect.catch(() => Effect.succeed(false)));
-    let existingRaw = '';
-    const existing = settingsExists
-      ? yield* fs.readFileString(settingsPath, 'utf-8').pipe(
-          Effect.mapError(
-            e => new FsError({ path: settingsPath, operation: 'readFileString', cause: e }),
-          ),
-          Effect.flatMap(raw =>
-            Effect.try({
-              try: () => {
-                existingRaw = raw;
-                return JSON.parse(raw) as Record<string, unknown>;
-              },
-              catch: e => new FsError({ path: settingsPath, operation: 'JSON.parse', cause: e }),
-            }),
-          ),
-          Effect.catch(() => Effect.succeed({} as Record<string, unknown>)),
-        )
-      : ({} as Record<string, unknown>);
-
-    const backedUp = existingRaw ? yield* backupIfNeeded(claudeDir, existingRaw) : false;
-    const backupPath = backedUp ? yield* findNewestBackup(claudeDir) : undefined;
-
-    const envBlock = (existing.env as Record<string, string> | undefined) ?? {};
-    const keysInjected: string[] = [];
-
-    for (const key of PROVIDER_ENV_KEYS) {
-      if (key in providerEnv) {
-        envBlock[key] = providerEnv[key];
-        keysInjected.push(key);
-      } else {
-        // Blank the key so project-level overrides user-level settings.json.
-        // Claude Code deep-merges configs — deleting a key lets user-level win.
-        envBlock[key] = '';
-        keysInjected.push(key);
-      }
-    }
-
-    existing.env = Object.keys(envBlock).length > 0 ? envBlock : undefined;
-    if (existing.env === undefined) delete existing.env;
-
-    yield* atomicWrite(settingsPath, JSON.stringify(existing, null, 2) + '\n');
-
-    return { settingsPath, backedUp, backupPath, keysInjected };
-  }).pipe(Effect.provide(NodeFileSystem.layer));
-}
-
-/**
- * Remove Overdeck's provider env overlay from settings.local.json.
- * Restores the file to its pre-overlay state by removing only the
- * provider env keys we injected.
- */
-export function removeProviderEnvOverlay(workingDir: string): Effect.Effect<void, never> {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const settingsPath = join(workingDir, '.claude', 'settings.local.json');
-
-    const exists = yield* fs.exists(settingsPath).pipe(Effect.catch(() => Effect.succeed(false)));
-    if (!exists) return;
-
-    const raw = yield* fs.readFileString(settingsPath, 'utf-8').pipe(
-      Effect.catch(() => Effect.succeed(null as string | null)),
-    );
-    if (!raw) return;
-
-    const settings = yield* Effect.try({
-      try: () => JSON.parse(raw) as Record<string, unknown>,
-      catch: e => new FsError({ path: settingsPath, operation: 'JSON.parse', cause: e }),
-    }).pipe(Effect.catch(() => Effect.succeed(null as Record<string, unknown> | null)));
-    if (!settings) return;
-
-    const envBlock = settings.env as Record<string, string> | undefined;
-    if (!envBlock) return;
-
-    for (const key of PROVIDER_ENV_KEYS) {
-      delete envBlock[key];
-    }
-
-    if (Object.keys(envBlock).length === 0) {
-      delete settings.env;
-    }
-
-    yield* atomicWrite(settingsPath, JSON.stringify(settings, null, 2) + '\n').pipe(
-      Effect.catch(() => Effect.void),
-    );
   }).pipe(Effect.provide(NodeFileSystem.layer));
 }
 

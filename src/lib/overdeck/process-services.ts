@@ -1,18 +1,9 @@
 import { Cause, Context, Effect, Layer, Schema } from 'effect';
 
 import {
-  deliverAgentMessage,
-  deliverAgentPermissionDecision,
   type DeliveryResult,
 } from '../agents.js';
 import { type CloisterStatus } from '../cloister/service.js';
-import {
-  areDurableSpawnsPaused,
-  readDurableCloisterStatus,
-  resumeDurableSpawns,
-  startDurableCloister,
-  stopDurableCloister,
-} from '../../dashboard/server/services/cloister-control-surface.js';
 import { EventBus, type StoredOverdeckEvent } from './infra.js';
 
 export const AgentId = Schema.String.pipe(Schema.brand('AgentId'));
@@ -128,34 +119,6 @@ export class DeliveryService extends Context.Service<DeliveryService, DeliverySe
   'overdeck/DeliveryService',
 ) {}
 
-const defaultPokeMessage =
-  "You seem to have been inactive for a while. If you're stuck:\n"
-  + '1. Check your current xBRIEF task with `pan task show <issue> <item-id>`\n'
-  + '2. Try an alternative approach if blocked\n'
-  + '3. Ask for help if needed\n\n'
-  + "What's your current status?";
-
-export const DeliveryServiceLive = Layer.succeed(
-  DeliveryService,
-  DeliveryService.of({
-    tell: (agentId, message, caller = 'overdeck', deliveryMethod) =>
-      Effect.tryPromise({
-        try: () => deliverAgentMessage(agentId, message, caller, deliveryMethod),
-        catch: (error) => error instanceof Error ? error : new Error(String(error)),
-      }),
-    poke: (agentId, message = defaultPokeMessage) =>
-      Effect.tryPromise({
-        try: () => deliverAgentMessage(agentId, message, 'overdeck.poke'),
-        catch: (error) => error instanceof Error ? error : new Error(String(error)),
-      }),
-    permissionDecision: (agentId, requestId, behavior) =>
-      Effect.tryPromise({
-        try: () => deliverAgentPermissionDecision(agentId, requestId, behavior),
-        catch: (error) => error instanceof Error ? error : new Error(String(error)),
-      }),
-  }),
-);
-
 export interface ConversationRuntimeShape {
   readonly spawn: (name: string) => Effect.Effect<void, Error>;
   readonly stop: (name: string) => Effect.Effect<void, Error>;
@@ -188,31 +151,6 @@ export interface ConversationRuntimeDeps {
   readonly pendingInput: () => Promise<ReadonlyArray<unknown>>;
 }
 
-export function makeConversationRuntimeLive(deps: ConversationRuntimeDeps): Layer.Layer<ConversationRuntime> {
-  const wrap = <A>(run: () => Promise<A>) =>
-    Effect.tryPromise({
-      try: run,
-      catch: (error) => error instanceof Error ? error : new Error(String(error)),
-    });
-
-  return Layer.succeed(
-    ConversationRuntime,
-    ConversationRuntime.of({
-      spawn: (name) => wrap(() => deps.spawn(name)),
-      stop: (name) => wrap(() => deps.stop(name)),
-      resume: (name) => wrap(() => deps.resume(name)),
-      restart: (name) => wrap(() => deps.restart(name)),
-      deliver: (name, message) => wrap(() => deps.deliver(name, message)),
-      setDeliveryMethod: (name, method) => wrap(() => deps.setDeliveryMethod(name, method)),
-      approve: (name, requestId, behavior) => wrap(() => deps.approve(name, requestId, behavior)),
-      planAction: (name, action, message) => wrap(() => deps.planAction(name, action, message)),
-      stageAttachment: (name, filePath) => wrap(() => deps.stageAttachment(name, filePath)),
-      removeAttachment: (name, filePath) => wrap(() => deps.removeAttachment(name, filePath)),
-      pendingInput: () => wrap(() => deps.pendingInput()),
-    }),
-  );
-}
-
 export interface CloisterRuntimeShape {
   readonly start: Effect.Effect<void, Error>;
   readonly stop: Effect.Effect<void, Error>;
@@ -224,32 +162,6 @@ export interface CloisterRuntimeShape {
 export class CloisterRuntime extends Context.Service<CloisterRuntime, CloisterRuntimeShape>()(
   'overdeck/CloisterRuntime',
 ) {}
-
-export const CloisterRuntimeLive = Layer.succeed(
-  CloisterRuntime,
-  CloisterRuntime.of({
-    start: Effect.tryPromise({
-      try: async () => { await startDurableCloister(); },
-      catch: (error) => error instanceof Error ? error : new Error(String(error)),
-    }),
-    stop: Effect.tryPromise({
-      try: () => stopDurableCloister(),
-      catch: (error) => error instanceof Error ? error : new Error(String(error)),
-    }),
-    resumeSpawns: Effect.try({
-      try: () => resumeDurableSpawns(),
-      catch: (error) => error instanceof Error ? error : new Error(String(error)),
-    }),
-    isSpawnPaused: Effect.try({
-      try: () => areDurableSpawnsPaused(),
-      catch: (error) => error instanceof Error ? error : new Error(String(error)),
-    }),
-    getStatus: Effect.tryPromise({
-      try: () => readDurableCloisterStatus(),
-      catch: (error) => error instanceof Error ? error : new Error(String(error)),
-    }),
-  }),
-);
 
 export interface AgentPermissionsShape {
   readonly request: (input: PermissionRequestInput) => Effect.Effect<PermissionRequest, AgentPermissionsError>;
@@ -480,29 +392,4 @@ export const AgentPermissionsLive = Layer.effect(
 
     return AgentPermissions.of({ request, resolve, pending });
   }),
-);
-
-export const ProcessServicesLive = Layer.mergeAll(
-  DeliveryServiceLive,
-  CloisterRuntimeLive,
-  AgentPermissionsLive,
-);
-
-export const emptyConversationRuntimeLive = makeConversationRuntimeLive({
-  spawn: async () => {},
-  stop: async () => {},
-  resume: async () => {},
-  restart: async () => {},
-  deliver: async () => {},
-  setDeliveryMethod: async () => {},
-  approve: async () => {},
-  planAction: async () => {},
-  stageAttachment: async () => {},
-  removeAttachment: async () => {},
-  pendingInput: async () => [],
-});
-
-export const EmptyProcessServicesLive = Layer.mergeAll(
-  ProcessServicesLive,
-  emptyConversationRuntimeLive,
 );

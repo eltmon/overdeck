@@ -442,23 +442,6 @@ export function selectAllModelsSync(
 }
 
 /**
- * Get simple model mapping (for backward compatibility with presets)
- */
-export function getSimpleModelMappingSync(
-  availableModels: ModelId[],
-  options: SelectionOptions = {}
-): Record<string, ModelId> {
-  const results = selectAllModelsSync(availableModels, options);
-  const mapping: Record<string, ModelId> = {} as Record<string, ModelId>;
-
-  for (const [workType, result] of Object.entries(results)) {
-    mapping[workType] = result.model;
-  }
-
-  return mapping;
-}
-
-/**
  * Pretty print selection results for debugging
  */
 export function formatSelectionResults(

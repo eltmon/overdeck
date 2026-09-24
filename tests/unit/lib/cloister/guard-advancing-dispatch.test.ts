@@ -72,7 +72,7 @@ vi.mock('../../../../src/lib/cloister/review-context.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
-  archiveFeedbackFiles: vi.fn(async () => undefined),
+  clearFeedbackFiles: vi.fn(async () => undefined),
 }));
 
 

@@ -9,7 +9,7 @@
  * it checks its hook for pending work and executes immediately.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
 
@@ -248,30 +248,6 @@ export function sendMailSync(
     join(mailDir, `${mailItem.id}.json`),
     JSON.stringify(mailItem, null, 2)
   );
-}
-
-/**
- * Get and clear mail for an agent
- */
-export function collectMailSync(agentId: string): HookItem[] {
-  const mailDir = getMailDir(agentId);
-  if (!existsSync(mailDir)) return [];
-
-  const mails: HookItem[] = [];
-  const files = readdirSync(mailDir).filter((f) => f.endsWith('.json'));
-
-  for (const file of files) {
-    const filePath = join(mailDir, file);
-    try {
-      const content = readFileSync(filePath, 'utf-8');
-      mails.push(JSON.parse(content));
-      unlinkSync(filePath); // Remove after reading
-    } catch {
-      // Skip invalid mail
-    }
-  }
-
-  return mails;
 }
 
 /**

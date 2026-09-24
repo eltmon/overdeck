@@ -454,8 +454,3 @@ export function getHerdrApiClient(): HerdrApiClient {
   sharedClient ??= new HerdrApiClient();
   return sharedClient;
 }
-
-/** Tests and the dashboard swap the client; passing null restores the default. */
-export function setHerdrApiClient(client: HerdrApiClient | null): void {
-  sharedClient = client;
-}

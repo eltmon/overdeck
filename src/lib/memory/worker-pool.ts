@@ -318,25 +318,8 @@ export class MemoryPipelineWorkerPool {
   }
 }
 
-const defaultMemoryExtractionWorkerPool = new MemoryExtractionWorkerPool();
 const defaultMemoryPipelineWorkerPool = new MemoryPipelineWorkerPool();
-
-export function getMemoryExtractionWorkerPool(): MemoryExtractionWorkerPool {
-  return defaultMemoryExtractionWorkerPool;
-}
-
-export function getMemoryPipelineWorkerPool(): MemoryPipelineWorkerPool {
-  return defaultMemoryPipelineWorkerPool;
-}
-
-export function enqueueMemoryExtractionJob(job: MemoryExtractionJob): string {
-  return defaultMemoryExtractionWorkerPool.enqueue(job);
-}
 
 export function enqueueMemoryPipelineJob(job: MemoryPipelineJob): string {
   return defaultMemoryPipelineWorkerPool.enqueue(job);
-}
-
-export function enqueueReconciledMemoryExtractionJobs(jobs: MemoryExtractionJob[]): string[] {
-  return defaultMemoryExtractionWorkerPool.enqueueReconciliationSweep(jobs);
 }

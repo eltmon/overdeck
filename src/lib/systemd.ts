@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { OVERDECK_HOME, getCanonicalOverdeckHome } from './paths.js';
 import { getSupervisorPortSync, resolveSupervisorBundle, resolveSupervisorPrimaryRepoRoot } from './supervisor.js';
@@ -194,11 +194,6 @@ export async function isSupervisorUnitFailed(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-export async function uninstallSupervisorUnit(options: { unitDir?: string } = {}): Promise<void> {
-  await rm(supervisorUnitPath(options.unitDir), { force: true });
-  await systemctl('daemon-reload');
 }
 
 async function runningInContainer(): Promise<boolean> {

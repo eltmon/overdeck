@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
   setReviewStatusSync: vi.fn(),
   buildReviewContext: vi.fn(),
   formatTier1Summary: vi.fn(),
-  archiveFeedbackFiles: vi.fn(),
   clearFeedbackFiles: vi.fn(),
   convergeRowFromVerdictOfRecord: vi.fn(),
   notifyPipeline: vi.fn(),
@@ -95,7 +94,6 @@ vi.mock('../review-monitor.js', () => ({
 }));
 
 vi.mock('../feedback-writer.js', () => ({
-  archiveFeedbackFiles: mocks.archiveFeedbackFiles,
   clearFeedbackFiles: mocks.clearFeedbackFiles,
 }));
 
@@ -147,7 +145,7 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.killSession.mockReturnValue(Effect.void);
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
-    mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
+    mocks.clearFeedbackFiles.mockResolvedValue(undefined);
     mocks.convergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
   });
 
@@ -284,7 +282,6 @@ describe('spawnReviewRoleForIssue', () => {
     expect(result.success).toBe(false);
     expect(result.message).toContain('already running');
     // A duplicate dispatch must not delete feedback the skipped cycle still owns.
-    expect(mocks.archiveFeedbackFiles).not.toHaveBeenCalled();
     expect(mocks.clearFeedbackFiles).not.toHaveBeenCalled();
     expect(mocks.spawnRun).not.toHaveBeenCalled();
   });
@@ -297,7 +294,7 @@ describe('spawnReviewRoleForIssue', () => {
     }));
 
     expect(result.success).toBe(true);
-    expect(mocks.archiveFeedbackFiles).toHaveBeenCalledWith('/tmp/pan-review-fresh');
+    expect(mocks.clearFeedbackFiles).toHaveBeenCalledWith('/tmp/pan-review-fresh');
   });
 
 

@@ -49,21 +49,6 @@ import type { RemoteProvider, RemoteProviderConfig } from './interface.js';
 export type ProviderType = 'fly';
 
 /**
- * Get a remote provider by type
- */
-export function getRemoteProvider(
-  type: ProviderType,
-  config?: RemoteProviderConfig
-): RemoteProvider {
-  switch (type) {
-    case 'fly':
-      return createFlyProvider();
-    default:
-      throw new Error(`Unknown remote provider type: ${type}`);
-  }
-}
-
-/**
  * Check if remote providers are available
  */
 export async function isRemoteAvailable(): Promise<{ available: boolean; reason?: string }> {

@@ -100,32 +100,6 @@ export function closeHealthDatabase(): void {
 }
 
 /**
- * Write a health event to the database
- *
- * @param event - Health event to store
- * @returns The ID of the inserted event
- */
-export function writeHealthEventSync(event: Omit<HealthEvent, 'id'>): number {
-  const database = getHealthDatabase();
-
-  const stmt = database.prepare(`
-    INSERT INTO health_events (agent_id, timestamp, state, previous_state, source, metadata)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-
-  const result = stmt.run(
-    event.agentId,
-    event.timestamp,
-    event.state,
-    event.previousState || null,
-    event.source || null,
-    event.metadata || null
-  );
-
-  return result.lastInsertRowid as number;
-}
-
-/**
  * Write multiple health events in a transaction
  *
  * @param events - Array of health events to store
@@ -157,149 +131,6 @@ export function writeHealthEventsSync(events: Omit<HealthEvent, 'id'>[]): number
 }
 
 /**
- * Get health events for an agent within a time range
- *
- * @param agentId - Agent identifier
- * @param startTime - Start of time range (ISO 8601)
- * @param endTime - End of time range (ISO 8601)
- * @returns Array of health events, ordered by timestamp
- */
-export function getHealthHistorySync(
-  agentId: string,
-  startTime: string,
-  endTime: string
-): HealthEventWithMetadata[] {
-  const database = getHealthDatabase();
-
-  const stmt = database.prepare(`
-    SELECT id, agent_id as agentId, timestamp, state, previous_state as previousState,
-           source, metadata
-    FROM health_events
-    WHERE agent_id = ? AND timestamp >= ? AND timestamp <= ?
-    ORDER BY timestamp ASC
-  `);
-
-  const events = stmt.all(agentId, startTime, endTime) as unknown as HealthEvent[];
-
-  // Parse metadata JSON
-  return events.map((event) => ({
-    ...event,
-    metadata: event.metadata ? JSON.parse(event.metadata) : undefined,
-  }));
-}
-
-/**
- * Get recent health events for an agent
- *
- * @param agentId - Agent identifier
- * @param limit - Maximum number of events to return (default: 100)
- * @returns Array of health events, ordered by timestamp descending
- */
-export function getRecentHealthHistorySync(
-  agentId: string,
-  limit: number = 100
-): HealthEventWithMetadata[] {
-  const database = getHealthDatabase();
-
-  const stmt = database.prepare(`
-    SELECT id, agent_id as agentId, timestamp, state, previous_state as previousState,
-           source, metadata
-    FROM health_events
-    WHERE agent_id = ?
-    ORDER BY timestamp DESC
-    LIMIT ?
-  `);
-
-  const events = stmt.all(agentId, limit) as unknown as HealthEvent[];
-
-  // Parse metadata JSON and reverse to get chronological order
-  return events
-    .map((event) => ({
-      ...event,
-      metadata: event.metadata ? JSON.parse(event.metadata) : undefined,
-    }))
-    .reverse();
-}
-
-/**
- * Get health events for all agents within a time range
- *
- * @param startTime - Start of time range (ISO 8601)
- * @param endTime - End of time range (ISO 8601)
- * @returns Array of health events, ordered by timestamp
- */
-export function getAllHealthHistorySync(
-  startTime: string,
-  endTime: string
-): HealthEventWithMetadata[] {
-  const database = getHealthDatabase();
-
-  const stmt = database.prepare(`
-    SELECT id, agent_id as agentId, timestamp, state, previous_state as previousState,
-           source, metadata
-    FROM health_events
-    WHERE timestamp >= ? AND timestamp <= ?
-    ORDER BY timestamp ASC
-  `);
-
-  const events = stmt.all(startTime, endTime) as unknown as HealthEvent[];
-
-  // Parse metadata JSON
-  return events.map((event) => ({
-    ...event,
-    metadata: event.metadata ? JSON.parse(event.metadata) : undefined,
-  }));
-}
-
-/**
- * Get the latest health event for an agent
- *
- * @param agentId - Agent identifier
- * @returns Latest health event or null if none exist
- */
-export function getLatestHealthEventSync(agentId: string): HealthEventWithMetadata | null {
-  const database = getHealthDatabase();
-
-  const stmt = database.prepare(`
-    SELECT id, agent_id as agentId, timestamp, state, previous_state as previousState,
-           source, metadata
-    FROM health_events
-    WHERE agent_id = ?
-    ORDER BY timestamp DESC
-    LIMIT 1
-  `);
-
-  const event = stmt.get(agentId) as HealthEvent | undefined;
-
-  if (!event) {
-    return null;
-  }
-
-  return {
-    ...event,
-    metadata: event.metadata ? JSON.parse(event.metadata) : undefined,
-  };
-}
-
-/**
- * Get list of all agents with health history
- *
- * @returns Array of unique agent IDs
- */
-export function getAgentsWithHistorySync(): string[] {
-  const database = getHealthDatabase();
-
-  const stmt = database.prepare(`
-    SELECT DISTINCT agent_id as agentId
-    FROM health_events
-    ORDER BY agent_id ASC
-  `);
-
-  const results = stmt.all() as { agentId: string }[];
-  return results.map((r) => r.agentId);
-}
-
-/**
  * Delete health events older than the retention period
  *
  * @param database - Database instance
@@ -320,24 +151,6 @@ export function cleanupOldEventsSync(
   `);
 
   const result = stmt.run(cutoffTimestamp);
-  return result.changes;
-}
-
-/**
- * Delete all health events for a specific agent
- *
- * @param agentId - Agent identifier
- * @returns Number of events deleted
- */
-export function deleteAgentHistorySync(agentId: string): number {
-  const database = getHealthDatabase();
-
-  const stmt = database.prepare(`
-    DELETE FROM health_events
-    WHERE agent_id = ?
-  `);
-
-  const result = stmt.run(agentId);
   return result.changes;
 }
 

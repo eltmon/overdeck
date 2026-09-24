@@ -385,50 +385,6 @@ export function recordTierPromotion(
   writeFileSync(path, JSON.stringify({ ...state, tierOverrides: nextOverrides, tierRetries: currentRetries }, null, 2), 'utf-8');
 }
 
-/** Recorded retry attempts per item (PAN-3858), keyed by xBRIEF item id. */
-export function readTierRetries(workspacePath: string): TierRetriesMap {
-  const path = readableWorkspaceContinuePath(workspacePath);
-  try {
-    const raw = readFileSync(path, 'utf-8');
-    const parsed = JSON.parse(raw) as { tierRetries?: TierRetriesMap };
-    return parsed.tierRetries ?? {};
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Persist a retry attempt at the item's current effective difficulty
- * (PAN-3858). `attempts` is the attempt number decideEscalation returned;
- * a later promotion clears the entry via recordTierPromotion.
- */
-export function recordTierRetry(
-  workspacePath: string,
-  itemId: string,
-  difficulty: XBriefDifficulty,
-  attempts: number,
-): void {
-  const path = workspaceContinuePath(workspacePath);
-  const readablePath = readableWorkspaceContinuePath(workspacePath);
-  let state: Record<string, unknown> = {};
-  try {
-    state = JSON.parse(readFileSync(readablePath, 'utf-8')) as Record<string, unknown>;
-  } catch {
-    state = {};
-  }
-
-  const current = (state.tierRetries && typeof state.tierRetries === 'object')
-    ? state.tierRetries as TierRetriesMap
-    : {};
-  const nextRetries: TierRetriesMap = {
-    ...current,
-    [itemId]: { difficulty, attempts },
-  };
-
-  mkdirSync(getWorkspacePanPaths(workspacePath).panDir, { recursive: true });
-  writeFileSync(path, JSON.stringify({ ...state, tierRetries: nextRetries }, null, 2), 'utf-8');
-}
-
 /**
  * PAN-2401: overlay the continue file's item statuses onto an already-loaded
  * plan document. The single overlay door for read paths that resolve the spec

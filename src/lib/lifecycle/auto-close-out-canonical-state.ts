@@ -16,15 +16,6 @@ const execFileAsync = promisify(execFile);
 const autoCloseOutCache = new Map<string, { state: string | null; timestamp: number }>();
 const AUTO_CLOSE_OUT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-export function sweepAutoCloseOutCache(): void {
-  const now = Date.now();
-  for (const [issueId, entry] of autoCloseOutCache.entries()) {
-    if (now - entry.timestamp > AUTO_CLOSE_OUT_CACHE_TTL_MS) {
-      autoCloseOutCache.delete(issueId);
-    }
-  }
-}
-
 export async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | null> {
   const cached = autoCloseOutCache.get(issueId);
   if (cached && Date.now() - cached.timestamp < AUTO_CLOSE_OUT_CACHE_TTL_MS) {

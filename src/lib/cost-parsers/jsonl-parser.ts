@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
-import { TokenUsage, calculateCostSync, getPricingSync, AIProvider, logCostSync, CostEntry } from '../cost.js';
+import { TokenUsage, calculateCostSync, getPricingSync, AIProvider } from '../cost.js';
 
 // Claude Code JSONL message format
 export interface ClaudeMessage {
@@ -405,40 +405,6 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
 }
 
 /**
- * Parse all sessions and return usage summaries
- */
-export function parseAllSessionsSync(maxAge?: number): SessionUsage[] {
-  const sessions: SessionUsage[] = [];
-  const cutoffTime = maxAge ? Date.now() - maxAge : 0;
-
-  for (const file of getAllSessionFilesSync()) {
-    try {
-      const stat = statSync(file);
-      if (cutoffTime && stat.mtime.getTime() < cutoffTime) {
-        continue;
-      }
-
-      const usage = parseClaudeSessionSync(file);
-      if (usage) {
-        sessions.push(usage);
-      }
-    } catch {
-      // Skip files that can't be read
-    }
-  }
-
-  return sessions;
-}
-
-/**
- * Get recent sessions (last N days)
- */
-export function getRecentSessionsSync(days: number = 7): SessionUsage[] {
-  const maxAge = days * 24 * 60 * 60 * 1000;
-  return parseAllSessionsSync(maxAge);
-}
-
-/**
  * Get the active session model for a workspace
  * Returns the full model ID (e.g., "claude-sonnet-4-5-20250929") from the most recent session file
  *
@@ -499,42 +465,4 @@ export function getActiveSessionModelSync(workspacePath: string): string | null 
     console.warn('Failed to get active session model:', error);
     return null;
   }
-}
-
-/**
- * Import session usage to cost log
- */
-export function importSessionToCostLog(
-  session: SessionUsage,
-  options: {
-    issueId?: string;
-    agentId?: string;
-    operation?: string;
-  } = {}
-): CostEntry | null {
-  const { provider, model } = normalizeModelName(session.model);
-  const pricing = getPricingSync(provider, model);
-
-  if (!pricing) {
-    console.warn(`No pricing found for ${session.model}`);
-    return null;
-  }
-
-  return logCostSync({
-    provider,
-    model,
-    usage: session.usage,
-    cost: session.cost,
-    currency: 'USD',
-    operation: options.operation || 'claude_session',
-    issueId: options.issueId,
-    agentId: options.agentId,
-    metadata: {
-      sessionId: session.sessionId,
-      sessionFile: session.sessionFile,
-      startTime: session.startTime,
-      endTime: session.endTime,
-      messageCount: session.messageCount,
-    },
-  });
 }

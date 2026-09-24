@@ -52,7 +52,7 @@ import {
 } from '../../../lib/overdeck/planning-sessions.js';
 import { generateTasksForIssue } from '../../../lib/overdeck/task-generation.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
-import { resolveGitHubIssueSync as resolveGitHubIssueShared, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
+import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
@@ -140,7 +140,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueShared(issueId);
+  const resolved = resolveGitHubIssueSync(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }

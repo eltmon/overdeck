@@ -61,7 +61,7 @@ import {
   findProjectByTeamSync,
   extractTeamPrefix,
 } from '../../../lib/projects.js';
-import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
+import { resolveGitHubIssueSync } from '../../../lib/tracker-utils.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { isInternalAgentRequest, resolveRequestedStartedBy } from './agents/shared.js';
@@ -415,7 +415,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueShared(issueId);
+  const resolved = resolveGitHubIssueSync(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }

@@ -1,4 +1,4 @@
-import { access, mkdir, readFile } from 'node:fs/promises';
+import { access, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { ArtifactMetadata } from '@overdeck/contracts';
 import { getOverdeckHome } from '../paths.js';
@@ -75,10 +75,6 @@ export async function getOrCreateArtifactThumbnail(
   }
 }
 
-export async function readPlaceholderThumbnail(error = 'Artifact thumbnail unavailable'): Promise<string> {
-  return placeholderThumbnail(error).body;
-}
-
 async function renderArtifactThumbnailWithPlaywright(input: {
   rawUrl: string;
   outputPath: string;
@@ -140,8 +136,4 @@ function escapeXml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
-}
-
-export async function readThumbnailFile(path: string): Promise<Buffer> {
-  return readFile(path);
 }

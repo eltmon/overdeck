@@ -30,7 +30,7 @@ import type { XBriefDocument } from './types.js';
 import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
-import { readContinueState, updateContinueState, writeContinueState } from './continue-state.js';
+import { readContinueState, updateContinueState } from './continue-state.js';
 
 // PAN-1249: pan-dir/specs.ts migrated `findSpecByIssue`, `writeSpecForIssue`,
 // and `updateSpecStatus` to return Effects. The sync surface in this module
@@ -334,14 +334,6 @@ export function readContinueStateForIssue(
   issueId: string,
 ): ContinueState | null {
   return readContinueState(resolvePlanHome(projectRoot), issueId);
-}
-
-export function writeContinueStateForIssue(
-  projectRoot: string,
-  issueId: string,
-  state: ContinueState,
-): void {
-  writeContinueState(resolvePlanHome(projectRoot), issueId, state);
 }
 
 export function appendContinueSessionEntryForIssue(

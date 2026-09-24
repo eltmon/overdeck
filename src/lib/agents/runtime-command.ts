@@ -18,11 +18,11 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { findAgentRuntimePidInSubtree } from './runtime-pid-probe.js';
 import { initCodexHome } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
-import { createPiFifo, piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
+import { piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { requireModelOverrideSync, shellQuoteModelIdSync } from '../model-validation.js';
 import { getOpenAIAuthStatus } from '../openai-auth.js';
-import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath } from '../paths.js';
+import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath } from '../paths.js';
 import { getProviderForModelSync, resolveKimiCodeModelAlias } from '../providers.js';
 import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
@@ -98,31 +98,6 @@ function isNodeNotFound(error: unknown): boolean {
  */
 export async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
   return (await findAgentRuntimePidInSubtree(rootPid, harness)) !== null;
-}
-
-export async function getPiLauncherFields(agentId: string, model: string): Promise<{
-  harness: 'ohmypi';
-  piExtensionPath: string;
-  piFifoPath: string;
-  piSessionDir: string;
-  model: string;
-}> {
-  const paths = piFifoPaths(agentId);
-  await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
-  const piExtensionPath = resolvePiExtensionPath();
-  if (!piExtensionPath) {
-    throw new Error(
-      `Pi extension not built. Run: npm run build\n(looked for dist/extensions/pi.js and packages/pi-extension/dist/index.js under ${packageRoot})`
-    );
-  }
-  // The launcher rebuilds the command, so it must receive the selected model explicitly.
-  return {
-    harness: 'ohmypi',
-    piExtensionPath,
-    piFifoPath: await createPiFifo(agentId),
-    piSessionDir: paths.agentDir,
-    model,
-  };
 }
 
 export async function getOhmypiLauncherFields(agentId: string, model: string, effort?: string): Promise<{

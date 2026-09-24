@@ -5,7 +5,7 @@
  * Supports multiple AI providers with configurable pricing.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { COSTS_DIR } from './paths.js';
 
@@ -252,61 +252,6 @@ function getCurrentDateString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-/**
- * Log a cost entry
- */
-export function logCostSync(entry: Omit<CostEntry, 'id' | 'timestamp'>): CostEntry {
-  mkdirSync(COSTS_DIR, { recursive: true });
-
-  const fullEntry: CostEntry = {
-    ...entry,
-    id: `cost-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    timestamp: new Date().toISOString(),
-  };
-
-  const costFile = getCostFile(getCurrentDateString());
-  appendFileSync(costFile, JSON.stringify(fullEntry) + '\n');
-
-  return fullEntry;
-}
-
-/**
- * Log cost from token usage
- */
-export function logUsageSync(
-  provider: AIProvider,
-  model: string,
-  usage: TokenUsage,
-  options: {
-    issueId?: string;
-    featureId?: string;
-    agentId?: string;
-    operation?: string;
-    metadata?: Record<string, any>;
-  } = {}
-): CostEntry | null {
-  const pricing = getPricingSync(provider, model);
-  if (!pricing) {
-    console.warn(`No pricing found for ${provider}/${model}`);
-    return null;
-  }
-
-  const cost = calculateCostSync(usage, pricing);
-
-  return logCostSync({
-    provider,
-    model,
-    usage,
-    cost,
-    currency: pricing.currency,
-    operation: options.operation || 'api_call',
-    issueId: options.issueId,
-    featureId: options.featureId,
-    agentId: options.agentId,
-    metadata: options.metadata,
-  });
-}
-
 // ============== Cost Reading ==============
 
 /**
@@ -524,21 +469,6 @@ export function getBudgetSync(id: string): CostBudget | null {
  */
 export function getAllBudgetsSync(): CostBudget[] {
   return loadBudgets();
-}
-
-/**
- * Update budget spent amount
- */
-export function updateBudgetSpentSync(id: string, spent: number): boolean {
-  const budgets = loadBudgets();
-  const budget = budgets.find(b => b.id === id);
-
-  if (!budget) return false;
-
-  budget.spent = spent;
-  saveBudgets(budgets);
-
-  return true;
 }
 
 /**

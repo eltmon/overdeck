@@ -90,17 +90,6 @@ export function decideEscalation(
   };
 }
 
-export function decideVerificationFailureEscalation(
-  input: VerificationFailureEscalationInput,
-): EscalationAction {
-  return decideEscalation({
-    kind: 'verification-failed',
-    itemId: input.bead.id,
-    detail: input.detail,
-    attemptsAtCurrentTier: input.attemptsAtCurrentTier,
-  }, input.bead, input.config, input.overrides);
-}
-
 function triggerReason(trigger: EscalationTrigger): string {
   switch (trigger.kind) {
     case 'supervisor-blocked':

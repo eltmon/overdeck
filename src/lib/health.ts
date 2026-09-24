@@ -12,7 +12,7 @@ import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgent, getAgentStateSync, getAgentRuntimeStateSync } from './agents.js';
-import { capturePane, listSessionNames, sessionExists } from './tmux.js';
+import { listSessionNames, sessionExists } from './tmux.js';
 import { getAgentEffectiveLastActivityMs } from './agents/liveness.js';
 
 /** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
@@ -91,41 +91,6 @@ export function saveAgentHealth(health: AgentHealth): void {
 /** Tmux session liveness probe for an agent; never rejects. */
 export async function isAgentAlive(agentId: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(agentId));
-}
-
-/**
- * Get recent output from agent's terminal
- */
-export async function getAgentOutput(agentId: string, lines: number = 20): Promise<string | null> {
-  try {
-    const output = await capturePane(agentId, lines);
-    return output.trim();
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Send a health check nudge to the agent
- * Returns true if we detect activity, false otherwise
- */
-export async function sendHealthNudge(agentId: string): Promise<boolean> {
-  if (!(await isAgentAlive(agentId))) {
-    return false;
-  }
-
-  // Capture output before nudge
-  const outputBefore = await getAgentOutput(agentId, 5);
-
-  // Send a gentle nudge - just check if the session is responsive
-  // We don't want to interrupt actual work, just verify the session exists
-  try {
-    // Check if there's been any recent output change
-    // For now, we consider alive = responsive
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function pingAgentPromise(

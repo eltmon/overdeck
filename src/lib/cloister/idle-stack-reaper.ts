@@ -118,10 +118,6 @@ export function handleAgentLifecycleEventForIdleStack(agentId: string): void {
   }
 }
 
-export function resetIdleStackGraceClock(issueLower: string): void {
-  firstIdleAt.delete(issueLower);
-}
-
 export interface ComposeContainerRef {
   name: string;
   composeProject?: string;

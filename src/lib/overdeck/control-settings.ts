@@ -1,7 +1,6 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
@@ -231,35 +230,6 @@ export const ConfigResolverLive = Layer.succeed(
 // Runtime-control endpoints (startFlywheel, pauseFlywheel, resumeFlywheel,
 // abortFlywheel, emergencyStop, brake) are omitted pending workspace-lf582.
 
-export const SettingsApi = HttpApiGroup.make('settings')
-  .add(
-    HttpApiEndpoint.get('getDeaconPause', '/deacon/pause', {
-      success: Schema.Struct({ paused: Schema.Boolean }),
-    }),
-  )
-  .add(
-    HttpApiEndpoint.get('getFlywheelConfig', '/flywheel/config', {
-      success: FlywheelConfig,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.get('getFlywheelRuntime', '/flywheel/state', {
-      success: FlywheelRuntime,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post('setDeaconPause', '/deacon/pause', {
-      payload: Schema.Struct({ paused: Schema.Boolean }),
-      success: Schema.Struct({ paused: Schema.Boolean }),
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post('setFlywheelConfig', '/flywheel/config', {
-      payload: FlywheelConfigPatch,
-      success: FlywheelConfig,
-    }),
-  );
-
 // ── Sync helpers (for call sites that cannot use Effect) ─────────────────────
 
 function overdeckDb() {
@@ -269,7 +239,6 @@ function overdeckDb() {
 export const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
 export const CLOISTER_SPAWNS_PAUSED_KEY = 'cloister.spawns_paused';
 export const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
-export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
 export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
 export const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
 export const FLYWHEEL_MERGE_TRAIN_ENABLED_KEY = 'flywheel.merge_train_enabled';
@@ -383,30 +352,12 @@ export function getBootReconciliationState(): BootReconciliationState {
   };
 }
 
-export function setBootReconciliationDecision(
-  decision: BootReconciliationDecision,
-  perAgent: BootReconciliationPerAgentMap = {},
-): void {
-  setSetting(BOOT_RECONCILIATION_DECISION_KEY, decision);
-  setSetting(BOOT_RECONCILIATION_PER_AGENT_KEY, JSON.stringify(perAgent));
-  setSetting(BOOT_RECONCILIATION_DECIDED_AT_KEY, new Date().toISOString());
-}
-
 export function stampBootReconciliation(bootId: string, graceDeadline: string, bootStartedAt: string): void {
   setSetting(BOOT_RECONCILIATION_BOOT_ID_KEY, bootId);
   setSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, bootStartedAt);
   setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
   // A fresh boot starts with a fresh extension budget.
   setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, '0');
-}
-
-/**
- * Push this boot's grace deadline out without touching the decision. Used only
- * by the extend door, which owns the extension cap.
- */
-export function setBootReconciliationGrace(graceDeadline: string, graceExtensions: number): void {
-  setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
-  setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, String(graceExtensions));
 }
 
 /** Synchronous check of the global Deacon pause flag; a failed read logs and reports not paused. */
@@ -437,11 +388,6 @@ export function isCloisterSpawnsPausedSync(): boolean {
 /** Synchronous set of the Cloister spawn pause flag. */
 export function setCloisterSpawnsPausedSync(paused: boolean): void {
   setSetting(CLOISTER_SPAWNS_PAUSED_KEY, paused ? 'true' : 'false');
-}
-
-/** Set the active flywheel run ID. */
-export function setFlywheelActiveRunId(runId: string | null): void {
-  setSetting(FLYWHEEL_ACTIVE_RUN_ID_KEY, runId ?? '');
 }
 
 /** Drop-in for isFlywheelGloballyPaused() from app-settings.ts. */
@@ -490,20 +436,6 @@ export function setMergeTrainEnabled(enabled: boolean): void {
   // Write to new key only; never write to legacy key
   setSetting(MERGE_TRAIN_ENABLED_KEY, enabled ? 'true' : 'false');
 }
-
-export const ConfigApi = HttpApiGroup.make('config')
-  .add(
-    HttpApiEndpoint.get('getProject', '/projects/:key', {
-      params: { key: ProjectKey },
-      success: ProjectConfig,
-      error: ProjectNotFound,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.get('listProjects', '/projects', {
-      success: Schema.Array(ProjectConfig),
-    }),
-  );
 
 // ── Sync bridge — used by lib/agents.ts (sync context) ──────────────────────
 

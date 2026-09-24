@@ -41,7 +41,6 @@ import {
 import { sessionExists } from '../tmux.js';
 import { getCloisterEventStore } from './event-store-provider.js';
 import {
-  clearSweeperRowState,
   readSweeperRowState,
   readSweeperSignature,
   writeSweeperRowState,
@@ -279,13 +278,5 @@ async function reportRow(
 
     default:
       return false;
-  }
-}
-
-/** Forget episode state for rows that left the population (called by tests + future reconcilers). */
-export function forgetResolvedSweeperRows(currentRows: readonly ParkedRow[]): void {
-  const live = new Set(currentRows.map((row) => `${row.issueId}:${row.orbit}`));
-  for (const row of currentRows) {
-    if (!live.has(`${row.issueId}:${row.orbit}`)) clearSweeperRowState(row.issueId, row.orbit);
   }
 }

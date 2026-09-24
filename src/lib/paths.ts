@@ -36,7 +36,6 @@ export const COSTS_DIR = join(OVERDECK_HOME, 'costs');
 export const HEARTBEATS_DIR = join(OVERDECK_HOME, 'heartbeats');
 export const ARCHIVES_DIR = join(OVERDECK_HOME, 'archives');
 export const LOGS_DIR = join(OVERDECK_HOME, 'logs');
-export const HANDOFFS_DIR = join(OVERDECK_HOME, 'handoffs');
 
 export function getHandoffsDir(): string {
   return join(getOverdeckHome(), 'handoffs');
@@ -135,14 +134,6 @@ export function piExtensionCandidates(): string[] {
  */
 export function resolveOhmypiExtensionPath(): string | null {
   for (const candidate of ohmypiExtensionCandidates()) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
-}
-
-/** Resolve the legacy pi extension bundle to the first existing candidate. */
-export function resolvePiExtensionPath(): string | null {
-  for (const candidate of piExtensionCandidates()) {
     if (existsSync(candidate)) return candidate;
   }
   return null;
@@ -251,7 +242,6 @@ export const SYNC_SOURCES = {
 } as const;
 
 // Cache directories (where Overdeck keeps its copy of distributed content)
-export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.overdeck/skills/
 export const CACHE_AGENTS_DIR = join(OVERDECK_HOME, 'agent-definitions');  // separate from agent state
 export const CACHE_RULES_DIR = join(OVERDECK_HOME, 'rules');
 export const CACHE_MANIFEST = join(OVERDECK_HOME, '.manifest.json');
@@ -261,10 +251,6 @@ export const DOCS_DIR = join(OVERDECK_HOME, 'docs');
 export const PRDS_DIR = join(DOCS_DIR, 'prds');
 export const PRD_DRAFTS_DIR = join(PRDS_DIR, 'drafts');
 export const PRD_PUBLISHED_DIR = join(PRDS_DIR, 'published');
-export const DOCS_INDEX_FILE = join(DOCS_DIR, 'index.sqlite');
-export const DOCS_BUDGET_STATE_FILE = join(DOCS_DIR, 'budget-state.json');
-export const DOCS_DISABLE_STATE_FILE = join(DOCS_DIR, 'disable-state.json');
-export const DOCS_TELEMETRY_FILE = join(DOCS_DIR, 'telemetry.jsonl');
 
 export interface DocsPathOverrides {
   overdeckHome?: string;

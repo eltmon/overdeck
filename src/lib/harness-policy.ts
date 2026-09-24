@@ -48,14 +48,10 @@ const ACP_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
   reason: 'ACP currently supports the Kimi provider only. Pick a Kimi model or use the provider\'s supported harness.',
 }
 
-export const ACP_KIMI_ONLY_BLOCK_REASON = ACP_KIMI_ONLY_BLOCK.reason!
-
 const KIMI_CODE_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason: 'The Kimi Code harness runs Kimi (Moonshot) models only. Pick a Kimi model, or use the model\'s supported harness.',
 }
-
-export const KIMI_CODE_KIMI_ONLY_BLOCK_REASON = KIMI_CODE_KIMI_ONLY_BLOCK.reason!
 
 const KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK: HarnessPolicyDecision = {
   allowed: false,
@@ -63,8 +59,6 @@ const KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK: HarnessPolicyDecision = {
     'kimi-code/* model ids exist only in the native Kimi Code CLI catalog — no other harness can serve them. ' +
     'Pick a "— Kimi Code CLI" or "— ACP (Kimi Code)" row for this model, or switch to a bare Kimi id (e.g. k3), which every Kimi route accepts.',
 }
-
-export const KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK_REASON = KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK.reason!
 
 const SUBSCRIPTION_ONLY_MODEL_BLOCK: HarnessPolicyDecision = {
   allowed: false,

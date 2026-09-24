@@ -110,17 +110,3 @@ export function getShadowModeFromEnv(): boolean {
   if (!value) return false;
   return ['true', '1', 'yes'].includes(value.toLowerCase());
 }
-
-/**
- * Check if ~/.overdeck.env file exists
- */
-export function hasEnvFile(): boolean {
-  return existsSync(ENV_FILE_PATH);
-}
-
-/**
- * Get the path to the env file
- */
-export function getEnvFilePath(): string {
-  return ENV_FILE_PATH;
-}

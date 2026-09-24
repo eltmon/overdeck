@@ -64,9 +64,3 @@ export function sessionFilePath(cwd: string, sessionId: string): string {
 export function claudeSessionTranscriptExists(cwd: string, sessionId: string): boolean {
   return existsSync(sessionFilePath(cwd, sessionId));
 }
-
-/** Extract the session UUID from a full JSONL file path. */
-export function sessionIdFromFile(sessionFile: string | null | undefined): string | undefined {
-  if (!sessionFile) return undefined;
-  return sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined;
-}

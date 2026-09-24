@@ -52,8 +52,3 @@ export function getCachedMemoryVerdict(): MemoryVerdict | null {
 export function setCachedMemoryVerdict(verdict: MemoryVerdict | null): void {
   cachedVerdict = verdict;
 }
-
-/** Test-only. */
-export function setCachedMemoryVerdictForTests(verdict: MemoryVerdict | null): void {
-  cachedVerdict = verdict;
-}

@@ -906,52 +906,6 @@ export function detectTerminalApiErrorSync(paneOutput: string): TerminalApiError
 // both in agents.ts. The old `❯` pane-scrape was non-deterministic and is no
 // longer used by any caller.
 
-/**
- * Verify that a message sent to Claude was actually received and processing started.
- * Compares tmux output before and after to detect new activity.
- */
-export async function confirmDelivery(
-  sessionName: string,
-  outputBefore: string,
-  timeoutMs: number = 10000,
-): Promise<boolean> {
-  const start = Date.now();
-  const poll = 1000;
-  const beforeText = outputBefore.trimEnd();
-  const processingPatterns = [
-    '●',
-    '⎿',
-    'Read',
-    '✻',
-    '✶',
-    '✽',
-    '✢',
-    'Generating',
-    'thinking',
-    'thought for',
-    'Retrying in',
-    'API Error',
-    "You've hit your limit",
-    'Tool use',
-  ];
-
-  while (Date.now() - start < timeoutMs) {
-    await new Promise(r => setTimeout(r, poll));
-    const after = await capturePane(sessionName, 50);
-    const afterText = after.trimEnd();
-    if (afterText === beforeText) continue;
-
-    const newOutput = afterText.startsWith(beforeText)
-      ? afterText.slice(beforeText.length)
-      : afterText;
-
-    if (processingPatterns.some(pattern => newOutput.includes(pattern))) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export function getAgentSessionsSync(): TmuxSession[] {
   return listSessionsSync().filter(s => s.name.startsWith('agent-'));
 }
@@ -1316,9 +1270,4 @@ export const isPaneDead = (
 export const getAgentSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
   listSessions().pipe(
     Effect.map((sessions) => sessions.filter(s => s.name.startsWith('agent-'))),
-  );
-
-export const getReviewSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
-  listSessions().pipe(
-    Effect.map((sessions) => sessions.filter(s => /^review-/.test(s.name))),
   );

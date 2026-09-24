@@ -12,7 +12,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { promises as fs } from 'fs';
-import { join, dirname, parse as parsePath } from 'path';
+import { join } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from '@iarna/toml';
 import { CONFIG_FILE } from './paths.js';
@@ -475,31 +475,5 @@ export function checkDevrootDeprecation(): string | null {
     '       New location: ~/.overdeck/context/global/',
     '       Set sync.devroot to null in config to silence this warning after migrating.',
   ].join('\n');
-}
-
-/**
- * Find the devroot for a given project path.
- * Tries config first, then walks up from projectPath looking for .claude/ directory.
- * Returns the project path itself as last resort.
- */
-export function findDevrootForProjectSync(projectPath: string): string {
-  // 1. Explicit config takes priority
-  const configured = getDevrootPathSync();
-  if (configured) return configured;
-
-  // 2. Walk up from project path to find nearest .claude/ directory
-  let dir = projectPath;
-  const root = parsePath(dir).root;
-  while (dir !== root && dir !== homedir()) {
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    if (existsSync(join(parent, '.claude'))) {
-      return parent;
-    }
-    dir = parent;
-  }
-
-  // 3. Fallback to project path itself
-  return projectPath;
 }
 
