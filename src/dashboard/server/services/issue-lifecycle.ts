@@ -151,7 +151,10 @@ function findLinearState(states: ReadonlyArray<LinearState>, state: IssueState):
 
 const GITHUB_STATE_LABELS: Record<IssueState, { add: string[]; remove: string[] }> = {
   open: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
-  in_planning: { add: ['planned'], remove: ['in-progress', 'in-review', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  // PAN-3953: planning START adds no label. `planned` means a finalized spec
+  // exists, so only `pan plan finalize` (completePlanningForIssue) applies it,
+  // after the spec is written and committed.
+  in_planning: { add: [], remove: ['in-progress', 'in-review', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
   in_progress: { add: ['in-progress'], remove: ['planned', 'in-planning', 'in-review', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
   in_review: { add: ['in-review'], remove: ['in-progress', 'planned', 'in-planning', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
   verifying_on_main: { add: ['verifying-on-main'], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'ready-for-merge', 'done', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },

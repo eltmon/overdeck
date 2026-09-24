@@ -66,7 +66,7 @@
               "cli/hygiene",
               "cli/agent-commands",
               "cli/workspace-commands",
-              "cli/convoy-commands"
+              "cli/review-commands"
             ]
           }
         ]
@@ -159,5 +159,11 @@
   "feedback": {
     "thumbsRating": true,
     "suggestEdit": true
-  }
+  },
+  "redirects": [
+    {
+      "source": "/cli/convoy-commands",
+      "destination": "/cli/review-commands"
+    }
+  ]
 }

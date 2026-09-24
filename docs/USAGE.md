@@ -145,7 +145,6 @@ Rally Features (PortfolioItems) get special treatment in the dashboard:
 
 Overdeck supports multiple AI model providers through direct Anthropic-compatible endpoints (Kimi, GLM, MiniMax, MiMo, OpenRouter) and a built-in CLIProxy sidecar (OpenAI, Gemini). You can also use the [Pi harness](https://github.com/badlogic/pi-mono) for native multi-provider routing.
 
-📖 **[Complete work types guide →](WORK-TYPES.md)**
 📋 **[Configuration file reference →](CONFIGURATION.md)**
 🧠 **[Model recommendations →](MODEL_RECOMMENDATIONS.md)**
 
@@ -586,9 +585,11 @@ less ~/.overdeck/agents/agent-pan-123/lifecycle.log
 less ~/.overdeck/agents/agent-pan-123/spawn.log
 ```
 
-If the dashboard shows a stopped/starting placeholder agent but no tmux session appears, `lifecycle.log` should show the last successful step (`agent.start_requested`, container wait, spawn request, process spawned/closed). `spawn.log` captures the detached `pan start <id> --local --phase <phase>` subprocess output that was previously lost when stdout/stderr were sent to `ignore`.
+Agent state is derived, not stored ahead of time. Overdeck writes an agent's state only after its terminal-backend session exists, so there are no placeholder rows: an agent that never reached Herdr (or tmux) does not appear at all, and a later `pan start` starts it fresh. Whether a listed agent is alive comes from the backend (the session, a live pane, and the harness process in that pane), not from a stored status. `pan status --json` gives each agent's `alive` and `livenessReason` from the backend. To look at the backend directly, run `herdr --session overdeck agent list` on Herdr (the default), or `tmux -L overdeck list-sessions` with `terminal.backend: tmux` or for legacy tmux agents.
 
-When Start Agent or Resume Session is working normally, the dashboard now shows a transient `Starting...` / `Resuming...` state first, then automatically swaps to the normal running controls once the live tmux-backed work agent is visible. If a stopped agent has stale session metadata but no usable workspace-backed state, the UI intentionally offers **Start Agent** instead of **Resume Session**.
+When a start was requested but no agent appeared, `lifecycle.log` shows how far it got: `agent.start_requested`, then either a refusal (`agent.start_blocked`, `agent.start_in_flight_blocked`, `agent.start_refused_dirty_workspace`) or `agent.work_spawn_requested`, and `agent.start_spawn_failed` if the spawn failed. `spawn.log` holds the stdout and stderr of the detached `pan start <id> --local` that the dashboard launches.
+
+On the default Herdr backend, a harness that exits leaves its pane open at a shell prompt. `pan status` reports that agent as dead (`pane-dead`) even though `herdr agent list` may still show the pane, and stopping the agent closes it. See "Stopping an agent" in [TERMINAL-BACKENDS.md](TERMINAL-BACKENDS.md).
 
 ### Git Worktree Issues
 
@@ -677,20 +678,13 @@ pan workspace connect feature-pan-123
 
 📖 **[Remote workspace guide →](PRD-REMOTE-WORKSPACES.md)**
 
-### Custom Work Types
+### Custom Work Types (removed)
 
-Define custom work types for model routing:
-
-```yaml
-# ~/.overdeck/work-types.yaml
-custom_work_types:
-  - name: security-audit
-    complexity: expert
-    model: claude-opus-4-6
-    description: Security vulnerability assessment
-```
-
-📖 **[Work types reference →](WORK-TYPES.md)**
+`~/.overdeck/work-types.yaml` and work-type model routing were removed with the
+work-type router (PAN-1048). Nothing reads that file. Set models per role with
+`roles.<role>.model` and `workhorses`; see
+[CONFIGURATION.md](CONFIGURATION.md#removed-presets-work-type-overrides-thinking-levels).
+[WORK-TYPES.md](WORK-TYPES.md) is kept for history only.
 
 ### Heartbeat Monitoring
 
