@@ -219,6 +219,24 @@ describe('IssueLifecycle Effect service', () => {
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'planned');
     });
 
+    // PAN-3953: planning START must not claim the issue is planned. Only a
+    // finalize that wrote the spec applies `planned`; a planner that dies
+    // before finalize must leave no `planned` label behind.
+    it('does not add the planned label when planning starts (in_planning)', async () => {
+      const { IssueLifecycle } = await import('../issue-lifecycle.js');
+      const layer = await makeTestLayer();
+
+      const program = Effect.gen(function* () {
+        const lifecycle = yield* IssueLifecycle;
+        yield* lifecycle.transitionTo('APP-42', 'in_planning');
+      }).pipe(Effect.provide(layer));
+
+      await runProgram(program);
+      expect(mockGitHubAddLabel).not.toHaveBeenCalledWith('acme', 'myapp', 42, 'planned');
+      expect(mockGitHubEnsureLabel).not.toHaveBeenCalledWith('acme', 'myapp', 'planned', expect.anything(), expect.anything());
+      expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-progress');
+    });
+
     it('adds in-review label and removes in-progress', async () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
