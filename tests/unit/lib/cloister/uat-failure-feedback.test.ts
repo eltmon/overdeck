@@ -210,7 +210,53 @@ describe('relayUatFailureFeedback', () => {
           issueId: 'PAN-3575',
           data: { kind: 'uat', dedupKey: key, agentId: 'agent-pan-3575' },
         }),
+        expect.objectContaining({
+          type: 'feedback.skipped',
+          issueId: 'PAN-3575',
+          data: { kind: 'uat', dedupKey: key },
+        }),
       ]);
+      expect(mocks.surfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
+    });
+
+    it('PAN-3580: repeated identical failures on one head escalate once to the operator, never re-relay', async () => {
+      const results = [];
+      for (let run = 0; run < 6; run += 1) {
+        results.push(await relayUatFailureFeedback({
+          issueId: 'PAN-3575',
+          uatNotes: 'Criterion 2 unmet.',
+          anchor: 'head-one',
+          workspacePath: workspace,
+        }));
+      }
+
+      const key = uatFeedbackDedupKey('PAN-3575', 'head-one');
+      expect(results[0]).toEqual(expect.objectContaining({ agentMessageSent: true, deduplicated: false }));
+      expect(results.slice(1).every((r) => r.deduplicated && !r.agentMessageSent)).toBe(true);
+      expect(results.map((r) => r.needsYouSurfaced)).toEqual([false, false, true, false, false, false]);
+      // One feedback file, one agent message, one operator escalation.
+      expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(1);
+      expect(mocks.messageAgent).toHaveBeenCalledTimes(1);
+      expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledTimes(1);
+      expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
+        'PAN-3575',
+        expect.stringContaining('UAT is not converging'),
+        { specialist: 'uat-agent', dedupKey: key },
+      );
+      expect(readPipelineJournal(workspace).filter((e) => e.type === 'feedback.skipped')).toHaveLength(5);
+    });
+
+    it('PAN-3580: a pass between failures resets the escalation count with the new episode', async () => {
+      for (let run = 0; run < 2; run += 1) {
+        await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+      }
+      appendPipelineEntry(workspace, { type: 'uat.verdict', issueId: 'PAN-3575', data: { status: 'passed' } });
+      for (let run = 0; run < 2; run += 1) {
+        await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+      }
+
+      expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+      expect(mocks.surfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
     });
 
     it('a new head is a new delivery', async () => {
@@ -251,7 +297,7 @@ describe('relayUatFailureFeedback', () => {
 
       await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
 
-      expect(readPipelineJournal(workspace)).toEqual([]);
+      expect(readPipelineJournal(workspace).some((e) => e.type === 'feedback.delivered')).toBe(false);
     });
   });
 

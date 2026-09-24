@@ -9,7 +9,7 @@
 import { Effect } from 'effect'
 import { listRunningAgents } from '../../../lib/agents.js'
 import { capturePane } from '../../../lib/tmux.js'
-import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js'
+import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
 import type { AgentOutputReceivedEvent } from '@overdeck/contracts'
 import { readFile } from 'node:fs/promises'
@@ -125,7 +125,7 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
     }
 
     if (interestedIds.size === 0) return
-    await withConcurrencyLimitPromise(
+    await withConcurrencyLimit(
       [...interestedIds].map((agentId) => () => captureInterestedAgent(state, agentId)),
       4,
     )

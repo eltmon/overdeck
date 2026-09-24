@@ -18,7 +18,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitHubApiError, ConfigError, FsError } from './errors.js';
 import { ensureBotCredentialFile, resolveWorkspaceRemote } from './github-credentials.js';
-import { withConcurrencyLimitPromise } from './concurrency.js';
+import { withConcurrencyLimit } from './concurrency.js';
 import { isAdvisoryCheckName } from './advisory-checks.js';
 
 const execAsync = promisify(exec);
@@ -681,7 +681,7 @@ export async function listIssuesWithAnyLabel(
   labels: readonly string[],
 ): Promise<GitHubIssueLabels[]> {
   const byNumber = new Map<number, GitHubIssueLabels>();
-  const issueGroups = await withConcurrencyLimitPromise(labels.map((label) => async () =>
+  const issueGroups = await withConcurrencyLimit(labels.map((label) => async () =>
     githubApiAllPages<{
       number: number;
       state: 'open' | 'closed';

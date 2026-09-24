@@ -1,0 +1,11 @@
+[Unit]
+Description=Preserve all Claude and Overdeck JSONL transcripts
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.overdeck/bin/preserve-transcripts.py backup
+UMask=0077
+Environment=GOMAXPROCS=2
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=infinity

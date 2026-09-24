@@ -92,6 +92,45 @@ export function getTodayCost(now = new Date()): number {
   return getCostSinceSync(utcMidnight);
 }
 
+export interface TodayCostSummary {
+  dailyTotal: number;
+  topAgents: Array<{ agentId: string; cost: number }>;
+  topIssues: Array<{ issueId: string; cost: number }>;
+}
+
+/**
+ * Today's (UTC) spend with the top agents and issues by cost, read from
+ * cost_events. Backs the Metrics page (`/api/metrics/costs`,
+ * `/api/metrics/summary`); replaces the never-written cost-data.json (PAN-4052).
+ */
+export function getTodayCostSummary(now = new Date(), limit = 10): TodayCostSummary {
+  const sinceMillis = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const db = getOverdeckDatabase();
+  const topAgents = db
+    .prepare(
+      `SELECT agent_id AS id, SUM(cost) AS cost FROM cost_events
+       WHERE ts >= ? AND agent_id IS NOT NULL AND agent_id != ''
+       GROUP BY agent_id
+       ORDER BY cost DESC
+       LIMIT ?`,
+    )
+    .all(sinceMillis, limit) as Array<{ id: string; cost: number }>;
+  const topIssues = db
+    .prepare(
+      `SELECT UPPER(issue_id) AS id, SUM(cost) AS cost FROM cost_events
+       WHERE ts >= ? AND issue_id IS NOT NULL AND issue_id != ''
+       GROUP BY UPPER(issue_id)
+       ORDER BY cost DESC
+       LIMIT ?`,
+    )
+    .all(sinceMillis, limit) as Array<{ id: string; cost: number }>;
+  return {
+    dailyTotal: getCostSinceSync(new Date(sinceMillis)),
+    topAgents: topAgents.map((r) => ({ agentId: r.id, cost: r.cost ?? 0 })),
+    topIssues: topIssues.map((r) => ({ issueId: r.id, cost: r.cost ?? 0 })),
+  };
+}
+
 /**
  * Returns the total cost in USD for an issue (for records.ts projectUsage).
  * Returns null if no cost events exist.

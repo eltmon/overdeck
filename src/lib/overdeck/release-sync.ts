@@ -90,8 +90,12 @@ function loadComponentsForReleaseSet(
   return rows.map(rowToReleaseComponent);
 }
 
-/** Insert or replace a release set and its component rows. */
-export function upsertReleaseSet(releaseSet: ReleaseSet): void {
+/**
+ * Insert or replace a release-set row and its component rows, as given.
+ * Callers normally go through `upsertReleaseSet` in `release-set.ts`, which
+ * canonicalizes the issue id first.
+ */
+export function upsertReleaseSetRow(releaseSet: ReleaseSet): void {
   const db = getOverdeckDatabase();
   const createdAtMs = millisFromIso(releaseSet.createdAt) ?? nowMillis();
   const updatedAtMs = millisFromIso(releaseSet.updatedAt) ?? nowMillis();

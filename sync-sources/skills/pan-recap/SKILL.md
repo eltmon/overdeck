@@ -60,7 +60,9 @@ number memorized. Up-level it.
 3. **Group by outcome, not by phase or issue number:** *What shipped* → *In
    flight* → *Needs your attention* → *By the numbers*. Drop empty sections.
 4. **Define pipeline jargon inline** the first time it appears (strike, convoy,
-   verifying-on-main, readyForMerge). The reader should never need a second doc.
+   verifying-on-main, and "ready": the derived state for an approved PR with
+   green checks that the forge reports mergeable). The reader should never need
+   a second doc.
 5. **Bold the deliverable, then explain it.** Each bullet leads with the thing
    that happened in bold, followed by the plain-language what/why.
 6. **Numbers live in one "By the numbers" line**, not sprinkled through prose.
@@ -148,15 +150,22 @@ tmux -L overdeck list-sessions -F '#{session_name}' 2>/dev/null \
   | grep -E '^(agent|planning|strike)-' | sort
 
 echo "=== in-review issues (need a merge decision) ==="
-curl -s http://localhost:3011/api/issues 2>/dev/null | python3 -c "
-import json,sys
-try: data=json.load(sys.stdin)
-except: sys.exit(0)
+python3 -c "
+import json,sys,urllib.request
+def get(path):
+    with urllib.request.urlopen('http://localhost:3011'+path, timeout=10) as r:
+        return json.load(r)
+try:
+    data=get('/api/issues')
+    # Derived state (PAN-3917): 'ready' = approved PR, green checks, mergeable.
+    state_by_id={(r.get('issueId') or '').upper(): r.get('state')
+                 for r in get('/api/issues/resource-allocated')}
+except Exception: sys.exit(0)
 for i in data:
     st=(i.get('state','') or '').lower().replace(' ','_')
     if st in ('in_review','in_progress'):
         print(i.get('identifier'),'-',i.get('title','')[:70],
-              '(readyForMerge)' if i.get('readyForMerge') else '')
+              '(ready)' if state_by_id.get((i.get('identifier') or '').upper())=='ready' else '')
 " 2>/dev/null
 ```
 

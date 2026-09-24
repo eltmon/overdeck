@@ -39,6 +39,7 @@ import {
 import { isRespawnPending } from './pending-respawn.js';
 import { isHarnessProcessAlive } from '../../../lib/tmux.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
+import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 import { claudeProjectDir, sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import type { HarnessName } from '../../../lib/runtimes/types.js';
@@ -593,9 +594,18 @@ function scheduleNext(): void {
   }, POLL_INTERVAL_MS);
 }
 
-export function startConversationLifecycleService(): void {
+/**
+ * Start the poller. Returns false, and starts nothing, in a peer dashboard
+ * (PAN-3931): every pass writes the shared conversations table — marking rows
+ * ended, resurrecting them, backfilling specialist rows. A peer in a workspace
+ * container cannot see the primary's sessions, so it would end live
+ * conversations. The primary is the one writer.
+ */
+export function startConversationLifecycleService(): boolean {
+  if (isPeerDashboardProcess()) return false;
   console.log('[overdeck] ConversationLifecycleService started (10s poll)');
   scheduleNext();
+  return true;
 }
 
 export function stopConversationLifecycleService(): void {

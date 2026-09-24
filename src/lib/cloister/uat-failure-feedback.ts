@@ -14,7 +14,9 @@
  * `uat-feedback:<issue>:<hash>`, which the keyed tmux/PTY-supervisor tiers
  * enforce as a second layer. The key hashes the tested head plus the number
  * of passing UAT verdicts journaled so far, so a pass between two failures
- * on one head makes the second failure a new delivery.
+ * on one head makes the second failure a new delivery. A repeat is journaled
+ * as `feedback.skipped`; the second skip of one key surfaces a single
+ * needs-you instead of relaying again (PAN-3580).
  *
  * Keyed delivery also trades two guarantees, exactly as review feedback does:
  * for a Claude Code agent it confirms only that the text reached the agent's
@@ -33,6 +35,7 @@ import {
   feedbackAlreadyDelivered,
   passingVerdictCount,
   recordFeedbackDelivered,
+  recordFeedbackSkipped,
   verdictEpisodeIdentity,
 } from './feedback-delivery-record.js';
 
@@ -66,6 +69,48 @@ export const UAT_AMBIGUOUS_DELIVERY_RETRY_MS = 2_000;
 export function uatFeedbackDedupKey(issueId: string, anchor: string, passCount = 0): string {
   const digest = createHash('sha256').update(verdictEpisodeIdentity(anchor, passCount)).digest('hex').slice(0, 16);
   return `uat-feedback:${issueId.toLowerCase()}:${digest}`;
+}
+
+/**
+ * PAN-3580: skips of one already-delivered UAT failure (same issue, tested
+ * head, and pass episode) after which the relay escalates to the operator.
+ * The agent was told once; the pipeline re-running UAT on an unchanged head
+ * and failing again is a loop the agent cannot break, so the operator is told
+ * once instead of the agent being told again.
+ */
+export const UAT_REPEATED_FAILURE_ESCALATION_SKIPS = 2;
+const suppressedUatFeedbackDeliveries = new Map<string, number>();
+
+/**
+ * Count a suppressed re-delivery of one UAT failure key and surface needs-you
+ * exactly once, at the threshold. The count lives in the pipeline journal
+ * (`feedback.skipped`), so it holds across `pan admin specialists done`
+ * processes; with no workspace it falls back to this process's memory.
+ */
+async function noteSuppressedUatDelivery(
+  issueId: string,
+  dedupKey: string,
+  workspacePath: string | undefined,
+): Promise<boolean> {
+  let suppressedCount = recordFeedbackSkipped(workspacePath, {
+    issueId, kind: 'uat', dedupKey, source: 'uat-failure-feedback',
+  });
+  if (suppressedCount === undefined) {
+    suppressedCount = (suppressedUatFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
+    suppressedUatFeedbackDeliveries.set(dedupKey, suppressedCount);
+  }
+  if (suppressedCount !== UAT_REPEATED_FAILURE_ESCALATION_SKIPS) return false;
+  try {
+    await surfaceIssueFeedbackNeedsYou(
+      issueId,
+      `UAT failed ${suppressedCount + 1} times on the same tested commit after its feedback was already delivered to the agent — UAT is not converging. Investigate the UAT verdict instead of re-running it.`,
+      { specialist: 'uat-agent', dedupKey },
+    );
+    return true;
+  } catch (err) {
+    console.warn(`[uat-failure-feedback] Could not surface repeated UAT failure for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
 }
 
 type DeliveryOutcome = Awaited<ReturnType<typeof messageAgent>>;
@@ -144,8 +189,10 @@ export async function relayUatFailureFeedback(
   // #4035: the journal, not process memory, says whether this verdict's
   // feedback already reached the agent — checked before any target is
   // resolved (or revived) and before any backend prompt.
+  // PAN-3580: each skip is journaled, and the Nth surfaces one needs-you.
   if (dedupKey && feedbackAlreadyDelivered(workspacePath, dedupKey)) {
-    return { ...result, deduplicated: true };
+    const needsYouSurfaced = await noteSuppressedUatDelivery(issueId, dedupKey, workspacePath);
+    return { ...result, deduplicated: true, needsYouSurfaced };
   }
 
   let fileResult;
@@ -204,6 +251,7 @@ Use your Read tool to open this file, read every line, then fix every failed UAT
     if (outcome.delivered && outcome.deduplicated) {
       // The keyed store already holds this anchor: the agent was told once.
       result.deduplicated = true;
+      if (dedupKey) result.needsYouSurfaced = await noteSuppressedUatDelivery(issueId, dedupKey, workspacePath);
       return result;
     }
     if (outcome.delivered) {

@@ -3,8 +3,8 @@ name: pipeline-status
 description: >
   Cross-room visual status board for every active issue moving through the
   Overdeck pipeline. One row per issue, one column per phase
-  (agent → review → test → verify → merge → ready), with a checkmark or X in
-  each cell. Designed to be readable from across the room while agents work
+  (agent → state → needs → PR review → checks → mergeable), with a checkmark
+  or X in each cell. Designed to be readable from across the room while agents work
   autonomously. Surface this BEFORE the verbose pan-status / agent-status
   output whenever the user asks "where are we?" or wants a status overview.
 triggers:
@@ -29,7 +29,7 @@ allowed-tools:
 Produces a single dense table for every issue returned by the authoritative
 pipeline-membership read door (plus active planning sessions), with one column
 per workflow phase. This includes exception-queue drift such as `zombie_pr`
-and `post_merge_limbo`, even when tracker or review-status state is stale.
+and `post_merge_limbo`, even when the tracker lags the PR.
 
 This is the **first thing** to show when the user asks for status. Anything
 more detailed (`pan status`, `agent-status`) goes underneath.
@@ -37,11 +37,11 @@ more detailed (`pan status`, `agent-status`) goes underneath.
 ## Output format
 
 ```
-ISSUE      BUCKET              TITLE                                      MODEL              AGENT  REVIEW  TEST  VERIFY  MERGE  READY
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-PAN-1028   in_flight           TTS: first speech utterance gets clipped   kimi-k2.6          ✓      ·       ·     -       ·      ·
-PAN-945    post_merge_limbo    Planning artifact path mismatch            gpt-5.4            ·      ·       ·     ·       ✓*     ·
-PAN-1024   zombie_pr           Lazy-load per-turn diff summaries          gpt-5.4            ·      ·       ·     ·       ·      ·
+ISSUE      BUCKET              TITLE                                      MODEL              AGENT  STATE               NEEDS       PR-REVIEW           CHECKS   MERGEABLE
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+PAN-1028   in_flight           TTS: first speech utterance gets clipped   kimi-k2.6          ✓      working             ·           ·                   ·        ·
+PAN-945    post_merge_limbo    Planning artifact path mismatch            gpt-5.4            ·      merged              ·           ·                   ·        ·
+PAN-1024   zombie_pr           Lazy-load per-turn diff summaries          gpt-5.4            ·      changes-requested   needs-you   changes-requested   ✗        ·
 
 PLANNING (Opus drafting xBRIEFs)
 PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-4-6  ◐ planning
@@ -57,7 +57,6 @@ PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-
 | `◐`   | in progress (reviewing, testing, queued, merging, verifying, pending) |
 | `✗`   | failed / blocked |
 | `·`   | pending or not applicable for this issue's current phase |
-| `*`   | flag a stale value (e.g. `mergeStatus=merged` while DB drift exists, see PAN-1027) |
 
 ## Columns
 
@@ -68,11 +67,11 @@ PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-
 | TITLE | `/api/issues` `title` | truncated to ~52 chars |
 | MODEL | `~/.overdeck/agents/agent-pan-NNN/state.json` `.model` | Which model the work agent is using |
 | AGENT | tmux + `state.json` `.status` | `✓` if agent tmux session is alive AND `status: running` |
-| REVIEW | review-status DB `.review_status` | `passed`, `reviewing`, `failed`, `blocked`, `null` |
-| TEST | review-status DB `.test_status` | `passed`, `testing`, `failed`, `null` |
-| VERIFY | review-status DB `.verification_status` (lazy — only show if review passed) | `passed`, `running`, `failed`, `null` |
-| MERGE | review-status DB `.merge_status` | `merged`, `merging`, `verifying`, `failed`, `null` |
-| READY | review-status DB `.ready_for_merge` | `✓` if `readyForMerge=true`, else `·` |
+| STATE | `/api/issues/resource-allocated` `.state` | derived pipeline state: `backlog`, `parked`, `planned`, `working`, `in-review`, `changes-requested`, `ready`, `merged`, `closed`, or `·` if unknown |
+| NEEDS | `pan show <id> --json` `.attention` (fetched only when STATE is `in-review`, `changes-requested`, or `ready`) | `needs-you`, `stuck`, `api-error`, or `·` |
+| PR-REVIEW | `pan show <id> --json` `.pr.reviewState` (same fetch as NEEDS) | `approved`, `changes-requested`, `review-requested`, `commented`, `none`, or `·` if there's no PR |
+| CHECKS | `pan show <id> --json` `.pr.checks` (same fetch) | `✓` green, `✗` red, `◐` pending, `·` no PR |
+| MERGEABLE | `pan show <id> --json` `.pr.mergeable` (same fetch) | `✓` true, `✗` false, `·` unknown or no PR |
 
 Always sort by priority: P0 hotfix → P1 bug → P2 enhancement → others. Within
 each tier, sort by issue ID descending (newest first).
@@ -86,7 +85,7 @@ don't appear via `/api/issues` filtering.
 ### 1. Generate the table
 
 Run this script. It gets the row universe from `GET /api/pipeline/membership`,
-then joins issue titles, review status, tmux, and agent state as annotations. A
+then joins issue titles, derived state, tmux, and agent state as annotations. A
 bare array is a successful answer. An HTTP 200 object with
 `status: "unavailable"` is a typed blind spot; show its `projectKey`, `reason`,
 and `message`, then stop instead of deriving membership from another source.
@@ -94,11 +93,11 @@ HTTP 503 means the first snapshot is still loading and may be retried later.
 
 ```bash
 python3 - <<'PY'
-import json, subprocess, sqlite3, os
+import json, subprocess
 from pathlib import Path
 
-PANO_DB = Path.home() / ".overdeck" / "panopticon.db"
 AGENTS = Path.home() / ".overdeck" / "agents"
+PR_STATES = {'in-review', 'changes-requested', 'ready'}
 
 issues_data = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues']))
 membership = json.loads(subprocess.check_output([
@@ -109,6 +108,9 @@ if isinstance(membership, dict) and membership.get('status') == 'unavailable':
         'PIPELINE MEMBERSHIP UNAVAILABLE: '
         f"{membership.get('projectKey')} — {membership.get('reason')}: {membership.get('message')}"
     )
+resource = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues/resource-allocated']))
+state_by_id = {(r.get('issueId') or '').upper(): r.get('state') for r in resource}
+
 issues_by_id = {(i.get('identifier') or '').upper(): i for i in issues_data}
 panissues = []
 for member in membership:
@@ -118,15 +120,6 @@ for member in membership:
     }))
     issue['pipelineBucket'] = member['bucket']
     panissues.append(issue)
-
-db = sqlite3.connect(PANO_DB)
-
-def review_row(issue_id):
-    r = db.execute(
-        "SELECT review_status, test_status, verification_status, merge_status, ready_for_merge "
-        "FROM review_status WHERE issue_id=?", (issue_id.upper(),)
-    ).fetchone()
-    return r if r else (None,)*5
 
 def state_json(name):
     p = AGENTS / name / "state.json"
@@ -141,13 +134,26 @@ def has_session(name):
         return True
     except: return False
 
-def cell(value):
-    if value is None or value == '': return '·'
-    v = str(value).lower()
-    if v in ('passed','merged','running','done','true','1'): return '✓'
-    if v in ('failed','blocked','error'): return '✗'
-    if v in ('reviewing','testing','queued','merging','verifying','pending'): return '◐'
-    return v[:3]
+def derived(issue_id):
+    try:
+        out = subprocess.check_output(['pan','show',issue_id,'--json'],
+                                       stderr=subprocess.DEVNULL, timeout=60)
+        return json.loads(out)
+    except Exception:
+        return None
+
+def checks_cell(pr):
+    c = pr.get('checks')
+    if c == 'green': return '✓'
+    if c == 'red': return '✗'
+    if c == 'pending': return '◐'
+    return '·'
+
+def mergeable_cell(pr):
+    m = pr.get('mergeable')
+    if m is True: return '✓'
+    if m is False: return '✗'
+    return '·'
 
 def tier(i):
     L = ','.join(i.get('labels',[])).lower()
@@ -157,13 +163,16 @@ def tier(i):
 
 panissues.sort(key=lambda i: (tier(i), -int(''.join(c for c in i['identifier'] if c.isdigit()) or 0)))
 
-W = {'id':10,'bucket':18,'title':44,'model':22,'agent':6,'review':7,'tests':6,'verify':7,'merge':7}
+W = {'id':10,'bucket':18,'title':44,'model':22,'agent':6,'state':18,'needs':10,'review':18,'checks':7,'mergeable':10}
 print()
-print(f"{'ISSUE':<{W['id']}}  {'BUCKET':<{W['bucket']}}  {'TITLE':<{W['title']}}  {'MODEL':<{W['model']}}  {'AGENT':<{W['agent']}}  {'REVIEW':<{W['review']}}  {'TEST':<{W['tests']}}  {'VERIFY':<{W['verify']}}  {'MERGE':<{W['merge']}}  {'READY'}")
-print('─' * 130)
+print(f"{'ISSUE':<{W['id']}}  {'BUCKET':<{W['bucket']}}  {'TITLE':<{W['title']}}  {'MODEL':<{W['model']}}  {'AGENT':<{W['agent']}}  {'STATE':<{W['state']}}  {'NEEDS':<{W['needs']}}  {'PR-REVIEW':<{W['review']}}  {'CHECKS':<{W['checks']}}  {'MERGEABLE'}")
+print('─' * 150)
 for i in panissues:
     iid = i['identifier']
-    review,test,verify,merge,ready = review_row(iid)
+    state = state_by_id.get(iid)
+    d = derived(iid) if state in PR_STATES else None
+    pr = (d.get('pr') or {}) if d else {}
+    attention = (d.get('attention') if d else None) or '·'
     agent_alive = has_session(f"agent-{iid.lower()}")
     sj = state_json(f"agent-{iid.lower()}")
     astatus = (sj or {}).get('status','-')
@@ -172,15 +181,14 @@ for i in panissues:
     if len(title) > W['title']: title = title[:W['title']-1] + '…'
     if len(amodel) > W['model']: amodel = amodel[:W['model']-1] + '…'
     agent_cell = '✓' if agent_alive and astatus=='running' else ('◐' if astatus=='running' else '·')
-    verify_cell = '·' if (review != 'passed' and not merge) else cell(verify)
+    review_cell = pr.get('reviewState') or '·'
     print(f"{iid:<{W['id']}}  {i['pipelineBucket']:<{W['bucket']}}  {title:<{W['title']}}  {amodel:<{W['model']}}  "
-          f"{agent_cell:<{W['agent']}}  {cell(review):<{W['review']}}  {cell(test):<{W['tests']}}  "
-          f"{verify_cell:<{W['verify']}}  {cell(merge):<{W['merge']}}  "
-          f"{'✓' if ready else '·'}")
+          f"{agent_cell:<{W['agent']}}  {(state or '·'):<{W['state']}}  {attention:<{W['needs']}}  "
+          f"{review_cell:<{W['review']}}  {checks_cell(pr):<{W['checks']}}  {mergeable_cell(pr)}")
 
 print()
 print("PLANNING SESSIONS (Opus drafting xBRIEFs)")
-print('─' * 130)
+print('─' * 150)
 sessions = subprocess.check_output(['tmux','-L','overdeck','list-sessions','-F','#{session_name}']).decode().split('\n')
 for ps in sorted(s for s in sessions if s.startswith('planning-pan-')):
     iid = 'PAN-' + ps.replace('planning-pan-','').upper()
@@ -192,30 +200,29 @@ for ps in sorted(s for s in sessions if s.startswith('planning-pan-')):
 
 print()
 print("✓ done/passing  ◐ in-progress  ✗ failed/blocked  · pending/n-a")
-print("Stages: AGENT (work agent alive) → REVIEW → TEST → VERIFY → MERGE → READY (Awaiting Merge)")
+print("Columns: AGENT (work agent alive) → STATE → NEEDS → PR-REVIEW → CHECKS → MERGEABLE (ready for merge)")
 PY
 ```
 
 ### 2. Add an Awaiting Merge summary line
 
-After the main table, count and list canonical pipeline members with `readyForMerge=true`:
+After the main table, count and list canonical pipeline members whose derived
+`state` is `ready`:
 
 ```bash
 python3 -c "
 import json, subprocess
-data = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues']))
+resource = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues/resource-allocated']))
 membership = json.loads(subprocess.check_output([
     'curl','-s','http://localhost:3011/api/pipeline/membership?project=overdeck'
 ]))
 member_ids = {m['issueId'].upper() for m in membership if m.get('inPipeline') is True}
-ready = [i for i in data
-         if i.get('source')=='github' and i.get('sourceRepo')=='eltmon/overdeck'
-         and (i.get('identifier') or '').upper() in member_ids
-         and i.get('readyForMerge') is True
-         and (i.get('mergeStatus') or '').lower() != 'merged']
+ready = [r for r in resource
+         if (r.get('issueId') or '').upper() in member_ids
+         and r.get('state') == 'ready']
 print(f'\\nAwaiting Merge: {len(ready)} issue(s) ready for human approval')
-for i in ready:
-    print(f'  → {i[\"identifier\"]}  {i[\"title\"][:80]}')
+for r in ready:
+    print(f'  → {r[\"issueId\"]}  {r[\"title\"][:80]}')
 "
 ```
 
@@ -250,10 +257,7 @@ For deeper detail beyond the pipeline view:
 ## Notes
 
 - The table's issue universe comes only from `/api/pipeline/membership`; it uses
-  `/api/issues`, review status, tmux, and agent files only to annotate those
+  `/api/issues`, derived state, tmux, and agent files only to annotate those
   members. If the dashboard is down, fall back to `pan status` text.
-- A `*` after a value flags a known data-drift case (e.g. `mergeStatus=merged`
-  surviving a PR revert per PAN-1027). Document the underlying issue inline so
-  the reader knows why the cell can't be trusted.
 - This skill is **read-only**. It does not change agent state, merge anything,
   or write to the DB. Pure observation.

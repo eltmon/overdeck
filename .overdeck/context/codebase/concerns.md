@@ -2,7 +2,7 @@
 
 Live landmines a change in this repo can step on. Verified 2026-09-20.
 
-- **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
+- **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts:88`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
   passing its winner through this gate; blocked ⇒ collapse to `claude-code`.
   Never bypass, never reorder around it.
@@ -80,7 +80,7 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   loop must use async exec/spawn (PAN-70: ~70 calls cleaned up). Note doctor's
   `checkCommand` (`src/cli/commands/doctor.ts`) is execSync-based — CLI-only, do
   not import it into server-reachable code.
-- **tmux sync primitives are legacy debt** — `sendKeysSync` etc. exist but new
+- **tmux sync primitives are legacy debt** — `capturePaneSync`/`killSessionSync` etc. exist but new
   callers must use async variants; raw `send-keys "text" C-m` drops Enter.
 - **RTK output compression** — when `agents.rtk.enabled`, Bash output agents see
   may be compressed/garbled; trust exit codes over visual output.
