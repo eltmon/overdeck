@@ -2,6 +2,7 @@
 import { Effect } from 'effect';
 import { getAgentState, listRunningAgents } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import type { HealthState } from '../runtimes/types.js';
 import { writeHealthEvent } from '../overdeck/health-events.js';
 import type { CloisterConfig } from './config.js';
@@ -51,7 +52,18 @@ export interface HealthHost {
  */
 export async function performHealthCheck(host: HealthHost): Promise<void> {
     try {
-      const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
+      // Live = present in the selected backend's inventory (#4109), not the
+      // tmux-only `tmuxActive` flag, which is false for every Herdr agent. An
+      // unreadable inventory is unknown liveness: skip this round and keep
+      // previousRunningAgents, so an outage never reads as every agent crashing
+      // (auto-restart) and the next readable round still diffs correctly.
+      const liveIds = await listLiveAgentIds();
+      if (liveIds === null) {
+        console.warn('[cloister] Terminal backend inventory unreadable — skipping this health check (liveness unknown)');
+        host.lastCheck = new Date();
+        return;
+      }
+      const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => liveIds.has(a.id));
       const agentIds = runningAgents.map((a) => a.id);
       const currentRunningSet = new Set(agentIds);
 
