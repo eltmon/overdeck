@@ -25,7 +25,7 @@ import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { request as httpRequest } from 'node:http'
-import { codexHome, codexSessionsRoot, extractThreadIdFromRollout, findLatestRollout, findRolloutPath } from './storage/codex.js'
+import { codexDefaultHome, codexHome, codexSessionsRoot, extractThreadIdFromRollout, findLatestRollout, findRolloutPath } from './storage/codex.js'
 import yaml from 'js-yaml'
 import type {
   AgentRuntimeSync,
@@ -357,7 +357,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   // `codex login` heals everyone. Best-effort: if the user has never signed in
   // to Codex globally there is nothing to link, and onboarding will (correctly)
   // prompt for a real first-time login.
-  const globalCodexHome = join(homedir(), '.codex')
+  const globalCodexHome = codexDefaultHome()
   const homeAuthPath = join(codexHomeDir, 'auth.json')
   const globalAuthPath = join(globalCodexHome, 'auth.json')
   seedCodexAuthSymlink(homeAuthPath, globalAuthPath)

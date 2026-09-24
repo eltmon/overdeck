@@ -1210,7 +1210,7 @@ left behind when the async pair moved to `kimi-context-envelope.ts`; it now sits
 | Module | Accessor | Replaces |
 | --- | --- | --- |
 | `storage/claude-code.ts` | `claudeProjectsRoot(home = homedir())` | `join(<home>, '.claude', 'projects')`; callers that read `process.env.HOME` first pass it, so the resolved home is unchanged |
-| `storage/codex.ts` | `codexDefaultHome()` | `join(homedir(), '.codex')` where `$CODEX_HOME` was deliberately ignored (conversation discovery) |
+| `storage/codex.ts` | `codexDefaultHome()` | `join(homedir(), '.codex')` where `$CODEX_HOME` was deliberately ignored (conversation discovery, and `initCodexHome`'s global home for the auth and rules symlinks) |
 | `storage/codex.ts` | `codexSessionsRoot(home)` | `join(<codex home>, 'sessions')` |
 | `storage/kimi-code.ts` | `kimiHomeDefault()` (now exported) | `join(homedir(), '.kimi-code')` |
 | `storage/kimi-code.ts` | `kimiWirePath(home, workDir, sessionId)` | `join(kimiSessionsRoot(...), id, 'agents', 'main', 'wire.jsonl')` |
@@ -1232,7 +1232,8 @@ Claude: `agent-enrichment.ts`, `agents/activity.ts` (private `claudeProjectDir` 
 `dashboard/server/routes/agents/control.ts`, `costs/migration.ts`, `costs/reconciler.ts`,
 `conversations/session-fork.ts`, `cost-parsers/jsonl-parser.ts`. Kimi: `runtimes/kimi-code.ts`, `agents/recovery.ts`,
 `agents/transcript-resolver.ts`, `overdeck/conversation-runtime.ts`, `overdeck/conversation-reads.ts`. Codex:
-`cli/commands/cost.ts`, `conversations/harness-discovery.ts`, `runtimes/codex.ts`, `agents/runtime-command.ts`,
+`cli/commands/cost.ts`, `conversations/harness-discovery.ts`, `runtimes/codex.ts` (sessions dirs and the global home),
+`agents/runtime-command.ts`,
 `overdeck/conversation-runtime.ts`, `dashboard/server/services/codex-plugin-importer.ts`. Pi: `cli/commands/cost.ts`,
 `conversations/harness-discovery.ts`, `overdeck/conversation-runtime.ts`, `memory/transcript-source.ts`. ACP:
 `acp/host.ts`, `conversations/harness-discovery.ts`, `overdeck/conversation-reads.ts`. Muse:
@@ -1246,7 +1247,7 @@ Claude: `agent-enrichment.ts`, `agents/activity.ts` (private `claudeProjectDir` 
 | `remote/remote-completion.ts:198` | a shell glob run on a remote Fly VM, not a local path; allowlisted |
 | `harness-binary.ts:193` | Kimi's binary install dir, not transcript storage; allowlisted |
 | `cli/commands/conversations/index.ts:31,33` | CLI help text; allowlisted |
-| `.codex/auth.json`, `~/.pi/agent/auth.json`, `~/.pi/agent/settings.json`, context-layer `AGENTS.md`, `paths.ts` `LEGACY_RUNTIME_DIRS` | auth and config, not transcript storage; out of scope |
+| `~/.codex/auth.json` (`codex-auth.ts`, `cliproxy.ts`, `openai-auth.ts`, `autopreso/agent.ts`), `~/.pi/agent/auth.json`, `~/.pi/agent/settings.json`, context-layer `AGENTS.md`, `paths.ts` `LEGACY_RUNTIME_DIRS`, `config-migration.ts` legacy dirs | auth and config, not transcript storage; out of scope |
 | `runtimes/ohmypi.ts`, `ohmypi-models.ts`, the `.omp` discovery root | Oh My Pi is #4003 |
 | `overdeck/conversation-reads.ts` `isCodexSessionFile`, `memory/reconciliation.ts`, `runtimes/codex-subagents.ts`, `runtimes/codex.ts` rollout recognizers | classify a path already in hand by its `codex-home/sessions` or `rollout-*.jsonl` shape; no storage literal the lint names |
 | `palette.ts` project encoding | a different encoding scheme, not Claude's project dir |
