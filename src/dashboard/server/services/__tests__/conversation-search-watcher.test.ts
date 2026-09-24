@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NormalizedConversationSearchConfig } from '../../../../lib/config-yaml.js';
+import { getConversationSearchHealth, resetConversationSearchHealthForTests } from '../../../../lib/conversation-search/health.js';
 import { ConversationDirectoryWatcher } from '../conversation-directory-watcher.js';
 import { ConversationSearchWatcher, startConversationSearchWatcher, stopConversationSearchWatcher } from '../conversation-search-watcher.js';
 
@@ -36,6 +37,7 @@ function config(overrides: Partial<NormalizedConversationSearchConfig> = {}): No
 
 describe('conversation search watcher', () => {
   beforeEach(() => {
+    resetConversationSearchHealthForTests();
     vi.useFakeTimers();
     vi.stubEnv('OPENAI_API_KEY', 'sk-test');
   });
@@ -45,6 +47,7 @@ describe('conversation search watcher', () => {
     vi.unstubAllEnvs();
     vi.useRealTimers();
     vi.restoreAllMocks();
+    resetConversationSearchHealthForTests();
   });
 
   it('debounces JSONL changes into incremental index calls after startup scan', async () => {
@@ -138,6 +141,34 @@ describe('conversation search watcher', () => {
     expect(removeFile).toHaveBeenCalledTimes(1);
     expect(removeFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/tmp/conversations/session-a.jsonl', config: config() }));
     expect(indexFile).not.toHaveBeenCalled();
+  });
+
+  it('treats a transcript deleted mid-index as a skip, not a search failure (PAN-3915)', async () => {
+    const fakeWatcher = new FakeWatcher();
+    const enoent = Object.assign(new Error("ENOENT: no such file or directory, stat '/tmp/conversations/session-a.jsonl'"), { code: 'ENOENT' });
+    const indexFile = vi.fn(async () => { throw enoent; });
+    const log = { log: vi.fn(), warn: vi.fn() };
+    const watcher = new ConversationSearchWatcher({
+      config: config(),
+      roots: ['/tmp/conversations'],
+      debounceMs: 25,
+      watchFactory: vi.fn(() => fakeWatcher),
+      indexAll: vi.fn(async () => ({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false })),
+      indexFile,
+      removeFile: vi.fn(async () => undefined),
+      log,
+    });
+
+    watcher.start();
+    await vi.advanceTimersByTimeAsync(0);
+    const healthBefore = getConversationSearchHealth();
+    fakeWatcher.emit('add', '/tmp/conversations/session-a.jsonl');
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(indexFile).toHaveBeenCalledTimes(1);
+    expect(getConversationSearchHealth().lastErrorAt).toBe(healthBefore.lastErrorAt);
+    expect(getConversationSearchHealth().lastErrorAt).toBeNull();
+    expect(log.warn).not.toHaveBeenCalled();
   });
 
   it('aborts and awaits startup indexing when stopped', async () => {

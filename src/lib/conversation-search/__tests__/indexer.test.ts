@@ -189,6 +189,20 @@ describe('conversation search indexer', () => {
     expect(db.chunks.map((chunk) => chunk.sessionId)).toEqual(['session-real']);
   });
 
+  it('skips a transcript deleted before indexing instead of reporting an error (PAN-3915)', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'session-gone.jsonl');
+    writeFileSync(filePath, line(message('user', 'short-lived')));
+    rmSync(filePath);
+    const provider = fakeProvider();
+
+    const result = await indexConversationFile({ filePath, config: config(), db: fakeDb(), provider });
+
+    expect(result.errors).toEqual([]);
+    expect(result.chunksSkipped).toBe(1);
+    expect(provider.embed).not.toHaveBeenCalled();
+  });
+
   it('no-ops when conversation search is disabled', async () => {
     const dir = makeTmpDir();
     const filePath = join(dir, 'session-c.jsonl');

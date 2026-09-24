@@ -245,11 +245,21 @@ export async function indexConversationFile(
     return result;
   } catch (error) {
     if (isAbortError(error)) throw error;
+    // PAN-3915: a transcript deleted while it was being indexed is a prune, not
+    // an indexing failure; the watcher's unlink handler drops its chunks.
+    if (isMissingFileError(error)) {
+      result.chunksSkipped += 1;
+      return result;
+    }
     result.errors.push({ filePath: options.filePath, message: error instanceof Error ? error.message : String(error) });
     return result;
   } finally {
     owned.close();
   }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as NodeJS.ErrnoException).code === 'ENOENT';
 }
 
 async function indexBatch(input: {

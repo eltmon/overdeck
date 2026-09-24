@@ -217,6 +217,10 @@ export class ConversationSearchWatcher {
             recordConversationSearchSuccess();
           }
         }, (error) => {
+          if (isMissingFileError(error)) {
+            // PAN-3915: deleted mid-index; the unlink handler prunes it.
+            return;
+          }
           if (!isAbortError(error)) {
             recordConversationSearchFailure(error);
             this.log.warn(`[conversation-search] failed to index ${filePath}:`, error);
@@ -290,4 +294,8 @@ function defaultConversationRoots(): string[] {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as NodeJS.ErrnoException).code === 'ENOENT';
 }
