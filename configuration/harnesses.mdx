@@ -251,7 +251,10 @@ Each session runs through the authenticated `acp-host` process, with its socket,
 token, ACP session id, and append-only transcript stored under
 `~/.overdeck/agents/<agentId>/`. The runtime adapter is
 `src/lib/runtimes/acp.ts`; Kimi-specific launch and authentication behavior is
-in `src/lib/acp/kimi.ts`.
+in `src/lib/acp/kimi.ts`. When the agent rejects a prompt (for example an
+OpenCode provider error such as `Rate limit exceeded`), the host records a
+`prompt_failed` transcript entry and the conversation feed shows it as a red
+**Prompt failed** row carrying the provider's message.
 
 ### Kimi Code CLI, native (alternative)
 
