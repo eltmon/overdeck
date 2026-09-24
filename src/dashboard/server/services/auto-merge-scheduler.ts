@@ -36,6 +36,8 @@ export interface AutoMergeSchedulerDeps {
   /** The schedule door; `postAutoMergeSchedulePayload` by default. */
   schedule?: (issueId: string) => Promise<{ status: number; body: unknown }>;
   log?: (message: string) => void;
+  /** Read for the `OVERDECK_DISABLE_AUTO_MERGE=1` kill switch; `process.env` by default. */
+  env?: NodeJS.ProcessEnv;
 }
 
 export interface AutoMergeScheduleOutcome {
@@ -79,6 +81,9 @@ function refusalReason(result: { status: number; body: unknown }): string {
  * failure is logged and skipped; it never stops the rest of the pass.
  */
 export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {}): Promise<AutoMergeScheduleOutcome[]> {
+  // The executor's kill switch stops scheduling too: rows written while the
+  // executor is off would all fire together the moment it came back.
+  if ((deps.env ?? process.env).OVERDECK_DISABLE_AUTO_MERGE === '1') return [];
   const log = deps.log ?? console.log;
   const listProjects = deps.listProjects ?? (await import('../../../lib/projects.js')).listProjectsSync;
   const isTrainEnabledForProject = deps.isTrainEnabledForProject

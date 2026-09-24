@@ -104,6 +104,7 @@ function world(options: WorldOptions = {}) {
       announce: vi.fn(),
     }),
     log: vi.fn(),
+    env: {},
   };
   return { deps, insert, listReady };
 }
@@ -183,6 +184,14 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
       uatRequired: async () => true,
     });
     await scheduleReadyAutoMerges(deps);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('schedules nothing while OVERDECK_DISABLE_AUTO_MERGE=1 is set', async () => {
+    const { deps, insert, listReady } = world({ labels: ['auto-merge'] });
+    const outcomes = await scheduleReadyAutoMerges({ ...deps, env: { OVERDECK_DISABLE_AUTO_MERGE: '1' } });
+    expect(outcomes).toEqual([]);
+    expect(listReady).not.toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
   });
 
