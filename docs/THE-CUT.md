@@ -150,6 +150,7 @@ blank means the row came from the docs grep, which doesn't carry a line count.
 | Frontend | `VerifyingOnMainBadge` | 15 | Frontend surface for record-plane recovery/verdict state | dropped (state layer) — no stored state left for these to render |
 | Frontend | `ReviewPolicyControl` | 1 | Frontend surface for record-plane recovery/verdict state | dropped (state layer) — no stored state left for these to render |
 | CLI verb | `pan inspect` | 139 | Per-item inspection gate machinery | dropped — the inspection gate and `pan inspect` are deleted outright (FR-14) |
+| Config | `roles.work.sub.inspect` / `roles.work.sub.inspect-deep` | | Model slots for the per-item inspection agents (Settings Roles panel, `/api/models/resolve`) | dropped — the inspection gate and `pan inspect` are deleted outright (FR-14); legacy config.yaml keys are ignored on load |
 | CLI verb | `pan reset-to-planned` | 83 | Reset an issue to planned state | dropped (state layer) — "planned" is now derived from spec-file existence; nothing to reset |
 | CLI verb | `pan unstick` | 52 | Clear a resolved issue's stuck gate | dropped — gate was record-based; stuck detection now lives in deacon-lite only |
 | CLI verb | `pan untroubled` | 40 | Clear repeated-failure troubled state | dropped (state layer) — no stored troubled flag |

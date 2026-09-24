@@ -84,7 +84,7 @@ Overdeck orchestrates issue work through five lifecycle **roles**. **You are run
 | **test** | Automated verification and required browser UAT | project root | `roles/test.md` |
 | server-side shipping | Rebase/readyForMerge preparation for human merge | project root | no spawned role file |
 
-Sub-roles are configuration slots under a role, not independent lifecycle stages. Current sub-roles include `work.inspect`, `work.inspect-deep`, and the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). Plan acceptance criteria should say which outcomes these roles must verify; lifecycle dispatch decides when the role runs.
+Sub-roles are configuration slots under a role, not independent lifecycle stages. Current sub-roles are the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). Plan acceptance criteria should say which outcomes these roles must verify; lifecycle dispatch decides when the role runs.
 
 **Critical asymmetry:** the workspace `CLAUDE.md` you see is not necessarily the same context later roles see. Instructions you put in `continue.json` reach the work role (same workspace). Requirements that review/test and server-side shipping must enforce should be encoded in the xBRIEF as acceptance criteria, because those criteria propagate through the role prompts and downstream artifacts.
 
@@ -101,7 +101,7 @@ The review convoy sub-roles (`review.security`, `review.correctness`, `review.pe
 
 ### What happens after you finalize
 
-After `pan plan finalize`, the pipeline runs without you once the handoff gate opens: `pan start` / Start Agent for human-approved planning, or the `--auto-start` stamp for autonomous orchestrators. The downstream flow is `work` → optional `work.inspect`/`work.inspect-deep` on flagged xBRIEF tasks → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your xBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
+After `pan plan finalize`, the pipeline runs without you once the handoff gate opens: `pan start` / Start Agent for human-approved planning, or the `--auto-start` stamp for autonomous orchestrators. The downstream flow is `work` → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your xBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
 
 ## Process
 

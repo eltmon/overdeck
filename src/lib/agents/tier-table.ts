@@ -454,10 +454,9 @@ export function validateTieredExecutionConfig(
       model: supervisorModel,
       harness: config.supervisor.harness,
       subscribe: config.supervisor.subscribe,
-      // PAN-2397 W4: a configured supervisor owns inspection by default —
-      // one inspection path (the standing supervisor) instead of also
-      // spawning ephemeral inspect/inspect-deep subrole agents. An explicit
-      // `owns_inspection: false` still routes inspection to the subroles.
+      // PAN-2397 W4: a configured supervisor owns inspection by default.
+      // The work.inspect / work.inspect-deep sub-roles it once replaced were
+      // deleted with the inspect gate (#3927).
       owns_inspection: config.supervisor.owns_inspection ?? true,
     },
     by_kind: byKind,
