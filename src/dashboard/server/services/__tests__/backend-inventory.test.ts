@@ -8,6 +8,7 @@ import {
   _resetBackendInventoryForTests,
   getBackendPanes,
   getBackendPanesForIssue,
+  isBackendInventoryDegraded,
   listBackendPanes,
   parseAgentSessionName,
   type TmuxPaneProbe,
@@ -167,6 +168,22 @@ describe('listBackendPanes — Herdr fixture', () => {
       expect(listTmuxPanes).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
+    }
+  });
+
+  it('flags the inventory degraded while herdr cannot answer, and clears it on the next good read (#4098)', async () => {
+    const failing = { name: 'herdr', list: () => Effect.fail(new Error('socket refused')) } as unknown as TerminalBackend;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      expect(isBackendInventoryDegraded()).toBe(false);
+      await expect(listBackendPanes({ backend: failing, now: () => NOW })).resolves.toEqual([]);
+      expect(isBackendInventoryDegraded()).toBe(true);
+      await listBackendPanes({ backend: herdrBackend(), now: () => NOW });
+      expect(isBackendInventoryDegraded()).toBe(false);
+    } finally {
+      warn.mockRestore();
+      log.mockRestore();
     }
   });
 
