@@ -344,13 +344,21 @@ services:
 ### Agent stuck / not responding
 
 ```bash
-# Check tmux session
-tmux capture-pane -t agent-min-123 -p
+# Is the agent alive? (backend-neutral; Herdr is the default backend)
+pan status --json   # read the agent's `alive` and `livenessReason`
+
+# Read its recent pane output (either backend)
+curl -s "http://localhost:3011/api/agents/agent-min-123/output?lines=100"
 
 # Kill and restart
-pan work kill MIN-123
-pan work issue MIN-123
+pan kill MIN-123
+pan start MIN-123
 ```
+
+To attach from a shell, run the `Attach:` command that `pan start MIN-123`
+prints (it prints it again when the agent is already running), or open the
+agent in the dashboard. See "Reaching an agent from a shell" in
+`docs/TERMINAL-BACKENDS.md`.
 
 ### Agent keeps failing
 
