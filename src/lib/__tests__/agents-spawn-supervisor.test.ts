@@ -584,6 +584,20 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('records the role run\'s backend pane in its state, as spawnAgent does (PAN-3923)', async () => {
+    // stopAgent falls back to the recorded pane once a Herdr restore has
+    // dropped the pane's tokens, so a role run needs it as much as a work agent.
+    const { spawnRun, getAgentState } = await import('../agents.js');
+
+    await spawnRun('PAN-1405', 'review', { workspace, model: 'gpt-5.5' });
+
+    expect(getAgentState('agent-pan-1405-review')).toMatchObject({
+      backend: 'tmux',
+      paneId: expect.any(String),
+      terminalId: expect.any(String),
+    });
+  });
+
   it('persists fresh role-run session origin beside the Claude session id', async () => {
     const { spawnRun } = await import('../agents.js');
 

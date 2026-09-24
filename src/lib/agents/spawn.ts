@@ -442,7 +442,7 @@ async function spawnRunWithoutConsentClaim(
       model: selectedModel,
       ...(options.parentId ? { parent: options.parentId } : {}),
     },
-  }).then((pane) => { launchedPane = pane; });
+  }).then((pane) => { launchedPane = pane; Object.assign(state, { backend: pane.backend, paneId: pane.paneId, terminalId: pane.terminalId }); });
   if (resolvedHarness === 'kimi-code') {
     try {
       rawSessionId = await launchAndCaptureManagedKimiSession({
