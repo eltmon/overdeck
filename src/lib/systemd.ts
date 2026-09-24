@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { OVERDECK_HOME, getCanonicalOverdeckHome } from './paths.js';
-import { getSupervisorPortSync, resolveSupervisorBundle, resolveSupervisorPrimaryRepoRoot } from './supervisor.js';
+import { getSupervisorPort, resolveSupervisorBundle, resolveSupervisorPrimaryRepoRoot } from './supervisor.js';
 
 const execAsync = promisify(exec);
 
@@ -69,7 +69,7 @@ export function supervisorUnitPath(unitDir = userUnitDir()): string {
 export function renderSupervisorUnit(options: RenderSupervisorUnitOptions = {}): string {
   const nodePath = options.nodePath ?? process.execPath;
   const supervisorBundle = options.supervisorBundle ?? resolveSupervisorBundle();
-  const supervisorPort = options.supervisorPort ?? getSupervisorPortSync();
+  const supervisorPort = options.supervisorPort ?? getSupervisorPort();
   const workingDirectory = options.workingDirectory ?? resolveSupervisorPrimaryRepoRoot();
   const overdeckHome = options.overdeckHome ?? OVERDECK_HOME;
   const restartSec = options.restartSec ?? DEFAULT_RESTART_SEC;

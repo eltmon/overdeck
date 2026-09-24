@@ -75,14 +75,14 @@ export async function prepareFreshWorkAgentSession(
   const agentId = `agent-${issueId.toLowerCase()}`;
   const messages: string[] = [];
 
-  const { getAgentStateSync, stopAgent, wipeAgentStateDirs } = await import('../../lib/agents.js');
-  const { assertCanStartFreshSync } = await import('../../lib/work-agent-lifecycle.js');
+  const { getAgentState, stopAgent, wipeAgentStateDirs } = await import('../../lib/agents.js');
+  const { assertCanStartFresh: assertCanStartFreshImpl } = await import('../../lib/work-agent-lifecycle.js');
   const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
-  const assertCanStartFresh = deps.assertCanStartFresh ?? assertCanStartFreshSync;
+  const assertCanStartFresh = deps.assertCanStartFresh ?? assertCanStartFreshImpl;
   const sessionLive = deps.sessionLive ?? agentSessionLive;
   const stop = deps.stopAgent ?? ((id: string) => Effect.runPromise(stopAgent(id)));
 
-  const priorState = getAgentStateSync(agentId);
+  const priorState = getAgentState(agentId);
 
   if (!options.force) {
     const pendingDecision = await detectPendingDecision(agentId);

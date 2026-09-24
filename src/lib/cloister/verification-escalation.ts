@@ -9,8 +9,8 @@
  */
 import { Effect } from 'effect';
 
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { clearAgentPaused, getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { clearAgentPaused, getAgentState, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { getPrFacts } from './pr-facts.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
@@ -49,7 +49,7 @@ export async function skipMergedVerification(
  */
 export function announceVerificationFailure(issueId: string, failedCheck: string, summary: string): void {
   try {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'cloister',
       level: 'warn',
       message: `Verification failed for ${issueId} at ${failedCheck}`,
@@ -192,7 +192,7 @@ export async function deliverVerificationFeedback(
 /** True while the whole-issue agent holds the stuck pause escalation set. */
 function isVerificationStuckPaused(issueId: string): boolean {
   try {
-    const state = getAgentStateSync(`agent-${issueId.toLowerCase()}`);
+    const state = getAgentState(`agent-${issueId.toLowerCase()}`);
     return state?.paused === true && (state.pausedReason ?? '').startsWith(VERIFICATION_STUCK_PAUSE_PREFIX);
   } catch {
     return false;

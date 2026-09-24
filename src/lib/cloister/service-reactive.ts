@@ -1,8 +1,8 @@
 /** Cloister reactive lifecycle scheduler. */
 import { Effect } from 'effect';
-import { getAgentStateSync } from '../agents.js';
+import { getAgentState } from '../agents.js';
 import type { Role } from '../agents.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { sessionExists, killSession } from '../tmux.js';
 import {
@@ -113,7 +113,7 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
   // writes to planning-pan-X while spawnRun uses agent-pan-X-plan.
   if (role === 'plan') {
     const legacyId = `planning-${issueLower}`;
-    const legacyState = getAgentStateSync(legacyId);
+    const legacyState = getAgentState(legacyId);
     if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
       // S1 (age-aware): only a STALE 'starting' state with no live tmux
       // session is a crashed spawn; a fresh one is mid-startup (PAN-2159).
@@ -128,7 +128,7 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
     ? `agent-${issueLower}`
     : `agent-${issueLower}-${role}`;
 
-  const state = getAgentStateSync(candidateId);
+  const state = getAgentState(candidateId);
   if (!state) return false;
 
   const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
@@ -149,8 +149,8 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
   // intentionally compare stale once, then the next run receives a full anchor.
   if (workspacePath && state.roleRunHead) {
     try {
-      const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-      const currentHead = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
+      const { formatAnchorShort, snapshotWorkspaceHeads } = await import('../git-utils.js');
+      const currentHead = await snapshotWorkspaceHeads(issueId, workspacePath);
       if (currentHead && currentHead !== state.roleRunHead) {
         console.log(
           `[cloister] ${issueId}: ${role} session ${candidateId} is stale `
@@ -185,7 +185,7 @@ Required steps:
  */
 async function resolveWorkspaceForIssue(issueId: string): Promise<string | null> {
   const issueLower = issueId.toLowerCase();
-  const agentState = getAgentStateSync(`agent-${issueLower}`);
+  const agentState = getAgentState(`agent-${issueLower}`);
   if (agentState?.workspace) return agentState.workspace;
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) return null;
@@ -207,7 +207,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   if (await isIssueClosed(normalizedIssueId)) {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — issue is closed`;
     console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;
   }
 
@@ -223,7 +223,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   if (mergedGuard.skip) {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — ${mergedGuard.reason}`;
     console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;
   }
 
@@ -234,7 +234,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   if (await activeRoleRunExists(normalizedIssueId, role, workspace ?? undefined)) {
     const message = `${normalizedIssueId}: ${role} role already active; skipping lifecycle spawn`;
     console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;
   }
 
@@ -248,7 +248,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   if (await Effect.runPromise(sessionExists(roleSessionId))) {
     const message = `${normalizedIssueId}: killing stale ${role} session ${roleSessionId} before re-dispatch`;
     console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     try {
       await Effect.runPromise(killSession(roleSessionId));
     } catch (err) {
@@ -261,7 +261,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
       if (!workspace) {
         const failure = `${normalizedIssueId}: cannot dispatch review role — no workspace or project resolved`;
         console.error(`[cloister] ${failure}`);
-        emitActivityEntrySync({ source: 'cloister', level: 'error', message: failure, issueId: normalizedIssueId });
+        emitActivityEntry({ source: 'cloister', level: 'error', message: failure, issueId: normalizedIssueId });
         return;
       }
       const branch = `feature/${normalizedIssueId.toLowerCase()}`;
@@ -269,7 +269,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
       const result = await Effect.runPromise(spawnReviewRoleForIssue({ issueId: normalizedIssueId, workspace, branch }));
       const message = `${normalizedIssueId}: review role dispatched from lifecycle state '${newState}' (${result.message})`;
       console.log(`[cloister] ${message}`);
-      emitActivityEntrySync({ source: 'cloister', level: result.success ? 'info' : 'error', message, issueId: normalizedIssueId });
+      emitActivityEntry({ source: 'cloister', level: result.success ? 'info' : 'error', message, issueId: normalizedIssueId });
       return;
     }
 
@@ -279,7 +279,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
       await Effect.runPromise(dispatchTestAgentAndNotify(normalizedIssueId, workspace ?? undefined, branch));
       const message = `${normalizedIssueId}: test role dispatched from lifecycle state '${newState}'`;
       console.log(`[cloister] ${message}`);
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+      emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
       return;
     }
 
@@ -295,7 +295,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
         // increment a recovery-trip counter on the record so a later patrol
         // could decide when to raise needs-you; the counter and the patrol are
         // both gone.
-        emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
+        emitActivityEntry({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
         return;
       }
       const run = await spawnRun(normalizedIssueId, 'plan', {
@@ -305,7 +305,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
       });
       const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
       console.log(`[cloister] ${message}`);
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+      emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
       return;
     }
 
@@ -317,7 +317,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
       if (!decision.allow) {
         const message = `${normalizedIssueId}: ${decision.reason}`;
         console.log(`[cloister] ${message}`);
-        emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
+        emitActivityEntry({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
         return;
       }
       autoSpawnConsentRequired = decision.releaseSource === 'planning-consent';
@@ -330,17 +330,17 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
     });
     const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
     console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('already running')) {
       const skipMessage = `${normalizedIssueId}: ${role} role already running; skipping lifecycle spawn`;
       console.log(`[cloister] ${skipMessage}`);
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message: skipMessage, issueId: normalizedIssueId });
+      emitActivityEntry({ source: 'cloister', level: 'info', message: skipMessage, issueId: normalizedIssueId });
       return;
     }
     console.error(`[cloister] Failed to start ${role} role for ${normalizedIssueId}:`, error);
-    emitActivityEntrySync({ source: 'cloister', level: 'error', message: `${normalizedIssueId}: failed to start ${role} role: ${message}`, issueId: normalizedIssueId });
+    emitActivityEntry({ source: 'cloister', level: 'error', message: `${normalizedIssueId}: failed to start ${role} role: ${message}`, issueId: normalizedIssueId });
   }
 }
 

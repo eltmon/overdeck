@@ -65,8 +65,8 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/tracker-utils.js')>();
   return {
     ...actual,
-    resolveGitHubIssueSync: mockResolveGitHubIssue,
-    resolveTrackerTypeSync: () => 'github',
+    resolveGitHubIssue: mockResolveGitHubIssue,
+    resolveTrackerType: () => 'github',
   };
 });
 
@@ -95,15 +95,15 @@ vi.mock('../../../../lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   saveAgentStateSync: mockSaveAgentStateSync,
   getProviderAuthMode: vi.fn(() => Promise.resolve('api')),
   normalizeAgentId: vi.fn((id: string) => id),
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
+  emitActivityEntry: vi.fn(),
+  emitActivityTts: vi.fn(),
 }));
 
 vi.mock('../../../../lib/planning/spawn-planning-session.js', () => ({

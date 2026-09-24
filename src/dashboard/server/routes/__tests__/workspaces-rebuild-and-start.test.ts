@@ -26,10 +26,10 @@ vi.mock('node:child_process', async (importOriginal) => {
   };
 });
 
-// emitActivityEntrySync writes to the SQLite event store; keep this a pure
+// emitActivityEntry writes to the SQLite event store; keep this a pure
 // unit test by no-op'ing it.
 vi.mock('../../../../lib/activity-logger.js', () => ({
-  emitActivityEntrySync: () => undefined,
+  emitActivityEntry: () => undefined,
 }));
 
 import { spawnPanCommand } from '../workspaces.js';

@@ -38,7 +38,7 @@ function timestamp(): string {
 }
 
 /** Append a line to ~/.overdeck/logs/deacon.log */
-export function logDeaconEventSync(message: string): void {
+export function logDeaconEvent(message: string): void {
   ensureLogsDir();
   try {
     appendFileSync(join(logsDir(), 'deacon.log'), `[${timestamp()}] ${message}\n`);
@@ -48,7 +48,7 @@ export function logDeaconEventSync(message: string): void {
 }
 
 /** Append a line to ~/.overdeck/agents/<agentId>/lifecycle.log */
-export function logAgentLifecycleSync(agentId: string, message: string): void {
+export function logAgentLifecycle(agentId: string, message: string): void {
   ensureAgentDir(agentId);
   try {
     appendFileSync(

@@ -12,7 +12,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
   CACHE_RULES_DIR: cacheDirs.rules,
 }));
 
-let mergeSkillsIntoWorkspaceSync: typeof import('../../../src/lib/skills-merge.js').mergeSkillsIntoWorkspaceSync;
+let mergeSkillsIntoWorkspace: typeof import('../../../src/lib/skills-merge.js').mergeSkillsIntoWorkspace;
 
 function hash(content: string): string {
   return `sha256:${createHash('sha256').update(content).digest('hex')}`;
@@ -33,7 +33,7 @@ describe('skills-merge', () => {
     cacheDirs.agents = join(cacheBase, 'agent-definitions');
     cacheDirs.rules = join(cacheBase, 'rules');
     const module = await import('../../../src/lib/skills-merge.js');
-    mergeSkillsIntoWorkspaceSync = module.mergeSkillsIntoWorkspaceSync;
+    mergeSkillsIntoWorkspace = module.mergeSkillsIntoWorkspace;
   });
 
   beforeEach(() => {
@@ -54,7 +54,7 @@ describe('skills-merge', () => {
     rmSync(cacheBase, { recursive: true, force: true });
   });
 
-  describe('mergeSkillsIntoWorkspaceSync pruning', () => {
+  describe('mergeSkillsIntoWorkspace pruning', () => {
     it('deletes and reports stale manifest-tracked workspace files', () => {
       const workspacePath = join(testDir, 'workspace');
       const relativePath = 'skills/old-skill/SKILL.md';
@@ -71,7 +71,7 @@ describe('skills-merge', () => {
         },
       }));
 
-      const result = mergeSkillsIntoWorkspaceSync(workspacePath);
+      const result = mergeSkillsIntoWorkspace(workspacePath);
 
       expect(result.pruned).toEqual([relativePath]);
       expect(result.keptModified).toEqual([]);
@@ -97,7 +97,7 @@ describe('skills-merge', () => {
         },
       }));
 
-      const result = mergeSkillsIntoWorkspaceSync(workspacePath);
+      const result = mergeSkillsIntoWorkspace(workspacePath);
 
       expect(result.pruned).toEqual([]);
       expect(result.keptModified).toEqual([]);
@@ -118,7 +118,7 @@ describe('skills-merge', () => {
         'rules/old.md': { hash: hash('historical rule'), source: 'overdeck', installed_at: '' },
       },
     }));
-    const result = mergeSkillsIntoWorkspaceSync(workspace);
+    const result = mergeSkillsIntoWorkspace(workspace);
     expect(readFileSync(target, 'utf8')).toBe('historical rule');
     expect(existsSync(join(workspace, '.claude', 'rules', 'new.md'))).toBe(false);
     expect(readFileSync(join(workspace, '.claude', 'skills', 'sample', 'SKILL.md'), 'utf8')).toBe('skill');

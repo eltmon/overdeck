@@ -11,7 +11,7 @@ import { claudeProjectDir } from './runtimes/storage/claude-code.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
-import { getAgentStateSync } from './agents/agent-state.js'
+import { getAgentState } from './agents/agent-state.js'
 import { getAgentRuntimeState } from './agents/runtime-state.js'
 import {
   detectAwaitingInputForAgent,
@@ -20,8 +20,8 @@ import {
 } from './agent-input-detection.js'
 import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
-import { extractPrefixSync } from './issue-id.js'
-import { getLatestSessionIdSync } from './agents/activity.js'
+import { extractPrefix } from './issue-id.js'
+import { getLatestSessionId } from './agents/activity.js'
 import { resolveAgentTranscriptCandidate } from './agents/transcript-resolver.js'
 
 const execAsync = promisify(exec)
@@ -204,7 +204,7 @@ function getProjectPathByPrefix(issuePrefix: string): string {
 
 /** Resolve the workspace path for an agent (null when unknown). */
 export async function getAgentWorkspace(agentId: string): Promise<string | null> {
-  const workspace = getAgentStateSync(agentId)?.workspace;
+  const workspace = getAgentState(agentId)?.workspace;
   if (workspace) return workspace;
   try {
     const { stdout: paneCwd } = await execAsync(
@@ -216,7 +216,7 @@ export async function getAgentWorkspace(agentId: string): Promise<string | null>
   } catch {}
   const isStrikeAgent = agentId.startsWith('strike-')
   const issueId = agentId.replace(/^(agent-|planning-|strike-)/, '').toUpperCase()
-  const prefix = extractPrefixSync(issueId)
+  const prefix = extractPrefix(issueId)
   if (!prefix) return null
   try {
     const projectPath = getProjectPathByPrefix(prefix)
@@ -262,7 +262,7 @@ export async function countPendingAskUserQuestionsForAgent(agentId: string): Pro
   let total = 0
   for (const f of files) {
     try {
-      const scan = await scanPendingInputsPromise(join(projectDir, f))
+      const scan = await scanPendingInputs(join(projectDir, f))
       total += scan.askUserQuestions.length
     } catch {
       // A file vanishing mid-scan (rotation) is not "no question" — but we
@@ -284,11 +284,11 @@ export async function countPendingAskUserQuestionsForCurrentAgentSession(
   const jsonlPath = await getAgentJsonlPath(agentId)
   if (!jsonlPath) return 0
 
-  const currentSessionId = getLatestSessionIdSync(agentId)
+  const currentSessionId = getLatestSessionId(agentId)
   const isPinnedCurrentSession = currentSessionId !== null
     && basename(jsonlPath) === `${currentSessionId}.jsonl`
   if (!isPinnedCurrentSession) {
-    const startedAtMs = Date.parse(getAgentStateSync(agentId)?.startedAt ?? '')
+    const startedAtMs = Date.parse(getAgentState(agentId)?.startedAt ?? '')
     if (Number.isFinite(startedAtMs)) {
       try {
         if ((await stat(jsonlPath)).mtimeMs < startedAtMs) return 0
@@ -299,7 +299,7 @@ export async function countPendingAskUserQuestionsForCurrentAgentSession(
   }
 
   try {
-    const scan = await scanPendingInputsPromise(jsonlPath)
+    const scan = await scanPendingInputs(jsonlPath)
     return scan.askUserQuestions.length
   } catch {
     return 0
@@ -367,7 +367,7 @@ function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error
 
 /** Parse pending questions from a JSONL session file. */
 export async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
-  const detection = await scanPendingInputsPromise(jsonlPath)
+  const detection = await scanPendingInputs(jsonlPath)
   return detection.askUserQuestions
 }
 
@@ -502,7 +502,7 @@ function scanPiEntry(entry: unknown, state: AskScanState): void {
  * and claude plan-mode state. Format is detected per line, so a transcript
  * resolves correctly even when the recorded harness is stale.
  */
-export async function scanPendingInputsPromise(jsonlPath: string): Promise<PendingInputsScan> {
+export async function scanPendingInputs(jsonlPath: string): Promise<PendingInputsScan> {
   if (!existsSync(jsonlPath)) {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
   }
@@ -638,7 +638,7 @@ export async function computeAgentEnrichment(
   const isPlanning = agentId.startsWith('planning-')
 
   // Read persisted role for enrichment projection.
-  const stateRole = getAgentStateSync(agentId)?.role
+  const stateRole = getAgentState(agentId)?.role
 
   const role: AgentEnrichment['role'] =
     (stateRole === 'plan' || stateRole === 'work' || stateRole === 'review' ||
@@ -661,7 +661,7 @@ export async function computeAgentEnrichment(
     scan = cachedScan
   } else {
     const jsonlPath = await getAgentJsonlPath(agentId)
-    if (jsonlPath) scan = await scanPendingInputsPromise(jsonlPath)
+    if (jsonlPath) scan = await scanPendingInputs(jsonlPath)
   }
 
   let pendingQuestions: PendingQuestion[] = [...scan.askUserQuestions]

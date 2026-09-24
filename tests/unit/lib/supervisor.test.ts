@@ -23,9 +23,9 @@ function fakeChild(pid: number) {
 describe('supervisor lifecycle', () => {
   let home: string;
   let prevHome: string | undefined;
-  let startSupervisorProcessSync: typeof supervisor.startSupervisorProcessSync;
-  let stopSupervisorProcessSync: typeof supervisor.stopSupervisorProcessSync;
-  let isSupervisorRunningSync: typeof supervisor.isSupervisorRunningSync;
+  let startSupervisorProcess: typeof supervisor.startSupervisorProcess;
+  let stopSupervisorProcess: typeof supervisor.stopSupervisorProcess;
+  let isSupervisorRunning: typeof supervisor.isSupervisorRunning;
   let resolveSupervisorPrimaryRepoRoot: typeof supervisor.resolveSupervisorPrimaryRepoRoot;
 
   beforeEach(async () => {
@@ -48,9 +48,9 @@ describe('supervisor lifecycle', () => {
     vi.resetModules();
 
     const mod = await import('../../../src/lib/supervisor.js');
-    startSupervisorProcessSync = mod.startSupervisorProcessSync;
-    stopSupervisorProcessSync = mod.stopSupervisorProcessSync;
-    isSupervisorRunningSync = mod.isSupervisorRunningSync;
+    startSupervisorProcess = mod.startSupervisorProcess;
+    stopSupervisorProcess = mod.stopSupervisorProcess;
+    isSupervisorRunning = mod.isSupervisorRunning;
     resolveSupervisorPrimaryRepoRoot = mod.resolveSupervisorPrimaryRepoRoot;
   });
 
@@ -82,7 +82,7 @@ describe('supervisor lifecycle', () => {
     expect(resolveSupervisorPrimaryRepoRoot()).toBe('/home/dev/Projects/overdeck');
   });
 
-  describe('startSupervisorProcessSync', () => {
+  describe('startSupervisorProcess', () => {
     it('removes the pidfile and logs an error when the child dies immediately', () => {
       makeBundle();
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -90,20 +90,20 @@ describe('supervisor lifecycle', () => {
         fakeChild(DEAD_PID) as never,
       );
 
-      expect(() => startSupervisorProcessSync()).toThrow(/exited immediately/);
+      expect(() => startSupervisorProcess()).toThrow(/exited immediately/);
 
       expect(spawn).toHaveBeenCalledWith(process.execPath, [join(home, 'dist', 'supervisor', 'server.js')], expect.objectContaining({
         cwd: home,
       }));
       expect(existsSync(join(home, 'supervisor.pid'))).toBe(false);
-      expect(isSupervisorRunningSync()).toBe(false);
+      expect(isSupervisorRunning()).toBe(false);
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('exited immediately'));
 
       errorSpy.mockRestore();
     });
   });
 
-  describe('stopSupervisorProcessSync', () => {
+  describe('stopSupervisorProcess', () => {
     it('waits for the process to exit before removing the pidfile', () => {
       const pid = 1_234_567;
       writeFileSync(join(home, 'supervisor.pid'), String(pid), 'utf-8');
@@ -135,7 +135,7 @@ describe('supervisor lifecycle', () => {
         }) as typeof process.kill,
       );
 
-      stopSupervisorProcessSync();
+      stopSupervisorProcess();
 
       expect(existsSync(join(home, 'supervisor.pid'))).toBe(false);
       expect(sigtermReceived).toBe(true);
@@ -174,7 +174,7 @@ describe('supervisor lifecycle', () => {
         }) as typeof process.kill,
       );
 
-      stopSupervisorProcessSync();
+      stopSupervisorProcess();
 
       expect(existsSync(join(home, 'supervisor.pid'))).toBe(false);
       expect(sigtermReceived).toBe(true);

@@ -16,7 +16,7 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import {
   getAgentDir,
-  getAgentStateSync,
+  getAgentState,
   saveAgentStateSync,
   saveAgentState,
   markAgentStoppedState,
@@ -191,7 +191,7 @@ export function stopAgentSync(agentId: string, cause: AgentStopCause = 'system')
     // Non-fatal — stopping the agent must succeed even if guard cleanup fails.
   }
 
-  const state = getAgentStateSync(normalizedId);
+  const state = getAgentState(normalizedId);
   if (state) {
     // Ensure id is set — runtime state files may lack it (PAN-150)
     if (!state.id) state.id = normalizedId;
@@ -269,7 +269,7 @@ export const stopAgent = (
     });
 
     const state = yield* Effect.try({
-      try: () => getAgentStateSync(normalizedId),
+      try: () => getAgentState(normalizedId),
       catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${normalizedId}`, cause }),
     });
     if (state) {

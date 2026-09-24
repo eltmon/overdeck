@@ -5,7 +5,7 @@ import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 import { Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getHeaderFromMap, getTrustedOrigins, normalizeOrigin, type HeaderMap } from './origin-validation.js';
 
@@ -40,7 +40,7 @@ function getDashboardSessionToken(): string {
   // bootstrap hash token is already consumed on first load. Falls back to a
   // random token only when no internal token is configured, in which case the
   // auth gate already 503s before the session token is ever consulted.
-  const internal = getInternalTokenSync();
+  const internal = getInternalToken();
   browserSessionToken = internal
     ? createHmac('sha256', internal).update('overdeck-dashboard-session-v1').digest('base64url')
     : randomBytes(32).toString('base64url');
@@ -60,7 +60,7 @@ export function dashboardCsrfToken(): string {
   // dashboard restart — and the flywheel restarts the dashboard on every
   // post-merge deploy. Distinct context string keeps it independent of the
   // session token.
-  const internal = getInternalTokenSync();
+  const internal = getInternalToken();
   browserCsrfToken = internal
     ? createHmac('sha256', internal).update('overdeck-dashboard-csrf-v1').digest('base64url')
     : randomBytes(32).toString('base64url');
@@ -101,7 +101,7 @@ export function dashboardSessionCookieHeader(options: { secure?: boolean } = {})
 }
 
 export function hasDashboardInternalTokenHeaders(headers: HeaderMap): boolean {
-  const expected = getInternalTokenSync();
+  const expected = getInternalToken();
   if (!expected) return false;
 
   const internalHeader = getHeaderFromMap(headers, INTERNAL_TOKEN_HEADER);
@@ -290,7 +290,7 @@ function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
 export function rejectUnauthorizedDashboardSessionMintRequest(
   request: HttpServerRequest.HttpServerRequest,
 ): HttpServerResponse.HttpServerResponse | null {
-  const expected = getInternalTokenSync();
+  const expected = getInternalToken();
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }
@@ -303,7 +303,7 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
 export function rejectUnauthorizedDashboardRequest(
   request: HttpServerRequest.HttpServerRequest,
 ): HttpServerResponse.HttpServerResponse | null {
-  const expected = getInternalTokenSync();
+  const expected = getInternalToken();
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }

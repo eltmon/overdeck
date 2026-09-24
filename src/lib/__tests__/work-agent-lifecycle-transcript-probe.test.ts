@@ -8,10 +8,10 @@ const mockSessionExists = vi.fn();
 const mockExistsSync = vi.fn<(path: string) => boolean>();
 
 vi.mock('../agents.js', () => ({
-  getAgentStateSync: () => mockGetAgentState(),
+  getAgentState: () => mockGetAgentState(),
   getAgentRuntimeStateSync: () => mockGetAgentRuntimeState(),
   getAgentRuntimeState: () => Effect.succeed(mockGetAgentRuntimeState()),
-  getLatestSessionIdSync: () => mockGetLatestSessionId(),
+  getLatestSessionId: () => mockGetLatestSessionId(),
   normalizeAgentId: (id: string) => id,
 }));
 
@@ -50,7 +50,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 import {
-  assertCanStartFreshSync,
+  assertCanStartFresh,
   getWorkAgentLifecycleState,
   getWorkAgentLifecycleStateSync,
 } from '../work-agent-lifecycle.js';
@@ -125,8 +125,8 @@ describe('Claude transcript resumability probe (PAN-3194)', () => {
   it('allows pan start to proceed without --fresh when the transcript is missing', () => {
     configureLifecycle({ transcriptExists: false });
 
-    expect(() => assertCanStartFreshSync('agent-pan-3194')).not.toThrow();
-    expect(assertCanStartFreshSync('agent-pan-3194').recommendedAction).toBe('start');
+    expect(() => assertCanStartFresh('agent-pan-3194')).not.toThrow();
+    expect(assertCanStartFresh('agent-pan-3194').recommendedAction).toBe('start');
   });
 
   it('does not require a Claude JSONL for a non-Claude harness', () => {

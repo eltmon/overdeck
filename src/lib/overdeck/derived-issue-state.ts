@@ -68,9 +68,9 @@ import { isUnsupported } from '../terminal-backends/types.js';
 import type { BackendAgentSnapshot, TerminalBackend } from '../terminal-backends/types.js';
 import { createSettledTtlPromiseCache } from '../concurrency.js';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
-import { findSpecByIssueSync } from '../xbrief/io.js';
-import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
-import { inferProjectForgeSync } from '../project-repos.js';
+import { findSpecByIssue } from '../xbrief/io.js';
+import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
+import { inferProjectForge } from '../project-repos.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -376,9 +376,9 @@ async function readMrWithGlab(_issueId: string, projectPath: string, branch: str
  * forever. `inferProjectForgeSync` is the canonical resolver.
  */
 export function forgeForProject(projectPath: string): 'github' | 'gitlab' {
-  const project = findProjectByPathSync(projectPath);
+  const project = findProjectByPath(projectPath);
   if (!project) return 'github';
-  return inferProjectForgeSync(project) ?? 'github';
+  return inferProjectForge(project) ?? 'github';
 }
 
 function forgeReader(projectPath: string) {
@@ -472,7 +472,7 @@ async function readFeatureBranchesWithGit(projectPath: string): Promise<Map<stri
 export function specExistsFor(issueId: string, projectPath: string): boolean {
   const workspace = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
   return [projectPath, workspace].some((root) => {
-    if (findSpecByIssueSync(root, issueId) !== null) return true;
+    if (findSpecByIssue(root, issueId) !== null) return true;
     const { specsDir } = getProjectPanPaths(root);
     return existsSync(join(specsDir, `${issueId.toLowerCase()}.xbrief.json`))
       || existsSync(join(specsDir, `${issueId.toUpperCase()}.xbrief.json`));
@@ -580,7 +580,7 @@ async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]
 export async function readIssueFromTracker(issueId: string): Promise<TrackerIssueFacts | null> {
   const { loadConfigSync } = await import('../config.js');
   const { createTracker, createTrackerFromConfig } = await import('../tracker/factory.js');
-  const { resolveGitHubIssueSync } = await import('../tracker-utils.js');
+  const { resolveGitHubIssue } = await import('../tracker-utils.js');
   const { Effect } = await import('effect');
 
   let trackers;
@@ -594,7 +594,7 @@ export async function readIssueFromTracker(issueId: string): Promise<TrackerIssu
   // A GitHub tracker is configured with ONE owner/repo, but an issue id names
   // its repo through its prefix (PAN-, TIN-, …). Reading `PAN-1` against the
   // configured repo would answer about a different issue entirely.
-  const gh = resolveGitHubIssueSync(issueId);
+  const gh = resolveGitHubIssue(issueId);
 
   const order = [trackers.primary, ...(trackers.secondary ? [trackers.secondary] : [])];
   for (const type of order) {

@@ -16,7 +16,7 @@ import { join, dirname } from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { arch as osArch, homedir, platform as osPlatform, tmpdir } from 'os';
 import { createHash } from 'crypto';
-import { readSettingsOrAbort, backupSettingsSync, pruneBackupsSync, atomicWriteJsonSync, diffJson } from './safe-settings.js';
+import { readSettingsOrAbort, backupSettings, pruneBackups, atomicWriteJson, diffJson } from './safe-settings.js';
 import { SYNC_SOURCES } from '../../../lib/paths.js';
 
 const RTK_VERSION = '0.41.0';
@@ -448,12 +448,12 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     console.log(diffJson(beforeSnapshot, settings));
     console.log(chalk.cyan('\nDry run complete — no file changes written.'));
   } else {
-    const backupPath = backupSettingsSync(settingsPath);
+    const backupPath = backupSettings(settingsPath);
     if (backupPath) {
       console.log(chalk.dim(`✓ Backed up settings.json → ${backupPath}`));
     }
-    atomicWriteJsonSync(settingsPath, settings);
-    pruneBackupsSync(settingsPath);
+    atomicWriteJson(settingsPath, settings);
+    pruneBackups(settingsPath);
     console.log(chalk.green('✓ Updated Claude Code settings.json'));
   }
 

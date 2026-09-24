@@ -23,7 +23,7 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/agents.js')>()
   return {
     ...actual,
-    getAgentStateSync: mocks.getAgentState,
+    getAgentState: mocks.getAgentState,
     restartAgent: mocks.restartAgent,
   }
 })

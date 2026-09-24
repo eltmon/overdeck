@@ -7,7 +7,7 @@
  * Pattern mirrors tunnel.ts — stateless CRUD against external API.
  */
 
-import { HumeConfig, TemplatePlaceholders, replacePlaceholdersSync } from './workspace-config.js';
+import { HumeConfig, TemplatePlaceholders, replacePlaceholders } from './workspace-config.js';
 
 export interface HumeResult {
   success: boolean;
@@ -76,8 +76,8 @@ export async function createHumeConfig(
   }
 
   // Resolve config name and BYOLLM URL
-  const configName = replacePlaceholdersSync(config.name_pattern, placeholders);
-  const byollmUrl = replacePlaceholdersSync(config.byollm_url_pattern, placeholders);
+  const configName = replacePlaceholders(config.name_pattern, placeholders);
+  const byollmUrl = replacePlaceholders(config.byollm_url_pattern, placeholders);
   steps.push(`[hume] Target config: ${configName}`);
   steps.push(`[hume] BYOLLM URL: ${byollmUrl}`);
 
@@ -184,7 +184,7 @@ export async function deleteHumeConfig(
     return { success: false, steps: [`[hume] API key not found in env var ${config.api_key_env || 'HUME_API_KEY'}`] };
   }
 
-  const configName = replacePlaceholdersSync(config.name_pattern, placeholders);
+  const configName = replacePlaceholders(config.name_pattern, placeholders);
   steps.push(`[hume] Looking for config: ${configName}`);
 
   // List configs matching the name

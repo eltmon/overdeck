@@ -19,8 +19,8 @@
 
 import { Effect } from 'effect';
 import { getEventStore, type EventStore } from '../event-store.js';
-import { getAgentStateSync, type AgentState } from '../../../lib/agents.js';
-import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
+import { getAgentState, type AgentState } from '../../../lib/agents.js';
+import { logAgentLifecycle } from '../../../lib/persistent-logger.js';
 import { sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
 import {
   getSupervisedConversationByTmuxSession,
@@ -53,7 +53,7 @@ export function saveAgentStateAndEmitEventWithDeps(
   event: Omit<DomainEvent, 'sequence'>,
 ): AgentProjectionResult {
   const sequence = eventStore.append(event);
-  logAgentLifecycleSync(
+  logAgentLifecycle(
     state.id,
     `projected ${event.type} (seq=${sequence}) for ${state.id}`,
   );
@@ -227,7 +227,7 @@ export async function applyAgentLifecycleEventWithDeps(
   input: AgentLifecycleEventInput,
   deps: AgentLifecycleDeps = {},
 ): Promise<AgentLifecycleApplyResult> {
-  const state = (deps.readAgentState ?? getAgentStateSync)(agentId);
+  const state = (deps.readAgentState ?? getAgentState)(agentId);
   if (!state) {
     const conversation = (deps.readConversation ?? readSupervisedConversation)(agentId);
     if (!conversation) return { applied: false, reason: 'no-state' };
@@ -307,7 +307,7 @@ async function applyConversationLifecycleEvent(
       timestamp: at,
       payload: { agentId: sessionId, activity },
     });
-    logAgentLifecycleSync(
+    logAgentLifecycle(
       sessionId,
       `projected agent.activity_changed(${activity}) (seq=${sequence}) for conversation ${conversation.name}`,
     );

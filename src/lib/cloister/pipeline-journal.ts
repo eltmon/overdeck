@@ -28,7 +28,7 @@
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { notifyPipelineSync } from '../pipeline-notifier.js';
+import { notifyPipeline } from '../pipeline-notifier.js';
 
 export type PipelineJournalEntryType =
   | 'verification.started' | 'verification.passed' | 'verification.failed'
@@ -83,7 +83,7 @@ export function appendPipelineEntry(
     );
   }
   try {
-    notifyPipelineSync({ type: 'pipeline.entry', issueId: stamped.issueId, entry: stamped });
+    notifyPipeline({ type: 'pipeline.entry', issueId: stamped.issueId, entry: stamped });
   } catch (err) {
     console.warn(`[pipeline-journal] Could not notify pipeline.entry for ${stamped.issueId}:`, err);
   }

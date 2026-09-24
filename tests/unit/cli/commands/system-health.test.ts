@@ -15,15 +15,13 @@ global.fetch = mockFetch as unknown as typeof fetch;
 const mockGetDashboardApiUrl = vi.fn(() => 'http://localhost:3011');
 vi.mock('../../../../src/lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../../src/lib/config.js')>()),
-  getDashboardApiUrlSync: (...args: Parameters<typeof mockGetDashboardApiUrl>) =>
+  getDashboardApiUrl: (...args: Parameters<typeof mockGetDashboardApiUrl>) =>
     mockGetDashboardApiUrl(...args),
 }));
 
 const mockIsSmeeProcessRunning = vi.fn();
 vi.mock('../../../../src/lib/smee.js', () => ({
   isSmeeProcessRunning: (...args: Parameters<typeof mockIsSmeeProcessRunning>) =>
-    mockIsSmeeProcessRunning(...args),
-  isSmeeProcessRunningSync: (...args: Parameters<typeof mockIsSmeeProcessRunning>) =>
     mockIsSmeeProcessRunning(...args),
 }));
 

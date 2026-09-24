@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../agent-state.js', () => ({
   getAgentDir: () => mocks.agentDir,
-  getAgentStateSync: () => mocks.state,
+  getAgentState: () => mocks.state,
   saveAgentStateSync: mocks.saveAgentStateSync,
 }));
 

@@ -277,7 +277,7 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
  * Read one agent's `state.json`. Returns null when the file is absent, unparsable, or
  * roleless; throws only when reading an existing file fails (e.g. EACCES).
  */
-export function getAgentStateSync(agentId: string): AgentState | null {
+export function getAgentState(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
   const stateFile = getAgentStateFilePath(normalizedId);
   if (!existsSync(stateFile)) return null;
@@ -303,7 +303,7 @@ export function listAgentStatesSync(): AgentState[] {
   }
   const states: AgentState[] = [];
   for (const name of entries) {
-    const state = getAgentStateSync(name);
+    const state = getAgentState(name);
     if (state) states.push(state);
   }
   return states;

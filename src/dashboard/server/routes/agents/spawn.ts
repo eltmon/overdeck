@@ -6,21 +6,21 @@ import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
-  saveAgentState, determineModel, getProviderAuthMode, getAgentStateSync,
+  saveAgentState, determineModel, getProviderAuthMode, getAgentState,
   clearAgentPaused, clearAgentTroubled,
 } from '../../../../lib/agents.js';
 import { resolveIssueWorkModel } from '../../../../lib/agents/staffing.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
-import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
+import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
 import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
-import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
-import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { canUseHarness } from '../../../../lib/harness-policy.js';
+import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { FsError } from '../../../../lib/errors.js';
 import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
-import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
-import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
+import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { ProviderHealthError, validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
@@ -66,7 +66,7 @@ import { claimAgentStart, handleContainerOrchestration, handleRemoteAgentSpawn, 
  */
 export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: string): void {
   try {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'warn',
       message: `Workspace dirty — agent start refused for ${issueId}`,
@@ -116,7 +116,7 @@ export function resolveStartAgentGateForRoute(input: {
 
   return Effect.gen(function* () {
     const state = yield* Effect.try({
-      try: () => getAgentStateSync(input.agentSessionName),
+      try: () => getAgentState(input.agentSessionName),
       catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${input.agentSessionName}`, cause }),
     });
     gate = evaluateAgentStartGate(input.agentSessionName, state);
@@ -154,7 +154,7 @@ export function resolveStartAgentGateForRoute(input: {
     if (!cleared) return gate;
 
     gate = evaluateAgentStartGate(input.agentSessionName, yield* Effect.try({
-      try: () => getAgentStateSync(input.agentSessionName),
+      try: () => getAgentState(input.agentSessionName),
       catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${input.agentSessionName}`, cause }),
     }));
     return gate;
@@ -243,7 +243,7 @@ export const postAgentsRoute = HttpRouter.add(
       );
     }
 
-    const parsedIssueId = parseIssueIdSync(String(issueId));
+    const parsedIssueId = parseIssueId(String(issueId));
     if (!parsedIssueId) {
       return jsonResponse(
         {
@@ -285,7 +285,7 @@ export const postAgentsRoute = HttpRouter.add(
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
     const clearGates = (body as any).clearGates === true;
-    const initialAgentState = getAgentStateSync(agentSessionName);
+    const initialAgentState = getAgentState(agentSessionName);
     const startGateBlock = evaluateAgentStartGate(agentSessionName, initialAgentState);
     if (startGateBlock) {
       if (!clearGates) {
@@ -302,7 +302,7 @@ export const postAgentsRoute = HttpRouter.add(
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const resolvedProject = resolveProjectFromIssueSync(String(issueId));
     const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
     const projectPath = projectConfig?.path ?? getProjectPath(projectId, issuePrefix);
@@ -316,7 +316,7 @@ export const postAgentsRoute = HttpRouter.add(
         const nodeDir = dirname(process.execPath);
         yield* Effect.promise(() => execAsync(
           `pan workspace create ${issueId} --local`,
-          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmuxSync(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
+          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmux(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
         ));
       } catch (wsErr) {
         return jsonResponse({
@@ -511,7 +511,7 @@ export const postAgentsRoute = HttpRouter.add(
             workspacePath,
             lastObserved: stackHealth.lastObserved,
           });
-          emitActivityEntrySync({
+          emitActivityEntry({
             source: 'dashboard',
             level: 'error',
             issueId: issueId.toUpperCase(),
@@ -709,7 +709,7 @@ export const postAgentsRoute = HttpRouter.add(
     // variable and the workType/harnessOverrides map are gone — the
     // legacy-field guard above (line 1872) blocks any client still sending
     // them. Note: when bodyHarness is set we still run it through
-    // canUseHarnessSync() so we can fail fast on a model+harness incompatibility
+    // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
     const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null =
@@ -717,7 +717,7 @@ export const postAgentsRoute = HttpRouter.add(
     let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
-        canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
+        canUseHarness(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
       );
       // PAN-1837 review fix (NFR-2): an explicitly requested harness that
       // policy denies must fail loudly, not silently substitute claude-code —
@@ -858,7 +858,7 @@ export const postAgentsRoute = HttpRouter.add(
           workspacePath,
           activityId: error?.activityId,
         });
-        emitActivityEntrySync({
+        emitActivityEntry({
           source: 'dashboard',
           level: 'error',
           issueId: issueId.toUpperCase(),

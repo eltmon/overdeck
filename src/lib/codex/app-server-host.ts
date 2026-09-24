@@ -23,8 +23,8 @@ import { SubAgentSpawns } from './sub-agent-spawns.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
 import { waitForCodexRollout } from '../runtimes/codex.js';
 import { codexHome } from '../runtimes/storage/codex.js';
-import { calculateCostSync, getPricingSync } from '../cost.js';
-import { recordAgentActivitySync } from '../agents/agent-state.js';
+import { calculateCost, getPricing } from '../cost.js';
+import { recordAgentActivity } from '../agents/agent-state.js';
 import { appendSessionIdToHistory } from '../session-history.js';
 
 type JsonRecord = Record<string, unknown>;
@@ -630,7 +630,7 @@ export class CodexAppServerHost {
     const costSoFar = this.threadCosts.size > 0
       ? [...this.threadCosts.values()].reduce((sum, cost) => sum + cost, 0)
       : undefined;
-    const record = this.options.recordActivity ?? recordAgentActivitySync;
+    const record = this.options.recordActivity ?? recordAgentActivity;
     if (record(this.options.agentId, {
       at: new Date(now).toISOString(),
       ...(costSoFar === undefined ? {} : { costSoFar }),
@@ -807,9 +807,9 @@ export function codexNotificationCost(message: AppServerMessage, model?: string)
   const inputTokens = numberValue(total.inputTokens);
   const cachedInputTokens = numberValue(total.cachedInputTokens);
   const outputTokens = numberValue(total.outputTokens);
-  const pricing = getPricingSync('openai', model);
+  const pricing = getPricing('openai', model);
   if (!pricing || (inputTokens === 0 && cachedInputTokens === 0 && outputTokens === 0)) return undefined;
-  return calculateCostSync({
+  return calculateCost({
     inputTokens: Math.max(0, inputTokens - cachedInputTokens),
     cacheReadTokens: cachedInputTokens,
     outputTokens,

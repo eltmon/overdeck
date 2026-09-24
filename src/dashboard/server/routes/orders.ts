@@ -21,7 +21,7 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../../lib/orders/writer.js';
-import { findProjectByPathSync, getProjectSync, listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../../lib/projects.js';
+import { findProjectByPath, getProjectSync, listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../../lib/projects.js';
 import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
@@ -85,7 +85,7 @@ function resolveOrdersStateRoot(deps: OrdersRouteDeps, projectKey?: string): Ord
       projectConfig: project,
     };
   }
-  const project = findProjectByPathSync(process.cwd());
+  const project = findProjectByPath(process.cwd());
   if (!project) throw new Error(`No configured project contains ${process.cwd()}`);
   const key = projectKeyForConfig(project);
   return {

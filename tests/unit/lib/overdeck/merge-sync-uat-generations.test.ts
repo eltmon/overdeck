@@ -14,13 +14,13 @@ import {
 } from '../../../helpers/overdeck-test-db.js';
 
 import {
-  insertUatGenerationSync,
-  getUatGenerationSync,
-  listUatGenerationsSync,
-  listUatGenerationNamesSync,
-  listUatGenerationsWithStacksSync,
-  updateUatGenerationSync,
-  setUatGenerationStackStartedAtSync,
+  insertUatGeneration,
+  getUatGeneration,
+  listUatGenerations,
+  listUatGenerationNames,
+  listUatGenerationsWithStacks,
+  updateUatGeneration,
+  setUatGenerationStackStartedAt,
   type UatGeneration,
 } from '../../../../src/lib/overdeck/merge-sync.js';
 
@@ -74,9 +74,9 @@ describe('insert + get round-trip', () => {
       heldOut: [{ issueId: 'PAN-3', reason: 'conflict with PAN-1 could not be resolved' }],
       resolutions: [{ issueIds: ['PAN-2', 'PAN-1'], files: ['src/a.ts'], commitSha: 'ccc333' }],
     });
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    const loaded = getUatGenerationSync(gen.name);
+    const loaded = getUatGeneration(gen.name);
     expect(loaded).not.toBeNull();
     expect(loaded!.members).toHaveLength(2);
     expect(loaded!.members[1]).toMatchObject({ issueId: 'PAN-2', pr: 42, mergeOrder: 2 });
@@ -98,9 +98,9 @@ describe('insert + get round-trip', () => {
     seedIssue(db, 'PAN-2');
 
     const gen = makeGeneration({ createdAt: '2026-06-10T12:00:00.000Z' });
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    const loaded = getUatGenerationSync(gen.name)!;
+    const loaded = getUatGeneration(gen.name)!;
     // createdAt must round-trip as ISO string, not as a raw number
     expect(loaded.createdAt).toBe('2026-06-10T12:00:00.000Z');
     expect(typeof loaded.updatedAt).toBe('string');
@@ -108,7 +108,7 @@ describe('insert + get round-trip', () => {
   });
 
   it('returns null for an unknown name', () => {
-    expect(getUatGenerationSync('uat/nope-0101')).toBeNull();
+    expect(getUatGeneration('uat/nope-0101')).toBeNull();
   });
 
   it('resets an existing deterministic daily generation on insert', () => {
@@ -123,7 +123,7 @@ describe('insert + get round-trip', () => {
       heldOut: [{ issueId: 'PAN-3', reason: 'old conflict' }],
       resolutions: [{ issueIds: ['PAN-2', 'PAN-1'], files: ['old.ts'], commitSha: 'old-sha' }],
     });
-    insertUatGenerationSync(first);
+    insertUatGeneration(first);
 
     const replacement = makeGeneration({
       name: 'uat/pan-otter-0610',
@@ -134,9 +134,9 @@ describe('insert + get round-trip', () => {
       resolutions: [],
       createdAt: '2026-06-10T03:00:00.000Z',
     });
-    insertUatGenerationSync(replacement);
+    insertUatGeneration(replacement);
 
-    const loaded = getUatGenerationSync('uat/pan-otter-0610')!;
+    const loaded = getUatGeneration('uat/pan-otter-0610')!;
     expect(loaded.baseSha).toBe('new-main');
     expect(loaded.status).toBe('assembling');
     expect(loaded.members).toEqual([]);
@@ -146,16 +146,16 @@ describe('insert + get round-trip', () => {
   });
 });
 
-describe('listUatGenerationsSync', () => {
+describe('listUatGenerations', () => {
   it('orders newest first by created_at', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');
     seedIssue(db, 'PAN-2');
 
-    insertUatGenerationSync(makeGeneration({ name: 'uat/older-0610', createdAt: '2026-06-10T01:00:00.000Z' }));
-    insertUatGenerationSync(makeGeneration({ name: 'uat/newer-0610', createdAt: '2026-06-10T02:00:00.000Z' }));
+    insertUatGeneration(makeGeneration({ name: 'uat/older-0610', createdAt: '2026-06-10T01:00:00.000Z' }));
+    insertUatGeneration(makeGeneration({ name: 'uat/newer-0610', createdAt: '2026-06-10T02:00:00.000Z' }));
 
-    const chain = listUatGenerationsSync();
+    const chain = listUatGenerations();
     expect(chain.map((g) => g.name)).toEqual(['uat/newer-0610', 'uat/older-0610']);
   });
 
@@ -164,14 +164,14 @@ describe('listUatGenerationsSync', () => {
     seedIssue(db, 'PAN-1');
     seedIssue(db, 'PAN-2');
 
-    insertUatGenerationSync(makeGeneration({ name: 'uat/a-0610', status: 'ready' }));
-    insertUatGenerationSync(makeGeneration({ name: 'uat/b-0610', status: 'invalidated' }));
-    insertUatGenerationSync(makeGeneration({ name: 'uat/c-0610', status: 'ready', projectRoot: '/tmp/other' }));
+    insertUatGeneration(makeGeneration({ name: 'uat/a-0610', status: 'ready' }));
+    insertUatGeneration(makeGeneration({ name: 'uat/b-0610', status: 'invalidated' }));
+    insertUatGeneration(makeGeneration({ name: 'uat/c-0610', status: 'ready', projectRoot: '/tmp/other' }));
 
-    const ready = listUatGenerationsSync({ statuses: ['ready'], projectRoot: '/tmp/project' });
+    const ready = listUatGenerations({ statuses: ['ready'], projectRoot: '/tmp/project' });
     expect(ready.map((g) => g.name)).toEqual(['uat/a-0610']);
 
-    const live = listUatGenerationsSync({ statuses: ['ready', 'invalidated'] });
+    const live = listUatGenerations({ statuses: ['ready', 'invalidated'] });
     expect(live).toHaveLength(3);
   });
 
@@ -180,9 +180,9 @@ describe('listUatGenerationsSync', () => {
     seedIssue(db, 'PAN-1');
     seedIssue(db, 'PAN-2');
 
-    insertUatGenerationSync(makeGeneration({ name: 'uat/x-0610' }));
-    insertUatGenerationSync(makeGeneration({ name: 'uat/y-0610' }));
-    expect(listUatGenerationNamesSync().sort()).toEqual(['uat/x-0610', 'uat/y-0610']);
+    insertUatGeneration(makeGeneration({ name: 'uat/x-0610' }));
+    insertUatGeneration(makeGeneration({ name: 'uat/y-0610' }));
+    expect(listUatGenerationNames().sort()).toEqual(['uat/x-0610', 'uat/y-0610']);
   });
 });
 
@@ -193,24 +193,24 @@ describe('status transitions', () => {
     seedIssue(db, 'PAN-2');
 
     const gen = makeGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    updateUatGenerationSync(gen.name, { status: 'ready' });
-    expect(getUatGenerationSync(gen.name)!.status).toBe('ready');
+    updateUatGeneration(gen.name, { status: 'ready' });
+    expect(getUatGeneration(gen.name)!.status).toBe('ready');
 
-    updateUatGenerationSync(gen.name, { status: 'superseded' });
-    expect(getUatGenerationSync(gen.name)!.status).toBe('superseded');
+    updateUatGeneration(gen.name, { status: 'superseded' });
+    expect(getUatGeneration(gen.name)!.status).toBe('superseded');
 
-    updateUatGenerationSync(gen.name, { status: 'promoted' });
-    expect(getUatGenerationSync(gen.name)!.status).toBe('promoted');
+    updateUatGeneration(gen.name, { status: 'promoted' });
+    expect(getUatGeneration(gen.name)!.status).toBe('promoted');
   });
 
   it('throws for an unknown generation', () => {
-    expect(() => updateUatGenerationSync('uat/ghost-0101', { status: 'ready' })).toThrow();
+    expect(() => updateUatGeneration('uat/ghost-0101', { status: 'ready' })).toThrow();
   });
 });
 
-describe('updateUatGenerationSync patch', () => {
+describe('updateUatGeneration patch', () => {
   it('patches members/heldOut/resolutions/status in one call', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');
@@ -218,16 +218,16 @@ describe('updateUatGenerationSync patch', () => {
     seedIssue(db, 'PAN-9');
 
     const gen = makeGeneration();
-    insertUatGenerationSync(gen);
+    insertUatGeneration(gen);
 
-    updateUatGenerationSync(gen.name, {
+    updateUatGeneration(gen.name, {
       status: 'ready',
       heldOut: [{ issueId: 'PAN-9', branch: 'feature/pan-9', headSha: 'hhh999', reason: 'agent timeout' }],
       resolutions: [{ issueIds: ['PAN-2', 'PAN-1'], files: ['x.ts', 'y.ts'], commitSha: 'ddd444' }],
       cleanedAt: '2026-06-10T03:00:00.000Z',
     });
 
-    const loaded = getUatGenerationSync(gen.name)!;
+    const loaded = getUatGeneration(gen.name)!;
     expect(loaded.status).toBe('ready');
     expect(loaded.heldOut).toEqual([{ issueId: 'PAN-9', branch: 'feature/pan-9', headSha: 'hhh999', reason: 'agent timeout' }]);
     expect(loaded.resolutions[0]!.files).toEqual(['x.ts', 'y.ts']);
@@ -243,8 +243,8 @@ describe('updateUatGenerationSync patch', () => {
     seedIssue(db, 'PAN-2');
 
     const gen = makeGeneration();
-    insertUatGenerationSync(gen);
-    expect(() => updateUatGenerationSync(gen.name, {})).not.toThrow();
+    insertUatGeneration(gen);
+    expect(() => updateUatGeneration(gen.name, {})).not.toThrow();
   });
 });
 
@@ -256,19 +256,19 @@ describe('stack state', () => {
 
     const a = makeGeneration({ name: 'uat/stack-a-0610' });
     const b = makeGeneration({ name: 'uat/stack-b-0610' });
-    insertUatGenerationSync(a);
-    insertUatGenerationSync(b);
+    insertUatGeneration(a);
+    insertUatGeneration(b);
 
-    setUatGenerationStackStartedAtSync(a.name, '2026-06-10T02:00:00.000Z');
-    setUatGenerationStackStartedAtSync(b.name, '2026-06-10T01:00:00.000Z');
+    setUatGenerationStackStartedAt(a.name, '2026-06-10T02:00:00.000Z');
+    setUatGenerationStackStartedAt(b.name, '2026-06-10T01:00:00.000Z');
 
-    const running = listUatGenerationsWithStacksSync();
+    const running = listUatGenerationsWithStacks();
     expect(running.map((g) => g.name)).toEqual(['uat/stack-b-0610', 'uat/stack-a-0610']);
 
     // Verify stackStartedAt round-trips as ISO string
     expect(running[0]!.stackStartedAt).toBe('2026-06-10T01:00:00.000Z');
 
-    setUatGenerationStackStartedAtSync(b.name, null);
-    expect(listUatGenerationsWithStacksSync().map((g) => g.name)).toEqual(['uat/stack-a-0610']);
+    setUatGenerationStackStartedAt(b.name, null);
+    expect(listUatGenerationsWithStacks().map((g) => g.name)).toEqual(['uat/stack-a-0610']);
   });
 });

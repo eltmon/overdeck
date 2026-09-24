@@ -7,12 +7,12 @@ import { listAgentStates } from '../agents/queries.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { waitForPromptReady } from '../agents/runtime-command.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { writePtyToken } from '../pty-token.js';
 import { getOverdeckHome } from '../paths.js';
-import { getPricingSync } from '../cost.js';
-import { parseMuseSessionSync } from '../cost-parsers/muse-parser.js';
+import { getPricing } from '../cost.js';
+import { parseMuseSession } from '../cost-parsers/muse-parser.js';
 import { museSessionId, resolveMuseSessionPath, resolveMuseSessionPathSync } from './storage/muse.js';
 import { getRuntimeBehavior } from './behavior.js';
 import { appendSessionIdToHistory } from '../session-history.js';
@@ -33,13 +33,13 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
   }
   getTokenUsage(agentId: string) {
     const path = this.getSessionPath(agentId);
-    return path ? parseMuseSessionSync(path)?.usage ?? null : null;
+    return path ? parseMuseSession(path)?.usage ?? null : null;
   }
   getSessionCost(agentId: string): CostBreakdown | null {
     const path = this.getSessionPath(agentId);
-    const session = path ? parseMuseSessionSync(path) : null;
+    const session = path ? parseMuseSession(path) : null;
     if (!session) return null;
-    const pricing = getPricingSync('custom', session.model);
+    const pricing = getPricing('custom', session.model);
     if (!pricing) return null;
     return {
       inputCost: session.usage.inputTokens * pricing.inputPer1k / 1000,
@@ -62,7 +62,7 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
     await mkdir(dir, { recursive: true });
     await writePtyToken(config.agentId);
     const launcher = join(dir, 'launcher.sh');
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       role: 'work', workingDir: config.workspace, harness: 'muse', museModel: config.model, museEffort: config.effort,
       museContextFile: await materializeMuseContext(config.agentId, config.workspace),
       museResumeSessionId: config.sessionId, overdeckEnv: { agentId: config.agentId },
@@ -96,4 +96,4 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
   }
 }
 
-export function createMuseRuntimeSync(): MuseRuntimeSync { return new MuseRuntimeSync(); }
+export function createMuseRuntime(): MuseRuntimeSync { return new MuseRuntimeSync(); }

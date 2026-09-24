@@ -200,7 +200,7 @@ describe('both adapters run the guard', () => {
   it('tmux: a reviewer is refused and a repeat is dropped', async () => {
     vi.resetModules();
     vi.doMock('../../../../src/lib/agents/agent-state-read.js', () => ({
-      getAgentStateSync: () => ({ id: 'agent-min-1039-item', issueId: 'MIN-1039', role: 'worker', model: 'x', harness: 'claude-code' }),
+      getAgentState: () => ({ id: 'agent-min-1039-item', issueId: 'MIN-1039', role: 'worker', model: 'x', harness: 'claude-code' }),
     }));
     const sent: string[] = [];
     vi.doMock('../../../../src/lib/tmux.js', () => ({

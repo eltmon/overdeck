@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   acquireRestartLock: vi.fn(),
   readRestartLockHolder: vi.fn(),
-  readPlatformConfigSync: vi.fn(),
+  readPlatformConfig: vi.fn(),
   writeRestartStatus: vi.fn(),
   refuseNonPrimaryDashboardCwd: vi.fn(),
   resolveBundledServerPath: vi.fn(),
@@ -49,7 +49,7 @@ vi.mock('../../../lib/deploy/build-from-origin.js', async (importActual) => ({
 
 vi.mock('../../../lib/platform-lifecycle.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/platform-lifecycle.js')>()),
-  readPlatformConfigSync: mocks.readPlatformConfigSync,
+  readPlatformConfig: mocks.readPlatformConfig,
 }));
 
 vi.mock('../restart.js', () => ({
@@ -68,7 +68,7 @@ vi.mock('../../../lib/restart-gate-client.js', () => ({
 import { reloadCommand } from '../reload.js';
 import {
   activeDashboardBundleFile,
-  readActiveDashboardBundleSync,
+  readActiveDashboardBundle,
 } from '../../../lib/deploy/active-dashboard-bundle.js';
 
 async function reservePort(): Promise<number> {
@@ -150,7 +150,7 @@ describe('reloadCommand health-timeout recovery', () => {
       'import { join } from "node:path";\nexport { join };\n',
     );
 
-    mocks.readPlatformConfigSync.mockReturnValue({
+    mocks.readPlatformConfig.mockReturnValue({
       dashboardPort,
       dashboardApiPort: apiPort,
       traefikEnabled: false,
@@ -192,7 +192,7 @@ describe('reloadCommand health-timeout recovery', () => {
 
     expect(process.exitCode).toBe(1);
     expect(mocks.removeDashboardDeployment).not.toHaveBeenCalled();
-    expect(readActiveDashboardBundleSync()).toEqual({ repoRoot, deployRoot, serverPath });
+    expect(readActiveDashboardBundle()).toEqual({ repoRoot, deployRoot, serverPath });
     await expect(fs.readFile(serverPath, 'utf8')).resolves.toBe('canonical bundle');
     await expect(fs.readFile(join(repoRoot, 'dist', 'dashboard', 'server.js'), 'utf8'))
       .resolves.toBe('canonical bundle');

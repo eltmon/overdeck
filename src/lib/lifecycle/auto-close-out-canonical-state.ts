@@ -8,7 +8,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,7 +22,7 @@ export async function getAutoCloseOutCanonicalState(issueId: string): Promise<st
     return cached.state;
   }
 
-  const ghResolved = resolveGitHubIssueSync(issueId);
+  const ghResolved = resolveGitHubIssue(issueId);
   if (!ghResolved.isGitHub) {
     autoCloseOutCache.set(issueId, { state: null, timestamp: Date.now() });
     return null;

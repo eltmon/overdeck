@@ -6,7 +6,7 @@ import {
   type OverdeckTestDb,
 } from '../../../../tests/helpers/overdeck-test-db.js';
 import {
-  readLatestAgentClaudeSessionIdEventSync,
+  readLatestAgentClaudeSessionIdEvent,
 } from '../event-reads.js';
 
 function insertEvent(
@@ -46,14 +46,14 @@ describe('agent event read door', () => {
     insertModelSet(odb, 3, { agentId: 'agent-min-839', model: 'claude-opus-5' });
     insertModelSet(odb, 4, { agentId: 'agent-min-839', claudeSessionId: 'newer-session' });
 
-    expect(readLatestAgentClaudeSessionIdEventSync('agent-min-839')).toBe('newer-session');
+    expect(readLatestAgentClaudeSessionIdEvent('agent-min-839')).toBe('newer-session');
   });
 
   it('honors an explicit session clear instead of resurrecting an older id', () => {
     insertModelSet(odb, 1, { agentId: 'agent-min-839', claudeSessionId: 'older-session' });
     insertModelSet(odb, 2, { agentId: 'agent-min-839', claudeSessionId: null });
 
-    expect(readLatestAgentClaudeSessionIdEventSync('agent-min-839')).toBeNull();
+    expect(readLatestAgentClaudeSessionIdEvent('agent-min-839')).toBeNull();
   });
 
 });

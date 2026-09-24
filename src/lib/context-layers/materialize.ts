@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { Harness } from '@overdeck/contracts';
 
 import { getOverdeckHome, isDevMode } from '../paths.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPath } from '../projects.js';
 import { workspaceContextWithoutProjectLayer } from './assemble.js';
 import { renderForHarness } from './harness.js';
 import { resolveWorkspaceContextFile } from './layers.js';
@@ -28,7 +28,7 @@ const SECTION_SEPARATOR = '\n\n---\n\n';
  */
 export function renderManagedLaunchContext(workspace: string, harness: Harness): string {
   const sections: string[] = [renderGlobalLayer(harness, isDevMode())];
-  const project = findProjectByPathSync(workspace);
+  const project = findProjectByPath(workspace);
   if (project) sections.push(renderProjectLayer(project.path, harness));
 
   const workspaceFile = resolveWorkspaceContextFile(workspace);

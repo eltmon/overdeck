@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 const { costs } = vi.hoisted(() => ({ costs: vi.fn() }));
-vi.mock('../../../../lib/overdeck/cost-sync.js', () => ({ getCostsByIssueSync: costs }));
+vi.mock('../../../../lib/overdeck/cost-sync.js', () => ({ getCostsByIssue: costs }));
 import { getCostsByIssueSnapshot } from '../dashboard-cost-snapshot.js';
 
 describe('cost snapshot response no-loss audit', () => {

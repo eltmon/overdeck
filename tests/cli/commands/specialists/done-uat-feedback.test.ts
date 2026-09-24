@@ -43,7 +43,7 @@ vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
 vi.mock('../../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
   bumpIssuePrTabCacheGeneration: vi.fn(),
 }));
-vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipelineSync: vi.fn() }));
+vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 vi.mock('../../../../src/lib/overdeck/issue-projects.js', () => ({
   getIssueWorkspacePath: vi.fn(() => mocks.workspace.path),
 }));

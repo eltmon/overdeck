@@ -131,7 +131,7 @@ vi.mock('../pending-decision-gate.js', () => ({
 
 import { recoverAgent, restartAgent } from '../recovery.js';
 import { registerTerminalBackend } from '../../terminal-backends/registry.js';
-import { getAgentDir, getAgentStateSync, saveAgentStateSync } from '../agent-state.js';
+import { getAgentDir, getAgentState, saveAgentStateSync } from '../agent-state.js';
 import { appendSessionIdToHistory } from '../../session-history.js';
 import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 
@@ -252,7 +252,7 @@ describe('restartAgent relaunches on the host backend (PAN-3960)', () => {
       undefined,
     );
     expect(mocks.tmuxCreateSession).not.toHaveBeenCalled();
-    expect(getAgentStateSync(agentId)?.backend).toBe(host);
+    expect(getAgentState(agentId)?.backend).toBe(host);
   });
 });
 
@@ -274,7 +274,7 @@ describe('recoverAgent relaunches on the host backend (PAN-3960)', () => {
       tokens: { issue: 'PAN-3960', role: 'work', harness: 'claude-code', model: 'claude-sonnet-5' },
     });
     expect(mocks.tmuxCreateSession).not.toHaveBeenCalled();
-    expect(getAgentStateSync(agentId)?.backend).toBe(host);
+    expect(getAgentState(agentId)?.backend).toBe(host);
   });
 
   it('leaves a live agent alone — liveness comes from liveness.ts, not a tmux probe', async () => {

@@ -27,13 +27,13 @@
 import { getPrFacts, type PrFacts } from './pr-facts.js';
 
 import {
-  clearYieldForResumeSync,
+  clearYieldForResume,
   listAgentStates,
   resumeAgent,
   type AgentState,
 } from '../agents.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { logDeaconEventSync } from '../persistent-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { logDeaconEvent } from '../persistent-logger.js';
 import { assessMemoryPressure } from './memory-governor.js';
 
 /** RSS settle window after a resume before the next memory re-assessment (mirrors deacon-auto-resume). */
@@ -100,7 +100,7 @@ export async function resumeYieldedAgents(maxToResume: number): Promise<string[]
 
     const memVerdict = await assessMemoryPressure();
     if (memVerdict.band !== 'ok') {
-      logDeaconEventSync(
+      logDeaconEvent(
         `[preemption] resumeYieldedAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}`
         + `${memVerdict.loadPerCore == null ? '' : `, load/core=${memVerdict.loadPerCore.toFixed(2)}`}; deferring remaining yielded agents`,
       );
@@ -112,17 +112,17 @@ export async function resumeYieldedAgents(maxToResume: number): Promise<string[]
       await new Promise((r) => setTimeout(r, RSS_SETTLE_MS));
     }
 
-    clearYieldForResumeSync(agent.id);
+    clearYieldForResume(agent.id);
     const result = await resumeAgent(agent.id);
     if (result.success) {
       resumed.push(agent.id);
       const message = `Resumed yielded ${agent.id} for ${agent.issueId} — capacity returned`;
-      logDeaconEventSync(`[preemption] ${message}`);
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: agent.issueId });
+      logDeaconEvent(`[preemption] ${message}`);
+      emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: agent.issueId });
     } else {
       // The pause is already cleared, so the normal auto-resume path will retry
       // this agent on a later patrol like any other stopped work agent.
-      logDeaconEventSync(`[preemption] resumeYieldedAgents: resume failed for ${agent.id}: ${result.error ?? 'unknown'}`);
+      logDeaconEvent(`[preemption] resumeYieldedAgents: resume failed for ${agent.id}: ${result.error ?? 'unknown'}`);
     }
   }
   return resumed;

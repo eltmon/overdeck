@@ -25,7 +25,7 @@ const testHome = vi.hoisted(() => {
 
 import { isRole } from '../role.js';
 import { resolveModel, DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../config-yaml/roles.js';
-import { getAgentStateSync } from '../agent-state-read.js';
+import { getAgentState } from '../agent-state-read.js';
 import { Db, Tmux } from '../../overdeck/infra.js';
 import { AgentsResolver, AgentsResolverLive } from '../../overdeck/agents.js';
 
@@ -66,7 +66,7 @@ describe('role worker (PAN-3920 W10)', () => {
 
   it('reads back a worker state.json', () => {
     seedWorker('agent-pan-9-worker-1');
-    expect(getAgentStateSync('agent-pan-9-worker-1')).toMatchObject({
+    expect(getAgentState('agent-pan-9-worker-1')).toMatchObject({
       role: 'worker',
       issueId: 'PAN-9',
       parentId: 'conv-orchestrator',

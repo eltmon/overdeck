@@ -65,7 +65,7 @@ function resolveVoiceId(options: ResolveAndSpeakOptions, config: NormalizedTtsDa
 }
 
 /** Build a TTS speak payload from a voice + text. Pure. */
-export function buildTtsSpeakPayloadSync(
+export function buildTtsSpeakPayload(
   voice: TtsVoice,
   text: string,
   config: NormalizedTtsDaemonConfig,
@@ -182,5 +182,5 @@ export async function resolveAndSpeak(
   const voice = await (deps.findVoiceById ?? findVoiceById)(voiceId);
   if (!voice) return 'no-voice';
 
-  return postSpeakPayload(buildTtsSpeakPayloadSync(voice, text, config), config, deps);
+  return postSpeakPayload(buildTtsSpeakPayload(voice, text, config), config, deps);
 }

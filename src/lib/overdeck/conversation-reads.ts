@@ -12,7 +12,7 @@ import { basename } from 'node:path';
 import { Effect } from 'effect';
 
 import { withConcurrencyLimitPromise } from '../concurrency.js';
-import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
+import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
@@ -322,7 +322,7 @@ export async function getCachedMessages(
 // ─── Pending input helpers ───────────────────────────────────────────────────
 
 export function askUserQuestionSnapshotFromScan(
-  scan: Awaited<ReturnType<typeof scanPendingInputsPromise>>,
+  scan: Awaited<ReturnType<typeof scanPendingInputs>>,
 ): PendingAskUserQuestionSnapshot | undefined {
   if (scan.askUserQuestions.length === 0) return undefined;
   const first = scan.askUserQuestions[0];
@@ -362,7 +362,7 @@ export async function getConversationsPendingInputFeed(
             // non-fatal — askedAt falls back to now for the codex path
           }
           try {
-            const scan = await scanPendingInputsPromise(convSf);
+            const scan = await scanPendingInputs(convSf);
             pending = askUserQuestionSnapshotFromScan(scan);
             pendingPlan = scan.pendingProposedPlan;
           } catch {
@@ -433,7 +433,7 @@ export async function getConversationRead(
     let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
     if (sessionAlive && convSf && existsSync(convSf)) {
       try {
-        const scan = await scanPendingInputsPromise(convSf);
+        const scan = await scanPendingInputs(convSf);
         const kinds: PendingInputKind[] = [];
         if (scan.askUserQuestions.length > 0) {
           kinds.push('askUserQuestion');

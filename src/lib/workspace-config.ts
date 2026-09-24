@@ -313,7 +313,7 @@ export interface TemplatePlaceholders {
 /**
  * Replace template placeholders in a string
  */
-export function replacePlaceholdersSync(template: string, placeholders: TemplatePlaceholders): string {
+export function replacePlaceholders(template: string, placeholders: TemplatePlaceholders): string {
   let result = template;
   for (const [key, value] of Object.entries(placeholders)) {
     if (value == null) continue; // skip unset optional placeholders (e.g. CHANGED_BASE)
@@ -325,7 +325,7 @@ export function replacePlaceholdersSync(template: string, placeholders: Template
 /**
  * Get default workspace config for a monorepo project
  */
-export function getDefaultWorkspaceConfigSync(): WorkspaceConfig {
+export function getDefaultWorkspaceConfig(): WorkspaceConfig {
   return {
     type: 'monorepo',
     workspaces_dir: 'workspaces',

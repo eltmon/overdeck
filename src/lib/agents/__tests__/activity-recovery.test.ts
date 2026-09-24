@@ -5,9 +5,9 @@ import { join } from 'node:path';
 
 import type { AgentState } from '../agent-state.js';
 import {
-  getLatestSessionIdSync,
-  resolveClaudeSessionRecoverySync,
-  resolveLatestSessionIdSync,
+  getLatestSessionId,
+  resolveClaudeSessionRecovery,
+  resolveLatestSessionId,
   type ClaudeSessionRecoveryDeps,
 } from '../activity.js';
 import { appendSessionIdToHistory } from '../../session-history.js';
@@ -54,7 +54,7 @@ describe('Claude session reconstruction fallback', () => {
     writeFileSync(join(dir, 'launcher.sh'), "claude --resume '11111111-1111-1111-1111-111111111111'\n");
     appendSessionIdToHistory(agentState.id, 'indexed-session', 'test');
 
-    const result = resolveLatestSessionIdSync(agentState.id, deps({
+    const result = resolveLatestSessionId(agentState.id, deps({
       getAgentState: () => ({ ...agentState, sessionId: 'stale-state-session' }),
     }));
 
@@ -66,7 +66,7 @@ describe('Claude session reconstruction fallback', () => {
     mkdirSync(join(dir, 'codex-home'), { recursive: true });
     writeFileSync(join(dir, 'codex-thread-id'), 'retained-codex-thread\n');
 
-    expect(resolveLatestSessionIdSync(agentState.id, deps({
+    expect(resolveLatestSessionId(agentState.id, deps({
       getAgentState: () => agentState,
     })).sessionId).toBeNull();
   });
@@ -76,7 +76,7 @@ describe('Claude session reconstruction fallback', () => {
     mkdirSync(join(dir, 'codex-home'), { recursive: true });
     writeFileSync(join(dir, 'codex-thread-id'), 'current-codex-thread\n');
 
-    expect(resolveLatestSessionIdSync(agentState.id, deps({
+    expect(resolveLatestSessionId(agentState.id, deps({
       getAgentState: () => ({ ...agentState, harness: 'codex' }),
     })).sessionId).toBe('current-codex-thread');
   });
@@ -88,15 +88,15 @@ describe('Claude session reconstruction fallback', () => {
       transcriptExists: (_workspace, sessionId) => sessionId === 'event-only-session',
     });
 
-    const syncSessionId = resolveLatestSessionIdSync(agentState.id, recoveryDeps).sessionId;
-    const asyncSessionId = getLatestSessionIdSync(agentState.id, recoveryDeps);
+    const syncSessionId = resolveLatestSessionId(agentState.id, recoveryDeps).sessionId;
+    const asyncSessionId = getLatestSessionId(agentState.id, recoveryDeps);
 
     expect(syncSessionId).toBe('event-only-session');
     expect(asyncSessionId).toBe(syncSessionId);
   });
 
   it('does not reconstruct a reset session from the event store', () => {
-    const result = resolveLatestSessionIdSync(agentState.id, deps({
+    const result = resolveLatestSessionId(agentState.id, deps({
       isSessionReset: () => true,
       readEventSessionId: () => 'reset-session',
       transcriptExists: () => true,
@@ -106,7 +106,7 @@ describe('Claude session reconstruction fallback', () => {
   });
 
   it('uses the latest event-store session when its transcript exists', () => {
-    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
+    const result = resolveClaudeSessionRecovery(agentState.id, agentState, deps({
       readEventSessionId: () => 'event-session',
       transcriptExists: (_workspace, sessionId) => sessionId === 'event-session',
     }));
@@ -123,14 +123,14 @@ describe('Claude session reconstruction fallback', () => {
     // resolves to null, and only the event-store source is consulted
     // (PAN-3917: the durable agent-plane source this also checked is gone
     // with the record plane).
-    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps());
+    const result = resolveClaudeSessionRecovery(agentState.id, agentState, deps());
 
     expect(result.sessionId).toBeNull();
     expect(result.checked).toEqual(['agent.model_set event history']);
   });
 
   it('returns null with the recovery source named when empty', () => {
-    expect(resolveClaudeSessionRecoverySync(agentState.id, agentState, deps())).toEqual({
+    expect(resolveClaudeSessionRecovery(agentState.id, agentState, deps())).toEqual({
       sessionId: null,
       checked: ['agent.model_set event history'],
     });

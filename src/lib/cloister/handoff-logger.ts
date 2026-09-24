@@ -77,7 +77,7 @@ function ensureLogDir(): void {
  *
  * @param event - Handoff event to log
  */
-export function logHandoffEventSync(event: HandoffEvent): void {
+export function logHandoffEvent(event: HandoffEvent): void {
   ensureLogDir();
 
   const line = JSON.stringify(event) + '\n';

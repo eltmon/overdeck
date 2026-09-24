@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { emitActivityEntrySync, type EmitActivityOptions } from '../../../../lib/activity-logger.js';
+import { emitActivityEntry, type EmitActivityOptions } from '../../../../lib/activity-logger.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { httpHandler } from '../http-handler.js';
@@ -38,7 +38,7 @@ export interface StackTeardownInput {
 
 let dockerTeardownExec: DockerTeardownExec = execFileAsync;
 let teardownTokenGenerator: () => string = () => `td-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-let activityEmitter: (options: EmitActivityOptions) => void = emitActivityEntrySync;
+let activityEmitter: (options: EmitActivityOptions) => void = emitActivityEntry;
 const teardownTokens = new Map<string, StackTeardownToken>();
 
 export function setStackTeardownDockerExecForTests(execImpl: DockerTeardownExec): void {
@@ -56,7 +56,7 @@ export function setStackTeardownActivityEmitterForTests(emitter: (options: EmitA
 export function resetStackTeardownForTests(): void {
   dockerTeardownExec = execFileAsync;
   teardownTokenGenerator = () => `td-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  activityEmitter = emitActivityEntrySync;
+  activityEmitter = emitActivityEntry;
   teardownTokens.clear();
 }
 

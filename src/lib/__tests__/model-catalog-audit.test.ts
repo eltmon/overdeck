@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevelsSync } from '../model-capabilities.js';
-import { getProviderForModelSync, PROVIDERS } from '../providers.js';
-import { apiLaunchModelIdSync } from '../model-context-windows.js';
+import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevels } from '../model-capabilities.js';
+import { getProviderForModel, PROVIDERS } from '../providers.js';
+import { apiLaunchModelId } from '../model-context-windows.js';
 import { getClaudeCodeContextPolicyForModel } from '../agents/provider-env.js';
 import type { EffortLevel } from '../model-capability-types.js';
 import { ModelId } from '../settings.js';
@@ -9,10 +9,10 @@ import { ModelId } from '../settings.js';
 // Moved here from src/lib/model-capabilities.ts, which no production code called (PAN-3958 CH-8).
 /**
  * Whether a model accepts the given effort level. Returns true when the model
- * has no enumerated effort levels (permissive fallback — see {@link getModelEffortLevelsSync}).
+ * has no enumerated effort levels (permissive fallback — see {@link getModelEffortLevels}).
  */
 function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
-  const levels = getModelEffortLevelsSync(model);
+  const levels = getModelEffortLevels(model);
   return levels === undefined || levels.length === 0 || levels.includes(effort);
 }
 
@@ -43,7 +43,7 @@ describe('September model catalog no-loss audit', () => {
     ['mimo-v2.5', 'mimo', 1048576],
   ] as const)('registers %s with the intended context and provider', (id, provider, contextWindow) => {
     expect(MODEL_CAPABILITIES[id].contextWindow).toBe(contextWindow);
-    expect(getProviderForModelSync(id).name).toBe(provider);
+    expect(getProviderForModel(id).name).toBe(provider);
     expect(PROVIDERS[provider].models).toContain(id);
     if (provider !== 'anthropic') {
       expect(getClaudeCodeContextPolicyForModel(id)).toEqual({ autoCompactWindow: contextWindow, maxContextTokens: contextWindow });
@@ -51,8 +51,8 @@ describe('September model catalog no-loss audit', () => {
   });
 
   it('preserves K3 context tier across launch translation and hides unsupported K2.7 effort', () => {
-    expect(apiLaunchModelIdSync('k3')).toBe('k3-256k');
-    expect(apiLaunchModelIdSync('k3[1m]')).toBe('k3[1m]');
+    expect(apiLaunchModelId('k3')).toBe('k3-256k');
+    expect(apiLaunchModelId('k3[1m]')).toBe('k3[1m]');
     expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding'].effortLevels).toEqual([]);
     expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding-highspeed'].effortLevels).toEqual([]);
     // Generic role effort remains valid; the native launcher omits unsupported controls.

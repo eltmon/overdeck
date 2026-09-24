@@ -1,4 +1,4 @@
-import { emitActivityEntrySync, type EmitActivityOptions } from '../../../lib/activity-logger.js';
+import { emitActivityEntry, type EmitActivityOptions } from '../../../lib/activity-logger.js';
 import {
   type AppCanMergeResult,
   verifyAppCanMerge,
@@ -28,7 +28,7 @@ export async function warnIfAppCannotMerge(deps: WarnAppCannotMergeDeps = {}): P
     ].join('\n');
 
     (deps.warn ?? console.warn)(message);
-    (deps.emit ?? emitActivityEntrySync)({
+    (deps.emit ?? emitActivityEntry)({
       source: 'dashboard',
       level: 'warn',
       message: `GitHub App installation cannot merge: missing ${missing.join(', ')}`,

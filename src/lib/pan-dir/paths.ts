@@ -10,7 +10,7 @@
  * in a worktree writes — and commits — the plan inside that same worktree.
  */
 import { join, relative, resolve, sep } from 'path'
-import { findProjectByPathSync, resolveInfraRepo } from '../projects.js'
+import { findProjectByPath, resolveInfraRepo } from '../projects.js'
 import {
   PAN_DIRNAME,
   PAN_CONTINUES_DIRNAME,
@@ -44,7 +44,7 @@ function checkoutRootFor(project: { path: string }, somePath: string): string {
  * the same `.pan/` a CLI invoked from the root does.
  */
 export function resolvePlanHome(projectRoot: string): string {
-  const project = findProjectByPathSync(projectRoot)
+  const project = findProjectByPath(projectRoot)
   if (!project) return projectRoot
   return resolveInfraRepo(project, checkoutRootFor(project, projectRoot)).repoPath
 }

@@ -29,19 +29,19 @@ vi.mock('../../agent-enrichment.js', () => ({
   countPendingAskUserQuestionsForAgent: async () => 0,
 }));
 vi.mock('../../agents.js', () => ({
-  getAgentStateSync: vi.fn(() => testState.agentState),
+  getAgentState: vi.fn(() => testState.agentState),
 }));
 vi.mock('../../../dashboard/server/services/agent-projection.js', () => ({
   saveAgentStateAndEmitEvent: vi.fn(),
 }));
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
+  emitActivityEntry: vi.fn(),
+  emitActivityTts: vi.fn(),
 }));
 vi.mock('../../pan-dir/index.js', () => ({
   WORKSPACE_RUNTIME_DIRNAME: '.overdeck',
   asPanSpecDocument: (doc: Record<string, unknown>) => doc,
-  checkPrdGateSync: vi.fn(() => (testState.prdGateOk
+  checkPrdGate: vi.fn(() => (testState.prdGateOk
     ? { ok: true, path: '/workspace/.overdeck/drafts/test.md', lineCount: 42 }
     : { ok: false, reason: 'missing' })),
   findSpecByIssue: () => Effect.succeed(null),
@@ -57,15 +57,15 @@ vi.mock('../../planning/spawn-planning-session.js', () => ({
 }));
 vi.mock('../../projects.js', () => ({
   extractTeamPrefix: () => 'PAN',
-  findProjectByPathSync: () => null,
-  findProjectByTeamSync: () => null,
+  findProjectByPath: () => null,
+  findProjectByTeam: () => null,
   resolveProjectFromIssueSync: () => null,
 }));
 vi.mock('../../remote/remote-agents.js', () => ({
   loadRemoteAgentState: () => null,
 }));
 vi.mock('../../tracker-utils.js', () => ({
-  resolveGitHubIssueSync: () => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3230 }),
+  resolveGitHubIssue: () => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3230 }),
 }));
 vi.mock('../../tmux.js', () => ({
   // Killing the session actually clears sessionAlive so the follow-up
@@ -79,10 +79,10 @@ vi.mock('../../xbrief/quality-lint.js', () => ({
   PlanQualityLintError: class PlanQualityLintError extends Error {},
 }));
 vi.mock('../issue-reads.js', () => ({
-  resolveIssueProjectPathSync: () => testState.projectPath,
+  resolveIssueProjectPath: () => testState.projectPath,
 }));
 
-import { getAgentStateSync } from '../../agents.js';
+import { getAgentState } from '../../agents.js';
 import { saveAgentStateAndEmitEvent } from '../../../dashboard/server/services/agent-projection.js';
 import { completePlanningForIssue } from '../planning-promotion.js';
 
@@ -180,7 +180,7 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
 
     expect(response.status).toBe(200);
     expect(responseJson(response)).toMatchObject({ success: true, issueId: 'PAN-3230' });
-    expect(getAgentStateSync).toHaveBeenCalledWith('planning-pan-3230');
+    expect(getAgentState).toHaveBeenCalledWith('planning-pan-3230');
     expect(saveAgentStateAndEmitEvent).toHaveBeenCalledTimes(1);
     expect(saveAgentStateAndEmitEvent).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'planning-pan-3230', status: 'stopped', stoppedAt: expect.any(String) }),

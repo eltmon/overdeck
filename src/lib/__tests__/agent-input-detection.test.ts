@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { detectAwaitingInputFromPaneSync, normalizeAwaitingInputPrompt, parseCodexApprovalPrompt } from '../agent-input-detection.js'
+import { detectAwaitingInputFromPane, normalizeAwaitingInputPrompt, parseCodexApprovalPrompt } from '../agent-input-detection.js'
 
 describe('detectAwaitingInputFromPane', () => {
   it('detects Claude Code permission menus and preserves prompt text', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 ● Bash(git status)
   ⎿  Run git status in the workspace
 
@@ -20,7 +20,7 @@ Do you want to proceed?
   })
 
   it('detects generic y/n confirmations near the bottom of the pane', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 Preparing migration...
 Continue with destructive migration? [y/N]
 `)
@@ -35,8 +35,8 @@ Wrote xBRIEF and tasks.
 Planning finalized — click Done in the dashboard to hand off to the implementation agent.
 `
 
-    expect(detectAwaitingInputFromPaneSync(pane, { isPlanning: true })).toMatchObject({ reason: 'planning_done' })
-    expect(detectAwaitingInputFromPaneSync(pane, { isPlanning: false })).toBeNull()
+    expect(detectAwaitingInputFromPane(pane, { isPlanning: true })).toMatchObject({ reason: 'planning_done' })
+    expect(detectAwaitingInputFromPane(pane, { isPlanning: false })).toBeNull()
   })
 
   it('ignores old prompts outside the recent pane window', () => {
@@ -48,11 +48,11 @@ Planning finalized — click Done in the dashboard to hand off to the implementa
       ...Array.from({ length: 30 }, (_, index) => `later output ${index}`),
     ]
 
-    expect(detectAwaitingInputFromPaneSync(lines.join('\n'))).toBeNull()
+    expect(detectAwaitingInputFromPane(lines.join('\n'))).toBeNull()
   })
 
   it('clears answered permission prompts once subsequent output appears', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 Do you want to proceed?
 ❯ 1. Yes
   2. Yes, allow all Bash commands
@@ -69,7 +69,7 @@ Do you want to proceed?
   // prompts were never detected. Captured verbatim from agent-min-896's pane
   // while it sat frozen on a sensitive-file gate for three hours.
   it('detects a Claude permission menu despite the trailing footer hint', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
  Bash command
 
    rm -r /home/eltmon/Projects/myn/workspaces/feature-min-896/.devcontainer && rm /home/eltmon/Projects/myn/workspaces/feature-min-896/dev && git status --short
@@ -91,7 +91,7 @@ Do you want to proceed?
   })
 
   it('still clears an answered Claude permission menu followed by a footer hint and real output', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 Do you want to proceed?
 ❯ 1. Yes
   2. Yes, allow all Bash commands
@@ -109,7 +109,7 @@ Do you want to proceed?
   // and a footer hint below "3. No", which defeats the Claude trailing-line
   // heuristics; these cases regressed before the codex-aware branch.
   it('detects a Codex command-approval prompt despite a trailing footer hint', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 I need local copies of both repos to diff accurately.
 
   Would you like to run the following command?
@@ -130,7 +130,7 @@ I need local copies of both repos to diff accurately.
   })
 
   it('detects a Codex network-host grant prompt with a footer hint', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
   Would you like to grant these permissions?
 
   Network access to github.com
@@ -146,7 +146,7 @@ I need local copies of both repos to diff accurately.
   })
 
   it('does not re-fire a Codex approval header that has scrolled into history', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
   Would you like to run the following command?
   $ git clone https://github.com/eltmon/foo /tmp/foo
 ❯ 1. Yes, proceed
@@ -159,7 +159,7 @@ ${Array.from({ length: 20 }, (_, i) => `cloning… ${i}`).join('\n')}
 
   // PAN-1834 — Codex/gpt-5.5 rate-limit / model-switch modal.
   it('detects a rate-limit model-switch modal near the bottom of the pane', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 Rate limit reached for gpt-5.5.
 
 Choose how to continue:
@@ -173,7 +173,7 @@ Choose how to continue:
   })
 
   it('ignores a pane that only mentions a rate limit in prose without the option pairing', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 We hit a rate limit for gpt-5.5 and are retrying after a short delay.
 Some other progress line here.
 `)
@@ -182,7 +182,7 @@ Some other progress line here.
   })
 
   it('ignores a rate-limit modal that has scrolled outside the recent window', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 Rate limit reached for gpt-5.5.
 Choose how to continue:
 ❯ Keep current model
@@ -196,7 +196,7 @@ ${Array.from({ length: 30 }, (_, i) => `later output ${i}`).join('\n')}
   // PAN-3766 — ohmypi `ask` modal, keyed on its distinctive footer hint. Shape
   // mirrors a captured live pane: box-drawn frame, bottom border after footer.
   it('detects a pi ask modal as a user_question with the question text in the prompt', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 Some earlier agent output.
 
  ⠙ Choosing which battle to stage live ⟦esc⟧
@@ -217,7 +217,7 @@ Some earlier agent output.
   })
 
   it('also detects the unboxed ask layout', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 Ask  1 questions
 [battle]  options:5
 Which battle should I stage?
@@ -231,7 +231,7 @@ Enter select · n note · ↑↓ move · Esc cancel
   })
 
   it('clears the pi ask detection once the modal is answered and output follows', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 │ Enter select · n note · ↑/↓ move · Esc cancel     │
 ╰───────────────────────────────────────────────────╯
 The agent continued working after the answer.
@@ -241,7 +241,7 @@ The agent continued working after the answer.
   })
 
   it('does not fire on prose that merely mentions the footer keys', () => {
-    const detection = detectAwaitingInputFromPaneSync(`
+    const detection = detectAwaitingInputFromPane(`
 Press Enter to select an item from the list, or Esc to cancel the operation entirely.
 Done.
 `)

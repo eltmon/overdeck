@@ -33,8 +33,8 @@ describe('settings', () => {
 
   describe('getDefaultSettings', () => {
     it('should return default Kimi configuration', async () => {
-      const { getDefaultSettingsSync } = await import('../../src/lib/settings.js');
-      const defaults = getDefaultSettingsSync();
+      const { getDefaultSettings } = await import('../../src/lib/settings.js');
+      const defaults = getDefaultSettings();
 
       // Default model configuration per DEFAULT_SETTINGS
       expect(defaults.models.specialists.review_agent).toBe('claude-opus-4-6');
@@ -44,9 +44,9 @@ describe('settings', () => {
     });
 
     it('should return a deep copy (not same reference)', async () => {
-      const { getDefaultSettingsSync } = await import('../../src/lib/settings.js');
-      const defaults1 = getDefaultSettingsSync();
-      const defaults2 = getDefaultSettingsSync();
+      const { getDefaultSettings } = await import('../../src/lib/settings.js');
+      const defaults1 = getDefaultSettings();
+      const defaults2 = getDefaultSettings();
 
       expect(defaults1).not.toBe(defaults2);
       expect(defaults1.models).not.toBe(defaults2.models);
@@ -56,7 +56,7 @@ describe('settings', () => {
 
   describe('loadSettings', () => {
     it('should return defaults when file does not exist', async () => {
-      const { loadSettingsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { loadSettings, getDefaultSettings } = await import('../../src/lib/settings.js');
 
       // Clear any env vars that might affect API keys
       const originalOpenAI = process.env.OPENAI_API_KEY;
@@ -73,8 +73,8 @@ describe('settings', () => {
       delete process.env.KIMI_CODING_API_KEY;
 
       try {
-        const loaded = loadSettingsSync();
-        const defaults = getDefaultSettingsSync();
+        const loaded = loadSettings();
+        const defaults = getDefaultSettings();
 
         expect(loaded).toEqual(defaults);
       } finally {
@@ -89,7 +89,7 @@ describe('settings', () => {
     });
 
     it('should merge user settings with defaults', async () => {
-      const { loadSettingsSync } = await import('../../src/lib/settings.js');
+      const { loadSettings } = await import('../../src/lib/settings.js');
 
       // Write partial settings (only override test_agent)
       const settingsPath = join(tempDir, 'settings.json');
@@ -105,7 +105,7 @@ describe('settings', () => {
       };
       writeFileSync(settingsPath, JSON.stringify(userSettings), 'utf8');
 
-      const loaded = loadSettingsSync();
+      const loaded = loadSettings();
 
       // User values should override defaults
       expect(loaded.models.specialists.test_agent).toBe('gpt-4o-mini');
@@ -116,7 +116,7 @@ describe('settings', () => {
     });
 
     it('should handle invalid JSON gracefully', async () => {
-      const { loadSettingsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { loadSettings, getDefaultSettings } = await import('../../src/lib/settings.js');
 
       // Clear any env vars that might affect API keys
       const originalOpenAI = process.env.OPENAI_API_KEY;
@@ -137,8 +137,8 @@ describe('settings', () => {
         const settingsPath = join(tempDir, 'settings.json');
         writeFileSync(settingsPath, '{ invalid json }', 'utf8');
 
-        const loaded = loadSettingsSync();
-        const defaults = getDefaultSettingsSync();
+        const loaded = loadSettings();
+        const defaults = getDefaultSettings();
 
         // Should return defaults on parse error
         expect(loaded).toEqual(defaults);
@@ -154,7 +154,7 @@ describe('settings', () => {
     });
 
     it('should handle empty JSON object', async () => {
-      const { loadSettingsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { loadSettings, getDefaultSettings } = await import('../../src/lib/settings.js');
 
       // Clear any env vars that might affect API keys
       const originalOpenAI = process.env.OPENAI_API_KEY;
@@ -175,8 +175,8 @@ describe('settings', () => {
         const settingsPath = join(tempDir, 'settings.json');
         writeFileSync(settingsPath, '{}', 'utf8');
 
-        const loaded = loadSettingsSync();
-        const defaults = getDefaultSettingsSync();
+        const loaded = loadSettings();
+        const defaults = getDefaultSettings();
 
         // Should return defaults when merging with empty object
         expect(loaded).toEqual(defaults);
@@ -192,7 +192,7 @@ describe('settings', () => {
     });
 
     it('should deep merge nested objects', async () => {
-      const { loadSettingsSync } = await import('../../src/lib/settings.js');
+      const { loadSettings } = await import('../../src/lib/settings.js');
 
       // Write nested partial settings
       const settingsPath = join(tempDir, 'settings.json');
@@ -205,7 +205,7 @@ describe('settings', () => {
       };
       writeFileSync(settingsPath, JSON.stringify(userSettings), 'utf8');
 
-      const loaded = loadSettingsSync();
+      const loaded = loadSettings();
 
       // User override should apply
       expect(loaded.models.specialists.review_agent).toBe('gpt-5.3-codex');
@@ -223,10 +223,10 @@ describe('settings', () => {
 
   describe('getAvailableModels', () => {
     it('should always return Anthropic models', async () => {
-      const { getAvailableModelsSync, getClaudeModelFlagSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getClaudeModelFlag, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettingsSync();
-      const available = getAvailableModelsSync(settings);
+      const settings = getDefaultSettings();
+      const available = getAvailableModels(settings);
 
       expect(available.anthropic).toEqual([
         'claude-fable-5-1',
@@ -240,14 +240,14 @@ describe('settings', () => {
         'claude-sonnet-4-6',
         'claude-haiku-4-5',
       ]);
-      expect(getClaudeModelFlagSync('claude-opus-5-5')).toBe('claude-opus-5-5');
+      expect(getClaudeModelFlag('claude-opus-5-5')).toBe('claude-opus-5-5');
     });
 
     it('should return empty arrays for providers without API keys', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettingsSync();
-      const available = getAvailableModelsSync(settings);
+      const settings = getDefaultSettings();
+      const available = getAvailableModels(settings);
 
       expect(available.openai).toEqual([]);
       expect(available.google).toEqual([]);
@@ -256,12 +256,12 @@ describe('settings', () => {
     });
 
     it('should return OpenAI models when API key is configured', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettingsSync();
+      const settings = getDefaultSettings();
       settings.api_keys.openai = 'sk-test-key';
 
-      const available = getAvailableModelsSync(settings);
+      const available = getAvailableModels(settings);
 
       expect(available.openai).toEqual([
         'gpt-6-astra',
@@ -275,12 +275,12 @@ describe('settings', () => {
     });
 
     it('should return Google models when API key is configured', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettingsSync();
+      const settings = getDefaultSettings();
       settings.api_keys.google = 'AIza-test-key';
 
-      const available = getAvailableModelsSync(settings);
+      const available = getAvailableModels(settings);
 
       expect(available.google).toEqual([
         'gemini-3.8-flash',
@@ -292,47 +292,47 @@ describe('settings', () => {
     });
 
     it('should return MiniMax models when API key is configured', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettingsSync();
+      const settings = getDefaultSettings();
       settings.api_keys.minimax = 'minimax-test-key';
 
-      const available = getAvailableModelsSync(settings);
+      const available = getAvailableModels(settings);
 
       expect(available.minimax).toEqual(['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
     });
 
     it('should return Kimi models when API key is configured', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettingsSync();
+      const settings = getDefaultSettings();
       settings.api_keys.kimi = 'kimi-test-key';
 
-      const available = getAvailableModelsSync(settings);
+      const available = getAvailableModels(settings);
 
       expect(available.kimi).toEqual(['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
     });
 
     it('should return xAI models when XAI_API_KEY is configured', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettingsSync();
+      const settings = getDefaultSettings();
       settings.api_keys.xai = 'xai-test-key';
 
-      const available = getAvailableModelsSync(settings);
+      const available = getAvailableModels(settings);
 
       expect(available.xai).toEqual(['grok-build-0.1']);
     });
 
     it('should return multiple providers when multiple API keys configured', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettingsSync();
+      const settings = getDefaultSettings();
       settings.api_keys.openai = 'sk-test-key';
       settings.api_keys.google = 'AIza-test-key';
       settings.api_keys.minimax = 'minimax-test-key';
 
-      const available = getAvailableModelsSync(settings);
+      const available = getAvailableModels(settings);
 
       expect(available.anthropic.length).toBeGreaterThan(0);
       expect(available.openai.length).toBeGreaterThan(0);
@@ -341,23 +341,23 @@ describe('settings', () => {
     });
 
     it('should gate QuantumLlama models on the quantumllama API key (PAN-3252)', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const without = getAvailableModelsSync(getDefaultSettingsSync());
+      const without = getAvailableModels(getDefaultSettings());
       expect(without.quantumllama).toEqual([]);
 
-      const settings = getDefaultSettingsSync();
+      const settings = getDefaultSettings();
       settings.api_keys.quantumllama = 'ql-test-key';
-      const available = getAvailableModelsSync(settings);
+      const available = getAvailableModels(settings);
       expect(available.quantumllama).toEqual(['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']);
     });
 
     it('should fall back to QUANTUMLLAMA_API_KEY from the environment', async () => {
-      const { loadSettingsSync } = await import('../../src/lib/settings.js');
+      const { loadSettings } = await import('../../src/lib/settings.js');
 
       process.env.QUANTUMLLAMA_API_KEY = 'ql-env-key';
       try {
-        const loaded = loadSettingsSync();
+        const loaded = loadSettings();
         expect(loaded.api_keys.quantumllama).toBe('ql-env-key');
       } finally {
         delete process.env.QUANTUMLLAMA_API_KEY;

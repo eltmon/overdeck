@@ -5,11 +5,11 @@ import { Context, Effect, Layer, Schema } from 'effect';
 import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-import { Db, Tmux, getOverdeckDatabaseSync } from './infra.js';
+import { Db, Tmux, getOverdeckDatabase } from './infra.js';
 import { IssueId, type Stage } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
 import { listAgentStatesSync, type AgentState } from '../agents/agent-state.js';
-import { resolveLatestSessionIdSync } from '../agents/activity.js';
+import { resolveLatestSessionId } from '../agents/activity.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
 
@@ -19,8 +19,8 @@ import { resolveLatestSessionIdSync } from '../agents/activity.js';
  * an FK anchor; its stage column is unwritten going forward but not yet
  * dropped) — inlined here rather than recreated at the deleted path.
  */
-export function getIssueStageSync(issueId: string): string | null {
-  const row = getOverdeckDatabaseSync()
+export function getIssueStage(issueId: string): string | null {
+  const row = getOverdeckDatabase()
     .prepare(`SELECT stage FROM issues WHERE id = ?`)
     .get(issueId) as { stage: string } | undefined;
   return row?.stage ?? null;
@@ -162,7 +162,7 @@ function agentStateToEntityInput(state: AgentState): Record<string, unknown> {
     role: state.role,
     status: state.status,
     workspace: state.workspace ?? '',
-    sessionId: resolveLatestSessionIdSync(state.id, { getAgentState: () => state }).sessionId,
+    sessionId: resolveLatestSessionId(state.id, { getAgentState: () => state }).sessionId,
     harness: state.harness ?? '',
     model: state.model ?? '',
     hostOverride: typeof state.hostOverride === 'string' ? state.hostOverride : null,
@@ -271,7 +271,7 @@ export const AgentsResolverLive = Layer.effect(
  * since the overdeck.db mirror was dropped. Used to enumerate an issue's review
  * fleet, e.g. listAgentIdsByPrefixSync('agent-pan-1866-review').
  */
-export function listAgentIdsByPrefixSync(prefix: string): string[] {
+export function listAgentIdsByPrefix(prefix: string): string[] {
   try {
     return readdirSync(join(getOverdeckHome(), 'agents')).filter((name) => name.startsWith(prefix));
   } catch {

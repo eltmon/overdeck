@@ -11,7 +11,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
-import { getClaudePermissionFlagsStringSync, ensureClaudePermissionFlagSync } from '../claude-permissions.js';
+import { getClaudePermissionFlagsString, ensureClaudePermissionFlag } from '../claude-permissions.js';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getDefaultCwd } from '../default-cwd.js';
 import {
@@ -40,7 +40,7 @@ import {
   setOption,
   exactPaneTarget,
   listSessionNames,
-  findManagedServerPidSync,
+  findManagedServerPid,
 } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
 import {
@@ -48,18 +48,18 @@ import {
   getProviderExportsForModel,
   getProviderAuthMode,
 } from '../agents.js';
-import { writeBridgeTokenSync } from '../bridge-token.js';
+import { writeBridgeToken } from '../bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../config-yaml.js';
 import { writePtyToken } from '../pty-token.js';
-import { canUseHarnessSync } from '../harness-policy.js';
+import { canUseHarness } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
-import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../providers.js';
+import { getProviderForModel, piProviderForModel, UnknownModelError } from '../providers.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { claudeSystemPromptFiles, getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
 import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
@@ -67,7 +67,7 @@ import { getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { buildResumeContract } from '../resume-contract.js';
-import { readLatestIndexedSessionIdSync } from '../session-history.js';
+import { readLatestIndexedSessionId } from '../session-history.js';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { markRespawnPending } from '../../dashboard/server/services/pending-respawn.js';
@@ -160,7 +160,7 @@ export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTab
   const launcherScript = join(getOverdeckHome(), 'conversations', conv.tmuxSession, 'launcher.sh');
   const sessionId = conv.claudeSessionId?.trim();
   const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
-  const serverPid = findManagedServerPidSync();
+  const serverPid = findManagedServerPid();
   return rows
     .filter((row) => {
       if (row.pid === process.pid) return false;
@@ -363,7 +363,7 @@ export async function handleConversationSwitchModel(
     const requestedRuntime: RuntimeName = requestedHarness === 'pi' ? 'ohmypi' : requestedHarness;
     if (requestedRuntime !== currentHarness) {
       const policyModel = model ?? conv.model ?? '';
-      const decision = canUseHarnessSync(
+      const decision = canUseHarness(
         requestedRuntime,
         policyModel,
         await getProviderAuthMode(policyModel),
@@ -560,7 +560,7 @@ export async function spawnConversationSession(
   await mkdir(stateDir, { recursive: true });
   clearReadySignal(tmuxSession);
   const launcherScript = join(stateDir, 'launcher.sh');
-  const permissionFlags = getClaudePermissionFlagsStringSync();
+  const permissionFlags = getClaudePermissionFlagsString();
   let runtimeCommand = `claude ${permissionFlags}`;
   let providerExportsStr = '';
   let piFields: {
@@ -610,10 +610,10 @@ export async function spawnConversationSession(
     }
     runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
     // Map permissions through the canonical helper; Claude rejects the literal `auto` flag.
-    runtimeCommand = ensureClaudePermissionFlagSync(runtimeCommand);
+    runtimeCommand = ensureClaudePermissionFlag(runtimeCommand);
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
-      if (getProviderForModelSync(model).name === 'openai') {
+      if (getProviderForModel(model).name === 'openai') {
         const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
         if (auth.status === 'missing' || auth.status === 'expired') {
           throw new Error(
@@ -627,7 +627,7 @@ export async function spawnConversationSession(
       await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
       await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
       const storedPiSessionId = resume
-        ? readLatestIndexedSessionIdSync(tmuxSession) ?? undefined
+        ? readLatestIndexedSessionId(tmuxSession) ?? undefined
         : undefined;
       piFields = {
         harness: 'ohmypi',
@@ -718,7 +718,7 @@ export async function spawnConversationSession(
     !museFields &&
     !plainFork &&
     isClaudeCodeChannelsEnabled() &&
-    (!model || getProviderForModelSync(model).name === 'anthropic') &&
+    (!model || getProviderForModel(model).name === 'anthropic') &&
     process.env.CLAUDE_CODE_USE_BEDROCK !== '1' &&
     process.env.CLAUDE_CODE_USE_VERTEX !== '1' &&
     process.env.CLAUDE_CODE_USE_FOUNDRY !== '1' &&
@@ -726,7 +726,7 @@ export async function spawnConversationSession(
     process.env.PAN_DOCKER !== '1'
   ) {
     channelsBridgeMcpConfig = join(stateDir, 'agent-mcp.json');
-    writeBridgeTokenSync(tmuxSession);
+    writeBridgeToken(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
   // PAN-1837 review fix: the tmux-create + session-capture sequence below is
@@ -756,7 +756,7 @@ export async function spawnConversationSession(
     const launcherTmp = `${launcherScript}.${randomUUID()}.tmp`;
     await writeFile(
       launcherTmp,
-      generateLauncherScriptSync({
+      generateLauncherScript({
         role: 'work',
         spawnMode: 'conversation',
         workingDir: cwd,

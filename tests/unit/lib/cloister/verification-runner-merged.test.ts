@@ -34,7 +34,7 @@ vi.mock('../../../../src/lib/cloister/verification-check-run.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: mockEmitActivity,
+  emitActivityEntry: mockEmitActivity,
 }));
 
 vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
@@ -61,7 +61,7 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
-  findProjectByPathSync: vi.fn(() => ({
+  findProjectByPath: vi.fn(() => ({
     name: 'Overdeck',
     path: '/tmp/overdeck',
     workspace: { type: 'polyrepo', default_branch: 'main' },
@@ -71,11 +71,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/xbrief/acceptance-criteria.js', () => ({
-  getXBriefACStatusSync: vi.fn(() => null),
+  getXBriefACStatus: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/work/done-preflight.js', () => ({
-  checkIncompletePlanItemsPromise: vi.fn(async () => []),
+  checkIncompletePlanItems: vi.fn(async () => []),
 }));
 
 import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';

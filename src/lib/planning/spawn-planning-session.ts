@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { extractTeamPrefix, findProjectByTeamSync, findProjectByPathSync } from '../projects.js';
+import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
 import {
   closeAgentPane,
   keepTmuxSessionOpen,
@@ -30,7 +30,7 @@ import {
 import type { AgentPaneRef } from '../terminal-backends/types.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
+import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentState } from '../agents.js';
 import { claudeSystemPromptFiles, getAcpLauncherFields, getCodexLauncherFields, getKimiCodeLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
@@ -38,7 +38,7 @@ import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
 import { getIssueDraftPath } from '../pan-dir/drafts.js';
@@ -212,7 +212,7 @@ export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: s
 
   // Check for polyrepo structure
   const teamPrefix = extractTeamPrefix(issue.identifier);
-  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
   let projectStructureSection = '';
   if (projectConfig?.workspace?.type === 'polyrepo' && projectConfig.workspace.repos) {
     const repos = projectConfig.workspace.repos;
@@ -403,7 +403,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     if (!workspaceCreated) {
       try {
-        const projectConfig = findProjectByPathSync(projectPath) || findProjectByTeamSync(extractTeamPrefix(issue.identifier) || '');
+        const projectConfig = findProjectByPath(projectPath) || findProjectByTeam(extractTeamPrefix(issue.identifier) || '');
         if (projectConfig?.workspace) {
           // Use library directly for real-time progress streaming
           console.log(`[start-planning] Creating workspace via library for ${issue.identifier}, projectConfig=${projectConfig.name}`);
@@ -445,7 +445,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         const errorMsg = `Workspace creation failed: ${err.message}`;
         console.error(`[start-planning] ABORTING: ${errorMsg}`);
         progress(1, 'Creating workspace', errorMsg, 'error');
-        const existingErrState = getAgentStateSync(sessionName);
+        const existingErrState = getAgentState(sessionName);
         if (existingErrState) saveAgentStateSync({ ...existingErrState, status: 'error' });
         return { success: false, error: errorMsg };
       }
@@ -577,7 +577,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     await writeFile(promptFile, initMessage);
     await writeFile(
       launcherScript,
-      generateLauncherScriptSync({
+      generateLauncherScript({
         role: 'plan',
         harness: effectiveHarness,
         workingDir: workspacePath,
@@ -663,7 +663,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // Keep the launch non-healthy until every protocol-owned kickoff has completed.
     // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
     {
-      const baseState = getAgentStateSync(sessionName);
+      const baseState = getAgentState(sessionName);
       saveAgentStateSync({
         ...(baseState ?? { id: sessionName, issueId: issue.identifier, workspace: workspacePath, startedAt: new Date().toISOString() }),
         model: planningModel,
@@ -686,14 +686,14 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         const errorMsg = `${behavior.displayName} planning kickoff prompt delivery failed: ${delivery.failure ?? 'unknown error'}`;
         console.error(`[start-planning] ${errorMsg}`);
         await closeAgentPane(sessionName);
-        const existingErrState = getAgentStateSync(sessionName);
+        const existingErrState = getAgentState(sessionName);
         if (existingErrState) saveAgentStateSync({ ...existingErrState, status: 'error' });
         progress(5, 'Launching planning session', errorMsg, 'error');
         return { success: false, error: errorMsg };
       }
     }
 
-    const runningState = getAgentStateSync(sessionName);
+    const runningState = getAgentState(sessionName);
     if (runningState) saveAgentStateSync({ ...runningState, status: 'running' });
     progress(5, 'Launching planning session', 'Agent running', 'complete');
 
@@ -703,7 +703,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
   } catch (err: any) {
     console.error(`[start-planning] Agent spawn failed for ${issue.identifier}:`, err);
     try {
-      const existingCatchState = getAgentStateSync(sessionName);
+      const existingCatchState = getAgentState(sessionName);
       if (existingCatchState) saveAgentStateSync({ ...existingCatchState, status: 'error' });
     } catch { /* ignore state write errors */ }
     return { success: false, error: err.message };

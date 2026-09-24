@@ -22,7 +22,7 @@ import { Effect } from 'effect';
 // registry/feature-registry-population.ts back to agents.ts, which imports
 // this backend transitively — import the read-only leaf instead so a terminal
 // backend computing pane tokens cannot close that cycle.
-import { getAgentStateSync } from '../agents/agent-state-read.js';
+import { getAgentState } from '../agents/agent-state-read.js';
 import { isAliveOnTmux, isIdle } from '../agents/liveness.js';
 import { shellQuoteArg } from '../shell-quote.js';
 import { createSession, killSession, listSessions, sendKeys, sessionExists } from '../tmux.js';
@@ -60,7 +60,7 @@ const BACKEND = 'tmux' as const;
 const OVERDECK_SESSION_NAME = /^(agent|planning|strike|conv)-/;
 
 export function tmuxTargetTokens(sessionName: string): Partial<PaneTokens> {
-  return tokensFromLaunchMetadata(getAgentStateSync(sessionName));
+  return tokensFromLaunchMetadata(getAgentState(sessionName));
 }
 
 function sessionNameOf(target: AgentTarget): string {

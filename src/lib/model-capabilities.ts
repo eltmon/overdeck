@@ -43,7 +43,7 @@ export { MODEL_DEPRECATIONS } from './model-deprecations.js';
  * @param modelId - Model ID to resolve (may be deprecated)
  * @returns Current model ID
  */
-export function resolveModelIdSync(modelId: string): ModelId {
+export function resolveModelId(modelId: string): ModelId {
   return (MODEL_DEPRECATIONS[modelId] as ModelId) || (modelId as ModelId);
 }
 
@@ -53,7 +53,7 @@ type CapabilityModelId = ModelId;
 
 // CLIProxy context ceilings live in their own module so this table stays a table;
 // re-exported here because they are part of the capability contract.
-export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, apiLaunchModelIdSync, isGpt56LongContextVariantSync } from './model-context-windows.js';
+export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, apiLaunchModelId, isGpt56LongContextVariant } from './model-context-windows.js';
 
 /**
  * Master capability database
@@ -1371,7 +1371,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
 /**
  * Get capability profile for a model
  */
-export function getModelCapabilitySync(model: ModelId): ModelCapability {
+export function getModelCapability(model: ModelId): ModelCapability {
   const capability = MODEL_CAPABILITIES[model as CapabilityModelId];
   if (!capability) {
     throw new Error(`No capability profile registered for model: ${model}`);
@@ -1379,7 +1379,7 @@ export function getModelCapabilitySync(model: ModelId): ModelCapability {
   return capability;
 }
 
-export function hasModelCapabilitySync(model: ModelId | string): boolean {
+export function hasModelCapability(model: ModelId | string): boolean {
   return model in MODEL_CAPABILITIES;
 }
 
@@ -1388,8 +1388,8 @@ export function hasModelCapabilitySync(model: ModelId | string): boolean {
  * model (treat undefined as "no model-specific restriction"). Resolves
  * deprecated IDs first so callers can pass raw config refs.
  */
-export function getModelEffortLevelsSync(model: ModelId | string): readonly EffortLevel[] | undefined {
-  const resolved = resolveModelIdSync(String(model));
+export function getModelEffortLevels(model: ModelId | string): readonly EffortLevel[] | undefined {
+  const resolved = resolveModelId(String(model));
   return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.effortLevels;
 }
 
@@ -1400,7 +1400,7 @@ export function getModelEffortLevelsSync(model: ModelId | string): readonly Effo
  * the final authority for unaudited models. Resolves deprecated IDs first.
  * See {@link ModelCapability.supportsImages} and PAN-1685.
  */
-export function modelSupportsImagesSync(model: ModelId | string): boolean {
-  const resolved = resolveModelIdSync(String(model));
+export function modelSupportsImages(model: ModelId | string): boolean {
+  const resolved = resolveModelId(String(model));
   return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.supportsImages !== false;
 }

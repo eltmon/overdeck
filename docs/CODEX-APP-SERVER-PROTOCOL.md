@@ -116,10 +116,10 @@ The existing rollout path helpers worked unchanged:
 - `findRolloutPath(codexHome, "019f5796-a6eb-7ec0-91e6-ac452b37e193")`
   returned the same JSONL.
 
-The existing cost parser also worked unchanged. `parseCodexSessionSync` returned
+The existing cost parser also worked unchanged. `parseCodexSession` returned
 one assistant message, model `gpt-5.6-sol`, 26,389 input tokens, 9,984 cached
 input tokens, 5 output tokens, and total cost `0.087167`.
-`parseCodexSessionCostEventsSync` emitted one cost event with the same usage.
+`parseCodexSessionCostEvents` emitted one cost event with the same usage.
 
 The existing conversation reader path worked unchanged. `getCachedMessages`
 already treats `rollout-*.jsonl` as Codex and dispatches to

@@ -4,7 +4,7 @@ import { join } from 'path';
 
 export type Shell = 'bash' | 'zsh' | 'fish' | 'unknown';
 
-export function detectShellSync(): Shell {
+export function detectShell(): Shell {
   const shell = process.env.SHELL || '';
 
   if (shell.includes('zsh')) return 'zsh';
@@ -14,7 +14,7 @@ export function detectShellSync(): Shell {
   return 'unknown';
 }
 
-export function getShellRcFileSync(shell: Shell): string | null {
+export function getShellRcFile(shell: Shell): string | null {
   const home = homedir();
 
   switch (shell) {
@@ -42,7 +42,7 @@ function hasAliasSync(rcFile: string): boolean {
   return content.includes(ALIAS_MARKER) || content.includes(ALIAS_LINE);
 }
 
-export function addAliasSync(rcFile: string): void {
+export function addAlias(rcFile: string): void {
   if (hasAliasSync(rcFile)) return;
 
   const aliasBlock = `
@@ -53,8 +53,8 @@ ${ALIAS_LINE}
   appendFileSync(rcFile, aliasBlock, 'utf8');
 }
 
-export function getAliasInstructionsSync(shell: Shell): string {
-  const rcFile = getShellRcFileSync(shell);
+export function getAliasInstructions(shell: Shell): string {
+  const rcFile = getShellRcFile(shell);
 
   if (!rcFile) {
     return `Add this to your shell config:\n  ${ALIAS_LINE}`;

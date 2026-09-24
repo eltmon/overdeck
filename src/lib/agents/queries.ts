@@ -15,7 +15,7 @@ import { Effect } from 'effect';
 import { FsError, TmuxError } from '../errors.js';
 import type { AgentStatus } from '@overdeck/contracts';
 import type { AgentState, Role } from '../agents.js';
-import { getAgentStateSync, isRole, normalizeAgentId } from '../agents.js';
+import { getAgentState, isRole, normalizeAgentId } from '../agents.js';
 import { killSession, listSessionsSync } from '../tmux.js';
 import { getRuntimeCensus, getRuntimeCensusSnapshot } from '../runtime-census.js';
 import { AGENTS_DIR } from '../paths.js';
@@ -194,7 +194,7 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
       } catch {
         return;
       }
-      const state = getAgentStateSync(entry);
+      const state = getAgentState(entry);
       if (state?.issueId && /^\d+$/.test(state.issueId)) {
         legacy.push(`${entry} (issueId: "${state.issueId}")`);
       }

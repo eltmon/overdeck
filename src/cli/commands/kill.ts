@@ -2,11 +2,11 @@ import { exitCli } from '../exit.js';
 import { existsSync, readdirSync } from 'fs';
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { stopAgent, getAgentStateSync, isQualifiedAgentId } from '../../lib/agents.js';
+import { stopAgent, getAgentState, isQualifiedAgentId } from '../../lib/agents.js';
 import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent, loadRemoteAgentState } from '../../lib/remote/remote-agents.js';
-import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
+import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
@@ -75,9 +75,9 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
     // agent-…-ship) targets exactly that agent — no issue-wide discovery.
     const agentId = id.toLowerCase();
     agentIds = [agentId];
-    issueId = getAgentStateSync(agentId)?.issueId ?? agentId;
+    issueId = getAgentState(agentId)?.issueId ?? agentId;
   } else {
-    const resolved = resolveBareNumericIdSync(id);
+    const resolved = resolveBareNumericId(id);
     if (!resolved) {
       console.error(chalk.red(`Could not resolve issue ID "${id}"`));
       console.error(chalk.dim(
@@ -113,7 +113,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
   for (const agentId of agentIds) {
     // Remote (fly.io) agents persist remote-state.json, not state.json —
     // without this fallback the remote teardown branch below never fires.
-    const state = (getAgentStateSync(agentId) ?? loadRemoteAgentState(agentId)) as any;
+    const state = (getAgentState(agentId) ?? loadRemoteAgentState(agentId)) as any;
     const isRunning = await hasLivePane(agentId);
 
     if (!state && !isRunning) {

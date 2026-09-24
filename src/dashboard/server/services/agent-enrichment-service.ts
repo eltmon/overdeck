@@ -20,7 +20,7 @@ import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js'
 import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
 import { getEventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js'
+import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js'
 import type { AgentEnrichmentChangedEvent, AgentCreatedEvent } from '@overdeck/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 
@@ -263,8 +263,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       if (isAwaitingInputRisingEdge(previousEnrichment, enrichment)) {
         const message = buildAwaitingInputActivityMessage(agentId, issueId, enrichment.pendingInputKinds)
         const source = toRole(agent.role) ?? 'work'
-        emitActivityEntrySync({ source, level: 'warn', message, issueId })
-        emitActivityTtsSync({ utterance: message, priority: 1, issueId, source, eventType: 'awaiting_input' })
+        emitActivityEntry({ source, level: 'warn', message, issueId })
+        emitActivityTts({ utterance: message, priority: 1, issueId, source, eventType: 'awaiting_input' })
       }
 
       // PAN-2633 — a stop-shaped status_changed event may have wiped the read
@@ -322,7 +322,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         }
 
         const issueId = reapIssueId
-        emitActivityEntrySync({
+        emitActivityEntry({
           source: toRole(agentRecord?.role) ?? 'work',
           level: 'info',
           message: buildExpiredQuestionActivityMessage(id, issueId),

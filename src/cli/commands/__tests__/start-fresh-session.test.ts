@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const agentMocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   stopAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(),
 }))
@@ -17,7 +17,7 @@ const backendMocks = vi.hoisted(() => ({
 }))
 
 const lifecycleMocks = vi.hoisted(() => ({
-  assertCanStartFreshSync: vi.fn(),
+  assertCanStartFresh: vi.fn(),
 }))
 
 vi.mock('../../../lib/agents.js', () => agentMocks)
@@ -30,7 +30,7 @@ import { prepareFreshWorkAgentSession } from '../start-fresh-session.js'
 describe('prepareFreshWorkAgentSession', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    agentMocks.getAgentStateSync.mockReturnValue({ id: 'agent-pan-3228' })
+    agentMocks.getAgentState.mockReturnValue({ id: 'agent-pan-3228' })
     agentMocks.wipeAgentStateDirs.mockResolvedValue({
       removed: ['/tmp/agent-pan-3228'],
       path: '/tmp/agents',
@@ -38,7 +38,7 @@ describe('prepareFreshWorkAgentSession', () => {
     agentMocks.stopAgent.mockReturnValue(Effect.void)
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false))
     backendMocks.agentPaneExists.mockResolvedValue(false)
-    lifecycleMocks.assertCanStartFreshSync.mockReturnValue({ canStartFresh: true })
+    lifecycleMocks.assertCanStartFresh.mockReturnValue({ canStartFresh: true })
   })
 
   it('refuses to replace a session with a pending operator decision', async () => {
@@ -66,7 +66,7 @@ describe('prepareFreshWorkAgentSession', () => {
   })
 
   it('leaves the agent state directory intact when the fresh-start guard refuses', async () => {
-    lifecycleMocks.assertCanStartFreshSync.mockImplementation(() => {
+    lifecycleMocks.assertCanStartFresh.mockImplementation(() => {
       throw new Error("Use 'pan reset-session PAN-3228' before starting a new session.")
     })
 
@@ -76,7 +76,7 @@ describe('prepareFreshWorkAgentSession', () => {
       ok: false,
       error: expect.stringContaining('pan reset-session PAN-3228'),
     })
-    expect(lifecycleMocks.assertCanStartFreshSync).toHaveBeenCalledWith('PAN-3228', {
+    expect(lifecycleMocks.assertCanStartFresh).toHaveBeenCalledWith('PAN-3228', {
       allowPausedForce: false,
       allowLiveSessionReplacement: true,
       explicitFresh: true,

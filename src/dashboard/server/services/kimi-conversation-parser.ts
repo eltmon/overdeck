@@ -176,7 +176,7 @@ export async function parseKimiConversationMessages(sessionFile: string): Promis
   // for wire.jsonl usage.record accounting) rather than being re-derived here.
   // Reuses the entries already parsed above instead of re-reading and
   // re-parsing the whole file a second time per update (PAN-1837 review fix
-  // — the previous parseKimiSessionSync(sessionFile) call did its own
+  // — the previous parseKimiSession(sessionFile) call did its own
   // synchronous full-file read/parse on every wire.jsonl append).
   const usage = summarizeKimiEntries(parsedEntries, sessionFile);
   const totalCost = usage?.cost_v2 ?? usage?.cost ?? 0;

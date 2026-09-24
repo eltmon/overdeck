@@ -15,7 +15,7 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { renderWorkspaceGitShowPromise } from '../git-utils.js';
+import { renderWorkspaceGitShow } from '../git-utils.js';
 import { deliverAgentMessage, type DeliveryResult } from './delivery.js';
 import { estimateFeedDeliveryTokens, recordTierFeedDelivery } from './tier-metrics.js';
 import type { ValidatedTieredExecutionFeedConfig } from './tier-table.js';
@@ -107,11 +107,11 @@ async function renderCommitFeedDiff(
   const pathspecArgs = feedConfig.exclude.length > 0
     ? ['--', '.', ...feedConfig.exclude.map(glob => `:(exclude)${glob}`)]
     : [];
-  const diff = await renderWorkspaceGitShowPromise(deps.issueId, workspace, sha, pathspecArgs, gitShow);
+  const diff = await renderWorkspaceGitShow(deps.issueId, workspace, sha, pathspecArgs, gitShow);
   const maxBytes = feedConfig.max_diff_bytes;
   if (maxBytes === null || Buffer.byteLength(diff, 'utf-8') <= maxBytes) return diff;
 
-  const stat = await renderWorkspaceGitShowPromise(deps.issueId, workspace, sha, ['--stat', ...pathspecArgs], gitShow);
+  const stat = await renderWorkspaceGitShow(deps.issueId, workspace, sha, ['--stat', ...pathspecArgs], gitShow);
   return [
     stat.trimEnd(),
     '',

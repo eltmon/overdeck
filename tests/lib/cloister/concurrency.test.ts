@@ -156,7 +156,7 @@ describe('concurrency governor — config + counting', () => {
         { id: 'agent-d', role: 'work', tmuxActive: true, lastActivity: '2026-01-04T00:00:00Z' }, // idle
       ],
       stopAgentSync: (id: string, cause?: string) => { stopCalls.push([id, cause]); },
-      getAgentStateSync: (id: string) => states[id],
+      getAgentState: (id: string) => states[id],
       saveAgentStateSync: () => {},
       getAgentRuntimeStateSync: (id: string) => ({ state: idle.has(id) ? 'idle' : 'active' }),
     }));
@@ -182,7 +182,7 @@ describe('concurrency governor — config + counting', () => {
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [{ id: 'agent-a', role: 'work', tmuxActive: true }],
       stopAgentSync: () => { throw new Error('should not stop anything'); },
-      getAgentStateSync: () => null,
+      getAgentState: () => null,
       saveAgentStateSync: () => {},
       getAgentRuntimeStateSync: () => null,
     }));
@@ -207,7 +207,7 @@ describe('concurrency governor — config + counting', () => {
         { id: 'agent-op-c', role: 'work', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' },
       ],
       stopAgentSync: (id: string) => { states[id].stoppedByUser = true; },
-      getAgentStateSync: (id: string) => states[id],
+      getAgentState: (id: string) => states[id],
       saveAgentStateSync: (s: { id: string }) => { states[s.id] = states[s.id]; },
       getAgentRuntimeStateSync: (id: string) => ({ state: 'active' }),
     }));

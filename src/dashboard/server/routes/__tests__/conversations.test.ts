@@ -185,9 +185,9 @@ let TEST_HOME: string;
 const ORIGINAL_HOME = process.env.HOME;
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
   const { resetDiscoveredSessionsSchemaBootstrap } = await import('../../../../lib/overdeck/discovered-sessions.js');
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   resetDiscoveredSessionsSchemaBootstrap();
 }
 
@@ -993,9 +993,9 @@ describe('conversations route — DB integration', () => {
 
   it('returns archived conversations ordered by archivedAt descending', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+    const { getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
     const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
-    const db = getOverdeckDatabaseSync();
+    const db = getOverdeckDatabase();
 
     createConversation({ name: 'older-archived', tmuxSession: 'conv-older', cwd: '/cwd/older', title: 'Older archived' });
     createConversation({ name: 'active-conv', tmuxSession: 'conv-active', cwd: '/cwd/active', title: 'Active' });
@@ -1026,9 +1026,9 @@ describe('conversations route — DB integration', () => {
   it('filters archived conversations with active facets before mapping rows', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
-    const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+    const { getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
     const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
-    const db = getOverdeckDatabaseSync();
+    const db = getOverdeckDatabase();
 
     createConversation({
       name: 'matching-archived',
@@ -1097,9 +1097,9 @@ describe('conversations route — DB integration', () => {
 
   it('includes legacy null-harness archived conversations when filtering for claude-code', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+    const { getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
     const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
-    const db = getOverdeckDatabaseSync();
+    const db = getOverdeckDatabase();
 
     createConversation({ name: 'legacy-claude-archived', tmuxSession: 'conv-legacy-claude', cwd: '/cwd/legacy' });
     createConversation({ name: 'codex-archived', tmuxSession: 'conv-codex', cwd: '/cwd/codex', harness: 'codex' });
@@ -1133,9 +1133,9 @@ describe('conversations route — DB integration', () => {
 
   it('returns archived conversations without discovered_sessions enrichment', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+    const { getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
     const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
-    const db = getOverdeckDatabaseSync();
+    const db = getOverdeckDatabase();
 
     createConversation({
       name: 'sparse-archived',
@@ -1200,9 +1200,9 @@ describe('conversations route — DB integration', () => {
   it('merges discovered_sessions enrichment for archived conversations', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
-    const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+    const { getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
     const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
-    const db = getOverdeckDatabaseSync();
+    const db = getOverdeckDatabase();
 
     createConversation({
       name: 'enriched-archived',

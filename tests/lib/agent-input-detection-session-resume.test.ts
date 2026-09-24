@@ -6,9 +6,9 @@
  * so the kanban INPUT indicator fires and a desktop notification triggers.
  */
 import { describe, it, expect } from 'vitest'
-import { detectAwaitingInputFromPaneSync } from '../../src/lib/agent-input-detection.js'
+import { detectAwaitingInputFromPane } from '../../src/lib/agent-input-detection.js'
 
-describe('detectAwaitingInputFromPaneSync — session_resume', () => {
+describe('detectAwaitingInputFromPane — session_resume', () => {
   it('detects "this session is still active" wording', () => {
     const pane = [
       'Starting Claude...',
@@ -17,7 +17,7 @@ describe('detectAwaitingInputFromPaneSync — session_resume', () => {
       '> Continue here',
       '  Cancel',
     ].join('\n')
-    const result = detectAwaitingInputFromPaneSync(pane)
+    const result = detectAwaitingInputFromPane(pane)
     expect(result?.reason).toBe('session_resume')
   })
 
@@ -27,7 +27,7 @@ describe('detectAwaitingInputFromPaneSync — session_resume', () => {
       'Do you want to resume the previous session?',
       '[Y/n]',
     ].join('\n')
-    const result = detectAwaitingInputFromPaneSync(pane)
+    const result = detectAwaitingInputFromPane(pane)
     expect(result?.reason).toBe('session_resume')
   })
 
@@ -36,7 +36,7 @@ describe('detectAwaitingInputFromPaneSync — session_resume', () => {
       'Welcome back',
       'Press Enter to continue your session',
     ].join('\n')
-    const result = detectAwaitingInputFromPaneSync(pane)
+    const result = detectAwaitingInputFromPane(pane)
     expect(result?.reason).toBe('session_resume')
   })
 
@@ -45,7 +45,7 @@ describe('detectAwaitingInputFromPaneSync — session_resume', () => {
       'Adding resume function to handler...',
       'Editing src/lib/handler.ts',
     ].join('\n')
-    const result = detectAwaitingInputFromPaneSync(pane)
+    const result = detectAwaitingInputFromPane(pane)
     expect(result).toBeNull()
   })
 
@@ -58,7 +58,7 @@ describe('detectAwaitingInputFromPaneSync — session_resume', () => {
       '  2. Yes, and don\'t ask',
       '  3. No',
     ].join('\n')
-    const result = detectAwaitingInputFromPaneSync(pane)
+    const result = detectAwaitingInputFromPane(pane)
     // The permission menu check runs first and is the more specific signal.
     expect(result?.reason).toBe('tool_permission')
   })

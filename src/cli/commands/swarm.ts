@@ -37,7 +37,7 @@ import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgent } from '../../lib/agents/removal.js';
 import { ensureSwarmForeman } from '../../lib/cloister/swarm-foreman.js';
-import { resolveSlotWorkspaceWorktreesSync, type SlotWorkspaceWorktrees } from '../../lib/project-repos.js';
+import { resolveSlotWorkspaceWorktrees, type SlotWorkspaceWorktrees } from '../../lib/project-repos.js';
 import { removeWorkspaceDirectory } from '../../lib/workspace-manager/remove-directory.js';
 import { isRegisteredWorktree } from '../../lib/cloister/deacon-swarm-gc.js';
 import {
@@ -497,7 +497,7 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   getFailedMergeBlocks,
   removeAgent,
   listSlotWorkspaceDirectories: listSlotWorkspaceDirectoriesSync,
-  resolveSlotWorkspaceWorktrees: resolveSlotWorkspaceWorktreesSync,
+  resolveSlotWorkspaceWorktrees: resolveSlotWorkspaceWorktrees,
   removeDirectory: path => removeWorkspaceDirectory(path),
 };
 

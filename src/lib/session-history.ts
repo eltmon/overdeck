@@ -25,7 +25,7 @@ import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { logAgentLifecycleSync } from './persistent-logger.js';
+import { logAgentLifecycle } from './persistent-logger.js';
 
 export const SESSION_RESET_MARKER = 'session-reset';
 
@@ -185,7 +185,7 @@ export function latestSessionResetTime(contents: string): number | null {
   return latest;
 }
 
-export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
+export function readSessionIndex(agentId: string): SessionIndexEntry[] {
   try {
     const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
     if (!existsSync(file)) return [];
@@ -195,9 +195,9 @@ export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
   }
 }
 
-export function readSessionIndexWithLegacySync(agentId: string): SessionIndexEntry[] {
+export function readSessionIndexWithLegacy(agentId: string): SessionIndexEntry[] {
   const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
-  if (existsSync(file)) return readSessionIndexSync(agentId);
+  if (existsSync(file)) return readSessionIndex(agentId);
   let sessionId: string | null;
   try {
     sessionId = readFileSync(join(getOverdeckHome(), 'agents', agentId, 'session.id'), 'utf8').trim() || null; // legacy read-only fallback
@@ -207,8 +207,8 @@ export function readSessionIndexWithLegacySync(agentId: string): SessionIndexEnt
   return sessionId ? [{ sessionId, at: '', source: 'legacy-pointer' }] : [];
 }
 
-export function readLatestIndexedSessionIdSync(agentId: string): string | null {
-  return readSessionIndexWithLegacySync(agentId).at(-1)?.sessionId ?? null;
+export function readLatestIndexedSessionId(agentId: string): string | null {
+  return readSessionIndexWithLegacy(agentId).at(-1)?.sessionId ?? null;
 }
 
 type SessionEntryMetadata = { harness?: string; model?: string; path?: string };
@@ -293,12 +293,12 @@ export function createFreshSessionIdentity(agentId: string, harness: RuntimeName
   const sessionId = randomUUID();
   appendSessionIdToHistory(agentId, sessionId, 'launcher', { harness, model });
   const dir = join(getOverdeckHome(), 'agents', agentId);
-  logAgentLifecycleSync(agentId, `session identity allocated: harness=${harness} sessionId=${sessionId} indexPersisted=${existsSync(join(dir, 'sessions.json'))}`);
+  logAgentLifecycle(agentId, `session identity allocated: harness=${harness} sessionId=${sessionId} indexPersisted=${existsSync(join(dir, 'sessions.json'))}`);
   return sessionId;
 }
 
 export function logLauncherSessionPinned(agentId: string, sessionId: string, launcher: string): void {
-  logAgentLifecycleSync(
+  logAgentLifecycle(
     agentId,
     `launcher session pinned: sessionId=${sessionId} flag=--session-id launcher=${launcher}`,
   );

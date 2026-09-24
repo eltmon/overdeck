@@ -26,7 +26,7 @@ vi.mock('../../../../src/lib/agents/messaging.js', () => ({
 }));
 
 // The journal is real (a temp workspace); only its event fan-out is silenced.
-vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipelineSync: vi.fn() }));
+vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

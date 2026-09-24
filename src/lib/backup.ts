@@ -16,7 +16,7 @@ export function createBackupTimestamp(): string {
  * Create a timestamped backup of the supplied source directories. Throws on a
  * copy failure.
  */
-export function createBackupSync(sourceDirs: string[]): BackupInfo {
+export function createBackup(sourceDirs: string[]): BackupInfo {
   const timestamp = createBackupTimestamp();
   const backupPath = join(BACKUPS_DIR, timestamp);
 
@@ -57,7 +57,7 @@ export function createBackupSync(sourceDirs: string[]): BackupInfo {
  * write that touches pre-existing content. Pass a shared `timestamp` to group
  * several files from the same sync run under one backup dir.
  */
-export function backupFileSync(file: string, timestamp = createBackupTimestamp()): string | null {
+export function backupFile(file: string, timestamp = createBackupTimestamp()): string | null {
   if (!existsSync(file)) return null;
   const dir = join(BACKUPS_DIR, timestamp, 'context');
   mkdirSync(dir, { recursive: true });
@@ -67,7 +67,7 @@ export function backupFileSync(file: string, timestamp = createBackupTimestamp()
   return dest;
 }
 
-export function listBackupsSync(): BackupInfo[] {
+export function listBackups(): BackupInfo[] {
   if (!existsSync(BACKUPS_DIR)) return [];
 
   const entries = readdirSync(BACKUPS_DIR, { withFileTypes: true });
@@ -87,7 +87,7 @@ export function listBackupsSync(): BackupInfo[] {
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
-export function restoreBackupSync(timestamp: string, targetDirs: Record<string, string>): void {
+export function restoreBackup(timestamp: string, targetDirs: Record<string, string>): void {
   const backupPath = join(BACKUPS_DIR, timestamp);
 
   if (!existsSync(backupPath)) {
@@ -113,8 +113,8 @@ export function restoreBackupSync(timestamp: string, targetDirs: Record<string, 
   }
 }
 
-export function cleanOldBackupsSync(keepCount: number = 10): number {
-  const backups = listBackupsSync();
+export function cleanOldBackups(keepCount: number = 10): number {
+  const backups = listBackups();
 
   if (backups.length <= keepCount) return 0;
 

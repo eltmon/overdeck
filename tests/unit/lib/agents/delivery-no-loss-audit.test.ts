@@ -104,7 +104,7 @@ describe('delivery call-site inventory (W7 no-loss audit)', () => {
 });
 
 const mocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentRuntimeStateSync: vi.fn(),
   deliverAgentMessage: vi.fn(),
   sessionExists: vi.fn(),
@@ -112,9 +112,9 @@ const mocks = vi.hoisted(() => ({
   waitForAgentIdle: vi.fn(),
   getCodexAppServerStatus: vi.fn(),
   appendOperatorInterventionEvent: vi.fn(),
-  logAgentLifecycleSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
   resumeAgent: vi.fn(),
-  getLatestSessionIdSync: vi.fn(),
+  getLatestSessionId: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
   hasAgentRuntimeInSubtree: vi.fn(),
@@ -160,7 +160,7 @@ vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
     }
     return { decision: 'block', reason: block.reason, clearStoppedByUser: false };
   },
-  getAgentStateSync: mocks.getAgentStateSync,
+  getAgentState: mocks.getAgentState,
   markAgentRunning: vi.fn(),
   saveAgentStateSync: vi.fn(),
 }));
@@ -219,7 +219,7 @@ vi.mock('../../../../src/lib/agents/runtime-command.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/activity.js', () => ({
-  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
+  getLatestSessionId: mocks.getLatestSessionId,
 }));
 
 vi.mock('../../../../src/lib/agents/supervisor-channels.js', () => ({
@@ -233,11 +233,11 @@ vi.mock('../../../../src/lib/operator-interventions.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
-  logAgentLifecycleSync: mocks.logAgentLifecycleSync,
+  logAgentLifecycle: mocks.logAgentLifecycle,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -250,13 +250,13 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 
 vi.mock('../../../../src/lib/providers.js', () => ({
-  clearCredentialFileAuthSync: vi.fn(),
-  getProviderForModelSync: vi.fn(),
-  setupCredentialFileAuthSync: vi.fn(),
+  clearCredentialFileAuth: vi.fn(),
+  getProviderForModel: vi.fn(),
+  setupCredentialFileAuth: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/launcher-generator.js', () => ({
-  generateLauncherScriptSync: vi.fn(),
+  generateLauncherScript: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/child-env.js', () => ({
@@ -308,7 +308,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
     mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
-    mocks.getLatestSessionIdSync.mockImplementation((agentId, options) =>
+    mocks.getLatestSessionId.mockImplementation((agentId, options) =>
       options?.getAgentState?.(agentId)?.sessionId);
     mocks.captureTranscriptUserRecordSnapshot.mockResolvedValue({
       sessionFile: '/tmp/session.jsonl',
@@ -329,7 +329,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   describe('(a) idle Claude Code session whose transcript grows', () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      mocks.getAgentStateSync.mockReturnValue({
+      mocks.getAgentState.mockReturnValue({
         id: 'agent-pan-3846',
         issueId: 'PAN-3846',
         status: 'running',
@@ -361,7 +361,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   describe('(b) session whose transcript never grows', () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      mocks.getAgentStateSync.mockReturnValue({
+      mocks.getAgentState.mockReturnValue({
         id: 'agent-pan-3846',
         issueId: 'PAN-3846',
         status: 'running',
@@ -385,7 +385,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   });
 
   it('(c) dead pane never reports delivered', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-3846',
       issueId: 'PAN-3846',
       status: 'running',
@@ -411,7 +411,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   });
 
   it('(d) stoppedByUser with a completion marker and owesRework clears the gate and resumes (PAN-2668)', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-3846',
       issueId: 'PAN-3846',
       status: 'stopped',
@@ -430,7 +430,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
   });
 
   it('(e) paused agent is not delivered, with the pause reason', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-3846',
       issueId: 'PAN-3846',
       status: 'stopped',
@@ -453,7 +453,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
       // deleted review_status row, so there is no flag left to clear. What the
       // eight parked issues (PAN-3679, 3677, 3685, 3689, 3690, 3740, 3810,
       // 3814) needed is what survives: the redelivery itself is confirmed.
-      mocks.getAgentStateSync.mockReturnValue({
+      mocks.getAgentState.mockReturnValue({
         id: 'agent-pan-3679',
         issueId: 'PAN-3679',
         status: 'running',

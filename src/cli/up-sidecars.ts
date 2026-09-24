@@ -86,20 +86,20 @@ export async function startPostLaunchSidecars(config: {
   }
 
   try {
-    const { startSmeeProcessSync } = await import('../lib/smee.js');
+    const { startSmeeProcess } = await import('../lib/smee.js');
     console.log(chalk.dim('\nStarting smee-client webhook relay...'));
-    startSmeeProcessSync();
+    startSmeeProcess();
   } catch (error: unknown) {
     console.log(chalk.yellow('⚠ Failed to start smee-client:'), errorMessage(error));
     console.log(chalk.dim('  Webhook relay unavailable — GitHub events will use polling fallback'));
   }
 
   try {
-    const { getTldrDaemonServiceSync } = await import('../lib/tldr-daemon.js');
+    const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
     const venvPath = join(config.projectRoot, '.venv');
     if (existsSync(venvPath)) {
       console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-      const tldrService = getTldrDaemonServiceSync(config.projectRoot, venvPath);
+      const tldrService = getTldrDaemonService(config.projectRoot, venvPath);
       await tldrService.start(true);
       console.log(chalk.green('✓ TLDR daemon started'));
     } else {
@@ -132,14 +132,14 @@ export async function startPostLaunchSidecars(config: {
   // ensureHerdrBeforeDashboard (called from `pan up`).
 
   try {
-    const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../lib/supervisor.js');
+    const { startSupervisorProcess, getSupervisorPort } = await import('../lib/supervisor.js');
     const { startSupervisorUnitIfAvailable, SUPERVISOR_UNIT_NAME } = await import('../lib/systemd.js');
     const onWarning = (message: string) => console.log(chalk.dim(`  ⚠ ${message}`));
     if (await startSupervisorUnitIfAvailable({ onWarning })) {
       console.log(chalk.green(`✓ Supervisor managed by ${SUPERVISOR_UNIT_NAME}`));
     } else {
-      startSupervisorProcessSync();
-      console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPortSync()}`));
+      startSupervisorProcess();
+      console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPort()}`));
     }
   } catch (error: unknown) {
     console.log(chalk.yellow('⚠ Failed to start supervisor:'), errorMessage(error));

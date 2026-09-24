@@ -22,7 +22,7 @@ import type { Command } from 'commander';
 import { Effect } from 'effect';
 
 import { exitCli } from '../exit.js';
-import { resolveIssueIdSync } from '../../lib/issue-id.js';
+import { resolveIssueId } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { createItemWorktree } from '../../lib/workspaces/item-worktree.js';
@@ -71,7 +71,7 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
     return exitCli(1);
   }
 
-  const issueId = resolveIssueIdSync(options.issue);
+  const issueId = resolveIssueId(options.issue);
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved?.projectPath) {
     console.error(chalk.red(`Could not resolve a registered project for ${issueId}.`));

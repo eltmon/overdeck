@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -19,7 +19,7 @@ export async function verifyMergedBeforeLifecycle(
   // for "is this PR merged." Non-GitHub projects still require manual confirmation.
   const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
 
-  const ghResolved = resolveGitHubIssueSync(issueId);
+  const ghResolved = resolveGitHubIssue(issueId);
   if (!ghResolved.isGitHub) {
     return { merged: false, reason: `Non-GitHub project for ${issueId}; merge state cannot be auto-verified` };
   }

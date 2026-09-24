@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentRuntimeStateSync: vi.fn(),
-  getLatestSessionIdSync: vi.fn(),
+  getLatestSessionId: vi.fn(),
   hasCompletionMarkerForAgent: vi.fn(),
   claudeSessionTranscriptExists: vi.fn(),
   getPrFacts: vi.fn(),
@@ -11,9 +11,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentStateSync: mocks.getAgentStateSync,
+  getAgentState: mocks.getAgentState,
   getAgentRuntimeStateSync: mocks.getAgentRuntimeStateSync,
-  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
+  getLatestSessionId: mocks.getLatestSessionId,
   getAgentRuntimeState: vi.fn(),
   normalizeAgentId: (id: string) => id,
 }));
@@ -61,7 +61,7 @@ describe('issueOwesRework', () => {
 describe('getWorkAgentLifecycleStateSync after handoff (PAN-3334)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-3846',
       issueId: 'PAN-3846',
       workspace: '/tmp',
@@ -70,7 +70,7 @@ describe('getWorkAgentLifecycleStateSync after handoff (PAN-3334)', () => {
       status: 'stopped',
     });
     mocks.getAgentRuntimeStateSync.mockReturnValue(null);
-    mocks.getLatestSessionIdSync.mockReturnValue('session-3846');
+    mocks.getLatestSessionId.mockReturnValue('session-3846');
     mocks.sessionExistsSync.mockReturnValue(false);
     mocks.claudeSessionTranscriptExists.mockReturnValue(true);
     mocks.hasCompletionMarkerForAgent.mockReturnValue(true);

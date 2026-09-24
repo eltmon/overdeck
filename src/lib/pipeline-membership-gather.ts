@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 
 import type { ForgeType } from './forge.js';
 import {
-  listIssuesWithAnyLabelPromise,
+  listIssuesWithAnyLabel,
   listOpenIssuesWithLabels,
 } from './github-app.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
@@ -18,8 +18,8 @@ import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
 import type { IssueLensSignals } from './pipeline-membership.js';
 import { getIssuePrefix, type ProjectConfig } from './projects.js';
-import { getRepoForge, inferProjectForgeSync } from './project-repos.js';
-import { parseIssueIdFromTextSync } from './resource-utils.js';
+import { getRepoForge, inferProjectForge } from './project-repos.js';
+import { parseIssueIdFromText } from './resource-utils.js';
 import { createTracker } from './tracker/factory.js';
 import type { Issue, TrackerType } from './tracker/interface.js';
 
@@ -288,7 +288,7 @@ export interface PipelineMembershipGatherDeps {
 
 const defaultDeps: PipelineMembershipGatherDeps = {
   listOpenIssues: listOpenIssuesWithLabels,
-  listPhaseLabeledIssues: (owner, repo) => listIssuesWithAnyLabelPromise(owner, repo, STALE_PIPELINE_LABELS),
+  listPhaseLabeledIssues: (owner, repo) => listIssuesWithAnyLabel(owner, repo, STALE_PIPELINE_LABELS),
   listOpenPullRequests: listOpenPullRequestsSnapshot,
   listOpenMergeRequests: listOpenGitLabMergeRequests,
   listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
@@ -316,7 +316,7 @@ function issueNumber(issueId: string): number {
 
 function issueIdFromRef(ref: string, issuePrefix: string): string | null {
   if (!/(?:^|\/)(?:feature|strike)\//.test(ref)) return null;
-  const issueId = parseIssueIdFromTextSync(ref);
+  const issueId = parseIssueIdFromText(ref);
   return issueId?.startsWith(`${issuePrefix}-`) ? issueId : null;
 }
 
@@ -345,7 +345,7 @@ export function projectRepositories(project: ProjectConfig): ProjectRepository[]
     return [{
       path: project.path,
       defaultBranch: project.workspace?.default_branch ?? 'main',
-      forge: inferProjectForgeSync(project) || 'github',
+      forge: inferProjectForge(project) || 'github',
     }];
   }
 

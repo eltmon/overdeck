@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DerivedIssueState } from '@overdeck/contracts';
 
-vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTtsSync: vi.fn() }));
+vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
 // W5 owns these; they still reach the record plane in this tree, so the route
 // test stubs them rather than loading half of cloister.
 vi.mock('../../../../lib/cloister/merge-eligibility.js', () => ({
@@ -27,7 +27,7 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', () => ({
   listProblemAutoMerges: vi.fn(() => []),
   scheduleAutoMergeWithResult: vi.fn(() => ({ created: true, entry: {} })),
   isMergeTrainEnabledForProject: vi.fn(() => true),
-  getUatGenerationSync: vi.fn(() => null),
+  getUatGeneration: vi.fn(() => null),
 }));
 vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
   isFlywheelAutoPickupBacklog: vi.fn(() => false),

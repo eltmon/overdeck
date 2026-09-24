@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 const mocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentRuntimeStateSync: vi.fn(),
   deliverAgentMessage: vi.fn(),
   sessionExists: vi.fn(),
@@ -12,9 +12,9 @@ const mocks = vi.hoisted(() => ({
   getCodexAppServerStatus: vi.fn(),
   findAgentRuntimePidInSubtree: vi.fn(),
   appendOperatorInterventionEvent: vi.fn(),
-  logAgentLifecycleSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
   resumeAgent: vi.fn(),
-  getLatestSessionIdSync: vi.fn(),
+  getLatestSessionId: vi.fn(),
   hasAgentRuntimeInSubtree: vi.fn(),
   getConversationByName: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
   decideResumeGate: (block: { reason?: string } | undefined) => block
     ? { decision: 'block', reason: block.reason }
     : { decision: 'proceed', clearStoppedByUser: false },
-  getAgentStateSync: mocks.getAgentStateSync,
+  getAgentState: mocks.getAgentState,
   markAgentRunning: vi.fn(),
   saveAgentStateSync: vi.fn(),
 }));
@@ -97,7 +97,7 @@ vi.mock('../../../../src/lib/overdeck/conversations.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/activity.js', () => ({
-  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
+  getLatestSessionId: mocks.getLatestSessionId,
 }));
 
 vi.mock('../../../../src/lib/agents/supervisor-channels.js', () => ({
@@ -111,21 +111,21 @@ vi.mock('../../../../src/lib/operator-interventions.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
-  logAgentLifecycleSync: mocks.logAgentLifecycleSync,
+  logAgentLifecycle: mocks.logAgentLifecycle,
 }));
 
 vi.mock('../../../../src/lib/providers.js', () => ({
-  clearCredentialFileAuthSync: vi.fn(),
-  getProviderForModelSync: vi.fn(),
-  setupCredentialFileAuthSync: vi.fn(),
+  clearCredentialFileAuth: vi.fn(),
+  getProviderForModel: vi.fn(),
+  setupCredentialFileAuth: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/launcher-generator.js', () => ({
-  generateLauncherScriptSync: vi.fn(),
+  generateLauncherScript: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/child-env.js', () => ({
@@ -160,7 +160,7 @@ describe('messageAgent', () => {
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
     mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
-    mocks.getLatestSessionIdSync.mockImplementation((agentId, options) =>
+    mocks.getLatestSessionId.mockImplementation((agentId, options) =>
       options?.getAgentState?.(agentId)?.sessionId);
     mocks.captureTranscriptUserRecordSnapshot.mockResolvedValue({
       sessionFile: '/tmp/session.jsonl',
@@ -184,7 +184,7 @@ describe('messageAgent', () => {
   });
 
   it('delivers to a troubled agent when its tmux session is live', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2262',
       issueId: 'PAN-2262',
       status: 'running',
@@ -208,14 +208,14 @@ describe('messageAgent', () => {
       'messageAgent:pan-tell',
       undefined,
     );
-    expect(mocks.logAgentLifecycleSync).not.toHaveBeenCalledWith(
+    expect(mocks.logAgentLifecycle).not.toHaveBeenCalledWith(
       'agent-pan-2262',
       expect.stringContaining('queued mail without resume'),
     );
   });
 
   it('fails loudly for a Claude Code agent with no identifiable transcript (PR #3870 finding 2)', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2262',
       issueId: 'PAN-2262',
       status: 'running',
@@ -223,7 +223,7 @@ describe('messageAgent', () => {
       harness: 'claude-code',
       // no sessionId, and none recorded in activity
     });
-    mocks.getLatestSessionIdSync.mockReturnValue(undefined);
+    mocks.getLatestSessionId.mockReturnValue(undefined);
 
     const outcome = await messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
 
@@ -232,14 +232,14 @@ describe('messageAgent', () => {
     expect(outcome.reason).toContain('no Claude transcript identifiable');
     // Nothing was injected — the composer path must not claim an unconfirmed success.
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
-    expect(mocks.logAgentLifecycleSync).toHaveBeenCalledWith(
+    expect(mocks.logAgentLifecycle).toHaveBeenCalledWith(
       'agent-pan-2262',
       expect.stringContaining('messageAgent NOT confirmed'),
     );
   });
 
   it('fails loudly for a Claude Code agent with no workspace on record', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2262',
       issueId: 'PAN-2262',
       status: 'running',
@@ -255,7 +255,7 @@ describe('messageAgent', () => {
   });
 
   it('keeps the composer-level contract for a Claude conversation without agent state', async () => {
-    mocks.getAgentStateSync.mockReturnValue(undefined);
+    mocks.getAgentState.mockReturnValue(undefined);
     mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
 
     const outcome = await messageAgent('conv-20260716-1234', 'operator message', 'pan-tell');
@@ -270,7 +270,7 @@ describe('messageAgent', () => {
   });
 
   it('delivers keyed Claude feedback without transcript confirmation (the dedup door owns the receipt)', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2262',
       issueId: 'PAN-2262',
       status: 'running',
@@ -305,7 +305,7 @@ describe('messageAgent', () => {
   });
 
   it('reports paused-agent mail as undelivered with the gate reason', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2262',
       issueId: 'PAN-2262',
       status: 'stopped',
@@ -322,7 +322,7 @@ describe('messageAgent', () => {
   });
 
   it('reports a failed stopped-agent resume without rotating the session', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2262',
       issueId: 'PAN-2262',
       status: 'stopped',
@@ -339,7 +339,7 @@ describe('messageAgent', () => {
   });
 
   it('queues a message instead of pasting into a mid-turn codex agent', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2701',
       issueId: 'PAN-2701',
       status: 'running',
@@ -360,7 +360,7 @@ describe('messageAgent', () => {
   });
 
   it('marks direct codex delivery as backup mail rather than pending mail', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2701',
       issueId: 'PAN-2701',
       status: 'running',
@@ -383,7 +383,7 @@ describe('messageAgent', () => {
   });
 
   it('queues a second codex message until the current turn completes', async () => {
-    mocks.getAgentStateSync.mockReturnValue({
+    mocks.getAgentState.mockReturnValue({
       id: 'agent-pan-2701',
       issueId: 'PAN-2701',
       status: 'running',
@@ -406,7 +406,7 @@ describe('messageAgent', () => {
   });
 
   it('detects a codex conversation through app-server without agent state', async () => {
-    mocks.getAgentStateSync.mockReturnValue(undefined);
+    mocks.getAgentState.mockReturnValue(undefined);
     mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'ready' });
     mocks.sessionExists.mockReturnValue(Effect.succeed(false));
     mkdirSync('/tmp/conv-20260716-1234', { recursive: true });
@@ -436,7 +436,7 @@ describe('messageAgent', () => {
     }
 
     it('resolves an opencode conversation harness from the conversation row', async () => {
-      mocks.getAgentStateSync.mockReturnValue(undefined);
+      mocks.getAgentState.mockReturnValue(undefined);
       mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1267', harness: 'opencode' });
       mockLiveConvPane();
       mocks.findAgentRuntimePidInSubtree.mockResolvedValue(4242);
@@ -457,7 +457,7 @@ describe('messageAgent', () => {
     });
 
     it('skips the zombie resume for an opencode conversation and hands off to delivery', async () => {
-      mocks.getAgentStateSync.mockReturnValue(undefined);
+      mocks.getAgentState.mockReturnValue(undefined);
       mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1267', harness: 'opencode' });
       mockLiveConvPane();
       mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
@@ -475,7 +475,7 @@ describe('messageAgent', () => {
     });
 
     it('skips the zombie resume for a codex conversation (PAN-2546/PAN-2580 class)', async () => {
-      mocks.getAgentStateSync.mockReturnValue(undefined);
+      mocks.getAgentState.mockReturnValue(undefined);
       mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1300', harness: 'codex' });
       mockLiveConvPane();
       mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
@@ -493,7 +493,7 @@ describe('messageAgent', () => {
     });
 
     it('still resumes a claude-code agent whose runtime exited', async () => {
-      mocks.getAgentStateSync.mockReturnValue({
+      mocks.getAgentState.mockReturnValue({
         id: 'agent-pan-2262',
         issueId: 'PAN-2262',
         status: 'running',
@@ -514,7 +514,7 @@ describe('messageAgent', () => {
     });
 
     it('fails loudly for a dead claude-code conversation without calling resume', async () => {
-      mocks.getAgentStateSync.mockReturnValue(undefined);
+      mocks.getAgentState.mockReturnValue(undefined);
       mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1400', harness: 'claude-code' });
       mockLiveConvPane();
       mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
@@ -529,7 +529,7 @@ describe('messageAgent', () => {
   describe('confirmed turn for running Claude Code agents (PAN-3846)', () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      mocks.getAgentStateSync.mockReturnValue({
+      mocks.getAgentState.mockReturnValue({
         id: 'agent-pan-2262',
         issueId: 'PAN-2262',
         status: 'running',
@@ -562,7 +562,7 @@ describe('messageAgent', () => {
         undefined,
       );
       expect(mocks.probeTranscriptSince).toHaveBeenCalledTimes(2);
-      expect(mocks.logAgentLifecycleSync).toHaveBeenCalledWith(
+      expect(mocks.logAgentLifecycle).toHaveBeenCalledWith(
         'agent-pan-2262',
         expect.stringContaining('messageAgent confirmed turn in session-2262'),
       );
@@ -581,7 +581,7 @@ describe('messageAgent', () => {
       expect(outcome.reason).toContain('no turn appeared in transcript session-2262');
       // Two attempts of the confirming primitive, each with its own window.
       expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(2);
-      expect(mocks.logAgentLifecycleSync).toHaveBeenCalledWith(
+      expect(mocks.logAgentLifecycle).toHaveBeenCalledWith(
         'agent-pan-2262',
         expect.stringContaining('messageAgent NOT confirmed'),
       );

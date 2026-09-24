@@ -15,7 +15,7 @@
  * being announced — a restart from hours ago is history, not news.
  */
 import {
-  emitActivityEntrySync,
+  emitActivityEntry,
   type EmitActivityOptions,
 } from '../../../lib/activity-logger.js';
 import { readRestartStatus, writeRestartStatus, type RestartStatus } from '../../../lib/restart-status.js';
@@ -180,7 +180,7 @@ export async function announceNewRestart(deps: RestartAnnouncerDeps = {}): Promi
     ?? ((status: RestartStatus) => writeRestartStatus(status));
   const readSupervisorUnitFailed = deps.readSupervisorUnitFailed
     ?? (() => isSupervisorUnitFailed());
-  const emit = deps.emit ?? emitActivityEntrySync;
+  const emit = deps.emit ?? emitActivityEntry;
   const getLastAnnounced = deps.getLastAnnounced
     ?? (() => getSetting(RESTART_ANNOUNCER_LAST_TS_KEY));
   const setLastAnnounced = deps.setLastAnnounced

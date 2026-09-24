@@ -84,7 +84,7 @@ export async function createPiFifo(agentId: string, home?: string): Promise<stri
  *
  * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function destroyPiFifoSync(agentId: string, home?: string): void {
+export function destroyPiFifo(agentId: string, home?: string): void {
   const paths = piFifoPaths(agentId, home)
   try {
     unlinkSync(paths.fifoPath)
@@ -108,7 +108,7 @@ export function destroyPiFifoSync(agentId: string, home?: string): void {
  * The command is JSON-stringified and a single trailing newline is added so
  * Pi's JSONL parser sees one record per line.
  */
-export function writePiCommandSync(agentId: string, command: unknown, home?: string): void {
+export function writePiCommand(agentId: string, command: unknown, home?: string): void {
   const paths = piFifoPaths(agentId, home)
   if (!existsSync(paths.readyPath)) {
     throw new PiNotReady(

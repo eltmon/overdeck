@@ -29,7 +29,7 @@ import { basename, join } from 'path';
 import { stepOk, stepSkipped, stepFailed } from '../lifecycle/types.js';
 import type { StepResult } from '../lifecycle/types.js';
 import {
-  renderDevcontainerSync,
+  renderDevcontainer,
   type DevcontainerRenderResult,
 } from './devcontainer-renderer.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
@@ -60,7 +60,7 @@ export interface EnsureDevcontainerResult {
  * callers want to keep going (e.g. `pan workspace up`) and surface the error
  * in the dashboard rather than crash the whole flow.
  */
-export function ensureDevcontainerSync(
+export function ensureDevcontainer(
   input: EnsureDevcontainerInput,
 ): EnsureDevcontainerResult {
   const stepName = 'ensure:devcontainer';
@@ -109,7 +109,7 @@ export function ensureDevcontainerSync(
   const featureName = isUatBatch ? workspaceLeaf.slice('uat-'.length) : workspaceLeaf.replace(/^feature-/, '');
 
   try {
-    const renderDetail = renderDevcontainerSync({
+    const renderDetail = renderDevcontainer({
       workspacePath: input.workspacePath,
       projectConfig,
       featureName,

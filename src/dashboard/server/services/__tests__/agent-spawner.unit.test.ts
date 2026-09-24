@@ -25,7 +25,7 @@ const mockSpawnAgent = vi.fn();
 const mockStopAgent = vi.fn();
 const mockMessageAgent = vi.fn();
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: mockGetAgentState,
+  getAgentState: mockGetAgentState,
   getAgentStateProgram: mockGetAgentState,
   spawnAgent: mockSpawnAgent,
   stopAgent: mockStopAgent,
@@ -59,11 +59,10 @@ vi.mock('../../../../lib/xbrief/io.js', () => ({
 
 const mockResolveProjectFromIssue = vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' });
 vi.mock('../../../../lib/projects.js', () => ({
-  findProjectByPathSync: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
+  findProjectByPath: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
   listProjectsSync: vi.fn(() => [{ key: 'myapp', config: { path: '/projects/myapp', name: 'myapp' } }]),
   resolveProjectFromIssue: mockResolveProjectFromIssue,
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
-  findProjectByPathSync: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
 }));
 
 vi.mock('../../../../lib/xbrief/io.js', () => ({

@@ -15,7 +15,7 @@
  */
 import { Effect } from 'effect'
 
-import { scanPendingInputsPromise, type PendingInputsScan } from './agent-enrichment.js'
+import { scanPendingInputs, type PendingInputsScan } from './agent-enrichment.js'
 import { resolvePiSessionPath } from './agents/transcript-resolver.js'
 import { capturePane, sendRawKeystroke, sessionExists, tmuxExecAsync, exactPaneTarget } from './tmux.js'
 import { randomUUID } from 'node:crypto'
@@ -110,7 +110,7 @@ export async function answerPiAskModal(
     }
 
     const resolveTranscript = deps.resolveTranscript ?? ((name: string) => resolvePiSessionPath(name))
-    const scanTranscript = deps.scanTranscript ?? scanPendingInputsPromise
+    const scanTranscript = deps.scanTranscript ?? scanPendingInputs
     const transcript = await resolveTranscript(sessionName)
     const scan = transcript ? await scanTranscript(transcript) : null
     const pending = scan?.askUserQuestions.find((q) => q.toolId === toolUseId)

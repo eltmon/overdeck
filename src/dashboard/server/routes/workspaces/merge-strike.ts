@@ -6,10 +6,10 @@ import { Effect } from 'effect';
 import { messageAgent, spawnAgent } from '../../../../lib/agents.js';
 import { isAlive } from '../../../../lib/agents/liveness.js';
 import {
-  clearYieldForResumeSync,
+  clearYieldForResume,
   decideResumeGate,
   getAgentResumeGateBlockReason,
-  getAgentStateSync,
+  getAgentState,
   saveAgentStateSync,
 } from '../../../../lib/agents/agent-state.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
@@ -284,14 +284,14 @@ export async function validateStrikeMergeRequest(
  * was cleared so the operator sees why the agent came back.
  */
 async function clearMergePreparationGate(agentId: string): Promise<string | null> {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (!state) return null;
   const decision = decideResumeGate(getAgentResumeGateBlockReason(state), 'merge-preparation');
   if (decision.decision === 'block') throw new Error(decision.reason);
   if (decision.decision !== 'proceed') return null;
 
   if (decision.clearYield) {
-    clearYieldForResumeSync(agentId);
+    clearYieldForResume(agentId);
     return `cleared scheduler yield (${state.pausedReason ?? 'yielded'})`;
   }
   if (decision.clearStoppedByUser) {
@@ -320,7 +320,7 @@ export async function ensureAgentReadyForMerge(issueId: string, workspacePath: s
     assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));
     return { recovered: true, agentId, detail: `Work agent already running; sent merge preparation request${gateSuffix}.` };
   }
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (agentState) try {
     assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));
     const updatedLifecycle = getWorkAgentLifecycleStateSync(agentId);

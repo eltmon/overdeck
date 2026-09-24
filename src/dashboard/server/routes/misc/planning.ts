@@ -6,17 +6,17 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { ensureSessionContextBriefingFile } from '../../../../lib/briefing-freshness.js';
-import { getClaudePermissionFlagsStringSync } from '../../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsString } from '../../../../lib/claude-permissions.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../../../../lib/config-yaml.js';
 import { workspaceContextFile } from '../../../../lib/context-layers/layers.js';
-import { extractPrefixSync } from '../../../../lib/issue-id.js';
+import { extractPrefix } from '../../../../lib/issue-id.js';
 import { prepareHarnessLaunch } from '../../../../lib/harness-binary.js';
-import { generateLauncherScriptSync } from '../../../../lib/launcher-generator.js';
+import { generateLauncherScript } from '../../../../lib/launcher-generator.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
-import { extractTeamPrefix, findProjectByTeamSync } from '../../../../lib/projects.js';
+import { extractTeamPrefix, findProjectByTeam } from '../../../../lib/projects.js';
 import { loadRemoteAgentState } from '../../../../lib/remote/remote-agents.js';
-import { getAgentStateSync, saveAgentStateSync } from '../../../../lib/agents/agent-state.js';
+import { getAgentState, saveAgentStateSync } from '../../../../lib/agents/agent-state.js';
 import { deliverAgentMessage } from '../../../../lib/agents/delivery.js';
 import { isAlive, isConfirmedDead } from '../../../../lib/agents/liveness.js';
 import { closeAgentPane, closeAgentPaneDetailed, launchAgentPane } from '../../../../lib/terminal-backends/launch.js';
@@ -57,7 +57,7 @@ const checkPlanStatus = (
 export const PLANNER_LAUNCH_GRACE_MS = 60_000;
 
 function plannerIsLaunching(sessionName: string, now = Date.now()): boolean {
-  const state = getAgentStateSync(sessionName);
+  const state = getAgentState(sessionName);
   if (!state || (state.status !== 'starting' && state.status !== 'running')) return false;
   const startedAtMs = Date.parse(state.startedAt);
   return Number.isFinite(startedAtMs) && now - startedAtMs < PLANNER_LAUNCH_GRACE_MS;
@@ -87,7 +87,7 @@ const getPlanningStatusRoute = HttpRouter.add(
     const issueId = parts[3] || '';
     const sessionName = `planning-${issueId.toLowerCase()}`;
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
       try {
@@ -196,7 +196,7 @@ const postPlanningMessageRoute = HttpRouter.add(
         }
         if (!projectPath) {
           const teamPrefix = extractTeamPrefix(issueId);
-          const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+          const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
           projectPath = projectConfig?.path || '';
         }
 
@@ -310,13 +310,13 @@ Continue the PLANNING session. Do NOT implement anything.
           await rename(outputFile, backupPath);
         }
 
-        const { getAgentCommandSync } = await import('../../../../lib/settings.js');
+        const { getAgentCommand } = await import('../../../../lib/settings.js');
         let msgPlanningModel = 'claude-sonnet-5';
         try {
           msgPlanningModel = resolveModel('plan', undefined, loadYamlConfig().config);
         } catch { /* fall back to default */ }
-        const msgAgentCmd = getAgentCommandSync(msgPlanningModel);
-        const msgPermissionFlags = getClaudePermissionFlagsStringSync();
+        const msgAgentCmd = getAgentCommand(msgPlanningModel);
+        const msgPermissionFlags = getClaudePermissionFlagsString();
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0
             ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} ${msgPermissionFlags}`
@@ -328,7 +328,7 @@ Continue the PLANNING session. Do NOT implement anything.
 
         await writeFile(
           launcherScript,
-          generateLauncherScriptSync({
+          generateLauncherScript({
             role: 'plan',
             workingDir: agentCwd,
             baseCommand: msgCmdWithArgs,
@@ -346,7 +346,7 @@ Continue the PLANNING session. Do NOT implement anything.
         // launching another (review of #4018, L3).
         const launchStartedAt = new Date().toISOString();
         saveAgentStateSync({
-          ...(getAgentStateSync(sessionName)
+          ...(getAgentState(sessionName)
             ?? { id: sessionName, issueId, workspace: agentCwd, role: 'plan' as const }),
           status: 'starting',
           harness: 'claude-code',
@@ -380,14 +380,14 @@ Continue the PLANNING session. Do NOT implement anything.
           },
         }).catch((error: unknown) => {
           // A launch that failed is not a planner starting: drop the grace window.
-          const failedState = getAgentStateSync(sessionName);
+          const failedState = getAgentState(sessionName);
           if (failedState) saveAgentStateSync({ ...failedState, status: 'error' });
           throw error;
         });
 
         // The pane is up: record where it landed. `startedAt` stays the launch
         // time, so the grace window still covers the harness starting in it.
-        const launchedState = getAgentStateSync(sessionName);
+        const launchedState = getAgentState(sessionName);
         if (launchedState) {
           saveAgentStateSync({ ...launchedState, status: 'running', backend: pane.backend, paneId: pane.paneId });
         }

@@ -9,7 +9,7 @@ import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { Effect } from 'effect';
 import type { MemoryIdentity } from '@overdeck/contracts';
-import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
@@ -17,18 +17,18 @@ import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { initCodexHome } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
-import { piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
+import { piFifoPaths, PiNotReady, writePiCommand } from '../runtimes/pi-fifo.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { requireModelOverrideSync, shellQuoteModelIdSync } from '../model-validation.js';
+import { requireModelOverride, shellQuoteModelId } from '../model-validation.js';
 import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath } from '../paths.js';
-import { getProviderForModelSync, resolveKimiCodeModelAlias } from '../providers.js';
+import { getProviderForModel, resolveKimiCodeModelAlias } from '../providers.js';
 import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
-import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
+import { getAgentDir, getAgentState, type Role } from './agent-state.js';
 import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
-import { getClaudeCodeLaunchModelSync } from '../kimi-claude-routing.js';
+import { getClaudeCodeLaunchModel } from '../kimi-claude-routing.js';
 import { codexSessionsRoot } from '../runtimes/storage/codex.js';
 
 const execAsync = promisify(exec);
@@ -42,7 +42,7 @@ export interface RoleMcpServerDef {
 }
 
 /** Parse and flatten a role definition's mcpServers frontmatter. */
-export function parseRoleMcpServersSync(definitionPath: string): Record<string, RoleMcpServerDef> {
+export function parseRoleMcpServers(definitionPath: string): Record<string, RoleMcpServerDef> {
   const abs = resolve(definitionPath);
   if (!existsSync(abs)) return {};
 
@@ -137,7 +137,7 @@ export function getAcpLauncherFields(
   return {
     harness: model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp',
     acpAgentId: agentId,
-    acpProvider: getProviderForModelSync(model).name,
+    acpProvider: getProviderForModel(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
     acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp'),
@@ -193,7 +193,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
-    mcpServers: role ? parseRoleMcpServersSync(roleAgentDefinitionPath(role)) : undefined,
+    mcpServers: role ? parseRoleMcpServers(roleAgentDefinitionPath(role)) : undefined,
   });
   return {
     harness: 'codex',
@@ -540,7 +540,7 @@ export function inferMemoryProjectId(workspacePath: string): string {
 async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promise<string> {
   if (!prompt.trim()) return prompt;
 
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!agentState || !agentState.workspace || !agentState.issueId) {
     return prompt;
   }
@@ -616,7 +616,7 @@ export async function writePiAgentPrompt(agentId: string, prompt: string, timeou
   try {
     // steer: Pi delivers immediately when idle and queues mid-turn; a bare
     // prompt is rejected with AgentBusyError while a run is active.
-    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt, streamingBehavior: 'steer' });
+    writePiCommand(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt, streamingBehavior: 'steer' });
   } catch (err) {
     if (err instanceof PiNotReady) {
       throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
@@ -644,7 +644,7 @@ export async function writeOhmypiAgentPrompt(agentId: string, prompt: string, ti
 }
 
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
-  const provider = getProviderForModelSync(model);
+  const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') {
     const authStatus = await Effect.runPromise(getClaudeAuthStatus());
     if (authStatus.hasAnthropicApiKey) return 'api-key';
@@ -685,8 +685,8 @@ export async function getAgentRuntimeBaseCommand(
   harness: RuntimeName = 'claude-code',
   effort?: RoleEffort,
 ): Promise<string> {
-  const validatedModel = requireModelOverrideSync(model);
-  const quotedModel = shellQuoteModelIdSync(harness === 'claude-code' ? getClaudeCodeLaunchModelSync(validatedModel) : validatedModel);
+  const validatedModel = requireModelOverride(model);
+  const quotedModel = shellQuoteModelId(harness === 'claude-code' ? getClaudeCodeLaunchModel(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return `omp --mode rpc --model ${quotedModel}`;
@@ -712,7 +712,7 @@ export async function getAgentRuntimeBaseCommand(
     return process.env.OVERDECK_TEST_HARNESS_COMMAND;
   }
 
-  const provider = getProviderForModelSync(validatedModel);
+  const provider = getProviderForModel(validatedModel);
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
@@ -734,7 +734,7 @@ export async function getAgentRuntimeBaseCommand(
     const effortFlag = effort ? ` --effort ${effort}` : '';
     if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
       const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-      return `claude${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+      return `claude${agentFlag} --model ${shellQuoteModelId(resolvedModel)}${effortFlag}${nameFlag}`;
     }
     return `claude${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
   }
@@ -743,8 +743,8 @@ export async function getAgentRuntimeBaseCommand(
   // comes from the global permission flags; the role's hooks fire globally via
   // ~/.claude/settings.json. roleInject folds in effort when a role file is
   // present; otherwise --effort is passed directly.
-  const permissionFlags = getClaudePermissionFlagsStringSync();
-  const roleInject = defIsRoleFile ? roleSystemPromptInjectionSync(agentDefinition as string, effort) : '';
+  const permissionFlags = getClaudePermissionFlagsString();
+  const roleInject = defIsRoleFile ? roleSystemPromptInjection(agentDefinition as string, effort) : '';
   const effortFlag = (!defIsRoleFile && effort) ? ` --effort ${effort}` : '';
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
@@ -754,7 +754,7 @@ export async function getAgentRuntimeBaseCommand(
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    return `claude ${permissionFlags}${roleInject} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude ${permissionFlags}${roleInject} --model ${shellQuoteModelId(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
   return `claude ${permissionFlags}${roleInject} --model ${quotedModel}${effortFlag}${nameFlag}`;
@@ -814,7 +814,7 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
  * Returns the flags (with a leading space) to splice in place of the old
  * `--agent <file>` flag, or '' when the definition file is missing.
  */
-export function roleSystemPromptInjectionSync(definitionPath: string, explicitEffort?: RoleEffort): string {
+export function roleSystemPromptInjection(definitionPath: string, explicitEffort?: RoleEffort): string {
   const abs = resolve(definitionPath);
   if (!existsSync(abs)) return '';
   const raw = readFileSync(abs, 'utf8');
@@ -846,7 +846,7 @@ export function roleSystemPromptInjectionSync(definitionPath: string, explicitEf
   // into one { mcpServers: { name: def } } config loaded via --mcp-config. It is
   // additive (the launcher's channels --mcp-config still applies; no
   // --strict-mcp-config), so the role keeps any project/global MCP servers too.
-  const servers = parseRoleMcpServersSync(definitionPath);
+  const servers = parseRoleMcpServers(definitionPath);
   const mcpNames = Object.keys(servers);
   if (mcpNames.length > 0) {
     const mcpPath = join(dir, `${stem}.mcp.json`);
@@ -877,11 +877,11 @@ export async function getRoleRuntimeBaseCommand(
   subRole?: string,
   effort?: RoleEffort,
 ): Promise<string> {
-  const validatedModel = requireModelOverrideSync(model);
-  const quotedModel = shellQuoteModelIdSync(harness === 'claude-code' ? getClaudeCodeLaunchModelSync(validatedModel) : validatedModel);
+  const validatedModel = requireModelOverride(model);
+  const quotedModel = shellQuoteModelId(harness === 'claude-code' ? getClaudeCodeLaunchModel(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
-    const mcpNames = Object.keys(parseRoleMcpServersSync(roleAgentDefinitionPath(role)));
+    const mcpNames = Object.keys(parseRoleMcpServers(roleAgentDefinitionPath(role)));
     if (mcpNames.length > 0) {
       console.warn(`[spawn] role '${role}' declares MCP servers (${mcpNames.join(', ')}) but harness 'ohmypi' does not provision MCP — those tools will be unavailable`);
     }
@@ -906,7 +906,7 @@ export async function getRoleRuntimeBaseCommand(
     return process.env.OVERDECK_TEST_HARNESS_COMMAND;
   }
 
-  const provider = getProviderForModelSync(validatedModel);
+  const provider = getProviderForModel(validatedModel);
   const requestedDefinitionPath = roleAgentDefinitionPath(role, subRole);
   const definitionPath = requestedDefinitionPath && existsSync(resolve(requestedDefinitionPath))
     ? requestedDefinitionPath
@@ -919,7 +919,7 @@ export async function getRoleRuntimeBaseCommand(
   }
   // PAN-2087: inject the role body (+ effort frontmatter) as an appended system
   // prompt instead of `--agent <file>` (Claude Code dropped --agent file support).
-  const roleInject = definitionPath ? roleSystemPromptInjectionSync(definitionPath, effort) : '';
+  const roleInject = definitionPath ? roleSystemPromptInjection(definitionPath, effort) : '';
   const nameFlag = ` --name ${agentName}`;
   // PAN-3077: never omit --effort on definition-less runs (review sub-roles,
   // standing supervisor). Omission hands the choice to the harness default —
@@ -930,7 +930,7 @@ export async function getRoleRuntimeBaseCommand(
   // permissionMode now comes from the global permission flags for EVERY role
   // (the old --agent path relied on role frontmatter, which Claude Code no longer
   // applies). This honors the user's bypass/auto setting uniformly.
-  const permissionFlags = ` ${getClaudePermissionFlagsStringSync()}`;
+  const permissionFlags = ` ${getClaudePermissionFlagsString()}`;
 
   // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions
   // (prompt delivered via tmux, completion signalled by the Stop-hook) instead
@@ -939,7 +939,7 @@ export async function getRoleRuntimeBaseCommand(
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    return `claude${printFlag}${roleInject}${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude${printFlag}${roleInject}${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
   return `claude${printFlag}${roleInject}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;

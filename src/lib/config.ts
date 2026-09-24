@@ -357,7 +357,7 @@ export function loadConfigSync(): OverdeckConfig {
   return config;
 }
 
-export function saveConfigSync(config: OverdeckConfig): void {
+export function saveConfig(config: OverdeckConfig): void {
   const content = stringify(config as any);
   writeFileSync(CONFIG_FILE, content, 'utf8');
 }
@@ -397,7 +397,7 @@ export async function loadConfig(): Promise<OverdeckConfig> {
   return config;
 }
 
-export function getDefaultConfigSync(): OverdeckConfig {
+export function getDefaultConfig(): OverdeckConfig {
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
 
@@ -413,7 +413,7 @@ export function getDefaultConfigSync(): OverdeckConfig {
  * runtime already standardized on OVERDECK_DASHBOARD_URL (agent-runtime.ts,
  * cli/commands/merge.ts, flywheel.ts); this resolver now matches them.
  */
-export function getDashboardApiUrlSync(): string {
+export function getDashboardApiUrl(): string {
   const internal = process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL;
   if (internal) return internal;
   const config = loadConfigSync();
@@ -429,7 +429,7 @@ export function getDashboardApiUrlSync(): string {
  * rejects the local TLS cert and every CLI call back to the server fails
  * with a bare "fetch failed" (PAN-3331).
  */
-export function getDashboardLoopbackApiUrlSync(): string {
+export function getDashboardLoopbackApiUrl(): string {
   const envPort = Number(process.env.API_PORT || process.env.PORT);
   const config = loadConfigSync();
   const port = (Number.isFinite(envPort) && envPort > 0 ? envPort : 0)
@@ -442,7 +442,7 @@ export function getDashboardLoopbackApiUrlSync(): string {
  * Returns null if devroot is disabled (set to null or empty string).
  * Resolves ~ to home directory and validates the directory exists.
  */
-export function getDevrootPathSync(): string | null {
+export function getDevrootPath(): string | null {
   const config = loadConfigSync();
   const devroot = config.sync?.devroot;
 

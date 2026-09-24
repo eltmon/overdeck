@@ -52,7 +52,6 @@ vi.mock('child_process', () => {
 const mockAppend = vi.fn();
 vi.mock('../../../src/lib/git-activity.js', () => ({
   appendGitOperation: (...args: unknown[]) => mockAppend(...args),
-  appendGitOperationSync: (...args: unknown[]) => mockAppend(...args),
 }));
 
 // ── Import module under test (after mocks) ────────────────────────────────────

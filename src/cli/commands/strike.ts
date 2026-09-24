@@ -12,14 +12,14 @@ import { Effect } from 'effect';
 import { getAgentRuntimeState, spawnAgent, stopAgent } from '../../lib/agents.js';
 import { ACTIVITY_STALLED_MS } from '../../lib/agents/health.js';
 import type { ForgeType } from '../../lib/forge.js';
-import { forgeFromRemoteUrlSync, getRepoTargetBranch, inferProjectForgeSync } from '../../lib/project-repos.js';
+import { forgeFromRemoteUrl, getRepoTargetBranch, inferProjectForge } from '../../lib/project-repos.js';
 import {
   getProjectSync,
   resolveProjectFromIssueSync,
   type ProjectConfig,
   type ResolvedProject,
 } from '../../lib/projects.js';
-import { resolveGitHubIssueSync, type IssueResolution } from '../../lib/tracker-utils.js';
+import { resolveGitHubIssue, type IssueResolution } from '../../lib/tracker-utils.js';
 import { isHarnessProcessAlive, sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 
@@ -68,7 +68,7 @@ interface PlanStrikeDeps {
 const defaultPlanStrikeDeps: PlanStrikeDeps = {
   resolveProject: (issueId) => resolveProjectFromIssueSync(issueId),
   getProject: getProjectSync,
-  resolveGitHubIssue: resolveGitHubIssueSync,
+  resolveGitHubIssue: resolveGitHubIssue,
 };
 
 async function registeredWorktreeBranch(projectRoot: string, workspace: string): Promise<string | null | undefined> {
@@ -119,7 +119,7 @@ function planStrike(issueId: string, deps: PlanStrikeDeps = defaultPlanStrikeDep
   }
   const config = deps.getProject(project.projectKey);
   const workspace = join(project.projectPath, 'workspaces', `feature-${normalized}-strike`);
-  const forge = (config ? inferProjectForgeSync(config) : null) ?? (config?.tracker === 'gitlab' ? 'gitlab' : null);
+  const forge = (config ? inferProjectForge(config) : null) ?? (config?.tracker === 'gitlab' ? 'gitlab' : null);
   const hasConfiguredBase = Boolean(config?.workspace?.pr_target || config?.workspace?.default_branch);
   const closesGithubIssue = closableGithubIssue(config, deps.resolveGitHubIssue(issueId));
   return {
@@ -155,7 +155,7 @@ async function resolveStrikePlan(
   git: (cwd: string, command: string) => Promise<string | null> = gitOutput,
 ): Promise<StrikePlan> {
   const forge = draft.forge
-    ?? forgeFromRemoteUrlSync(await git(draft.projectRoot, 'git remote get-url origin'))
+    ?? forgeFromRemoteUrl(await git(draft.projectRoot, 'git remote get-url origin'))
     ?? 'github';
   const originHead = draft.baseBranch
     ? null

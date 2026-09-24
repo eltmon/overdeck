@@ -12,7 +12,7 @@ const testHome = vi.hoisted(() => {
   return home;
 });
 
-import { getAgentStateSync, saveAgentStateSync } from '../../../../src/lib/agents/agent-state.js';
+import { getAgentState, saveAgentStateSync } from '../../../../src/lib/agents/agent-state.js';
 import { persistIssueAgentsStopped } from '../../../../src/lib/lifecycle/teardown-workspace.js';
 
 describe('close-out agent state persistence', () => {
@@ -36,7 +36,7 @@ describe('close-out agent state persistence', () => {
     });
 
     expect(persistIssueAgentsStopped('pan-3950')).toBe(1);
-    expect(getAgentStateSync('agent-pan-3950')).toMatchObject({
+    expect(getAgentState('agent-pan-3950')).toMatchObject({
       status: 'stopped',
       stoppedAt: expect.any(String),
     });

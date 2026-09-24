@@ -25,7 +25,7 @@ import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, set
 import { buildTmuxArgs, capturePane, getWindowDimensions, listSessionNames, resizeWindow, sessionExists } from '../../lib/tmux.js';
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { validateOriginHeaders } from './routes/origin-validation.js';
-import { buildChildEnvWithoutTmuxSync } from '../../lib/child-env.js';
+import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
 import { HerdrTerminalProcess, resolveHerdrTerminalId } from './services/terminal-service.js';
 
@@ -596,7 +596,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
           cols: hub.cols,
           rows: hub.rows,
           cwd: homedir(),
-          env: buildChildEnvWithoutTmuxSync(process.env, {
+          env: buildChildEnvWithoutTmux(process.env, {
             TERM: 'xterm-256color',
             COLORTERM: 'truecolor',
             LANG: 'en_US.UTF-8',

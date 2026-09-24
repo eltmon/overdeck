@@ -39,7 +39,7 @@ import {
   getRemoteAgentOutput,
   sendToRemoteAgent,
 } from './remote-agents.js';
-import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { PAN_DIRNAME, PAN_CONTINUE_FILENAME } from '../pan-dir/index.js';
 
@@ -224,7 +224,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       }
 
       const teamPrefix = extractTeamPrefix(issueId);
-      const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
       const resolved = resolveProjectFromIssueSync(issueId, []);
       const projectRoot = projectConfig?.path ?? resolved?.projectPath;
       if (!projectRoot) {
@@ -320,8 +320,8 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       }
 
       // 4. Minimal local agent state so downstream flows resolve the workspace.
-      const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
-      const existing = getAgentStateSync(agentId);
+      const { getAgentState, saveAgentStateSync } = await import('../agents.js');
+      const existing = getAgentState(agentId);
       if (existing) {
         existing.workspace = existing.workspace || workspacePath;
         existing.status = 'stopped';
@@ -381,8 +381,8 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       } catch (err: any) {
         details.push(`Warning: could not destroy machine: ${err.message}`);
       }
-      const { deleteWorkspaceMetadataSync } = await import('./workspace-metadata.js');
-      deleteWorkspaceMetadataSync(issueId);
+      const { deleteWorkspaceMetadata } = await import('./workspace-metadata.js');
+      deleteWorkspaceMetadata(issueId);
       details.push('Removed remote workspace metadata (pipeline is local from here)');
       saveRemoteAgentState({ ...remoteState, status: 'stopped', lastActivity: new Date().toISOString() });
 

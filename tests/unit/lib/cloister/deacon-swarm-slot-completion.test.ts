@@ -29,7 +29,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: () => [],
   resolveProjectFromIssueSync: () => null,
   getProjectSync: () => null,
-  findProjectByPathSync: () => null,
+  findProjectByPath: () => null,
   getProjectSwarmHotspots: () => [],
 }));
 

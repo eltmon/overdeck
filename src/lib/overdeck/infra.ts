@@ -154,12 +154,12 @@ export interface DropPipelineStateMirrorResult {
  * Drops and marker commit in one transaction: a partial drop must not leave a
  * marker that stops the next boot from finishing the job.
  */
-export function dropPipelineStateMirrorTablesSync(
-  db: SqliteDatabase = getOverdeckDatabaseSync(),
+export function dropPipelineStateMirrorTables(
+  db: SqliteDatabase = getOverdeckDatabase(),
   env: NodeJS.ProcessEnv = process.env,
 ): DropPipelineStateMirrorResult {
   if (isPeerDashboardProcess(env)) return { dropped: false, skipped: 'peer' };
-  if (readPipelineMirrorMarkerSync(db) !== null) return { dropped: false, skipped: 'already-dropped' };
+  if (readPipelineMirrorMarker(db) !== null) return { dropped: false, skipped: 'already-dropped' };
 
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -183,7 +183,7 @@ export function dropPipelineStateMirrorTablesSync(
 }
 
 /** The marker value, or null when the drop has not run against this database. */
-export function readPipelineMirrorMarkerSync(db: SqliteDatabase): string | null {
+export function readPipelineMirrorMarker(db: SqliteDatabase): string | null {
   try {
     const row = db
       .prepare('SELECT value FROM app_settings WHERE key = ?')
@@ -245,8 +245,8 @@ export interface DropDeadIssuesFkResult {
  * EXACTLY ONCE via an app_settings marker. It runs from the dashboard boot
  * step in main.ts, never on database open.
  */
-export function dropDeadIssuesForeignKeysSync(
-  db: SqliteDatabase = getOverdeckDatabaseSync(),
+export function dropDeadIssuesForeignKeys(
+  db: SqliteDatabase = getOverdeckDatabase(),
   env: NodeJS.ProcessEnv = process.env,
 ): DropDeadIssuesFkResult {
   if (isPeerDashboardProcess(env)) return { dropped: false, tables: [], skipped: 'peer' };
@@ -492,7 +492,7 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `uat_generation_resolutions` ADD COLUMN `note` text');
 }
 
-export function getOverdeckDatabaseSync(
+export function getOverdeckDatabase(
   dbPath = getOverdeckDatabasePath(),
   options: { readOnly?: boolean } = {},
 ): SqliteDatabase {
@@ -541,7 +541,7 @@ function getOverdeckDatabaseReadOnlySync(dbPath: string): SqliteDatabase {
 }
 
 /** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
-export function closeOverdeckDatabaseSync(): void {
+export function closeOverdeckDatabase(): void {
   overdeckDbSync?.db.close();
   overdeckDbSync = null;
   overdeckReadOnlyDbSync?.db.close();

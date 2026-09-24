@@ -25,7 +25,7 @@ export interface RebaseResult {
   conflictFiles?: string[];
   reason?: string;
   newHead?: string;
-}async function rebaseFeatureBranchPromise(
+}async function rebaseFeatureBranchBody(
   workspacePath: string,
   featureBranch: string,
   baseBranch: string,
@@ -139,7 +139,7 @@ export function rebaseFeatureBranch(
   issueId: string,
 ): Effect.Effect<RebaseResult, GitError | MergeConflictError> {
   const wrapped: Effect.Effect<RebaseResult, GitError> = Effect.tryPromise({
-    try: () => rebaseFeatureBranchPromise(workspacePath, featureBranch, baseBranch, issueId),
+    try: () => rebaseFeatureBranchBody(workspacePath, featureBranch, baseBranch, issueId),
     catch: (cause) =>
       new GitError({
         command: ['git', 'rebase', baseBranch],

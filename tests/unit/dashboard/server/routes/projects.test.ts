@@ -14,7 +14,7 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck' })),
   // PAN-3917 (W6): the derived issue state resolves the owning project from a
   // path before it asks the forge; unregistered here, so it never asks.
-  findProjectByPathSync: vi.fn(() => null),
+  findProjectByPath: vi.fn(() => null),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
@@ -35,11 +35,11 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn(),
   getAgentRuntimeStateProgram: vi.fn(),
   // fetchProjectSessionTree → collectSessionTreeNodes calls
-  // getAgentStateSync for each candidate session id. The test seeds
+  // getAgentState for each candidate session id. The test seeds
   // agent-pan-539 via the readFile mock (readFileSync from node:fs is not
   // mocked here, so the rollback layer would throw ENOENT), so resolve the
   // agent state through this direct hook instead.
-  getAgentStateSync: vi.fn((id: string) => mockAgentStates.get(id) ?? null),
+  getAgentState: vi.fn((id: string) => mockAgentStates.get(id) ?? null),
 }));
 
 vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({

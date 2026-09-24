@@ -46,11 +46,11 @@ import { OHMYPI_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, createSession, listSessionsSync, getManagedTmuxSocketName } from '../tmux.js'
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
-import { generateLauncherScriptSync } from '../launcher-generator.js'
+import { generateLauncherScript } from '../launcher-generator.js'
 import { createOhmypiFifo, destroyOhmypiFifoSync, writeOhmypiCommandSync, ohmypiFifoPaths, OhmypiNotReady } from './ohmypi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
 import { getOverdeckHome } from '../paths.js'
-import { readLatestIndexedSessionIdSync } from '../session-history.js'
+import { readLatestIndexedSessionId } from '../session-history.js'
 
 const execAsync = promisify(exec)
 
@@ -114,7 +114,7 @@ function readyPathFor(agentId: string): string {
  * Returns null when the file is absent or unreadable.
  */
 function readStoredSessionId(agentId: string): string | null {
-  return readLatestIndexedSessionIdSync(agentId)
+  return readLatestIndexedSessionId(agentId)
 }
 
 /**
@@ -341,7 +341,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       )
     }
 
-    const launcherScript = generateLauncherScriptSync({
+    const launcherScript = generateLauncherScript({
       role: 'work',
       workingDir: config.workspace,
       harness: 'ohmypi',

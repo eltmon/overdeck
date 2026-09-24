@@ -9,7 +9,7 @@
  * migration SQL) so it stays outside the OVERDECK_TABLE_COUNT check.
  */
 
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 
 // ─── Schema bootstrap ─────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ export function ensureDiscoveredSessionsSchema(): void {
 
 function ensureSchema(): void {
   if (_schemaBootstrapped) return;
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   // FTS5 virtual table — not in migration SQL, created inline.
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
@@ -44,7 +44,7 @@ function ensureSchema(): void {
 
 function overdeckDb() {
   ensureSchema();
-  return getOverdeckDatabaseSync();
+  return getOverdeckDatabase();
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

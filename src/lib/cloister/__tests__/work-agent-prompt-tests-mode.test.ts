@@ -8,11 +8,11 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const findProjectByPathSync = vi.hoisted(() => vi.fn());
+const findProjectByPath = vi.hoisted(() => vi.fn());
 
 vi.mock('../../projects.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../projects.js')>(),
-  findProjectByPathSync,
+  findProjectByPath,
 }));
 
 import { buildWorkAgentPrompt } from '../work-agent-prompt.js';
@@ -41,7 +41,7 @@ async function prompt(): Promise<string> {
 describe('work prompt test wording', () => {
   it('a CI-mode vitest project: touched tests with vitest, the full suite on CI', async () => {
     writeFileSync(join(root, 'vitest.config.ts'), 'export default {};\n');
-    findProjectByPathSync.mockReturnValue({ name: 'Overdeck', path: root, verification: { tests: 'ci' } });
+    findProjectByPath.mockReturnValue({ name: 'Overdeck', path: root, verification: { tests: 'ci' } });
 
     const text = await prompt();
 
@@ -52,7 +52,7 @@ describe('work prompt test wording', () => {
 
   it('a local-mode project without vitest: no vitest command, no CI wording', async () => {
     writeFileSync(join(root, 'go.mod'), 'module example.com/x\n');
-    findProjectByPathSync.mockReturnValue({ name: 'myn-cli', path: root, verification: { tests: 'local' } });
+    findProjectByPath.mockReturnValue({ name: 'myn-cli', path: root, verification: { tests: 'local' } });
 
     const text = await prompt();
 
@@ -64,7 +64,7 @@ describe('work prompt test wording', () => {
 
   it('detects vitest from package.json', async () => {
     writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { vitest: '^4.0.0' } }));
-    findProjectByPathSync.mockReturnValue(null);
+    findProjectByPath.mockReturnValue(null);
 
     const text = await prompt();
 

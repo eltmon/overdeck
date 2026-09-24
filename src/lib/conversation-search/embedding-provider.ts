@@ -1,7 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { embedMany as aiEmbedMany } from 'ai';
 
-import { getConversationSearchConfigSync, loadConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
+import { getConversationSearchConfig, loadConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
 
 export type ConversationEmbeddingProviderName = 'openai';
 
@@ -60,7 +60,7 @@ export class ConversationEmbeddingUnavailableError extends Error {
 export function createConversationEmbeddingProvider(
   options: CreateConversationEmbeddingProviderOptions = {},
 ): ConversationEmbeddingProvider {
-  const config = options.config ?? getConversationSearchConfigSync();
+  const config = options.config ?? getConversationSearchConfig();
   const provider = config.provider as ConversationEmbeddingProviderName;
 
   if (!config.enabled) return unavailableProvider(provider, config.model, 'conversationSearch is disabled');

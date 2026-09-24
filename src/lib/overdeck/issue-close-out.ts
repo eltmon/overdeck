@@ -7,11 +7,11 @@ import { EventStoreService } from '../../dashboard/server/services/domain-servic
 import { getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../lifecycle/types.js';
 import type { DodRowId } from '../lifecycle/dod.js';
-import { getAgentStateSync, normalizeAgentId } from '../agents.js';
+import { getAgentState, normalizeAgentId } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
-import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { resolveIssueProjectPath } from './issue-reads.js';
 import { archiveIssueWorkspaceRow } from './workspace-hygiene.js';
 
 function getIssueDataService(): IssueDataService {
@@ -24,7 +24,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -210,10 +210,10 @@ async function hasActiveAgentForIssue(issueId: string, allowPausedMerged = false
     if (VALID_TMUX_NAME_RE.test(agentId) && (yield* sessionExists(agentId))) return true;
     if (VALID_TMUX_NAME_RE.test(planningId) && (yield* sessionExists(planningId))) return true;
 
-    const agentState = getAgentStateSync(agentId);
+    const agentState = getAgentState(agentId);
     if (agentState && !isInactiveAgentStatus(agentState.status) && !isPausedMergedAgentSafe(agentState, allowPausedMerged)) return true;
 
-    const planningState = getAgentStateSync(planningId);
+    const planningState = getAgentState(planningId);
     if (planningState && !isInactiveAgentStatus(planningState.status) && !isPausedMergedAgentSafe(planningState, allowPausedMerged)) return true;
 
     return false;
@@ -283,7 +283,7 @@ export function bulkCloseOut(body: Record<string, unknown>) {
       }
 
       const githubCheck = isGitHubIssue(id);
-      const projectPath = resolveIssueProjectPathSync(id);
+      const projectPath = resolveIssueProjectPath(id);
       if (!projectPath) {
         tasks.push({ id, skipped: true, error: `Could not resolve project path for ${id}` });
         continue;

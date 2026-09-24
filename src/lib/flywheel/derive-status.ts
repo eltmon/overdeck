@@ -99,8 +99,8 @@ export async function readFlywheelTranscript(conv: LegacyConversation): Promise<
 }
 
 async function defaultResolveProjectPath(dir: string): Promise<string | null> {
-  const { findProjectByPathSync } = await import('../projects.js');
-  return findProjectByPathSync(dir)?.path ?? null;
+  const { findProjectByPath } = await import('../projects.js');
+  return findProjectByPath(dir)?.path ?? null;
 }
 
 async function defaultResolvePlanHome(projectRoot: string): Promise<string> {

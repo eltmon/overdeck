@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   setAgentPaused: vi.fn(),
   clearAgentPaused: vi.fn(),
   clearAgentTroubled: vi.fn(),
@@ -48,7 +48,7 @@ vi.mock('../../../lib/agents.js', async (importOriginal) => {
     ...actual,
     ...agentMocks,
     isQualifiedAgentId: isQualifiedAgentIdForTest,
-    resolveAgentTargetSync: resolveAgentTargetSyncForTest,
+    resolveAgentTarget: resolveAgentTargetSyncForTest,
   };
 });
 
@@ -114,7 +114,7 @@ vi.mock('fs', async (importOriginal) => {
 const STOPPED_STATE = { issueId: 'PAN-1723', status: 'stopped' };
 
 beforeAll(async () => {
-  ({ resolveAgentTargetSync: actualResolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js'));
+  ({ resolveAgentTarget: actualResolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js'));
 });
 
 beforeEach(() => {
@@ -124,11 +124,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   agentMocks.stopAgent.mockReturnValue(Effect.void);
   FAKE_AGENTS_DIR_LISTING.entries = [];
-  agentMocks.getAgentStateSync.mockReturnValue(STOPPED_STATE);
+  agentMocks.getAgentState.mockReturnValue(STOPPED_STATE);
   tmuxMocks.sessionExistsSync.mockReturnValue(false);
 });
 
-describe('resolveAgentTargetSync (PAN-1760)', () => {
+describe('resolveAgentTarget (PAN-1760)', () => {
   it('preserves strike-/inspect- prefixed agent IDs', async () => {
     expect(actualResolveAgentTargetSync!('strike-pan-1723')).toBe('strike-pan-1723');
     expect(actualResolveAgentTargetSync!('inspect-pan-1744-workspace-flccb')).toBe('inspect-pan-1744-workspace-flccb');
@@ -167,7 +167,7 @@ describe('pauseCommand agent targeting (PAN-1760)', () => {
 
 describe('unpauseCommand agent targeting (PAN-1760)', () => {
   it('unpauses a strike session by its full agent ID', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ ...STOPPED_STATE, paused: true });
+    agentMocks.getAgentState.mockReturnValue({ ...STOPPED_STATE, paused: true });
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('strike-pan-1723');
     expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('strike-pan-1723');

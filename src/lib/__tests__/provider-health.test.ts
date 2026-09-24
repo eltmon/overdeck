@@ -9,20 +9,20 @@ vi.mock('../openai-compatible-proxy.js', () => ({
   getOpenAICompatibleProxyBaseUrl: vi.fn((provider: string) => `http://127.0.0.1:12436/${provider}`),
 }));
 
-const { invalidateProbeCacheSync, probeProvider } = await import('../provider-health.js');
+const { invalidateProbeCache, probeProvider } = await import('../provider-health.js');
 const { PROVIDERS } = await import('../providers.js');
 
 describe('provider health Nous probe path (PAN-1168)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    invalidateProbeCacheSync();
+    invalidateProbeCache();
     proxyMocks.ensureOpenAICompatibleProxyRunning.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    invalidateProbeCacheSync();
+    invalidateProbeCache();
     vi.useRealTimers();
   });
 

@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import { join } from 'path';
 import chalk from 'chalk';
 import { getOverdeckHome } from '../../lib/paths.js';
-import { getAgentStateSync } from '../../lib/agents.js';
+import { getAgentState } from '../../lib/agents.js';
 import { inferIssueIdFromStackContainerName } from '../../lib/workspace/stack-health.js';
 
 const execFileAsync = promisify(execFile);
@@ -174,7 +174,7 @@ function collectActiveAgentIssueIds(): Set<string> {
 
   for (const dir of readdirSync(agentsDir)) {
     try {
-      const state = getAgentStateSync(dir);
+      const state = getAgentState(dir);
       if (!state?.issueId || !state.status || !ACTIVE_AGENT_STATUSES.has(state.status)) continue;
       activeIssues.add(normalizeIssueId(state.issueId));
     } catch {}

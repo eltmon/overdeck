@@ -59,7 +59,7 @@ let odb: OverdeckTestDb | null = null;
 
 function makeAgentsDir(): string {
   // Overdeck (PAN-1938): the doctor test seeds agent state into overdeck.db
-  // via saveOverdeckAgentStateSync, and getAgentStateSync reads overdeck first.
+  // via saveOverdeckAgentStateSync, and getAgentState reads overdeck first.
   // The agentsDir parameter still must point at a real directory under
   // OVERDECK_HOME so readDoctorAgentStates' readdirSync can enumerate it.
   const dir = odb ? join(odb.home, 'agents') : mkdtempSync(join(tmpdir(), 'pan-doctor-agents-'));
@@ -72,7 +72,7 @@ function writeAgentState(agentsDir: string, agentId: string, state: object): voi
   const agentDir = join(agentsDir, agentId);
   mkdirSync(agentDir, { recursive: true });
   // Mirror the on-disk state.json (read by the rollback layer fallback) AND
-  // persist the same record into overdeck.db so getAgentStateSync resolves
+  // persist the same record into overdeck.db so getAgentState resolves
   // the agent on the first lookup (the overdeck door is the source of truth
   // post-PAN-1938).
   writeFileSync(join(agentDir, 'state.json'), JSON.stringify(state), 'utf8');

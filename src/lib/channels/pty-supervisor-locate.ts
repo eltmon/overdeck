@@ -47,7 +47,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { unresolvedBundleImports } from '../bundle-imports.js';
-import { readActiveDashboardBundleSync } from '../deploy/active-dashboard-bundle.js';
+import { readActiveDashboardBundle } from '../deploy/active-dashboard-bundle.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -78,7 +78,7 @@ export function supervisorDeploymentFailure(deployRoot: string): string | null {
 }
 
 export function resolvePtySupervisorScriptPath(): string {
-  const activeBundle = readActiveDashboardBundleSync();
+  const activeBundle = readActiveDashboardBundle();
   const candidates = [
     join(packageRoot, 'dist', 'pty-supervisor.js'),
     // Desktop layouts: all server chunks (this module included) sit in one

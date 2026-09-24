@@ -23,9 +23,9 @@ import type {
   ActivitySource,
 } from './types.js';
 import { CLAUDE_CODE_BEHAVIOR } from './behavior.js';
-import { getAgentStateSync, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentStateSync, saveAgentRuntimeState, determineModel } from '../agents.js';
+import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentStateSync, saveAgentRuntimeState, determineModel } from '../agents.js';
 import { sessionExistsSync, killSessionSync, sendKeys, getAgentSessionsSync } from '../tmux.js';
-import { parseClaudeSessionSync, getSessionFilesSync, getProjectDirsSync } from '../cost-parsers/jsonl-parser.js';
+import { parseClaudeSession, getSessionFiles, getProjectDirs } from '../cost-parsers/jsonl-parser.js';
 import { claudeProjectsRoot } from './storage/claude-code.js';
 
 const CLAUDE_PROJECTS_DIR = claudeProjectsRoot();
@@ -62,7 +62,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
     }
 
     // Get all project directories
-    const projectDirs = getProjectDirsSync();
+    const projectDirs = getProjectDirs();
 
     for (const projectDir of projectDirs) {
       // Check if this project's sessions-index.json references the workspace
@@ -121,7 +121,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
    * Get the most recent JSONL file for a project
    */
   private getMostRecentJSONL(projectDir: string): string | null {
-    const files = getSessionFilesSync(projectDir);
+    const files = getSessionFiles(projectDir);
     return files.length > 0 ? files[0] : null;
   }
 
@@ -129,7 +129,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
    * Get the session path for an agent
    */
   getSessionPath(agentId: string): string | null {
-    const state = getAgentStateSync(agentId);
+    const state = getAgentState(agentId);
     if (!state) {
       return null;
     }
@@ -254,7 +254,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
       return null;
     }
 
-    const sessionUsage = parseClaudeSessionSync(sessionPath);
+    const sessionUsage = parseClaudeSession(sessionPath);
     if (!sessionUsage) {
       return null;
     }
@@ -271,7 +271,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
       return null;
     }
 
-    const sessionUsage = parseClaudeSessionSync(sessionPath);
+    const sessionUsage = parseClaudeSession(sessionPath);
     if (!sessionUsage) {
       return null;
     }
@@ -335,7 +335,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
     saveAgentRuntimeState(agentId, { state: 'idle', lastActivity: new Date().toISOString() });
 
     // Update agent state
-    const state = getAgentStateSync(agentId);
+    const state = getAgentState(agentId);
     if (state) {
       state.status = 'stopped';
       saveAgentStateSync(state);
@@ -381,7 +381,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
       // Get sessions for specific workspace
       const projectDir = this.getProjectDirForWorkspace(workspace);
       if (projectDir) {
-        const files = getSessionFilesSync(projectDir);
+        const files = getSessionFiles(projectDir);
         for (const file of files) {
           const session = this.parseSessionFile(file, workspace);
           if (session) {
@@ -391,9 +391,9 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
       }
     } else {
       // Get all sessions
-      const projectDirs = getProjectDirsSync();
+      const projectDirs = getProjectDirs();
       for (const projectDir of projectDirs) {
-        const files = getSessionFilesSync(projectDir);
+        const files = getSessionFiles(projectDir);
         for (const file of files) {
           const session = this.parseSessionFile(file);
           if (session) {
@@ -410,7 +410,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
    * Parse a session file into a Session object
    */
   private parseSessionFile(file: string, workspace?: string): Session | null {
-    const sessionUsage = parseClaudeSessionSync(file);
+    const sessionUsage = parseClaudeSession(file);
     if (!sessionUsage) {
       return null;
     }
@@ -439,6 +439,6 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
 /**
  * Create a Claude Code runtime instance
  */
-export function createClaudeCodeRuntimeSync(): ClaudeCodeRuntimeSync {
+export function createClaudeCodeRuntime(): ClaudeCodeRuntimeSync {
   return new ClaudeCodeRuntimeSync();
 }

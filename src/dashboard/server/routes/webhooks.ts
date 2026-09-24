@@ -24,7 +24,7 @@ import {
   handlePullRequestReviewComment,
   handlePullRequestReviewThread,
   handleStatus,
-  isTrackedRepositorySync,
+  isTrackedRepository,
   type WebhookPayload,
 } from '../../../lib/webhook-handlers.js';
 
@@ -161,7 +161,7 @@ export function runWebhookHandler(
 
     // Repository authorization: reject events from unconfigured repos
     const repoFullName = payload.repository?.full_name;
-    if (!repoFullName || !isTrackedRepositorySync(repoFullName)) {
+    if (!repoFullName || !isTrackedRepository(repoFullName)) {
       console.warn(`[webhook] Repository not allowed: ${repoFullName ?? 'unknown'}`);
       return jsonResponse({ error: 'Repository not allowed' }, { status: 403 });
     }

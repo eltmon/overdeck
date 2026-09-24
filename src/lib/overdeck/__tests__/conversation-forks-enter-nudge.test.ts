@@ -190,13 +190,13 @@ describe('runForkPipeline stranded status', () => {
     process.env.HOME = testHome;
     process.env.OVERDECK_HOME = testHome;
     mkdirSync(testHome, { recursive: true });
-    const { closeOverdeckDatabaseSync } = await import('../infra.js');
-    closeOverdeckDatabaseSync();
+    const { closeOverdeckDatabase } = await import('../infra.js');
+    closeOverdeckDatabase();
   });
 
   afterEach(async () => {
-    const { closeOverdeckDatabaseSync } = await import('../infra.js');
-    closeOverdeckDatabaseSync();
+    const { closeOverdeckDatabase } = await import('../infra.js');
+    closeOverdeckDatabase();
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
     delete process.env.OVERDECK_HOME;

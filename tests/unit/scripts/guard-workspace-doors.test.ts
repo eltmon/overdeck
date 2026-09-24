@@ -66,7 +66,7 @@ describe('guard-workspace-doors.sh', () => {
     mkdirSync(join(root, 'src', 'lib', 'workspaces'), { recursive: true });
     writeFileSync(
       join(root, 'src', 'lib', 'workspaces', 'rebuild.ts'),
-      `import { getOverdeckDatabaseSync } from '../overdeck/infra.js';\nexport function badRebuildRead(id: string) {\n  return getOverdeckDatabaseSync().prepare(\`SELECT * FROM workspaces WHERE id = ?\`).get(id);\n}\n`,
+      `import { getOverdeckDatabase } from '../overdeck/infra.js';\nexport function badRebuildRead(id: string) {\n  return getOverdeckDatabase().prepare(\`SELECT * FROM workspaces WHERE id = ?\`).get(id);\n}\n`,
     );
     commitAll(root);
 
@@ -104,11 +104,11 @@ describe('guard-workspace-doors.sh', () => {
     mkdirSync(join(root, 'src', 'lib', 'workspaces'), { recursive: true });
     writeFileSync(
       join(root, 'src', 'lib', 'workspaces', 'resolver.ts'),
-      `import { getOverdeckDatabaseSync } from '../overdeck/infra.js';\nexport function getWorkspaceById(id: string) {\n  return getOverdeckDatabaseSync().prepare(\`SELECT * FROM workspaces WHERE id = ?\`).get(id);\n}\n`,
+      `import { getOverdeckDatabase } from '../overdeck/infra.js';\nexport function getWorkspaceById(id: string) {\n  return getOverdeckDatabase().prepare(\`SELECT * FROM workspaces WHERE id = ?\`).get(id);\n}\n`,
     );
     writeFileSync(
       join(root, 'src', 'lib', 'workspaces', 'writer.ts'),
-      `import { getOverdeckDatabaseSync } from '../overdeck/infra.js';\nexport function deleteWorkspace(id: string) {\n  getOverdeckDatabaseSync().prepare(\`DELETE FROM workspaces WHERE id = ?\`).run(id);\n}\n`,
+      `import { getOverdeckDatabase } from '../overdeck/infra.js';\nexport function deleteWorkspace(id: string) {\n  getOverdeckDatabase().prepare(\`DELETE FROM workspaces WHERE id = ?\`).run(id);\n}\n`,
     );
 
     // Prose mentioning "projects.yaml" (a file, not a table reference) must not trip the guard.

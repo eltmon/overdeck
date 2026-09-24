@@ -25,7 +25,7 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   messageAgent: mocks.messageAgent,
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   setAgentPaused: vi.fn(),
   stopAgent: vi.fn(),
 }));

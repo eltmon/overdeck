@@ -95,16 +95,15 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 2468 }),
+  resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 2468 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
-  resolveTrackerTypeSync: vi.fn().mockReturnValue('github'),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
   resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),
   getProjectSync: vi.fn().mockReturnValue(null),
-  findProjectByPathSync: vi.fn().mockReturnValue(null),
+  findProjectByPath: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
   loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));
@@ -148,7 +147,7 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  getMergeSetSync: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
+  getMergeSet: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
 }));
 
 vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({

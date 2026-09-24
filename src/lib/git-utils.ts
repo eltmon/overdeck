@@ -24,7 +24,7 @@ const DEFAULT_PROCESS_PROBE_TIMEOUT_MS = 30_000;
  * every such value with `git check-ref-format --branch` before it reaches a
  * git command.
  */
-export async function isValidBranchNamePromise(name: string): Promise<boolean> {
+export async function isValidBranchName(name: string): Promise<boolean> {
   if (!name || name.length > 255) return false;
   try {
     await execFileAsync('git', ['check-ref-format', '--branch', name], { encoding: 'utf-8', timeout: 5_000 });
@@ -35,8 +35,8 @@ export async function isValidBranchNamePromise(name: string): Promise<boolean> {
 }
 
 /** Throw when a branch value fails isValidBranchNamePromise — the rejection every fetch gate uses. */
-export async function assertValidBranchNamePromise(name: string, context: string): Promise<void> {
-  if (!(await isValidBranchNamePromise(name))) {
+export async function assertValidBranchName(name: string, context: string): Promise<void> {
+  if (!(await isValidBranchName(name))) {
     throw new Error(`Invalid branch name for ${context}: ${JSON.stringify(name)} — refusing to run git with it`);
   }
 }
@@ -318,7 +318,7 @@ export function parseWorkspaceHeadAnchor(anchor: string): WorkspaceHeadAnchorEnt
  * Composite entries are resolved to their nested worktree and labeled using
  * the same repo-section convention as review and inspect diff summaries.
  */
-export async function renderWorkspaceGitShowPromise(
+export async function renderWorkspaceGitShow(
   issueId: string | undefined,
   workspacePath: string,
   anchor: string,
@@ -331,9 +331,9 @@ export async function renderWorkspaceGitShowPromise(
     throw new Error(`Cannot resolve composite workspace head anchor '${anchor}' without an issue id`);
   }
 
-  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+  const { resolveWorkspaceRepoRoots } = await import('./project-repos.js');
   const rootsByKey = new Map(
-    resolveWorkspaceRepoRootsSync(issueId, workspacePath).map(root => [root.repoKey, root]),
+    resolveWorkspaceRepoRoots(issueId, workspacePath).map(root => [root.repoKey, root]),
   );
 
   const sections = await Promise.all(entries.map(async ({ repoKey, sha }) => {
@@ -388,11 +388,11 @@ export function formatAnchorShort(anchor: string): string {
  * lastVerifiedCommit, and roleRunHead. Persisted values never regain that brand
  * (the rehydrate helper had no caller and was removed in PAN-3958 CH-8).
  */
-export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
+export async function snapshotWorkspaceHeads(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
   // Dynamic import: project-repos → projects sits above this low-level module
   // in the layering; a static edge here would risk a require cycle.
-  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
-  const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  const { resolveWorkspaceRepoRoots } = await import('./project-repos.js');
+  const roots = resolveWorkspaceRepoRoots(issueId, workspacePath);
   // PAN-3254: a degraded polyrepo resolution would snapshot the wrapper repo,
   // whose HEAD never moves — every drift comparison against a real composite
   // anchor then false-drifts forever (426 review cycles on MIN-901). No

@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { listRunningAgents, stopAgent } from '../agents.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
 import { resolveProjectForIssue } from '../overdeck/issue-projects.js';
@@ -90,7 +90,7 @@ async function stopClosedAgent(agentId: string, issueId: string, actions: string
   const action = `Reaped ${agentId} — parent issue ${issueId} is closed`;
   actions.push(action);
   console.log(`[deacon] ${action}`);
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'cloister',
     level: 'info',
     issueId,

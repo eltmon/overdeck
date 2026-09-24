@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
+import { getConversationSearchConfig, type NormalizedConversationSearchConfig } from '../config-yaml.js';
 import { getOverdeckHome } from '../paths.js';
 import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../overdeck/conversations-search.js';
@@ -60,7 +60,7 @@ const DEFAULT_EMBED_BATCH_SIZE = 64;
 export async function indexConversationSearch(
   options: ConversationIndexerOptions = {},
 ): Promise<ConversationIndexResult> {
-  const config = options.config ?? getConversationSearchConfigSync();
+  const config = options.config ?? getConversationSearchConfig();
   if (!config.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: 'conversationSearch is disabled' };
   const provider = options.provider ?? createConversationEmbeddingProvider({ config });
   if (!provider.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable' };
@@ -99,7 +99,7 @@ export async function indexConversationSearch(
 export async function fullReindexConversationSearch(
   options: ConversationIndexerOptions = {},
 ): Promise<ConversationIndexResult> {
-  const config = options.config ?? getConversationSearchConfigSync();
+  const config = options.config ?? getConversationSearchConfig();
   if (!config.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: 'conversationSearch is disabled' };
   const provider = options.provider ?? createConversationEmbeddingProvider({ config });
   if (!provider.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable' };
@@ -136,7 +136,7 @@ export interface ConversationReindexCostEstimate extends ConversationEmbeddingCo
 export async function estimateFullReindexConversationSearchCost(
   options: ConversationIndexerOptions = {},
 ): Promise<ConversationReindexCostEstimate> {
-  const config = options.config ?? getConversationSearchConfigSync();
+  const config = options.config ?? getConversationSearchConfig();
   const provider = options.provider ?? createConversationEmbeddingProvider({ config });
   const empty = provider.estimateCost([]);
   if (!config.enabled) {
@@ -177,7 +177,7 @@ export async function estimateFullReindexConversationSearchCost(
 export async function indexConversationFile(
   options: IndexConversationFileOptions,
 ): Promise<ConversationIndexResult> {
-  const config = options.config ?? getConversationSearchConfigSync();
+  const config = options.config ?? getConversationSearchConfig();
   if (!config.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: 'conversationSearch is disabled' };
   // Enforced here rather than only in the directory sweep: the file watcher
   // indexes each new transcript directly as it appears, so a sweep-only

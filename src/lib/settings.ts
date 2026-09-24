@@ -129,11 +129,11 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
  * Returns default settings if file doesn't exist or is invalid
  * Also loads API keys from environment variables as fallback
  */
-export function loadSettingsSync(): SettingsConfig {
+export function loadSettings(): SettingsConfig {
   let settings: SettingsConfig;
 
   if (!existsSync(SETTINGS_FILE)) {
-    settings = getDefaultSettingsSync();
+    settings = getDefaultSettings();
   } else {
     try {
       const content = readFileSync(SETTINGS_FILE, 'utf8');
@@ -141,7 +141,7 @@ export function loadSettingsSync(): SettingsConfig {
       settings = deepMerge(DEFAULT_SETTINGS, parsed);
     } catch (error) {
       console.error('Warning: Failed to parse settings.json, using defaults');
-      settings = getDefaultSettingsSync();
+      settings = getDefaultSettings();
     }
   }
 
@@ -171,7 +171,7 @@ export function loadSettingsSync(): SettingsConfig {
 /**
  * Get a deep copy of the default settings
  */
-export function getDefaultSettingsSync(): SettingsConfig {
+export function getDefaultSettings(): SettingsConfig {
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 }
 
@@ -179,7 +179,7 @@ export function getDefaultSettingsSync(): SettingsConfig {
  * Get available models for a provider based on configured API keys
  * Returns empty array if provider API key is not configured
  */
-export function getAvailableModelsSync(settings: SettingsConfig): {
+export function getAvailableModels(settings: SettingsConfig): {
   anthropic: AnthropicModel[];
   openai: OpenAIModel[];
   google: GoogleModel[];
@@ -266,7 +266,7 @@ function isAnthropicModelSync(modelId: ModelId | string): boolean {
  * Get the Claude CLI model flag for an Anthropic model
  * Maps our model IDs to Claude's expected format
  */
-export function getClaudeModelFlagSync(modelId: ModelId | string): string {
+export function getClaudeModelFlag(modelId: ModelId | string): string {
   const modelMap: Record<string, string> = {
     // Fable has no short `claude` CLI alias (like opus/sonnet); pass the full
     // API model ID through to `--model`.
@@ -292,11 +292,11 @@ export function getClaudeModelFlagSync(modelId: ModelId | string): string {
  * Always uses 'claude' CLI — non-Anthropic models work via ANTHROPIC_BASE_URL env var
  * pointing to their Anthropic-compatible endpoint.
  */
-export function getAgentCommandSync(modelId: ModelId | string): { command: string; args: string[] } {
+export function getAgentCommand(modelId: ModelId | string): { command: string; args: string[] } {
   if (isAnthropicModelSync(modelId)) {
     return {
       command: 'claude',
-      args: ['--model', getClaudeModelFlagSync(modelId)],
+      args: ['--model', getClaudeModelFlag(modelId)],
     };
   }
   if (modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor') {

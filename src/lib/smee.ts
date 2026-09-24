@@ -32,7 +32,7 @@ function getSmeeUrl(): string | null {
   }
 }
 
-export function isSmeeConfiguredSync(): boolean {
+export function isSmeeConfigured(): boolean {
   return getSmeeUrl() !== null;
 }
 
@@ -120,7 +120,7 @@ function terminateProcess(pid: number): void {
   }
 }
 
-export function isSmeeProcessRunningSync(): boolean {
+export function isSmeeProcessRunning(): boolean {
   const pid = readSmeePid();
   if (!pid) return false;
   if (!isProcessAlive(pid)) {
@@ -174,7 +174,7 @@ function removeStaleOrWrongPidfile(smeeUrl: string, target: string): void {
   if (match === false) clearSmeePidfile();
 }
 
-export function startSmeeProcessSync(): void {
+export function startSmeeProcess(): void {
   const smeeUrl = getSmeeUrl();
   if (!smeeUrl) {
     console.warn('[smee] No smee-url configured — skipping webhook relay');
@@ -216,7 +216,7 @@ export function startSmeeProcessSync(): void {
   console.log(`[smee] Started process (PID ${child.pid}) relaying to ${target}`);
 }
 
-export function stopSmeeProcessSync(): void {
+export function stopSmeeProcess(): void {
   const smeeUrl = getSmeeUrl();
   const target = smeeUrl ? getWebhookTarget() : null;
   const matchingPids = smeeUrl && target ? findMatchingSmeeProcesses(smeeUrl, target) : [];

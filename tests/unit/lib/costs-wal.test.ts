@@ -119,9 +119,9 @@ describe('appendToWal', () => {
     listProjects.mockReturnValue([
       { key: 'PAN', config: { path: tmpDir, name: 'Overdeck' } },
     ]);
-    const { appendToWalSync } = await import('../../../src/lib/costs/wal.js');
+    const { appendToWal } = await import('../../../src/lib/costs/wal.js');
     const event = makeCostEvent();
-    const result = appendToWalSync(event);
+    const result = appendToWal(event);
 
     expect(result).toBe(true);
     const walFile = join(tmpDir, '.pan/events/PAN-335.jsonl');
@@ -135,8 +135,8 @@ describe('appendToWal', () => {
 
   it('returns false when no project matches', async () => {
     listProjects.mockReturnValue([]);
-    const { appendToWalSync } = await import('../../../src/lib/costs/wal.js');
-    const result = appendToWalSync(makeCostEvent());
+    const { appendToWal } = await import('../../../src/lib/costs/wal.js');
+    const result = appendToWal(makeCostEvent());
     expect(result).toBe(false);
   });
 
@@ -144,9 +144,9 @@ describe('appendToWal', () => {
     listProjects.mockReturnValue([
       { key: 'PAN', config: { path: tmpDir, name: 'Overdeck' } },
     ]);
-    const { appendToWalSync } = await import('../../../src/lib/costs/wal.js');
-    appendToWalSync(makeCostEvent({ requestId: 'req-1' }));
-    appendToWalSync(makeCostEvent({ requestId: 'req-2' }));
+    const { appendToWal } = await import('../../../src/lib/costs/wal.js');
+    appendToWal(makeCostEvent({ requestId: 'req-1' }));
+    appendToWal(makeCostEvent({ requestId: 'req-2' }));
 
     const walFile = join(tmpDir, '.pan/events/PAN-335.jsonl');
     const lines = readFileSync(walFile, 'utf-8').trim().split('\n').filter(Boolean);

@@ -34,12 +34,12 @@ const lifecycleMocks = vi.hoisted(() => ({
 const projectMocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   extractTeamPrefix: vi.fn(),
-  findProjectByTeamSync: vi.fn(),
+  findProjectByTeam: vi.fn(),
 }));
 
 const trackerMocks = vi.hoisted(() => ({
-  resolveGitHubIssueSync: vi.fn(),
-  resolveTrackerTypeSync: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
+  resolveTrackerType: vi.fn(),
 }));
 
 const operatorInterventionMocks = vi.hoisted(() => ({
@@ -113,7 +113,7 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/agents.js')>();
   return {
     ...actual,
-    getAgentStateSync: agentMocks.getAgentState,
+    getAgentState: agentMocks.getAgentState,
     setAgentPaused: agentMocks.setAgentPaused,
     saveAgentState: agentMocks.saveAgentState,
     saveAgentRuntimeState: agentMocks.saveAgentRuntimeState,
@@ -151,7 +151,7 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
     ...actual,
     resolveProjectFromIssueSync: projectMocks.resolveProjectFromIssueSync,
     extractTeamPrefix: projectMocks.extractTeamPrefix,
-    findProjectByTeamSync: projectMocks.findProjectByTeamSync,
+    findProjectByTeam: projectMocks.findProjectByTeam,
   };
 });
 
@@ -159,8 +159,8 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/tracker-utils.js')>();
   return {
     ...actual,
-    resolveGitHubIssueSync: trackerMocks.resolveGitHubIssueSync,
-    resolveTrackerTypeSync: trackerMocks.resolveTrackerTypeSync,
+    resolveGitHubIssue: trackerMocks.resolveGitHubIssue,
+    resolveTrackerType: trackerMocks.resolveTrackerType,
   };
 });
 
@@ -322,9 +322,9 @@ describe('operator.intervention dashboard routes', () => {
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
     projectMocks.extractTeamPrefix.mockReturnValue('PAN');
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project', projectName: 'overdeck' });
-    projectMocks.findProjectByTeamSync.mockReturnValue({ name: 'overdeck', workspace: {} });
-    trackerMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
-    trackerMocks.resolveTrackerTypeSync.mockReturnValue('github');
+    projectMocks.findProjectByTeam.mockReturnValue({ name: 'overdeck', workspace: {} });
+    trackerMocks.resolveGitHubIssue.mockReturnValue({ isGitHub: false });
+    trackerMocks.resolveTrackerType.mockReturnValue('github');
     issueServiceMock.getIssueSource.mockReturnValue('github');
     issueServiceMock.patchIssue.mockReturnValue(undefined);
     issueServiceMock.invalidateTracker.mockResolvedValue(undefined);

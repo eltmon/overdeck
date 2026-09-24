@@ -705,23 +705,23 @@ program
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {
-        const { generateOverdeckTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } = await import('../lib/traefik.js');
+        const { generateOverdeckTraefikConfig, ensureProjectCerts, generateTlsConfig, cleanupStaleTlsSections } = await import('../lib/traefik.js');
 
         // Clean stale tls: sections from older config files
-        cleanupStaleTlsSectionsSync();
+        cleanupStaleTlsSections();
 
-        if (generateOverdeckTraefikConfigSync()) {
+        if (generateOverdeckTraefikConfig()) {
           console.log(chalk.dim('  Regenerated Traefik config from template'));
         }
 
         // Generate missing certs for registered projects
-        const generatedDomains = ensureProjectCertsSync();
+        const generatedDomains = ensureProjectCerts();
         for (const domain of generatedDomains) {
           console.log(chalk.dim(`  Generated wildcard cert for *.${domain}`));
         }
 
         // Generate tls.yml from all discovered certs
-        if (generateTlsConfigSync()) {
+        if (generateTlsConfig()) {
           console.log(chalk.dim('  Generated TLS config (tls.yml)'));
         }
       } catch {
@@ -915,8 +915,8 @@ program
       }
     }
 
-    const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
-    const platformConfig = readPlatformConfigSync();
+    const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+    const platformConfig = readPlatformConfig();
     await stopDashboard({
       ...platformConfig,
       dashboardPort,
@@ -1103,9 +1103,9 @@ program
 
     // Stop smee-client webhook relay
     try {
-      const { stopSmeeProcessSync } = await import('../lib/smee.js');
+      const { stopSmeeProcess } = await import('../lib/smee.js');
       console.log(chalk.dim('Stopping smee-client webhook relay...'));
-      stopSmeeProcessSync();
+      stopSmeeProcess();
       console.log(chalk.green('✓ smee-client stopped'));
     } catch {
       console.log(chalk.dim('  smee-client not running'));
@@ -1113,14 +1113,14 @@ program
 
     // Stop the supervisor sidecar
     try {
-      const { stopSupervisorProcessSync, isSupervisorRunningSync } = await import('../lib/supervisor.js');
+      const { stopSupervisorProcess, isSupervisorRunning } = await import('../lib/supervisor.js');
       const { stopSupervisorUnitIfActive } = await import('../lib/systemd.js');
       if (await stopSupervisorUnitIfActive()) {
         console.log(chalk.dim('Stopping supervisor sidecar...'));
         console.log(chalk.green('✓ Supervisor unit stopped'));
-      } else if (isSupervisorRunningSync()) {
+      } else if (isSupervisorRunning()) {
         console.log(chalk.dim('Stopping supervisor sidecar...'));
-        stopSupervisorProcessSync();
+        stopSupervisorProcess();
         console.log(chalk.green('✓ Supervisor stopped'));
       }
     } catch {
@@ -1150,8 +1150,8 @@ program
     // have identical teardown semantics.
     console.log(chalk.dim('Stopping dashboard...'));
     try {
-      const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
-      const platformConfig = readPlatformConfigSync();
+      const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+      const platformConfig = readPlatformConfig();
       // Respect whatever ports this block already parsed out of config.toml.
       await stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort });
       console.log(chalk.green('✓ Dashboard stopped'));
@@ -1209,7 +1209,7 @@ program
 
     // Stop TLDR daemon on project root
     try {
-      const { getTldrDaemonServiceSync } = await import('../lib/tldr-daemon.js');
+      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
       const { exec } = await import('child_process');
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
@@ -1219,7 +1219,7 @@ program
 
       if (existsSync(venvPath)) {
         console.log(chalk.dim('\nStopping TLDR daemon...'));
-        const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
+        const tldrService = getTldrDaemonService(projectRoot, venvPath);
         await tldrService.stop();
         console.log(chalk.green('✓ TLDR daemon stopped'));
       }

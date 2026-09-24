@@ -43,15 +43,15 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
-  getMergeSetSync: getMergeSetMock,
-  upsertMergeSetSync: upsertMergeSetMock,
-  withRepoArtifactUrlSync: vi.fn(),
-  withRepoStateSync: withRepoStateMock,
+  ensureMergeSetForIssue: ensureMergeSetForIssueMock,
+  getMergeSet: getMergeSetMock,
+  upsertMergeSet: upsertMergeSetMock,
+  withRepoArtifactUrl: vi.fn(),
+  withRepoState: withRepoStateMock,
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: vi.fn().mockReturnValue(null),
+  resolveProjectReposForIssue: vi.fn().mockReturnValue(null),
 }));
 
 import {

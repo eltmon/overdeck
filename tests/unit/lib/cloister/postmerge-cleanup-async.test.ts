@@ -141,9 +141,8 @@ vi.mock('../../../../src/lib/paths.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
+  resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
-  resolveTrackerTypeSync: vi.fn().mockReturnValue('github'),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -158,7 +157,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
       },
     },
   }),
-  findProjectByPathSync: vi.fn().mockReturnValue(null),
+  findProjectByPath: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
   loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));
@@ -190,7 +189,7 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  getMergeSetSync: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
+  getMergeSet: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
 }));
 
 vi.mock('../../../../src/lib/activity-log.js', () => ({
@@ -206,12 +205,12 @@ vi.mock('../../../../src/lib/cloister/merged-docker-cleanup-worker.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/workspace-manager/docker.js', () => ({
-  teardownWorkspaceDockerByNamePromise: mockTeardownWorkspaceDockerByNamePromise,
+  teardownWorkspaceDockerByName: mockTeardownWorkspaceDockerByNamePromise,
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   setAgentPaused: mockSetAgentPaused,
-  getAgentStateSync: mockGetAgentState,
+  getAgentState: mockGetAgentState,
 }));
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({

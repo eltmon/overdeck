@@ -11,8 +11,8 @@ import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getTrackerContext } from '../../lib/cloister/work-agent-prompt.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
-import { resolveTrackerTypeSync, isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
+import { resolveBareNumericId } from '../../lib/issue-id.js';
+import { resolveTrackerType, isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
 
 export interface ReopenOptions {
   json?: boolean;
@@ -131,7 +131,7 @@ interface GitHubIssueResult {
  * Fetch a GitHub issue by its full identifier (e.g., "PAN-457")
  */
 async function fetchGitHubIssue(issueId: string): Promise<GitHubIssueResult> {
-  const gh = resolveGitHubIssueSync(issueId);
+  const gh = resolveGitHubIssue(issueId);
   if (!gh.isGitHub) {
     throw new Error(`Issue ${issueId} is not a GitHub issue`);
   }
@@ -160,7 +160,7 @@ async function fetchGitHubIssue(issueId: string): Promise<GitHubIssueResult> {
  * Transition a GitHub issue to "open" state (reopen) and add in-progress label
  */
 async function reopenGitHubIssue(issueId: string): Promise<void> {
-  const gh = resolveGitHubIssueSync(issueId);
+  const gh = resolveGitHubIssue(issueId);
   if (!gh.isGitHub) {
     throw new Error(`Issue ${issueId} is not a GitHub issue`);
   }
@@ -194,7 +194,7 @@ async function reopenGitHubIssue(issueId: string): Promise<void> {
  * Add a comment to a GitHub issue
  */
 async function addGitHubComment(issueId: string, body: string): Promise<void> {
-  const gh = resolveGitHubIssueSync(issueId);
+  const gh = resolveGitHubIssue(issueId);
   if (!gh.isGitHub) {
     throw new Error(`Issue ${issueId} is not a GitHub issue`);
   }
@@ -285,7 +285,7 @@ export function findLocalWorkspace(issueId: string, startDir?: string): string |
 }
 
 export async function reopenCommand(id: string, options: ReopenOptions = {}): Promise<void> {
-  const issueId = resolveBareNumericIdSync(id);
+  const issueId = resolveBareNumericId(id);
   if (!issueId) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(
@@ -296,7 +296,7 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
 
   // Resolve tracker type using the same logic as `pan start` so GitHub issues
   // (e.g. pan-457) don't misroute to Linear (MIN-848).
-  const trackerType = resolveTrackerTypeSync(issueId);
+  const trackerType = resolveTrackerType(issueId);
 
   if (trackerType === 'github') {
     await reopenGitHubIssueCommand(issueId, options);
@@ -595,9 +595,9 @@ export async function resetWorkspaceState(
 async function printNextSteps(id: string): Promise<void> {
   // Check if agent is currently running and suggest appropriate next step
   try {
-    const { getAgentStateSync } = await import('../../lib/agents.js');
+    const { getAgentState } = await import('../../lib/agents.js');
     const agentId = `agent-${id.toLowerCase()}`;
-    const agentState = getAgentStateSync(agentId);
+    const agentState = getAgentState(agentId);
     const agentRunning = agentState?.status === 'running' || agentState?.status === 'starting';
 
     if (agentRunning) {

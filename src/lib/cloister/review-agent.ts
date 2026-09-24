@@ -44,9 +44,9 @@ import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
-import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
+import { listAgentIdsByPrefix } from '../overdeck/agents.js';
 import { loadConfigSync as loadYamlConfig, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
@@ -56,13 +56,13 @@ import { reviewResumeDecision } from './review-resume-decision.js';
 import { isReviewSessionForIssue } from './specialists-registry.js';
 import {
   recoverMissingConvoyReviewers,
-  launchConvoyReviewersPromise,
+  launchConvoyReviewers,
 } from './review-convoy.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
+import { getAgentState } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { withReviewLifecycleGuard } from '../review-lifecycle-guard.js';
 
@@ -82,11 +82,11 @@ const selfReviewReportPath = (reviewDir: string): string => join(reviewDir, 'rev
 
 async function deriveReviewRunHead8(issueId: string, workspace: string): Promise<string> {
   try {
-    const { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
-    const roots = resolveWorkspaceRepoRootsSync(issueId, workspace);
+    const { resolvePrimaryWorkspaceRepoDir, resolveWorkspaceRepoRoots } = await import('../project-repos.js');
+    const roots = resolveWorkspaceRepoRoots(issueId, workspace);
     if (roots.some(root => root.isPolyrepo)) {
-      const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-      const anchor = await snapshotWorkspaceHeadsPromise(issueId, workspace);
+      const { snapshotWorkspaceHeads } = await import('../git-utils.js');
+      const anchor = await snapshotWorkspaceHeads(issueId, workspace);
       return anchor
         ? createHash('sha1').update(anchor).digest('hex').substring(0, 8)
         : 'unknown';
@@ -95,7 +95,7 @@ async function deriveReviewRunHead8(issueId: string, workspace: string): Promise
     // PAN-3037: the primary code repo is resolved through the shared helper —
     // the polyrepo wrapper's HEAD never moves, so a wrapper-derived runId would
     // mismatch every live run and kill a healthy convoy on each dispatch.
-    const probeDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspace);
+    const probeDir = resolvePrimaryWorkspaceRepoDir(issueId, workspace);
     const { stdout } = await execAsync(['git', 'rev-parse', '--short=8', 'HEAD'].join(' '), {
       cwd: probeDir,
       encoding: 'utf-8',
@@ -270,7 +270,7 @@ function buildSelfReviewPrompt(opts: {
   console.log(`[review-agent] Self-review prompt for ${opts.issueId}: ${sizeBytes} bytes`);
   return prompt;
 }
-async function spawnReviewRoleForIssuePromise(
+async function spawnReviewRoleForIssueBody(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const dispatchStartedAtMs = Date.now();
@@ -282,7 +282,7 @@ async function spawnReviewRoleForIssuePromise(
   if (mergedGuard.skip) {
     const message = `[review-agent] Skipping review dispatch for ${opts.issueId} — ${mergedGuard.reason}`;
     console.log(message);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: opts.issueId });
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: opts.issueId });
     return { success: false, message };
   }
 
@@ -296,7 +296,7 @@ async function spawnReviewRoleForIssuePromise(
   if (resolveReviewMode(opts.issueId) === 'none') {
     const message = `Review skipped for ${opts.issueId} (mode=none) — AI review disabled by configuration; the verification gate still applies`;
     console.log(`[review-agent] ${message}`);
-    emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
+    emitActivityEntry({ source: 'review', level: 'info', message, issueId: opts.issueId });
     return { success: true, message };
   }
 
@@ -343,7 +343,7 @@ async function spawnReviewRoleForIssuePromise(
           const head8 = await deriveReviewRunHead8(opts.issueId, opts.workspace);
           if (head8 === 'unknown') throw new Error('workspace HEAD unavailable');
           currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${head8}`;
-          const synthReviewRunId = getAgentStateSync(reviewSessionName)?.reviewRunId;
+          const synthReviewRunId = getAgentState(reviewSessionName)?.reviewRunId;
           // A missing identity cannot prove that the live pane covers the
           // current obligation, so legacy/unknown sessions are stale too.
           if (!synthReviewRunId || synthReviewRunId !== currentRunId) {
@@ -447,15 +447,15 @@ async function spawnReviewRoleForIssuePromise(
   // gate, uncommitted scratch becomes visible in the review — that's the
   // correct fail-loud behavior, not a reason to silently stash.
   try {
-    const { notifyPipelineSync } = await import('../pipeline-notifier.js');
-    notifyPipelineSync({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
+    notifyPipeline({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
   } catch {
     // Non-fatal
   }
 
   try {
-    const { spawnRun, saveAgentState, getAgentStateSync, getLatestSessionIdSync, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
-    const workAgentState = getAgentStateSync(`agent-${opts.issueId.toLowerCase()}`);
+    const { spawnRun, saveAgentState, getAgentState, getLatestSessionId, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
+    const workAgentState = getAgentState(`agent-${opts.issueId.toLowerCase()}`);
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
     // Build the shared context manifest before spawning so all reviewers
@@ -493,7 +493,7 @@ async function spawnReviewRoleForIssuePromise(
       : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
 
     const spawnConvoyReviewers = (synthesisAgentId: string) =>
-      launchConvoyReviewersPromise({
+      launchConvoyReviewers({
         issueId: opts.issueId,
         workspace: opts.workspace,
         runId,
@@ -511,14 +511,14 @@ async function spawnReviewRoleForIssuePromise(
     // different agent then) or there is no resumable saved session. The resume delivery is
     // resilient (supervisor → tmux fallback, PAN-1988).
     const reviewAgentId = `agent-${opts.issueId.toLowerCase()}-review`;
-    const savedReview = getAgentStateSync(reviewAgentId);
+    const savedReview = getAgentState(reviewAgentId);
     const canResumeReview = reviewResumeDecision({
       requestedModel: opts.model,
       requestedHarness: opts.harness,
       savedModel: savedReview?.model,
       savedHarness: savedReview?.harness,
       hasSavedState: !!savedReview,
-      hasSavedSession: !!getLatestSessionIdSync(reviewAgentId),
+      hasSavedSession: !!getLatestSessionId(reviewAgentId),
     });
     if (canResumeReview) {
       console.log(`[review-agent] Resuming saved review session for ${opts.issueId} — model/harness unchanged, preserving context (PAN-1862)`);
@@ -526,7 +526,7 @@ async function spawnReviewRoleForIssuePromise(
       if (resumeResult.success) {
         try {
           // Keep the idempotency guard's HEAD-staleness detection honest for the resumed run.
-          const resumed = getAgentStateSync(reviewAgentId);
+          const resumed = getAgentState(reviewAgentId);
           if (resumed) {
             resumed.reviewRunId = runId;
             // PAN-2584: arm the parent's liveness deadline for this cycle.
@@ -562,7 +562,7 @@ async function spawnReviewRoleForIssuePromise(
     }
     // Fresh review: wipe any stale review state (harness/model changed, or the resume above
     // failed) so the new session does not inherit a mismatched saved session id.
-    if (savedReview || getLatestSessionIdSync(reviewAgentId)) {
+    if (savedReview || getLatestSessionId(reviewAgentId)) {
       try { await wipeAgentStateDirs(opts.issueId, { rolePrefix: 'review' }); }
       catch (wipeErr) { console.warn(`[review-agent] review state wipe before fresh spawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`); }
     }
@@ -589,7 +589,7 @@ async function spawnReviewRoleForIssuePromise(
     if (fullReview) {
       await spawnConvoyReviewers(run.id);
       console.log(`[review-agent] Review role (convoy synthesis) spawned for ${opts.issueId}: ${run.id}`);
-      emitActivityEntrySync({ source: 'review', level: 'info', message: `Convoy review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+      emitActivityEntry({ source: 'review', level: 'info', message: `Convoy review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
       return {
         success: true,
         message: `Convoy review spawned: ${run.id}`,
@@ -597,7 +597,7 @@ async function spawnReviewRoleForIssuePromise(
     }
 
     console.log(`[review-agent] Review role (self-review) spawned for ${opts.issueId}: ${run.id}`);
-    emitActivityEntrySync({ source: 'review', level: 'info', message: `Self-review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+    emitActivityEntry({ source: 'review', level: 'info', message: `Self-review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
 
     return {
       success: true,
@@ -613,7 +613,7 @@ async function spawnReviewRoleForIssuePromise(
     // created: an older startedAt means a pre-existing session that must not
     // be killed here.
     try {
-      const orphan = getAgentStateSync(reviewSessionName);
+      const orphan = getAgentState(reviewSessionName);
       const orphanStartedMs = orphan?.startedAt ? Date.parse(orphan.startedAt) : Number.NaN;
       const createdByThisDispatch = orphan !== null && orphan !== undefined
         && Number.isFinite(orphanStartedMs) && orphanStartedMs >= dispatchStartedAtMs - 5_000;
@@ -752,7 +752,7 @@ export const spawnReviewRoleForIssue = (
     }
     return reviewDispatchCoalescer.run(
       key,
-      () => withReviewLifecycleGuard(key, () => spawnReviewRoleForIssuePromise(opts)),
+      () => withReviewLifecycleGuard(key, () => spawnReviewRoleForIssueBody(opts)),
     );
   });
 
@@ -799,7 +799,7 @@ export async function purgeReviewAgentsForIssue(
 ): Promise<{ killed: string[]; removed: string[] }> {
   const killResult = await killAllReviewerSessions(projectKey, issueId);
   const removed: string[] = [];
-  for (const agentId of listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review`)) {
+  for (const agentId of listAgentIdsByPrefix(`agent-${issueId.toLowerCase()}-review`)) {
     await removeAgent(agentId);
     removed.push(agentId);
   }

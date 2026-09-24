@@ -2,12 +2,12 @@ import type { NormalizedCavemanConfig } from '../config-yaml.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { readCavemanVariant } from '../caveman/workspace.js';
 import { bridgeGeminiAuthToCliproxy, getCliproxyClientEnv } from '../cliproxy.js';
-import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
+import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
 import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { ensureOpenAICompatibleProxyRunning } from '../openai-compatible-proxy.js';
 import { validateProviderHealth } from '../provider-health.js';
-import { getProviderEnvSync, getProviderForModelSync } from '../providers.js';
-import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
+import { getProviderEnv, getProviderForModel } from '../providers.js';
+import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, hasModelCapability, getModelCapability, resolveModelId } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -24,7 +24,7 @@ export const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
  * always use the latest key.
  */
 export async function getProviderEnvForModel(model: string, harness?: RuntimeName): Promise<Record<string, string>> {
-  const provider = getProviderForModelSync(model);
+  const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') return {};
   // Muse owns login/API credentials; keep them out of Claude's environment.
   if (provider.name === 'meta' && harness === 'muse') return {};
@@ -37,7 +37,7 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
   // which only skips the Anthropic-compat env — it never bypassed this
   // upstream API-key requirement.
   if (provider.name === 'kimi' && harness === 'kimi-code') {
-    return getProviderEnvSync(provider, '', harness);
+    return getProviderEnv(provider, '', harness);
   }
 
   const { config } = loadYamlConfig();
@@ -46,7 +46,7 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
   if (provider.name === 'openrouter') {
     const apiKey = config.apiKeys.openrouter;
     if (apiKey) {
-      return getProviderEnvSync(provider, apiKey, harness);
+      return getProviderEnv(provider, apiKey, harness);
     }
     throw new Error(`OpenRouter API key not configured. Add your key in Settings → OpenRouter before using model "${model}".`);
   }
@@ -87,7 +87,7 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
       await ensureOpenAICompatibleProxyRunning();
     }
     await validateProviderHealth(model, apiKey);
-    return getProviderEnvSync(provider, apiKey, harness);
+    return getProviderEnv(provider, apiKey, harness);
   }
 
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
@@ -141,15 +141,15 @@ interface ClaudeCodeContextPolicy {
 }
 
 export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeContextPolicy {
-  const provider = getProviderForModelSync(model);
+  const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') {
-    return hasModelCapabilitySync(model)
-      ? { autoCompactWindow: getModelCapabilitySync(resolveModelIdSync(model)).contextWindow }
+    return hasModelCapability(model)
+      ? { autoCompactWindow: getModelCapability(resolveModelId(model)).contextWindow }
       : {};
   }
 
 
-  const resolvedModel = resolveModelIdSync(model);
+  const resolvedModel = resolveModelId(model);
   // OpenRouter models are unknown to Claude Code, which assumes a 200K window
   // for unrecognized ids. Pin both vars (K3 precedent — only
   // CLAUDE_CODE_MAX_CONTEXT_TOKENS is verified to lift the 200K assumption;
@@ -176,9 +176,9 @@ export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeCon
       maxContextTokens: CLIPROXY_GPT56_CONTEXT_WINDOW,
     };
   }
-  if (!hasModelCapabilitySync(resolvedModel)) return {};
+  if (!hasModelCapability(resolvedModel)) return {};
 
-  const contextWindow = getModelCapabilitySync(resolvedModel).contextWindow;
+  const contextWindow = getModelCapability(resolvedModel).contextWindow;
   // Unknown-to-Claude model IDs otherwise keep its smaller native budget.
   // Both ceilings must describe the same context shown in Overdeck's picker.
   return { autoCompactWindow: contextWindow, maxContextTokens: contextWindow };
@@ -309,10 +309,10 @@ export async function buildCavemanExports(
 const WORK_AGENT_BROKEN_MODELS = new Set<string>([]);
 
 export function determineModel(options: { model?: string; role?: Role; spawnKey?: string } = {}): string {
-  const modelOverride = normalizeModelOverrideSync(options.model);
+  const modelOverride = normalizeModelOverride(options.model);
   const resolved = modelOverride
     ? modelOverride
-    : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config, options.spawnKey));
+    : requireModelOverride(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config, options.spawnKey));
 
   // Work-agent safety net: a config pin (or smart-selection) must not spawn a
   // work agent on a model that is known to wedge for the work role. Fail loudly

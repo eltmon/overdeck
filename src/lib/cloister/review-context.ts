@@ -18,8 +18,8 @@ import { findPlanSync, readPlan } from '../xbrief/io.js';
 import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
 import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-ingestion.js';
 import { findXBriefByIssueSync } from '../xbrief/lifecycle-io.js';
-import { getDevrootPathSync } from '../config.js';
-import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
+import { getDevrootPath } from '../config.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
 
 const execAsync = promisify(exec);
 
@@ -243,7 +243,7 @@ async function extractPlanReviewRequirements(workspace: string, issueId: string)
 
   // Try project-root lifecycle directories
   try {
-    const projectRoot = getDevrootPathSync();
+    const projectRoot = getDevrootPath();
     if (!projectRoot) return { acceptanceCriteria: [], nonGoals: [], traces: [] };
     const found = findXBriefByIssueSync(projectRoot, issueId);
     if (found) {
@@ -488,7 +488,7 @@ export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<
   // .gitignore excludes the code sub-repos — diffing it always yields an empty
   // manifest. Resolve the actual repo roots and build per-repo, aggregating
   // with repo-prefixed paths. Monorepo resolves to one root at the workspace.
-  const roots = resolveWorkspaceRepoRootsSync(issueId, workspace);
+  const roots = resolveWorkspaceRepoRoots(issueId, workspace);
   const isPolyrepo = roots.some(root => root.isPolyrepo);
 
   const perRepo = await Promise.all(roots.map(async root => {

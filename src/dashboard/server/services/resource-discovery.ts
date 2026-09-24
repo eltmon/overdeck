@@ -32,7 +32,7 @@ import type { IssueState } from '@overdeck/contracts';
 import { loadIssueStatesForProject } from './derived-issue-state.js';
 import { resolveAgentGitInfo } from './git-info.js';
 import { resolveMissingIssueTitles } from './issue-title-fallback.js';
-import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
+import { parseIssueIdFromText } from '../../../lib/resource-utils.js';
 import {
   readPipelineMembershipSnapshotsForProjects,
   refreshMembershipSnapshotsForProjects,
@@ -337,7 +337,7 @@ async function loadOpenPullRequests(projects: ProjectRef[]): Promise<Map<string,
           number: row.number, title: row.title, url: row.url, state: row.state,
           isDraft: row.isDraft, headRefName: row.headRefName, baseRefName: row.baseRefName,
         };
-        const issueId = parseIssueIdFromTextSync(pr.headRefName);
+        const issueId = parseIssueIdFromText(pr.headRefName);
         if (!issueId) continue;
         const existing = pullRequests.get(issueId) ?? [];
         existing.push(pr);
@@ -545,7 +545,7 @@ async function computeResourceAllocatedIssues(
     if (!isDiscoverableAgentSession(sessionName)) {
       continue;
     }
-    const issueId = parseIssueIdFromTextSync(sessionName);
+    const issueId = parseIssueIdFromText(sessionName);
     if (!issueId) continue;
     const issue = ensureIssue(issueId);
     if (!issue) continue;
@@ -589,7 +589,7 @@ async function computeResourceAllocatedIssues(
   }
 
   for (const containerName of dockerContainers) {
-    const issueId = parseIssueIdFromTextSync(containerName.replace(/feature\//g, 'feature-'));
+    const issueId = parseIssueIdFromText(containerName.replace(/feature\//g, 'feature-'));
     if (!issueId) continue;
     const issue = ensureIssue(issueId);
     if (!issue) continue;
@@ -649,7 +649,7 @@ async function computeResourceAllocatedIssues(
       ...branches.local.map((b) => [b, 'localBranches'] as const),
       ...branches.remote.map((b) => [b, 'remoteBranches'] as const),
     ]) {
-      const issueId = parseIssueIdFromTextSync(branch);
+      const issueId = parseIssueIdFromText(branch);
       if (!issueId) continue;
       const issue = ensureIssue(issueId, project);
       if (!issue) continue;

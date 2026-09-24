@@ -19,14 +19,14 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import {
   getCachedDockerContainerLifecycleObservedAt,
   getCachedDockerContainerLifecycleSnapshot,
   recordDockerContainerLifecycleSnapshot,
   type DockerContainerLifecycle,
 } from '../docker-stats.js';
-import { parseIssueIdSync } from '../issue-id.js';
+import { parseIssueId } from '../issue-id.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
 const execFileAsync = promisify(execFile);
@@ -237,7 +237,7 @@ function normalizeIssue(issueId: string): string {
   // an optional value do not crash with `Cannot read properties of undefined
   // (reading 'toLowerCase')`.
   if (!issueId) return '';
-  return parseIssueIdSync(issueId)?.normalized ?? issueId.toLowerCase();
+  return parseIssueId(issueId)?.normalized ?? issueId.toLowerCase();
 }
 
 function resolveStackProject(issueId: string): WorkspaceStackProject | null {
@@ -459,7 +459,7 @@ export function recordWorkspaceStackHealthTransition(issueId: string, health: Wo
 
   if (previous !== true || health.healthy) return false;
 
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'cloister',
     level: 'error',
     issueId: issueId.toUpperCase(),

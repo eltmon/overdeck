@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   existsSync: vi.fn(),
-  readPlatformConfigSync: vi.fn(),
+  readPlatformConfig: vi.fn(),
   restartDashboard: vi.fn(),
   stopDashboard: vi.fn(),
 }));
@@ -14,7 +14,7 @@ vi.mock('fs', async (importActual) => ({
 
 vi.mock('../../../lib/platform-lifecycle.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/platform-lifecycle.js')>()),
-  readPlatformConfigSync: mocks.readPlatformConfigSync,
+  readPlatformConfig: mocks.readPlatformConfig,
   restartDashboard: mocks.restartDashboard,
   stopDashboard: mocks.stopDashboard,
 }));
@@ -43,7 +43,7 @@ describe('restartCommand workspace guard', () => {
       'Run this command from the primary checkout at /repo',
     ));
     expect(process.exitCode).toBe(2);
-    expect(mocks.readPlatformConfigSync).not.toHaveBeenCalled();
+    expect(mocks.readPlatformConfig).not.toHaveBeenCalled();
     expect(mocks.restartDashboard).not.toHaveBeenCalled();
     expect(mocks.stopDashboard).not.toHaveBeenCalled();
   });

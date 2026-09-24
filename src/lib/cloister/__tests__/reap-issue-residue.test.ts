@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   isBranchMerged: vi.fn(),
   killSession: vi.fn(() => Effect.void),
   listSessionNames: vi.fn(() => Effect.succeed([])),
-  teardownWorkspaceDockerByNamePromise: vi.fn(() =>
+  teardownWorkspaceDockerByName: vi.fn(() =>
     Promise.resolve({ networkRemoved: true, steps: ['Stopped Docker stack'] }),
   ),
   agentsDir: '',
@@ -38,7 +38,7 @@ vi.mock('../../tmux.js', () => ({
 }));
 
 vi.mock('../../workspace-manager/docker.js', () => ({
-  teardownWorkspaceDockerByNamePromise: mocks.teardownWorkspaceDockerByNamePromise,
+  teardownWorkspaceDockerByName: mocks.teardownWorkspaceDockerByName,
 }));
 
 vi.mock('../../paths.js', () => ({
@@ -62,7 +62,7 @@ describe('reapIssueResidue', () => {
     vi.clearAllMocks();
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.isBranchMerged.mockResolvedValue({ status: 'merged', message: 'merged' });
-    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+    mocks.teardownWorkspaceDockerByName.mockResolvedValue({
       networkRemoved: true,
       steps: ['Stopped Docker stack'],
     });
@@ -156,13 +156,13 @@ describe('reapIssueResidue', () => {
 
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-2054');
+    expect(mocks.teardownWorkspaceDockerByName).toHaveBeenCalledWith('pan-2054');
     expect(actions.some((action) => action.includes('removed Docker stack for feature-pan-2054'))).toBe(true);
   });
 
   it('records a warning when the Docker network is still present', async () => {
     mocks.isBranchMerged.mockResolvedValue({ status: 'merged', message: 'merged' });
-    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+    mocks.teardownWorkspaceDockerByName.mockResolvedValue({
       networkRemoved: false,
       steps: ['network still present'],
     });
@@ -180,7 +180,7 @@ describe('reapIssueResidue', () => {
 
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-2054');
+    expect(mocks.teardownWorkspaceDockerByName).toHaveBeenCalledWith('pan-2054');
     expect(actions.some((action) => action.includes('removed Docker stack for feature-pan-2054'))).toBe(true);
     expect(actions.some((action) => action.includes('skipped disk reap') && action.includes('unmerged'))).toBe(true);
   });

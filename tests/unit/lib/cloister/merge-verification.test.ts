@@ -38,7 +38,7 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  getMergeSetSync: getMergeSetMock,
+  getMergeSet: getMergeSetMock,
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -46,7 +46,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: resolveGitHubIssueMock,
+  resolveGitHubIssue: resolveGitHubIssueMock,
 }));
 
 vi.mock('../../../../src/lib/cloister/merge-completeness.js', () => ({

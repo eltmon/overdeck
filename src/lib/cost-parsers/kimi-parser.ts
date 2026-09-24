@@ -30,7 +30,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import type { SessionUsage } from './jsonl-parser.js';
-import { getPricingSync } from '../cost.js';
+import { getPricing } from '../cost.js';
 
 interface KimiUsageFields {
   inputOther?: number;
@@ -81,7 +81,7 @@ function readLines(sessionFile: string): KimiWireEntry[] {
  * Parse a Kimi Code CLI wire.jsonl file into the shared SessionUsage shape.
  * Returns null if the file cannot be read or contains no usage.record entries.
  */
-export function parseKimiSessionSync(sessionFile: string): SessionUsage | null {
+export function parseKimiSession(sessionFile: string): SessionUsage | null {
   if (!existsSync(sessionFile)) return null;
   let entries: KimiWireEntry[];
   try {
@@ -94,7 +94,7 @@ export function parseKimiSessionSync(sessionFile: string): SessionUsage | null {
 
 /**
  * Aggregate already-parsed wire.jsonl entries into the shared SessionUsage
- * shape. Split out of {@link parseKimiSessionSync} (PAN-1837 review fix) so a
+ * shape. Split out of {@link parseKimiSession} (PAN-1837 review fix) so a
  * caller that has already read and parsed the file (the conversation-feed
  * adapter, which re-parses on every wire.jsonl append) can reuse those
  * entries instead of re-reading and re-parsing the whole file a second time
@@ -141,7 +141,7 @@ export function summarizeKimiEntries(entries: KimiWireEntry[], sessionFile: stri
   if (!hasUsage) return null;
   const bareModel = model ? bareKimiModel(model) : 'unknown';
 
-  const pricing = getPricingSync('custom', bareModel);
+  const pricing = getPricing('custom', bareModel);
   const inputCost = (totalInput / 1000) * (pricing?.inputPer1k ?? 0);
   const outputCost = (totalOutput / 1000) * (pricing?.outputPer1k ?? 0);
   const cacheReadCost = (totalCacheRead / 1000) * (pricing?.cacheReadPer1k ?? 0);

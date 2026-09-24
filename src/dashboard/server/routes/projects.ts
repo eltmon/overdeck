@@ -23,7 +23,7 @@ import {
 import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
 import { setProjectVersionSync } from '../../../lib/projects-writer.js';
-import { listUatGenerationsSync, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
+import { listUatGenerations, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { resolveImplicitStaffing } from '../../../lib/agents/staffing.js';
 import { resolveTieredExecutionBlock } from '../../../lib/agents/tier-table.js';
@@ -41,7 +41,7 @@ import {
   rejectUnsafeDashboardMutationRequest,
 } from './dashboard-auth.js';
 
-import { extractPrefixSync } from '../../../lib/issue-id.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
@@ -53,7 +53,7 @@ import { getBackendPanesForIssue } from '../services/backend-inventory.js';
 import { getDerivedIssueState } from '../services/derived-issue-state.js';
 import { getShipLog } from '../../../lib/cloister/ship-log.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentRuntimeState, getAgentState } from '../../../lib/agents.js';
 import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
@@ -68,7 +68,7 @@ import { isPlanningComplete } from '../../../lib/xbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
-import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
+import { parseIssueIdFromText } from '../../../lib/resource-utils.js';
 import { isDiscoverableAgentSession } from '../services/resource-discovery.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
@@ -148,7 +148,7 @@ function issueIdsWithLiveTmuxSessions(sessionNames: ReadonlySet<string>): Set<st
   const issueIds = new Set<string>();
   for (const sessionName of sessionNames) {
     if (!isDiscoverableAgentSession(sessionName)) continue;
-    const issueId = parseIssueIdFromTextSync(sessionName);
+    const issueId = parseIssueIdFromText(sessionName);
     if (issueId) issueIds.add(issueId.toLowerCase());
   }
   return issueIds;
@@ -196,7 +196,7 @@ async function collectSessionTreeNodes(
   context: SessionTreeContext,
 ): Promise<SessionNode[]> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const agentsDir = join(getOverdeckHome(), 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
@@ -238,7 +238,7 @@ async function collectSessionTreeNodes(
   for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
     // PAN-1908: the agents registry decides whether a session exists — never
     // the ~/.overdeck/agents/<id>/ dir, which janitors remove after sessions end.
-    const state = getAgentStateSync(checkId);
+    const state = getAgentState(checkId);
     if (!state) continue;
 
     try {
@@ -406,7 +406,7 @@ async function collectSessionTreeNodes(
   {
     const shipSessionName = `agent-${issueLower}-ship`;
     const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
-    const shipState = getAgentStateSync(shipSessionName);
+    const shipState = getAgentState(shipSessionName);
     const shipJsonlPath = shipIsLive || shipState
       ? await resolveJsonlPath(shipSessionName, workspacePath)
       : null;
@@ -704,7 +704,7 @@ interface ProjectVersionSyncRouteDeps {
 const defaultProjectVersionSyncRouteDeps: ProjectVersionSyncRouteDeps = {
   getProject: key => getProjectSync(key) ?? null,
   listProjectKeys: () => listProjectsSync().map(entry => entry.key),
-  listPromotedGenerations: projectRoot => listUatGenerationsSync({
+  listPromotedGenerations: projectRoot => listUatGenerations({
     projectRoot: resolve(projectRoot),
     statuses: ['promoted'],
     limit: 1,

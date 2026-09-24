@@ -7,10 +7,10 @@ import {
   createSession,
   ensureOverdeckTmuxServerSync,
   ensureOverdeckTmuxServerAsync,
-  findManagedServerPidSync,
+  findManagedServerPid,
   getManagedTmuxSocketName,
   _resetWarnedManagedServerDirtyForTest,
-  sanitizeManagedServerGlobalEnvSync,
+  sanitizeManagedServerGlobalEnv,
 } from '../tmux.js';
 import { Effect } from 'effect';
 
@@ -385,7 +385,7 @@ describe('createSession', () => {
   });
 });
 
-describe('findManagedServerPidSync', () => {
+describe('findManagedServerPid', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -397,7 +397,7 @@ describe('findManagedServerPidSync', () => {
       return '';
     });
 
-    expect(findManagedServerPidSync()).toBe(54321);
+    expect(findManagedServerPid()).toBe(54321);
   });
 
   it('falls back to pgrep when the unit is not loaded', () => {
@@ -407,7 +407,7 @@ describe('findManagedServerPidSync', () => {
       return '';
     });
 
-    expect(findManagedServerPidSync()).toBe(11111);
+    expect(findManagedServerPid()).toBe(11111);
   });
 
   it('returns undefined when no PID can be found', () => {
@@ -417,7 +417,7 @@ describe('findManagedServerPidSync', () => {
       return '';
     });
 
-    expect(findManagedServerPidSync()).toBeUndefined();
+    expect(findManagedServerPid()).toBeUndefined();
   });
 });
 
@@ -494,7 +494,7 @@ describe('PAN-3671: managed server global environment sanitizer', () => {
     process.env.OVERDECK_HOME = '/tmp/fake';
     process.env.OVERDECK_TMUX_SOCKET_NAME = 'overdeck';
 
-    sanitizeManagedServerGlobalEnvSync({ HOME: '/tmp/fake-user', OVERDECK_HOME: '/tmp/fake' });
+    sanitizeManagedServerGlobalEnv({ HOME: '/tmp/fake-user', OVERDECK_HOME: '/tmp/fake' });
 
     expect(pinnedValue('HOME')).toBe(homedir());
     expect(pinnedValue('OVERDECK_HOME')).toBe(join(homedir(), '.overdeck'));
@@ -507,7 +507,7 @@ describe('PAN-3671: managed server global environment sanitizer', () => {
     delete process.env.OVERDECK_HOME;
     delete process.env.OVERDECK_TMUX_SOCKET_NAME;
 
-    sanitizeManagedServerGlobalEnvSync({});
+    sanitizeManagedServerGlobalEnv({});
 
     expect(pinnedValue('HOME')).toBe(homedir());
     expect(pinnedValue('OVERDECK_HOME')).toBe(join(homedir(), '.overdeck'));
@@ -517,7 +517,7 @@ describe('PAN-3671: managed server global environment sanitizer', () => {
     process.env.OVERDECK_HOME = '/tmp/fake';
     process.env.OVERDECK_TMUX_SOCKET_NAME = 'custom';
 
-    sanitizeManagedServerGlobalEnvSync({ HOME: '/tmp/fake-user', OVERDECK_HOME: '/tmp/fake' });
+    sanitizeManagedServerGlobalEnv({ HOME: '/tmp/fake-user', OVERDECK_HOME: '/tmp/fake' });
 
     expect(pinnedValue('HOME')).toBe('/tmp/fake-user');
     expect(pinnedValue('OVERDECK_HOME')).toBe('/tmp/fake');

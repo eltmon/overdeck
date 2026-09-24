@@ -11,7 +11,7 @@
 
 import { homedir } from 'node:os';
 import { Effect, Layer, Context } from 'effect';
-import { loadOverdeckEnvSync } from '../../lib/env-loader.js';
+import { loadOverdeckEnv } from '../../lib/env-loader.js';
 import {
   getDashboardIdentity,
   isNonPrimaryCheckoutRoot,
@@ -66,7 +66,7 @@ export const ServerConfigLayer = Layer.effect(
   ServerConfig,
   Effect.sync((): ServerConfigShape => {
     // Load .overdeck.env (idempotent)
-    loadOverdeckEnvSync();
+    loadOverdeckEnv();
 
     const portStr = process.env['API_PORT'] ?? process.env['PORT'] ?? '3011';
     const port = parseInt(portStr, 10);

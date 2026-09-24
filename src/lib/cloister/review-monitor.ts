@@ -63,7 +63,7 @@ interface ReviewerState {
   settled: boolean;
   stalledAt?: number;
   lastModifiedMs: number;
-}export async function waitForReviewerOutputsPromise(
+}export async function waitForReviewerOutputs(
   opts: WaitForReviewerOutputsOpts,
 ): Promise<ReviewerResult[]> {
   const {

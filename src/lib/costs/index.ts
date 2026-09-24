@@ -6,13 +6,13 @@
 
 // Event log management
 export {
-  appendCostEventSync,
-  readEventsSync,
-  tailEventsSync,
-  readEventsFromLineSync,
-  getLastEventMetadataSync,
-  replaceEventsFileSync,
-  deduplicateEventsSync,
+  appendCostEvent,
+  readEvents,
+  tailEvents,
+  readEventsFromLine,
+  getLastEventMetadata,
+  replaceEventsFile,
+  deduplicateEvents,
   eventsFileExists,
   getEventsFilePath,
   type CostEvent,
@@ -22,14 +22,14 @@ export {
 
 // Aggregation cache management
 export {
-  loadCacheSync,
-  saveCacheSync,
-  updateCacheFromEventsSync,
-  rebuildCacheSync,
-  syncCacheSync,
-  getCostsByIssueSync,
-  getCostsForIssueSync,
-  setIssueBudgetSync,
+  loadCache,
+  saveCache,
+  updateCacheFromEvents,
+  rebuildCache,
+  syncCache,
+  getCostsByIssue,
+  getCostsForIssue,
+  setIssueBudget,
   getCacheStatus,
   type CostCache,
   type IssueStats,
@@ -39,9 +39,9 @@ export {
 
 // Historical data migration
 export {
-  migrateAllSessionsSync,
-  needsMigrationSync,
-  migrateIfNeededSync,
+  migrateAllSessions,
+  needsMigration,
+  migrateIfNeeded,
   type MigrationStats,
 } from './migration.js';
 
@@ -53,15 +53,15 @@ export {
 
 // Event retention
 export {
-  pruneOldEventsSync,
-  needsPruningSync,
-  getRetentionStatusSync,
+  pruneOldEvents,
+  needsPruning,
+  getRetentionStatus,
   type RetentionStats,
 } from './retention.js';
 
 // WAL writers / sync (PAN-1249)
 export {
-  appendToWalSync,
+  appendToWal,
   resolveWalDir,
 } from './wal.js';
 export {

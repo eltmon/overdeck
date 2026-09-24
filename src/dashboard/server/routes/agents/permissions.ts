@@ -5,9 +5,9 @@ import {
   deliverAgentMessage,
   deliverAgentPermissionDecision,
   getAgentRuntimeState,
-  getAgentStateSync,
+  getAgentState,
 } from '../../../../lib/agents.js';
-import { getAgentJsonlPath, scanPendingInputsPromise } from '../../../../lib/agent-enrichment.js';
+import { getAgentJsonlPath, scanPendingInputs } from '../../../../lib/agent-enrichment.js';
 import { deliverPlanActionToSession } from '../../../../lib/overdeck/conversation-delivery.js';
 import {
   answerSessionPaneChoice,
@@ -15,7 +15,7 @@ import {
   type PendingPaneChoice,
   type SessionPaneChoiceResult,
 } from '../../../../lib/session-pane-choice.js';
-import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -42,7 +42,7 @@ interface AgentPaneChoiceDeps {
     sessionName: string,
     body: Record<string, unknown>,
   ) => Promise<SessionPaneChoiceResult>;
-  emitActivityEntry?: typeof emitActivityEntrySync;
+  emitActivityEntry?: typeof emitActivityEntry;
 }
 
 export async function handleGetAgentPaneChoice(
@@ -64,7 +64,7 @@ export async function handlePostAgentPaneChoice(
 ): Promise<SessionPaneChoiceResult> {
   if (!agentId.trim()) return { body: { error: 'missing agent id' }, status: 400 };
   const readAgentState = deps.getAgentState
-    ?? (async (id: string) => getAgentStateSync(id));
+    ?? (async (id: string) => getAgentState(id));
   const agentState = await readAgentState(agentId);
   if (!agentState) return { body: { error: `Agent ${agentId} not found` }, status: 404 };
 
@@ -72,7 +72,7 @@ export async function handlePostAgentPaneChoice(
   const result = await answer(agentId, body);
   const answeredLabel = result.body['answeredLabel'];
   if (result.status === undefined && result.body['ok'] === true && typeof answeredLabel === 'string') {
-    (deps.emitActivityEntry ?? emitActivityEntrySync)({
+    (deps.emitActivityEntry ?? emitActivityEntry)({
       source: 'dashboard',
       level: 'info',
       issueId: agentState.issueId,
@@ -196,9 +196,9 @@ export const postAgentPlanActionRoute = HttpRouter.add(
     const action = typeof body['action'] === 'string' ? body['action'] : '';
     const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
 
-    let agentState: ReturnType<typeof getAgentStateSync>;
+    let agentState: ReturnType<typeof getAgentState>;
     try {
-      agentState = getAgentStateSync(id);
+      agentState = getAgentState(id);
     } catch {
       agentState = null;
     }
@@ -208,7 +208,7 @@ export const postAgentPlanActionRoute = HttpRouter.add(
 
     const jsonlPath = yield* Effect.promise(() => getAgentJsonlPath(id));
     const scan = jsonlPath
-      ? yield* Effect.promise(() => scanPendingInputsPromise(jsonlPath))
+      ? yield* Effect.promise(() => scanPendingInputs(jsonlPath))
       : null;
     if (!scan?.exitPlanModePending) {
       return jsonResponse({ error: 'No pending plan approval for this agent' }, { status: 409 });
@@ -218,7 +218,7 @@ export const postAgentPlanActionRoute = HttpRouter.add(
     if (error) {
       return jsonResponse({ error }, { status: 400 });
     }
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'info',
       issueId: agentState.issueId,
@@ -239,10 +239,10 @@ export const postInternalAgentPermissionRequestRoute = HttpRouter.add(
     }
 
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const { INTERNAL_TOKEN_HEADER, getInternalTokenSync } = yield* Effect.promise(() =>
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
       import('../../../../lib/internal-token.js'),
     );
-    const expected = getInternalTokenSync();
+    const expected = getInternalToken();
     if (!expected) {
       return jsonResponse({ ok: false, error: 'internal token not configured' }, { status: 503 });
     }
@@ -269,7 +269,7 @@ export const postInternalAgentPermissionRequestRoute = HttpRouter.add(
       return jsonResponse({ ok: true, duplicate: true });
     }
 
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ ok: false, error: `agent ${id} not found` }, { status: 404 });
     }
@@ -301,7 +301,7 @@ export const postInternalAgentPermissionRequestRoute = HttpRouter.add(
       },
     } as never);
 
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'warn',
       message: `Permission requested for ${toolName}`,
@@ -369,7 +369,7 @@ export const postAgentPermissionResponseRoute = HttpRouter.add(
         deliverDecision: (agentId, permissionRequestId, decisionBehavior) =>
           deliverAgentPermissionDecision(agentId, permissionRequestId, decisionBehavior),
         emitResolvedActivity: (pendingRequest, decisionBehavior) => {
-          emitActivityEntrySync({
+          emitActivityEntry({
             source: 'dashboard',
             level: decisionBehavior === 'allow' ? 'success' : 'warn',
             message: `Permission ${permissionResolutionVerb(decisionBehavior)} for ${pendingRequest.toolName}`,

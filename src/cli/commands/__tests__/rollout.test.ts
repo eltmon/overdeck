@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getReleaseSetSync: vi.fn(),
+  getReleaseSet: vi.fn(),
   runRelease: vi.fn(),
-  parseIssueIdSync: vi.fn((id: string) => ({ prefix: id.split('-')[0], numeric: Number(id.split('-')[1]), issueId: id })),
-  resolveIssueIdSync: vi.fn((id: string) => id.toUpperCase()),
+  parseIssueId: vi.fn((id: string) => ({ prefix: id.split('-')[0], numeric: Number(id.split('-')[1]), issueId: id })),
+  resolveIssueId: vi.fn((id: string) => id.toUpperCase()),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectPath: '/repo/overdeck' })),
 }));
 
 vi.mock('../../../lib/release-set.js', () => ({
-  getReleaseSetSync: mocks.getReleaseSetSync,
+  getReleaseSet: mocks.getReleaseSet,
 }));
 
 vi.mock('../../../lib/release/release-engine.js', () => ({
@@ -17,8 +17,8 @@ vi.mock('../../../lib/release/release-engine.js', () => ({
 }));
 
 vi.mock('../../../lib/issue-id.js', () => ({
-  parseIssueIdSync: mocks.parseIssueIdSync,
-  resolveIssueIdSync: mocks.resolveIssueIdSync,
+  parseIssueId: mocks.parseIssueId,
+  resolveIssueId: mocks.resolveIssueId,
 }));
 
 vi.mock('../../../lib/projects.js', () => ({
@@ -27,7 +27,7 @@ vi.mock('../../../lib/projects.js', () => ({
 
 import { rolloutStatusCommand, rolloutRetryCommand } from '../rollout.js';
 
-function makeReleaseSet(overrides: Partial<ReturnType<typeof mocks.getReleaseSetSync>> = {}): NonNullable<ReturnType<typeof mocks.getReleaseSetSync>> {
+function makeReleaseSet(overrides: Partial<ReturnType<typeof mocks.getReleaseSet>> = {}): NonNullable<ReturnType<typeof mocks.getReleaseSet>> {
   return {
     issueId: 'PAN-399',
     projectKey: 'overdeck',
@@ -41,7 +41,7 @@ function makeReleaseSet(overrides: Partial<ReturnType<typeof mocks.getReleaseSet
       { componentKey: 'frontend', trigger: 'auto', releaseOrder: 1, required: true, status: 'passed' },
     ],
     ...overrides,
-  } as NonNullable<ReturnType<typeof mocks.getReleaseSetSync>>;
+  } as NonNullable<ReturnType<typeof mocks.getReleaseSet>>;
 }
 
 describe('rollout status', () => {
@@ -55,7 +55,7 @@ describe('rollout status', () => {
   });
 
   it('prints release status and component rows', async () => {
-    mocks.getReleaseSetSync.mockReturnValue(makeReleaseSet());
+    mocks.getReleaseSet.mockReturnValue(makeReleaseSet());
 
     await rolloutStatusCommand('PAN-399');
 
@@ -68,7 +68,7 @@ describe('rollout status', () => {
   });
 
   it('exits when the issue ID is invalid', async () => {
-    mocks.parseIssueIdSync.mockReturnValueOnce(null);
+    mocks.parseIssueId.mockReturnValueOnce(null);
 
     await expect(rolloutStatusCommand('BAD')).rejects.toThrow('process.exit unexpectedly called with "1"');
   });
@@ -80,12 +80,12 @@ describe('rollout status', () => {
   });
 
   it('canonicalizes lowercase issue IDs for status lookup', async () => {
-    mocks.getReleaseSetSync.mockReturnValue(makeReleaseSet());
+    mocks.getReleaseSet.mockReturnValue(makeReleaseSet());
 
     await rolloutStatusCommand('pan-399');
 
-    expect(mocks.resolveIssueIdSync).toHaveBeenCalledWith('pan-399');
-    expect(mocks.getReleaseSetSync).toHaveBeenCalledWith('PAN-399');
+    expect(mocks.resolveIssueId).toHaveBeenCalledWith('pan-399');
+    expect(mocks.getReleaseSet).toHaveBeenCalledWith('PAN-399');
   });
 });
 
@@ -123,7 +123,7 @@ describe('rollout retry', () => {
 
     await rolloutRetryCommand('pan-399');
 
-    expect(mocks.resolveIssueIdSync).toHaveBeenCalledWith('pan-399');
+    expect(mocks.resolveIssueId).toHaveBeenCalledWith('pan-399');
     expect(mocks.runRelease).toHaveBeenCalledWith('PAN-399', '/repo/overdeck');
   });
 });

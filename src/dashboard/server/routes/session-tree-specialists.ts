@@ -5,7 +5,7 @@ import type { AgentSnapshot, SessionNode, SessionNodePresence } from '@overdeck/
 
 import {
   getAgentDir,
-  getAgentStateSync,
+  getAgentState,
   type AgentState,
 } from '../../../lib/agents.js';
 import type { AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
@@ -78,7 +78,7 @@ export async function buildSpecialistSessionNodes(
 
   if (reachedReview || reviewIsLive) {
     const projectKey = resolveProjectFromIssueSync(issueId)?.projectKey ?? fallbackProjectKey;
-    const state = getAgentStateSync(reviewSessionName);
+    const state = getAgentState(reviewSessionName);
     const status = normalizeAgentStatus(
       reviewIsLive
         ? 'running'
@@ -138,7 +138,7 @@ export async function buildSpecialistSessionNodes(
   const reachedTest = derived?.pr?.checks !== undefined && derived.pr.checks !== 'pending';
 
   if (reachedTest || testIsLive) {
-    const state = getAgentStateSync(testSessionName);
+    const state = getAgentState(testSessionName);
     const jsonlPath = await resolveJsonlPath(testSessionName, workspacePath);
     const awaitingInput = awaitingInputFromProjection(testSessionName, agentSnapshotsById);
     const snapshot = agentSnapshotsById?.get(testSessionName);

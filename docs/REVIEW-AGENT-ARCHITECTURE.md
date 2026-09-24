@@ -179,7 +179,7 @@ or un-parks an issue.
 
 ## Evidence and polyrepo anchors
 
-`snapshotWorkspaceHeadsPromise()` is the producer for review `HeadAnchor` values:
+`snapshotWorkspaceHeads()` is the producer for review `HeadAnchor` values:
 a monorepo anchor is one full SHA, while a polyrepo anchor is a space-separated
 set of `repoKey@sha` tokens. `parseCompositeSnapshot()` is the shared parser for
 inspection. Persisted strings do not regain the `HeadAnchor` brand: the

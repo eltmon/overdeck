@@ -8,7 +8,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { homedir } from 'os';
-import { TunnelConfig, TunnelHostname, TemplatePlaceholders, replacePlaceholdersSync } from './workspace-config.js';
+import { TunnelConfig, TunnelHostname, TemplatePlaceholders, replacePlaceholders } from './workspace-config.js';
 
 export interface TunnelResult {
   success: boolean;
@@ -99,8 +99,8 @@ function resolveHostnames(
   placeholders: TemplatePlaceholders,
 ): Array<{ hostname: string; httpHostHeader?: string; noTlsVerify: boolean }> {
   return hostnames.map(h => ({
-    hostname: replacePlaceholdersSync(h.pattern, placeholders),
-    httpHostHeader: h.http_host_header ? replacePlaceholdersSync(h.http_host_header, placeholders) : undefined,
+    hostname: replacePlaceholders(h.pattern, placeholders),
+    httpHostHeader: h.http_host_header ? replacePlaceholders(h.http_host_header, placeholders) : undefined,
     noTlsVerify: h.no_tls_verify !== false, // default true
   }));
 }

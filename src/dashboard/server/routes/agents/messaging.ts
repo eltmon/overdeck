@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getAgentStateSync, messageAgent } from '../../../../lib/agents.js';
+import { getAgentState, messageAgent } from '../../../../lib/agents.js';
 import {
   ComposerCommandConfirmationError,
   composerCommandConfirmationFromBody,
@@ -48,7 +48,7 @@ export async function handleAgentMessage(
     if (isComposerCommandMessage(message)) {
       let agentState;
       try {
-        agentState = getAgentStateSync(id);
+        agentState = getAgentState(id);
       } catch {
         return jsonResponse({
           error: `Failed to resolve agent target: ${id}`,

@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState } from '../agents.js';
 import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
-import { closeOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { closeOverdeckDatabase } from '../overdeck/infra.js';
 
 let tmpHome: string;
 let workspace: string;
@@ -111,7 +111,7 @@ function mockSpawnDependencies(): void {
       readyPath: join(tmpHome, 'agents', agentId, 'ready.json'),
       fifoPath: join(tmpHome, 'agents', agentId, 'rpc.in'),
     })),
-    writePiCommandSync: vi.fn(),
+    writePiCommand: vi.fn(),
   }));
 
   vi.doMock('../paths.js', async (importOriginal) => {
@@ -159,8 +159,8 @@ function mockSpawnDependencies(): void {
     readWorkspacePlanSync: vi.fn(() => ({ plan: { items: [{ id: 'item-1' }] } })),
   }));
   vi.doMock('../activity-logger.js', () => ({
-    emitActivityEntrySync: vi.fn(),
-    emitActivityTtsSync: vi.fn(),
+    emitActivityEntry: vi.fn(),
+    emitActivityTts: vi.fn(),
   }));
   vi.doMock('../cloister/work-agent-prompt.js', () => ({
     writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -197,17 +197,17 @@ function mockSpawnDependencies(): void {
   vi.doMock('../provider-health.js', () => ({
     validateProviderHealth: vi.fn(async () => undefined),
   }));
-  // agents.ts now imports getFlywheelActiveRunIdSync from overdeck/control-settings (not database/app-settings)
+  // agents.ts now imports getFlywheelActiveRunId from overdeck/control-settings (not database/app-settings)
   vi.doMock('../overdeck/control-settings.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../overdeck/control-settings.js')>();
     return {
       ...actual,
-      getFlywheelActiveRunIdSync: () => activeFlywheelRunId,
+      getFlywheelActiveRunId: () => activeFlywheelRunId,
     };
   });
   vi.doMock('../projects.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../projects.js')),
-    findProjectByPathSync: vi.fn(() => null),
+    findProjectByPath: vi.fn(() => null),
   }));
 }
 
@@ -217,9 +217,9 @@ beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-workspace-'));
   packageRootDir = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-package-'));
   // Seed overdeck.db so saveAgentStateSync can find the migration SQL
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   process.env.OVERDECK_HOME = tmpHome;
   // fix10: this suite drives the real spawn path. Pin tmux so no selection
   // can reach a Herdr session and start a live agent in it.
@@ -261,7 +261,7 @@ afterEach(() => {
   vi.doUnmock('../provider-health.js');
   vi.doUnmock('../overdeck/control-settings.js');
   vi.doUnmock('../projects.js');
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   delete process.env.OVERDECK_AGENT_STARTED_BY;
   delete process.env.PAN_DOCKER;
@@ -332,11 +332,11 @@ describe('spawnAgent PTY supervisor wiring', () => {
   });
 
   it('persists supervisorEnabled through state read/write', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
 
     saveAgentStateSync({ ...baseState(), supervisorEnabled: true });
 
-    expect(getAgentStateSync('agent-pan-1405')?.supervisorEnabled).toBe(true);
+    expect(getAgentState('agent-pan-1405')?.supervisorEnabled).toBe(true);
   });
 
   it('writes pty-token, skips Channels MCP by default, persists supervisorEnabled, and wraps the launcher', async () => {

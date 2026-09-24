@@ -46,7 +46,7 @@ function parseEnvFile(content: string): Record<string, string> {
  *
  * @returns Object with loaded variables and any errors
  */
-export function loadOverdeckEnvSync(): {
+export function loadOverdeckEnv(): {
   loaded: string[];
   skipped: string[];
   error?: string;

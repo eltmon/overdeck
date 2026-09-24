@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { getAgentStateSync, type AgentState } from '../agents.js';
+import { getAgentState, type AgentState } from '../agents.js';
 import { CostDoorLive, CostWriter } from '../overdeck/cost.js';
 
 type RunningAgent = AgentState & { tmuxActive: boolean };
@@ -8,7 +8,7 @@ async function reconcileSourceForRunningAgents(
   runningAgents: readonly RunningAgent[],
   source: 'ohmypi' | 'codex',
 ): Promise<void> {
-  if (!runningAgents.some((agent) => getAgentStateSync(agent.id)?.harness === source)) return;
+  if (!runningAgents.some((agent) => getAgentState(agent.id)?.harness === source)) return;
 
   try {
     await Effect.runPromise(

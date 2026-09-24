@@ -13,11 +13,11 @@ vi.mock('ora', () => ({
 
 vi.mock('../../../lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/config.js')>()),
-  getDashboardApiUrlSync: () => 'http://pan.test',
+  getDashboardApiUrl: () => 'http://pan.test',
 }));
 
 vi.mock('../../../lib/internal-token.js', () => ({
-  ensureInternalTokenSync: () => 'test-internal-token',
+  ensureInternalToken: () => 'test-internal-token',
   INTERNAL_TOKEN_HEADER: 'x-overdeck-internal-token',
 }));
 

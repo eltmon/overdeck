@@ -16,8 +16,8 @@ const mockGetPrFacts = vi.fn();
 vi.mock('../../../../src/lib/agents.js', () => ({
   spawnRun: (...args: Parameters<typeof mockSpawnRun>) => mockSpawnRun(...args),
   messageAgent: vi.fn(),
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentStateSync>) => mockGetAgentStateSync(...args),
-  getLatestSessionIdSync: (...args: Parameters<typeof mockGetLatestSessionIdSync>) => mockGetLatestSessionIdSync(...args),
+  getAgentState: (...args: Parameters<typeof mockGetAgentStateSync>) => mockGetAgentStateSync(...args),
+  getLatestSessionId: (...args: Parameters<typeof mockGetLatestSessionIdSync>) => mockGetLatestSessionIdSync(...args),
   saveAgentState: (...args: Parameters<typeof mockSaveAgentState>) => mockSaveAgentState(...args),
   resumeAgent: vi.fn(async () => ({ success: false })),
   wipeAgentStateDirs: vi.fn(),
@@ -81,7 +81,7 @@ vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: (...args: Parameters<typeof mockEmitActivityEntrySync>) => mockEmitActivityEntrySync(...args),
+  emitActivityEntry: (...args: Parameters<typeof mockEmitActivityEntrySync>) => mockEmitActivityEntrySync(...args),
 }));
 
 import { beforeEach } from 'vitest';

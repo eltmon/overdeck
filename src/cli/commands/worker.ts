@@ -21,7 +21,7 @@ import type { Command } from 'commander';
 import { Effect } from 'effect';
 
 import { exitCli } from '../exit.js';
-import { resolveIssueIdSync } from '../../lib/issue-id.js';
+import { resolveIssueId } from '../../lib/issue-id.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { isAlive as livenessIsAlive, isConfirmedDead, type LivenessVerdict } from '../../lib/agents/liveness.js';
 import {
@@ -215,7 +215,7 @@ export async function workerRunCommand(options: WorkerRunOptions, deps: WorkerCl
   let started: StartedWorker;
   try {
     started = await deps.startWorker({
-      issueId: resolveIssueIdSync(options.issue),
+      issueId: resolveIssueId(options.issue),
       prompt,
       parentId,
       model: options.model,
@@ -333,7 +333,7 @@ export async function workerListCommand(
   deps: WorkerCliDeps,
 ): Promise<number> {
   const listings = await deps.listWorkers({
-    ...(options.issue ? { issueId: resolveIssueIdSync(options.issue) } : {}),
+    ...(options.issue ? { issueId: resolveIssueId(options.issue) } : {}),
     ...(options.parent ? { parentId: options.parent } : {}),
   });
   const rows = await Promise.all(listings.map(async (listing) => ({

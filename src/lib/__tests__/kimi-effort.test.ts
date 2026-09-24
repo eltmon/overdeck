@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveKimiNativeEffort } from '../kimi-effort.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { getClaudeCodeContextPolicyForModel } from '../agents/provider-env.js';
 
 describe('managed Kimi effort', () => {
@@ -38,7 +38,7 @@ describe('managed Kimi effort', () => {
   it.each(['low', 'high', 'max'])(
     'exports explicit %s effort for fresh and resumed native launches', (effort) => {
       for (const resumeSessionId of [undefined, 'existing-session']) {
-        const script = generateLauncherScriptSync({
+        const script = generateLauncherScript({
           role: 'work', workingDir: '/workspace', harness: 'kimi-code',
           kimiCodeModel: 'kimi-code/k3', kimiCodeEffort: effort, resumeSessionId,
         });
@@ -50,7 +50,7 @@ describe('managed Kimi effort', () => {
   );
 
   it('clears an inherited forced effort for K2.7 instead of claiming it supports levels', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       role: 'work', workingDir: '/workspace', harness: 'kimi-code',
       kimiCodeModel: 'kimi-code/kimi-for-coding', kimiCodeEffort: 'high',
     });
@@ -59,7 +59,7 @@ describe('managed Kimi effort', () => {
   });
 
   it('passes explicit effort into the persistent ACP host', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       role: 'work', workingDir: '/workspace', harness: 'acp',
       acpAgentId: 'agent-test', acpProvider: 'kimi', acpWorkspace: '/workspace',
       acpBinaryPath: '/bin/kimi', model: 'kimi-code/k3', acpEffort: 'low',

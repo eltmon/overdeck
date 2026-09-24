@@ -9,8 +9,8 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
-import { appendCostEventSync, CostEvent, eventsFileExists, getLastEventMetadataSync } from './events.js';
-import { getPricingSync, calculateCostSync, TokenUsage } from '../cost.js';
+import { appendCostEvent, CostEvent, eventsFileExists, getLastEventMetadata } from './events.js';
+import { getPricing, calculateCost, TokenUsage } from '../cost.js';
 
 // ============== Types ==============
 
@@ -208,7 +208,7 @@ function usageToCostEvents(
     }
 
     // Get pricing and calculate cost
-    const pricing = getPricingSync(provider as any, usage.model);
+    const pricing = getPricing(provider as any, usage.model);
     if (!pricing) {
       continue; // Skip if no pricing found
     }
@@ -221,7 +221,7 @@ function usageToCostEvents(
       cacheTTL: '5m',
     };
 
-    const cost = calculateCostSync(tokenUsage, pricing);
+    const cost = calculateCost(tokenUsage, pricing);
 
     events.push({
       ts: usage.timestamp || new Date().toISOString(),
@@ -348,7 +348,7 @@ function migrateAgent(agentDir: string, stats: MigrationStats): void {
         const events = usageToCostEvents(usages, context);
 
         for (const event of events) {
-          appendCostEventSync(event);
+          appendCostEvent(event);
           stats.eventsCreated++;
           stats.totalCost += event.cost;
           stats.totalTokens += event.input + event.output + event.cacheRead + event.cacheWrite;
@@ -390,7 +390,7 @@ function migrateAgent(agentDir: string, stats: MigrationStats): void {
           const events = usageToCostEvents(usages, subagentContext);
 
           for (const event of events) {
-            appendCostEventSync(event);
+            appendCostEvent(event);
             stats.eventsCreated++;
             stats.totalCost += event.cost;
             stats.totalTokens += event.input + event.output + event.cacheRead + event.cacheWrite;
@@ -420,7 +420,7 @@ function migrateAgent(agentDir: string, stats: MigrationStats): void {
 /**
  * Migrate all historical session data to events.jsonl
  */
-export function migrateAllSessionsSync(): MigrationStats {
+export function migrateAllSessions(): MigrationStats {
   const stats: MigrationStats = {
     agentsProcessed: 0,
     sessionFilesProcessed: 0,
@@ -478,14 +478,14 @@ export function migrateAllSessionsSync(): MigrationStats {
 /**
  * Check if migration is needed
  */
-export function needsMigrationSync(): boolean {
+export function needsMigration(): boolean {
   // If events file doesn't exist, we need migration
   if (!eventsFileExists()) {
     return true;
   }
 
   // If events file is empty, we need migration
-  const metadata = getLastEventMetadataSync();
+  const metadata = getLastEventMetadata();
   if (metadata.totalEvents === 0) {
     return true;
   }
@@ -496,11 +496,11 @@ export function needsMigrationSync(): boolean {
 /**
  * Migrate only if needed
  */
-export function migrateIfNeededSync(): MigrationStats | null {
-  if (!needsMigrationSync()) {
+export function migrateIfNeeded(): MigrationStats | null {
+  if (!needsMigration()) {
     console.log('Migration not needed - events file already exists with data');
     return null;
   }
 
-  return migrateAllSessionsSync();
+  return migrateAllSessions();
 }

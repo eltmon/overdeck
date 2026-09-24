@@ -51,7 +51,7 @@ const STRIPPED_KEYS = new Set([...LEAKED_ENV_KEYS, ...PROVIDER_ENV_KEYS]);
  * @param overrides  Key/value pairs to overlay AFTER stripping.
  * @returns  A plain object safe to pass to spawn, pty.spawn, etc.
  */
-export function buildChildEnvSync(
+export function buildChildEnv(
   baseEnv: NodeJS.ProcessEnv = process.env,
   overrides?: Record<string, string>,
 ): Record<string, string> {
@@ -86,7 +86,7 @@ export const BLANKED_PROVIDER_ENV: Record<string, string> = Object.fromEntries(
  * Variant that strips ONLY tmux/screen artifacts (not provider keys).
  * Use this when the caller will handle provider env separately (e.g. launcher scripts).
  */
-export function buildChildEnvWithoutTmuxSync(
+export function buildChildEnvWithoutTmux(
   baseEnv: NodeJS.ProcessEnv = process.env,
   overrides?: Record<string, string>,
 ): Record<string, string> {

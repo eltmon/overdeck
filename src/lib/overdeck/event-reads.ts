@@ -1,5 +1,5 @@
 /** Canonical narrow read door for retained agent runtime events. */
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 
 interface EventPayloadRow {
   payload: string | Record<string, unknown> | null;
@@ -33,8 +33,8 @@ function parsePayload(payload: EventPayloadRow['payload']): Record<string, unkno
  * claudeSessionId fields are skipped; an explicit null/empty value is a clear
  * tombstone and prevents an older id from being resurrected.
  */
-export function readLatestAgentClaudeSessionIdEventSync(agentId: string): string | null {
-  const row = getOverdeckDatabaseSync().prepare(`
+export function readLatestAgentClaudeSessionIdEvent(agentId: string): string | null {
+  const row = getOverdeckDatabase().prepare(`
     SELECT payload
     FROM events
     WHERE type = 'agent.model_set'

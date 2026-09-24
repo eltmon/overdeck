@@ -16,10 +16,10 @@ import { cvCommand } from './cv.js';
 import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
 import { pingAgent } from '../../lib/health.js';
-import { readAgentCVSync } from '../../lib/cv.js';
-import { getAgentRuntimeStateSync, getAgentStateSync } from '../../lib/agents.js';
+import { readAgentCV } from '../../lib/cv.js';
+import { getAgentRuntimeStateSync, getAgentState } from '../../lib/agents.js';
 import { getAgentEffectiveLastActivityMs, isAlive, type LivenessVerdict } from '../../lib/agents/liveness.js';
-import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
+import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { getDerivedIssueState } from '../../lib/overdeck/derived-issue-state.js';
 import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
 import { readPipelineJournal, type PipelineJournalEntry } from '../../lib/cloister/pipeline-journal.js';
@@ -127,7 +127,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   // and prefixed agent IDs (agent-pan-1148). Bare numbers are resolved by probing
   // ~/.overdeck/agents/ for a unique state dir, since the CLI doesn't otherwise
   // know which project a bare number belongs to.
-  const resolved = resolveBareNumericIdSync(id);
+  const resolved = resolveBareNumericId(id);
   if (!resolved) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(
@@ -146,7 +146,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
 
   const issueState = await getDerivedIssueState(issueId);
   const runtimeState = getAgentRuntimeStateSync(agentId);
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   const hasAgent = Boolean(agentState || runtimeState);
 
   // PAN-3917 (W12): `pingAgent` asks tmux directly — `sessionExists` — so on a
@@ -162,7 +162,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   const liveness = hasAgent && backend !== 'tmux'
     ? await isAlive(agentId).catch((): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }))
     : null;
-  const cvData = readAgentCVSync(agentId);
+  const cvData = readAgentCV(agentId);
 
   // What Overdeck DID, from the workspace's append-only journal. No forge call
   // is added: this is a local file read, and the derived `state` above still

@@ -13,24 +13,24 @@ import { validateOrigin } from '../../dashboard/server/routes/origin-validation.
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
-import { getAgentStateSync } from '../agents.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { getAgentState } from '../agents.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
-import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { checkPrdGate, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
 import { PENDING_PROMOTION_FILENAME } from '../pan-dir/types.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
-import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
+import { extractTeamPrefix, findProjectByPath, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
 import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-commit.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
 import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../xbrief/quality-lint.js';
 import { isPreWorktreeMetadataOnlyDir } from '../workspace-manager/worktree-ops.js';
-import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { resolveIssueProjectPath } from './issue-reads.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -55,7 +55,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -145,7 +145,7 @@ function emitCompletePlanningPhase(
   details: Record<string, unknown> = {},
 ): void {
   const timestamp = new Date().toISOString();
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'complete-planning',
     level: status === 'failure' ? 'error' : status === 'skipped' ? 'warn' : 'info',
     message: `complete-planning.phase=${phase}`,
@@ -319,7 +319,7 @@ export async function recordPlanningAutoHandoffFailure(options: {
   result: CompletePlanningAutoSpawnResult;
   eventStore: any;
   now?: () => string;
-  emitActivity?: typeof emitActivityEntrySync;
+  emitActivity?: typeof emitActivityEntry;
 }): Promise<string> {
   const skipReason = options.result.workAgentSkipReason ?? 'spawn-failed';
   const error = options.result.workAgentError ?? `Work agent startup failed: ${skipReason}`;
@@ -338,7 +338,7 @@ export async function recordPlanningAutoHandoffFailure(options: {
       ...details,
     },
   }));
-  (options.emitActivity ?? emitActivityEntrySync)({
+  (options.emitActivity ?? emitActivityEntry)({
     source: 'plan',
     level: 'error',
     message: `${options.issueId} planning complete, but work-agent startup failed: ${error}`,
@@ -361,7 +361,7 @@ export async function completePlanningAutoSpawn(options: {
   }
 
   const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
-  const internalToken = getInternalTokenSync();
+  const internalToken = getInternalToken();
   const internalTokenHeaders: Record<string, string> = internalToken
     ? { [INTERNAL_TOKEN_HEADER]: internalToken }
     : {};
@@ -592,7 +592,7 @@ export async function completePlanningForIssue(options: {
 
     // Determine project path
     const githubCheck = isGitHubIssue(id);
-    const projectPath = resolveIssueProjectPathSync(id);
+    const projectPath = resolveIssueProjectPath(id);
 
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
     if (workspacePath) {
@@ -602,7 +602,7 @@ export async function completePlanningForIssue(options: {
       if (noPrd) {
         emitCompletePlanningPhase(id, 'prdGate', 'skipped', 'noPrd bypass requested');
       } else {
-        const prdGate = checkPrdGateSync({ projectRoot: projectPath || null, workspacePath, issueId: id });
+        const prdGate = checkPrdGate({ projectRoot: projectPath || null, workspacePath, issueId: id });
         if (!prdGate.ok) {
           emitCompletePlanningPhase(id, 'prdGate', 'failure', prdGate.reason ?? 'missing', { prdGate });
           return jsonResponse({ error: `PRD-first gate: no PRD draft for ${id.toUpperCase()}`, prdGate }, { status: 422 });
@@ -738,7 +738,7 @@ export async function completePlanningForIssue(options: {
     // hasLiveTmuxSession:true after the session died would never self-heal).
     const projectPlanningAgentStopped = async (): Promise<void> => {
       try {
-        const planningState = getAgentStateSync(sessionName);
+        const planningState = getAgentState(sessionName);
         if (!planningState) return;
         const previousStatus = planningState.status;
         const hasLiveTmuxSession = await agentPaneExists(sessionName).catch(() => false);
@@ -805,7 +805,7 @@ export async function completePlanningForIssue(options: {
         eventStore,
       });
     } else {
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'plan',
         level: 'info',
         message: autoSpawnResult?.workAgentSpawned
@@ -813,7 +813,7 @@ export async function completePlanningForIssue(options: {
           : `${id} planning complete — ready for work`,
         issueId: id,
       });
-      emitActivityTtsSync({
+      emitActivityTts({
         utterance: autoSpawnResult?.workAgentSpawned
           ? `${id} planning complete, work agent starting`
           : `${id} planning complete, ready for work`,

@@ -25,7 +25,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
   resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
   listProjectsSync: mocks.listProjectsSync,
-  findProjectByPathSync: (projectPath: string) =>
+  findProjectByPath: (projectPath: string) =>
     (mocks.listProjectsSync() ?? []).find(({ config }: { config: { path: string } }) => config.path === projectPath)?.config ?? null,
   // PAN-2372 WI-2: workspace-door record path now resolves the owning project;
   // these tests fixture the continue file under the project root, so treat

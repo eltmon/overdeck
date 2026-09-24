@@ -14,8 +14,8 @@ export async function systemHealthCommand(): Promise<void> {
 
   // Dashboard health
   try {
-    const { getDashboardApiUrlSync } = await import('../../lib/config.js');
-    const dashboardUrl = getDashboardApiUrlSync();
+    const { getDashboardApiUrl } = await import('../../lib/config.js');
+    const dashboardUrl = getDashboardApiUrl();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(`${dashboardUrl}/api/health`, { method: 'GET', signal: controller.signal });
@@ -31,7 +31,7 @@ export async function systemHealthCommand(): Promise<void> {
 
   // smee-client webhook relay
   try {
-    const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
+    const { isSmeeProcessRunning } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');
     if (!existsSync(smeeUrlPath)) {
       checks.push({
@@ -39,7 +39,7 @@ export async function systemHealthCommand(): Promise<void> {
         status: 'unknown',
         message: 'Not configured',
       });
-    } else if (isSmeeProcessRunningSync()) {
+    } else if (isSmeeProcessRunning()) {
       checks.push({
         name: 'smee-client Webhook Relay',
         status: 'healthy',

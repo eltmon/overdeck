@@ -120,7 +120,7 @@ storage code. Landing order is fixed: the ratchet first, then one child at a tim
 | 21g | CH-7 | One owner per harness for transcript/session/home paths (skips ohmypi, removed by #4003) | **LANDED** #4049 |
 | 21h | CH-8 | Dead exports, `export` pruning, alias shims (CH-8a deletions in two PRs; CH-8b `export` pruning and the comment-blind scan) | **LANDED** #4050, #4051, #4055 |
 | 21i | CH-9 | The nine twin pairs AC-W8 still listed after CH-8b: four variants deleted (the Effect `withConcurrencyLimit`, sync `getBook`, sync `readAutoSpawnOnFinalizeFlag`, the Effect `listProjects`), the other five pairs C6 with header notes; parser-exact comment stripping for the dead-export scan | in review |
-| 21j | follow-up | AC-W6: 26 `async function …Promise(` names left in cluster modules outside Oh My Pi. 12 are the only variant left (their Effect twin was deleted as dead), so the suffix is stale: rename to the bare name. 14 are private bodies behind a kept Effect export: rename `…Body`, as CH-4 did. Candidate scope for #4002 (ledger, CH-9) | open |
+| 21j | follow-up | AC-W6: 26 `async function …Promise(` names left in cluster modules outside Oh My Pi. 12 are the only variant left (their Effect twin was deleted as dead), so the suffix is stale: rename to the bare name. 14 are private bodies behind a kept Effect export: rename `…Body`, as CH-4 did. Candidate scope for #4002 (ledger, CH-9) | **LANDED** #4002 |
 
 ## Related in-pipeline items being shepherded alongside (not queue members)
 

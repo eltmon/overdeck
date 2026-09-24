@@ -48,7 +48,7 @@ import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
 import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
-import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
+import { getConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { getConversationSearchStatus } from '../services/conversation-search-status.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
@@ -764,7 +764,7 @@ const getConversationSearchReindexEstimateRoute = HttpRouter.add(
       try: async () => {
         // Optional ?model= lets the UI price a *prospective* model switch before saving it.
         const modelOverride = new URL(request.url, 'http://localhost').searchParams.get('model')?.trim();
-        const baseConfig = getConversationSearchConfigSync();
+        const baseConfig = getConversationSearchConfig();
         const config = modelOverride ? { ...baseConfig, model: modelOverride } : baseConfig;
         const estimate = await estimateFullReindexConversationSearchCost({ config });
         const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD

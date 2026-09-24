@@ -39,7 +39,7 @@ import type { AgentState } from '../../../../src/lib/agents.js';
 
 // The projection logs via persistent-logger — fire-and-forget in tests.
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
-  logAgentLifecycleSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
 }));
 
 // PAN-3917: whether a late session-started may resurrect the agent is the

@@ -390,6 +390,6 @@ function postUnixSocketJson(
   })
 }
 
-export function createAcpRuntimeSync(options: AcpRuntimeOptions = {}): AcpRuntimeSync {
+export function createAcpRuntime(options: AcpRuntimeOptions = {}): AcpRuntimeSync {
   return new AcpRuntimeSync(options)
 }

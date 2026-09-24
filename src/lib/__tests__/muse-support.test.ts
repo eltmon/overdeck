@@ -3,20 +3,20 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { getHarnessBehavior, KNOWN_HARNESSES } from '@overdeck/contracts';
-import { getProviderForModelSync } from '../providers.js';
+import { getProviderForModel } from '../providers.js';
 import { parseMuseSessionMetadata } from '../conversations/harness-metadata.js';
-import { applyFallbackSync } from '../model-fallback.js';
-import { getAgentCommandSync } from '../settings.js';
-import { getPricingSync } from '../cost.js';
-import { canUseHarnessSync } from '../harness-policy.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { applyFallback } from '../model-fallback.js';
+import { getAgentCommand } from '../settings.js';
+import { getPricing } from '../cost.js';
+import { canUseHarness } from '../harness-policy.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { getAvailableModelsApi } from '../settings-api.js';
 import { mergeConfigs } from '../config-yaml/merge.js';
 import { parseMuseRecords, summarizeMuseRecords } from '../cost-parsers/muse-parser.js';
 import { museDataHome, resolveMuseSessionPath } from '../runtimes/storage/muse.js';
 import { renderForHarness } from '../context-layers/harness.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
-import { readSessionIndexSync } from '../session-history.js';
+import { readSessionIndex } from '../session-history.js';
 import { MuseRuntimeSync } from '../runtimes/muse.js';
 
 vi.mock('../harness-binary.js', async (importOriginal) => {
@@ -51,13 +51,13 @@ describe('Muse model and harness support', () => {
     expect(getHarnessBehavior('muse').executableName).toBe('muse');
     expect(getAvailableModelsApi().meta.map(model => model.id)).toEqual(models);
     for (const model of models) {
-      expect(getProviderForModelSync(model)).toMatchObject({ name: 'meta', defaultHarness: 'muse' });
-      expect(canUseHarnessSync('muse', model, undefined).allowed).toBe(true);
-      expect(canUseHarnessSync('claude-code', model, undefined).allowed).toBe(false);
+      expect(getProviderForModel(model)).toMatchObject({ name: 'meta', defaultHarness: 'muse' });
+      expect(canUseHarness('muse', model, undefined).allowed).toBe(true);
+      expect(canUseHarness('claude-code', model, undefined).allowed).toBe(false);
     }
-    expect(canUseHarnessSync('muse', 'claude-sonnet-5', undefined).allowed).toBe(false);
-    expect(applyFallbackSync(models[0], new Set(['meta']))).toBe(models[0]);
-    expect(() => applyFallbackSync(models[0], new Set(['anthropic']))).toThrow('Meta (Muse) is disabled');
+    expect(canUseHarness('muse', 'claude-sonnet-5', undefined).allowed).toBe(false);
+    expect(applyFallback(models[0], new Set(['meta']))).toBe(models[0]);
+    expect(() => applyFallback(models[0], new Set(['anthropic']))).toThrow('Meta (Muse) is disabled');
     expect(getAvailableModelsApi().meta[1].name).toContain('training data');
   });
 
@@ -75,11 +75,11 @@ describe('Muse model and harness support', () => {
     );
     expect(config.enabledProviders.has('meta')).toBe(false);
     expect(explicitlyDisabled.has('meta')).toBe(true);
-    expect(() => applyFallbackSync(models[0], config.enabledProviders)).toThrow('Meta (Muse) is disabled');
+    expect(() => applyFallback(models[0], config.enabledProviders)).toThrow('Meta (Muse) is disabled');
   });
 
   it.each(models)('routes the command helper for %s to native Muse', model => {
-    expect(getAgentCommandSync(model)).toEqual({ command: 'muse', args: ['--model', model] });
+    expect(getAgentCommand(model)).toEqual({ command: 'muse', args: ['--model', model] });
   });
 
   it('clears the completed-turn marker when a resumed turn starts', async () => {
@@ -105,7 +105,7 @@ describe('Muse model and harness support', () => {
   });
 
   it.each(models)('launches %s interactively and resumes only a native UUID', model => {
-    const script = generateLauncherScriptSync({ role: 'work', workingDir: '/tmp/muse workspace', harness: 'muse',
+    const script = generateLauncherScript({ role: 'work', workingDir: '/tmp/muse workspace', harness: 'muse',
       museModel: model, overdeckEnv: { agentId: 'conv-muse-test' },
       resumeSessionId: 'stale-claude-id', museResumeSessionId: 'native-muse-id',
       museContextFile: '/tmp/context with spaces.md', spawnMode: 'conversation' });
@@ -119,7 +119,7 @@ describe('Muse model and harness support', () => {
   });
 
   it('requires an explicit model instead of using Muse settings as a fallback', () => {
-    expect(() => generateLauncherScriptSync({ role: 'work', workingDir: '/tmp', harness: 'muse',
+    expect(() => generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
       overdeckEnv: { agentId: 'agent-muse-test' } })).toThrow('explicit supported Muse');
   });
 
@@ -142,7 +142,7 @@ describe('Muse model and harness support', () => {
     } } };
     const records = parseMuseRecords([metadata, completion, completion].map(record => JSON.stringify(record)).join('\n') + '\n{"partial":');
     const result = summarizeMuseRecords(records, '/sessions/root/session.jsonl');
-    const price = getPricingSync('custom', model)!;
+    const price = getPricing('custom', model)!;
     expect(result?.usage).toEqual({ inputTokens: 500000, outputTokens: 1000000, cacheReadTokens: 500000 });
     expect(result?.cost).toBeCloseTo(500 * price.inputPer1k + 1000 * price.outputPer1k + 500 * price.cacheReadPer1k!);
     expect(result?.cost).toBeCloseTo(model.endsWith('contributor') ? 0.251 : 4.95);
@@ -181,7 +181,7 @@ describe('Muse model and harness support', () => {
       });
 
       expect(agent.sessionId).toBe('01-fresh');
-      expect(readSessionIndexSync(agentId)).toEqual([
+      expect(readSessionIndex(agentId)).toEqual([
         expect.objectContaining({
           sessionId: '01-fresh',
           source: 'launcher',

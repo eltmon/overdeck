@@ -20,7 +20,7 @@ import { promisify } from 'node:util';
 
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
-import { resolveProjectReposForIssueSync, type ResolvedProjectRepo } from '../project-repos.js';
+import { resolveProjectReposForIssue, type ResolvedProjectRepo } from '../project-repos.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestCheckName } from './verification-tests-mode.js';
 
@@ -100,7 +100,7 @@ export interface FailedCheck {
 
 export interface PrFactsDeps {
   fetchGitHubPr?: typeof fetchIssuePullRequest;
-  resolveRepos?: typeof resolveProjectReposForIssueSync;
+  resolveRepos?: typeof resolveProjectReposForIssue;
   listGitLabMrs?: typeof listOpenGitLabMergeRequests;
   viewGitLabMr?: (projectPath: string, iid: number) => Promise<GitLabMrView>;
   /**
@@ -553,7 +553,7 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
     return emptyPrFacts(issueId, `GitHub PR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
   }
 
-  const resolveRepos = deps.resolveRepos ?? resolveProjectReposForIssueSync;
+  const resolveRepos = deps.resolveRepos ?? resolveProjectReposForIssue;
   let repo: ResolvedProjectRepo | null = null;
   try {
     repo = primaryGitLabRepo(resolveRepos(issueId) ?? []);

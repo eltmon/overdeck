@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { afterEach, describe, expect, it } from 'vitest';
-import { executeAgentSkillsSync, planAgentSkillsSync} from '../harness-skill-sync.js';
+import { executeAgentSkills, planAgentSkills} from '../harness-skill-sync.js';
 
 // Moved here from src/lib/harness-skill-sync.ts, which no production code called (PAN-3958 CH-8).
 /**
@@ -46,7 +46,7 @@ describe('agent harness skill sync', () => {
   it('copies the complete skill bundle into the shared Agent Skills directory', () => {
     const { source, target } = fixture();
 
-    const result = executeAgentSkillsSync({}, target, source);
+    const result = executeAgentSkills({}, target, source);
 
     expect(result.created).toEqual(expect.arrayContaining(['okf/SKILL.md', 'okf/references/workflow.md']));
     expect(result.created).toHaveLength(2);
@@ -58,7 +58,7 @@ describe('agent harness skill sync', () => {
   it('includes every nested bundle file in the dry-run plan', () => {
     const { source, target } = fixture();
 
-    const plan = planAgentSkillsSync(target, source);
+    const plan = planAgentSkills(target, source);
 
     expect(plan.map((item) => item.name)).toEqual(
       expect.arrayContaining(['okf/SKILL.md', 'okf/references/workflow.md']),
@@ -68,14 +68,14 @@ describe('agent harness skill sync', () => {
 
   it('updates managed files but preserves user-owned skills', () => {
     const { source, target } = fixture();
-    executeAgentSkillsSync({}, target, source);
+    executeAgentSkills({}, target, source);
     writeFileSync(join(source, 'okf', 'SKILL.md'), '# Updated OKF\n');
     mkdirSync(join(target, 'personal'), { recursive: true });
     writeFileSync(join(target, 'personal', 'SKILL.md'), '# Personal\n');
     mkdirSync(join(source, 'personal'), { recursive: true });
     writeFileSync(join(source, 'personal', 'SKILL.md'), '# Bundled collision\n');
 
-    const result = executeAgentSkillsSync({}, target, source);
+    const result = executeAgentSkills({}, target, source);
 
     expect(result.updated).toContain('okf/SKILL.md');
     expect(result.skipped).toContain('personal/SKILL.md');

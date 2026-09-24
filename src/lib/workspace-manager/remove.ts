@@ -3,8 +3,8 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import {
-  replacePlaceholdersSync,
-  getDefaultWorkspaceConfigSync,
+  replacePlaceholders,
+  getDefaultWorkspaceConfig,
 } from '../workspace-config.js';
 import { removeDnsEntry } from '../dns.js';
 import { removeTunnelIngress } from '../tunnel.js';
@@ -13,7 +13,7 @@ import { releasePort, removeWorktree } from './worktree-ops.js';
 import { getContainersReferencingWorkspacePath, stopWorkspaceDocker } from './docker.js';
 import type { WorkspaceRemoveOptions, WorkspaceRemoveResult } from './types.js';
 import {
-  createWorkspacePlaceholdersSync as createPlaceholders,
+  createWorkspacePlaceholders as createPlaceholders,
   DEVCONTAINER_DIRNAME,
 } from '../workspace/devcontainer-renderer.js';
 
@@ -28,7 +28,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
     steps: [],
   };
 
-  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfigSync();
+  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfig();
   const workspacesDir = join(projectConfig.path, workspaceConfig.workspaces_dir || 'workspaces');
   const featureFolder = `feature-${featureName}`;
   const workspacePath = join(workspacesDir, featureFolder);
@@ -48,8 +48,8 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   const venvPath = join(workspacePath, '.venv');
   if (existsSync(venvPath)) {
     try {
-      const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
-      const tldrService = getTldrDaemonServiceSync(workspacePath, venvPath);
+      const { getTldrDaemonService } = await import('../tldr-daemon.js');
+      const tldrService = getTldrDaemonService(workspacePath, venvPath);
       await tldrService.stop();
       result.steps.push('Stopped TLDR daemon');
     } catch (error: any) {
@@ -107,7 +107,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
 
     const dnsMethod = workspaceConfig.dns.sync_method || 'wsl2hosts';
     for (const entryPattern of workspaceConfig.dns.entries) {
-      const hostname = replacePlaceholdersSync(entryPattern, placeholders);
+      const hostname = replacePlaceholders(entryPattern, placeholders);
       if (removeDnsEntry(dnsMethod, hostname)) {
         result.steps.push(`Removed DNS entry: ${hostname}`);
       }

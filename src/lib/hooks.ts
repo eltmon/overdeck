@@ -49,7 +49,7 @@ function getMailDir(agentId: string): string {
 /**
  * Initialize hook structure for an agent
  */
-export function initHookSync(agentId: string): void {
+export function initHook(agentId: string): void {
   const hookDir = getHookDir(agentId);
   const mailDir = getMailDir(agentId);
 
@@ -86,8 +86,8 @@ function getHookSync(agentId: string): Hook | null {
 /**
  * Add work to an agent's hook (FPP trigger)
  */
-export function pushToHookSync(agentId: string, item: Omit<HookItem, 'id' | 'createdAt'>): HookItem {
-  initHookSync(agentId);
+export function pushToHook(agentId: string, item: Omit<HookItem, 'id' | 'createdAt'>): HookItem {
+  initHook(agentId);
 
   const hook = getHookSync(agentId) || { agentId, items: [] };
 
@@ -106,7 +106,7 @@ export function pushToHookSync(agentId: string, item: Omit<HookItem, 'id' | 'cre
 /**
  * Check if agent has pending work (FPP check)
  */
-export function checkHookSync(agentId: string): { hasWork: boolean; urgentCount: number; items: HookItem[] } {
+export function checkHook(agentId: string): { hasWork: boolean; urgentCount: number; items: HookItem[] } {
   const hook = getHookSync(agentId);
 
   if (!hook || hook.items.length === 0) {
@@ -159,7 +159,7 @@ export function checkHookSync(agentId: string): { hasWork: boolean; urgentCount:
 /**
  * Pop the next work item from hook (after execution)
  */
-export function popFromHookSync(agentId: string, itemId: string): boolean {
+export function popFromHook(agentId: string, itemId: string): boolean {
   const hook = getHookSync(agentId);
   if (!hook) return false;
 
@@ -176,7 +176,7 @@ export function popFromHookSync(agentId: string, itemId: string): boolean {
 /**
  * Clear all items from hook
  */
-export function clearHookSync(agentId: string): void {
+export function clearHook(agentId: string): void {
   const hook = getHookSync(agentId);
   if (!hook) return;
 
@@ -188,13 +188,13 @@ export function clearHookSync(agentId: string): void {
 /**
  * Send a message to an agent's mailbox
  */
-export function sendMailSync(
+export function sendMail(
   toAgentId: string,
   from: string,
   message: string,
   priority: HookItem['priority'] = 'normal'
 ): void {
-  initHookSync(toAgentId);
+  initHook(toAgentId);
   const mailDir = getMailDir(toAgentId);
 
   const mailItem: HookItem = {
@@ -215,8 +215,8 @@ export function sendMailSync(
 /**
  * Generate Fixed Point prompt for agent startup
  */
-export function generateFixedPointPromptSync(agentId: string): string | null {
-  const { hasWork, urgentCount, items } = checkHookSync(agentId);
+export function generateFixedPointPrompt(agentId: string): string | null {
+  const { hasWork, urgentCount, items } = checkHook(agentId);
 
   if (!hasWork) return null;
 

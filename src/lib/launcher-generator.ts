@@ -5,14 +5,14 @@ import type { Role } from './agents.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel, resolveKimiCodeModelAlias } from './providers.js';
 import { provisionOhmypiProviderForModel } from './ohmypi-models.js';
-import { shellQuoteModelIdSync } from './model-validation.js';
+import { shellQuoteModelId } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
 import { buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
 import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
-import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
+import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -269,7 +269,7 @@ function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
  * and baseCommand strings — the generator does NOT call helper functions
  * internally (keeps coupling low, tests simple).
  */
-export function generateLauncherScriptSync(config: LauncherConfig): string {
+export function generateLauncherScript(config: LauncherConfig): string {
   const preparedContext = prepareClaudeContext(config);
   config = preparedContext.config;
   const lines: string[] = [];
@@ -663,7 +663,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
     cmd += ` --session-id ${shellQuote(config.sessionId)}`;
   }
   if (config.model) {
-    cmd += ` --model ${shellQuoteModelIdSync(getClaudeCodeLaunchModelSync(config.model))}`;
+    cmd += ` --model ${shellQuoteModelId(getClaudeCodeLaunchModel(config.model))}`;
   }
   if (config.extraArgs) {
     cmd += ` ${config.extraArgs}`;
@@ -734,7 +734,7 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   }
   tokens.push('--thinking', shellQuote(config.piEffort ?? 'high'));
   if (config.model) {
-    tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
+    tokens.push('--model', shellQuoteModelId(qualifyPiModel(config.model)));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {
@@ -844,7 +844,7 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--resume', shellQuote(config.resumeSessionId));
   }
   if (config.model) {
-    tokens.push('--model', shellQuoteModelIdSync(config.model));
+    tokens.push('--model', shellQuoteModelId(config.model));
   }
   if (config.harness === 'opencode' && config.acpEffort) {
     tokens.push('--effort', shellQuote(config.acpEffort));
@@ -890,7 +890,7 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   // an already-native `kimi-code/<alias>` passes through unchanged.
   const kimiCodeModel = resolveKimiCodeModelAlias(config.kimiCodeModel);
 
-  const tokens: string[] = ['kimi', '-m', shellQuoteModelIdSync(kimiCodeModel)];
+  const tokens: string[] = ['kimi', '-m', shellQuoteModelId(kimiCodeModel)];
   if (config.resumeSessionId) {
     // `-S <id>` resumes that specific session; `kimi`'s own `-c` continue flag
     // picks "most recent for this cwd" and can't target a captured id (PAN-1837).

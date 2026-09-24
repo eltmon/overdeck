@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getAgentStateSync, getAgentRuntimeState, messageAgent, transitionIssueToInProgress } from '../../../../lib/agents.js';
+import { getAgentState, getAgentRuntimeState, messageAgent, transitionIssueToInProgress } from '../../../../lib/agents.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { commentOnArtifact, parseArtifactRef } from '../../../../lib/forge.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
@@ -76,7 +76,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       isRunning,
       getTmuxSessionName,
     } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    const { clearHookSync } = yield* Effect.promise(() => import('../../../../lib/hooks.js'));
+    const { clearHook } = yield* Effect.promise(() => import('../../../../lib/hooks.js'));
 
     const specialists = getAllSpecialists();
     const results: { name: string; killed: boolean; sessionCleared: boolean; queueCleared: boolean }[] = [];
@@ -94,7 +94,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
         killed = killResult;
       }
 
-      clearHookSync(name);
+      clearHook(name);
       results.push({ name, killed, sessionCleared: false, queueCleared: true });
     }
 
@@ -383,7 +383,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           try {
             const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
             const { sessionExists } = await import('../../../../lib/tmux.js');
-            const { messageAgent, spawnAgent, getAgentStateSync } = await import('../../../../lib/agents.js');
+            const { messageAgent, spawnAgent, getAgentState } = await import('../../../../lib/agents.js');
 
             if (await Effect.runPromise(sessionExists(workAgentId))) {
               // Agent is running — send rebase instructions directly
@@ -469,8 +469,8 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/logs/cleanup-all',
   httpHandler(Effect.gen(function* () {
-    const { cleanupAllLogsSync } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-    const results = cleanupAllLogsSync();
+    const { cleanupAllLogs } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
+    const results = cleanupAllLogs();
 
     return jsonResponse({
       success: true,
@@ -633,7 +633,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const { issueId: requestIssueId, status: requestStatus, agentId } = body;
 
-    const agentState = agentId ? getAgentStateSync(agentId) : null;
+    const agentState = agentId ? getAgentState(agentId) : null;
     const runtimeState = agentId ? yield* getAgentRuntimeState(agentId) : null;
     const metadata = validateSpecialistAutoCompleteMetadata(name, body, agentState, runtimeState);
     if (!metadata.ok) {

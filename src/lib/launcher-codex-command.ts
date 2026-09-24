@@ -8,7 +8,7 @@
  */
 import { join } from 'node:path';
 import { toCodexSandboxValue } from './runtimes/codex.js';
-import { shellQuoteModelIdSync } from './model-validation.js';
+import { shellQuoteModelId } from './model-validation.js';
 import { packageRoot } from './paths.js';
 import { shellQuote } from './shell-quote.js';
 
@@ -110,7 +110,7 @@ function computeCodexCommandTokens(
       tokens.push('resume');
     }
     if (config.model) {
-      tokens.push('-m', shellQuoteModelIdSync(config.model));
+      tokens.push('-m', shellQuoteModelId(config.model));
     }
     addDeveloperInstructions(tokens);
     if (config.resumeSessionId) {
@@ -124,7 +124,7 @@ function computeCodexCommandTokens(
     const hostPath = join(packageRoot, 'dist', 'codex-app-server-host.js');
     const tokens: string[] = ['node', shellQuote(hostPath), '--effort', shellQuote(config.codexEffort ?? 'high')];
     if (config.model) {
-      tokens.push('--model', shellQuoteModelIdSync(config.model));
+      tokens.push('--model', shellQuoteModelId(config.model));
     }
     if (config.resumeSessionId) {
       tokens.push('--resume', shellQuote(config.resumeSessionId));
@@ -151,7 +151,7 @@ function computeCodexCommandTokens(
   }
 
   if (config.model) {
-    tokens.push('-m', shellQuoteModelIdSync(config.model));
+    tokens.push('-m', shellQuoteModelId(config.model));
   }
 
   addDeveloperInstructions(tokens);

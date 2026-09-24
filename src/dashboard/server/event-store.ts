@@ -20,7 +20,7 @@ import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
-import { getOverdeckDatabaseSync } from '../../lib/overdeck/infra.js';
+import { getOverdeckDatabase } from '../../lib/overdeck/infra.js';
 import { getWorkspaceForIssue } from '../../lib/workspaces/resolver.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
@@ -196,7 +196,7 @@ export async function openEventDb(): Promise<DbAdapter> {
 
   // Open overdeck.db through the shared overdeck opener so the hand-maintained
   // migration owns the events table and indexes.
-  const db = getOverdeckDatabaseSync(dbPath);
+  const db = getOverdeckDatabase(dbPath);
   return db as unknown as DbAdapter;
 }
 

@@ -1,6 +1,6 @@
 import { promisify } from 'node:util';
 import { exec } from 'node:child_process';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { PARKED_LABEL, VETOED_LABEL, BLOCKS_MAIN_LABEL, READY_LABEL, RELEASED_LABEL, OBJECTION_LABEL } from './pickup.js';
 
 const execAsync = promisify(exec);
@@ -12,7 +12,7 @@ export { PARKED_LABEL, VETOED_LABEL, BLOCKS_MAIN_LABEL, READY_LABEL, RELEASED_LA
  * skipped; the `|| true` keeps a missing-label / already-applied no-op non-fatal.
  */
 async function editIssueLabel(issueId: string, op: 'add' | 'remove', label: string): Promise<void> {
-  const resolution = resolveGitHubIssueSync(issueId);
+  const resolution = resolveGitHubIssue(issueId);
   if (!resolution.isGitHub) return;
   const { owner, repo, number } = resolution;
   const flag = op === 'add' ? '--add-label' : '--remove-label';

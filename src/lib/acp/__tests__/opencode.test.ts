@@ -7,11 +7,11 @@ import {
   translateOpenCodeAcpModelId,
 } from '../opencode.js';
 import { resolveAcpProviderSupport, resolveAcpModelId } from '../providers.js';
-import { getProviderForModelSync, getBuiltInDefaultHarness } from '../../providers.js';
-import { getModelProviderSync, isOpenRouterModelSync } from '../../model-fallback.js';
-import { canUseHarnessSync } from '../../harness-policy.js';
+import { getProviderForModel, getBuiltInDefaultHarness } from '../../providers.js';
+import { getModelProvider, isOpenRouterModel } from '../../model-fallback.js';
+import { canUseHarness } from '../../harness-policy.js';
 import { resolveExecutable } from '../../harness-binary.js';
-import { generateLauncherScriptSync } from '../../launcher-generator.js';
+import { generateLauncherScript } from '../../launcher-generator.js';
 import { mergeConfigs } from '../../config-yaml/merge.js';
 
 const routes = ['opencode', 'opencode-go'] as const;
@@ -19,20 +19,20 @@ const routes = ['opencode', 'opencode-go'] as const;
 describe('OpenCode Go and Zen', () => {
   it.each(routes)('keeps %s model IDs distinct from other providers', (provider) => {
     const model = `${provider}/kimi-k3`;
-    expect(getProviderForModelSync(model).name).toBe(provider);
-    expect(getModelProviderSync(model)).toBe(provider);
-    expect(isOpenRouterModelSync(model)).toBe(false);
+    expect(getProviderForModel(model).name).toBe(provider);
+    expect(getModelProvider(model)).toBe(provider);
+    expect(isOpenRouterModel(model)).toBe(false);
     expect(getBuiltInDefaultHarness(provider)).toBe('opencode');
     expect(resolveAcpModelId(provider, model)).toBe(model);
     expect(resolveAcpProviderSupport(provider).buildSpawnInput).toBe(buildOpenCodeAcpSpawnInput);
-    expect(canUseHarnessSync('opencode', model, 'api-key')).toEqual({ allowed: true });
+    expect(canUseHarness('opencode', model, 'api-key')).toEqual({ allowed: true });
     for (const harness of ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code'] as const) {
-      expect(canUseHarnessSync(harness, model, 'api-key').allowed).toBe(false);
+      expect(canUseHarness(harness, model, 'api-key').allowed).toBe(false);
     }
   });
 
   it('does not route another provider through OpenCode', () => {
-    expect(canUseHarnessSync('opencode', 'k3', 'api-key').allowed).toBe(false);
+    expect(canUseHarness('opencode', 'k3', 'api-key').allowed).toBe(false);
     expect(() => translateOpenCodeAcpModelId('kimi/k3')).toThrow('Invalid OpenCode model');
   });
 
@@ -79,7 +79,7 @@ describe('OpenCode Go and Zen', () => {
   });
 
   it.each(routes)('launches and resumes %s through the host with model and effort intact', (provider) => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       role: 'work', baseCommand: 'acp-host', workingDir: '/workspace with spaces', harness: 'opencode',
       acpAgentId: 'conv-opencode', acpProvider: provider,
       acpWorkspace: '/workspace with spaces', acpBinaryPath: '/tools/opencode',

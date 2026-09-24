@@ -1,7 +1,7 @@
 import { jsonResponse } from "../http-helpers.js";
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
-import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
+import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 import { spawnPanCli } from '../../../lib/pan-cli-invocation.js';
 /**
  * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
@@ -58,10 +58,10 @@ import {
   resolveProjectFromIssueSync,
   getProjectSync,
   listProjectsSync,
-  findProjectByTeamSync,
+  findProjectByTeam,
   extractTeamPrefix,
 } from '../../../lib/projects.js';
-import { resolveGitHubIssueSync } from '../../../lib/tracker-utils.js';
+import { resolveGitHubIssue } from '../../../lib/tracker-utils.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { isInternalAgentRequest, resolveRequestedStartedBy } from './agents/shared.js';
@@ -74,11 +74,11 @@ import {
   saveAgentRuntimeState,
   getAgentRuntimeStateSync,
   transitionIssueToInReview,
-  getAgentStateSync,
+  getAgentState,
   spawnRun,
 } from '../../../lib/agents.js';
-import { getActiveSessionModelSync } from '../../../lib/cost-parsers/jsonl-parser.js';
-import { getCostsForIssueSync } from '../../../lib/costs/index.js';
+import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
+import { getCostsForIssue } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { readPlan, isPlanningComplete } from '../../../lib/xbrief/io.js';
@@ -89,13 +89,13 @@ import { criticalPath, actionableDoc } from '../../../lib/xbrief/dag.js';
 import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
-import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
-import { loadWorkspaceMetadataSync, listWorkspaceMetadataSync } from '../../../lib/remote/workspace-metadata.js';
+import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
+import { loadWorkspaceMetadata, listWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 import { loadConfigSync } from '../../../lib/config.js';
-import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
-import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getWorkspacePathForIssue } from '../workspace-paths.js';
@@ -377,7 +377,7 @@ export interface WorkspaceInfo {
 
 export function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   try {
-    const meta = loadWorkspaceMetadataSync(issueId);
+    const meta = loadWorkspaceMetadata(issueId);
     if (meta?.location === 'remote' && meta.vmName) {
       const metaRecord = meta as unknown as Record<string, unknown>;
       return {
@@ -390,7 +390,7 @@ export function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
     }
   } catch { /* non-fatal */ }
 
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const issueLower = issueId.toLowerCase();
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
@@ -415,7 +415,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -467,7 +467,7 @@ export function spawnPanCommand(
 
   if (issueId && pendingOp) {
     setPendingOperation(issueId, pendingOp);
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'info',
       issueId: issueId.toUpperCase(),
@@ -486,7 +486,7 @@ export function spawnPanCommand(
     updateActivity(activityId, { status: code === 0 ? 'completed' : 'failed' });
     if (issueId && pendingOp) {
       completePendingOperation(issueId, code === 0 ? null : `${failedCommand} exited ${code ?? 'unknown'}`);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'dashboard',
         level: code === 0 ? 'success' : 'error',
         issueId: issueId.toUpperCase(),
@@ -501,7 +501,7 @@ export function spawnPanCommand(
   child.on('close', (code) => {
     if (code === 0 && chain) {
       if (issueId) {
-        emitActivityEntrySync({
+        emitActivityEntry({
           source: 'dashboard',
           level: 'info',
           issueId: issueId.toUpperCase(),
@@ -766,7 +766,7 @@ function getFlyAppName(vmName: string): string {
   // Resolve via workspace metadata — deriving from the vmName prefix is wrong
   // ('pan-pan-1712-ws' → 'pan-pan'). Fall back to the configured app.
   try {
-    const meta = listWorkspaceMetadataSync().find((m) => m.vmName === vmName);
+    const meta = listWorkspaceMetadata().find((m) => m.vmName === vmName);
     if (meta?.appName) return meta.appName;
   } catch { /* fall through */ }
   try {
@@ -914,10 +914,10 @@ const postWorkspaceRebuildRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const activityId = spawnPanCommand(
       ['workspace', 'rebuild', issueId],
@@ -943,10 +943,10 @@ const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
     let startedBy: string;
     try { startedBy = resolveRequestedStartedBy(body?.startedBy, internalRequest); }
     catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const activityId = spawnPanCommand(
       ['workspace', 'rebuild', issueId],
@@ -977,12 +977,12 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const parsed = parseIssueIdSync(issueId);
-    const issuePrefix = parsed?.prefix ?? extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const parsed = parseIssueId(issueId);
+    const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
@@ -1003,10 +1003,10 @@ const postWorkspaceStartRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -1044,7 +1044,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
     // Repair .env if needed
     const envFilePath = join(workspacePath, '.env');
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
     if (projectConfig?.workspace?.ports && projectConfig?.workspace?.env?.template) {
       const featureFolder = `feature-${issueLower}`;
@@ -1180,7 +1180,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
       cwd: workspacePath,
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: buildChildEnvWithoutTmuxSync(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
+      env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
     });
 
     child.stdout?.on('data', (data) => {
@@ -1313,11 +1313,11 @@ const postWorkspaceRefreshTokenRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 

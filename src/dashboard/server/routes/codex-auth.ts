@@ -10,7 +10,7 @@ import { CodexAuthCheckError, checkCodexAuthStatus, type CheckCodexAuthOptions }
 import { FsError } from '../../../lib/errors.js';
 import { bridgeCodexAuthToCliproxy, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSession, sessionExists, listSessionNames } from '../../../lib/tmux.js';
-import { getDashboardApiUrlSync } from '../../../lib/config.js';
+import { getDashboardApiUrl } from '../../../lib/config.js';
 import { validateOrigin } from './origin-validation.js';
 
 // ─── Re-auth session registry ──────────────────────────────────────────────────
@@ -84,7 +84,7 @@ export function consumeReauthTerminalToken(sessionName: string, token: string | 
 
 function buildTerminalCookie(sessionName: string, terminalToken: string): string {
   const value = encodeURIComponent(`${sessionName}:${terminalToken}`);
-  const secure = getDashboardApiUrlSync().startsWith('https://') ? '; Secure' : '';
+  const secure = getDashboardApiUrl().startsWith('https://') ? '; Secure' : '';
   return `pan_codex_reauth=${value}; HttpOnly; SameSite=Strict; Path=/ws/terminal; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}${secure}`;
 }
 

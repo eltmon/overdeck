@@ -5,17 +5,14 @@ import type { XBriefDocument } from '../../xbrief/types.js';
 
 const planMocks = vi.hoisted(() => ({
   readWorkspacePlan: vi.fn(),
-  readWorkspacePlanSync: vi.fn(),
 }));
 
 vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlan: planMocks.readWorkspacePlan,
-  readWorkspacePlanSync: planMocks.readWorkspacePlanSync,
 }));
 
 import {
-  checkIncompletePlanItemsPromise,
-  checkIncompletePlanItemsSync,
+  checkIncompletePlanItems,
   evaluateIncompletePlanItems,
 } from '../done-preflight.js';
 
@@ -61,32 +58,27 @@ function planWithStatus(
 
 beforeEach(() => {
   planMocks.readWorkspacePlan.mockReset();
-  planMocks.readWorkspacePlanSync.mockReset();
 });
 
 describe('plan checklist evaluation', () => {
-  it('uses the asynchronous workspace-plan door for Promise callers', async () => {
+  it('uses the asynchronous workspace-plan door', async () => {
     planMocks.readWorkspacePlan.mockReturnValue(Effect.succeed(planWithStatus('pending')));
-    planMocks.readWorkspacePlanSync.mockImplementation(() => {
-      throw new Error('synchronous plan reader must not run');
-    });
 
-    const incomplete = await checkIncompletePlanItemsPromise('/project/workspaces/feature-pan-3451', 'PAN-3451');
+    const incomplete = await checkIncompletePlanItems('/project/workspaces/feature-pan-3451', 'PAN-3451');
 
     expect(incomplete).toEqual([
       '  Incomplete plan items (1):',
       '    - item-one First item (pending)',
     ]);
     expect(planMocks.readWorkspacePlan).toHaveBeenCalledWith('/project/workspaces/feature-pan-3451');
-    expect(planMocks.readWorkspacePlanSync).not.toHaveBeenCalled();
   });
 
-  it('keeps the synchronous reader for synchronous callers', () => {
-    planMocks.readWorkspacePlanSync.mockReturnValue(planWithStatus('completed'));
+  it('rethrows the plan reader error unwrapped so pan done shows its message', async () => {
+    const conflict = new Error('xBRIEF document at /p/plan.json contains unresolved git merge conflict markers.');
+    conflict.name = 'XBriefMergeConflictError';
+    planMocks.readWorkspacePlan.mockReturnValue(Effect.fail(conflict));
 
-    expect(checkIncompletePlanItemsSync('/project/workspaces/feature-pan-3451')).toEqual([]);
-    expect(planMocks.readWorkspacePlanSync).toHaveBeenCalledWith('/project/workspaces/feature-pan-3451');
-    expect(planMocks.readWorkspacePlan).not.toHaveBeenCalled();
+    await expect(checkIncompletePlanItems('/project/workspaces/feature-pan-3451')).rejects.toBe(conflict);
   });
 
   it('treats pending children of a cancelled item as satisfied', () => {

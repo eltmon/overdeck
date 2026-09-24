@@ -58,13 +58,12 @@ vi.mock('../../../lib/deploy/dashboard-bundle-integrity.js', () => ({
 }));
 
 vi.mock('../../../lib/deploy/active-dashboard-bundle.js', () => ({
-  readActiveDashboardBundleSync: mocks.readActiveDashboardBundle,
+  readActiveDashboardBundle: mocks.readActiveDashboardBundle,
   writeActiveDashboardBundle: mocks.writeActiveDashboardBundle,
 }));
 
 vi.mock('../../../lib/platform-lifecycle.js', () => ({
   readPlatformConfig: mocks.readPlatformConfig,
-  readPlatformConfigSync: mocks.readPlatformConfig,
   restartDashboard: mocks.restartDashboard,
   stopDashboard: mocks.stopDashboard,
   parseHealthTimeoutMs: (value: string | undefined, defaultMs: number) => {

@@ -10,7 +10,7 @@
 import { existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { Effect } from 'effect';
-import { getAgentStateSync, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, normalizeAgentId } from './agents.js';
+import { getAgentState, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionId, normalizeAgentId } from './agents.js';
 import { hasCompletionMarkerForAgent } from './agents/supervisor-channels.js';
 import { claudeSessionTranscriptExists } from './runtimes/storage/claude-code.js';
 import { getPrFacts } from './cloister/pr-facts.js';
@@ -91,10 +91,10 @@ async function pathExists(path: string): Promise<boolean> {
 
 export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgentLifecycleState {
   const agentId = normalizeAgentId(agentOrIssueId);
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   const runtimeState = getAgentRuntimeStateSync(agentId);
   const hasAgentState = !!agentState;
-  const sessionId = getLatestSessionIdSync(agentId) ?? null;
+  const sessionId = getLatestSessionId(agentId) ?? null;
   const hasSavedSession = !!sessionId;
   // PAN-3849 (W32): liveness comes from the single oracle — a remain-on-exit
   // zombie pane (session alive, harness process gone) reads as NOT live here,
@@ -205,10 +205,10 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
 /** Snapshot an agent's lifecycle: running, resumable, restartable, and the recommended action. */
 export async function getWorkAgentLifecycleState(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
   const agentId = normalizeAgentId(agentOrIssueId);
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId));
   const hasAgentState = !!agentState;
-  const sessionId = getLatestSessionIdSync(agentId) ?? null;
+  const sessionId = getLatestSessionId(agentId) ?? null;
   const hasSavedSession = !!sessionId;
   // Same not-dead default as the sync variant above: an indeterminate probe
   // reads as live.
@@ -330,11 +330,11 @@ interface StartFreshOptions {
 }
 
 /** Assert the agent can start fresh; throws an Error naming the reason when it cannot. */
-export function assertCanStartFreshSync(agentOrIssueId: string, options: StartFreshOptions = {}): WorkAgentLifecycleState {
+export function assertCanStartFresh(agentOrIssueId: string, options: StartFreshOptions = {}): WorkAgentLifecycleState {
   const lifecycle = getWorkAgentLifecycleStateSync(agentOrIssueId);
   const pausedForceOverride = options.allowPausedForce === true
     && lifecycle.requiresSessionResetBeforeFreshStart
-    && getAgentStateSync(lifecycle.agentId)?.paused === true;
+    && getAgentState(lifecycle.agentId)?.paused === true;
   const liveSessionReplacement = options.allowLiveSessionReplacement === true && lifecycle.isRunning;
   if (liveSessionReplacement && lifecycle.canResetSession) {
     throw new Error(sessionResetRequiredReason(lifecycle.agentId, agentOrIssueId));
@@ -345,7 +345,7 @@ export function assertCanStartFreshSync(agentOrIssueId: string, options: StartFr
   return lifecycle;
 }
 
-export function assertCanResumeSessionSync(agentOrIssueId: string): WorkAgentLifecycleState {
+export function assertCanResumeSession(agentOrIssueId: string): WorkAgentLifecycleState {
   const lifecycle = getWorkAgentLifecycleStateSync(agentOrIssueId);
   if (!lifecycle.canResumeSession && !lifecycle.isRunningButStuck) {
     throw new Error(lifecycle.reason || `Cannot resume session for ${lifecycle.agentId}`);

@@ -9,13 +9,13 @@ import {
   SYNC_TARGET, isDevMode,
 } from './paths.js';
 import {
-  buildManifestFromDirectory, writeManifestSync, readManifestSync, hashFileSync,
-  setManifestEntry, collectSourceFilesSync, pruneStaleManifestEntriesSync,
+  buildManifestFromDirectory, writeManifest, readManifest, hashFile,
+  setManifestEntry, collectSourceFiles, pruneStaleManifestEntries,
   type Manifest,
   compareFileToManifest,
 } from './manifest.js';
 import { listProjectsSync } from './projects.js';
-import { planHooksSyncSync, syncHooksSync, type HookItem, type HooksSyncResult } from './sync-hooks.js';
+import { planHooksSync, syncHooks, type HookItem, type HooksSyncResult } from './sync-hooks.js';
 import {
   ensureGlobalLayer,
   renderGlobalLayer,
@@ -23,7 +23,7 @@ import {
   codexGlobalContextFile,
   claudeGlobalContextFile,
 } from './context-layers/index.js';
-export { isStartupSyncNeededSync, writeSyncManifestSync } from './sync-startup-gate.js';
+export { isStartupSyncNeeded, writeSyncManifest } from './sync-startup-gate.js';
 export interface SyncItem {
   name: string;
   sourcePath: string;
@@ -74,7 +74,7 @@ export interface MigrationResult {
  * Plain directories are always preserved as user content — there is no reliable
  * way to prove a plain directory was created by Overdeck vs the user.
  */
-export function migrateStalePersonalContentSync(): MigrationResult {
+export function migrateStalePersonalContent(): MigrationResult {
   const claudeDir = join(homedir(), '.claude');
   const result: MigrationResult = {
     removedSymlinks: [],
@@ -122,7 +122,7 @@ export function migrateStalePersonalContentSync(): MigrationResult {
  * in the 0.7.0 command taxonomy reorganization. Safe to call on every sync — if the
  * skills are already gone, it's a no-op.
  */
-export function removeLegacySkills070Sync(): string[] {
+export function removeLegacySkills070(): string[] {
   // Skills renamed or removed in 0.7.0:
   // pan-issue → pan-start
   // pan-plan-finalize → deleted (subcommand of pan plan)
@@ -201,13 +201,13 @@ function copyDirectoryRecursive(source: string, dest: string): number {
  *
  * This replaces the old "skip if exists" behavior in `pan install`.
  */
-export function refreshCacheSync(): RefreshCacheResult {
-  const oldManifest = readManifestSync(CACHE_MANIFEST);
+export function refreshCache(): RefreshCacheResult {
+  const oldManifest = readManifest(CACHE_MANIFEST);
   const sourceFiles = [
-    ...collectSourceFilesSync(SYNC_SOURCES.skills, 'skills/'),
-    ...(isDevMode() ? collectSourceFilesSync(SYNC_SOURCES.devSkills, 'skills/') : []),
-    ...collectSourceFilesSync(SYNC_SOURCES.agents, 'agent-definitions/'),
-    ...collectSourceFilesSync(SYNC_SOURCES.rules, 'rules/'),
+    ...collectSourceFiles(SYNC_SOURCES.skills, 'skills/'),
+    ...(isDevMode() ? collectSourceFiles(SYNC_SOURCES.devSkills, 'skills/') : []),
+    ...collectSourceFiles(SYNC_SOURCES.agents, 'agent-definitions/'),
+    ...collectSourceFiles(SYNC_SOURCES.rules, 'rules/'),
   ];
   const sourceSet = new Set(sourceFiles.map((file) => file.relativePath));
   const result: RefreshCacheResult = {
@@ -313,7 +313,7 @@ export function refreshCacheSync(): RefreshCacheResult {
   }
 
   const cacheBase = join(SKILLS_DIR, '..');
-  const pruneResult = pruneStaleManifestEntriesSync(cacheBase, oldManifest, sourceSet);
+  const pruneResult = pruneStaleManifestEntries(cacheBase, oldManifest, sourceSet);
   result.pruned.push(...pruneResult.pruned);
   result.keptModified.push(...pruneResult.keptModified);
 
@@ -328,12 +328,12 @@ export function refreshCacheSync(): RefreshCacheResult {
     if (sourceSet.has(relativePath)) continue;
     const previousEntry = oldManifest.installed[relativePath];
     if (previousEntry) {
-      manifest.installed[relativePath] = { ...previousEntry, hash: hashFileSync(join(cacheBase, relativePath)) };
+      manifest.installed[relativePath] = { ...previousEntry, hash: hashFile(join(cacheBase, relativePath)) };
     } else {
       setManifestEntry(manifest, relativePath, entry.hash, 'user');
     }
   }
-  writeManifestSync(CACHE_MANIFEST, manifest);
+  writeManifest(CACHE_MANIFEST, manifest);
 
   return result;
 }
@@ -346,7 +346,7 @@ export function refreshCacheSync(): RefreshCacheResult {
  * and agents are distributed as files; rules now fold into CLAUDE.md (see
  * the context-layers subsystem) and are not planned here.
  */
-export function planSyncSync(): SyncPlan {
+export function planSync(): SyncPlan {
   const plan: SyncPlan = {
     skills: [],
     commands: [],
@@ -357,10 +357,10 @@ export function planSyncSync(): SyncPlan {
 
   const targetBase = CLAUDE_DIR;
   const manifestPath = join(targetBase, '.overdeck-manifest.json');
-  const manifest = readManifestSync(manifestPath);
+  const manifest = readManifest(manifestPath);
 
   const planInto = (sourceDir: string, prefix: string, bucket: SyncItem[]): void => {
-    for (const file of collectSourceFilesSync(sourceDir, prefix)) {
+    for (const file of collectSourceFiles(sourceDir, prefix)) {
       const targetFile = join(targetBase, file.relativePath);
       const status = compareFileToManifest(targetFile, file.relativePath, manifest);
 
@@ -372,7 +372,7 @@ export function planSyncSync(): SyncPlan {
       } else if (status.action === 'user-owned') {
         // Identical content sitting at the target from a previous Overdeck
         // era is not a conflict — it would simply be adopted on the real run.
-        syncStatus = hashFileSync(targetFile) === hashFileSync(file.absolutePath) ? 'exists' : 'adopted';
+        syncStatus = hashFile(targetFile) === hashFile(file.absolutePath) ? 'exists' : 'adopted';
       }
 
       bucket.push({
@@ -421,7 +421,7 @@ export interface SyncResult {
  * install; it is overwritten, recorded in the manifest, and reported as
  * adopted.
  */
-export function executeSyncSync(options: SyncOptions = {}): SyncResult {
+export function executeSync(options: SyncOptions = {}): SyncResult {
   const result: SyncResult = {
     created: [], updated: [],
     adopted: [], skipped: [],
@@ -433,12 +433,12 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
 
   const targetBase = CLAUDE_DIR;
   const manifestPath = join(targetBase, '.overdeck-manifest.json');
-  const manifest = readManifestSync(manifestPath);
+  const manifest = readManifest(manifestPath);
 
   // Collect all source files from cache (skills + agent definitions).
   const allFiles = [
-    ...collectSourceFilesSync(SKILLS_DIR, 'skills/'),
-    ...collectSourceFilesSync(CACHE_AGENTS_DIR, 'agents/'),
+    ...collectSourceFiles(SKILLS_DIR, 'skills/'),
+    ...collectSourceFiles(CACHE_AGENTS_DIR, 'agents/'),
   ];
 
   for (const file of allFiles) {
@@ -450,7 +450,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
         // File doesn't exist at target — copy it
         mkdirSync(dirname(targetFile), { recursive: true });
         copyFileSync(file.absolutePath, targetFile);
-        const hash = hashFileSync(targetFile);
+        const hash = hashFile(targetFile);
         setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
         result.created.push(file.relativePath);
         break;
@@ -460,7 +460,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
         // File exists, hash matches manifest — safe to overwrite (user didn't modify)
         mkdirSync(dirname(targetFile), { recursive: true });
         copyFileSync(file.absolutePath, targetFile);
-        const hash = hashFileSync(targetFile);
+        const hash = hashFile(targetFile);
         setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
         result.updated.push(file.relativePath);
         break;
@@ -479,7 +479,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
         if (options.force) {
           mkdirSync(dirname(targetFile), { recursive: true });
           copyFileSync(file.absolutePath, targetFile);
-          const hash = hashFileSync(targetFile);
+          const hash = hashFile(targetFile);
           setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
           result.updated.push(file.relativePath);
         } else {
@@ -494,13 +494,13 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
         // it so future syncs can manage it. If it differs at a bundled source
         // path, it is a legacy pre-manifest Overdeck install: overwrite and
         // record it explicitly so the operator sees the adoption.
-        if (hashFileSync(targetFile) === hashFileSync(file.absolutePath)) {
-          setManifestEntry(manifest, file.relativePath, hashFileSync(targetFile), 'overdeck');
+        if (hashFile(targetFile) === hashFile(file.absolutePath)) {
+          setManifestEntry(manifest, file.relativePath, hashFile(targetFile), 'overdeck');
           result.skipped.push(file.relativePath);
         } else {
           mkdirSync(dirname(targetFile), { recursive: true });
           copyFileSync(file.absolutePath, targetFile);
-          const hash = hashFileSync(targetFile);
+          const hash = hashFile(targetFile);
           setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
           result.adopted.push(file.relativePath);
         }
@@ -511,16 +511,16 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
 
   const sourceSet = new Set([
     ...allFiles.map((file) => file.relativePath),
-    ...collectSourceFilesSync(CACHE_RULES_DIR, 'rules/').map((file) => file.relativePath),
+    ...collectSourceFiles(CACHE_RULES_DIR, 'rules/').map((file) => file.relativePath),
   ]);
-  const pruneResult = pruneStaleManifestEntriesSync(targetBase, manifest, sourceSet, {
+  const pruneResult = pruneStaleManifestEntries(targetBase, manifest, sourceSet, {
     prefixes: ['skills/', 'agents/', 'rules/'],
   });
   result.pruned.push(...pruneResult.pruned);
   result.keptModified.push(...pruneResult.keptModified);
 
   // Write updated manifest
-  writeManifestSync(manifestPath, manifest);
+  writeManifest(manifestPath, manifest);
 
   return result;
 }
@@ -558,7 +558,7 @@ function writeContextArtifactSync(
  * changed by this path. Canonical project context is rendered and combined with
  * workspace context at managed-session launch.
  */
-export function syncContextLayersSync(): ContextLayerSyncResult {
+export function syncContextLayers(): ContextLayerSyncResult {
   const result: ContextLayerSyncResult = {
     claudeGlobalWritten: false,
     globalStubCreated: false,
@@ -606,7 +606,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
 
 // Hook distribution lives in sync-hooks.ts; re-exported so the CLI and the
 // startup gate keep a single sync entry point.
-export { planHooksSyncSync, syncHooksSync };
+export { planHooksSync, syncHooks };
 export type { HookItem, HooksSyncResult };
 
 /**
@@ -627,7 +627,7 @@ const STATUSLINE_TARGETS: Record<string, { configDir: string; scriptName: string
  * Copies the canonical statusline.sh from overdeck scripts to each runtime's config dir
  * and ensures the runtime's settings.json references it.
  */
-export function syncStatuslineSync(): { synced: string[]; errors: string[] } {
+export function syncStatusline(): { synced: string[]; errors: string[] } {
   const result = { synced: [] as string[], errors: [] as string[] };
 
   const sourceScript = join(SYNC_SOURCES.hooks, 'statusline.sh');
@@ -811,7 +811,7 @@ function getGitTrackedSkillDirNames(targetDir: string, projectRoot: string): Set
   return names;
 }
 
-export function mirrorProjectSkillsSync(
+export function mirrorProjectSkills(
   cwd: string = process.cwd(),
   opts?: { manifestDir?: string },
 ): SkillsMirrorResult {
@@ -964,7 +964,7 @@ function isPiOnPath(): boolean {
  * PATH the function returns status "skipped" without ever opening the file —
  * we never overwrite user config for a tool they have not installed.
  */
-export function syncPiSettingsSync(): PiSettingsSyncResult {
+export function syncPiSettings(): PiSettingsSyncResult {
   const settingsPath = join(homedir(), '.pi', 'agent', 'settings.json');
 
   if (!isPiOnPath()) {

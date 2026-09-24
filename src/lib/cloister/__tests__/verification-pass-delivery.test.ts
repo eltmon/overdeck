@@ -21,7 +21,7 @@ vi.mock('../feedback-target.js', () => ({
 vi.mock('../../agents.js', () => ({
   messageAgent: mocks.messageAgent,
   clearAgentPaused: vi.fn(),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   setAgentPaused: vi.fn(),
   stopAgent: vi.fn(),
 }));

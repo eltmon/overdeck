@@ -20,7 +20,7 @@ import {
   parseAcpHostArgs,
   reserveOpenCodePort} from "../host.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
-import { readSessionIndexSync } from "../../session-history.js";
+import { readSessionIndex } from "../../session-history.js";
 
 // Moved here from src/lib/acp/host.ts, which no production code called (PAN-3958 CH-8).
 async function readPersistedAcpSessionId(
@@ -285,7 +285,7 @@ describe("AcpHost", () => {
     expect(await readPersistedAcpSessionId(overdeckHome, "agent-pan-2858")).toBe(
       "acp-session-1",
     );
-    expect(readSessionIndexSync("agent-pan-2858")).toEqual([
+    expect(readSessionIndex("agent-pan-2858")).toEqual([
       expect.objectContaining({
         sessionId: "acp-session-1",
         source: "acp-host",

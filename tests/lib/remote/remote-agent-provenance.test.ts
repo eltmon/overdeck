@@ -23,7 +23,7 @@ vi.mock('../../../src/lib/pan-dir/record.js', () => ({
 }));
 
 vi.mock('../../../src/lib/launcher-generator.js', () => ({
-  generateLauncherScriptSync: (options: Record<string, unknown>) => {
+  generateLauncherScript: (options: Record<string, unknown>) => {
     mocks.launcherOptions = options;
     return '#!/bin/sh\nexec claude\n';
   },

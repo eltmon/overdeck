@@ -101,13 +101,13 @@ vi.mock('../../../src/lib/tmux.js', async () => {
 });
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
+  getAgentState: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
   messageAgent: mockMessageAgent,
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateSync: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateProgram: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   spawnRun: mockSpawnRun,
-  getLatestSessionIdSync: mockGetLatestSessionIdSync,
+  getLatestSessionId: mockGetLatestSessionIdSync,
   resumeAgent: mockResumeAgent,
   stopAgent: (...args: Parameters<typeof mockStopAgent>) => Effect.promise(() => mockStopAgent(...args)),
   wipeAgentStateDirs: mockWipeAgentStateDirs,
@@ -115,7 +115,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../src/lib/agents/agent-state.js', () => ({
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
+  getAgentState: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   markAgentStoppedState: (...args: Parameters<typeof mockMarkAgentStoppedState>) => mockMarkAgentStoppedState(...args),
 }));
@@ -135,7 +135,6 @@ vi.mock('../../../src/lib/paths.js', async (importOriginal) => {
 
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: mockNotifyPipeline,
-  notifyPipelineSync: mockNotifyPipeline,
 }));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
@@ -483,7 +482,7 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(block).toContain('buildSelfReviewPrompt');
     // The fan-out itself lives in review-convoy.ts and always launches the four
     // independent convoy lanes for a new review run.
-    expect(block).toContain('launchConvoyReviewersPromise');
+    expect(block).toContain('launchConvoyReviewers');
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
     expect(block).not.toContain('discoveryForkMode');
@@ -621,7 +620,7 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     );
 
     const guardMatch = agentSrc.match(
-      /async function spawnReviewRoleForIssuePromise[\s\S]*?clearFeedbackFiles/,
+      /async function spawnReviewRoleForIssueBody[\s\S]*?clearFeedbackFiles/,
     );
     expect(guardMatch).not.toBeNull();
     const guardBlock = guardMatch![0];

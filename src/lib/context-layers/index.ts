@@ -73,5 +73,5 @@ export {
 export {
   type ContextDetachItem,
   planManagedRegionDetach,
-  detachManagedContextSync,
+  detachManagedContext,
 } from './detach.js';

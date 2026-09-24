@@ -10,8 +10,8 @@
  */
 
 import {
-  appendGitOperationSync,
-  listGitOperationsSync,
+  appendGitOperation,
+  listGitOperations,
 } from './overdeck/git-activity.js';
 import type {
   GitOperation,
@@ -21,4 +21,4 @@ import type {
 } from './overdeck/git-activity.js';
 
 export type { GitOperation, GitOperationFilter, GitOperationType, GitOperationStatus };
-export { appendGitOperationSync, listGitOperationsSync };
+export { appendGitOperation, listGitOperations };

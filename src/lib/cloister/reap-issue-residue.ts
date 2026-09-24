@@ -7,7 +7,7 @@ import { Effect } from 'effect';
 import { isBranchMerged } from '../close-out.js';
 import { AGENTS_DIR } from '../paths.js';
 import { killSession, listSessionNames } from '../tmux.js';
-import { teardownWorkspaceDockerByNamePromise } from '../workspace-manager/docker.js';
+import { teardownWorkspaceDockerByName } from '../workspace-manager/docker.js';
 import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
 import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
 
@@ -60,7 +60,7 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
   // issues), so tearing them down for a closed issue destroys no work, while
   // leaked `_devnet` networks eventually exhaust Docker's address pools.
   try {
-    const teardownResult = await teardownWorkspaceDockerByNamePromise(issueLower);
+    const teardownResult = await teardownWorkspaceDockerByName(issueLower);
     if (teardownResult.networkRemoved) {
       actions.push(`removed Docker stack for feature-${issueLower}`);
     } else {

@@ -26,7 +26,7 @@ function resolveDraftProjectRoot(issueId: string): string {
   throw new Error(`Could not resolve project path for ${issueId}. Add the project to projects.yaml first.`);
 }
 
-export function getPRDDraftPathSync(issueId: string): string {
+export function getPRDDraftPath(issueId: string): string {
   return getIssueDraftPath(resolveDraftProjectRoot(issueId), issueId);
 }
 

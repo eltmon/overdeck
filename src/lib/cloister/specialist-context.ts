@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from '
 import { join } from 'path';
 import { exec } from 'child_process';
 import { getOverdeckHome } from '../paths.js';
-import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import type { RunLogEntry } from './specialist-logs.js';
 import { getProjectSync } from '../projects.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
@@ -177,7 +177,7 @@ export async function generateContextDigest(
     const { getProviderEnvForModel } = await import('../agents.js');
     const providerEnv = await getProviderEnvForModel(model);
     const envPrefix = Object.entries(providerEnv).map(([k, v]) => `${k}="${v}"`).join(' ');
-    const permissionFlags = getClaudePermissionFlagsStringSync();
+    const permissionFlags = getClaudePermissionFlagsString();
     const { stdout, stderr } = await execAsync(
       `${envPrefix ? envPrefix + ' ' : ''}claude ${permissionFlags} --model ${model} "$(cat '${promptFile}')"`,
       {

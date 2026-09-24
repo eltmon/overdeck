@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
   runRelease: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
 }));
 
 vi.mock('../../projects.js', () => ({
@@ -27,9 +27,9 @@ vi.mock('../../release/release-engine.js', () => ({
 }));
 
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: mocks.emitActivityEntrySync,
-  emitActivityTtsSync: vi.fn(),
-  emitDashboardLifecycleSync: vi.fn(),
+  emitActivityEntry: mocks.emitActivityEntry,
+  emitActivityTts: vi.fn(),
+  emitDashboardLifecycle: vi.fn(),
 }));
 
 vi.mock('../../tmux.js', () => ({

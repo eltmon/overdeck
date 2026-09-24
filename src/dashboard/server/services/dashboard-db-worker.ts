@@ -1,5 +1,5 @@
 import { getCostsByIssueSnapshot } from './dashboard-cost-snapshot.js';
-import { getAgentCostStatsSync } from '../../../lib/overdeck/cost-sync.js';
+import { getAgentCostStats } from '../../../lib/overdeck/cost-sync.js';
 import { getConversationSearchStats } from '../../../lib/overdeck/conversations-search.js';
 import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { parentPort } from 'node:worker_threads';
@@ -110,7 +110,7 @@ async function runJob(
 
   switch (operation) {
     case 'getAgentCostStats':
-      return getAgentCostStatsSync(payload as { agentIds: string[]; nowMs: number });
+      return getAgentCostStats(payload as { agentIds: string[]; nowMs: number });
     case 'getCostsByIssueSnapshot':
       return getCostsByIssueSnapshot();
     case 'getConversationSearchStats':

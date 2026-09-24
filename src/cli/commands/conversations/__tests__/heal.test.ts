@@ -12,7 +12,7 @@ vi.mock('chalk', () => {
 
 vi.mock('../../../../lib/config.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../lib/config.js')>()),
-  getDashboardApiUrlSync: vi.fn(() => 'http://dashboard.test'),
+  getDashboardApiUrl: vi.fn(() => 'http://dashboard.test'),
 }));
 
 let odb: OverdeckTestDb;

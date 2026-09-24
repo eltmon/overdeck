@@ -14,7 +14,7 @@ import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import { claudeSessionTranscriptExists } from '../../../../lib/runtimes/storage/claude-code.js';
-import { resolvePrimaryWorkspaceRepoDirSync } from '../../../../lib/project-repos.js';
+import { resolvePrimaryWorkspaceRepoDir } from '../../../../lib/project-repos.js';
 import {
   appendAgentLifecycleLog,
   launchPanCommandDetached,
@@ -22,7 +22,7 @@ import {
 } from '../../../../lib/composer-commands/detached.js';
 import {
   getAgentDir,
-  getLatestSessionIdSync,
+  getLatestSessionId,
   normalizeAgentId,
   type AgentRuntimeState,
   type AgentState,
@@ -39,7 +39,7 @@ import {
 } from '../../../../lib/agent-enrichment.js';
 import type { WorkAgentLifecycleState, WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
 import { hasCompletionMarkerForAgent } from '../../../../lib/agents/supervisor-channels.js';
-import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../../services/system-health-service.js';
 import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
 import { capturePane } from '../../../../lib/tmux.js';
@@ -130,7 +130,7 @@ function emitStartAgentPhase(
   details: Record<string, unknown> = {},
 ): void {
   const timestamp = new Date().toISOString();
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'start-agent',
     level: status === 'failure' ? 'error' : status === 'skipped' ? 'warn' : 'info',
     message: `start-agent.phase=${phase}`,
@@ -274,10 +274,10 @@ function buildStoppedAgentLifecycle(
   const hasAgentState = true;
   const hasLiveTmuxSession = false;
   // claudeSessionId only covers claude-code agents — codex agents keep their
-  // resumable thread in codex-thread-id, which getLatestSessionIdSync resolves
+  // resumable thread in codex-thread-id, which getLatestSessionId resolves
   // (PAN-1988). Without the fallback the listing reports canResumeSession=false
   // for every stopped codex agent and the UI never offers Resume.
-  const sessionId = getLatestSessionIdSync(agentId) ?? runtimeData.claudeSessionId ?? null;
+  const sessionId = getLatestSessionId(agentId) ?? runtimeData.claudeSessionId ?? null;
   const hasSavedSession = !!sessionId;
   const hasWorkspace = typeof state.workspace === 'string' && state.workspace.length > 0;
   const hasResumableTranscript = !sessionId
@@ -425,7 +425,7 @@ async function getWorkspaceLocation(issueId: string): Promise<'local' | 'remote'
 async function getGitStatusAsync(issueId: string, workspacePath: string): Promise<{ branch: string; uncommittedFiles: number; latestCommit: string } | null> {
   try {
     if (!existsSync(workspacePath)) return null;
-    const repoDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspacePath);
+    const repoDir = resolvePrimaryWorkspaceRepoDir(issueId, workspacePath);
     const [branchResult, uncommittedResult, commitResult] = await Promise.all([
       execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""', { cwd: repoDir }),
       execAsync('git status --porcelain 2>/dev/null | wc -l', { cwd: repoDir }),

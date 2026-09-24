@@ -5,14 +5,14 @@ import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeXBriefDocument } from '../../lib/xbrief/io.js';
 import { generateXBriefFilename, slugify } from '../../lib/xbrief/lifecycle.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
-import { checkPrdGateSync, getIssueDraftPath, MIN_PRD_LINES, type PrdGateResult, PAN_DIRNAME, PAN_SPEC_FILENAME, WORKSPACE_RUNTIME_DIRNAME } from '../../lib/pan-dir/index.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
+import { checkPrdGate, getIssueDraftPath, MIN_PRD_LINES, type PrdGateResult, PAN_DIRNAME, PAN_SPEC_FILENAME, WORKSPACE_RUNTIME_DIRNAME } from '../../lib/pan-dir/index.js';
 import { PENDING_PROMOTION_FILENAME } from '../../lib/pan-dir/types.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/xbrief/quality-lint.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
-import { findProjectByPathSync, getProjectSwarmHotspots } from '../../lib/projects.js';
+import { findProjectByPath, getProjectSwarmHotspots } from '../../lib/projects.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -116,7 +116,7 @@ function emitAutoPromotePhase(
   details: Record<string, unknown> = {},
 ): void {
   const timestamp = new Date().toISOString();
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'plan-finalize',
     level: status === 'failure' ? 'error' : 'info',
     message: `auto-promote.phase=${phase}`,
@@ -211,11 +211,11 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   // draft. The prompt in roles/plan.md has always required this; this is the
   // mechanical enforcement. --no-prd bypasses loudly (and propagates noPrd to
   // the complete-planning endpoint so the server doesn't 422 the same run).
-  const projectRootHint = findProjectByPathSync(workspacePath)?.path ?? null;
+  const projectRootHint = findProjectByPath(workspacePath)?.path ?? null;
   if (options.prd === false) {
     if (!options.json) console.error(chalk.yellow('⚠ PRD gate SKIPPED (--no-prd)'));
   } else {
-    const prdGate = checkPrdGateSync({ projectRoot: projectRootHint, workspacePath, issueId });
+    const prdGate = checkPrdGate({ projectRoot: projectRootHint, workspacePath, issueId });
     if (!prdGate.ok) {
       const message = formatPrdGateFailureMessage(issueId, prdGate, projectRootHint);
       if (options.json) {
@@ -234,7 +234,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const planDoc = readPlanSync(planPath);
   const prdText = readPrdDraftText(workspacePath, issueId);
-  const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspacePath));
+  const hotspots = getProjectSwarmHotspots(findProjectByPath(workspacePath));
   const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText, hotspots });
   const readinessReport = formatReadinessReport(analyzeSwarmReadiness(planDoc, { hotspots }));
   if (qualityGate.skipped) {
@@ -283,7 +283,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   );
   const finalizedAt = new Date().toISOString();
 
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'plan',
     level: 'info',
     message: autoSpawnOnFinalize
@@ -291,7 +291,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       : `${issueId} planning finalized — awaiting your approval`,
     issueId,
   });
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: autoSpawnOnFinalize
       ? `${issueId} planned, starting implementation`
       : `${issueId} planning is done, awaiting your approval`,
@@ -436,7 +436,7 @@ const promoteFailure = (error: string): PromotePlanningResult => ({
 });
 
 export async function promotePlanning(issueId: string, autoSpawn = false, opts: { noPrd?: boolean } = {}): Promise<PromotePlanningResult> {
-  const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
+  const url = `${getDashboardApiUrl()}/api/issues/${issueId}/complete-planning`;
   let lastError = 'complete-planning failed';
 
   for (let attempt = 0; attempt < PROMOTE_MAX_ATTEMPTS; attempt++) {
@@ -448,7 +448,7 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
       try {
         response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrlSync() },
+          headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrl() },
           body: JSON.stringify({ ...(autoSpawn ? { autoSpawn: true } : {}), ...(opts.noPrd ? { noPrd: true } : {}) }),
           signal: controller.signal,
         });

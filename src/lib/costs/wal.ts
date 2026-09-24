@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { listProjectsSync } from '../projects.js';
-import { extractPrefixSync } from '../issue-id.js';
+import { extractPrefix } from '../issue-id.js';
 import type { CostEvent } from './events.js';
 
 const DEFAULT_EVENTS_SUBDIR = '.pan/events';
@@ -24,7 +24,7 @@ export function resolveWalDir(issueId: string): string | null {
 
   // Find which project this issueId belongs to.
   // Match by issue prefix (e.g. "PAN" in "PAN-335") against project key or name.
-  const issuePrefix = extractPrefixSync(issueId);
+  const issuePrefix = extractPrefix(issueId);
   if (!issuePrefix) return null;
 
   for (const { key, config } of projects) {
@@ -49,7 +49,7 @@ export function resolveWalDir(issueId: string): string | null {
  * Returns true if the event was written, false if no matching project was found.
  * Never throws — WAL writes are best-effort.
  */
-export function appendToWalSync(event: CostEvent): boolean {
+export function appendToWal(event: CostEvent): boolean {
   try {
     const walDir = resolveWalDir(event.issueId);
     if (!walDir) return false;

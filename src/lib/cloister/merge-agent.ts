@@ -10,7 +10,7 @@ import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames } from '../tmux.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import { enqueueMergedDockerCleanup } from './merged-docker-cleanup-worker.js';
@@ -151,7 +151,7 @@ export async function autoCommitWorkspaceChangesBeforeSync(
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 
 import { cleanupStaleLocks } from '../git-utils.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
@@ -224,8 +224,8 @@ export async function notifyTldrDaemon(projectPath: string, _sourceBranch: strin
     console.log(`[merge-agent] Found ${changedFiles.length} changed source files to reindex`);
 
     // Get TLDR daemon service
-    const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
-    const tldrService = getTldrDaemonServiceSync(projectPath, venvPath);
+    const { getTldrDaemonService } = await import('../tldr-daemon.js');
+    const tldrService = getTldrDaemonService(projectPath, venvPath);
 
     // Check if daemon is running
     const status = await tldrService.getStatus();
@@ -336,8 +336,8 @@ export async function postMergeLifecycle(
     // Eager Docker cleanup must run before any fatal post-merge handoff step.
     let dockerRetryReason: string | null = null;
     try {
-      const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
-      const teardown = await teardownWorkspaceDockerByNamePromise(issueId.toLowerCase());
+      const { teardownWorkspaceDockerByName } = await import('../workspace-manager/docker.js');
+      const teardown = await teardownWorkspaceDockerByName(issueId.toLowerCase());
       if (teardown.networkRemoved) {
         console.log(`[merge-agent] ✓ Removed Docker stack/network: ${teardown.steps.join('; ')}`);
         logActivity('docker_cleanup', `Removed Docker stack/network for ${issueId}: ${teardown.steps.join('; ')}`);
@@ -361,7 +361,7 @@ export async function postMergeLifecycle(
     // verifying-on-main is applied next and takes precedence in canonical state mapping.
     try {
       const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
-      const ghResolved = resolveGitHubIssueSync(issueId);
+      const ghResolved = resolveGitHubIssue(issueId);
       const labelCtx = ghResolved.isGitHub
         ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
         : { issueId, projectPath };
@@ -399,7 +399,7 @@ export async function postMergeLifecycle(
 
     // 3. Pause work/planning/strike agents and close their terminals to free resources.
     try {
-      const { setAgentPaused, getAgentStateSync } = await import('../agents.js');
+      const { setAgentPaused, getAgentState } = await import('../agents.js');
       // A failed backend close must never skip pausing the remaining agents.
       const closeAgentTerminal = async (agentId: string): Promise<boolean> => {
         try {
@@ -425,10 +425,10 @@ export async function postMergeLifecycle(
           // No state.json for this agent — nothing to pause (e.g. planning never ran).
           continue;
         }
-        let verify = getAgentStateSync(agentId);
+        let verify = getAgentState(agentId);
         if (verify?.paused !== true) {
           await Effect.runPromise(setAgentPaused(agentId, reason, true));
-          verify = getAgentStateSync(agentId);
+          verify = getAgentState(agentId);
         }
         if (verify?.paused === true) {
           console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);
@@ -730,7 +730,7 @@ async function resolveMainPreferredSyncConflicts(
  * Log activity to the dashboard activity log (event-sourced via emitActivityEntry)
  */
 function logActivity(action: string, details: string, issueId?: string): void {
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'ship',
     level: action.includes('fail') || action.includes('error') ? 'error' : action.includes('warn') ? 'warn' : 'success',
     message: details,
@@ -757,7 +757,7 @@ function announceMerge(
       ? 'Merge completed'
       : 'Merge failed';
   const tail = extra ? `. ${extra}` : '';
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'ship',
     level: status === 'failed' ? 'error' : 'success',
     message: `${prefix} for ${issueId}${tail}`,
@@ -769,7 +769,7 @@ function announceMerge(
     : status === 'completed'
       ? `${issueId} merged to main`
       : `Merge failed for ${issueId}`;
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: ttsUtterance,
     priority: status === 'failed' ? 0 : 1,
     issueId,

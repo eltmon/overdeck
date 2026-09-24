@@ -1,9 +1,9 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
-import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
+import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { buildStartPlanningBody, printPlanningConnectionError, streamPlanningSession } from './planning-stream.js';
 
 interface PlanOptions {
@@ -35,9 +35,9 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
   const spinner = ora(`${options.auto ? 'Auto-planning' : 'Starting planning for'} ${issueId}...`).start();
 
   try {
-    const response = await fetch(`${getDashboardApiUrlSync()}/api/issues/${encodeURIComponent(issueId)}/start-planning`, {
+    const response = await fetch(`${getDashboardApiUrl()}/api/issues/${encodeURIComponent(issueId)}/start-planning`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: ensureInternalTokenSync() },
+      headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: ensureInternalToken() },
       body: buildStartPlanningBody({
         auto: options.auto === true,
         autoStart: options.autoStart === true,

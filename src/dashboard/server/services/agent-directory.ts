@@ -48,7 +48,7 @@ import { getEnrichedConversationList } from '../../../lib/overdeck/conversation-
 import { resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import { findProjectKeyByPathSync } from '../../../lib/projects/project-key.js';
+import { findProjectKeyByPath } from '../../../lib/projects/project-key.js';
 import { listExternalCandidates, type ExternalDirectoryCandidate } from './agent-directory-external.js';
 import { SUBAGENT_WORKING_MTIME_MS, listAgentSubagents, listTranscriptSubagents } from './agent-subagents.js';
 import { getBackendPanes } from './backend-inventory.js';
@@ -204,7 +204,7 @@ function defaultProjectKeyForIssue(issueId: string): string | null {
 
 function defaultProjectKeyForPath(path: string): string | null {
   try {
-    return findProjectKeyByPathSync(path);
+    return findProjectKeyByPath(path);
   } catch {
     return null;
   }

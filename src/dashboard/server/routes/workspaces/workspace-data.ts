@@ -24,24 +24,24 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
+import { parseIssueId, extractPrefix } from '../../../../lib/issue-id.js';
 import {
   resolveProjectFromIssueSync,
   getProjectSync,
-  findProjectByTeamSync,
+  findProjectByTeam,
 } from '../../../../lib/projects.js';
-import { loadWorkspaceMetadataSync } from '../../../../lib/remote/workspace-metadata.js';
+import { loadWorkspaceMetadata } from '../../../../lib/remote/workspace-metadata.js';
 import {
   collectDockerContainerLifecycleSnapshot,
   getWorkspaceStackHealth,
 } from '../../../../lib/workspace/stack-health.js';
 import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
-import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
+import { getActiveSessionModel } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
 import { VcsError } from '../../../../lib/errors.js';
 import { findPlan, isPlanningComplete, mergeContinueItemStatuses, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
-import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
+import { getCostsForIssue } from '../../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../../services/running-agents-cache.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
@@ -52,7 +52,7 @@ import { XBRIEF_INSPECTION_POLICIES } from '../../../../lib/xbrief/types.js';
 import type { XBriefDocument, XBriefInspectionPolicy } from '../../../../lib/xbrief/types.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
-import { getTldrDaemonServiceSync } from '../../../../lib/tldr-daemon.js';
+import { getTldrDaemonService } from '../../../../lib/tldr-daemon.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -70,7 +70,7 @@ const execFileAsync = promisify(execFile);
 
 function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
   try {
-    const meta = loadWorkspaceMetadataSync(issueId);
+    const meta = loadWorkspaceMetadata(issueId);
     if (meta?.location) return meta.location as 'local' | 'remote';
   } catch { /* non-fatal */ }
   return undefined;
@@ -410,7 +410,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       .filter(Boolean)))
       .slice(0, 100);
 
-    const parsedIds = issueIds.map((issueId) => ({ issueId, parsed: parseIssueIdSync(issueId) }));
+    const parsedIds = issueIds.map((issueId) => ({ issueId, parsed: parseIssueId(issueId) }));
     const invalid = parsedIds.find(({ parsed }) => !parsed);
     if (invalid) {
       return jsonResponse({ error: `Invalid issue ID: ${invalid.issueId}` }, { status: 400 });
@@ -420,7 +420,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       const normalizedIssueId = parsed!.raw.toUpperCase();
       const workspaceMetadata = (() => {
         try {
-          return loadWorkspaceMetadataSync(normalizedIssueId);
+          return loadWorkspaceMetadata(normalizedIssueId);
         } catch {
           return null;
         }
@@ -512,10 +512,10 @@ const getWorkspaceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -569,7 +569,7 @@ const getWorkspaceRoute = HttpRouter.add(
           });
         }
 
-        const projectConfig = findProjectByTeamSync(issuePrefix);
+        const projectConfig = findProjectByTeam(issuePrefix);
         const dnsDomain = projectConfig?.workspace?.dns?.domain || 'localhost';
         const featureFolder = `feature-${issueLower}`;
 
@@ -677,7 +677,7 @@ const getWorkspaceRoute = HttpRouter.add(
           ) || paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
           agentModel = modelMatch ? modelMatch[1] : undefined;
 
-          const fullModel = getActiveSessionModelSync(workspacePath);
+          const fullModel = getActiveSessionModel(workspacePath);
           if (fullModel) agentModelFull = fullModel;
         }
 
@@ -705,7 +705,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const planningComplete = hasPlan ? yield* isPlanningComplete(workspacePath) : false;
         const hasTasks = planningComplete;
 
-        const issueData = getCostsForIssueSync(issueId);
+        const issueData = getCostsForIssue(issueId);
         const agents = yield* Effect.promise(() => getCachedRunningAgents());
         const resolvedCost = resolveIssueHeadlineCost({
           issueId: issueId,
@@ -807,7 +807,7 @@ const postWorkspacesRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
     const activityId = spawnPanCommand(
       ['workspace', 'create', issueId],
@@ -828,10 +828,10 @@ const getWorkspacePlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const location = yield* resolvePlanLocation(projectPath, issueId);
@@ -852,12 +852,12 @@ const getWorkspaceUatContextRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const parsed = parseIssueIdSync(issueId);
+    const parsed = parseIssueId(issueId);
     if (!parsed) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const issuePrefix = parsed.prefix ?? extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = parsed.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
@@ -891,7 +891,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -901,7 +901,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid inspection policy' }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
@@ -938,7 +938,7 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -958,7 +958,7 @@ const getWorkspaceTldrRoute = HttpRouter.add(
           });
         }
 
-        const service = getTldrDaemonServiceSync(workspacePath, venvPath);
+        const service = getTldrDaemonService(workspacePath, venvPath);
         const status = await service.getStatus();
         const { fileCount, indexAge, edgeCount } = await getIndexStats(workspacePath);
 

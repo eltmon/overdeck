@@ -8,7 +8,7 @@ import { Effect } from 'effect';
  */
 
 const agentMocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   stopAgent: vi.fn(),
 }));
 
@@ -32,7 +32,7 @@ const projectMocks = vi.hoisted(() => ({
 }));
 
 const issueIdMocks = vi.hoisted(() => ({
-  resolveBareNumericIdSync: vi.fn((id: string) => id.toUpperCase()),
+  resolveBareNumericId: vi.fn((id: string) => id.toUpperCase()),
 }));
 
 const fsMocks = vi.hoisted(() => ({
@@ -53,7 +53,7 @@ vi.mock('../../../lib/agents.js', () => {
     return lower === 'flywheel-orchestrator' || AGENT_PREFIXES.some(p => lower.startsWith(p));
   };
   return {
-    getAgentStateSync: agentMocks.getAgentStateSync,
+    getAgentState: agentMocks.getAgentState,
     stopAgent: agentMocks.stopAgent,
     isQualifiedAgentId,
   };
@@ -91,7 +91,7 @@ vi.mock('../../../lib/projects.js', () => ({
 }));
 
 vi.mock('../../../lib/issue-id.js', () => ({
-  resolveBareNumericIdSync: issueIdMocks.resolveBareNumericIdSync,
+  resolveBareNumericId: issueIdMocks.resolveBareNumericId,
 }));
 
 vi.mock('fs', () => ({
@@ -121,7 +121,7 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    agentMocks.getAgentStateSync.mockReset();
+    agentMocks.getAgentState.mockReset();
     agentMocks.stopAgent.mockReset();
     agentMocks.stopAgent.mockReturnValue(Effect.void);
     tmuxMocks.sessionExistsSync.mockReset();
@@ -132,8 +132,8 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     workspaceMocks.stopWorkspaceDocker.mockReset();
     workspaceMocks.findWorkspacePath.mockReset();
     projectMocks.resolveProjectFromIssueSync.mockReset();
-    issueIdMocks.resolveBareNumericIdSync.mockReset();
-    issueIdMocks.resolveBareNumericIdSync.mockImplementation((id: string) => id.toUpperCase());
+    issueIdMocks.resolveBareNumericId.mockReset();
+    issueIdMocks.resolveBareNumericId.mockImplementation((id: string) => id.toUpperCase());
     fsMocks.existsSync.mockReset();
     fsMocks.readdirSync.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockReset();
@@ -143,7 +143,7 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     // read the same directory listing, so this must not be a one-shot mock.
     fsMocks.existsSync.mockReturnValue(true);
     fsMocks.readdirSync.mockReturnValue(['agent-pan-3680', 'agent-pan-3680-test']);
-    agentMocks.getAgentStateSync.mockImplementation((agentId: string) => ({
+    agentMocks.getAgentState.mockImplementation((agentId: string) => ({
       issueId: 'PAN-3680',
       status: 'running',
       role: agentId.endsWith('-test') ? 'test' : 'work',

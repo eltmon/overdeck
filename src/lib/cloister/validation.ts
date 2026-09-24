@@ -12,7 +12,7 @@ import { promisify } from 'util';
 import { join } from 'path';
 import { Effect } from 'effect';
 import type { QualityGateConfig, TemplatePlaceholders } from '../workspace-config.js';
-import { replacePlaceholdersSync } from '../workspace-config.js';
+import { replacePlaceholders } from '../workspace-config.js';
 import { loadConfigSync } from '../config.js';
 import { GitError } from '../errors.js';
 import {
@@ -99,7 +99,7 @@ export interface ValidationResult {
   error?: string;
 }
 
-async function autoRevertMergePromise(projectPath: string): Promise<boolean> {
+async function autoRevertMergeBody(projectPath: string): Promise<boolean> {
   console.log(`[validation] Auto-reverting merge in ${projectPath}`);
 
   try {
@@ -298,7 +298,7 @@ export async function runQualityGates(
     // only the tests affected by the PR and skips pre-existing failures in files
     // the change never touched.
     const command = opts.placeholders
-      ? replacePlaceholdersSync(gate.command, opts.placeholders)
+      ? replacePlaceholders(gate.command, opts.placeholders)
       : gate.command;
 
     // For remote workspaces, build and validate the SSH command BEFORE entering
@@ -323,7 +323,7 @@ export async function runQualityGates(
       // Run inside Docker container — resolve container name from placeholders
       let containerName = gate.container_name;
       if (opts.placeholders) {
-        containerName = replacePlaceholdersSync(containerName, opts.placeholders);
+        containerName = replacePlaceholders(containerName, opts.placeholders);
       }
       // PAN-2461: a missing container previously burned verification attempts as a
       // fake check failure ("frontend-lint failed" in 33ms because docker exec had
@@ -570,7 +570,7 @@ export const autoRevertMerge = (
 ): Effect.Effect<void, GitError> =>
   Effect.tryPromise({
     try: async () => {
-      const ok = await autoRevertMergePromise(projectPath);
+      const ok = await autoRevertMergeBody(projectPath);
       if (!ok) throw new Error('autoRevertMerge returned false');
     },
     catch: (cause) =>

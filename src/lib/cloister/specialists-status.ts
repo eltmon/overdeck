@@ -9,8 +9,8 @@ import { basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { readLatestIndexedSessionIdSync } from '../session-history.js';
-import { getAllSessionFilesSync, parseClaudeSessionSync } from '../cost-parsers/jsonl-parser.js';
+import { readLatestIndexedSessionId } from '../session-history.js';
+import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { listPaneValues, sessionExists } from '../tmux.js';
 import {
   getAllSpecialists,
@@ -23,7 +23,7 @@ import {
 const execAsync = promisify(exec);
 
 function readRecordedClaudeSessionId(tmuxSession: string): string | null {
-  return readLatestIndexedSessionIdSync(tmuxSession);
+  return readLatestIndexedSessionId(tmuxSession);
 }
 
 /**
@@ -61,7 +61,7 @@ export function getSpecialistState(
  */
 export function findSessionFile(sessionId: string): string | null {
   try {
-    const allFiles = getAllSessionFilesSync();
+    const allFiles = getAllSessionFiles();
 
     for (const file of allFiles) {
       const fileSessionId = basename(file, '.jsonl');
@@ -98,7 +98,7 @@ export function countContextTokens(name: SpecialistAgentName): number | null {
     return null;
   }
 
-  const sessionUsage = parseClaudeSessionSync(sessionFile);
+  const sessionUsage = parseClaudeSession(sessionFile);
 
   if (!sessionUsage) {
     return null;

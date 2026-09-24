@@ -63,7 +63,7 @@ sleep 1
 export OVERDECK_DEV=1
 ```
 
-This is read by `generateOverdeckTraefikConfigSync()` (src/lib/traefik.ts) so the
+This is read by `generateOverdeckTraefikConfig()` (src/lib/traefik.ts) so the
 Traefik dynamic config routes the frontend to Vite (port 3010) instead of the
 bundled Node server (3011). Without this, https://overdeck.localhost serves the
 production-mode static build and you do not get HMR. Export it before any
@@ -106,7 +106,7 @@ import('~/Projects/overdeck/src/lib/traefik.ts').catch(()=>{});
 
 # Or, more reliably via tsx:
 cd ~/Projects/overdeck && \
-  OVERDECK_DEV=1 npx tsx -e "import('./src/lib/traefik.ts').then(m => m.generateOverdeckTraefikConfigSync())" 2>&1
+  OVERDECK_DEV=1 npx tsx -e "import('./src/lib/traefik.ts').then(m => m.generateOverdeckTraefikConfig())" 2>&1
 ```
 
 Verify the rendered file has the frontend on port 3010:

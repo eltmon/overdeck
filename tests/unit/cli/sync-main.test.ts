@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Mock config to return a predictable API URL
 vi.mock('../../../src/lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../src/lib/config.js')>()),
-  getDashboardApiUrlSync: vi.fn(() => 'http://localhost:3011'),
+  getDashboardApiUrl: vi.fn(() => 'http://localhost:3011'),
 }));
 
 // Mock ora so spinner.succeed/fail route through console.log/error (no TTY writes)

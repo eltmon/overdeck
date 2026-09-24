@@ -13389,7 +13389,7 @@ const DEFAULT_PRICING = [
 /**
 * Calculate cost for token usage
 */
-function calculateCostSync(usage, pricing) {
+function calculateCost(usage, pricing) {
 	let cost = 0;
 	let inputMultiplier = 1;
 	let outputMultiplier = 1;
@@ -13410,7 +13410,7 @@ function calculateCostSync(usage, pricing) {
 /**
 * Get pricing for a model
 */
-function getPricingSync(provider, model) {
+function getPricing(provider, model) {
 	let pricing = DEFAULT_PRICING.find((p) => p.provider === provider && p.model === model);
 	if (!pricing) pricing = DEFAULT_PRICING.find((p) => p.provider === provider && model.startsWith(p.model));
 	return pricing || null;
@@ -25732,7 +25732,7 @@ var import_dist = (/* @__PURE__ */ __commonJSMin(((exports) => {
 * @param projectConfig - Optional project config for custom patterns
 * @returns ParsedIssueId or null if no format matches
 */
-function parseIssueIdSync(issueId, projectConfig) {
+function parseIssueId(issueId, projectConfig) {
 	const standardMatch = issueId.match(/^([A-Za-z]+)-(\d+)$/);
 	if (standardMatch) return {
 		raw: issueId,
@@ -25765,8 +25765,8 @@ function parseIssueIdSync(issueId, projectConfig) {
 * Extract just the team/project prefix from an issue ID.
 * Handles standard (MIN-123), Rally (F29698), and custom formats.
 */
-function extractPrefixSync(issueId) {
-	return parseIssueIdSync(issueId)?.prefix ?? null;
+function extractPrefix(issueId) {
+	return parseIssueId(issueId)?.prefix ?? null;
 }
 //#endregion
 //#region ../../src/lib/projects.ts
@@ -25812,7 +25812,7 @@ function listProjectsSync() {
 * Matches any project whose root path is an ancestor of the given path.
 * Used to resolve the tracker (GitHub/GitLab) from a workspace directory.
 */
-function findProjectByPathSync(workspacePath) {
+function findProjectByPath(workspacePath) {
 	const config = loadProjectsConfigSync();
 	const normalizedTarget = resolve(workspacePath);
 	for (const [, projectConfig] of Object.entries(config.projects)) {
@@ -25867,7 +25867,7 @@ function resolveProjectPath(project, labels = []) {
 * @returns Resolved project info or null if not found
 */
 function resolveProjectFromIssueSync(issueId, labels = []) {
-	const parsed = parseIssueIdSync(issueId);
+	const parsed = parseIssueId(issueId);
 	if (!parsed) return null;
 	const config = loadProjectsConfigSync();
 	for (const [key, projectConfig] of Object.entries(config.projects)) {
@@ -26117,7 +26117,7 @@ function queueAutoCommit(opts) {
 	if (paths.length === 0) return;
 	let expectedBranch = "main";
 	if (repoRoot && existsSync(join(repoRoot, "migration-complete.json"))) expectedBranch = STATE_BRANCH;
-	const project = findProjectByPathSync(projectRoot);
+	const project = findProjectByPath(projectRoot);
 	if (project) {
 		const key = listProjectsSync().find(({ config }) => config.path === project.path)?.key;
 		if (key && isStateMigrationLocked(key)) {
@@ -26882,7 +26882,7 @@ const MODEL_DEPRECATIONS = {
 * @param modelId - Model ID to resolve (may be deprecated)
 * @returns Current model ID
 */
-function resolveModelIdSync(modelId) {
+function resolveModelId(modelId) {
 	return MODEL_DEPRECATIONS[modelId] || modelId;
 }
 /**
@@ -28017,8 +28017,8 @@ const MODEL_CAPABILITIES = {
 * model (treat undefined as "no model-specific restriction"). Resolves
 * deprecated IDs first so callers can pass raw config refs.
 */
-function getModelEffortLevelsSync(model) {
-	return MODEL_CAPABILITIES[resolveModelIdSync(String(model))]?.effortLevels;
+function getModelEffortLevels(model) {
+	return MODEL_CAPABILITIES[resolveModelId(String(model))]?.effortLevels;
 }
 //#endregion
 //#region ../../src/lib/config-yaml/roles.ts
@@ -28077,12 +28077,12 @@ function workhorseSlotFromRef(ref) {
 }
 function derefWorkhorse(ref, config, fieldPath = "model") {
 	if (ref === "parent") throw new Error(`config.yaml: ${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is a resolve-only sub-role sentinel`);
-	if (!isWorkhorseRef(ref)) return resolveModelIdSync(ref);
+	if (!isWorkhorseRef(ref)) return resolveModelId(ref);
 	const slot = workhorseSlotFromRef(ref);
 	const resolved = config.workhorses?.[slot];
 	if (!resolved) throw new Error(`config.yaml: ${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
 	if (isWorkhorseRef(resolved)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
-	return resolveModelIdSync(resolved);
+	return resolveModelId(resolved);
 }
 function mergeRoleConfig(result, config) {
 	if (!config?.workhorses && !config?.roles) return;
@@ -28135,7 +28135,7 @@ function validateRoleModelRefs(config) {
 	for (const [slot, ref] of Object.entries(config.workhorses ?? {})) {
 		if (ref === "parent") throw new Error(`config.yaml: workhorses.${slot} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is valid only for sub-role models`);
 		if (isWorkhorseRef(ref)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
-		resolveModelIdSync(ref);
+		resolveModelId(ref);
 	}
 	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
 		validateRoleFields(role, roleConfig);
@@ -28144,7 +28144,7 @@ function validateRoleModelRefs(config) {
 		else if (roleConfig.model) {
 			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
 			if (roleConfig.effort !== void 0) {
-				const supported = getModelEffortLevelsSync(resolvedModel);
+				const supported = getModelEffortLevels(resolvedModel);
 				if (supported !== void 0 && !supported.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(", ")})`);
 			}
 		}
@@ -28555,7 +28555,7 @@ function nearestKnownModelId(modelId) {
 /**
 * Get provider for a given model ID
 */
-function getProviderForModelSync(modelId) {
+function getProviderForModel(modelId) {
 	if (["qwen/qwen3.6-plus"].includes(modelId)) return PROVIDERS.nous;
 	if ([
 		"qwen3-max",
@@ -28661,17 +28661,17 @@ const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set([
 * Check whether a (model, authMode) pair is allowed, independent of harness.
 * Use this in pickers to lock model options that the current auth setup can't reach.
 */
-function canUseModelWithAuthSync(model, authMode) {
-	if (getProviderForModelSync(model).name === "openai" && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === "api-key") return SUBSCRIPTION_ONLY_MODEL_BLOCK;
+function canUseModelWithAuth(model, authMode) {
+	if (getProviderForModel(model).name === "openai" && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === "api-key") return SUBSCRIPTION_ONLY_MODEL_BLOCK;
 	return ALLOWED;
 }
-function canUseHarnessSync(harness, model, authMode) {
-	const modelAuth = canUseModelWithAuthSync(model, authMode);
+function canUseHarness(harness, model, authMode) {
+	const modelAuth = canUseModelWithAuth(model, authMode);
 	if (!modelAuth.allowed) return modelAuth;
 	if (harness === "claude-code") return ALLOWED;
 	if (harness === "codex") return ALLOWED;
 	if (harness === "ohmypi") {
-		if (getProviderForModelSync(model).name === "anthropic" && authMode === "subscription") return OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK;
+		if (getProviderForModel(model).name === "anthropic" && authMode === "subscription") return OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK;
 		return ALLOWED;
 	}
 	return ALLOWED;
@@ -28762,14 +28762,14 @@ function validateHarness(harness, path) {
 	if (!isRuntimeName(harness)) throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, codex, or acp`);
 }
 function validateModel(model, path) {
-	const resolved = resolveModelIdSync(model);
+	const resolved = resolveModelId(model);
 	if (!knownModelIds().has(resolved) && !resolved.includes("/")) throw new TieredExecutionConfigError(`${path}.model '${model}' is unknown`);
 	return resolved;
 }
 function validateModelHarnessPolicy(model, harness, path, context) {
-	const provider = getProviderForModelSync(model);
+	const provider = getProviderForModel(model);
 	const authMode = context.providerAuth?.[provider.name];
-	const decision = canUseHarnessSync(harness, model, authMode);
+	const decision = canUseHarness(harness, model, authMode);
 	if (!decision.allowed) throw new TieredExecutionConfigError(`${path} is not allowed: ${decision.reason ?? "harness policy rejected this model/harness/auth combination"}`);
 }
 function normalizeTieredExecutionConfig(config) {
@@ -29492,10 +29492,10 @@ function mergeConfigs(...configs) {
 			} else if (providers.dashscope !== void 0) explicitlyDisabled.add("dashscope");
 		}
 		if (config.tmux?.config_mode) result.tmux.configMode = config.tmux.config_mode;
-		if (config.conversations?.compaction_model) result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
+		if (config.conversations?.compaction_model) result.conversations.compactionModel = resolveModelId(config.conversations.compaction_model);
 		if (config.conversations?.manual_compact_mode) result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
 		if (config.conversations?.rich_compaction !== void 0) result.conversations.richCompaction = config.conversations.rich_compaction;
-		if (config.conversations?.title_model) result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
+		if (config.conversations?.title_model) result.conversations.titleModel = resolveModelId(config.conversations.title_model);
 		if (config.conversations?.watch_dirs) result.conversations.watchDirs = config.conversations.watch_dirs;
 		if (config.conversations?.scan_max_parallel !== void 0) result.conversations.scanMaxParallel = config.conversations.scan_max_parallel;
 		if (config.conversations?.embeddings !== void 0) result.conversations.embeddings = config.conversations.embeddings;
@@ -29610,7 +29610,7 @@ function mergeConfigs(...configs) {
 		if (config.tts?.summarizer) {
 			const s = config.tts.summarizer;
 			if (s.enabled !== void 0) result.ttsSummarizer.enabled = s.enabled;
-			if (s.model) result.ttsSummarizer.model = resolveModelIdSync(s.model);
+			if (s.model) result.ttsSummarizer.model = resolveModelId(s.model);
 			if (s.batch_window_seconds !== void 0) result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
 		}
 		if (config.background_ai) {
@@ -31963,7 +31963,7 @@ const STRIPPED_KEYS = new Set([...LEAKED_ENV_KEYS, ...PROVIDER_ENV_KEYS]);
 * @param overrides  Key/value pairs to overlay AFTER stripping.
 * @returns  A plain object safe to pass to spawn, pty.spawn, etc.
 */
-function buildChildEnvSync(baseEnv = process.env, overrides) {
+function buildChildEnv(baseEnv = process.env, overrides) {
 	const out = {};
 	for (const [k, v] of Object.entries(baseEnv)) {
 		if (v === void 0) continue;
@@ -32030,7 +32030,7 @@ function isManagedServerAliveSync() {
 * MainPID when we manage it; fall back to pgrep so the founder guard still
 * fires on pre-fix or manually-founded servers.
 */
-function findManagedServerPidSync() {
+function findManagedServerPid() {
 	try {
 		const mainPidOut = execFileSync("systemctl", [
 			"--user",
@@ -32091,7 +32091,7 @@ function readServerCmdlineSync(pid) {
 * restart — the operator must decide when to migrate off the live founder.
 */
 function warnIfServerInTmuxSpawnScopeSync() {
-	const pid = findManagedServerPidSync();
+	const pid = findManagedServerPid();
 	if (pid === void 0) return false;
 	const cgroup = readServerCgroupSync(pid);
 	if (!cgroup.includes("tmux-spawn-")) return false;
@@ -32105,7 +32105,7 @@ function warnIfServerInTmuxSpawnScopeSync() {
 * (pkill -f, pgrep -f) can hit the server itself. Never auto-restart.
 */
 function warnIfServerCmdlineIsDirtySync() {
-	const pid = findManagedServerPidSync();
+	const pid = findManagedServerPid();
 	if (pid === void 0) return false;
 	const cmdline = readServerCmdlineSync(pid);
 	if (!cmdline.includes("new-session")) return false;
@@ -32128,7 +32128,7 @@ function warnIfServerCmdlineIsDirtySync() {
 * dirtily-founded server — and strip known test pollution. Non-destructive: existing
 * sessions keep their captured env; only future sessions change.
 */
-function sanitizeManagedServerGlobalEnvSync(cleanEnv) {
+function sanitizeManagedServerGlobalEnv(cleanEnv) {
 	const sock = getManagedTmuxSocketName();
 	for (const key of ["HOME", "OVERDECK_HOME"]) {
 		const value = cleanEnv[key];
@@ -32176,7 +32176,7 @@ function ensureOverdeckTmuxServerSync(cleanEnv) {
 		if (process.env.OVERDECK_TMUX_NO_MANAGED_SERVER === "1" || process.env.VITEST) return;
 	}
 	if (isManagedServerAliveSync()) {
-		sanitizeManagedServerGlobalEnvSync(cleanEnv);
+		sanitizeManagedServerGlobalEnv(cleanEnv);
 		if (!warnedManagedServerTmuxSpawnScope) warnedManagedServerTmuxSpawnScope = warnIfServerInTmuxSpawnScopeSync();
 		if (!warnedManagedServerDirtyCmdline) warnedManagedServerDirtyCmdline = warnIfServerCmdlineIsDirtySync();
 		return;
@@ -32244,7 +32244,7 @@ async function ensureOverdeckTmuxServerAsync(cleanEnv) {
 }
 async function reloadManagedTmuxConfigAsync() {
 	try {
-		const cleanEnv = buildChildEnvSync();
+		const cleanEnv = buildChildEnv();
 		await ensureOverdeckTmuxServerAsync(cleanEnv);
 		await execFileAsync("tmux", [
 			"-L",
@@ -32461,7 +32461,7 @@ function auditOverdeckSchemaSync(db, topUps = EMPTY_TOP_UP_EXPECTATIONS) {
 /**
 * Runtime infrastructure for the canonical overdeck.db cache.
 * Schema top-ups tolerate idempotency errors, log unexpected failures without
-* blocking boot, and getOverdeckDatabaseSync follows them with a report-only
+* blocking boot, and getOverdeckDatabase follows them with a report-only
 * schema audit that warns about drift without mutating the database.
 */
 const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS = {
@@ -32666,7 +32666,7 @@ function warnSchemaDriftSync(db) {
 		console.warn(`[schema-audit] audit failed: ${message}`);
 	}
 }
-function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
+function getOverdeckDatabase(dbPath = getOverdeckDatabasePath()) {
 	if (overdeckDbSync?.path === dbPath) return overdeckDbSync.db;
 	if (overdeckDbSync) {
 		overdeckDbSync.db.close();
@@ -32866,8 +32866,8 @@ Service()("overdeck/MemoryFiles");
 * Returns true on success, false if row was a duplicate (request_id conflict).
 * Throws on unexpected errors — caller wraps in try/catch.
 */
-function insertCostEventSync(event) {
-	const db = getOverdeckDatabaseSync();
+function insertCostEvent(event) {
+	const db = getOverdeckDatabase();
 	const tsMillis = new Date(event.ts).getTime();
 	return db.prepare(`INSERT OR IGNORE INTO cost_events
         (ts, issue_id, agent_id, session_id, session_type, provider, model,
@@ -32891,7 +32891,7 @@ const DEFAULT_EVENTS_SUBDIR = ".pan/events";
 */
 function resolveWalDir(issueId) {
 	const projects = listProjectsSync();
-	const issuePrefix = extractPrefixSync(issueId);
+	const issuePrefix = extractPrefix(issueId);
 	if (!issuePrefix) return null;
 	for (const { key, config } of projects) {
 		const projectKey = key.toUpperCase();
@@ -32908,7 +32908,7 @@ function resolveWalDir(issueId) {
 * Returns true if the event was written, false if no matching project was found.
 * Never throws — WAL writes are best-effort.
 */
-function appendToWalSync(event) {
+function appendToWal(event) {
 	try {
 		const walDir = resolveWalDir(event.issueId);
 		if (!walDir) return false;
@@ -32955,18 +32955,18 @@ function ensureEventsFile() {
 * 2. Event timestamps provide ordering
 * 3. Aggregation is commutative (order doesn't affect totals)
 */
-function appendCostEventSync(event) {
+function appendCostEvent(event) {
 	ensureEventsFile();
 	if (!event.ts || !event.agentId || !event.issueId || !event.model) throw new Error("Missing required event fields: ts, agentId, issueId, model");
 	const line = JSON.stringify(event) + "\n";
 	appendFileSync(getEventsFile(), line, "utf-8");
 	try {
-		insertCostEventSync(event);
+		insertCostEvent(event);
 	} catch (err) {
 		console.error("[cost-events] SQLite write failed (continuing with JSONL):", err);
 	}
 	try {
-		appendToWalSync(event);
+		appendToWal(event);
 	} catch (err) {
 		console.error("[cost-events] WAL write failed (continuing):", err);
 	}
@@ -33011,7 +33011,7 @@ function readLogLines(logFile, startByte, startLine = 0) {
 * @param workspacePath - Workspace root (where .tldr/ lives)
 * @param sinceCheckpoint - Only return metrics since the last captured checkpoint
 */
-function getTldrMetricsSync(workspacePath, sinceCheckpoint = false) {
+function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
 	const tldrDir = join(workspacePath, ".tldr");
 	const interceptionsLog = join(tldrDir, "interceptions.log");
 	const bypassesLog = join(tldrDir, "bypasses.log");
@@ -33060,10 +33060,10 @@ function getTldrMetricsSync(workspacePath, sinceCheckpoint = false) {
 * @param workspacePath - Workspace root (where .tldr/ lives)
 * @returns Metrics delta since last capture, or null if no .tldr/ directory exists
 */
-function captureTldrMetricsSync(workspacePath) {
+function captureTldrMetrics(workspacePath) {
 	const tldrDir = join(workspacePath, ".tldr");
 	if (!existsSync(tldrDir)) return null;
-	const metrics = getTldrMetricsSync(workspacePath, true);
+	const metrics = getTldrMetrics(workspacePath, true);
 	const interceptionsLog = join(tldrDir, "interceptions.log");
 	const bypassesLog = join(tldrDir, "bypasses.log");
 	const checkpointFile = join(tldrDir, "metrics-checkpoint.json");
@@ -33168,7 +33168,7 @@ try {
 			"pipe"
 		]
 	}).trim();
-	if (workspaceRoot) tldrMetrics = captureTldrMetricsSync(workspaceRoot);
+	if (workspaceRoot) tldrMetrics = captureTldrMetrics(workspaceRoot);
 } catch {}
 let tldrAttachedToFirstEvent = false;
 for (const line of lines) {
@@ -33192,9 +33192,9 @@ for (const line of lines) {
 		if (model.includes("gpt")) provider = "openai";
 		else if (model.includes("gemini")) provider = "google";
 		else if (model.includes("kimi") || model.toLowerCase().startsWith("minimax")) provider = "custom";
-		const pricing = getPricingSync(provider, model);
+		const pricing = getPricing(provider, model);
 		if (!pricing) continue;
-		const cost = calculateCostSync({
+		const cost = calculateCost({
 			inputTokens,
 			outputTokens,
 			cacheReadTokens,
@@ -33208,7 +33208,7 @@ for (const line of lines) {
 			tldrBypassReasons: Object.keys(tldrMetrics.bypassReasons).length > 0 ? tldrMetrics.bypassReasons : void 0
 		} : {};
 		if (tldrMetrics && !tldrAttachedToFirstEvent) tldrAttachedToFirstEvent = true;
-		appendCostEventSync({
+		appendCostEvent({
 			ts: (/* @__PURE__ */ new Date()).toISOString(),
 			type: "cost",
 			agentId,

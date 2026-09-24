@@ -18,8 +18,8 @@ import { Effect } from 'effect';
 import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
-import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from '../issue-id.js';
-import { getAgentStateSync, markAgentStoppedState, saveAgentState } from '../agents.js';
+import { extractNumber, extractPrefix, normalizeIssueId } from '../issue-id.js';
+import { getAgentState, markAgentStoppedState, saveAgentState } from '../agents.js';
 
 const execAsync = promisify(exec);
 
@@ -61,8 +61,8 @@ export interface CloseIssueOptions {
  * Otherwise, falls back to direct gh CLI (GitHub) or Linear SDK calls.
  */
 async function markWorkAgentStoppedForIssue(issueId: string): Promise<void> {
-  const agentId = `agent-${normalizeIssueIdSync(issueId)}`;
-  const state = getAgentStateSync(agentId);
+  const agentId = `agent-${normalizeIssueId(issueId)}`;
+  const state = getAgentState(agentId);
   if (!state) return;
   markAgentStoppedState(state);
   await Effect.runPromise(saveAgentState(state));
@@ -322,8 +322,8 @@ async function closeLinearDirectImpl(ctx: LifecycleContext, apiKey: string): Pro
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    const issueNumber = extractNumberSync(ctx.issueId);
-    const issuePrefix = extractPrefixSync(ctx.issueId);
+    const issueNumber = extractNumber(ctx.issueId);
+    const issuePrefix = extractPrefix(ctx.issueId);
     if (issueNumber === null || issuePrefix === null) {
       return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
     }
@@ -505,8 +505,8 @@ async function applyLabelLinearImpl(ctx: LifecycleContext, apiKey: string): Prom
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    const issueNum = extractNumberSync(ctx.issueId);
-    const teamKey = extractPrefixSync(ctx.issueId);
+    const issueNum = extractNumber(ctx.issueId);
+    const teamKey = extractPrefix(ctx.issueId);
     if (issueNum === null || teamKey === null) {
       return stepFailed(step, `Could not parse issue ID: ${ctx.issueId}`);
     }

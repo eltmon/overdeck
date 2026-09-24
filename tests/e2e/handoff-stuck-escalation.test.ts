@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CloisterService } from '../../src/lib/cloister/service.js';
-import { spawnAgent, stopAgentSync, getAgentStateSync } from '../../src/lib/agents.js';
+import { spawnAgent, stopAgentSync, getAgentState } from '../../src/lib/agents.js';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

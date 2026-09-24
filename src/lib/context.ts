@@ -32,7 +32,7 @@ function getSummaryFile(agentId: string): string {
 /**
  * Append a work summary to SUMMARY.md
  */
-export function appendSummarySync(agentId: string, summary: SummaryEntry): void {
+export function appendSummary(agentId: string, summary: SummaryEntry): void {
   const dir = join(AGENTS_DIR, agentId);
   mkdirSync(dir, { recursive: true });
 
@@ -96,7 +96,7 @@ function getHistoryDir(agentId: string): string {
 /**
  * Log an action to queryable history
  */
-export function logHistorySync(
+export function logHistory(
   agentId: string,
   action: string,
   details?: Record<string, any>
@@ -118,7 +118,7 @@ export function logHistorySync(
 /**
  * Search history files for a pattern
  */
-export function searchHistorySync(agentId: string, pattern: string): string[] {
+export function searchHistory(agentId: string, pattern: string): string[] {
   const historyDir = getHistoryDir(agentId);
   if (!existsSync(historyDir)) return [];
 
@@ -145,7 +145,7 @@ export function searchHistorySync(agentId: string, pattern: string): string[] {
 /**
  * Get recent history entries
  */
-export function getRecentHistorySync(agentId: string, limit: number = 20): string[] {
+export function getRecentHistory(agentId: string, limit: number = 20): string[] {
   const historyDir = getHistoryDir(agentId);
   if (!existsSync(historyDir)) return [];
 
@@ -180,7 +180,7 @@ export interface ContextBudget {
 /**
  * Estimate token count (rough approximation: ~4 chars per token)
  */
-export function estimateTokensSync(text: string): number {
+export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
@@ -193,7 +193,7 @@ function getMaterializedDir(agentId: string): string {
 /**
  * Materialize tool output for later retrieval
  */
-export function materializeOutputSync(
+export function materializeOutput(
   agentId: string,
   toolName: string,
   output: string,
@@ -229,7 +229,7 @@ export function materializeOutputSync(
   writeFileSync(filepath, lines.join('\n'));
 
   // Log to history
-  logHistorySync(agentId, `materialized:${toolName}`, { file: filename });
+  logHistory(agentId, `materialized:${toolName}`, { file: filename });
 
   return filepath;
 }
@@ -237,7 +237,7 @@ export function materializeOutputSync(
 /**
  * List materialized outputs for an agent
  */
-export function listMaterializedSync(agentId: string): Array<{
+export function listMaterialized(agentId: string): Array<{
   tool: string;
   timestamp: number;
   file: string;
@@ -262,7 +262,7 @@ export function listMaterializedSync(agentId: string): Array<{
 /**
  * Read materialized output
  */
-export function readMaterializedSync(filepath: string): string | null {
+export function readMaterialized(filepath: string): string | null {
   if (!existsSync(filepath)) return null;
   return readFileSync(filepath, 'utf-8');
 }

@@ -11,11 +11,11 @@ import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Data } from 'effect';
 import type { AgentState } from '../agents.js';
-import { getAgentStateSync, saveAgentStateSync, stopAgent, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
+import { getAgentState, saveAgentStateSync, stopAgent, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
 import { sessionExists } from '../tmux.js';
-import { requireModelOverrideSync } from '../model-validation.js';
+import { requireModelOverride } from '../model-validation.js';
 
 /**
  * Handoff method type
@@ -56,7 +56,7 @@ export async function performHandoff(
   options: HandoffOptions
 ): Promise<HandoffResult> {
   // Get current agent state
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (!state) {
     return {
       success: false,
@@ -67,7 +67,7 @@ export async function performHandoff(
 
   let targetModel: string;
   try {
-    targetModel = requireModelOverrideSync(options.targetModel);
+    targetModel = requireModelOverride(options.targetModel);
   } catch (error) {
     return {
       success: false,

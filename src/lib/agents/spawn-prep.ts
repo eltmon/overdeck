@@ -3,21 +3,21 @@ import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { loadConfigSync } from '../config.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
-import { getFlywheelActiveRunIdSync } from '../overdeck/control-settings.js';
+import { getFlywheelActiveRunId } from '../overdeck/control-settings.js';
 import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
-import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByPath, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 import { getPrFacts } from '../cloister/pr-facts.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
-import { requireModelOverrideSync } from '../model-validation.js';
+import { requireModelOverride } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -28,7 +28,7 @@ import { normalizeFlywheelRunId } from './provenance.js';
 import { resolveStaffing } from './staffing.js';
 import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { checkStaffingFitness } from './tier-fitness.js';
-import { buildTierFitnessContextSync } from './tier-fitness-context.js';
+import { buildTierFitnessContext } from './tier-fitness-context.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
 import {
   buildCavemanExports,
@@ -45,7 +45,7 @@ import {
   getOhmypiLauncherFields,
   inferMemoryProjectId,
   roleAgentDefinitionPath,
-  roleSystemPromptInjectionSync,
+  roleSystemPromptInjection,
 } from './runtime-command.js';
 
 export type FlywheelSpawnEnv = {
@@ -54,7 +54,7 @@ export type FlywheelSpawnEnv = {
 };
 
 export function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
-  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunIdSync());
+  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunId());
   return runId
     ? { OVERDECK_FLYWHEEL_RUN_ID: runId, OVERDECK_FLYWHEEL_AGENT_ROLE: role }
     : {};
@@ -474,7 +474,7 @@ export function logTierFitnessAtSpawn(
 ): void {
   if (!staffing.model || difficulties.length === 0) return;
   try {
-    const ctx = buildTierFitnessContextSync(loadYamlConfig().config);
+    const ctx = buildTierFitnessContext(loadYamlConfig().config);
     const warnings = checkStaffingFitness(
       { tierName: staffing.tierName, model: staffing.model, harness: staffing.harness, path: `tier '${staffing.tierName}'` },
       difficulties,
@@ -588,7 +588,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
 
   // Resolve the project from workspacePath — its configured tracker is authoritative.
   // Every issue MUST belong to a registered project with a tracker configured.
-  const projectConfig = workspacePath ? findProjectByPathSync(workspacePath) : null;
+  const projectConfig = workspacePath ? findProjectByPath(workspacePath) : null;
   if (!projectConfig) {
     throw new Error(`Cannot transition ${issueId}: no project config found for workspace ${workspacePath || '(none)'}. Register the project in projects.yaml.`);
   }
@@ -688,7 +688,7 @@ export async function buildAgentLaunchConfig(opts: {
   /** Inline prompt to embed in launch commands that still support prompt arguments. */
   promptInline?: string;
 }): Promise<AgentLaunchConfig> {
-  const model = requireModelOverrideSync(opts.model);
+  const model = requireModelOverride(opts.model);
 
   // Substrate guard: inject permission deny rules for Overdeck infrastructure
   // paths (.claude/agents/, .claude/hooks/, ~/.overdeck/, JSONL session dirs)
@@ -707,11 +707,11 @@ export async function buildAgentLaunchConfig(opts: {
   const providerEnv = isAcp ? {} : await getProviderEnvForModel(model, opts.harness);
 
   if (!isAcp) {
-    const provider = getProviderForModelSync(model as ModelId);
+    const provider = getProviderForModel(model as ModelId);
     if (provider.authType === 'credential-file') {
-      setupCredentialFileAuthSync(provider, opts.workspace);
+      setupCredentialFileAuth(provider, opts.workspace);
     } else {
-      clearCredentialFileAuthSync(opts.workspace);
+      clearCredentialFileAuth(opts.workspace);
     }
   }
 
@@ -777,7 +777,7 @@ export async function buildAgentLaunchConfig(opts: {
     // --dangerously-skip-permissions on resume too.
     // Use the shared helper so the only string literal for DSP lives in
     // claude-permissions.ts (see scripts/lint-permissions.sh allowlist).
-    const launcherContent = generateLauncherScriptSync({
+    const launcherContent = generateLauncherScript({
       role: launchRole,
       spawnMode: 'resume',
       workingDir: opts.workspace,
@@ -791,7 +791,7 @@ export async function buildAgentLaunchConfig(opts: {
       // which short-circuits to the omp/codex form.
       baseCommand: behavior.launchCommandKind !== 'claude-code'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
-        : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
+        : `claude ${getClaudePermissionFlagsString()}${roleSystemPromptInjection(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
       // PAN-3189: the git guard is emitted for launchers that carry an agent
       // id. Work/strike/review agents — the ones the stash/rebase rules exist
@@ -829,7 +829,7 @@ export async function buildAgentLaunchConfig(opts: {
   // definitions). The launcher generator's Pi branch then layers --session-dir
   // and the fifo redirect on top.
   const agentDefinition = roleAgentDefinitionPath(launchRole);
-  const launcherContent = generateLauncherScriptSync({
+  const launcherContent = generateLauncherScript({
     role: launchRole,
     workingDir: opts.workspace,
     changeDir: false,
@@ -1027,7 +1027,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     if (!record.hostFallbackNoticed) {
       record.hostFallbackNoticed = true;
       spawnStackRebuildState.set(normalizedIssue, record);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: role,
         level: 'warn',
         issueId: normalizedIssue,
@@ -1050,7 +1050,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     if (!record.escalated) {
       record.escalated = true;
       spawnStackRebuildState.set(normalizedIssue, record);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: role,
         level: 'error',
         issueId: normalizedIssue,

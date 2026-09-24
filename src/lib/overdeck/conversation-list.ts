@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 
 import { Effect } from 'effect';
 
-import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
+import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
 import { withConcurrencyLimitPromise } from '../concurrency.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -153,7 +153,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
       let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
       if (sessionAlive && convSf && existsSync(convSf)) {
         try {
-          const scan = await scanPendingInputsPromise(convSf);
+          const scan = await scanPendingInputs(convSf);
           const kinds: PendingInputKind[] = [];
           const auqSnapshot = askUserQuestionSnapshotFromScan(scan);
           if (auqSnapshot) {

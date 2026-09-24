@@ -1,11 +1,11 @@
 /** Search health stays live; corpus statistics refresh in the shared DB worker. */
-import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
+import { getConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { getConversationSearchHealth } from '../../../lib/conversation-search/health.js';
 import { getConversationSearchStatsSnapshot } from './dashboard-poll-snapshots.js';
 
 export async function getConversationSearchStatus() {
-  const config = getConversationSearchConfigSync();
+  const config = getConversationSearchConfig();
   // Runtime embed failures (exhausted credits, quota, network) are recorded
   // by the search service and watcher; surface them in every shape (PAN-3771).
   if (!config.enabled) {

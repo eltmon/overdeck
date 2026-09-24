@@ -25,7 +25,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentStateProgram: vi.fn(),
   stopAgent: vi.fn(),
   stopAgentProgram: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('../../services/agent-projection.js', () => ({
 }));
 
 vi.mock('../../../../lib/activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntry: vi.fn(),
 }));
 
 vi.mock('../origin-validation.js', () => ({
@@ -46,10 +46,10 @@ vi.mock('../origin-validation.js', () => ({
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import { createAgentStopHandler } from '../agents.js';
-import { getAgentStateSync, stopAgent } from '../../../../lib/agents.js';
+import { getAgentState, stopAgent } from '../../../../lib/agents.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 
-const mockGetAgentState = vi.mocked(getAgentStateSync);
+const mockGetAgentState = vi.mocked(getAgentState);
 const mockStopAgent = vi.mocked(stopAgent);
 const mockSaveAgentStateAndEmitEventProgram = vi.mocked(saveAgentStateAndEmitEventProgram);
 

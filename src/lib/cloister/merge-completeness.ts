@@ -2,10 +2,10 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { getForgeAdapter, type ForgeType } from '../forge.js';
 import {
-  ensureMergeSetForIssueSync,
+  ensureMergeSetForIssue,
   type MergeSet,
 } from '../merge-set.js';
-import { resolveProjectReposForIssueSync } from '../project-repos.js';
+import { resolveProjectReposForIssue } from '../project-repos.js';
 
 const execAsync = promisify(exec);
 
@@ -83,10 +83,10 @@ function resolveRepos(
   issueId: string,
   labels: string[],
 ): { mergeSet: MergeSet | null; repos: RepoToAssess[] | null } {
-  const mergeSet = ensureMergeSetForIssueSync(issueId, labels);
+  const mergeSet = ensureMergeSetForIssue(issueId, labels);
   return {
     mergeSet,
-    repos: mergeSet?.repos ?? resolveProjectReposForIssueSync(issueId, labels),
+    repos: mergeSet?.repos ?? resolveProjectReposForIssue(issueId, labels),
   };
 }
 

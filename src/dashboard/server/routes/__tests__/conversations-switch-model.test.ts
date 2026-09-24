@@ -55,7 +55,7 @@ vi.mock('../../../../lib/conversations/smart-compaction.js', () => ({
 }));
 
 vi.mock('../../../../lib/providers.js', () => ({
-  getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
+  getProviderForModel: vi.fn(() => ({ name: 'anthropic' })),
   piProviderForModel: vi.fn(() => 'anthropic'),
   qualifyPiModel: vi.fn((m: string) => m),
 }));
@@ -108,8 +108,8 @@ async function postSwitchModel(conversationName: string, body: Record<string, un
 }
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 describe('POST /api/conversations/:name/switch-model', () => {

@@ -228,8 +228,8 @@ async function resurrectAgentForFeedback(
   keepPause?: (pausedReason: string) => boolean,
 ): Promise<boolean | typeof PAUSE_KEPT> {
   try {
-    const { getAgentStateSync, clearAgentPausedSync, clearAgentTroubled } = await import('../agents/agent-state.js');
-    const state = getAgentStateSync(agentId);
+    const { getAgentState, clearAgentPausedSync, clearAgentTroubled } = await import('../agents/agent-state.js');
+    const state = getAgentState(agentId);
     if (!state) {
       console.warn(`[feedback-target] Cannot resume ${agentId} for ${issueId} feedback: agent registry row is missing; trying the start path`);
       return startAgentForFeedback(agentId, issueId, workspacePath);
@@ -256,7 +256,7 @@ async function resurrectAgentForFeedback(
         return now === 'pipeline' || now === 'none';
       });
       if (!cleared) {
-        const current = getAgentStateSync(agentId);
+        const current = getAgentState(agentId);
         console.log(`[feedback-target] ${agentId}'s pause changed before it could be lifted (${current?.pausedReason ?? 'unknown'}) — not resuming it for ${issueId} feedback`);
         return current && classifyPause(current, keepPause) === 'kept' ? PAUSE_KEPT : false;
       }
@@ -300,9 +300,9 @@ export async function surfaceIssueFeedbackNeedsYou(
   reason: string,
   details: Record<string, unknown> = {},
 ): Promise<void> {
-  const { emitActivityEntrySync } = await import('../activity-logger.js');
+  const { emitActivityEntry } = await import('../activity-logger.js');
   try {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'cloister',
       level: 'warn',
       message: `${issueId} needs you: ${reason}`,

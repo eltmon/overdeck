@@ -45,7 +45,7 @@ function getCVFile(agentId: string): string {
 /**
  * Read an agent's CV without creating one.
  */
-export function readAgentCVSync(agentId: string): AgentCV | null {
+export function readAgentCV(agentId: string): AgentCV | null {
   const cvFile = getCVFile(agentId);
 
   if (!existsSync(cvFile)) return null;
@@ -60,8 +60,8 @@ export function readAgentCVSync(agentId: string): AgentCV | null {
 /**
  * Get or create an agent's CV
  */
-export function getAgentCVSync(agentId: string): AgentCV {
-  const existing = readAgentCVSync(agentId);
+export function getAgentCV(agentId: string): AgentCV {
+  const existing = readAgentCV(agentId);
   if (existing) return existing;
 
   // Create new CV
@@ -99,8 +99,8 @@ function saveAgentCVSync(cv: AgentCV): void {
 /**
  * Start tracking work for an agent
  */
-export function startWorkSync(agentId: string, issueId: string, skills?: string[]): void {
-  const cv = getAgentCVSync(agentId);
+export function startWork(agentId: string, issueId: string, skills?: string[]): void {
+  const cv = getAgentCV(agentId);
 
   const entry: WorkEntry = {
     issueId,
@@ -133,13 +133,13 @@ export function startWorkSync(agentId: string, issueId: string, skills?: string[
 /**
  * Complete work for an agent
  */
-export function completeWorkSync(
+export function completeWork(
   agentId: string,
   issueId: string,
   outcome: 'success' | 'failed' | 'abandoned',
   details?: { commits?: number; linesChanged?: number; failureReason?: string }
 ): void {
-  const cv = getAgentCVSync(agentId);
+  const cv = getAgentCV(agentId);
 
   // Find the work entry
   const entry = cv.recentWork.find(
@@ -186,7 +186,7 @@ export function completeWorkSync(
 /**
  * Get agent rankings by success rate
  */
-export function getAgentRankingsSync(): Array<{
+export function getAgentRankings(): Array<{
   agentId: string;
   successRate: number;
   totalIssues: number;
@@ -206,7 +206,7 @@ export function getAgentRankingsSync(): Array<{
   );
 
   for (const dir of dirs) {
-    const cv = getAgentCVSync(dir.name);
+    const cv = getAgentCV(dir.name);
     if (cv.stats.totalIssues > 0) {
       rankings.push({
         agentId: dir.name,
@@ -231,7 +231,7 @@ export function getAgentRankingsSync(): Array<{
 /**
  * Format CV for display
  */
-export function formatCVSync(cv: AgentCV): string {
+export function formatCV(cv: AgentCV): string {
   const lines: string[] = [
     `# Agent CV: ${cv.agentId}`,
     '',

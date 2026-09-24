@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentDir: vi.fn(() => '/tmp/agent-dir'),
   spawnAgent: vi.fn(),
   saveAgentState: vi.fn(),
@@ -58,14 +58,14 @@ vi.mock('../../../src/lib/runtimes/index.js', () => ({
 
 import { ClaudeCodeRuntimeSync } from '../../../src/lib/runtimes/claude-code.js';
 import { sessionExistsSync, killSessionSync } from '../../../src/lib/tmux.js';
-import { saveAgentRuntimeState, getAgentStateSync, saveAgentStateSync, listRunningAgentsSync } from '../../../src/lib/agents.js';
+import { saveAgentRuntimeState, getAgentState, saveAgentStateSync, listRunningAgentsSync } from '../../../src/lib/agents.js';
 import { getRuntimeForAgent } from '../../../src/lib/runtimes/index.js';
 import { CloisterService } from '../../../src/lib/cloister/service.js';
 
 const mockSessionExists = vi.mocked(sessionExistsSync);
 const mockKillSession = vi.mocked(killSessionSync);
 const mockSaveAgentRuntimeState = vi.mocked(saveAgentRuntimeState);
-const mockGetAgentState = vi.mocked(getAgentStateSync);
+const mockGetAgentState = vi.mocked(getAgentState);
 const mockSaveAgentState = vi.mocked(saveAgentStateSync);
 const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
 const mockGetRuntimeForAgent = vi.mocked(getRuntimeForAgent);

@@ -22,7 +22,7 @@ import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 import { readContinueState } from '../../lib/xbrief/continue-state.js';
 import { listXBriefs, readXBriefDocument } from '../../lib/xbrief/xbrief-index.js';
-import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, listProjectsSync } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam, listProjectsSync } from '../../lib/projects.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 
 function getProjectPath(issueId: string): string {
@@ -31,7 +31,7 @@ function getProjectPath(issueId: string): string {
     return resolved.projectPath;
   }
   const teamPrefix = extractTeamPrefix(issueId);
-  const project = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const project = teamPrefix ? findProjectByTeam(teamPrefix) : null;
   if (project?.path) {
     return project.path;
   }

@@ -19,11 +19,11 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import chalk from 'chalk';
 import {
-  renderDevcontainerSync,
+  renderDevcontainer,
 } from '../../lib/workspace/devcontainer-renderer.js';
 import {
   extractTeamPrefix,
-  findProjectByTeamSync,
+  findProjectByTeam,
   loadProjectsConfigSync,
 } from '../../lib/projects.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
@@ -79,7 +79,7 @@ export async function workspaceRenderDevcontainerCommand(
   }
 
   try {
-    const result = renderDevcontainerSync({
+    const result = renderDevcontainer({
       workspacePath,
       projectConfig: project,
       featureName: bareName,
@@ -130,7 +130,7 @@ function resolveProjectConfig(
   // 2. Issue-id-style prefix (e.g. "min-846" → MIN → mind-your-now).
   const prefix = extractTeamPrefix(featureName);
   if (prefix) {
-    const project = findProjectByTeamSync(prefix);
+    const project = findProjectByTeam(prefix);
     if (project) return project;
   }
 

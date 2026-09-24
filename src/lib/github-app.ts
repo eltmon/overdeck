@@ -277,7 +277,7 @@ function generateJWT(appId: string, privateKey: string): string {
   return `${header}.${payload}.${signature}`;
 }
 
-async function generateInstallationTokenPromise(
+async function generateInstallationTokenBody(
   config?: GitHubAppConfig
 ): Promise<InstallationToken> {
   const appConfig = config || loadGitHubAppConfig();
@@ -612,7 +612,7 @@ export async function listOpenIssuesWithLabels(
     }));
 }
 
-export async function listIssuesWithAnyLabelPromise(
+export async function listIssuesWithAnyLabel(
   owner: string,
   repo: string,
   labels: readonly string[],
@@ -819,7 +819,7 @@ export async function postOverdeckTestsStatus(
   }
 }
 
-async function refreshWorkspaceTokenPromise(
+async function refreshWorkspaceTokenBody(
   workspacePath: string,
 ): Promise<void> {
   const config = loadGitHubAppConfig();
@@ -880,7 +880,7 @@ export const generateInstallationToken = (
       );
     }
     return yield* Effect.tryPromise({
-      try: () => generateInstallationTokenPromise(cfg),
+      try: () => generateInstallationTokenBody(cfg),
       catch: apiCatch('generateInstallationToken'),
     });
   });
@@ -897,7 +897,7 @@ export const refreshWorkspaceToken = (
       );
     }
     return yield* Effect.tryPromise({
-      try: () => refreshWorkspaceTokenPromise(workspacePath),
+      try: () => refreshWorkspaceTokenBody(workspacePath),
       catch: (cause) =>
         new FsError({
           path: workspacePath,

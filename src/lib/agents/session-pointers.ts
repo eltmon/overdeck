@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { emitAgentEvent } from '../agent-runtime.js';
 import { resetSessionIndex, SESSION_RESET_MARKER } from '../session-history.js';
-import { getAgentDir, getAgentStateSync, saveAgentStateSync } from './agent-state.js';
+import { getAgentDir, getAgentState, saveAgentStateSync } from './agent-state.js';
 
 export interface ClearedAgentSessionPointers {
   cleared: string[];
@@ -50,7 +50,7 @@ export async function clearAgentSessionPointers(
     }
   }
 
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (state?.sessionId) {
     delete state.sessionId;
     saveAgentStateSync(state);

@@ -396,7 +396,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
 | `verification.failed` (`failedCheck: 'test'`, `cycleCount`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
 | `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through |
-| `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewersPromise`, once reviewers exist |
+| `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewers`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |

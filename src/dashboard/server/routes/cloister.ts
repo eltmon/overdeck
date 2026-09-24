@@ -21,7 +21,7 @@ import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfigSync, saveCloisterConfigSync } from '../../../lib/cloister/config.js';
 import { emergencyBrake } from '../../../lib/cloister/concurrency.js';
 import { saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
-import { getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentState } from '../../../lib/agents.js';
 import { httpHandler } from './http-handler.js';
 import {
   areDurableSpawnsPaused,
@@ -101,7 +101,7 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction. Cloister already stopped the agents,
       // so re-upsert the latest row to make the event atomic.
-      const state = getAgentStateSync(agentId);
+      const state = getAgentState(agentId);
       if (state) {
         yield* saveAgentStateAndEmitEventProgram(state, {
           type: 'agent.stopped',
@@ -132,7 +132,7 @@ const postCloisterBrakeRoute = HttpRouter.add(
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction. emergencyBrake already stopped the
       // agents, so re-upsert the latest row to make the event atomic.
-      const state = getAgentStateSync(agentId);
+      const state = getAgentState(agentId);
       if (state) {
         yield* saveAgentStateAndEmitEventProgram(state, {
           type: 'agent.stopped',

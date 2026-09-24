@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 import type { ContinueFeedbackEntry, ContinueSessionEntry, ContinueState } from './continue-state.js';
 import {
   LEGACY_VBRIEF_LIFECYCLE_DIRS,
-  ensureXBriefDirsSync,
+  ensureXBriefDirs,
   generateXBriefFilename,
   parseXBriefFilename,
   resolveXBriefDir,
@@ -251,7 +251,7 @@ export async function transitionXBriefOnMain(
     throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
-  ensureXBriefDirsSync(projectRoot);
+  ensureXBriefDirs(projectRoot);
   const ensured = ensurePanSpecForIssue(projectRoot, found);
   const ensuredSpec = ensured.found;
   const needsMove = ensuredSpec.lifecycleDir !== targetDir;

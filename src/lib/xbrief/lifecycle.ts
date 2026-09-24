@@ -127,7 +127,7 @@ export function resolveXBriefDir(projectRoot: string, lifecycleDir: XBriefLifecy
  *
  * @param legacyRootDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function ensureXBriefDirsSync(projectRoot: string, legacyRootDirname?: string): string {
+export function ensureXBriefDirs(projectRoot: string, legacyRootDirname?: string): string {
   const root = join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME);
   mkdirSync(root, { recursive: true });
   for (const dir of LEGACY_VBRIEF_LIFECYCLE_DIRS) {

@@ -3,9 +3,9 @@ import type { ModelId } from '../settings.js';
 import type { XBriefDifficulty, XBriefItemKind } from '../xbrief/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import type { ModelProvider } from '../model-fallback.js';
-import { resolveModelIdSync } from '../model-capabilities.js';
-import { getProviderForModelSync, PROVIDERS } from '../providers.js';
-import { canUseHarnessSync } from '../harness-policy.js';
+import { resolveModelId } from '../model-capabilities.js';
+import { getProviderForModel, PROVIDERS } from '../providers.js';
+import { canUseHarness } from '../harness-policy.js';
 
 export const TIERED_EXECUTION_DIFFICULTIES: readonly XBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
@@ -245,7 +245,7 @@ function validateHarness(harness: string, path: string): asserts harness is Runt
 }
 
 function validateModel(model: string, path: string): ModelId {
-  const resolved = resolveModelIdSync(model);
+  const resolved = resolveModelId(model);
   if (!knownModelIds().has(resolved) && !resolved.includes('/')) {
     throw new TieredExecutionConfigError(`${path}.model '${model}' is unknown`);
   }
@@ -258,9 +258,9 @@ function validateModelHarnessPolicy(
   path: string,
   context: TieredExecutionValidationContext,
 ): void {
-  const provider = getProviderForModelSync(model);
+  const provider = getProviderForModel(model);
   const authMode = context.providerAuth?.[provider.name as ModelProvider];
-  const decision = canUseHarnessSync(harness, model, authMode);
+  const decision = canUseHarness(harness, model, authMode);
   if (!decision.allowed) {
     throw new TieredExecutionConfigError(`${path} is not allowed: ${decision.reason ?? 'harness policy rejected this model/harness/auth combination'}`);
   }

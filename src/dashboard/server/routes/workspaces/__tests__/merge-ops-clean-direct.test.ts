@@ -20,9 +20,9 @@ const mocks = vi.hoisted(() => ({
   mergeRun: null as { phase: string } | null,
 }));
 
-vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
 }));
@@ -83,10 +83,10 @@ vi.mock('../../../../../lib/github-app.js', () => ({
 }));
 
 vi.mock('../../../../../lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: vi.fn(() => ({
+  ensureMergeSetForIssue: vi.fn(() => ({
     repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }],
   })),
-  getMergeSetSync: vi.fn(() => ({
+  getMergeSet: vi.fn(() => ({
     repos: [{ targetBranch: 'main', forge: 'github', artifactUrl: PR_URL }],
   })),
 }));
@@ -100,7 +100,7 @@ vi.mock('../../../../../lib/overdeck/merge.js', () => ({
 }));
 
 vi.mock('../../../../../lib/projects.js', () => ({
-  findProjectByTeamSync: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
+  findProjectByTeam: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
 }));
 
 // PAN-3917: readiness is derived from the forge, not read off a record.

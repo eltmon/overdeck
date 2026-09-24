@@ -7,7 +7,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
  */
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
-  resolveGitHubIssueSync: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
 }));
 
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -16,7 +16,7 @@ vi.mock('node:child_process', async (importOriginal) => ({
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: mocks.resolveGitHubIssueSync,
+  resolveGitHubIssue: mocks.resolveGitHubIssue,
 }));
 
 import { readCompletedCloseOut } from '../../../../src/lib/lifecycle/dod-gate.js';
@@ -36,7 +36,7 @@ function ghReturns(payload: unknown | Error): void {
 describe('readCompletedCloseOut idempotent guard (PAN-3025 WI-4, PAN-3917)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3025 });
+    mocks.resolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3025 });
   });
 
   it('returns closedAt for a CLOSED issue labelled closed-out', async () => {
@@ -64,7 +64,7 @@ describe('readCompletedCloseOut idempotent guard (PAN-3025 WI-4, PAN-3917)', () 
   });
 
   it('fails closed for a non-GitHub issue', async () => {
-    mocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
+    mocks.resolveGitHubIssue.mockReturnValue({ isGitHub: false });
 
     await expect(readCompletedCloseOut('MIN-1', '/repo/myn')).resolves.toBeNull();
     expect(mocks.execFile).not.toHaveBeenCalled();

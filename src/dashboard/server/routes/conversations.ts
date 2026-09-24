@@ -1,6 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
-import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
 import { mkdir, writeFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
@@ -127,7 +127,7 @@ import {
   setOption,
   exactPaneTarget,
   listSessionNames,
-  findManagedServerPidSync,
+  findManagedServerPid,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
@@ -137,7 +137,7 @@ import {
   getProviderEnvForModel,
   getProviderAuthMode,
 } from '../../../lib/agents.js';
-import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
+import { writeBridgeToken } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../../../lib/config-yaml.js';
 import {
   writeConversationControlCommand,
@@ -145,14 +145,14 @@ import {
   type ThinkingLevel,
 } from '../../../lib/runtimes/conversation-control.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
-import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { canUseHarness } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
-import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
+import { getProviderForModel, piProviderForModel } from '../../../lib/providers.js';
 import { getOhmypiCodexAuthStatus } from '../../../lib/ohmypi-codex-auth.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
-import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
+import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import { workspaceContextFile, piGlobalContextFile } from '../../../lib/context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import {

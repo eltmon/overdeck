@@ -12,11 +12,11 @@
 
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
+import { resolveBareNumericId } from '../../lib/issue-id.js';
 
-const DASHBOARD_URL = getDashboardApiUrlSync();
+const DASHBOARD_URL = getDashboardApiUrl();
 
 export interface ReviewRestartOptions {
   model?: string;
@@ -66,7 +66,7 @@ export async function reviewRestartCommand(
   id: string,
   opts: ReviewRestartOptions = {},
 ): Promise<void> {
-  const issueId = resolveBareNumericIdSync(id);
+  const issueId = resolveBareNumericId(id);
   if (!issueId) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(

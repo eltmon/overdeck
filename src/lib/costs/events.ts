@@ -18,8 +18,8 @@ import {
 } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { insertCostEventSync } from '../overdeck/cost-sync.js';
-import { appendToWalSync } from './wal.js';
+import { insertCostEvent } from '../overdeck/cost-sync.js';
+import { appendToWal } from './wal.js';
 
 // ============== Types ==============
 
@@ -170,7 +170,7 @@ function eventTimestampFromLine(line: string | null): string | null {
   }
 }
 
-export function getEventsFileSizeSync(): number {
+export function getEventsFileSize(): number {
   try {
     return statSync(getEventsFile()).size;
   } catch {
@@ -178,7 +178,7 @@ export function getEventsFileSizeSync(): number {
   }
 }
 
-export function forEachCostEventSync(visitor: (event: CostEvent) => void): EventMetadata {
+export function forEachCostEvent(visitor: (event: CostEvent) => void): EventMetadata {
   const scan = scanEventLinesSync({
     visitor: (line) => {
       try {
@@ -196,7 +196,7 @@ export function forEachCostEventSync(visitor: (event: CostEvent) => void): Event
   };
 }
 
-export function readEventsFromByteOffsetSync(startOffset: number): {
+export function readEventsFromByteOffset(startOffset: number): {
   events: CostEvent[];
   newOffset: number;
   linesRead: number;
@@ -250,7 +250,7 @@ function ensureEventsFile(): void {
  * 2. Event timestamps provide ordering
  * 3. Aggregation is commutative (order doesn't affect totals)
  */
-export function appendCostEventSync(event: CostEvent): void {
+export function appendCostEvent(event: CostEvent): void {
   ensureEventsFile();
 
   // Validate required fields
@@ -264,14 +264,14 @@ export function appendCostEventSync(event: CostEvent): void {
 
   // Dual-write to SQLite (best-effort — JSONL remains canonical)
   try {
-    insertCostEventSync(event);
+    insertCostEvent(event);
   } catch (err) {
     console.error('[cost-events] SQLite write failed (continuing with JSONL):', err);
   }
 
   // Append to per-project WAL file (best-effort — enables multi-developer sync)
   try {
-    appendToWalSync(event);
+    appendToWal(event);
   } catch (err) {
     console.error('[cost-events] WAL write failed (continuing):', err);
   }
@@ -282,7 +282,7 @@ export function appendCostEventSync(event: CostEvent): void {
 /**
  * Read all events from the log with optional filters
  */
-export function readEventsSync(options: ReadEventsOptions = {}): CostEvent[] {
+export function readEvents(options: ReadEventsOptions = {}): CostEvent[] {
   const events: CostEvent[] = [];
   const offset = options.offset ?? 0;
   const limit = options.limit;
@@ -327,7 +327,7 @@ export function readEventsSync(options: ReadEventsOptions = {}): CostEvent[] {
 /**
  * Get the last N events from the log
  */
-export function tailEventsSync(n: number): CostEvent[] {
+export function tailEvents(n: number): CostEvent[] {
   const lines: string[] = [];
   scanEventLinesSync({
     includeTrailingLine: true,
@@ -354,7 +354,7 @@ export function tailEventsSync(n: number): CostEvent[] {
  * Useful for incremental processing
  * Returns both events and the new line position to handle malformed lines correctly
  */
-export function readEventsFromLineSync(startLine: number): { events: CostEvent[]; newLine: number } {
+export function readEventsFromLine(startLine: number): { events: CostEvent[]; newLine: number } {
   if (!existsSync(getEventsFile())) {
     return { events: [], newLine: startLine };
   }
@@ -378,7 +378,7 @@ export function readEventsFromLineSync(startLine: number): { events: CostEvent[]
 /**
  * Get metadata about the event log
  */
-export function getLastEventMetadataSync(): EventMetadata {
+export function getLastEventMetadata(): EventMetadata {
   const scan = scanEventLinesSync({ includeTrailingLine: true });
   return {
     lastEventTs: eventTimestampFromLine(scan.lastLine),
@@ -392,7 +392,7 @@ export function getLastEventMetadataSync(): EventMetadata {
  * Replace the entire events log with new content
  * Used by retention pruning - DANGEROUS, use with caution
  */
-export function replaceEventsFileSync(events: CostEvent[]): void {
+export function replaceEventsFile(events: CostEvent[]): void {
   ensureEventsFile();
 
   // Write to temp file first
@@ -420,7 +420,7 @@ export function replaceEventsFileSync(events: CostEvent[]): void {
  *
  * Returns the number of duplicate events removed.
  */
-export function deduplicateEventsSync(): number {
+export function deduplicateEvents(): number {
   if (!existsSync(getEventsFile())) {
     return 0;
   }
@@ -473,7 +473,7 @@ export function deduplicateEventsSync(): number {
 
   const removed = lines.length - kept.length;
   if (removed > 0) {
-    replaceEventsFileSync(kept);
+    replaceEventsFile(kept);
   }
   return removed;
 }

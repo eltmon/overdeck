@@ -10,8 +10,8 @@ import {
   type SkipVerdict,
 } from '../../../../src/lib/costs/skip-cache.js';
 import {
-  closeOverdeckDatabaseSync,
-  getOverdeckDatabaseSync,
+  closeOverdeckDatabase,
+  getOverdeckDatabase,
 } from '../../../../src/lib/overdeck/infra.js';
 
 let testHome: string;
@@ -22,14 +22,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });
 
 describe('cost reconcile skip cache', () => {
   it('creates the file-state table with the expected columns', () => {
-    const columns = getOverdeckDatabaseSync()
+    const columns = getOverdeckDatabase()
       .prepare('PRAGMA table_info(cost_reconcile_file_state)')
       .all() as Array<{ name: string }>;
 

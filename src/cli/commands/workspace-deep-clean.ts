@@ -29,7 +29,7 @@ import {
   DangerousOpBlockedError,
 } from '../../lib/safety/dangerous-git-ops.js';
 import { GIT_CLEAN_EXCLUDES } from '../../lib/safety/protected-paths.js';
-import { extractTeamPrefix, findProjectByTeamSync } from '../../lib/projects.js';
+import { extractTeamPrefix, findProjectByTeam } from '../../lib/projects.js';
 
 export interface WorkspaceDeepCleanOptions {
   /** Skip the interactive confirmation. Only honoured when stdin is a TTY. */
@@ -57,7 +57,7 @@ export async function workspaceDeepCleanCommand(
 
   const issueLower = issueId.toLowerCase();
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
   if (!projectConfig) {
     console.error(chalk.red(`✗ No project found for issue ${issueId}`));
     return exitCli(1);

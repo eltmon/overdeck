@@ -1,4 +1,4 @@
-import { getAgentStateSync } from '../agents.js';
+import { getAgentState } from '../agents.js';
 import {
   LEGACY_PARKED_LABELS,
   OBJECTION_LABEL,
@@ -64,10 +64,10 @@ export async function gatherAutonomousPlanDispatchInput(
     // The scheduler cannot prove blocker labels are absent without the issue service.
   }
 
-  const currentState = getAgentStateSync(`agent-${issueLower}-plan`);
+  const currentState = getAgentState(`agent-${issueLower}-plan`);
   const legacyState = currentState?.model
     ? null
-    : getAgentStateSync(`planning-${issueLower}`);
+    : getAgentState(`planning-${issueLower}`);
   const config = loadConfigSync().config;
 
   return {

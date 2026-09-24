@@ -10,11 +10,11 @@ vi.mock('../../../lib/state-auto-migrate.js', () => ({
 
 const lifecycleMocks = vi.hoisted(() => ({
   getWorkAgentLifecycleStateSync: vi.fn(),
-  assertCanStartFreshSync: vi.fn(),
+  assertCanStartFresh: vi.fn(),
 }));
 
 const agentMocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   clearAgentPaused: vi.fn(),
   stopAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(async () => ({ removed: ['agent-pan-x'], path: '/tmp/agents/agent-pan-x' })),
@@ -58,7 +58,7 @@ vi.mock('../../../lib/agents.js', async () => {
   const actual = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js');
   return {
     ...actual,
-    getAgentStateSync: agentMocks.getAgentStateSync,
+    getAgentState: agentMocks.getAgentState,
     clearAgentPaused: agentMocks.clearAgentPaused,
     stopAgent: (...args: unknown[]) => Effect.sync(() => { agentMocks.stopAgent(...args); }),
     wipeAgentStateDirs: agentMocks.wipeAgentStateDirs,
@@ -84,7 +84,7 @@ vi.mock('../../../lib/terminal-backends/launch.js', async () => {
 vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssueSync: resolveProjectMock,
   getProjectSync: vi.fn(),
-  findProjectByPathSync: vi.fn(),
+  findProjectByPath: vi.fn(),
   getIssuePrefix: vi.fn(() => 'PAN'),
 }));
 
@@ -119,8 +119,8 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-2407-running-'));
 
     lifecycleMocks.getWorkAgentLifecycleStateSync.mockReset();
-    lifecycleMocks.assertCanStartFreshSync.mockReset();
-    agentMocks.getAgentStateSync.mockReset();
+    lifecycleMocks.assertCanStartFresh.mockReset();
+    agentMocks.getAgentState.mockReset();
     agentMocks.clearAgentPaused.mockReset();
     agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
     agentMocks.stopAgent.mockReset();
@@ -146,7 +146,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       linearTeam: 'PAN',
     }));
 
-    lifecycleMocks.assertCanStartFreshSync.mockReturnValue({ canStartFresh: true });
+    lifecycleMocks.assertCanStartFresh.mockReturnValue({ canStartFresh: true });
 
     originalExitCode = process.exitCode;
     process.exitCode = undefined;
@@ -179,7 +179,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
   }
 
   it('exits 0 with a no-op message when the work agent is already running', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({
+    agentMocks.getAgentState.mockReturnValue({
       id: 'agent-pan-x',
       issueId: 'PAN-X',
       paused: false,
@@ -200,7 +200,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
 
   it('derives flywheel provenance from an inherited run id', async () => {
     process.env['OVERDECK_FLYWHEEL_RUN_ID'] = 'RUN-82';
-    agentMocks.getAgentStateSync.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paused: false, troubled: false });
+    agentMocks.getAgentState.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paused: false, troubled: false });
     mockLifecycle({ isRunning: true, isRunningButStuck: false });
 
     const { issueCommand } = await import('../start.js');
@@ -211,7 +211,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
 
   it('preserves inherited route provenance', async () => {
     process.env['OVERDECK_AGENT_STARTED_BY'] = 'orphan-proposed-reconciler';
-    agentMocks.getAgentStateSync.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paused: false, troubled: false });
+    agentMocks.getAgentState.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paused: false, troubled: false });
     mockLifecycle({ isRunning: true, isRunningButStuck: false });
 
     const { issueCommand } = await import('../start.js');
@@ -221,7 +221,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
   });
 
   it('preserves exit 1 and pause refusal when the agent is paused', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({
+    agentMocks.getAgentState.mockReturnValue({
       id: 'agent-pan-x',
       issueId: 'PAN-X',
       paused: true,
@@ -239,7 +239,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
   });
 
   it('preserves exit 1 and troubled refusal when the agent is troubled', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({
+    agentMocks.getAgentState.mockReturnValue({
       id: 'agent-pan-x',
       issueId: 'PAN-X',
       paused: false,
@@ -260,7 +260,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
   it('preserves the resume/reset refusal for a stopped agent with a resumable session', async () => {
     createWorkspace('PAN-X');
     findPlanSyncMock.mockReturnValue('/tmp/.pan/specs/PAN-X.xbrief.json');
-    agentMocks.getAgentStateSync.mockReturnValue({
+    agentMocks.getAgentState.mockReturnValue({
       id: 'agent-pan-x',
       issueId: 'PAN-X',
       paused: false,
@@ -268,7 +268,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       workspace: join(tmpDir, 'workspaces', 'feature-pan-x'),
     });
     mockLifecycle({ isRunning: false, isRunningButStuck: false });
-    lifecycleMocks.assertCanStartFreshSync.mockImplementation(() => {
+    lifecycleMocks.assertCanStartFresh.mockImplementation(() => {
       throw new Error('use pan resume or pan reset-session');
     });
 
@@ -285,7 +285,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     function arrangeLiveFreshStart() {
       createWorkspace('PAN-X');
       findPlanSyncMock.mockReturnValue('/tmp/.pan/specs/PAN-X.xbrief.json');
-      agentMocks.getAgentStateSync.mockReturnValue({
+      agentMocks.getAgentState.mockReturnValue({
         id: 'agent-pan-x',
         issueId: 'PAN-X',
         paused: false,
@@ -295,7 +295,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       mockLifecycle({ isRunning: true, isRunningButStuck: false });
       // Live going in; gone once stopAgent has run.
       tmuxMocks.sessionExistsSync.mockImplementation(() => agentMocks.stopAgent.mock.calls.length === 0);
-      lifecycleMocks.assertCanStartFreshSync.mockReturnValue({ canStartFresh: true });
+      lifecycleMocks.assertCanStartFresh.mockReturnValue({ canStartFresh: true });
     }
 
     it('does not no-op on an already-running agent when --fresh is passed', async () => {
@@ -316,7 +316,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-x');
       expect(agentMocks.wipeAgentStateDirs).toHaveBeenCalledWith('PAN-X');
       expect(allConsoleOutput(consoleErrorSpy)).not.toMatch(/pan kill/);
-      expect(lifecycleMocks.assertCanStartFreshSync).toHaveBeenCalledWith('PAN-X', {
+      expect(lifecycleMocks.assertCanStartFresh).toHaveBeenCalledWith('PAN-X', {
         allowPausedForce: false,
         allowLiveSessionReplacement: true,
         explicitFresh: true,

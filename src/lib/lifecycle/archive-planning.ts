@@ -31,7 +31,7 @@ import {
   PAN_SESSIONS_FILENAME,
   PAN_SPEC_FILENAME,
 } from '../pan-dir/index.js';
-import { findPrdAtStatusSync, canonicalPrdSubdirSync } from '../prd-locations.js';
+import { findPrdAtStatus, canonicalPrdSubdir } from '../prd-locations.js';
 import type { LifecycleContext, StepResult, ArchiveOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 
@@ -99,19 +99,19 @@ async function movePrdImpl(
   const step = 'archive-planning:move-prd';
 
   // Idempotent skip: if any completed PRD already exists in any format, we're done.
-  if (findPrdAtStatusSync(ctx.projectPath, ctx.issueId, 'completed')) {
+  if (findPrdAtStatus(ctx.projectPath, ctx.issueId, 'completed')) {
     return stepSkipped(step, ['PRD already in completed/']);
   }
 
   // Find source PRD in active/ in any format/case (subdir lower/upper, flat lower/upper).
-  const source = findPrdAtStatusSync(ctx.projectPath, ctx.issueId, 'active');
+  const source = findPrdAtStatus(ctx.projectPath, ctx.issueId, 'active');
   if (!source) {
     return stepSkipped(step, ['No PRD found in active/ (may not have had one)']);
   }
 
   // Destination is always the canonical lowercase form, mirroring source format.
   const issueLower = ctx.issueId.toLowerCase();
-  const completedSubdir = canonicalPrdSubdirSync(ctx.projectPath, ctx.issueId, 'completed');
+  const completedSubdir = canonicalPrdSubdir(ctx.projectPath, ctx.issueId, 'completed');
   const completedFlat = join(
     ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR,
     PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`,

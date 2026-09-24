@@ -2,9 +2,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { renderPrompt } from './prompts.js';
-import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync } from '../projects.js';
+import { extractTeamPrefix, findProjectByPath, findProjectByTeam } from '../projects.js';
 import { resolveVerificationTestsMode } from './verification-tests-mode.js';
-import { isTldrEnabledSync } from '../config-yaml.js';
+import { isTldrEnabled } from '../config-yaml.js';
 import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext, readIssueDraft } from '../pan-dir/index.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
@@ -74,7 +74,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
       // TLDR is advertised to the agent only when the operator toggle is on AND
       // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
-      TLDR_AVAILABLE: isTldrEnabledSync() && existsSync(join(ctx.workspacePath, '.venv')),
+      TLDR_AVAILABLE: isTldrEnabled() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
       // Review of #3993 (PAN-3965): the test wording follows the project —
       // "the suite runs on CI" only where it does, `npx vitest` only for vitest.
@@ -89,7 +89,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 function projectRunsTestsOnCi(projectRoot: string | undefined): boolean {
   if (!projectRoot) return false;
   try {
-    return resolveVerificationTestsMode(findProjectByPathSync(projectRoot)) === 'ci';
+    return resolveVerificationTestsMode(findProjectByPath(projectRoot)) === 'ci';
   } catch {
     return false;
   }
@@ -526,7 +526,7 @@ function extractStitchDesigns(stateContent: string | null): string | null {
  */
 export function buildPolyrepoContext(issueId: string, workspacePath: string): string {
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
   if (
     !projectConfig?.workspace?.type ||

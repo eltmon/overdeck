@@ -121,7 +121,7 @@ function getTrackedRepos(): Set<string> {
   return cachedTrackedRepos;
 }
 
-export function isTrackedRepositorySync(fullName: string | undefined): boolean {
+export function isTrackedRepository(fullName: string | undefined): boolean {
   if (!fullName) return false;
   return getTrackedRepos().has(fullName.toLowerCase());
 }
@@ -166,7 +166,7 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
     }
   }
 
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
   if (!suite.pull_requests || suite.pull_requests.length === 0) return;
@@ -197,7 +197,7 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
 
 /** Handle a `check_run` GitHub webhook payload. */
 export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
   if (!run.pull_requests || run.pull_requests.length === 0) return;
@@ -236,7 +236,7 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
 
 /** Handle a `pull_request` GitHub webhook payload. */
 export async function handlePullRequest(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
   const issueId = issueIdFromBranch(pr.head.ref);
@@ -323,7 +323,7 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
 
 /** Handle a `pull_request_review` GitHub webhook payload. */
 export async function handlePullRequestReview(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const review = payload.review;
   if (!pr || !review) return;
@@ -335,7 +335,7 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
 
 /** Handle a `pull_request_review_comment` GitHub webhook payload. */
 export async function handlePullRequestReviewComment(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
   const issueId = issueIdFromBranch(pr.head.ref);
@@ -345,7 +345,7 @@ export async function handlePullRequestReviewComment(payload: WebhookPayload): P
 
 /** Handle an `issue_comment` GitHub webhook payload for PR tab cache invalidation. */
 export async function handleIssueComment(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const issue = payload.issue;
   if (!issue?.pull_request || issue.number == null) return;
 
@@ -359,7 +359,7 @@ export async function handleIssueComment(payload: WebhookPayload): Promise<void>
 
 /** Handle a `pull_request_review_thread` GitHub webhook payload. */
 export async function handlePullRequestReviewThread(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr || !payload.thread) return;
   const issueId = issueIdFromBranch(pr.head.ref);
@@ -369,7 +369,7 @@ export async function handlePullRequestReviewThread(payload: WebhookPayload): Pr
 
 /** Handle a `status` GitHub webhook payload. */
 export async function handleStatus(payload: WebhookPayload): Promise<void> {
-  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const state = payload.state;
   const branches = payload.branches;
   if (!state || !branches || branches.length === 0) return;

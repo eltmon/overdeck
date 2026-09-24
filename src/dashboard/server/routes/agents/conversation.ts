@@ -9,7 +9,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
   getActivity,
-  getAgentStateSync,
+  getAgentState,
 } from '../../../../lib/agents.js';
 import { capturePane } from '../../../../lib/tmux.js';
 import { parseEntireConversation } from '../../services/conversation-service.js';
@@ -284,7 +284,7 @@ export const getAgentFilesRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     if (!agentState?.workspace) {
       return jsonResponse({ files: [] });
     }
@@ -325,7 +325,7 @@ export const getAgentTimelineRoute = HttpRouter.add(
     const limit = parseInt(limitStr) || 50;
 
     const activity = getActivity(id, limit);
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     const events = activity.map((a: any) => ({
       timestamp: a.timestamp || new Date().toISOString(),
       type: a.type || 'activity',

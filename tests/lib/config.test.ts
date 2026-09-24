@@ -19,8 +19,8 @@ describe('config', () => {
 
   describe('getDefaultConfig', () => {
     it('should return default configuration', async () => {
-      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
 
       expect(config.overdeck.version).toBe('1.0.0');
       expect(config.sync.backup_before_sync).toBe(true);
@@ -31,8 +31,8 @@ describe('config', () => {
     });
 
     it('should include default traefik config', async () => {
-      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
 
       expect(config.traefik).toBeDefined();
       expect(config.traefik.enabled).toBe(false);
@@ -41,8 +41,8 @@ describe('config', () => {
     });
 
     it('should include default Linear config', async () => {
-      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
 
       expect(config.trackers.linear).toBeDefined();
       expect(config.trackers.linear?.type).toBe('linear');
@@ -52,8 +52,8 @@ describe('config', () => {
 
   describe('OverdeckConfig type', () => {
     it('should have all required sections', async () => {
-      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
 
       // Type checking - these should all exist
       expect(config.overdeck).toBeDefined();
@@ -66,8 +66,8 @@ describe('config', () => {
 
   describe('TrackersConfig type', () => {
     it('should support primary and secondary trackers', async () => {
-      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
 
       // Primary is required
       expect(config.trackers.primary).toBeDefined();
@@ -77,8 +77,8 @@ describe('config', () => {
     });
 
     it('should support optional tracker configs', async () => {
-      const { getDefaultConfigSync } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
 
       // These are optional
       expect(config.trackers.linear).toBeDefined();
@@ -89,16 +89,16 @@ describe('config', () => {
 
   describe('normalizeRemoteConfig', () => {
     it('defaults resiliency_tier to ephemeral when unset', async () => {
-      const { getDefaultConfigSync, normalizeRemoteConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig, normalizeRemoteConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
       delete (config.remote as { resiliency_tier?: string }).resiliency_tier;
       normalizeRemoteConfig(config);
       expect(config.remote?.resiliency_tier).toBe('ephemeral');
     });
 
     it('preserves a valid durable tier', async () => {
-      const { getDefaultConfigSync, normalizeRemoteConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig, normalizeRemoteConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
       config.remote = { enabled: true, resiliency_tier: 'durable', max_concurrent_agents: 5 };
       normalizeRemoteConfig(config);
       expect(config.remote.resiliency_tier).toBe('durable');
@@ -106,8 +106,8 @@ describe('config', () => {
     });
 
     it('rejects an invalid resiliency_tier', async () => {
-      const { getDefaultConfigSync, normalizeRemoteConfig } = await import('../../src/lib/config.js');
-      const config = getDefaultConfigSync();
+      const { getDefaultConfig, normalizeRemoteConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
       config.remote = { enabled: true, resiliency_tier: 'invalid' as any };
       expect(() => normalizeRemoteConfig(config)).toThrow('Invalid remote.resiliency_tier');
     });

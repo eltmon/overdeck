@@ -6,7 +6,7 @@ import { Effect } from 'effect';
 import {
   spawnRun,
   determineModel,
-  getAgentStateSync,
+  getAgentState,
   getAgentRuntimeStateSync,
   stopAgent,
 } from '../agents.js';
@@ -52,7 +52,7 @@ export async function getSequencerRunStatus(projectRoot: string): Promise<Sequen
   // A pane whose harness has exited is still a pane `spawnRun` refuses over.
   const paneDead = !verdict.alive && verdict.reason === 'pane-dead';
   const alive = verdict.alive || paneDead;
-  const startedAt = alive ? (getAgentStateSync(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
+  const startedAt = alive ? (getAgentState(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
   const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
 
   let freshSequence = false;
@@ -112,7 +112,7 @@ export async function spawnSequencerAgent(
   opts: SpawnSequencerOptions = {},
 ): Promise<AgentState> {
   const assertUnpaused = () => {
-    if (getAgentStateSync(SEQUENCER_AGENT_ID)?.paused) {
+    if (getAgentState(SEQUENCER_AGENT_ID)?.paused) {
       throw new Error('Sequencer is paused. Run pan unpause sequencer-runner before starting it again.');
     }
   };

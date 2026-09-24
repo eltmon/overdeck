@@ -7,12 +7,12 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 const internalTokenMocks = vi.hoisted(() => ({
-  getInternalTokenSync: vi.fn(() => 'test-internal-token'),
+  getInternalToken: vi.fn(() => 'test-internal-token'),
 }));
 
 vi.mock('../../../../lib/internal-token.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../../lib/internal-token.js')>(),
-  getInternalTokenSync: internalTokenMocks.getInternalTokenSync,
+  getInternalToken: internalTokenMocks.getInternalToken,
 }));
 
 import { INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';

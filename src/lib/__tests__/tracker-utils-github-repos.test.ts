@@ -26,9 +26,9 @@ vi.mock('../projects.js', async (importOriginal) => {
   };
 });
 
-import { parseGitHubReposSync } from '../tracker-utils.js';
+import { parseGitHubRepos } from '../tracker-utils.js';
 
-describe('parseGitHubReposSync (PAN-2449)', () => {
+describe('parseGitHubRepos (PAN-2449)', () => {
   beforeEach(() => {
     mocks.envContent = '';
     mocks.projects = {};
@@ -37,7 +37,7 @@ describe('parseGitHubReposSync (PAN-2449)', () => {
   it('merges projects.yaml github repos even when GITHUB_REPOS is set', () => {
     mocks.envContent = 'GITHUB_REPOS=eltmon/overdeck:PAN';
     mocks.projects = { lexerra: { github_repo: 'eltmon/lexerra', issue_prefix: 'LEX' } };
-    const repos = parseGitHubReposSync();
+    const repos = parseGitHubRepos();
     expect(repos).toEqual(expect.arrayContaining([
       expect.objectContaining({ prefix: 'PAN', repo: 'overdeck' }),
       expect.objectContaining({ prefix: 'LEX', repo: 'lexerra' }),
@@ -47,14 +47,14 @@ describe('parseGitHubReposSync (PAN-2449)', () => {
   it('env entry wins over projects.yaml for the same prefix', () => {
     mocks.envContent = 'GITHUB_REPOS=someone/fork:LEX';
     mocks.projects = { lexerra: { github_repo: 'eltmon/lexerra', issue_prefix: 'LEX' } };
-    const repos = parseGitHubReposSync().filter(r => r.prefix === 'LEX');
+    const repos = parseGitHubRepos().filter(r => r.prefix === 'LEX');
     expect(repos).toHaveLength(1);
     expect(repos[0]!.owner).toBe('someone');
   });
 
   it('still derives solely from projects.yaml when no env var', () => {
     mocks.projects = { krux: { github_repo: 'eltmon/krux' } };
-    const repos = parseGitHubReposSync();
+    const repos = parseGitHubRepos();
     expect(repos).toEqual([expect.objectContaining({ prefix: 'KRUX', repo: 'krux' })]);
   });
 });

@@ -17,7 +17,7 @@
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { appendGitOperationSync } from '../git-activity.js';
+import { appendGitOperation } from '../git-activity.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -47,7 +47,7 @@ export async function gitRevParse(cwd: string, ref: string): Promise<string | nu
   try {
     const { stdout } = await execFileAsync('git', ['rev-parse', ref], { cwd, encoding: 'utf-8' });
     const sha = stdout.trim();
-    appendGitOperationSync({ operation: 'rev_parse', branch: ref, issueId: undefined, afterSha: sha, status: 'success', ts });
+    appendGitOperation({ operation: 'rev_parse', branch: ref, issueId: undefined, afterSha: sha, status: 'success', ts });
     return sha || null;
   } catch {
     return null;
@@ -65,7 +65,7 @@ export async function gitFetch(
   const args = branch ? ['fetch', remote, branch] : ['fetch', remote];
   try {
     await execFileAsync('git', args, { cwd, encoding: 'utf-8', timeout: 30000 });
-    appendGitOperationSync({
+    appendGitOperation({
       operation: 'fetch',
       branch: branch ?? remote,
       issueId: opts.issueId,
@@ -74,7 +74,7 @@ export async function gitFetch(
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    appendGitOperationSync({
+    appendGitOperation({
       operation: 'fetch',
       branch: branch ?? remote,
       issueId: opts.issueId,
@@ -120,7 +120,7 @@ export async function gitPush(
     } catch (err: unknown) {
       // exit code 1 = "not an ancestor" (true divergence); any other code is a real git error
       if ((err as { code?: number }).code !== 1) throw err;
-      appendGitOperationSync({
+      appendGitOperation({
         operation: 'main_diverged',
         branch,
         issueId: opts.issueId,
@@ -138,7 +138,7 @@ export async function gitPush(
   try {
     await execFileAsync('git', ['push', remote, branch], { cwd, encoding: 'utf-8', timeout: 60000 });
     const afterSha = await gitRevParse(cwd, 'HEAD') ?? localSha;
-    appendGitOperationSync({
+    appendGitOperation({
       operation: 'push',
       branch,
       issueId: opts.issueId,
@@ -150,7 +150,7 @@ export async function gitPush(
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    appendGitOperationSync({
+    appendGitOperation({
       operation: 'push',
       branch,
       issueId: opts.issueId,

@@ -1,9 +1,9 @@
 import { join, resolve, sep } from 'node:path';
 
-import { parseIssueIdSync } from '../../lib/issue-id.js';
+import { parseIssueId } from '../../lib/issue-id.js';
 
 export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
-  const parsed = parseIssueIdSync(rawIssueId);
+  const parsed = parseIssueId(rawIssueId);
   if (!parsed) {
     throw new Error('Invalid issue ID');
   }

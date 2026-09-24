@@ -33,11 +33,11 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import type { DerivedIssueState } from '@overdeck/contracts';
 
-import { parseIssueIdSync, extractPrefixSync, resolveIssueIdSync } from '../../../../lib/issue-id.js';
+import { parseIssueId, extractPrefix, resolveIssueId } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { getDerivedIssueState } from '../../services/derived-issue-state.js';
-import { getReleaseSetSync } from '../../../../lib/release-set.js';
+import { getReleaseSet } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { transitionIssueToInReview } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
@@ -221,7 +221,7 @@ export async function startRequestReviewPipeline(
   options: { note?: string; source?: RequestReviewSource; onReviewSpawned?: () => void } = {},
 ): Promise<StartRequestReviewOutcome> {
   const canonicalIssueId = issueId.toUpperCase();
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = canonicalIssueId.toLowerCase();
   const branchName = `feature/${issueLower}`;
@@ -348,7 +348,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -363,7 +363,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
       (body as { force?: unknown })?.force === true;
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
@@ -599,7 +599,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const parsedIssueId = parseIssueIdSync(issueId);
+    const parsedIssueId = parseIssueId(issueId);
     if (!parsedIssueId) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
@@ -664,7 +664,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (forceReview && shouldTreatAsRerun(derived)) {
         const issueLowerRerun = canonicalIssueId.toLowerCase();
-        const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
+        const issuePrefixRerun = extractPrefix(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
         const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
         const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
         // Review runs against the local worktree only (PAN-1676) — see the
@@ -878,12 +878,12 @@ const getReleaseSetRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const rawIssueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(rawIssueId)) {
+    if (!parseIssueId(rawIssueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issueId = resolveIssueIdSync(rawIssueId);
+    const issueId = resolveIssueId(rawIssueId);
 
-    const releaseSet = getReleaseSetSync(issueId);
+    const releaseSet = getReleaseSet(issueId);
     if (!releaseSet) {
       return jsonResponse({ error: 'Release set not found' }, { status: 404 });
     }

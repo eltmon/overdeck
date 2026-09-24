@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SqliteDatabase } from '../../database/driver.js';
 import {
-  closeOverdeckDatabaseSync,
-  getOverdeckDatabaseSync,
+  closeOverdeckDatabase,
+  getOverdeckDatabase,
   runSchemaTopUp,
-  dropPipelineStateMirrorTablesSync,
-  dropDeadIssuesForeignKeysSync,
+  dropPipelineStateMirrorTables,
+  dropDeadIssuesForeignKeys,
 } from '../infra.js';
 
 let tempDirs: string[] = [];
@@ -33,7 +33,7 @@ function costIndexRows(db: SqliteDatabase): Array<{ name: string; sql: string }>
 }
 
 afterEach(() => {
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   vi.restoreAllMocks();
   for (const dir of tempDirs) {
     rmSync(dir, { recursive: true, force: true });
@@ -43,7 +43,7 @@ afterEach(() => {
 
 describe('overdeck schema top-ups', () => {
   it('creates cost-event lookup indexes in a fresh database', () => {
-    const db = getOverdeckDatabaseSync(makeDbPath());
+    const db = getOverdeckDatabase(makeDbPath());
 
     expect(costIndexRows(db)).toEqual([
       {
@@ -59,25 +59,25 @@ describe('overdeck schema top-ups', () => {
 
   it('restores missing cost-event indexes idempotently in an existing database', () => {
     const dbPath = makeDbPath();
-    const initial = getOverdeckDatabaseSync(dbPath);
+    const initial = getOverdeckDatabase(dbPath);
     initial.exec('DROP INDEX IF EXISTS `idx_cost_agent_id`');
     initial.exec('DROP INDEX IF EXISTS `idx_cost_issue_upper`');
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
 
-    const toppedUp = getOverdeckDatabaseSync(dbPath);
+    const toppedUp = getOverdeckDatabase(dbPath);
     expect(costIndexRows(toppedUp).map((row) => row.name)).toEqual([
       'idx_cost_agent_id',
       'idx_cost_issue_upper',
     ]);
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
 
-    const reopened = getOverdeckDatabaseSync(dbPath);
+    const reopened = getOverdeckDatabase(dbPath);
     expect(costIndexRows(reopened)).toHaveLength(2);
   });
 
   it('drops the pipeline-state mirror tables once, from the primary boot step, never on open (PAN-3917)', () => {
     const dbPath = makeDbPath();
-    const db = getOverdeckDatabaseSync(dbPath);
+    const db = getOverdeckDatabase(dbPath);
     const beforeDrop = db
       .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
       .all<{ name: string }>()
@@ -85,8 +85,8 @@ describe('overdeck schema top-ups', () => {
     // A plain open never drops anything (fix10: a peer or CLI process sharing
     // the live DB must not pull tables out from under the running dashboard).
     expect(beforeDrop).toContain('review_status');
-    expect(dropPipelineStateMirrorTablesSync(db, {})).toMatchObject({ dropped: true });
-    expect(dropPipelineStateMirrorTablesSync(db, {})).toMatchObject({ dropped: false, skipped: 'already-dropped' });
+    expect(dropPipelineStateMirrorTables(db, {})).toMatchObject({ dropped: true });
+    expect(dropPipelineStateMirrorTables(db, {})).toMatchObject({ dropped: false, skipped: 'already-dropped' });
     const tableNames = db
       .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
       .all<{ name: string }>()
@@ -101,7 +101,7 @@ describe('overdeck schema top-ups', () => {
   });
 
   it('uses idx_cost_agent_id for the agent daily-cost query', () => {
-    const db = getOverdeckDatabaseSync(makeDbPath());
+    const db = getOverdeckDatabase(makeDbPath());
     const plan = db
       .prepare(`
         EXPLAIN QUERY PLAN
@@ -115,7 +115,7 @@ describe('overdeck schema top-ups', () => {
   });
 
   it('creates the live issue-referencing tables WITHOUT the dead issues FK in a fresh database (PAN-3963)', () => {
-    const db = getOverdeckDatabaseSync(makeDbPath());
+    const db = getOverdeckDatabase(makeDbPath());
     for (const table of [
       'merge_queue',
       'merge_sets',
@@ -132,7 +132,7 @@ describe('overdeck schema top-ups', () => {
   });
 
   it('rebuilds a pre-cut table to drop the dead issues FK, preserving rows and the live FKs (PAN-3963)', () => {
-    const db = getOverdeckDatabaseSync(makeDbPath());
+    const db = getOverdeckDatabase(makeDbPath());
     // Recreate the pre-migration shape: uat_generation_members gated on the
     // issues cache that nothing writes since the Cut.
     db.exec('DROP TABLE `uat_generation_members`');
@@ -164,7 +164,7 @@ describe('overdeck schema top-ups', () => {
       db.prepare('INSERT INTO uat_generation_members (uat_name, issue_id) VALUES (?, ?)').run('uat/pan-onyx-0920', 'PAN-3950'),
     ).toThrow(/FOREIGN KEY/);
 
-    const result = dropDeadIssuesForeignKeysSync(db, {});
+    const result = dropDeadIssuesForeignKeys(db, {});
 
     expect(result).toMatchObject({ dropped: true, tables: ['uat_generation_members'] });
     // The existing row survived, and the post-cut issue id now inserts.
@@ -182,19 +182,19 @@ describe('overdeck schema top-ups', () => {
   });
 
   it('runs the dead-issues-FK rebuild once via marker, and never in a peer process', () => {
-    const db = getOverdeckDatabaseSync(makeDbPath());
+    const db = getOverdeckDatabase(makeDbPath());
     // Fresh database: nothing to rebuild, but the marker still lands.
-    expect(dropDeadIssuesForeignKeysSync(db, {})).toMatchObject({ dropped: true, tables: [] });
-    expect(dropDeadIssuesForeignKeysSync(db, {})).toMatchObject({ dropped: false, skipped: 'already-dropped' });
+    expect(dropDeadIssuesForeignKeys(db, {})).toMatchObject({ dropped: true, tables: [] });
+    expect(dropDeadIssuesForeignKeys(db, {})).toMatchObject({ dropped: false, skipped: 'already-dropped' });
 
-    const peerDb = getOverdeckDatabaseSync(makeDbPath());
-    expect(dropDeadIssuesForeignKeysSync(peerDb, { OVERDECK_DISABLE_DEACON: '1' } as NodeJS.ProcessEnv))
+    const peerDb = getOverdeckDatabase(makeDbPath());
+    expect(dropDeadIssuesForeignKeys(peerDb, { OVERDECK_DISABLE_DEACON: '1' } as NodeJS.ProcessEnv))
       .toMatchObject({ dropped: false, skipped: 'peer' });
   });
 
   it('silently tolerates a duplicate column reported by SQLite', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const db = getOverdeckDatabaseSync(makeDbPath());
+    const db = getOverdeckDatabase(makeDbPath());
 
     expect(() => runSchemaTopUp(db, 'ALTER TABLE `app_settings` ADD COLUMN `value` text')).not.toThrow();
     expect(errorSpy).not.toHaveBeenCalled();
@@ -202,7 +202,7 @@ describe('overdeck schema top-ups', () => {
 
   it('logs an unexpected SQLite error and continues with the next top-up', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const db = getOverdeckDatabaseSync(makeDbPath());
+    const db = getOverdeckDatabase(makeDbPath());
     db.exec('CREATE TABLE `schema_topup_probe` (`id` integer)');
     const malformed = 'ALTER TABLE `schema_topup_probe` ADD COLUMN';
 
@@ -224,13 +224,13 @@ describe('overdeck schema top-ups', () => {
 
   it('logs a missing-table top-up failure while startup and later top-ups continue', () => {
     const dbPath = makeDbPath();
-    const initial = getOverdeckDatabaseSync(dbPath);
+    const initial = getOverdeckDatabase(dbPath);
     initial.exec('DROP TABLE `flywheel_substrate_bugs`');
     initial.exec('DROP INDEX `idx_cost_agent_id`');
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    const reopened = getOverdeckDatabaseSync(dbPath);
+    const reopened = getOverdeckDatabase(dbPath);
 
     const logged = errorSpy.mock.calls.flat().join(' ');
     expect(logged).toContain('[schema] top-up failed');

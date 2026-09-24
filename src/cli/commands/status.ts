@@ -3,9 +3,9 @@ import { Effect } from 'effect';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { listRunningAgentsSync, getAgentDir, type AgentState } from '../../lib/agents.js';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 import { isNoResumeValueEnabled } from '../../lib/boot-no-resume.js';
-import { getTldrMetricsSync, getTldrDaemonServiceSync } from '../../lib/tldr-daemon.js';
+import { getTldrMetrics, getTldrDaemonService } from '../../lib/tldr-daemon.js';
 import {
   collectDockerContainerLifecycleSnapshot,
   getWorkspaceStackHealth,
@@ -94,7 +94,7 @@ async function isBootNoResumeModeActive(): Promise<boolean> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 250);
   try {
-    const response = await fetch(`${getDashboardApiUrlSync()}/api/no-resume-mode`, { signal: controller.signal });
+    const response = await fetch(`${getDashboardApiUrl()}/api/no-resume-mode`, { signal: controller.signal });
     if (!response.ok) return false;
     const payload = await response.json() as { active?: unknown };
     return payload.active === true;
@@ -231,7 +231,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     // Show TLDR session metrics if a .tldr/ dir exists in the workspace
     try {
-      const tldr = getTldrMetricsSync(agent.workspace);
+      const tldr = getTldrMetrics(agent.workspace);
       if (tldr.interceptions > 0 || tldr.bypasses > 0) {
         const savedK = Math.round(tldr.estimatedTokensSaved / 1000);
         const bypassStr = tldr.bypasses > 0 ? ` (${tldr.bypasses} bypassed)` : '';
@@ -333,7 +333,7 @@ export async function tldrIndexStatusCommand(projectRoot = process.cwd()): Promi
 
   const mainVenvPath = join(projectRoot, '.venv');
   if (existsSync(mainVenvPath)) {
-    const service = getTldrDaemonServiceSync(projectRoot, mainVenvPath);
+    const service = getTldrDaemonService(projectRoot, mainVenvPath);
     const status = await service.getStatus();
     const { fileCount, edgeCount, ageMs } = readTldrIndexData(projectRoot);
     mainEntries.push({ label: `Main (${projectName})`, running: status.running, fileCount, edgeCount, ageMs });
@@ -347,7 +347,7 @@ export async function tldrIndexStatusCommand(projectRoot = process.cwd()): Promi
       const wsPath = join(workspacesDir, ws.name);
       const wsVenvPath = join(wsPath, '.venv');
       if (existsSync(wsVenvPath)) {
-        const service = getTldrDaemonServiceSync(wsPath, wsVenvPath);
+        const service = getTldrDaemonService(wsPath, wsVenvPath);
         const status = await service.getStatus();
         const { fileCount, edgeCount, ageMs } = readTldrIndexData(wsPath);
         workspaceEntries.push({ label: ws.name, running: status.running, fileCount, edgeCount, ageMs });

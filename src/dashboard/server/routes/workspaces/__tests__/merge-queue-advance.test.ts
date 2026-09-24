@@ -5,15 +5,15 @@ import type { DerivedIssueState, IssueState } from '@overdeck/contracts';
 // reaches the record plane W3 is deleting. These tests exercise the queue walk
 // only, so the agent surface is stubbed rather than loaded.
 vi.mock('../../../../../lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
 }));
 vi.mock('../../../../../lib/agents/agent-state.js', () => ({
-  clearYieldForResumeSync: vi.fn(),
+  clearYieldForResume: vi.fn(),
   decideResumeGate: vi.fn(() => ({ decision: 'proceed' })),
   getAgentResumeGateBlockReason: vi.fn(() => null),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
   saveAgentStateSync: vi.fn(),
 }));
 // config-yaml's defaults pull tier-table, which still imports the record plane

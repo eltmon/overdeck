@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { parseIssueIdSync } from '../issue-id.js';
+import { parseIssueId } from '../issue-id.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { resolveProjectKeyForCwdAsync } from '../projects.js';
 import { issueIdFromBranch } from '../webhook-handlers.js';
@@ -746,7 +746,7 @@ export async function handleConversationSummaryFork(
     const requestedIssueId = body['issueId'];
     let explicitIssueId: string | undefined;
     if (requestedIssueId !== undefined) {
-      if (typeof requestedIssueId !== 'string' || !parseIssueIdSync(requestedIssueId.trim())) {
+      if (typeof requestedIssueId !== 'string' || !parseIssueId(requestedIssueId.trim())) {
         return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
       }
       explicitIssueId = requestedIssueId.trim();

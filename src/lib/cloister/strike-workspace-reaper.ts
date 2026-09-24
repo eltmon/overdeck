@@ -20,7 +20,7 @@
 import { Effect } from 'effect';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { sessionExists } from '../tmux.js';
 
 const execAsync = promisify(exec);
@@ -104,7 +104,7 @@ export async function reapMergedStrikeWorkspaces(projectRoot: string = process.c
       const action = `Reaped merged strike workspace ${path} (branch ${branch})`;
       actions.push(action);
       console.log(`[deacon] ${action}`);
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message: `[deacon] ${action}` });
+      emitActivityEntry({ source: 'cloister', level: 'info', message: `[deacon] ${action}` });
     } catch {
       // worktree busy / already gone — retry next patrol
     }

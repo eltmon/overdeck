@@ -47,7 +47,7 @@ function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikRenderMo
  * Otherwise the frontend route points to the bundled Node server on the API port,
  * which is the production layout. See template header for the full rationale.
  */
-export function generateOverdeckTraefikConfigSync(mode?: TraefikRenderMode): boolean {
+export function generateOverdeckTraefikConfig(mode?: TraefikRenderMode): boolean {
   const templatePath = join(SYNC_SOURCES.traefikTemplates, 'dynamic', 'overdeck.yml.template');
   if (!existsSync(templatePath)) {
     return false;
@@ -81,7 +81,7 @@ export function generateOverdeckTraefikConfigSync(mode?: TraefikRenderMode): boo
  * Remove any accidentally-copied .template files from the runtime Traefik dir.
  * Called after copyDirectoryRecursive in pan install.
  */
-export function cleanupTemplateFilesSync(): void {
+export function cleanupTemplateFiles(): void {
   const copiedTemplate = join(TRAEFIK_DYNAMIC_DIR, 'overdeck.yml.template');
   if (existsSync(copiedTemplate)) {
     unlinkSync(copiedTemplate);
@@ -101,7 +101,7 @@ export function cleanupTemplateFilesSync(): void {
  * Safe to call multiple times (idempotent).
  * Returns true if file was written, false if no certs found.
  */
-export function generateTlsConfigSync(): boolean {
+export function generateTlsConfig(): boolean {
   if (!existsSync(TRAEFIK_CERTS_DIR)) {
     return false;
   }
@@ -166,7 +166,7 @@ export function generateTlsConfigSync(): boolean {
  *
  * Returns array of domains that had certs generated.
  */
-export function ensureProjectCertsSync(): string[] {
+export function ensureProjectCerts(): string[] {
   // Check mkcert is available
   try {
     execSync('which mkcert', { stdio: 'pipe' });
@@ -213,7 +213,7 @@ export function ensureProjectCertsSync(): string[] {
  *
  * Called during `pan up` to clean up configs from older Overdeck versions.
  */
-export function cleanupStaleTlsSectionsSync(): void {
+export function cleanupStaleTlsSections(): void {
   // Clean static config (traefik.yml)
   const staticConfig = join(TRAEFIK_DIR, 'traefik.yml');
   if (existsSync(staticConfig)) {

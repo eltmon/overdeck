@@ -41,7 +41,7 @@ import { CODEX_BEHAVIOR } from './behavior.js'
 import { syncCodexSkillsIntoHome } from './codex-skills.js'
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
-import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
+import { parseCodexSession } from '../cost-parsers/codex-parser.js'
 import { appendSessionIdToHistory } from '../session-history.js'
 
 
@@ -557,14 +557,14 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   getTokenUsage(agentId: string): TokenUsage | null {
     const path = this.getSessionPath(agentId)
     if (!path) return null
-    const parsed = parseCodexSessionSync(path)
+    const parsed = parseCodexSession(path)
     return parsed?.usage ?? null
   }
 
   getSessionCost(agentId: string): CostBreakdown | null {
     const path = this.getSessionPath(agentId)
     if (!path) return null
-    const parsed = parseCodexSessionSync(path)
+    const parsed = parseCodexSession(path)
     if (!parsed) return null
     return {
       inputCost: 0,
@@ -757,6 +757,6 @@ function collectRollouts(dir: string, out: Session[]): void {
   }
 }
 
-export function createCodexRuntimeSync(): CodexRuntimeSync {
+export function createCodexRuntime(): CodexRuntimeSync {
   return new CodexRuntimeSync()
 }

@@ -24,8 +24,8 @@ import {
   runSsh,
   shellQuote,
 } from './remote-tmux.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { getClaudePermissionFlags, getClaudePermissionFlagsString } from '../claude-permissions.js';
 import {
   withAutoSpawnConsentClaim,
   type AcceptAutoSpawnConsent,
@@ -607,7 +607,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
     // Create launcher script
     const launcherScript = `/workspace/.pan/prompts/${agentId}-launcher.sh`;
-    const launcherContent = generateLauncherScriptSync({
+    const launcherContent = generateLauncherScript({
       role: 'work',
       spawnMode: 'remote',
       workingDir: '/workspace',
@@ -615,7 +615,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
       setRemotePath: true,
       promptFile,
       baseCommand: 'claude',
-      permissionFlags: getClaudePermissionFlagsSync(),
+      permissionFlags: getClaudePermissionFlags(),
       extraEnvExports: [`export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
       model,
     });
@@ -627,7 +627,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsStringSync()} --model ${model}`;
+    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsString()} --model ${model}`;
   }
 
   console.log(`[claude-invoke] purpose=remote-agent | model=${model} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);

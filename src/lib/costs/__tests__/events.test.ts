@@ -7,14 +7,14 @@ import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
-  appendCostEventSync,
+  appendCostEvent,
   CostEvent,
-  deduplicateEventsSync,
-  getLastEventMetadataSync,
-  readEventsFromByteOffsetSync,
-  readEventsFromLineSync,
-  readEventsSync,
-  tailEventsSync,
+  deduplicateEvents,
+  getLastEventMetadata,
+  readEventsFromByteOffset,
+  readEventsFromLine,
+  readEvents,
+  tailEvents,
 } from '../events.js';
 
 let TEST_ROOT: string;
@@ -57,25 +57,25 @@ function makeEvent(overrides: Partial<CostEvent> = {}): CostEvent {
 
 describe('bounded event readers', () => {
   it('filters and limits while scanning the log', () => {
-    appendCostEventSync(makeEvent({ issueId: 'PAN-1', provider: 'anthropic' }));
-    appendCostEventSync(makeEvent({ issueId: 'PAN-2', provider: 'openai' }));
-    appendCostEventSync(makeEvent({ issueId: 'PAN-1', provider: 'anthropic', input: 2000 }));
+    appendCostEvent(makeEvent({ issueId: 'PAN-1', provider: 'anthropic' }));
+    appendCostEvent(makeEvent({ issueId: 'PAN-2', provider: 'openai' }));
+    appendCostEvent(makeEvent({ issueId: 'PAN-1', provider: 'anthropic', input: 2000 }));
 
-    expect(readEventsSync({ issueId: 'pan-1', offset: 1, limit: 1 })).toMatchObject([
+    expect(readEvents({ issueId: 'pan-1', offset: 1, limit: 1 })).toMatchObject([
       { issueId: 'PAN-1', input: 2000 },
     ]);
-    expect(tailEventsSync(2).map((event) => event.issueId)).toEqual(['PAN-2', 'PAN-1']);
-    expect(readEventsSync({ offset: -1 }).map((event) => event.input)).toEqual([2000]);
-    expect(readEventsSync({ limit: -1 }).map((event) => event.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    expect(tailEvents(2).map((event) => event.issueId)).toEqual(['PAN-2', 'PAN-1']);
+    expect(readEvents({ offset: -1 }).map((event) => event.input)).toEqual([2000]);
+    expect(readEvents({ limit: -1 }).map((event) => event.issueId)).toEqual(['PAN-1', 'PAN-2']);
   });
 
   it('tracks line and byte cursors across appended events', () => {
-    appendCostEventSync(makeEvent({ issueId: 'PAN-1' }));
-    const first = getLastEventMetadataSync();
+    appendCostEvent(makeEvent({ issueId: 'PAN-1' }));
+    const first = getLastEventMetadata();
 
-    appendCostEventSync(makeEvent({ issueId: 'PAN-2' }));
-    const delta = readEventsFromByteOffsetSync(first.byteOffset);
-    const fromLine = readEventsFromLineSync(first.lastEventLine);
+    appendCostEvent(makeEvent({ issueId: 'PAN-2' }));
+    const delta = readEventsFromByteOffset(first.byteOffset);
+    const fromLine = readEventsFromLine(first.lastEventLine);
 
     expect(first.lastEventLine).toBe(1);
     expect(first.byteOffset).toBeGreaterThan(0);
@@ -87,17 +87,17 @@ describe('bounded event readers', () => {
   });
 
   it('does not advance the byte cursor past a partial append', () => {
-    appendCostEventSync(makeEvent({ issueId: 'PAN-1' }));
-    const first = getLastEventMetadataSync();
+    appendCostEvent(makeEvent({ issueId: 'PAN-1' }));
+    const first = getLastEventMetadata();
     const partial = JSON.stringify(makeEvent({ issueId: 'PAN-2' }));
     writeFileSync(eventsFile(), partial, { flag: 'a' });
 
-    const incomplete = readEventsFromByteOffsetSync(first.byteOffset);
+    const incomplete = readEventsFromByteOffset(first.byteOffset);
     expect(incomplete.events).toEqual([]);
     expect(incomplete.newOffset).toBe(first.byteOffset);
 
     writeFileSync(eventsFile(), '\n', { flag: 'a' });
-    const complete = readEventsFromByteOffsetSync(first.byteOffset);
+    const complete = readEventsFromByteOffset(first.byteOffset);
     expect(complete.events.map((event) => event.issueId)).toEqual(['PAN-2']);
   });
 
@@ -105,65 +105,65 @@ describe('bounded event readers', () => {
     const event = { ...makeEvent({ issueId: 'PAN-LARGE' }), detail: 'é'.repeat(40_000) };
     writeFileSync(eventsFile(), `${JSON.stringify(event)}\n`);
 
-    const [read] = readEventsSync();
+    const [read] = readEvents();
     expect(read.issueId).toBe('PAN-LARGE');
     expect((read as CostEvent & { detail: string }).detail).toBe(event.detail);
-    expect(getLastEventMetadataSync().byteOffset).toBe(Buffer.byteLength(`${JSON.stringify(event)}\n`));
+    expect(getLastEventMetadata().byteOffset).toBe(Buffer.byteLength(`${JSON.stringify(event)}\n`));
   });
 });
 
 describe('deduplicateEvents', () => {
   it('should return 0 when no events file exists', () => {
-    expect(deduplicateEventsSync()).toBe(0);
+    expect(deduplicateEvents()).toBe(0);
   });
 
   it('should return 0 when no duplicates exist', () => {
-    appendCostEventSync(makeEvent({ input: 1000 }));
-    appendCostEventSync(makeEvent({ input: 2000 })); // Different tokens — not a duplicate
-    expect(deduplicateEventsSync()).toBe(0);
-    expect(readEventsSync()).toHaveLength(2);
+    appendCostEvent(makeEvent({ input: 1000 }));
+    appendCostEvent(makeEvent({ input: 2000 })); // Different tokens — not a duplicate
+    expect(deduplicateEvents()).toBe(0);
+    expect(readEvents()).toHaveLength(2);
   });
 
   it('should remove duplicate events with identical fields within 60-second window', () => {
     const ts = new Date().toISOString();
     const event = makeEvent({ ts });
-    appendCostEventSync(event);
-    appendCostEventSync(event); // Exact duplicate (same ts, same tokens)
-    appendCostEventSync(event); // Third copy
+    appendCostEvent(event);
+    appendCostEvent(event); // Exact duplicate (same ts, same tokens)
+    appendCostEvent(event); // Third copy
 
-    const removed = deduplicateEventsSync();
+    const removed = deduplicateEvents();
     expect(removed).toBe(2);
-    expect(readEventsSync()).toHaveLength(1);
+    expect(readEvents()).toHaveLength(1);
   });
 
   it('should not deduplicate events with same tokens but different agents', () => {
     const ts = new Date().toISOString();
-    appendCostEventSync(makeEvent({ ts, agentId: 'agent-1', input: 1000 }));
-    appendCostEventSync(makeEvent({ ts, agentId: 'agent-2', input: 1000 })); // Different agent
+    appendCostEvent(makeEvent({ ts, agentId: 'agent-1', input: 1000 }));
+    appendCostEvent(makeEvent({ ts, agentId: 'agent-2', input: 1000 })); // Different agent
 
-    expect(deduplicateEventsSync()).toBe(0);
-    expect(readEventsSync()).toHaveLength(2);
+    expect(deduplicateEvents()).toBe(0);
+    expect(readEvents()).toHaveLength(2);
   });
 
   it('should not deduplicate events with same tokens but timestamps > 60 seconds apart', () => {
     const ts1 = new Date(Date.now() - 120_000).toISOString(); // 2 minutes ago
     const ts2 = new Date().toISOString();
-    appendCostEventSync(makeEvent({ ts: ts1, input: 1000 }));
-    appendCostEventSync(makeEvent({ ts: ts2, input: 1000 })); // Same tokens, different session turn
+    appendCostEvent(makeEvent({ ts: ts1, input: 1000 }));
+    appendCostEvent(makeEvent({ ts: ts2, input: 1000 })); // Same tokens, different session turn
 
-    expect(deduplicateEventsSync()).toBe(0);
-    expect(readEventsSync()).toHaveLength(2);
+    expect(deduplicateEvents()).toBe(0);
+    expect(readEvents()).toHaveLength(2);
   });
 
   it('should deduplicate events with slightly different timestamps within 60-second window', () => {
     const ts1 = new Date(Date.now() - 5_000).toISOString(); // 5 seconds ago
     const ts2 = new Date().toISOString();                    // now (same parallel session)
     const base = { input: 5000, output: 2000, cacheRead: 0, cacheWrite: 0 };
-    appendCostEventSync(makeEvent({ ts: ts1, ...base }));
-    appendCostEventSync(makeEvent({ ts: ts2, ...base }));
+    appendCostEvent(makeEvent({ ts: ts1, ...base }));
+    appendCostEvent(makeEvent({ ts: ts2, ...base }));
 
-    expect(deduplicateEventsSync()).toBe(1);
-    expect(readEventsSync()).toHaveLength(1);
+    expect(deduplicateEvents()).toBe(1);
+    expect(readEvents()).toHaveLength(1);
   });
 
   it('should preserve legitimate consecutive events with same token counts', () => {
@@ -171,12 +171,12 @@ describe('deduplicateEvents', () => {
     const ts2 = new Date(Date.now() - 120_000).toISOString(); // 2 min ago
     const ts3 = new Date().toISOString();
     const base = { input: 1000, output: 500, cacheRead: 0, cacheWrite: 0 };
-    appendCostEventSync(makeEvent({ ts: ts1, ...base }));
-    appendCostEventSync(makeEvent({ ts: ts2, ...base })); // > 60s from ts1 — not a duplicate
-    appendCostEventSync(makeEvent({ ts: ts3, ...base })); // > 60s from ts2 — not a duplicate
+    appendCostEvent(makeEvent({ ts: ts1, ...base }));
+    appendCostEvent(makeEvent({ ts: ts2, ...base })); // > 60s from ts1 — not a duplicate
+    appendCostEvent(makeEvent({ ts: ts3, ...base })); // > 60s from ts2 — not a duplicate
 
-    expect(deduplicateEventsSync()).toBe(0);
-    expect(readEventsSync()).toHaveLength(3);
+    expect(deduplicateEvents()).toBe(0);
+    expect(readEvents()).toHaveLength(3);
   });
 
   // requestId-based dedup tests (PAN-238)
@@ -186,34 +186,34 @@ describe('deduplicateEvents', () => {
     // Timestamps > 60s apart — heuristic would keep both, but requestId dedup removes the dup
     const ts1 = new Date(Date.now() - 300_000).toISOString(); // 5 min ago
     const ts2 = new Date().toISOString();
-    appendCostEventSync(makeEvent({ ts: ts1, requestId, input: 1000 }));
-    appendCostEventSync(makeEvent({ ts: ts2, requestId, input: 1000 })); // same requestId
+    appendCostEvent(makeEvent({ ts: ts1, requestId, input: 1000 }));
+    appendCostEvent(makeEvent({ ts: ts2, requestId, input: 1000 })); // same requestId
 
-    const removed = deduplicateEventsSync();
+    const removed = deduplicateEvents();
     expect(removed).toBe(1);
-    expect(readEventsSync()).toHaveLength(1);
+    expect(readEvents()).toHaveLength(1);
   });
 
   it('should keep events with different requestIds even with identical token counts', () => {
     const base = { input: 1000, output: 500, cacheRead: 0, cacheWrite: 0 };
-    appendCostEventSync(makeEvent({ requestId: 'req-1', ...base }));
-    appendCostEventSync(makeEvent({ requestId: 'req-2', ...base })); // different request
+    appendCostEvent(makeEvent({ requestId: 'req-1', ...base }));
+    appendCostEvent(makeEvent({ requestId: 'req-2', ...base })); // different request
 
-    expect(deduplicateEventsSync()).toBe(0);
-    expect(readEventsSync()).toHaveLength(2);
+    expect(deduplicateEvents()).toBe(0);
+    expect(readEvents()).toHaveLength(2);
   });
 
   it('should handle mixed events: requestId-based and legacy heuristic in the same file', () => {
     const ts = new Date().toISOString();
     // Event with requestId — dedup by requestId
-    appendCostEventSync(makeEvent({ ts, requestId: 'req-xyz', input: 1000 }));
-    appendCostEventSync(makeEvent({ ts, requestId: 'req-xyz', input: 1000 })); // dup by requestId
+    appendCostEvent(makeEvent({ ts, requestId: 'req-xyz', input: 1000 }));
+    appendCostEvent(makeEvent({ ts, requestId: 'req-xyz', input: 1000 })); // dup by requestId
     // Event without requestId — dedup by heuristic
-    appendCostEventSync(makeEvent({ ts, input: 2000 }));
-    appendCostEventSync(makeEvent({ ts, input: 2000 })); // dup by heuristic (same ts, same tokens)
+    appendCostEvent(makeEvent({ ts, input: 2000 }));
+    appendCostEvent(makeEvent({ ts, input: 2000 })); // dup by heuristic (same ts, same tokens)
 
-    const removed = deduplicateEventsSync();
+    const removed = deduplicateEvents();
     expect(removed).toBe(2);
-    expect(readEventsSync()).toHaveLength(2);
+    expect(readEvents()).toHaveLength(2);
   });
 });

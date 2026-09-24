@@ -14,10 +14,10 @@ const mockSessionExists = vi.fn();
 const mockHasCompletionMarker = vi.fn(() => false);
 
 vi.mock('../agents.js', () => ({
-  getAgentStateSync: () => mockGetAgentState(),
+  getAgentState: () => mockGetAgentState(),
   getAgentRuntimeStateSync: () => mockGetAgentRuntimeState(),
   getAgentRuntimeState: () => Effect.succeed(mockGetAgentRuntimeState()),
-  getLatestSessionIdSync: () => mockGetLatestSessionId(),
+  getLatestSessionId: () => mockGetLatestSessionId(),
   normalizeAgentId: (id: string) => id,
 }));
 

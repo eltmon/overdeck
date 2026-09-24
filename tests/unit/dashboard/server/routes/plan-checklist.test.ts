@@ -13,7 +13,7 @@ const routeMocks = vi.hoisted(() => ({
 
 vi.mock('../../../../../src/lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../src/lib/agents.js')>();
-  return { ...actual, getAgentStateSync: routeMocks.getAgentState };
+  return { ...actual, getAgentState: routeMocks.getAgentState };
 });
 
 import { postAgentPlanChecklistRoute } from '../../../../../src/dashboard/server/routes/agents/runtime-events.js';

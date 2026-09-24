@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { findDraftPrd, findDraftPrdSync, findPrdAnywhereSync } from '../prd-locations.js';
+import { findDraftPrd, findDraftPrdSync, findPrdAnywhere } from '../prd-locations.js';
 import { getDraftsDir } from '../pan-dir/index.js';
 
 let projectRoot: string;
@@ -63,14 +63,14 @@ describe('findDraftPrd', () => {
   });
 });
 
-describe('findPrdAnywhereSync', () => {
+describe('findPrdAnywhere', () => {
   it('falls through to the canonical draft when no legacy status PRD exists', () => {
     const draftsDir = getDraftsDir(projectRoot);
     mkdirSync(draftsDir, { recursive: true });
     const lower = join(draftsDir, 'pan-2858.md');
     writeFileSync(lower, 'prd\n', 'utf-8');
 
-    const loc = findPrdAnywhereSync(projectRoot, 'PAN-2858');
+    const loc = findPrdAnywhere(projectRoot, 'PAN-2858');
     expect(loc?.format).toBe('pan-draft');
     expect(loc?.path).toBe(lower);
   });

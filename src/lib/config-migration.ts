@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, renameSync, readdirSync, lstat
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
-import { loadSettingsSync, type SettingsConfig } from './settings.js';
+import { loadSettings, type SettingsConfig } from './settings.js';
 import { type YamlConfig } from './config-yaml.js';
 import { type ModelId } from './settings.js';
 
@@ -26,14 +26,14 @@ const BACKUP_SETTINGS_PATH = join(homedir(), '.overdeck', 'settings.json.backup'
  * Check if migration is needed
  * Returns true if settings.json exists and config.yaml doesn't
  */
-export function needsMigrationSync(): boolean {
+export function needsMigration(): boolean {
   return existsSync(LEGACY_SETTINGS_PATH) && !existsSync(NEW_CONFIG_PATH);
 }
 
 /**
  * Check if legacy settings exist (even if already migrated)
  */
-export function hasLegacySettingsSync(): boolean {
+export function hasLegacySettings(): boolean {
   return existsSync(LEGACY_SETTINGS_PATH);
 }
 
@@ -57,7 +57,7 @@ function detectEnabledProviders(settings: SettingsConfig): {
 /**
  * Convert legacy settings.json to new config.yaml format
  */
-export function convertToYamlConfigSync(settings: SettingsConfig): YamlConfig {
+export function convertToYamlConfig(settings: SettingsConfig): YamlConfig {
   const providers = detectEnabledProviders(settings);
 
   const config: YamlConfig = {
@@ -95,12 +95,12 @@ export interface MigrationResult {
   error?: string;
 }
 
-export function migrateConfigSync(options: MigrationOptions = {}): MigrationResult {
+export function migrateConfig(options: MigrationOptions = {}): MigrationResult {
   const { backup = true, deleteLegacy = false, dryRun = false } = options;
 
   try {
     // Check if migration is needed
-    if (!needsMigrationSync()) {
+    if (!needsMigration()) {
       if (existsSync(NEW_CONFIG_PATH)) {
         return {
           success: true,
@@ -118,10 +118,10 @@ export function migrateConfigSync(options: MigrationOptions = {}): MigrationResu
     }
 
     // Load legacy settings
-    const settings = loadSettingsSync();
+    const settings = loadSettings();
 
     // Convert to YAML config
-    const yamlConfig = convertToYamlConfigSync(settings);
+    const yamlConfig = convertToYamlConfig(settings);
 
     // Generate YAML content
     const yamlContent = yaml.dump(yamlConfig, {
@@ -192,7 +192,7 @@ export interface LegacyCleanupResult {
   errors: string[];
 }
 
-export function cleanupLegacyRuntimeSymlinksSync(): LegacyCleanupResult {
+export function cleanupLegacyRuntimeSymlinks(): LegacyCleanupResult {
   const legacyDirs = [
     { name: 'codex', base: join(homedir(), '.codex') },
     { name: 'cursor', base: join(homedir(), '.cursor') },
@@ -240,7 +240,7 @@ export function cleanupLegacyRuntimeSymlinksSync(): LegacyCleanupResult {
  * Migrate legacy sync config by stripping the 'targets' field from config.toml.
  * This handles users who had `targets = ["claude", "codex"]` in their config.
  */
-export function migrateSyncTargetsSync(): { migrated: boolean; hadNonClaudeTargets: boolean } {
+export function migrateSyncTargets(): { migrated: boolean; hadNonClaudeTargets: boolean } {
   const configPath = join(homedir(), '.overdeck', 'config.toml');
 
   if (!existsSync(configPath)) {

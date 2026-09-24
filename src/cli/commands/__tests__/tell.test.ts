@@ -16,7 +16,7 @@ const remoteMocks = vi.hoisted(() => ({
 // singleton IDs and known prefixes must not get a naive `agent-` prefix, and
 // issue IDs can resolve to non-work agents when that is the registered run.
 vi.mock('../../../lib/agents.js', () => ({
-  resolveAgentTargetSync: (id: string) => {
+  resolveAgentTarget: (id: string) => {
     const lower = id.toLowerCase();
     if (lower === 'pan-1820') return 'strike-pan-1820';
     if (
@@ -31,7 +31,7 @@ vi.mock('../../../lib/agents.js', () => ({
     }
     return `agent-${lower}`;
   },
-  getAgentStateSync: (id: string) => ({ id, issueId: 'PAN-123' }),
+  getAgentState: (id: string) => ({ id, issueId: 'PAN-123' }),
   messageAgent: agentMocks.messageAgent,
 }));
 

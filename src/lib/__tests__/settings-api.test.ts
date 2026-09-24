@@ -68,7 +68,6 @@ vi.mock('../model-capabilities.js', () => ({
     'claude-opus-4-6': 'claude-opus-4-7',
   },
   getModelCapability: vi.fn(),
-  getModelCapabilitySync: vi.fn(),
   hasModelCapability: (modelId: string) => [
     'claude-opus-4-7',
     'claude-sonnet-4-6',
@@ -78,18 +77,8 @@ vi.mock('../model-capabilities.js', () => ({
     'minimax-m2.7-highspeed',
     'qwen3-coder-plus',
   ].includes(modelId),
-  hasModelCapabilitySync: (modelId: string) => [
-    'claude-opus-4-7',
-    'claude-sonnet-4-6',
-    'claude-haiku-4-5',
-    'gpt-5.5',
-    'gpt-5.5-mini',
-    'minimax-m2.7-highspeed',
-    'qwen3-coder-plus',
-  ].includes(modelId),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
-  resolveModelIdSync: (modelId: string) => mockResolveModelId(modelId),
-  getModelEffortLevelsSync: (modelId: string) => (({
+  getModelEffortLevels: (modelId: string) => (({
     'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
     'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
     'claude-sonnet-4-6': ['low', 'medium', 'high', 'max'],
@@ -1161,11 +1150,8 @@ describe('getAvailableModelsApi — MODEL_DEPRECATIONS filter (PAN-1122 follow-u
         'o4-mini': 'gpt-5.4-mini',
       },
       getModelCapability: vi.fn(),
-      getModelCapabilitySync: vi.fn(),
       hasModelCapability: () => true,
-      hasModelCapabilitySync: () => true,
       resolveModelId: (modelId: string) => modelId,
-      resolveModelIdSync: (modelId: string) => modelId,
     }));
 
     const { getAvailableModelsApi } = await import('../settings-api.js');
@@ -1204,11 +1190,8 @@ describe('getAvailableModelsApi — Kimi harness annotations (2026-08-02 harness
       },
       MODEL_DEPRECATIONS: {},
       getModelCapability: vi.fn(),
-      getModelCapabilitySync: vi.fn(),
       hasModelCapability: () => true,
-      hasModelCapabilitySync: () => true,
       resolveModelId: (modelId: string) => modelId,
-      resolveModelIdSync: (modelId: string) => modelId,
     }));
 
     const { getAvailableModelsApi } = await import('../settings-api.js');

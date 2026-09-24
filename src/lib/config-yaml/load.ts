@@ -30,7 +30,7 @@ function resolveConversationWatchDirs(config: RuntimeConversationsConfig): Runti
   };
 }
 
-export function getConversationSearchConfigSync(): NormalizedConversationSearchConfig {
+export function getConversationSearchConfig(): NormalizedConversationSearchConfig {
   const { config } = loadConfigSync();
   return config.conversationSearch;
 }
@@ -525,7 +525,7 @@ export function isClaudeCodeChannelsMcpEnabled(): boolean {
  * started at spawn. Read at session launch — a change only affects sessions
  * launched/resumed after it. Defaults to true when unset.
  */
-export function isTldrEnabledSync(): boolean {
+export function isTldrEnabled(): boolean {
   try {
     return loadConfigSync().config.tldr.enabled;
   } catch {

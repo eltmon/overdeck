@@ -21,7 +21,7 @@ vi.mock('../../../src/lib/paths.js', async () => {
 import {
   getProjectSync,
   PROJECTS_CONFIG_FILE,
-  registerProjectSync,
+  registerProject,
   renameProject,
   type ProjectConfig,
 } from '../../../src/lib/projects.js';
@@ -40,7 +40,7 @@ const PROJECT: ProjectConfig = {
 beforeEach(() => {
   mkdirSync(TEST_HOME, { recursive: true });
   rmSync(PROJECTS_CONFIG_FILE, { force: true });
-  registerProjectSync('original-key', PROJECT);
+  registerProject('original-key', PROJECT);
 });
 
 afterEach(() => {
@@ -72,7 +72,7 @@ describe('renameProject', () => {
   });
 
   it("rejects a case-insensitive collision with another project's name", async () => {
-    registerProjectSync('other-key', {
+    registerProject('other-key', {
       name: 'Existing Project',
       path: '/projects/other',
     });
@@ -83,7 +83,7 @@ describe('renameProject', () => {
   });
 
   it("rejects a case-insensitive collision with another project's key", async () => {
-    registerProjectSync('existing-key', {
+    registerProject('existing-key', {
       name: 'Unrelated Name',
       path: '/projects/other',
     });
