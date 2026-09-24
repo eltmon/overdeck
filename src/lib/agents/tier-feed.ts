@@ -90,14 +90,14 @@ async function runGitShow(workspace: string, sha: string, args: string[] = []): 
   return stdout;
 }
 
-export function shouldSkipFeedSubject(
+function shouldSkipFeedSubject(
   subject: string,
   feedConfig: Pick<ValidatedTieredExecutionFeedConfig, 'exclude_subjects'>,
 ): boolean {
   return feedConfig.exclude_subjects.some(prefix => subject.startsWith(prefix));
 }
 
-export async function renderCommitFeedDiff(
+async function renderCommitFeedDiff(
   workspace: string,
   sha: string,
   feedConfig: ValidatedTieredExecutionFeedConfig = DEFAULT_FEED_CONFIG,
@@ -120,7 +120,7 @@ export async function renderCommitFeedDiff(
   ].join('\n');
 }
 
-export function resolveFeedApiUrl(env: NodeJS.ProcessEnv = process.env): string {
+function resolveFeedApiUrl(env: NodeJS.ProcessEnv = process.env): string {
   return env.OVERDECK_DASHBOARD_URL
     ?? env.DASHBOARD_URL
     ?? `http://localhost:${env.API_PORT ?? env.PORT ?? '3011'}`;
@@ -130,7 +130,7 @@ export function resolveFeedApiUrl(env: NodeJS.ProcessEnv = process.env): string 
  * Compose the ingestion-only feed message for one commit. Deterministic over
  * (sha, itemTitle, diff) so replay reconstructs byte-identical messages.
  */
-export function composeCommitFeedMessage(
+function composeCommitFeedMessage(
   sha: string,
   itemTitle: string,
   diff: string,

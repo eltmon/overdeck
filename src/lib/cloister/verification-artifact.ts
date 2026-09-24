@@ -60,14 +60,14 @@ const ARTIFACT_RELATIVE_PATH = join('.overdeck', 'verification-latest.json');
 const RUNS_RELATIVE_DIR = join('.overdeck', 'verification');
 
 /** PAN-3847: per-run artifacts are kept for 30 days, then pruned by the idle-stack patrol. */
-export const VERIFICATION_RUN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const VERIFICATION_RUN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function verificationArtifactPath(workspacePath: string): string {
   return join(workspacePath, ARTIFACT_RELATIVE_PATH);
 }
 
 /** The immutable per-run artifact path: `<workspace>/.overdeck/verification/<ranAt>-<head8>.json`. */
-export function verificationRunArtifactPath(workspacePath: string, ranAt: string, head8: string): string {
+function verificationRunArtifactPath(workspacePath: string, ranAt: string, head8: string): string {
   return join(workspacePath, RUNS_RELATIVE_DIR, `${ranAt.replace(/[:.]/g, '-')}-${head8}.json`);
 }
 

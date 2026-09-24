@@ -132,7 +132,7 @@ function defaultDeps(): UatStackDeps {
   };
 }
 
-export function uatStackFolderName(gen: UatGeneration): string {
+function uatStackFolderName(gen: UatGeneration): string {
   return basename(gen.worktreePath);
 }
 

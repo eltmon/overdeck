@@ -2,10 +2,8 @@ import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
-import type { SequenceNode } from './backlog/types.js';
-import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
 import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
-import { findProjectByPathSync, getProjectSwarmHotspots, resolveProjectFromIssueSync } from './projects.js';
+import { findProjectByPathSync, getProjectSwarmHotspots } from './projects.js';
 import type { ResolvedProjectRepo } from './project-repos.js';
 
 export interface MergeQueueItem {
@@ -162,7 +160,7 @@ export const changedFilesVsMain = (branch: string, cwd: string, base = 'main') =
     );
   });
 
-export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
+const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 
 export interface ComputeMergeQueueOptions {
   getPrUrl?: (item: { issueId: string; pr?: number }) => string | undefined;
@@ -182,31 +180,6 @@ export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): 
   const githubIssue = resolveGitHubIssueSync(item.issueId.toUpperCase());
   if (!githubIssue.isGitHub) return undefined;
   return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${item.pr}`;
-}
-
-/**
- * PAN-1696 ready-set-source: every issue in this project whose PR the forge
- * says is ready to merge right now. PAN-3917: the ready set is the forge's
- * answer (approved + checks green + mergeable), not a stored merge-ready
- * flag, and the in-flight membership lens supplies the candidate issues.
- */
-export async function listEligibleCandidatesByProject(projectRoot: string): Promise<Array<{ issueId: string; title: string; pr?: number }>> {
-  const project = findProjectByPathSync(projectRoot);
-  if (!project) return [];
-
-  const { getMergeReadyIssues } = await import('./cloister/merge-ready-set.js');
-  const { getPrFacts } = await import('./cloister/pr-facts.js');
-  const ready = await getMergeReadyIssues();
-
-  const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
-  for (const issueId of ready) {
-    const issueProject = resolveProjectFromIssueSync(issueId);
-    if (issueProject?.projectPath !== project.path) continue;
-    const facts = await getPrFacts(issueId);
-    // AC 10: title resolved downstream by computeMergeQueueFromCandidates.
-    candidates.push({ issueId, title: issueId, ...(facts.number != null ? { pr: facts.number } : {}) });
-  }
-  return candidates;
 }
 
 /**
@@ -576,100 +549,3 @@ export interface SequencePickResult {
   predictedConflictsWith?: string[];
 }
 
-
-/**
- * PAN-1866: Pick the highest-ranked eligible issue from a sequence node list.
- *
- * Eligibility rules:
- * - gate must not be 'blocked' (the `vetoed` pickup state)
- * - no `vetoed` label — an absolute operator hard-stop (PAN-2006)
- * - not in-pipeline (active review/work/test)
- * - no parked labels (`parked`; legacy `needs-design`/`needs-discussion`)
- * - not in the optional exclusion set (e.g. already running agents)
- * - FR-14: must have an xBRIEF spec (ready) or a PRD draft (hasPrd)
- *
- * Returns null when no eligible issue is found.
- */
-export function pickFromSequence(
-  nodes: ReadonlyArray<SequenceNode>,
-  opts?: {
-    excludeIssueIds?: ReadonlySet<string>;
-    issueLabels?: (issueId: string) => ReadonlyArray<string>;
-    /** Flywheel author/assignee safety gate. Return false to skip an issue. When
-     *  absent every issue passes (backward-compatible default). */
-    isAuthorizedIssue?: (issueId: string) => boolean;
-    /** FR-14 eligibility gate. Return true if the issue has an xBRIEF spec (ready)
-     *  or a PRD draft (hasPrd). When absent every issue passes (backward-compatible
-     *  default). */
-    isReadyOrHasPrd?: (issueId: string) => boolean;
-    /** Supplement the built-in review-status inPipeline check with live workspace/agent
-     *  state. Return true to treat an issue as in-pipeline and skip it. When absent only
-     *  review_status is checked (backward-compatible default). */
-    isInPipeline?: (issueId: string) => boolean;
-    /** PAN-2006 Definition of Ready: when true, only issues carrying the `ready`
-     *  label are eligible (the hard entry gate). The live Flywheel passes true;
-     *  legacy callers omit it and keep their pre-DoR behavior. */
-    requireReady?: boolean;
-    /** PAN-2059 + vision.mdx blanket release: when auto-pickup is ON the toggle
-     *  satisfies the per-issue `released` gate for the whole backlog. The live Flywheel
-     *  passes its auto_pickup_backlog setting; legacy callers omit it (default OFF). */
-    autoPickupBacklog?: boolean;
-    /** Operator-released scope supplied by the active order book. */
-    activeBookMembership?: ReadonlySet<string>;
-    /**
-     * Advisory pre-branch conflict signal. When present, lower predicted-conflict
-     * counts sort first among otherwise pickable issues; no issue is filtered out.
-     */
-    predictedConflictSignals?: ReadonlyArray<PredictedConflictSignal>;
-  },
-): SequencePickResult | null {
-  // Single source of truth: the same classifier the Forecast UI uses (PAN-2006).
-  // `isReadyOrHasPrd` maps to the module's `planned` gate; the caller's
-  // `isInPipeline` callback feeds the `inPipeline` gate (PAN-3917: there is no
-  // status row left to consult here); vetoed / parked / gate-blocked are
-  // derived from labels + the node's gate inside classifyIssue.
-  const lookups: ClassifyLookups = {
-    labels: opts?.issueLabels ?? (() => []),
-    isPlanned: opts?.isReadyOrHasPrd ?? (() => true),
-    isInPipeline: (issueId) => opts?.isInPipeline?.(issueId) ?? false,
-  };
-
-  const signalByIssue = new Map((opts?.predictedConflictSignals ?? []).map(signal => [signal.issueId.toUpperCase(), signal]));
-  const eligible = [...nodes]
-    .sort((a, b) => a.rank - b.rank)
-    .filter((node) => {
-      const state = classifyIssue(node, lookups);
-      // DoR is conditional: when not required, treat readiness as satisfied so the
-      // remaining gates (planned / parked / vetoed / in-pipeline) still apply.
-      const activeBookMember = opts?.activeBookMembership?.has(node.issue.toUpperCase()) ?? false;
-      if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true }, opts?.autoPickupBacklog ?? false, activeBookMember)) return false;
-      if (opts?.excludeIssueIds?.has(node.issue)) return false;
-      if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) return false;
-      return true;
-    });
-
-  if (signalByIssue.size > 0) {
-    eligible.sort((a, b) => {
-      const aSignal = signalByIssue.get(a.issue.toUpperCase());
-      const bSignal = signalByIssue.get(b.issue.toUpperCase());
-      const aConflicts = aSignal?.conflictCount ?? 0;
-      const bConflicts = bSignal?.conflictCount ?? 0;
-      if (aConflicts !== bConflicts) return aConflicts - bConflicts;
-      return a.rank - b.rank;
-    });
-  }
-
-  for (const node of eligible) {
-    const state = classifyIssue(node, lookups);
-    const signal = signalByIssue.get(node.issue.toUpperCase());
-    return {
-      issueId: node.issue,
-      rank: node.rank,
-      gate: node.gate,
-      planning: node.planning,
-      predictedConflictCount: signal?.conflictCount,
-      predictedConflictsWith: signal?.conflictsWith,
-    };
-  }
-  return null;
-}

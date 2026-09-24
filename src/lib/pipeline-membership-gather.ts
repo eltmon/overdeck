@@ -457,7 +457,7 @@ function parseBranchRefLine(line: string): { tipSha: string | null; ref: string 
   };
 }
 
-export function classifyBranchRefLine(
+function classifyBranchRefLine(
   line: string,
   unmergedSet: Set<string>,
   firstParentShas: Set<string>,

@@ -90,7 +90,7 @@ export function getAgentCVSync(agentId: string): AgentCV {
 /**
  * Save an agent's CV
  */
-export function saveAgentCVSync(cv: AgentCV): void {
+function saveAgentCVSync(cv: AgentCV): void {
   const dir = join(AGENTS_DIR, cv.agentId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(getCVFile(cv.agentId), JSON.stringify(cv, null, 2));

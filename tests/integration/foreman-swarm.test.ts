@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { chooseDispatchTier } from '../../src/lib/agents/dispatch-tier.js';
 import { resolveRegisteredSlotSpawn } from '../../src/lib/agents/spawn-prep.js';
 import { verifyAndMergeSlot } from '../../src/lib/agents/slot-merge.js';
 import { reconcileSlotState, type ReconciledSlotAgent, type ReconciledSlotBranch } from '../../src/lib/cloister/swarm-slot-reconcile.js';
@@ -78,7 +77,6 @@ describe('foreman swarm dogfood', () => {
     ]));
 
     const slotSpawns = doc.plan.items.map((planItem, index) => {
-      expect(chooseDispatchTier(planItem)).toBe('registered-slot');
       return resolveRegisteredSlotSpawn(ISSUE_ID, FEATURE_WORKSPACE, {
         slotIndex: index + 1,
         slotItemId: planItem.id,

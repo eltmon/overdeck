@@ -31,7 +31,7 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
 const execFileAsync = promisify(execFile);
 
-export const DEFAULT_STUCK_CREATED_THRESHOLD_MS = 120_000;
+const DEFAULT_STUCK_CREATED_THRESHOLD_MS = 120_000;
 
 export type { DockerContainerLifecycle } from '../docker-stats.js';
 

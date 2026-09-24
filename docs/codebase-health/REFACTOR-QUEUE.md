@@ -110,15 +110,16 @@ storage code. Landing order is fixed: the ratchet first, then one child at a tim
 
 | # | Issue | What | Status |
 |---|---|---|---|
-| 21 | PAN-3958 | Audit tool (`scripts/audit-effect-boundary.mjs`) + `lint:effect-facades` ratchet, baseline A 220 / B 301 / C 82 | **IN REVIEW** |
-| 21a | CH-1 | Delete dead Effect wrappers and Effect runtime twins (two PRs: CH-1a dead Shape B; CH-1b dead Shape A + runtime twins + Shape C C1–C3) | proposed |
-| 21b | CH-2 | Promise-native cluster K1: `src/lib/cloister/**` | proposed |
-| 21c | CH-3 | Promise-native cluster K2: agents, runtime, tmux, health, git, checkpoint, workspace | proposed |
-| 21d | CH-4 | Promise-native cluster K3a: TTS, platform, cliproxy, tunnels, auth, GitHub app, webhooks | proposed |
-| 21e | CH-5 | Promise-native cluster K3b: config, projects, settings, shadow, costs, conversations, xbrief, memory | proposed |
-| 21f | CH-6 | Live Shape B callers + Shape C twins C4–C6 + no blocking sync in server code | proposed |
-| 21g | CH-7 | One owner per harness for transcript/session/home paths (skips ohmypi, removed by #4003) | proposed |
-| 21h | CH-8 | Dead exports, `export` pruning, alias shims (two PRs: CH-8a deletions; CH-8b `export` pruning) | proposed |
+| 21 | PAN-3958 | Audit tool (`scripts/audit-effect-boundary.mjs`) + `lint:effect-facades` ratchet, baseline A 220 / B 301 / C 82 | **LANDED** #4006 |
+| 21a | CH-1 | Delete dead Effect wrappers and Effect runtime twins (two PRs: CH-1a dead Shape B; CH-1b dead Shape A + runtime twins + Shape C C1–C3) | **LANDED** #4026, #4029 |
+| 21b | CH-2 | Promise-native cluster K1: `src/lib/cloister/**` | **LANDED** #4037 |
+| 21c | CH-3 | Promise-native cluster K2: agents, runtime, tmux, health, git, checkpoint, workspace | **LANDED** #4041 |
+| 21d | CH-4 | Promise-native cluster K3a: TTS, platform, cliproxy, tunnels, auth, GitHub app, webhooks | **LANDED** #4042 |
+| 21e | CH-5 | Promise-native cluster K3b: config, projects, settings, shadow, costs, conversations, xbrief, memory | **LANDED** #4043 |
+| 21f | CH-6 | Live Shape B callers + Shape C twins C4–C6 + no blocking sync in server code | **LANDED** #4044, #4048 |
+| 21g | CH-7 | One owner per harness for transcript/session/home paths (skips ohmypi, removed by #4003) | **LANDED** #4049 |
+| 21h | CH-8 | Dead exports, `export` pruning, alias shims (CH-8a deletions in two PRs; CH-8b `export` pruning and the comment-blind scan) | **LANDED** #4050, #4051; CH-8b in review |
+| 21i | follow-up | Twin pairs AC-W8 still lists: `withConcurrencyLimit`/`withConcurrencyLimitPromise` and eight `foo`/`fooAsync` pairs without a C6 header note (ledger, CH-8b) | open |
 
 ## Related in-pipeline items being shepherded alongside (not queue members)
 

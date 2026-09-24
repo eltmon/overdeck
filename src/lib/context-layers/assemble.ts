@@ -10,7 +10,7 @@
 const SECTION_SEPARATOR = '\n\n---\n\n';
 export const PROJECT_LAYER_START = '<!-- overdeck:project-layer:start';
 export const PROJECT_LAYER_END = '<!-- overdeck:project-layer:end -->';
-export const WORKSPACE_CONTEXT_V2 = '<!-- overdeck:workspace-context:v2 harness-neutral -->';
+const WORKSPACE_CONTEXT_V2 = '<!-- overdeck:workspace-context:v2 harness-neutral -->';
 
 function removeMarkedProjectLayer(content: string): string | null {
   const start = content.indexOf(PROJECT_LAYER_START);

@@ -66,7 +66,7 @@ export interface CompanionTerminalLifecycle {
   closeForOwner(ownerSession: string): Promise<boolean>;
 }
 
-export const COMPANION_SESSION_PREFIX = 'companion-';
+const COMPANION_SESSION_PREFIX = 'companion-';
 
 export function companionSessionName(ownerSession: string): string {
   const name = `${COMPANION_SESSION_PREFIX}${ownerSession}`;

@@ -19,8 +19,8 @@ async function editIssueLabel(issueId: string, op: 'add' | 'remove', label: stri
   await execAsync(`gh issue edit ${number} --repo ${owner}/${repo} ${flag} "${label}" 2>/dev/null || true`);
 }
 
-export const addIssueLabel = (issueId: string, label: string): Promise<void> => editIssueLabel(issueId, 'add', label);
-export const removeIssueLabel = (issueId: string, label: string): Promise<void> => editIssueLabel(issueId, 'remove', label);
+const addIssueLabel = (issueId: string, label: string): Promise<void> => editIssueLabel(issueId, 'add', label);
+const removeIssueLabel = (issueId: string, label: string): Promise<void> => editIssueLabel(issueId, 'remove', label);
 
 // PAN-2006 pipeline-state labels.
 export const applyIssueParkedLabel = (id: string): Promise<void> => addIssueLabel(id, PARKED_LABEL);

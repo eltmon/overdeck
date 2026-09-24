@@ -41,7 +41,7 @@ import { AcpTranscriptWriter, readOwedAcpPrompts } from "./transcript.js";
 import { ACP_TRANSCRIPT_FILE } from "../runtimes/storage/acp.js";
 
 const FILE_MODE = 0o600;
-export const OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS = 60_000;
+const OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS = 60_000;
 export const OPENCODE_PERMISSION_WATCHDOG_STALE_MS = 180_000;
 type JsonRecord = Record<string, unknown>;
 

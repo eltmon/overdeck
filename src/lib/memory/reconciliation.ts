@@ -82,7 +82,7 @@ export async function reconcileAgentMemory(
   return result;
 }
 
-export async function reconcileTranscriptCheckpoint(
+async function reconcileTranscriptCheckpoint(
   checkpoint: TranscriptCheckpoint,
   options: ReconcileTranscriptCheckpointOptions = {},
 ): Promise<'empty' | 'fired' | 'failed' | 'missing'> {

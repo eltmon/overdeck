@@ -50,7 +50,7 @@ import {
   type PaneViewport,
 } from './pane-composer.js';
 
-export const DEDUP_KEY_RE = /^[A-Za-z0-9:_-]+$/;
+const DEDUP_KEY_RE = /^[A-Za-z0-9:_-]+$/;
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -88,7 +88,7 @@ export function dedupTargetOptionName(dedupKey: string): string {
 }
 
 /** Explicit payload phase for a pending claim; unset means legacy/unknown. */
-export function dedupPayloadStateOptionName(dedupKey: string): string {
+function dedupPayloadStateOptionName(dedupKey: string): string {
   return `@overdeck-dedup-payload-state-${dedupKey}`;
 }
 

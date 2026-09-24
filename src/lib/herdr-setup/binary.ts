@@ -18,8 +18,8 @@ import { defaultHerdrExec, type HerdrExec, type HerdrStatus } from './status.js'
 export const HERDR_INSTALL_URL = 'https://herdr.dev/install.sh';
 export const HERDR_MANIFEST_URL = 'https://herdr.dev/latest.json';
 /** Installer and `herdr update` download a release; give them room. */
-export const HERDR_INSTALL_TIMEOUT_MS = 120_000;
-export const HERDR_MANIFEST_TIMEOUT_MS = 10_000;
+const HERDR_INSTALL_TIMEOUT_MS = 120_000;
+const HERDR_MANIFEST_TIMEOUT_MS = 10_000;
 
 /** `~/.local/bin` — where the vendor installer puts `herdr`. */
 export function herdrInstallDir(home: string = homedir()): string {
@@ -113,7 +113,7 @@ export async function updateHerdrBinary(binary: string, exec: HerdrExec = defaul
 }
 
 /** True when `binary` lives directly under the installer's directory. */
-export function isInstallerManaged(binary: string, home: string = homedir()): boolean {
+function isInstallerManaged(binary: string, home: string = homedir()): boolean {
   const dir = resolve(herdrInstallDir(home));
   return resolve(binary).startsWith(dir + sep);
 }

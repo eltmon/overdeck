@@ -34,7 +34,7 @@ const DEFAULT_THUMBNAIL_WIDTH = 640;
 const DEFAULT_THUMBNAIL_HEIGHT = 360;
 const DEFAULT_THUMBNAIL_TIMEOUT_MS = 10_000;
 
-export function getArtifactThumbnailDir(slug: string): string {
+function getArtifactThumbnailDir(slug: string): string {
   return join(getOverdeckHome(), 'artifacts', 'thumbnails', slug);
 }
 

@@ -58,7 +58,7 @@ function systemctl(command: string): Promise<{ stdout: string; stderr: string }>
   });
 }
 
-export function userUnitDir(): string {
+function userUnitDir(): string {
   return join(homedir(), '.config', 'systemd', 'user');
 }
 
@@ -174,7 +174,7 @@ export async function startSupervisorUnit(): Promise<void> {
   await systemctl(`start ${SUPERVISOR_UNIT_NAME}`);
 }
 
-export async function stopSupervisorUnit(): Promise<void> {
+async function stopSupervisorUnit(): Promise<void> {
   await systemctl(`stop ${SUPERVISOR_UNIT_NAME}`);
 }
 

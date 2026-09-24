@@ -12,7 +12,7 @@ import { homedir } from 'os';
 /**
  * Path to the Overdeck environment file
  */
-export const ENV_FILE_PATH = join(homedir(), '.overdeck.env');
+const ENV_FILE_PATH = join(homedir(), '.overdeck.env');
 
 /**
  * Parse a .env file content into key-value pairs

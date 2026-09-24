@@ -21,7 +21,7 @@ import {
   type YamlConfig,
 } from './schema.js';
 
-export function resolveConversationWatchDirs(config: RuntimeConversationsConfig): RuntimeConversationsConfig {
+function resolveConversationWatchDirs(config: RuntimeConversationsConfig): RuntimeConversationsConfig {
   return {
     ...config,
     watchDirs: config.watchDirs.map((dir) =>
@@ -549,7 +549,7 @@ export const getOpenInEditorCommand = (): Effect.Effect<string | null> =>
     catch: (cause) => cause,
   }).pipe(Effect.catchCause(() => Effect.succeed(DEFAULT_CONFIG.ui.openInEditorCommand)));
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 /**
  * The conversations config block with API keys and enabled providers merged in and `~/` watch dirs resolved.

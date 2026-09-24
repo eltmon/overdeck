@@ -10,7 +10,7 @@ function bridgeTokensDir(): string {
   return join(getOverdeckHome(), 'bridge-tokens');
 }
 
-export function getBridgeTokenPath(agentId: string): string {
+function getBridgeTokenPath(agentId: string): string {
   return join(bridgeTokensDir(), `${agentId}.token`);
 }
 

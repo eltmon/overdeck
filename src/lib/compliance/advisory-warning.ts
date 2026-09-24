@@ -60,7 +60,7 @@ export async function readComplianceWarningMarkers(projectId: string, workspaceI
   }
 }
 
-export async function writeComplianceWarningMarkers(projectId: string, workspaceId: string, markers: ComplianceWarningMarkers): Promise<void> {
+async function writeComplianceWarningMarkers(projectId: string, workspaceId: string, markers: ComplianceWarningMarkers): Promise<void> {
   const path = resolveComplianceWarningMarkersFile(projectId, workspaceId);
   await ensureParentDir(path);
   const tempPath = join(dirname(path), `.${randomUUID()}.tmp`);
@@ -68,7 +68,7 @@ export async function writeComplianceWarningMarkers(projectId: string, workspace
   await rename(tempPath, path);
 }
 
-export function resolveComplianceWarningMarkersFile(projectId: string, workspaceId: string): string {
+function resolveComplianceWarningMarkersFile(projectId: string, workspaceId: string): string {
   return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'compliance', 'warned-misses.json');
 }
 

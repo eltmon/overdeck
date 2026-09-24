@@ -216,7 +216,7 @@ function workflowRoots(project: Pick<ProjectConfig, 'path' | 'workspace'>): stri
   ];
 }
 
-export function detectGitHubActionsTestJobSync(
+function detectGitHubActionsTestJobSync(
   project: Pick<ProjectConfig, 'github_repo' | 'path' | 'workspace'>,
   deps: VerificationTestsModeDeps = {},
 ): GitHubActionsTestJob {

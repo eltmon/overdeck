@@ -15,7 +15,7 @@ export function resolveMemoryBase(): string {
   return resolve(getOverdeckHome(), 'memory');
 }
 
-export function assertUnderMemoryBase(path: string): string {
+function assertUnderMemoryBase(path: string): string {
   const base = resolveMemoryBase();
   const resolved = resolve(path);
   const rel = relative(base, resolved);

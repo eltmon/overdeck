@@ -90,7 +90,7 @@ export interface RestartAgentDeps {
   allocateSessionIdentity?: typeof createFreshSessionIdentity;
 }
 
-export function prepareRestartSessionIdentity(
+function prepareRestartSessionIdentity(
   agentId: string,
   harness: RuntimeName,
   state: AgentState,

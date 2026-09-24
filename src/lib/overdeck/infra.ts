@@ -196,7 +196,7 @@ export function readPipelineMirrorMarkerSync(db: SqliteDatabase): string | null 
 }
 
 /** `app_settings` key recording that the dead `issues` FK rebuild already ran. */
-export const DEAD_ISSUES_FK_DROPPED_SETTING = 'schema.deadIssuesFkDropped';
+const DEAD_ISSUES_FK_DROPPED_SETTING = 'schema.deadIssuesFkDropped';
 
 /**
  * Live tables whose `issue_id → issues(id)` foreign key still gates post-cut

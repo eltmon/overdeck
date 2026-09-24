@@ -21,12 +21,12 @@ export const DashboardSnapshot = Schema.Struct({
 });
 export type DashboardSnapshot = typeof DashboardSnapshot.Type;
 
-export const ReplayEventsInput = Schema.Struct({
+const ReplayEventsInput = Schema.Struct({
   fromSequence: Schema.Number,
 });
 export type ReplayEventsInput = typeof ReplayEventsInput.Type;
 
-export class ReplayGap extends Schema.TaggedErrorClass<ReplayGap>()(
+class ReplayGap extends Schema.TaggedErrorClass<ReplayGap>()(
   'ReplayGap',
   {
     requestedFromSequence: Schema.Number,
@@ -35,7 +35,7 @@ export class ReplayGap extends Schema.TaggedErrorClass<ReplayGap>()(
   },
 ) {}
 
-export class SnapshotRequired extends Schema.TaggedErrorClass<SnapshotRequired>()(
+class SnapshotRequired extends Schema.TaggedErrorClass<SnapshotRequired>()(
   'SnapshotRequired',
   {
     requestedFromSequence: Schema.Number,

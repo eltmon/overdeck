@@ -1084,7 +1084,7 @@ async function saveSettingsApiPromiseUnlocked(
 }
 
 /** Merge `updates` into the current API settings and persist them. */
-export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
+async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
   const current = loadSettingsApi();
 
   // Merge updates

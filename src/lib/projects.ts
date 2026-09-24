@@ -18,7 +18,7 @@
  *   lib/overdeck/issue-projects.ts, lib/pan-dir/migrate-plan-home.ts, lib/project-repos.ts, lib/projects.ts,
  *   lib/swarm-policy.ts, lib/workspace/ensure-devcontainer.ts, lib/workspace/rebuild-stack.ts,
  *   lib/workspace/stack-health.ts.
- * - `listProjectsSync` (async: `listProjects`): 30 sites in scripts/reconcile-work-model-stamps.ts,
+ * - `listProjectsSync` (async: `listProjects`): 29 sites in scripts/reconcile-work-model-stamps.ts,
  *   cli/commands/conversations/move.ts, cli/commands/doctor-plan-home-ignore.ts, cli/commands/doctor.ts,
  *   cli/commands/workspace-list.ts, dashboard/server/routes/misc/meta.ts,
  *   dashboard/server/routes/misc/trackers.ts, dashboard/server/routes/orders.ts,
@@ -29,13 +29,12 @@
  *   dashboard/server/ws-rpc.ts, lib/ci/project-ci-observation.ts, lib/cloister/closed-issue-reaper.ts,
  *   lib/cloister/deacon-main-divergence.ts, lib/cloister/deacon-workspaces.ts, lib/context-layers/detach.ts,
  *   lib/conversations/hash-resolver.ts, lib/costs/wal.ts, lib/overdeck/project-pipelines.ts,
- *   lib/pan-dir/fs-lock.ts, lib/prd-draft.ts, lib/projects.ts, lib/sync-startup-gate.ts,
- *   lib/workspaces/rebuild.ts.
+ *   lib/pan-dir/fs-lock.ts, lib/prd-draft.ts, lib/sync-startup-gate.ts, lib/workspaces/rebuild.ts.
  * - `loadProjectsConfigSync` (async: `loadProjectsConfig`): 18 sites in cli/commands/db.ts,
  *   cli/commands/issues.ts, cli/commands/workspace-render-devcontainer.ts, lib/overdeck/config.ts,
  *   lib/overdeck/control-settings.ts, lib/projects.ts, lib/projects/project-key.ts, lib/tracker-utils.ts,
  *   lib/traefik.ts.
- * - `resolveProjectFromIssueSync` (async: `resolveProjectFromIssue`): 71 sites in
+ * - `resolveProjectFromIssueSync` (async: `resolveProjectFromIssue`): 70 sites in
  *   cli/commands/admin/seed-uat-fixtures.ts, cli/commands/doctor-duplicate-stacks.ts, cli/commands/reopen.ts,
  *   cli/commands/scope.ts, cli/commands/start.ts, cli/commands/strike.ts, cli/commands/swarm-gates.ts,
  *   cli/commands/swarm-status.ts, cli/commands/swarm.ts, cli/commands/task.ts, cli/commands/workspace-migrate.ts,
@@ -48,14 +47,13 @@
  *   dashboard/server/services/system-health-service.ts, dashboard/server/services/uat-train.ts,
  *   dashboard/server/services/workspace-service.ts, lib/agent-enrichment.ts, lib/agents/spawn-prep.ts,
  *   lib/cloister/auto-merge-policy.ts, lib/cloister/autonomous-work-dispatch.ts,
- *   lib/cloister/ci-failure-feedback.ts, lib/cloister/memory-governor.ts, lib/cloister/merge-eligibility.ts,
- *   lib/cloister/merge-gate.ts, lib/cloister/merge-train-deps.ts, lib/cloister/merge-train.ts,
- *   lib/cloister/merge-verification.ts, lib/cloister/swarm-foreman.ts, lib/cloister/verification-tests-mode.ts,
- *   lib/merge-set.ts, lib/overdeck/issue-close-out.ts, lib/overdeck/issue-projects.ts,
- *   lib/overdeck/issue-reads.ts, lib/overdeck/issue-transitions.ts, lib/overdeck/planning-promotion.ts,
- *   lib/overdeck/planning-sessions.ts, lib/parked/resolver.ts, lib/prd-draft.ts, lib/project-repos.ts,
- *   lib/swarm-policy.ts, lib/workspace/ensure-devcontainer.ts, lib/workspace/rebuild-stack.ts,
- *   lib/workspace/stack-health.ts.
+ *   lib/cloister/ci-failure-feedback.ts, lib/cloister/merge-eligibility.ts, lib/cloister/merge-gate.ts,
+ *   lib/cloister/merge-train-deps.ts, lib/cloister/merge-train.ts, lib/cloister/merge-verification.ts,
+ *   lib/cloister/swarm-foreman.ts, lib/cloister/verification-tests-mode.ts, lib/merge-set.ts,
+ *   lib/overdeck/issue-close-out.ts, lib/overdeck/issue-projects.ts, lib/overdeck/issue-reads.ts,
+ *   lib/overdeck/issue-transitions.ts, lib/overdeck/planning-promotion.ts, lib/overdeck/planning-sessions.ts,
+ *   lib/parked/resolver.ts, lib/prd-draft.ts, lib/project-repos.ts, lib/swarm-policy.ts,
+ *   lib/workspace/ensure-devcontainer.ts, lib/workspace/rebuild-stack.ts, lib/workspace/stack-health.ts.
  * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
  * Do not add new synchronous callers; server-reachable code uses the async variants.
  */
@@ -624,12 +622,7 @@ function resolveProjectKeyForCwdFromProjects(
   return bestMatch?.key ?? null;
 }
 
-/** Resolve the registered project owning a cwd via longest path-prefix match. */
-export function resolveProjectKeyForCwd(cwd: string): string | null {
-  return resolveProjectKeyForCwdFromProjects(cwd, listProjectsSync());
-}
-
-/** Async request-path variant of {@link resolveProjectKeyForCwd}. */
+/** Resolve the registered project that contains `cwd` (request path; reads projects.yaml asynchronously). */
 export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string | null> {
   return resolveProjectKeyForCwdFromProjects(cwd, await listProjectsAsync());
 }
@@ -1042,7 +1035,7 @@ const DEFAULT_SPECIALIST_CONFIG: Required<SpecialistConfig> = {
  * @param projectKey - Project key
  * @returns Specialist config with defaults applied
  */
-export function getSpecialistConfig(projectKey: string): Required<SpecialistConfig> {
+function getSpecialistConfig(projectKey: string): Required<SpecialistConfig> {
   const project = getProjectSync(projectKey);
 
   if (!project || !project.specialists) {
@@ -1082,7 +1075,7 @@ export function findProjectsByRallyProject(): Array<{ key: string; config: Proje
     .map(([key, projectConfig]) => ({ key, config: projectConfig }));
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 /**
  * Effect variant of {@link loadProjectsConfigSync}.

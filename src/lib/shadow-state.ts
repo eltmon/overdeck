@@ -272,11 +272,10 @@ export async function getPendingSyncCount(): Promise<number> {
   ).length;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 //
-// Additive Effect-channel variants for the async shadow-state surface. The
-// one sync export (`removeShadowState`) is left unwrapped — it uses
-// `unlinkSync` for atomic deletion guarantees the caller relies on.
+// `removeShadowState` stays sync: it uses `unlinkSync` for the atomic deletion
+// its caller relies on.
 
 /** Tagged error for shadow-state Effect variants. */
 export class ShadowStateError extends Data.TaggedError('ShadowStateError')<{

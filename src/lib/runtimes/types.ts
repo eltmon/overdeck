@@ -262,11 +262,7 @@ export interface AgentRuntimeSync {
   isRunning(agentId: string): boolean | Promise<boolean>;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Effect-channel runtime interface. The legacy sync/promise AgentRuntimeSync
-// shape above is preserved for the existing registry while new callers compose
-// through the canonical Effect API.
+// ─── Effect runtime interface (Oh My Pi only, #4003) ──────────────────────────
 
 import type { Effect } from 'effect';
 import type {

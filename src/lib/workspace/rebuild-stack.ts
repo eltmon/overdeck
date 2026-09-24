@@ -102,7 +102,7 @@ export interface RebuildWorkspaceStackOptions {
  * poison token-based health matching and can hold port bindings. Never touches
  * a running container: a live foreign stack is left for a human.
  */
-export const removeStaleIssueContainers = (
+const removeStaleIssueContainers = (
   issueId: string,
   composeProjectName: string,
 ): Effect.Effect<number> =>

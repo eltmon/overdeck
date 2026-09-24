@@ -108,7 +108,7 @@ function writeJsonAtomic(path: string, value: unknown): void {
   renameSync(temp, path);
 }
 
-export function verificationWorkerDeadline(state: WorkerState): number | null {
+function verificationWorkerDeadline(state: WorkerState): number | null {
   if (state.phase !== 'running' || !state.admittedAt) return null;
   const admittedAt = Date.parse(state.admittedAt);
   return Number.isFinite(admittedAt) ? admittedAt + MAX_RUN_MS : null;

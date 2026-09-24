@@ -66,7 +66,7 @@ interface CliproxyCodexCredentials {
 }// ─── Native ~/.codex/auth.json store (PAN-2285) ────────────────────────────────
 
 /** Absolute path to the codex CLI's own global credential file. */
-export function getNativeCodexAuthPath(): string {
+function getNativeCodexAuthPath(): string {
   return join(homedir(), '.codex', 'auth.json');
 }
 
@@ -142,7 +142,7 @@ async function probeNativeCodexAuth(now: number = Date.now()): Promise<NativeCod
 }
 
 /** Sync native-store probe used by the spawn gate. */
-export function probeNativeCodexAuthSync(now: number = Date.now()): NativeCodexAuthResult {
+function probeNativeCodexAuthSync(now: number = Date.now()): NativeCodexAuthResult {
   let raw: string | null;
   try {
     raw = readFileSync(getNativeCodexAuthPath(), 'utf8');
@@ -235,7 +235,7 @@ export function filterCodexAuthBurnedAgentIds(
  * Agents currently flagged codex-auth-burned. Callers supply states read through
  * the agent resolver so this pure auth module does not create a spawn-time cycle.
  */
-export function listCodexAuthBurnedAgentsSync(
+function listCodexAuthBurnedAgentsSync(
   nativeMtimeMs: number,
   states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
 ): string[] {
@@ -243,7 +243,7 @@ export function listCodexAuthBurnedAgentsSync(
 }
 
 /** Sync convenience for the spawn gate: are any agents still burned right now? */
-export function hasActiveBurnedCodexAgentsSync(
+function hasActiveBurnedCodexAgentsSync(
   states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
 ): boolean {
   return listCodexAuthBurnedAgentsSync(nativeCodexAuthMtimeSync(), states).length > 0;

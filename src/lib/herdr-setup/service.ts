@@ -23,8 +23,8 @@ import { getOverdeckHome } from '../paths.js';
 import { DEFAULT_HERDR_SESSION_NAME } from '../terminal-backends/select.js';
 import { defaultHerdrExec, readHerdrStatus, type HerdrExec } from './status.js';
 
-export const HERDR_SERVER_WAIT_MS = 10_000;
-export const HERDR_SERVER_POLL_MS = 250;
+const HERDR_SERVER_WAIT_MS = 10_000;
+const HERDR_SERVER_POLL_MS = 250;
 
 /** `overdeck-herdr.service` for the default home. */
 export function herdrUnitName(session: string): string {
@@ -107,7 +107,7 @@ async function defaultSystemd(): Promise<HerdrSystemd> {
 }
 
 /** Log file for a detached (non-systemd) session server. */
-export function herdrServerLogPath(session: string, overdeckHome: string = getOverdeckHome()): string {
+function herdrServerLogPath(session: string, overdeckHome: string = getOverdeckHome()): string {
   return join(overdeckHome, 'logs', `herdr-${session}.log`);
 }
 

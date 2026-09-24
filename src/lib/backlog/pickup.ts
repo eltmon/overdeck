@@ -4,7 +4,7 @@
  * This module is the ONE place that classifies a backlog issue's pipeline state and
  * decides what is auto-pickable / unblock-eligible, plus the wave / lane / cohort
  * computations the Forecast UI (PAN-2005) and the Run lifecycle consume. The Flywheel
- * (`pickFromSequence`) and the dashboard must import from here rather than reimplement
+ * and the dashboard must import from here rather than reimplement
  * the rules, so the operator-facing forecast can never disagree with what actually runs.
  *
  * Pure: no I/O. All environment facts (labels, planned-ness, in-pipeline) are injected
@@ -116,7 +116,7 @@ export function isAutoPickable(
 }
 
 /** Effort → relative duration units for the lane forecast. */
-export const EFFORT_UNITS: Record<string, number> = { XS: 1, S: 2, M: 3, L: 5, XL: 8 };
+const EFFORT_UNITS: Record<string, number> = { XS: 1, S: 2, M: 3, L: 5, XL: 8 };
 export function effortOf(size: string): number {
   return EFFORT_UNITS[size] ?? EFFORT_UNITS['M']!;
 }

@@ -24,7 +24,7 @@ export type ResolveHarnessInput = {
   model: string;
 };
 
-export class HarnessResolutionError extends Error {
+class HarnessResolutionError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'HarnessResolutionError';

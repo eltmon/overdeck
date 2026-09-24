@@ -140,7 +140,6 @@ vi.mock('../no-resume-mode.js', () => ({
 }));
 
 vi.mock('../concurrency.js', () => ({
-  workResumeSlotsAvailable: () => 1,
   countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
   getConcurrencyLimits: () => ({
     maxWorkAgents: 6,

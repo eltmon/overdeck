@@ -30,7 +30,7 @@ export interface TranscriptTurn {
 }
 
 /** Pull plain text out of a Claude/Pi `message.content` (string or block array). */
-export function extractContentText(content: unknown): string {
+function extractContentText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return '';
   const parts: string[] = [];

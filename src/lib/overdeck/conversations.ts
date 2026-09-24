@@ -15,7 +15,6 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { Context, Effect, Schema, Stream } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckDatabaseSync } from './infra.js';
@@ -30,10 +29,10 @@ import { readLatestIndexedSessionIdSync } from '../session-history.js';
 
 // ── Entity schemas ────────────────────────────────────────────────────────────
 
-export const ConversationId   = Schema.String.pipe(Schema.brand('ConversationId'));
+const ConversationId   = Schema.String.pipe(Schema.brand('ConversationId'));
 export type  ConversationId   = typeof ConversationId.Type;
 
-export const ConversationName = Schema.String.pipe(Schema.brand('ConversationName'));
+const ConversationName = Schema.String.pipe(Schema.brand('ConversationName'));
 export type  ConversationName = typeof ConversationName.Type;
 
 // Includes legacy 'pi' (pre-rename alias for 'ohmypi', see normalizeHarness) so
@@ -44,10 +43,10 @@ export type  Harness     = typeof Harness.Type;
 export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'ai-refined', 'ai-explicit', 'default']);
 export type  TitleSource = typeof TitleSource.Type;
 
-export const FavoriteType = Schema.Literals(['conversation', 'project']);
+const FavoriteType = Schema.Literals(['conversation', 'project']);
 export type  FavoriteType = typeof FavoriteType.Type;
 
-export const BackingFile = Schema.Struct({
+const BackingFile = Schema.Struct({
   harness:   Harness,
   locator:   Schema.String,
   createdAt: Schema.Date,
@@ -81,7 +80,7 @@ export const ConversationFilter = Schema.Struct({
 });
 export type ConversationFilter = typeof ConversationFilter.Type;
 
-export const ParsedTranscript = Schema.Struct({
+const ParsedTranscript = Schema.Struct({
   messages:     Schema.Array(Schema.Unknown),
   messageCount: Schema.Number,
   models:       Schema.Array(Schema.String),
@@ -90,7 +89,7 @@ export const ParsedTranscript = Schema.Struct({
 });
 export type ParsedTranscript = typeof ParsedTranscript.Type;
 
-export const TranscriptSubject = Schema.Union([Conversation, ConversationName]);
+const TranscriptSubject = Schema.Union([Conversation, ConversationName]);
 export type  TranscriptSubject = typeof TranscriptSubject.Type;
 
 export const Transcript = Schema.Struct({
@@ -111,15 +110,15 @@ export type Transcript = typeof Transcript.Type;
 
 // ── Error types ───────────────────────────────────────────────────────────────
 
-export class ConversationNotFound extends Schema.TaggedErrorClass<ConversationNotFound>()(
+class ConversationNotFound extends Schema.TaggedErrorClass<ConversationNotFound>()(
   'ConversationNotFound', { name: ConversationName },
 ) {}
 
-export class AlreadyArchived extends Schema.TaggedErrorClass<AlreadyArchived>()(
+class AlreadyArchived extends Schema.TaggedErrorClass<AlreadyArchived>()(
   'AlreadyArchived', { name: ConversationName },
 ) {}
 
-export class NotArchived extends Schema.TaggedErrorClass<NotArchived>()(
+class NotArchived extends Schema.TaggedErrorClass<NotArchived>()(
   'NotArchived', { name: ConversationName },
 ) {}
 
@@ -191,38 +190,6 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
   readonly compact:     (name: ConversationName) =>
     Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>;
 }>()('overdeck/ConversationWriter') {}
-
-// ── ConversationsApi — HttpApiGroup (controller declarations) ─────────────────
-// Handlers wire in at bootstrap; R = ConversationsResolver | TranscriptsResolver |
-// ConversationWriter, never Db directly.
-
-export const ConversationsApi = HttpApiGroup.make('conversations')
-  .add(HttpApiEndpoint.get('list', '/conversations', {
-    success: Schema.Array(Conversation),
-  }))
-  .add(HttpApiEndpoint.get('get', '/conversations/:name', {
-    params:  Schema.Struct({ name: ConversationName }),
-    success: Conversation,
-    error:   ConversationNotFound,
-  }))
-  .add(HttpApiEndpoint.get('getHandoffDoc', '/conversations/:name/handoff-doc', {
-    params:  Schema.Struct({ name: ConversationName }),
-    success: Schema.String,
-    error:   ConversationNotFound,
-  }))
-  .add(HttpApiEndpoint.post('create', '/conversations', {
-    success: Conversation,
-  }))
-  .add(HttpApiEndpoint.post('archive', '/conversations/:name/archive', {
-    params:  Schema.Struct({ name: ConversationName }),
-    success: Conversation,
-    error:   [ConversationNotFound, AlreadyArchived],
-  }))
-  .add(HttpApiEndpoint.post('unarchive', '/conversations/:name/unarchive', {
-    params:  Schema.Struct({ name: ConversationName }),
-    success: Conversation,
-    error:   [ConversationNotFound, NotArchived],
-  }));
 
 // ── Legacy-compatible sync door ──────────────────────────────────────────────
 //
@@ -420,7 +387,7 @@ const LEGACY_CONVERSATION_SELECT = `
 
 const AGENT_CONVERSATION_PREFIXES = ['agent-', 'planning-', 'specialist-'];
 
-export function isAgentConversationName(name: string): boolean {
+function isAgentConversationName(name: string): boolean {
   return AGENT_CONVERSATION_PREFIXES.some((p) => name.startsWith(p));
 }
 
@@ -436,7 +403,7 @@ export function isAgentConversationName(name: string): boolean {
  *
  * Read inline (not via lib/agents.ts) to avoid the agents <-> conversations import cycle.
  */
-export function resolveLiveSessionId(conv: {
+function resolveLiveSessionId(conv: {
   name: string;
   tmuxSession: string;
   claudeSessionId: string | null;

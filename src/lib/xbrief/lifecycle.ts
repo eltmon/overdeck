@@ -18,15 +18,15 @@
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
-export const LEGACY_VBRIEF_ROOT_DIRNAME = 'vbrief';
+const LEGACY_VBRIEF_ROOT_DIRNAME = 'vbrief';
 
 export const LEGACY_VBRIEF_LIFECYCLE_DIRS = ['proposed', 'active', 'completed', 'cancelled'] as const;
 
 export type XBriefLifecycleDir = typeof LEGACY_VBRIEF_LIFECYCLE_DIRS[number];
 
 export const XBRIEF_FILENAME_SUFFIX = '.xbrief.json';
-export const LEGACY_VBRIEF_FILENAME_SUFFIX = '.vbrief.json';
-export const XBRIEF_FILENAME_SUFFIXES = [XBRIEF_FILENAME_SUFFIX, LEGACY_VBRIEF_FILENAME_SUFFIX] as const;
+const LEGACY_VBRIEF_FILENAME_SUFFIX = '.vbrief.json';
+const XBRIEF_FILENAME_SUFFIXES = [XBRIEF_FILENAME_SUFFIX, LEGACY_VBRIEF_FILENAME_SUFFIX] as const;
 
 const FILENAME_STEM_RE = /^(\d{4}-\d{2}-\d{2})-([A-Za-z][A-Za-z0-9]*-\d+)-([a-z0-9-]+)$/;
 

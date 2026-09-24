@@ -348,7 +348,7 @@ export function createFlyApiClientSync(token?: string): FlyApiClient {
   return new FlyApiClient(tok);
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 // Additive Effect-typed wrappers around the FlyApiClient methods and the
 // constructor helper, so callers in Effect graphs can stay end-to-end Effect
 // without `Effect.tryPromise`-wrapping every call site. The wrappers surface

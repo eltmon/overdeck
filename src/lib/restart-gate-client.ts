@@ -31,7 +31,7 @@ import { getDashboardApiUrlSync } from './config.js';
 /** Poll/TTL-refresh cadence. The server expires a request not refreshed for 20s. */
 export const RESTART_GATE_POLL_INTERVAL_MS = 5_000;
 /** Continuous health-endpoint failure after which the requester proceeds ungated. */
-export const RESTART_GATE_UNHEALTHY_FALLBACK_MS = 60_000;
+const RESTART_GATE_UNHEALTHY_FALLBACK_MS = 60_000;
 /** How often the blocked requester reprints a short "still waiting" heartbeat. */
 const WAIT_HEARTBEAT_MS = 60_000;
 /** Per-call HTTP budget while polling — short, because the loop retries. */

@@ -7,10 +7,10 @@ import { areMemoryObservationsEnabled } from './settings.js';
 import { getActiveTranscriptEntries, type TranscriptEntry } from './transcript-source.js';
 import { enqueueMemoryPipelineJob } from './worker-pool.js';
 
-export const DEFAULT_MEMORY_POLLER_INTERVAL_MS = 2_000;
-export const DEFAULT_MEMORY_POLLER_ACTIVITY_LINE_THRESHOLD = 20;
-export const DEFAULT_MEMORY_POLLER_MIN_INTERVAL_MS = 60_000;
-export const DEFAULT_MEMORY_POLLER_MAX_MID_TURN_EXTRACTIONS = 3;
+const DEFAULT_MEMORY_POLLER_INTERVAL_MS = 2_000;
+const DEFAULT_MEMORY_POLLER_ACTIVITY_LINE_THRESHOLD = 20;
+const DEFAULT_MEMORY_POLLER_MIN_INTERVAL_MS = 60_000;
+const DEFAULT_MEMORY_POLLER_MAX_MID_TURN_EXTRACTIONS = 3;
 export const MAX_MEMORY_POLLER_SAMPLE_BYTES = 64 * 1024;
 
 export interface RegisteredTranscript {

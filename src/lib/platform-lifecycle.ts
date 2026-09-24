@@ -36,7 +36,7 @@ const execAsync = promisify(exec);
  * leaving ZERO listeners (#3099, 2026-07-26 dashboard-down incident caused by
  * `--health-timeout 120` being read as 120ms).
  */
-export const MIN_HEALTH_TIMEOUT_MS = 1000;
+const MIN_HEALTH_TIMEOUT_MS = 1000;
 
 /**
  * Parse the operator-facing `--health-timeout` flag. Bare numbers are

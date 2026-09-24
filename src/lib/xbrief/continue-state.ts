@@ -104,8 +104,8 @@ export type TierOverridesMap = Record<string, TierOverride>;
 
 /**
  * Retry attempts at the current effective difficulty (PAN-3858). Recorded by
- * the escalation handlers when decideEscalation returns `retry`; cleared by a
- * promotion. An entry whose difficulty no longer matches the item's effective
+ * the escalation handlers when an escalation decides to retry at the same
+ * difficulty; cleared by a promotion. An entry whose difficulty no longer matches the item's effective
  * difficulty is treated as zero attempts.
  */
 export interface TierRetryEntry {

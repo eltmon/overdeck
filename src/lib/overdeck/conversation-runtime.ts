@@ -525,7 +525,7 @@ export function startConversationModelBackfill(resolveSessionFile: (conv: Conver
 async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[]> {
   return claudeSystemPromptFiles(cwd, 'claude-code');
 }
-export async function codexConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+async function codexConversationSystemPromptFiles(cwd: string): Promise<string[]> {
   return claudeSystemPromptFiles(cwd, 'codex');
 }
 async function ensurePiConversationSourceContractFile(): Promise<string> {

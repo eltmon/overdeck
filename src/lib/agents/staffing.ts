@@ -63,7 +63,7 @@ export interface ResolveStaffingOptions {
 
 /** Provider-default harness for a model (PAN-1984: harness is derived from the
  * model's provider — per-provider setting else built-in default). */
-export function providerDefaultHarnessSync(
+function providerDefaultHarnessSync(
   model: string,
   config: Pick<NormalizedConfig, 'providerHarnesses'>,
 ): RuntimeName {

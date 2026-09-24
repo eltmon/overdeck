@@ -250,7 +250,7 @@ function projectLifecycle(
   };
 }
 
-export function linearMcpAuthEvent(input: LinearMcpAuthEventInput): Omit<DomainEvent, 'sequence'> {
+function linearMcpAuthEvent(input: LinearMcpAuthEventInput): Omit<DomainEvent, 'sequence'> {
   return {
     type: input.type,
     timestamp: input.timestamp ?? new Date().toISOString(),
@@ -258,7 +258,7 @@ export function linearMcpAuthEvent(input: LinearMcpAuthEventInput): Omit<DomainE
   } as Omit<DomainEvent, 'sequence'>;
 }
 
-export async function appendLinearMcpAuthEvent(input: LinearMcpAuthEventInput): Promise<number> {
+async function appendLinearMcpAuthEvent(input: LinearMcpAuthEventInput): Promise<number> {
   const store = await initEventStore();
   return store.appendAsync(linearMcpAuthEvent(input));
 }
@@ -270,7 +270,7 @@ export function appendLinearMcpAuthHealthyEvent(
   return appendLinearMcpAuthEvent({ type: 'linear_mcp_auth.healthy', payload, timestamp });
 }
 
-export function appendLinearMcpAuthNotifiedEvent(
+function appendLinearMcpAuthNotifiedEvent(
   payload: NotifiedPayload,
   timestamp?: string,
 ): Promise<number> {

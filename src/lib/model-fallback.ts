@@ -360,7 +360,7 @@ function getBestAnthropicAtTier(
  * @param userTier       User's subscription tier (for OAuth users)
  * @returns              Best available model (possibly downgraded)
  */
-export function applyTierAwareFallbackSync(
+function applyTierAwareFallbackSync(
   modelId: ModelId,
   enabledProviders: Set<ModelProvider>,
   userTier?: SubscriptionPlan

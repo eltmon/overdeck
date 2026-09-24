@@ -11,9 +11,7 @@ import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  selectYieldVictim,
   resumeYieldedAgents,
-  type YieldCandidate,
 } from '../preemption.js';
 
 const mocks = vi.hoisted(() => ({
@@ -79,20 +77,6 @@ vi.mock('../concurrency.js', () => ({
   countRunningAgents: mocks.countRunningAgents,
 }));
 
-function candidate(overrides: Partial<YieldCandidate> = {}): YieldCandidate {
-  return {
-    id: 'agent-pan-1000',
-    issueId: 'PAN-1000',
-    idle: true,
-    attached: false,
-    paused: false,
-    reviewBlocked: false,
-    lastActivityMs: 1_000_000,
-    lastYieldResumeMs: null,
-    ...overrides,
-  };
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.stopAgent.mockReturnValue(Effect.void);
@@ -108,43 +92,6 @@ beforeEach(() => {
   });
 });
 
-describe('selectYieldVictim (pure predicate + ordering)', () => {
-  const NOW = 10_000_000;
-
-  it('returns null when there are no candidates', () => {
-    expect(selectYieldVictim([], NOW, 600)).toBeNull();
-  });
-
-  it('excludes non-idle, attached, and operator-paused agents', () => {
-    const nonIdle = candidate({ id: 'a', idle: false });
-    const attached = candidate({ id: 'b', attached: true });
-    const paused = candidate({ id: 'c', paused: true });
-    expect(selectYieldVictim([nonIdle, attached, paused], NOW, 600)).toBeNull();
-  });
-
-  it('excludes agents inside the re-yield cooldown', () => {
-    // resumed 100s ago, cooldown 600s ⇒ still cooling down
-    const cooling = candidate({ id: 'cool', lastYieldResumeMs: NOW - 100_000 });
-    expect(selectYieldVictim([cooling], NOW, 600)).toBeNull();
-
-    // resumed 700s ago ⇒ out of cooldown, now eligible
-    const cooled = candidate({ id: 'cooled', lastYieldResumeMs: NOW - 700_000 });
-    expect(selectYieldVictim([cooled], NOW, 600)?.id).toBe('cooled');
-  });
-
-  it('prefers a pipeline-blocked agent over a non-blocked one', () => {
-    const notBlocked = candidate({ id: 'plain', reviewBlocked: false, lastActivityMs: 0 });
-    const blocked = candidate({ id: 'blocked', reviewBlocked: true, lastActivityMs: 9_999_999 });
-    // Even though `blocked` is more recently active, review-blocked wins.
-    expect(selectYieldVictim([notBlocked, blocked], NOW, 600)?.id).toBe('blocked');
-  });
-
-  it('breaks ties by longest-idle (oldest lastActivity first)', () => {
-    const recent = candidate({ id: 'recent', lastActivityMs: 5_000_000 });
-    const old = candidate({ id: 'old', lastActivityMs: 1_000_000 });
-    expect(selectYieldVictim([recent, old], NOW, 600)?.id).toBe('old');
-  });
-});
 
 
 

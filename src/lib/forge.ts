@@ -14,7 +14,7 @@ import {
 } from './github-app.js';
 
 /** A forge (GitHub or GitLab) review-artifact operation failed. */
-export class ForgeError extends Data.TaggedError('ForgeError')<{
+class ForgeError extends Data.TaggedError('ForgeError')<{
   readonly forge: 'github' | 'gitlab';
   readonly operation: string;
   readonly message: string;
@@ -540,7 +540,7 @@ export function getForgeAdapter(forge: ForgeType): ForgeAdapter {
   return forge === 'gitlab' ? gitlabForgeAdapter : githubForgeAdapter;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 
 const wrapForgeOp = <T>(
   forge: ForgeType,

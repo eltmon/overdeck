@@ -7,7 +7,6 @@ import { loadConfigSync } from '../config-yaml/load.js';
 import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
 import { listRunningAgents } from '../agents/queries.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
 import { setAgentPaused, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
@@ -124,7 +123,7 @@ export function readGovernorWatchReserveBytes(): number {
   return loadConfigSync().config.resources.governorWatchReserveGb * GIB;
 }
 
-export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
+function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
   const resources = loadConfigSync().config.resources;
   return {
     swapSoftFreePercent: resources.governorSwapSoftFreePercent,
@@ -163,7 +162,7 @@ export function nextGovernorMode(
   return 'holding';
 }
 
-export function nextGovernorModeWithRunway(
+function nextGovernorModeWithRunway(
   availableBytes: number,
   reserves: GovernorReserves,
   runway: GovernorRunway,
@@ -307,45 +306,6 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
 // live stack exists yet for the project.
 
 export type FootprintRole = 'work' | 'review' | 'test';
-
-function coldStartFootprintBytes(role: FootprintRole): number {
-  const resources = loadConfigSync().config.resources;
-  const gb =
-    role === 'work' ? resources.governorFootprintDefaultWorkGb
-    : role === 'review' ? resources.governorFootprintDefaultReviewGb
-    : resources.governorFootprintDefaultTestGb;
-  return gb * GIB;
-}
-
-/**
- * Pure core of estimateFootprint — takes already-fetched stacks so it's
- * testable with a stubbed docker-stats map (no live collector needed).
- * Returns the average live memoryBytes across the project's current stacks,
- * or null when no stack exists yet for that project (cold start).
- */
-export function computeLearnedFootprintBytes(stacks: readonly ResourceStack[], projectKey: string): number | null {
-  const projectStacks = stacks.filter((stack) => {
-    if (!stack.issueId) return false;
-    return resolveProjectFromIssueSync(stack.issueId)?.projectKey === projectKey;
-  });
-  if (projectStacks.length === 0) return null;
-  const total = projectStacks.reduce((sum, stack) => sum + stack.aggregates.memoryBytes, 0);
-  const average = total / projectStacks.length;
-  return average > 0 ? average : null;
-}
-
-/**
- * Estimate the footprint (bytes) of an agent about to be admitted for `role`
- * in `projectKey`: the learned average live stack RSS for that project when
- * any of its stacks are currently running, else the configured per-role
- * cold-start default.
- */
-export async function estimateFootprint(role: FootprintRole, projectKey: string): Promise<number> {
-  const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
-  const stacks = await getResourceStacks(containers);
-  const learned = computeLearnedFootprintBytes(stacks, projectKey);
-  return learned ?? coldStartFootprintBytes(role);
-}
 
 // --- PAN-2500 tiered-eviction ------------------------------------------------
 //

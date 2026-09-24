@@ -42,7 +42,7 @@ let db: SqliteDatabase | null = null;
  * Creates the database file and schema if they don't exist.
  * Safe to call multiple times - idempotent.
  */
-export function initHealthDatabase(): SqliteDatabase {
+function initHealthDatabase(): SqliteDatabase {
   // Ensure overdeck home exists
   if (!existsSync(OVERDECK_HOME)) {
     mkdirSync(OVERDECK_HOME, { recursive: true });
@@ -82,7 +82,7 @@ export function initHealthDatabase(): SqliteDatabase {
 /**
  * Get the database instance, initializing if necessary
  */
-export function getHealthDatabase(): SqliteDatabase {
+function getHealthDatabase(): SqliteDatabase {
   if (!db) {
     return initHealthDatabase();
   }
@@ -96,7 +96,7 @@ export function getHealthDatabase(): SqliteDatabase {
  * @param retentionDays - Number of days to retain (default: 7)
  * @returns Number of events deleted
  */
-export function cleanupOldEventsSync(
+function cleanupOldEventsSync(
   database: SqliteDatabase = getHealthDatabase(),
   retentionDays: number = RETENTION_DAYS
 ): number {

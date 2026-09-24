@@ -462,15 +462,11 @@ function parseNumstatWithStatus(numstat: string, nameStatus: string): TurnDiffFi
   return files.sort((a, b) => a.path.localeCompare(b.path))
 }
 
-// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
+// ─── Effect API ──────────────────────────────────────────────────────────────
 //
-// These wrap the existing Promise-based functions so Effect-native callers can
-// use checkpoint operations with typed error channels. The underlying impl is
-// unchanged — failures are mapped to CheckpointError / InvalidAgentIdError /
-// VcsError / GitError so callers can narrow via Effect.catchTag.
-//
-// The existing Promise functions remain canonical; these are an additive
-// surface for the perf-driver migration (PAN-1249).
+// The exported checkpoint operations: Effect programs over the private Promise
+// implementations above, with failures mapped to CheckpointError /
+// InvalidAgentIdError / VcsError so callers can narrow via Effect.catchTag.
 
 function assertSafeAgentIdProgram(agentId: string): Effect.Effect<void, InvalidAgentIdError> {
   return SAFE_AGENT_ID_RE.test(agentId)
@@ -499,7 +495,7 @@ export function captureCheckpoint(
 }
 
 /** Delete a checkpoint ref. No-op if it doesn't exist. */
-export function deleteCheckpoint(
+function deleteCheckpoint(
   cwd: string,
   agentId: string,
   turnId: string,

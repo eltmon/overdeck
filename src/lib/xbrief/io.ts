@@ -20,10 +20,10 @@
  * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
  * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
  * as sync) and cannot await:
- * - `findPlanSync` (async: `findPlan`): 8 sites in cli/commands/plan-finalize.ts, cli/commands/scope.ts,
+ * - `findPlanSync` (async: `findPlan`): 7 sites in cli/commands/plan-finalize.ts, cli/commands/scope.ts,
  *   cli/commands/start-status.ts, cli/commands/start.ts, lib/xbrief/io.ts.
  * - `findWorkspaceDraftPlanSync` (async: `findWorkspaceDraftPlan`): src/lib/xbrief/io.ts:229.
- * - `readPlanSync` (async: `readPlan`): 10 sites in cli/commands/plan-finalize.ts, cli/commands/scope.ts,
+ * - `readPlanSync` (async: `readPlan`): 8 sites in cli/commands/plan-finalize.ts, cli/commands/scope.ts,
  *   lib/xbrief/io.ts, lib/xbrief/lifecycle-io.ts.
  * - `readWorkspacePlanSync` (async: `readWorkspacePlan`): 9 sites in cli/commands/task.ts,
  *   lib/agents/registered-slot-spawn.ts, lib/agents/spawn-prep.ts, lib/cloister/handoff-context.ts,
@@ -423,12 +423,10 @@ export function updateSubItemStatus(
   setItemStatus(planHomeForWorkspace(workspacePath), issueId, fullSubId, status);
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 //
-// These wrap the existing async APIs in Effect with typed error channels so
-// callers can compose xBRIEF reads with other Effect-native code. They do NOT
-// replace the sync/Promise variants — CLI and legacy callers continue to use
-// those. Migrate callers individually as they move into Effect.
+// xBRIEF reads as Effect programs with typed error channels. The sync twins stay
+// for the callers this module's header names.
 
 /**
  * Effect variant of readPlanAsync — failures surface as typed errors in the

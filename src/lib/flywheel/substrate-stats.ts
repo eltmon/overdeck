@@ -27,8 +27,8 @@ import type {
 
 const execFileAsync = promisify(execFile);
 
-export const SUBSTRATE_LABEL = 'substrate-improvement';
-export const DEFAULT_STATS_WINDOW_DAYS = 30;
+const SUBSTRATE_LABEL = 'substrate-improvement';
+const DEFAULT_STATS_WINDOW_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ISSUE_CACHE_TTL_MS = 60_000;
 /** Below this many merged PRs the rate is noise. */
@@ -102,7 +102,7 @@ interface GhIssueRow {
   labels?: Array<{ name?: string }>;
 }
 
-export async function listSubstrateIssuesWithGh(projectPath: string, since: Date): Promise<readonly SubstrateIssue[]> {
+async function listSubstrateIssuesWithGh(projectPath: string, since: Date): Promise<readonly SubstrateIssue[]> {
   const cached = issueCache.get(projectPath);
   if (cached && Date.now() - cached.at < ISSUE_CACHE_TTL_MS && cached.since <= since.getTime()) return cached.rows;
   const { stdout } = await execFileAsync('gh', [
@@ -128,7 +128,7 @@ export async function listSubstrateIssuesWithGh(projectPath: string, since: Date
   return rows;
 }
 
-export async function listMergedPrsFromForge(projectPath: string, since: Date): Promise<readonly MergedPr[]> {
+async function listMergedPrsFromForge(projectPath: string, since: Date): Promise<readonly MergedPr[]> {
   const { listRepoPullRequests } = await import('../overdeck/derived-issue-state.js');
   const rows = await listRepoPullRequests(projectPath);
   return rows.flatMap((row): MergedPr[] => (

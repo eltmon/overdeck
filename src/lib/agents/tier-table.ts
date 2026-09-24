@@ -124,7 +124,7 @@ export const DEFAULT_TIERED_EXECUTION_CONFIG: ValidatedTieredExecutionConfig = {
   difficultyToTier: {},
 };
 
-export const TIERED_EXECUTION_ISSUE_OVERRIDES = ['on', 'off'] as const;
+const TIERED_EXECUTION_ISSUE_OVERRIDES = ['on', 'off'] as const;
 export type TieredExecutionIssueOverride = typeof TIERED_EXECUTION_ISSUE_OVERRIDES[number];
 
 export function resolveTieredExecutionBlock(

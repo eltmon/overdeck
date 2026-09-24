@@ -141,7 +141,7 @@ export async function reconcileSlotState(
   return result;
 }
 
-export async function listSlotBranches(issueId: string, workspace: string): Promise<ReconciledSlotBranch[]> {
+async function listSlotBranches(issueId: string, workspace: string): Promise<ReconciledSlotBranch[]> {
   const issueLower = issueId.toLowerCase();
   const pattern = `feature/${issueLower}-slot-*`;
   const [allBranches, mergedBranches] = await Promise.all([

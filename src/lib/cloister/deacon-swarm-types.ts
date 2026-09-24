@@ -15,8 +15,6 @@ import type {
   writeSwarmCompletionObservation,
   writeSwarmForemanTakeover,
 } from './deacon-swarm-record.js';
-import type { ensureSwarmForeman } from './swarm-foreman.js';
-import type { SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
 
 export interface ArchivedBlockedSlot {
   archivedBranch: string;
@@ -96,11 +94,6 @@ export interface CoordinateSwarmSlotsDeps {
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
   listReleasedSlotIndexes?: (issueId: string, workspacePath: string) => number[];
   recordForemanTakeover?: typeof writeSwarmForemanTakeover;
-  ensureSwarmForeman?: typeof ensureSwarmForeman;
-  workResumeSlotsAvailable?: SwarmForemanLivenessDeps['workResumeSlotsAvailable'];
-  writeSwarmHold?: SwarmForemanLivenessDeps['writeSwarmHold'];
-  emitActivityEntry?: SwarmForemanLivenessDeps['emitActivityEntry'];
-  sendStallEvent?: (agentId: string, message: string) => Promise<unknown>;
   resolveAutomaticSwarmPolicy?: typeof resolveAutomaticSwarmPolicy;
   getReleasedSlotBranch?: (issueId: string, workspacePath: string, slotIndex: number) => string | undefined;
   clearReleasedSlot?: (workspacePath: string, issueId: string, slotIndex: number) => Promise<void>;

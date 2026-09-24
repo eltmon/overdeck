@@ -25,14 +25,14 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 /** The exact lines Overdeck wrote. Anything else is someone else's rule. */
-export const LEGACY_PAN_IGNORE_PATTERNS: readonly string[] = ['.pan/', '.pan'];
+const LEGACY_PAN_IGNORE_PATTERNS: readonly string[] = ['.pan/', '.pan'];
 
 /**
  * Paths checked against the ignore rules: one per `.pan/` subtree the pipeline
  * commits into. They need not exist — `check-ignore` is pattern matching — and
  * a nested `.pan/.gitignore` still applies to them.
  */
-export const PAN_IGNORE_PROBES: readonly string[] = [
+const PAN_IGNORE_PROBES: readonly string[] = [
   'drafts',
   'specs',
   'continues',

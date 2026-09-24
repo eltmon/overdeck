@@ -22,7 +22,7 @@ export interface AgentWarmHitFraction {
   warmHitFraction: number;
 }
 
-export function tierMetricsDir(overdeckHome = getOverdeckHome()): string {
+function tierMetricsDir(overdeckHome = getOverdeckHome()): string {
   return join(overdeckHome, 'tier-metrics');
 }
 

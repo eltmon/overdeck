@@ -202,7 +202,7 @@ export function toBackendEvents(kind: string, data: Record<string, unknown>): Ba
 }
 
 /** A routing probe must never hold up a delivery: give up and let tmux answer. */
-export const HERDR_PROBE_TIMEOUT_MS = 2_000;
+const HERDR_PROBE_TIMEOUT_MS = 2_000;
 
 /**
  * The pane stamped with this Overdeck agent id, or null when the session holds

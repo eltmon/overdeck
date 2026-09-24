@@ -205,7 +205,7 @@ export async function getPiCodexAuthStatus(opts?: { refreshIfExpired?: boolean }
  * token, Pi's OAuth module is unavailable, or the refresh was rejected (the
  * refresh token itself is dead → a full re-login is required).
  */
-export async function refreshPiCodexAuth(): Promise<PiCodexCredential | null> {
+async function refreshPiCodexAuth(): Promise<PiCodexCredential | null> {
   const cred = readPiCodexCredential();
   if (!cred?.refresh) return null;
   const mod = await loadPiCodexOAuth();

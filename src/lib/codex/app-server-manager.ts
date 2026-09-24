@@ -67,7 +67,7 @@ const ORPHAN_TERM_GRACE_MS = 5_000;
 const ORPHAN_POLL_MS = 100;
 
 /** `app.pid` beside the socket: the pid of the app-server serving it. */
-export function nativePidPath(socketPath: string): string {
+function nativePidPath(socketPath: string): string {
   return join(dirname(socketPath), 'app.pid');
 }
 

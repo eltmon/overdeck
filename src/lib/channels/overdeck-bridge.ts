@@ -349,7 +349,7 @@ export async function pushPermissionDecisionNotification(
   return { ok: true, status: 200, body: 'ok' };
 }
 
-export async function forwardPermissionRequestToDashboard(
+async function forwardPermissionRequestToDashboard(
   agentId: string,
   request: ChannelPermissionRequest,
 ): Promise<void> {

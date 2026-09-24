@@ -227,8 +227,8 @@ export interface SlotTierSpawnParams {
 /**
  * Tiered-execution model resolution for a registered slot spawn (PAN-1791,
  * fixing PAN-1196's "difficulty captured and ignored"). When tiered execution
- * is enabled for the plan, resolve the slot item's tier through
- * assignDispatchTier and return its (model, harness) as spawn params so the
+ * is enabled for the plan, resolve the slot item's tier through the
+ * resolution chain and return its (model, harness) as spawn params so the
  * dispatched bead runs on the tier its difficulty selected.
  *
  * Returns {} — leaving the existing model resolution untouched — when:
@@ -357,7 +357,7 @@ function effectiveItemDifficulty(
  * resolvable difficulty sort below every ranked item. Recorded tier
  * promotions (PAN-3858) raise an item's effective difficulty before ranking.
  */
-export function selectStaffingItem(
+function selectStaffingItem(
   doc: XBriefDocument,
   tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
   tierOverrides?: TierOverridesMap,

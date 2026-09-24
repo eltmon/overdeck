@@ -220,20 +220,10 @@ async function resolveObservationFromHit(
   return observations.find((observation) => observation.id === hit.source) ?? null;
 }
 
-/**
- * Issue-shaped facade over `getMemoryStatusForWorkspace`, retained as the
- * pre-PAN-3286 public entry point (the CLI now resolves a workspace first).
- */
-export async function getMemoryStatus(projectId: string, issueId: string): Promise<MemoryStatus | undefined> {
-  const workspaceId = getWorkspaceForIssue(issueId)?.id;
-  if (!workspaceId) return undefined;
-  return getMemoryStatusForWorkspace(projectId, workspaceId);
-}
-
 export interface MemoryWorkspaceTargetInput {
   /**
    * `--project`, used only by the issue-positional arm so its memory-root
-   * resolution stays byte-identical to `getMemoryStatus` (PAN-3286 FR-5).
+   * resolution stays byte-identical to the issue-keyed memory root (PAN-3286 FR-5).
    */
   projectId?: string;
   issueId?: string;
@@ -312,7 +302,7 @@ export interface MemoryTimelineOptions {
 
 /** Default day window and row cap for `pan memory timeline` (PAN-3286 FR-8). */
 export const MEMORY_TIMELINE_DEFAULT_DAYS = 7;
-export const MEMORY_TIMELINE_DEFAULT_LIMIT = 50;
+const MEMORY_TIMELINE_DEFAULT_LIMIT = 50;
 
 /**
  * Chronological observations for a resolved workspace, oldest-first

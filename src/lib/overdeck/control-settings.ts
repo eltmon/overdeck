@@ -9,21 +9,21 @@ import { getProjectSync, loadProjectsConfigSync } from '../projects.js';
 
 // ── Schema entities ──────────────────────────────────────────────────────────
 
-export const FlywheelConfig = Schema.Struct({
+const FlywheelConfig = Schema.Struct({
   autoPickupBacklog: Schema.Boolean,      // flywheel.auto_pickup_backlog (app_settings)
   requireUatBeforeMerge: Schema.Boolean,  // flywheel.require_uat_before_merge — default TRUE
   mergeTrainEnabled: Schema.Boolean,      // merge_train.enabled (with fallback to flywheel.merge_train_enabled)
 });
 export type FlywheelConfig = typeof FlywheelConfig.Type;
 
-export const FlywheelConfigPatch = Schema.Struct({
+const FlywheelConfigPatch = Schema.Struct({
   autoPickupBacklog: Schema.optional(Schema.Boolean),
   requireUatBeforeMerge: Schema.optional(Schema.Boolean),
   mergeTrainEnabled: Schema.optional(Schema.Boolean),
 });
 export type FlywheelConfigPatch = typeof FlywheelConfigPatch.Type;
 
-export const FlywheelRuntime = Schema.Struct({
+const FlywheelRuntime = Schema.Struct({
   activeRunId: Schema.NullOr(Schema.String),  // flywheel.active_run_id (app_settings)
   paused: Schema.Boolean,                      // flywheel.globally_paused
 });
@@ -117,17 +117,17 @@ function overdeckDb() {
   return getOverdeckDatabaseSync();
 }
 
-export const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
-export const CLOISTER_SPAWNS_PAUSED_KEY = 'cloister.spawns_paused';
-export const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
-export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
-export const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
+const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
+const CLOISTER_SPAWNS_PAUSED_KEY = 'cloister.spawns_paused';
+const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
+const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
+const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
 export const FLYWHEEL_MERGE_TRAIN_ENABLED_KEY = 'flywheel.merge_train_enabled';
-export const MERGE_TRAIN_ENABLED_KEY = 'merge_train.enabled';
+const MERGE_TRAIN_ENABLED_KEY = 'merge_train.enabled';
 export const DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY = 'dashboard.last_clean_shutdown_at';
-export const BOOT_RECONCILIATION_DECISION_KEY = 'boot_reconciliation.decision';
-export const BOOT_RECONCILIATION_PER_AGENT_KEY = 'boot_reconciliation.per_agent';
-export const BOOT_RECONCILIATION_DECIDED_AT_KEY = 'boot_reconciliation.decided_at';
+const BOOT_RECONCILIATION_DECISION_KEY = 'boot_reconciliation.decision';
+const BOOT_RECONCILIATION_PER_AGENT_KEY = 'boot_reconciliation.per_agent';
+const BOOT_RECONCILIATION_DECIDED_AT_KEY = 'boot_reconciliation.decided_at';
 export const BOOT_RECONCILIATION_BOOT_ID_KEY = 'boot_reconciliation.boot_id';
 export const BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY = 'boot_reconciliation.boot_started_at';
 export const BOOT_RECONCILIATION_GRACE_DEADLINE_KEY = 'boot_reconciliation.grace_deadline';

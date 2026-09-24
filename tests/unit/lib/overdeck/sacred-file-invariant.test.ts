@@ -10,12 +10,11 @@
  * path). The runtime property (source JSONL unchanged after compaction) is
  * covered by services/__tests__/conversation-compaction.test.ts.
  *
- * Memory side: verified at runtime — MemoryFilesLive.appendObservation must
+ * Memory side: verified at runtime — writeObservation (src/lib/memory/observations.ts) must
  * be idempotent: repeating the same observation ID does not add a second
  * entry to the JSONL file.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Effect } from 'effect';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -55,29 +54,28 @@ describe('sacred-file invariant — memory observations (FR-6 runtime)', () => {
     await rm(testHome, { recursive: true, force: true });
   });
 
-  it('appendObservation is idempotent — second write with same ID does not add a duplicate entry', async () => {
-    const { MemoryFilesLive } = await import('../../../../src/lib/overdeck/memory.js');
-    const { MemoryFiles } = await import('../../../../src/lib/overdeck/infra.js');
+  it('writeObservation is idempotent — second write with same ID does not add a duplicate entry', async () => {
+    // The live observation writer (the MemoryFilesLive layer this used to drive had no production
+    // caller and was deleted in PAN-3958 CH-8).
+    const { writeObservation } = await import('../../../../src/lib/memory/observations.js');
 
-    // Minimal shape: appendObservation only accesses id, projectId, workspaceId, timestamp
-    // (PAN-1990: memory storage is keyed by workspaceId, not issueId).
+    // PAN-1990: memory storage is keyed by workspaceId, not issueId.
     const obs = {
       id: 'g4-test-obs',
       projectId: 'proj1',
       workspaceId: 'workspace-pan-9999',
       issueId: 'PAN-9999',
       timestamp: new Date().toISOString(),
-    };
+      summary: 'sacred-file invariant fixture',
+      files: [],
+      tags: [],
+    } as never;
+    const options = { indexObservation: async () => undefined, updateHealth: async () => undefined } as never;
 
-    const runAppend = (o: typeof obs) =>
-      MemoryFiles.use((f) => f.appendObservation(o)).pipe(
-        Effect.provide(MemoryFilesLive),
-      );
-
-    const { jsonlPath } = await Effect.runPromise(runAppend(obs));
+    const { jsonlPath } = await writeObservation(obs, options);
 
     // Second write with same ID — must be a no-op (idempotent)
-    await Effect.runPromise(runAppend(obs));
+    await writeObservation(obs, options);
 
     const content = await readFile(jsonlPath, 'utf-8');
     const lines = content.split('\n').filter(Boolean);

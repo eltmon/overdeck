@@ -197,7 +197,7 @@ function captureTasks(context: HandoffContext, workspace: string): void {
  * @param context - Handoff context
  * @returns Markdown representation
  */
-export function serializeHandoffContext(context: HandoffContext): string {
+function serializeHandoffContext(context: HandoffContext): string {
   const lines: string[] = [];
 
   lines.push('# Handoff Context');

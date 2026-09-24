@@ -1,9 +1,9 @@
 /**
- * PAN-4012 review: `querySession` (async) classifies a failed `has-session`
- * from a promisified `execFile` error, which carries the exit code as a numeric
- * `code` and no `status`. These tests build the errors the way Node does —
- * real child processes that exit 1 with tmux's stderr — instead of mocking
- * `querySession`.
+ * PAN-4012 review: `sessionQueryFailure` classifies a failed `has-session` from
+ * either error shape: `execFileSync`'s `status`, or a promisified `execFile`
+ * error, which carries the exit code as a numeric `code` and no `status`. These
+ * tests build the errors the way Node does — real child processes that exit 1
+ * with tmux's stderr — instead of mocking them.
  */
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';

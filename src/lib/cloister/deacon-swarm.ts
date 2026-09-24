@@ -4,7 +4,6 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join, resolve } from 'path';
 import { getAgentRuntimeSnapshot } from '../agent-runtime.js';
-import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
 import { verifyAndMergeSlot } from '../agents/slot-merge.js';
 import {
@@ -72,8 +71,6 @@ import { updateSwarmSlotState } from './swarm-slot-store.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 import { archiveBlockedSwarmSlot, defaultIsSlotBranchPushed, prepareReleasedSwarmSlot, releaseBlockedSlots } from './swarm-blocked-slot.js';
-import { ensureSwarmForeman } from './swarm-foreman.js';
-import { maintainSwarmForeman, resetForemanRespawnFailuresForTests, type SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -167,8 +164,6 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   readSlotCompletion: defaultReadSlotCompletion,
   clearSlotCompletion: clearSwarmSlotCompletion,
   recordForemanTakeover: writeSwarmForemanTakeover,
-  ensureSwarmForeman,
-  sendStallEvent: (agentId, message) => messageAgent(agentId, message, 'deacon:swarm-stall'),
   resolveAutomaticSwarmPolicy,
 };
 
@@ -350,28 +345,6 @@ export async function coordinateSwarmSlots(
   return actions;
 }
 
-export async function swarmJanitorPass(deps: CoordinateSwarmSlotsDeps = defaultDeps): Promise<string[]> {
-  const actions: string[] = [];
-  const sessions = await deps.listSessionNames();
-  for (const workspace of deps.listFeatureWorkspaces()) {
-    const issueId = workspace.issueId.toUpperCase();
-    const spec = await Effect.runPromise((deps.findSpecByIssue ?? findSpecByIssue)(workspace.projectPath, issueId));
-    if (!spec) continue;
-    const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, spec.document);
-    actions.push(`[swarm-janitor] enumerated ${issueId}`);
-    actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
-    actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
-    const automatic = (deps.resolveAutomaticSwarmPolicy ?? resolveAutomaticSwarmPolicy)(issueId, analyzeSwarmReadiness(spec.document).swarmEligible);
-    actions.push(...await maintainSwarmForeman(issueId, workspace.workspacePath, reconciled, sessions, deps, automatic.policy.mode !== 'off', automatic.spawnForeman));
-    const classified = await classifyInFlightSlots(reconciled.inFlight, { ...deps, listSessionNames: async () => sessions }, { issueId, workspacePath: workspace.workspacePath });
-    for (const slot of classified.filter(candidate => candidate.signal === 'stall-event')) {
-      await deps.sendStallEvent?.(`agent-${issueId.toLowerCase()}`, `[swarm-event] slot ${slot.slotIndex} stalled (no progress ${Math.floor((slot.stalledForMs ?? 0) / 60_000)}m)`);
-      actions.push(`[swarm-janitor] notified ${issueId} foreman that slot ${slot.slotIndex} stalled`);
-    }
-  }
-  return actions;
-}
-export { resetForemanRespawnFailuresForTests };
 export async function classifyInFlightSlots(
   slots: ReconciledSlotItem[],
   deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus'>
@@ -623,7 +596,7 @@ export function recordSwarmAdvanceFailure(issueId: string, now = Date.now()): vo
   });
 }
 
-export function recordSwarmAdvanceSuccess(issueId: string): void {
+function recordSwarmAdvanceSuccess(issueId: string): void {
   issueAdvanceFailures.delete(issueId.toUpperCase());
 }
 

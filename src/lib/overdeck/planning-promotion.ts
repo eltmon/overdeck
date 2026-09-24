@@ -38,7 +38,7 @@ function getIssueDataService() {
   return getSharedIssueService();
 }
 
-export async function removePendingPromotionMarker(
+async function removePendingPromotionMarker(
   workspacePath: string,
   log: (message: string) => void = console.log,
 ): Promise<boolean> {
@@ -278,7 +278,7 @@ export async function commitCompletePlanningWorkspaceGit(
  * workspace's own `.pan/`, so the tree handed to auto-start would otherwise be
  * dirty and the start-agent guard would refuse to spawn.
  */
-export async function commitWorkspacePlanArtifacts(gitRoot: string, issueId: string): Promise<void> {
+async function commitWorkspacePlanArtifacts(gitRoot: string, issueId: string): Promise<void> {
   if (!existsSync(join(gitRoot, '.git'))) return;
   const outcome = await commitPlanArtifacts({
     cwd: gitRoot,

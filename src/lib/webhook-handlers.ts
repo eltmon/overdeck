@@ -127,7 +127,7 @@ export function isTrackedRepositorySync(fullName: string | undefined): boolean {
 }
 
 /** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
-export const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
+const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
 
 /** Handle a `check_suite` GitHub webhook payload. */
 export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {

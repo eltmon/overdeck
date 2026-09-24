@@ -8,7 +8,7 @@
  * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
  * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
  * as sync) and cannot await:
- * - `loadCloisterConfigSync` (async: `loadCloisterConfig`): 12 sites in dashboard/server/routes/cloister.ts,
+ * - `loadCloisterConfigSync` (async: `loadCloisterConfig`): 11 sites in dashboard/server/routes/cloister.ts,
  *   lib/cloister/concurrency.ts, lib/cloister/config.ts, lib/cloister/cost-monitor.ts,
  *   lib/cloister/deacon-swarm-completion.ts, lib/cloister/patrol-budget.ts, lib/cloister/service.ts,
  *   lib/cloister/triggers.ts.
@@ -349,8 +349,8 @@ export interface DeployConfig {
 }
 
 /**
- * PAN-3850 (W39, FR-26): per-patrol firing budgets. Each patrol registered
- * through `runBudgetedPatrol` may take at most `default` actions per UTC day
+ * PAN-3850 (W39, FR-26): per-patrol firing budgets. Each budgeted patrol
+ * may take at most `default` actions per UTC day
  * (per-patrol `overrides` win); exceeding the budget suspends the patrol
  * until the next UTC day and emits a needs-you. `exempt` patrols (the alarms:
  * Appendix C #3, #64, #70, #71, #77) tally but never suspend.
@@ -673,12 +673,10 @@ export function getHealthThresholdsMs(): {
   };
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 //
-// Additive Effect-channel variants of the config helpers above. The sync
-// variants are preserved so existing callers (CLI scripts, top-level module
-// initialization) do not have to migrate; new Effect-based callers can compose
-// these directly without `Effect.runSync` round-tripping.
+// Effect twins of the config helpers above; the sync twins stay for the callers
+// this module's header names.
 
 /** Effect variant of `loadCloisterConfig`. Falls back to defaults on read/parse failures. */
 export const loadCloisterConfig = (): Effect.Effect<CloisterConfig, FsError | ConfigError> =>

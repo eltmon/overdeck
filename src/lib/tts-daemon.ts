@@ -11,11 +11,11 @@ const execFileAsync = promisify(execFile);
 
 export const QWEN_TTS_PID_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.pid');
 export const QWEN_TTS_STATE_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.json');
-export const QWEN_TTS_START_LOCK_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.start.lock');
-export const QWEN_TTS_MANUAL_STOP_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.manual-stop');
-export const QWEN_TTS_AUTH_TOKEN_PATH = join(OVERDECK_HOME, 'secrets', 'qwen-tts.token');
-export const QWEN_TTS_AUTH_HEADER = 'X-Overdeck-TTS-Token';
-export const QWEN_TTS_LOG_PATH = join(LOGS_DIR, 'qwen-tts.log');
+const QWEN_TTS_START_LOCK_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.start.lock');
+const QWEN_TTS_MANUAL_STOP_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.manual-stop');
+const QWEN_TTS_AUTH_TOKEN_PATH = join(OVERDECK_HOME, 'secrets', 'qwen-tts.token');
+const QWEN_TTS_AUTH_HEADER = 'X-Overdeck-TTS-Token';
+const QWEN_TTS_LOG_PATH = join(LOGS_DIR, 'qwen-tts.log');
 const GPU_MEMORY_CACHE_TTL_MS = 30_000;
 const DEFAULT_TTS_DAEMON_STARTUP_GRACE_MS = 30 * 60_000;
 let gpuMemoryCache: { pid: number; sampledAt: number; value: number | undefined } | null = null;
@@ -135,7 +135,7 @@ export async function resolveQwenTtsPackageDir(deps: QwenTtsPackageDirDeps = {})
 }
 
 /** Path to the daemon entry script inside the qwen-tts package. */
-export async function resolveTtsDaemonScript(): Promise<string> {
+async function resolveTtsDaemonScript(): Promise<string> {
   const script = join(SYNC_SOURCES.skills, 'pan-tts', 'scripts', 'tts_daemon.py');
   if (await pathExists(script)) return script;
   throw new Error(`Qwen TTS daemon script not found at ${script}`);
@@ -147,7 +147,7 @@ export async function getTtsDaemonVenvDir(): Promise<string> {
 }
 
 /** Resolved python interpreter inside the TTS daemon venv. */
-export async function getTtsDaemonPython(): Promise<string> {
+async function getTtsDaemonPython(): Promise<string> {
   const venvDir = await getTtsDaemonVenvDir();
   return join(venvDir, 'bin', 'python');
 }
@@ -211,7 +211,7 @@ async function clearTtsDaemonManualStopGate(): Promise<void> {
 }
 
 /** Lazily-materialised auth token shared with the daemon. */
-export async function getTtsDaemonAuthToken(): Promise<string> {
+async function getTtsDaemonAuthToken(): Promise<string> {
   if (process.env.QWEN_TTS_AUTH_TOKEN?.trim()) return process.env.QWEN_TTS_AUTH_TOKEN.trim();
 
   try {
@@ -528,7 +528,7 @@ export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Pro
 }
 
 /** Poll until the daemon reports a healthy phase or the timeout elapses. */
-export async function waitForTtsDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 120_000): Promise<TtsDaemonStatus> {
+async function waitForTtsDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 120_000): Promise<TtsDaemonStatus> {
   const deadline = Date.now() + timeoutMs;
   let latest = await getTtsDaemonStatus(config);
   while (!latest.ok && Date.now() < deadline) {

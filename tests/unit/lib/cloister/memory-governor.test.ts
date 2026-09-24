@@ -65,7 +65,7 @@ vi.mock('node:os', async (importOriginal) => ({
   loadavg: (...args: unknown[]) => osMocks.loadavg(...args),
 }));
 
-import { assessMemoryPressure, classifyMemoryPressure, nextGovernorMode, resetGovernorModeForTests, computeLearnedFootprintBytes, estimateFootprint, getCachedMemoryVerdict, selectStackShedCandidates, selectAgentToPause, shed, type GovernorReserves, readGovernorReserves } from '../../../../src/lib/cloister/memory-governor.js';
+import { assessMemoryPressure, classifyMemoryPressure, nextGovernorMode, resetGovernorModeForTests, getCachedMemoryVerdict, selectStackShedCandidates, selectAgentToPause, shed, type GovernorReserves, readGovernorReserves   } from '../../../../src/lib/cloister/memory-governor.js';
 import {
   type ResourceStack,
   type StackContainerResource,
@@ -534,48 +534,7 @@ function stack(issueId: string, memoryBytes: number): ResourceStack {
   };
 }
 
-describe('computeLearnedFootprintBytes (PAN-2500 footprint-budget)', () => {
-  it('returns null when no stack exists yet for the project (cold start)', () => {
-    resolveProjectFromIssueSyncMock.mockReturnValue(null);
-    expect(computeLearnedFootprintBytes([stack('PAN-1', 3 * GIB)], 'overdeck')).toBeNull();
-  });
 
-  it('averages live memoryBytes across the project\'s current stacks', () => {
-    resolveProjectFromIssueSyncMock.mockReturnValue({ projectKey: 'overdeck' });
-    const stacks = [stack('PAN-1', 2 * GIB), stack('PAN-2', 4 * GIB)];
-    expect(computeLearnedFootprintBytes(stacks, 'overdeck')).toBe(3 * GIB);
-  });
-});
-
-describe('estimateFootprint (PAN-2500 footprint-budget)', () => {
-  beforeEach(() => {
-    loadConfigSyncMock.mockReturnValue({
-      config: {
-        resources: {
-          ...GOVERNOR_RESOURCES,
-          governorFootprintDefaultWorkGb: 2,
-          governorFootprintDefaultReviewGb: 1,
-          governorFootprintDefaultTestGb: 1,
-        },
-      },
-    });
-  });
-
-  it('returns a learned per-stack value from a stubbed docker-stats map when available', async () => {
-    resolveProjectFromIssueSyncMock.mockReturnValue({ projectKey: 'overdeck' });
-    getStatsMock.mockReturnValue([{ id: 'c1', name: 'feature-pan-1-svc-1', memoryUsage: 5 * GIB }]);
-    const footprint = await estimateFootprint('work', 'overdeck');
-    expect(footprint).toBe(5 * GIB);
-  });
-
-  it('falls back to the configured cold-start default per role otherwise', async () => {
-    resolveProjectFromIssueSyncMock.mockReturnValue(null);
-    getStatsMock.mockReturnValue([]);
-    expect(await estimateFootprint('work', 'overdeck')).toBe(2 * GIB);
-    expect(await estimateFootprint('review', 'overdeck')).toBe(1 * GIB);
-    expect(await estimateFootprint('test', 'overdeck')).toBe(1 * GIB);
-  });
-});
 
 describe('canAdmit (PAN-2500 footprint-budget)', () => {
   beforeEach(() => {

@@ -30,9 +30,9 @@ import { resolveHarnessBinary } from '../../harness-binary.js';
 import { getOverdeckHome } from '../../paths.js';
 import type { CompanionOwner, CompanionTargetResolution, CompanionTerminalAdapter } from './lifecycle.js';
 
-export const CODEX_THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CODEX_THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Long enough for the host to strictly resume a saved thread it has not loaded yet. */
-export const CODEX_PREPARE_TERMINAL_TIMEOUT_MS = 25_000;
+const CODEX_PREPARE_TERMINAL_TIMEOUT_MS = 25_000;
 
 export const CODEX_RESTART_REQUIRED_MESSAGE =
   'This Codex conversation started before Overdeck exposed a native endpoint for it, so the native CLI cannot attach. ' +

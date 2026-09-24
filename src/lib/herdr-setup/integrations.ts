@@ -44,7 +44,7 @@ export const HERDR_INTEGRATION_BINARY: Record<HerdrIntegrationTarget, string> = 
  * killing it at the 10 s default could leave a half-written install.
  * Override with `OVERDECK_HERDR_INTEGRATION_TIMEOUT_MS`.
  */
-export const HERDR_INTEGRATION_INSTALL_TIMEOUT_MS = 120_000;
+const HERDR_INTEGRATION_INSTALL_TIMEOUT_MS = 120_000;
 
 function integrationInstallTimeoutMs(env: Readonly<Record<string, string | undefined>> = process.env): number {
   const raw = Number(env.OVERDECK_HERDR_INTEGRATION_TIMEOUT_MS);
@@ -52,7 +52,7 @@ function integrationInstallTimeoutMs(env: Readonly<Record<string, string | undef
 }
 
 /** The Kimi integration needs Kimi Code ≥ 0.14.0 (D11). */
-export const KIMI_INTEGRATION_MIN_VERSION = '0.14.0';
+const KIMI_INTEGRATION_MIN_VERSION = '0.14.0';
 
 export type IntegrationState = 'installed' | 'outdated' | 'needs-repair' | 'not-installed' | 'unknown';
 

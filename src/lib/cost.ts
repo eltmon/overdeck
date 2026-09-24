@@ -257,7 +257,7 @@ function getCurrentDateString(): string {
 /**
  * Read cost entries for a date range
  */
-export function readCostsSync(startDate: string, endDate: string): CostEntry[] {
+function readCostsSync(startDate: string, endDate: string): CostEntry[] {
   const entries: CostEntry[] = [];
 
   const start = new Date(startDate);
@@ -459,7 +459,7 @@ export function createBudgetSync(budget: Omit<CostBudget, 'id' | 'spent'>): Cost
 /**
  * Get a budget by ID
  */
-export function getBudgetSync(id: string): CostBudget | null {
+function getBudgetSync(id: string): CostBudget | null {
   const budgets = loadBudgets();
   return budgets.find(b => b.id === id) || null;
 }

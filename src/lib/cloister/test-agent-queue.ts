@@ -55,7 +55,7 @@ Boundaries:
 // ─── Effect variant (PAN-1249) ───────────────────────────────────────────────
 
 /** A test-role dispatch error — wraps spawnRun failures. */
-export class TestDispatchError extends Data.TaggedError('TestDispatchError')<{
+class TestDispatchError extends Data.TaggedError('TestDispatchError')<{
   readonly issueId: string;
   readonly message: string;
   readonly cause?: unknown;

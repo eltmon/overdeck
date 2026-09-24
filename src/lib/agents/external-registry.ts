@@ -38,7 +38,7 @@ import {
 } from '../session-history.js';
 
 export const EXTERNAL_AGENT_PREFIX = 'ext-';
-export const REGISTRATION_FILE = 'registration.json';
+const REGISTRATION_FILE = 'registration.json';
 /** Sources other tools may register under; `codex-plugin` is the adapter's own. */
 export const EXTERNAL_SOURCE_RE = /^[a-z0-9-]{1,32}$/;
 export const RESERVED_EXTERNAL_SOURCES: readonly string[] = ['codex-plugin'];
@@ -106,7 +106,7 @@ export function externalAgentId(source: string, externalId: string): string {
   return `${prefix}${slug ? `${slug}-` : ''}${hash}`;
 }
 
-export function externalAgentDir(id: string): string {
+function externalAgentDir(id: string): string {
   return join(agentsRoot(), id);
 }
 
@@ -225,7 +225,7 @@ function str(value: unknown): string | null {
 }
 
 /** Parse one registration.json; null for anything that is not a registration. */
-export function parseRegistration(raw: string): ExternalRegistration | null {
+function parseRegistration(raw: string): ExternalRegistration | null {
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return null; }
   if (!value || typeof value !== 'object') return null;
@@ -295,7 +295,7 @@ export interface ProcReader {
   signalZero: (pid: number) => boolean;
 }
 
-export const defaultProcReader: ProcReader = {
+const defaultProcReader: ProcReader = {
   readStat: (pid) => readFile(`/proc/${pid}/stat`, 'utf8').catch(() => null),
   hasProc: () => access('/proc/self/stat').then(() => true, () => false),
   signalZero: (pid) => {

@@ -6,7 +6,6 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
-import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { OVERDECK_HOME } from '../paths.js';
 import { loadCloisterConfigSync, type CostLimitsConfig } from './config.js';
@@ -374,16 +373,3 @@ export function resetCostTrackingSync(): void {
   };
   saveCostData(costData);
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect variants for cost-monitor I/O. The sync variants remain in
-// place because the module-level `costData` cache is populated synchronously at
-// import time; new callers (route handlers, services in the dashboard server)
-// can use these to avoid blocking the event loop on cost ledger writes.
-
-// Re-export FsError so callers don't need to import it from the shared module.
-export { FsError } from '../errors.js';
-// Silence "unused" warnings for the async fs imports we may use in future
-// extensions of this module.
-void readFile;

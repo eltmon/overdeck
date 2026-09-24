@@ -51,9 +51,9 @@ import {
 /** Max recommendations per park episode; beyond this the row is escalate-only. */
 export const SWEEP_MAX_RECOMMENDATIONS_PER_ROW = 8;
 /** Max recommendations per patrol scan — a full graveyard surfaces over cycles, never in one burst. */
-export const SWEEP_MAX_RECOMMENDATIONS_PER_SCAN = 4;
+const SWEEP_MAX_RECOMMENDATIONS_PER_SCAN = 4;
 /** Operator-gated / exhausted rows re-surface to the operator this often (and stay hands-off otherwise). */
-export const SWEEP_RESURFACE_TTL_MS = 24 * 60 * 60_000;
+const SWEEP_RESURFACE_TTL_MS = 24 * 60 * 60_000;
 
 const ORBIT_COOLDOWN_MS: Record<string, number> = {
   'zombie-session': 15 * 60_000,

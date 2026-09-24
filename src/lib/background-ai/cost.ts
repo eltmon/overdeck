@@ -19,8 +19,8 @@ import { appendCostEventSync, type CostEvent } from '../costs/events.js';
 import { calculateCostSync, getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
 import type { BackgroundAiFeature } from './features.js';
 
-export const BACKGROUND_COST_AGENT_ID = 'background';
-export const BACKGROUND_COST_ISSUE_ID = 'background';
+const BACKGROUND_COST_AGENT_ID = 'background';
+const BACKGROUND_COST_ISSUE_ID = 'background';
 
 export interface RecordBackgroundAiCostInput {
   /** Which background feature spent the tokens. */

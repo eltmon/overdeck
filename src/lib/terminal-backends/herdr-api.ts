@@ -34,14 +34,14 @@ import { Data } from 'effect';
 import { herdrSocketPath } from './select.js';
 
 /** Protocol generation and schema version this adapter was written against. */
-export const HERDR_FIXTURE_DIR = join(
+const HERDR_FIXTURE_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__',
   'herdr-v0.9.1',
 );
 
 /** Default cap on a single NDJSON response line (a session snapshot is the big one). */
-export const DEFAULT_MAX_FRAME_BYTES = 8 * 1024 * 1024;
+const DEFAULT_MAX_FRAME_BYTES = 8 * 1024 * 1024;
 
 /** Default per-request deadline. Long waits (`agent.wait`) pass their own. */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
