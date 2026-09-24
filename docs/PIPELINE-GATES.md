@@ -341,10 +341,33 @@ Auto-resume is intentionally suppressible:
   fields in `~/.overdeck/agents/<agent-id>/state.json` and stops the agent
   if it is running. `pan unpause <id>` clears the gate without spawning.
   `pan start <id>` refuses paused agents unless `--force` is passed.
-  Pausing an issue's work agent pauses the issue (PAN-3911): the pause also
-  stops the issue's live review and test agents, and `recoverStalledReviews`
-  re-dispatches no reviewer for it until it is unpaused. A scheduler yield
-  (`yieldedByScheduler`) is not an issue pause.
+  **Issue pause (PAN-3911).** An operator pause (`pan pause`, the dashboard
+  Pause button) stamps `pausedBy: 'operator'`. An operator pause of the
+  issue's work agent `agent-<issue>` pauses the issue. Pausing a swarm slot
+  pauses only that slot. Machine pauses do not count: the memory governor's
+  shed, post-merge close-out, escalations and the Fly migration all leave
+  `pausedBy` unset, and neither does a scheduler yield. An operator pause
+  also clears the yield flags, so the scheduler cannot resume the agent.
+  The issue pause:
+  - Stops the issue's running review convoy (lanes first, the synthesis
+    parent last) and its test agent. "Running" is `isAlive`'s answer. An
+    agent whose liveness is indeterminate is left alone and reported. On
+    Herdr, a second pass (`closeIssuePanes`) closes review/test panes that no
+    agent row lists. A close that fails is reported by `pan pause` (exit 1)
+    and in the dashboard response (`warnings`), never as a stop.
+  - Stops them with cause `'system'`. `'operator'` would set `stoppedByUser`
+    on each one, and `messageAgent` answers that gate by queueing mail that
+    nothing drains. The hold is the issue gate (`getIssuePause`) instead.
+    `messageAgent` reads it and queues, rather than resumes, a message to a
+    stopped review or test agent of a paused issue.
+  - Records the stopped ids next to the pause (`pauseStoppedAgents`) and,
+    when reviewers were stopped, journals `review.halted`.
+  - `pan unpause` (and the dashboard Unpause) clears `stoppedByUser` on those
+    rows. It then re-requests the review through the review-request door
+    (source `pan-unpause`), before the work agent resumes. That dispatches a
+    fresh synthesis parent and convoy for the current head. When only the
+    test agent was stopped, unpause re-dispatches the test role instead. A
+    request that fails is printed with `pan review request <id>` as the fix.
 - **Operator-stop gate:** `stoppedByUser` blocks autonomous re-drive when no
   completed handoff exists and emits one durable needs-you trip. Only an
   operator-initiated stop sets the flag (PAN-3324) — `pan kill`, `pan
@@ -430,9 +453,13 @@ observe and nudge — none reconciles a stored copy of anything:
 5. `recoverStalledReviews` — the one recovery routine, and the only timer added
    by the journal work.
 
-`recoverStalledReviews` reads the journal and the issue's pause gate (the work
-agent's `paused`, see "Manual pause" above) — no GitHub call, no tracker call.
-It skips a paused issue and logs the hold once per pause. Otherwise it acts only when an issue's **last** entry is `review.dispatched`,
+`recoverStalledReviews` reads the journal and the issue pause gate
+(`getIssuePause`, see "Manual pause" above), with no GitHub call and no tracker
+call. It skips an issue that is paused, or whose pause state cannot be read,
+and logs the hold once. A `review.halted` last entry (the pause stopped the
+convoy) is not a stall. The pause stopped the synthesis parent, so relaunching
+lanes against it would only strand them; unpause re-requests the review
+instead. Otherwise it acts only when an issue's **last** entry is `review.dispatched`,
 `review.redispatched`, or `review.requested`, is at least 15 minutes old, and no
 pane whose id starts with `agent-<issue>-review-` is live. The last-entry rule is
 load-bearing: a `verification.failed` written *after* `review.requested` means
