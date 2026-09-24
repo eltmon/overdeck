@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
 import { GodViewSidebar } from '../Sidebar';
@@ -9,7 +9,7 @@ import { IssueRail } from './IssueRail';
 import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
 import { useConfluenceChoreography, useSweepChoreography } from './useConfluenceChoreography';
-import type { ConfluenceData, ConfluenceOrb } from './useConfluenceData';
+import { withObservedLiveness, type ConfluenceData, type ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
 
 interface HoverState {
@@ -57,7 +57,14 @@ export function GodViewConfluence({
 }: GodViewConfluenceProps) {
   const effectsRef = useRef<RiverCanvasHandle>(null);
   const { orbs, hookStream, meta } = data;
-  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  const agentRows = useDashboardStore(selectAgents);
+  const backendPanesById = useDashboardStore((state) => state.backendPanesById);
+  // The sidebar donut and the rail read agents as the terminal backend sees
+  // them — a stored `running` with no pane is stopped (PAN-3540).
+  const agents = useMemo(
+    () => withObservedLiveness(agentRows, backendPanesById) as unknown as Agent[],
+    [agentRows, backendPanesById],
+  );
   const [hover, setHover] = useState<HoverState | null>(null);
   const [selectedId, setSelectedId] = useState(() => selectedConfluenceIssueId());
   // Operator-reopened D-3: orb/feed clicks open the in-canvas issue rail (the
