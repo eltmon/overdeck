@@ -442,8 +442,20 @@ so re-verifies nothing; only a parent with no run state at all falls back to the
 full review door. At most one re-dispatch per issue per hour: the cooldown is
 held in memory and, because the deacon child's memory dies on restart, also read
 back from the routine's own `review.redispatched` entry. A recovery that launches
-nothing (every lane already wrote its report) journals and reports nothing, so
-the routine never claims a re-dispatch that did not happen (PAN-3914).
+nothing journals and reports nothing, so the routine never claims a re-dispatch
+that did not happen (PAN-3914).
+
+When every lane of the run already wrote its report, there is no lane to
+relaunch; what is missing is the synthesis (#4134). The routine then re-runs the
+synthesis step (`redispatchReviewSynthesis`: resume the saved parent, or close
+its dead pane and spawn a fresh one, with a prompt that says the reports are
+already on disk) only when all of these hold: no `review.verdict` is journaled
+for the run (the run id embeds the reviewed head), the liveness oracle
+(`isAlive` + `isConfirmedDead`) confirms the parent `agent-<issue>-review` dead,
+and the cooldown above has passed. An indeterminate probe is never death: it
+takes no action and re-probes on the next tick. The re-dispatch is journaled as
+`review.redispatched` with `via: synthesis-recovery` and the `runId`, which is
+also the restart-proof cooldown.
 
 **Accepted v1 gaps** (stated in the module, deliberately not built): a convoy
 where some reviewers posted a verdict and one died is not recovered, because the
