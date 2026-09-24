@@ -1,8 +1,15 @@
-import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useState, type ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { BackendConnectionBoundary } from './BackendConnectionBoundary';
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents';
+
+function render(ui: ReactNode, queryClient = new QueryClient()) {
+  return rtlRender(ui, {
+    wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+  });
+}
 
 describe('BackendConnectionBoundary', () => {
   it('hides the UI, without unmounting it, while the backend is down', () => {
@@ -69,5 +76,22 @@ describe('BackendConnectionBoundary', () => {
     });
     expect(screen.getByTestId('app-content')).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('refetches every query when the page is shown again after an outage', () => {
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    const { rerender } = render(
+      <BackendConnectionBoundary backendDown={false} restarting={false}><div /></BackendConnectionBoundary>,
+      queryClient,
+    );
+    expect(invalidate).not.toHaveBeenCalled();
+
+    rerender(<BackendConnectionBoundary backendDown restarting={false}><div /></BackendConnectionBoundary>);
+    expect(invalidate).not.toHaveBeenCalled();
+
+    rerender(<BackendConnectionBoundary backendDown={false} restarting={false}><div /></BackendConnectionBoundary>);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate).toHaveBeenCalledWith();
   });
 });

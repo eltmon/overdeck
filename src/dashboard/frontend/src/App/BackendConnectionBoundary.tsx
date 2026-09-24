@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents';
 
@@ -28,6 +29,18 @@ export function BackendConnectionBoundary({ backendDown, restarting, children }:
   // opens, and unmounting then threw away whatever the operator had already
   // typed (PAN-3867).
   const outage = backendDown || restarting;
+
+  // Unmounting used to refetch the page's queries on recovery. A hidden page
+  // keeps its cache, including queries that exhausted their retries during the
+  // outage, so refetch everything when the page is shown again. The health
+  // latch can clear without the RPC socket ever dropping, in which case no
+  // `overdeck:reconnected` event fires.
+  const queryClient = useQueryClient();
+  const wasOutage = useRef(outage);
+  useEffect(() => {
+    if (wasOutage.current && !outage) void queryClient.invalidateQueries();
+    wasOutage.current = outage;
+  }, [outage, queryClient]);
 
   // A transient stream reconnect keeps the UI visible too — data is at most a
   // few seconds stale, so a banner is enough.
