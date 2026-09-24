@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -239,5 +239,73 @@ describe('pan orders commands', () => {
     await expect(runOrdersStart(created.id, { projectKey: 'other-project' }))
       .resolves.toEqual({ runId: 'RUN-CLI-CROSS' });
     expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: created.id });
+  });
+});
+
+/**
+ * #4108: order books are committed on `main` in the plan home, so the verb
+ * pushes them too (`pushPlanArtifacts`), or local main drifts ahead of origin.
+ * Real git against the fixture's local bare remote.
+ */
+describe('pan orders pushes its order-book commits', () => {
+  const originOf = (panDir: string): string => `${dirname(panDir)}-origin.git`;
+  const originMain = (panDir: string): string => git(['rev-parse', 'main'], originOf(panDir));
+
+  function commitElsewhere(panDir: string, rel: string, content: string): void {
+    const other = `${dirname(panDir)}-other`;
+    roots.push(other);
+    execFileSync('git', ['clone', '-q', '-b', 'main', originOf(panDir), other], { encoding: 'utf8' });
+    git(['config', 'user.name', 'Orders CLI Test'], other);
+    git(['config', 'user.email', 'orders-cli@example.com'], other);
+    writeFileSync(join(other, rel), content, 'utf8');
+    git(['add', '--', rel], other);
+    git(['commit', '-q', '-m', 'feat: land elsewhere'], other);
+    git(['push', '-q', 'origin', 'main'], other);
+  }
+
+  it('pushes every write verb’s commit to origin main', async () => {
+    const panDir = gitFixture();
+    const home = dirname(panDir);
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+
+    const created = await runOrdersCreate('Pushed', deps);
+    expect(originMain(panDir)).toBe(git(['rev-parse', 'HEAD'], home));
+    expect(git(['ls-tree', '-r', '--name-only', 'main', '--', '.pan/orders'], originOf(panDir))).toContain(created.id);
+
+    await runOrdersAdd(created.id, ['PAN-1'], {}, deps);
+    await runOrdersQueue(created.id, deps);
+    expect(originMain(panDir)).toBe(git(['rev-parse', 'HEAD'], home));
+    expect(git(['log', '-1', '--format=%s', 'main'], originOf(panDir))).toBe(`chore(orders): queue order book ${created.id}`);
+  });
+
+  it('replays the order-book commit onto a moved origin without forcing', async () => {
+    const panDir = gitFixture();
+    const home = dirname(panDir);
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    commitElsewhere(panDir, 'README.md', 'moved on origin\n');
+    const moved = originMain(panDir);
+
+    const created = await runOrdersCreate('Replayed', deps);
+
+    const tip = originMain(panDir);
+    expect(git(['rev-list', '--count', `${moved}..${tip}`], originOf(panDir))).toBe('1');
+    expect(git(['show', `${tip}:README.md`], originOf(panDir))).toBe('moved on origin');
+    expect(git(['ls-tree', '-r', '--name-only', tip, '--', '.pan/orders'], originOf(panDir))).toContain(created.id);
+    expect(git(['rev-parse', 'HEAD'], home)).toBe(tip);
+  });
+
+  it('warns and leaves origin alone when local main carries a commit outside .pan/', async () => {
+    const panDir = gitFixture();
+    const home = dirname(panDir);
+    const deps = { panDir, now: () => new Date(at), actor: 'operator' };
+    const before = originMain(panDir);
+    writeFileSync(join(home, 'README.md'), 'unpushed operator work\n', 'utf8');
+    git(['commit', '-q', '-am', 'feat: unpushed operator work'], home);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await runOrdersCreate('Held back', deps);
+
+    expect(originMain(panDir)).toBe(before);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('README.md'));
   });
 });
