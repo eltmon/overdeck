@@ -9,12 +9,16 @@
  *
  * The transcript file watcher's own state lives beside it (PAN-3915): a
  * watcher error is not an embed failure, it re-arms the watcher, and the
- * payload says whether the watcher is running or waiting to restart.
+ * payload says whether the watcher is running, waiting to restart, or has
+ * stopped restarting after repeated failures.
  */
 
 export interface ConversationSearchWatcherHealth {
-  /** `restarting` while a failed watcher waits for its backoff to re-arm it. */
-  state: 'running' | 'restarting';
+  /**
+   * `restarting` while a failed watcher waits for its backoff to re-arm it;
+   * `failed` once the restart circuit breaker tripped and no restart is scheduled.
+   */
+  state: 'running' | 'restarting' | 'failed';
   /** Times the watcher was re-armed after an error since it started. */
   restarts: number;
   /** ISO timestamp of the most recent watcher error, if any. */
@@ -90,6 +94,32 @@ export function recordConversationSearchWatcherRestarted(): void {
     lastErrorReason: previous?.lastErrorReason ?? null,
     nextRestartAt: null,
   };
+}
+
+/**
+ * The restart circuit breaker tripped: the watcher kept failing right after
+ * each re-arm, so no further restart is scheduled until the dashboard restarts
+ * or conversation-search settings are saved. ENOSPC/EMFILE almost always mean
+ * the inotify watch limit, so the reason says which sysctl to raise.
+ */
+export function recordConversationSearchWatcherFailed(reason: unknown): void {
+  const previous = state.watcher;
+  state.watcher = {
+    state: 'failed',
+    restarts: previous?.restarts ?? 0,
+    lastErrorAt: new Date().toISOString(),
+    lastErrorReason: watcherFailureText(reason),
+    nextRestartAt: null,
+  };
+}
+
+function watcherFailureText(reason: unknown): string {
+  const text = reasonText(reason);
+  const code = typeof reason === 'object' && reason !== null ? (reason as NodeJS.ErrnoException).code : undefined;
+  if (/^(ENOSPC|EMFILE)$/.test(code ?? '') || /ENOSPC|EMFILE/.test(text)) {
+    return `${text} (inotify watch limit reached; raise fs.inotify.max_user_watches)`;
+  }
+  return text;
 }
 
 /** The watcher was stopped on purpose (shutdown, disabled, config change). */

@@ -5,6 +5,7 @@ import {
   recordConversationSearchFailure,
   recordConversationSearchSuccess,
   recordConversationSearchWatcherError,
+  recordConversationSearchWatcherFailed,
   recordConversationSearchWatcherRestarted,
   recordConversationSearchWatcherStarted,
   recordConversationSearchWatcherStopped,
@@ -21,7 +22,7 @@ interface WatcherLike {
 }
 
 type WatchFactory = (paths: string[], options: { ignoreInitial: boolean; awaitWriteFinish: { stabilityThreshold: number; pollInterval: number } }) => WatcherLike;
-type IndexAllFn = (options: { config: NormalizedConversationSearchConfig; roots: string[]; signal?: AbortSignal }) => Promise<ConversationIndexResult>;
+type IndexAllFn = (options: { config: NormalizedConversationSearchConfig; roots: string[]; signal?: AbortSignal; modifiedSince?: number }) => Promise<ConversationIndexResult>;
 type IndexFileFn = (options: { filePath: string; config: NormalizedConversationSearchConfig; signal?: AbortSignal }) => Promise<ConversationIndexResult>;
 type RemoveFileFn = (options: { filePath: string; config: NormalizedConversationSearchConfig }) => Promise<void>;
 
@@ -36,8 +37,10 @@ export interface ConversationSearchWatcherOptions {
   maxConcurrentIndexers?: number;
   /** First restart delay after a watcher error; doubles per consecutive error. */
   restartBaseDelayMs?: number;
-  /** Upper bound on the restart delay. */
+  /** Upper bound on the restart delay; a re-armed watcher that stays up this long counts as healthy. */
   restartMaxDelayMs?: number;
+  /** Re-armed watchers in a row that may fail inside the healthy window before restarts stop. */
+  maxConsecutiveRestarts?: number;
   log?: Pick<Console, 'log' | 'warn'>;
 }
 
@@ -46,6 +49,9 @@ const DEFAULT_WRITE_STABILITY_MS = 250;
 const DEFAULT_WRITE_POLL_MS = 50;
 const DEFAULT_RESTART_BASE_DELAY_MS = 1_000;
 const DEFAULT_RESTART_MAX_DELAY_MS = 60_000;
+const DEFAULT_MAX_CONSECUTIVE_RESTARTS = 5;
+/** Catch-up looks back this far before the first watcher error, for writes whose events were lost as it died. */
+const CATCH_UP_MARGIN_MS = 5_000;
 
 let activeWatcher: ConversationSearchWatcher | null = null;
 
@@ -84,6 +90,7 @@ export class ConversationSearchWatcher {
   private readonly maxConcurrentIndexers: number;
   private readonly restartBaseDelayMs: number;
   private readonly restartMaxDelayMs: number;
+  private readonly maxConsecutiveRestarts: number;
   private readonly log: Pick<Console, 'log' | 'warn'>;
   readonly signature: string;
   private watcher: WatcherLike | null = null;
@@ -95,6 +102,11 @@ export class ConversationSearchWatcher {
   /** Watcher errors in a row, each within `restartMaxDelayMs` of the last re-arm; drives the backoff. */
   private consecutiveWatcherErrors = 0;
   private lastArmedAt = 0;
+  /** When the watcher first went down and no catch-up has covered it yet (epoch ms). */
+  private outageStartedAt: number | null = null;
+  /** A restart happened while a sweep was running; run the catch-up once it ends. */
+  private catchUpPending = false;
+  private breakerTripped = false;
   private readonly activeTasks = new Set<Promise<void>>();
   private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly queued = new Set<string>();
@@ -113,7 +125,13 @@ export class ConversationSearchWatcher {
     this.maxConcurrentIndexers = Math.max(1, options.maxConcurrentIndexers ?? 1);
     this.restartBaseDelayMs = Math.max(1, options.restartBaseDelayMs ?? DEFAULT_RESTART_BASE_DELAY_MS);
     this.restartMaxDelayMs = Math.max(this.restartBaseDelayMs, options.restartMaxDelayMs ?? DEFAULT_RESTART_MAX_DELAY_MS);
+    this.maxConsecutiveRestarts = Math.max(0, options.maxConsecutiveRestarts ?? DEFAULT_MAX_CONSECUTIVE_RESTARTS);
     this.log = options.log ?? console;
+  }
+
+  /** The restart circuit breaker tripped; only a fresh watcher (restart or settings save) retries. */
+  get failed(): boolean {
+    return this.breakerTripped;
   }
 
   start(): void {
@@ -126,14 +144,22 @@ export class ConversationSearchWatcher {
 
   /**
    * Sweep every root. At startup this catches up on transcripts written while
-   * the dashboard was down; after a watcher restart it catches up on the ones
-   * written while the watcher was dead.
+   * the dashboard was down. After a watcher restart it catches up on the ones
+   * written while the watcher was dead, and only those: files whose mtime
+   * predates the outage are skipped from their stat, so a flapping watcher does
+   * not re-read every transcript on each restart.
    */
   private runFullIndex(label: 'startup' | 'catch-up'): void {
     const signal = this.abortController?.signal;
     if (!signal) return;
+    let modifiedSince: number | undefined;
+    if (label === 'catch-up') {
+      // Capture and clear: a later error starts a new outage window.
+      modifiedSince = (this.outageStartedAt ?? Date.now()) - CATCH_UP_MARGIN_MS;
+      this.outageStartedAt = null;
+    }
     const startupT0 = performance.now();
-    this.startupTask = this.indexAll({ config: this.config, roots: this.roots, signal })
+    this.startupTask = this.indexAll({ config: this.config, roots: this.roots, signal, ...(modifiedSince != null ? { modifiedSince } : {}) })
       .then((result) => {
         if (signal.aborted || this.stopped) return;
         if (result.disabled) {
@@ -157,6 +183,11 @@ export class ConversationSearchWatcher {
       })
       .finally(() => {
         this.startupTask = null;
+        if (this.catchUpPending && !this.stopped && this.watcher) {
+          this.catchUpPending = false;
+          this.runFullIndex('catch-up');
+          return;
+        }
         this.drainQueue();
       });
   }
@@ -192,13 +223,37 @@ export class ConversationSearchWatcher {
   private onWatcherError(watcher: WatcherLike, error: unknown): void {
     if (this.stopped || watcher !== this.watcher) return;
     this.watcher = null;
+    const now = Date.now();
+    this.outageStartedAt ??= now;
     // Only a watcher that stayed up for a full backoff cap starts the backoff over,
     // so an error loop (even one with events in between) cannot restart faster.
-    if (Date.now() - this.lastArmedAt >= this.restartMaxDelayMs) this.consecutiveWatcherErrors = 0;
+    if (now - this.lastArmedAt >= this.restartMaxDelayMs) this.consecutiveWatcherErrors = 0;
+    this.closeErroredWatcher(watcher);
+    // Circuit breaker: every re-armed watcher failed inside the healthy window.
+    if (this.consecutiveWatcherErrors >= this.maxConsecutiveRestarts) {
+      this.breakerTripped = true;
+      recordConversationSearchWatcherFailed(error);
+      this.log.warn(`[conversation-search] watcher failed ${this.consecutiveWatcherErrors + 1} times in a row; not restarting until the dashboard restarts or conversation-search settings are saved:`, error);
+      return;
+    }
     const delayMs = Math.min(this.restartMaxDelayMs, this.restartBaseDelayMs * 2 ** this.consecutiveWatcherErrors);
     this.consecutiveWatcherErrors += 1;
     recordConversationSearchWatcherError(error, delayMs);
     this.log.warn(`[conversation-search] watcher error, restarting in ${delayMs}ms:`, error);
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null;
+      if (this.stopped) return;
+      this.armWatcher();
+      recordConversationSearchWatcherRestarted();
+      this.log.log('[conversation-search] watcher restarted');
+      // Transcripts written while the watcher was dead produced no events. A
+      // sweep already running may have passed them, so queue one after it.
+      if (this.startupTask) this.catchUpPending = true;
+      else this.runFullIndex('catch-up');
+    }, delayMs);
+  }
+
+  private closeErroredWatcher(watcher: WatcherLike): void {
     const closing = Promise.resolve()
       .then(() => watcher.close())
       .then(() => undefined, (closeError: unknown) => {
@@ -208,15 +263,6 @@ export class ConversationSearchWatcher {
         this.activeTasks.delete(closing);
       });
     this.activeTasks.add(closing);
-    this.restartTimer = setTimeout(() => {
-      this.restartTimer = null;
-      if (this.stopped) return;
-      this.armWatcher();
-      recordConversationSearchWatcherRestarted();
-      this.log.log('[conversation-search] watcher restarted');
-      // Transcripts written while the watcher was dead produced no events.
-      if (!this.startupTask) this.runFullIndex('catch-up');
-    }, delayMs);
   }
 
   async stop(): Promise<void> {
@@ -358,7 +404,9 @@ export async function syncConversationSearchWatcher(options: ConversationSearchW
   }
 
   const signature = watcherSignature(config, roots);
-  if (activeWatcher?.signature === signature) return activeWatcher;
+  // A watcher whose restart breaker tripped is replaced even when nothing
+  // changed: saving the settings is the operator's retry.
+  if (activeWatcher?.signature === signature && !activeWatcher.failed) return activeWatcher;
 
   if (activeWatcher) {
     await stopConversationSearchWatcher();

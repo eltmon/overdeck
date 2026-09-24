@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 export interface ConversationSearchWatcherHealthState {
-  state: 'running' | 'restarting';
+  /** `failed`: restarts stopped after repeated failures (circuit breaker). */
+  state: 'running' | 'restarting' | 'failed';
   restarts: number;
   lastErrorAt: string | null;
   lastErrorReason: string | null;
