@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, modelSupportsEffortSync } from '../model-capabilities.js';
+import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS, getModelEffortLevelsSync } from '../model-capabilities.js';
 import { getProviderForModelSync, PROVIDERS } from '../providers.js';
 import { apiLaunchModelIdSync } from '../model-context-windows.js';
 import { getClaudeCodeContextPolicyForModel } from '../agents/provider-env.js';
+import type { EffortLevel } from '../model-capability-types.js';
+import { ModelId } from '../settings.js';
+
+// Moved here from src/lib/model-capabilities.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Whether a model accepts the given effort level. Returns true when the model
+ * has no enumerated effort levels (permissive fallback — see {@link getModelEffortLevelsSync}).
+ */
+function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
+  const levels = getModelEffortLevelsSync(model);
+  return levels === undefined || levels.length === 0 || levels.includes(effort);
+}
 
 describe('September model catalog no-loss audit', () => {
   it('accounts for retired GPT selections without losing historical capabilities', () => {

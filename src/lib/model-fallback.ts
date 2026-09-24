@@ -276,13 +276,6 @@ export function getModelProviderSync(modelId: ModelId | string): ModelProvider {
 }
 
 /**
- * Check if a model requires an external API key
- */
-export function requiresExternalKeySync(modelId: ModelId | string): boolean {
-  return getModelProviderSync(modelId) !== 'anthropic';
-}
-
-/**
  * Get all models for a specific provider
  */
 export function getModelsByProviderSync(provider: ModelProvider): ModelId[] {
@@ -471,78 +464,6 @@ export function getFallbackModelSync(modelId: ModelId): AnthropicModel {
   }
 
   return FALLBACK_MAP[modelId] || DEFAULT_FALLBACK;
-}
-
-/**
- * Detect enabled providers from API keys configuration
- *
- * @param apiKeys API keys object from settings
- * @returns Set of enabled provider names
- */
-export function detectEnabledProvidersSync(apiKeys: {
-  openai?: string;
-  google?: string;
-  kimi?: string;
-  minimax?: string;
-  openrouter?: string;
-  zai?: string;
-  mimo?: string;
-  nous?: string;
-  xai?: string;
-  quantumllama?: string;
-}): Set<ModelProvider> {
-  const enabled = new Set<ModelProvider>(['anthropic']); // Always enabled
-
-  // Check each optional provider
-  if (apiKeys.openai && apiKeys.openai.trim()) {
-    enabled.add('openai');
-  }
-  if (apiKeys.google && apiKeys.google.trim()) {
-    enabled.add('google');
-  }
-  if (apiKeys.kimi && apiKeys.kimi.trim()) {
-    enabled.add('kimi');
-  }
-  if (apiKeys.minimax && apiKeys.minimax.trim()) {
-    enabled.add('minimax');
-  }
-  if (apiKeys.openrouter && apiKeys.openrouter.trim()) {
-    enabled.add('openrouter');
-  }
-  if (apiKeys.zai && apiKeys.zai.trim()) {
-    enabled.add('zai');
-  }
-  if (apiKeys.mimo && apiKeys.mimo.trim()) {
-    enabled.add('mimo');
-  }
-  if (apiKeys.nous && apiKeys.nous.trim()) {
-    enabled.add('nous');
-  }
-  if (apiKeys.xai && apiKeys.xai.trim()) {
-    enabled.add('xai');
-  }
-  if (apiKeys.quantumllama && apiKeys.quantumllama.trim()) {
-    enabled.add('quantumllama');
-  }
-
-  return enabled;
-}
-
-/**
- * Filter a list of models to only those available with enabled providers
- *
- * @param models List of models to filter
- * @param enabledProviders Set of enabled provider names
- * @returns Filtered list of models
- */
-export function filterAvailableModelsSync(
-  models: ModelId[],
-  enabledProviders: Set<ModelProvider>
-): ModelId[] {
-  return models.filter((modelId) => {
-    const provider = getModelProviderSync(modelId);
-    return isProviderEnabled(provider, enabledProviders);
-  });
 }
 
 /**

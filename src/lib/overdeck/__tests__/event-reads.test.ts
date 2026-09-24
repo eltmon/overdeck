@@ -6,7 +6,6 @@ import {
   type OverdeckTestDb,
 } from '../../../../tests/helpers/overdeck-test-db.js';
 import {
-  listAgentRuntimeEventEvidenceSync,
   readLatestAgentClaudeSessionIdEventSync,
 } from '../event-reads.js';
 
@@ -57,35 +56,4 @@ describe('agent event read door', () => {
     expect(readLatestAgentClaudeSessionIdEventSync('agent-min-839')).toBeNull();
   });
 
-  it('reconstructs retained identity and post-clear session history', () => {
-    insertEvent(odb, 'agent.created', 1, {
-      agentId: 'agent-min-839',
-      issueId: 'MIN-839',
-      agent: {
-        issueId: 'MIN-839',
-        role: 'work',
-        workspace: '/work/myn/workspaces/feature-min-839',
-        model: 'claude-opus-5',
-        branch: 'feature/min-839',
-        startedAt: '2026-08-01T10:58:11.000Z',
-      },
-    });
-    insertModelSet(odb, 2, { agentId: 'agent-min-839', claudeSessionId: 'cleared-session' });
-    insertModelSet(odb, 3, { agentId: 'agent-min-839', claudeSessionId: null });
-    insertModelSet(odb, 4, { agentId: 'agent-min-839', claudeSessionId: 'recovered-session' });
-
-    expect(listAgentRuntimeEventEvidenceSync()).toEqual([{
-      agentId: 'agent-min-839',
-      issueId: 'MIN-839',
-      role: 'work',
-      workspace: '/work/myn/workspaces/feature-min-839',
-      model: 'claude-opus-5',
-      branch: 'feature/min-839',
-      startedAt: '2026-08-01T10:58:11.000Z',
-      sessions: [{
-        id: 'recovered-session',
-        startedAt: new Date(4).toISOString(),
-      }],
-    }]);
-  });
 });

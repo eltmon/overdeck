@@ -18,11 +18,22 @@ import {
   OPENCODE_PERMISSION_WATCHDOG_STALE_MS,
   type AcpHostRuntime,
   parseAcpHostArgs,
-  reserveOpenCodePort,
-  readPersistedAcpSessionId,
-} from "../host.js";
+  reserveOpenCodePort} from "../host.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
 import { readSessionIndexSync } from "../../session-history.js";
+
+// Moved here from src/lib/acp/host.ts, which no production code called (PAN-3958 CH-8).
+async function readPersistedAcpSessionId(
+  overdeckHome: string,
+  agentId: string,
+): Promise<string | undefined> {
+  try {
+    return (await readFile(join(overdeckHome, "agents", agentId, "acp-session-id"), "utf-8")).trim() || undefined;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
 
 interface StubRuntimeOptions {
   readonly sessionId?: string;

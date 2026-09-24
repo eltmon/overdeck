@@ -58,14 +58,6 @@ export const SETTINGS_FILE = join(CONFIG_DIR, 'settings.json');
 export const CLAUDE_DIR = join(homedir(), '.claude');
 export const AGENT_SKILLS_DIR = join(homedir(), '.agents', 'skills');
 
-// Legacy runtime directories (kept for symlink cleanup migration)
-export const LEGACY_RUNTIME_DIRS = {
-  codex: join(homedir(), '.codex'),
-  cursor: join(homedir(), '.cursor'),
-  gemini: join(homedir(), '.gemini'),
-  opencode: join(homedir(), '.opencode'),
-} as const;
-
 // Sync target (Claude Code only)
 export const SYNC_TARGET = {
   skills: join(CLAUDE_DIR, 'skills'),
@@ -116,14 +108,6 @@ export function ohmypiExtensionCandidates(): string[] {
   return [
     join(packageRoot, 'dist', 'extensions', 'ohmypi.js'),
     join(packageRoot, 'packages', 'ohmypi-extension', 'dist', 'index.js'),
-  ];
-}
-
-/** Candidate locations for the legacy pi extension bundle (same scheme). */
-export function piExtensionCandidates(): string[] {
-  return [
-    join(packageRoot, 'dist', 'extensions', 'pi.js'),
-    join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js'),
   ];
 }
 
@@ -278,10 +262,6 @@ export function getDocsPaths(overrides: DocsPathOverrides = {}): DocsPaths {
     disableStatePath: overrides.disableStatePath ?? join(docsDir, 'disable-state.json'),
     telemetryPath: overrides.telemetryPath ?? join(docsDir, 'telemetry.jsonl'),
   };
-}
-
-export function getDocsDir(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir'> = {}): string {
-  return getDocsPaths(overrides).docsDir;
 }
 
 export function getDocsIndexPath(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir' | 'indexPath'> = {}): string {

@@ -1,9 +1,5 @@
 import {
-  deleteMergeSet as dbDelete,
   getMergeSetFromDb,
-  patchMergeSetRepo as dbPatchRepo,
-  patchMergeSetRepos as dbPatchRepos,
-  type MergeSetRepoPatch,
   upsertMergeSet as dbUpsert,
 } from './overdeck/merge-sync.js';
 import type { ForgeType } from './forge.js';
@@ -51,10 +47,6 @@ export function upsertMergeSetSync(mergeSet: MergeSet): void {
 /** Fetch a merge-set by issue id; throws on a merge-set DB failure. */
 export function getMergeSetSync(issueId: string): MergeSet | null {
   return getMergeSetFromDb(resolveIssueIdSync(issueId));
-}
-
-export function deleteMergeSetSync(issueId: string): void {
-  dbDelete(resolveIssueIdSync(issueId));
 }
 
 export function buildMergeSetForIssueSync(issueId: string, labels: string[] = []): MergeSet | null {
@@ -132,17 +124,4 @@ export function withRepoStateSync(
         : repo
     )),
   };
-}
-
-export function patchMergeSetRepoSync(
-  issueId: string,
-  repoKey: string,
-  expected: Pick<MergeSetRepoState, 'sourceBranch' | 'targetBranch' | 'artifactUrl' | 'artifactId'>,
-  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'repoMerge'>>,
-): boolean {
-  return dbPatchRepo(resolveIssueIdSync(issueId), repoKey, expected, patch);
-}
-
-export function patchMergeSetReposSync(issueId: string, patches: MergeSetRepoPatch[]): boolean {
-  return dbPatchRepos(resolveIssueIdSync(issueId), patches);
 }

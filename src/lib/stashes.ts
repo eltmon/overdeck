@@ -243,22 +243,6 @@ export async function createRecoveryBranchFromStash(
   return branchName;
 }
 
-export function getNextReviewTempSequence(entries: ParsedStashEntry[], issueId: string): number {
-  const normalizedIssueId = issueId.toUpperCase();
-  const maxSequence = entries.reduce((max, entry) => {
-    if (entry.kind !== 'review-temp' || entry.issueId !== normalizedIssueId || entry.sequence === undefined) {
-      return max;
-    }
-    return Math.max(max, entry.sequence);
-  }, 0);
-  return maxSequence + 1;
-}
-
-export function isOlderThanDays(entry: ParsedStashEntry, days: number, now = new Date()): boolean {
-  if (!entry.createdAt) return false;
-  return now.getTime() - entry.createdAt.getTime() > days * 24 * 60 * 60 * 1000;
-}
-
 export function isSalvageableStash(entry: ParsedStashEntry): entry is SalvageableStashEntry {
   return entry.kind === 'salvageable' && !!entry.issueId && !!entry.shortDescription;
 }

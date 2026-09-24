@@ -6,7 +6,6 @@ import { tmpdir } from 'os';
 
 import {
   findXBriefByIssueSync,
-  promoteXBriefToProposed,
   transitionXBriefOnMain,
   updatePlanStatus,
 } from '../lifecycle-io.js';
@@ -15,7 +14,6 @@ import {
   generateXBriefFilename,
   resolveXBriefDir,
 } from '../lifecycle.js';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
 import type { XBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -166,121 +164,6 @@ describe('updatePlanStatus', () => {
   });
 });
 
-describe('promoteXBriefToProposed', () => {
-  function createWorkspace(workspacePath: string, plan: XBriefDocument): void {
-    const panDir = join(workspacePath, PAN_DIRNAME);
-    mkdirSync(panDir, { recursive: true });
-    writeFileSync(
-      join(panDir, PAN_SPEC_FILENAME),
-      JSON.stringify(plan, null, 2),
-      'utf-8',
-    );
-  }
-
-  it('throws when workspace plan is missing', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-1');
-    mkdirSync(workspacePath, { recursive: true });
-    expect(() => promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-1')).toThrow(
-      /No workspace spec found/,
-    );
-  });
-
-  it('canonicalizes a legacy stamped filename while promoting xBRIEF', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-1');
-    const plan = makePlan('PAN-1', 'foo');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-1-foo.vbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-1');
-
-    expect(result.canonicalFilename).toBe('2026-05-03-PAN-1-foo.xbrief.json');
-    expect(result.destXBrief).toBe(
-      join(TEST_DIR, '.pan', 'specs', '2026-05-03-PAN-1-foo.xbrief.json'),
-    );
-    expect(result.destContinue).toBeNull();
-    expect(existsSync(result.destXBrief)).toBe(true);
-    const copied = JSON.parse(readFileSync(result.destXBrief, 'utf-8')) as XBriefDocument & { status: string };
-    expect(copied.plan.id).toBe('pan-1');
-    expect(copied.status).toBe('proposed');
-  });
-
-  it('generates canonical filename from plan title when metadata is absent', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-2');
-    const plan = makePlan('PAN-2', 'fallback');
-    plan.plan.title = 'Adopt deft xBRIEF Lifecycle Model';
-    // No metadata.canonicalFilename
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-2');
-
-    expect(result.canonicalFilename).toMatch(
-      /^\d{4}-\d{2}-\d{2}-PAN-2-adopt-deft-xbrief-lifecycle-model\.xbrief\.json$/,
-    );
-    expect(existsSync(result.destXBrief)).toBe(true);
-  });
-
-  it('uppercases issue ID for filename even when caller passes lowercase', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-3');
-    const plan = makePlan('PAN-3', 'lowercase-test');
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'pan-3');
-
-    // generateXBriefFilename rejects lowercase issueId in its regex, so we verify
-    // the filename has uppercase PAN-3.
-    expect(result.canonicalFilename).toMatch(/PAN-3/);
-  });
-
-  it('always returns destContinue null (continue promotion retired in PAN-1919)', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-4');
-    const plan = makePlan('PAN-4', 'with-continue');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-4-with-continue.xbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-4');
-
-    expect(result.destContinue).toBeNull();
-    expect(existsSync(result.destXBrief)).toBe(true);
-  });
-
-  it('creates canonical .pan/specs storage if it does not exist yet', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-6');
-    const plan = makePlan('PAN-6', 'first-promotion');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-6-first-promotion.xbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    expect(existsSync(join(TEST_DIR, '.pan', 'specs'))).toBe(false);
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(false);
-
-    promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-6');
-
-    expect(existsSync(join(TEST_DIR, '.pan', 'specs'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, '.pan', 'specs', '2026-05-03-PAN-6-first-promotion.xbrief.json'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(false);
-  });
-
-  it('overwrites existing destination file (idempotent re-runs)', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-7');
-    const plan = makePlan('PAN-7', 'overwrite-test');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-7-overwrite-test.xbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
-
-    // Modify the workspace plan and re-run promotion
-    plan.plan.title = 'Updated title';
-    writeFileSync(
-      join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME),
-      JSON.stringify(plan, null, 2),
-      'utf-8',
-    );
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
-
-    const copied = JSON.parse(readFileSync(result.destXBrief, 'utf-8'));
-    expect(copied.plan.title).toBe('Updated title');
-  });
-});
 
 describe('transitionXBriefOnMain', () => {
   it('moves xBRIEF between dirs and updates status, without committing', async () => {

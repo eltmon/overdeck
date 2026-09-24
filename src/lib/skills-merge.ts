@@ -2,8 +2,6 @@ import {
   existsSync,
   readdirSync,
   mkdirSync,
-  readFileSync,
-  writeFileSync,
   copyFileSync,
 } from 'fs';
 import { join, relative, dirname } from 'path';
@@ -225,77 +223,6 @@ export function applyProjectTemplateOverlaySync(
 }
 
 // ─── Legacy exports (kept for migration, to be removed in future) ───
-
-/**
- * @deprecated No longer needed — skills are copies, not symlinks. Kept for migration.
- */
-export function cleanupGitignoreSync(gitignorePath: string): {
-  cleaned: boolean;
-  duplicatesRemoved: number;
-  entriesAfter: number;
-} {
-  if (!existsSync(gitignorePath)) {
-    return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
-  }
-
-  const OVERDECK_HEADER = '# Overdeck-managed symlinks (not committed)';
-  let content: string;
-  try {
-    content = readFileSync(gitignorePath, 'utf-8');
-  } catch {
-    return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
-  }
-
-  // If no Overdeck section, nothing to clean
-  if (!content.includes(OVERDECK_HEADER)) {
-    return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
-  }
-
-  // Remove the entire Overdeck section (skills are copies now, not symlinks)
-  const lines = content.split('\n');
-  const newLines: string[] = [];
-  let inOverdeckSection = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed === OVERDECK_HEADER) {
-      inOverdeckSection = true;
-      continue;
-    }
-    if (inOverdeckSection) {
-      if (trimmed.startsWith('#') && trimmed !== '') {
-        inOverdeckSection = false;
-        newLines.push(line);
-      } else if (trimmed === '') {
-        // Skip blank lines in Overdeck section
-        continue;
-      }
-      // Skip entries in Overdeck section
-      continue;
-    }
-    newLines.push(line);
-  }
-
-  // Write cleaned file
-  try {
-    writeFileSync(gitignorePath, newLines.join('\n'), 'utf-8');
-    return { cleaned: true, duplicatesRemoved: 0, entriesAfter: 0 };
-  } catch {
-    return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
-  }
-}
-
-/**
- * @deprecated No longer needed — skills are copies, not symlinks. Kept for migration.
- */
-export function cleanupWorkspaceGitignoreSync(workspacePath: string): {
-  cleaned: boolean;
-  duplicatesRemoved: number;
-  entriesAfter: number;
-} {
-  const gitignorePath = join(workspacePath, '.claude', 'skills', '.gitignore');
-  return cleanupGitignoreSync(gitignorePath);
-}
 
 /**
  * Merge project-local skills from .pan/skills/ into a workspace's .claude/skills/.

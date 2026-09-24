@@ -514,14 +514,6 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-export function netstatShowsListener(output: string, port: number): boolean {
-  const localPort = new RegExp(`[.:]${port}$`);
-  return output.split(/\r?\n/).some((line) => {
-    const columns = line.trim().split(/\s+/);
-    return /\bLISTENING\b/i.test(line) && localPort.test(columns[1] ?? '');
-  });
-}
-
 /**
  * Env vars to inject into Claude Code (or any Anthropic-compatible client) so
  * that it routes model calls through the local cliproxy sidecar.

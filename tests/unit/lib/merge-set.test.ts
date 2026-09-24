@@ -13,10 +13,7 @@ import {
 } from '../../helpers/overdeck-test-db.js';
 import {
   getMergeSetSync,
-  patchMergeSetRepoSync,
-  patchMergeSetReposSync,
   upsertMergeSetSync,
-  deleteMergeSetSync,
 } from '../../../src/lib/merge-set.js';
 import type { MergeSet, MergeSetRepoState } from '../../../src/lib/merge-set.js';
 
@@ -86,82 +83,7 @@ describe('merge-set sync accessors', () => {
     expect(row!.issue_id).toBe('PAN-399');
   });
 
-  it('deleteMergeSetSync normalizes lowercase IDs to uppercase', () => {
-    seedIssue('PAN-399');
-    upsertMergeSetSync(makeMergeSet());
 
-    deleteMergeSetSync('pan-399');
 
-    const row = odb.raw().prepare('SELECT issue_id FROM merge_sets WHERE issue_id = ?').get('PAN-399') as { issue_id: string } | undefined;
-    expect(row).toBeUndefined();
-  });
 
-  it('patches one observed repo without overwriting concurrent sibling progress', () => {
-    seedIssue('PAN-399');
-    const observed = repo('fe');
-    upsertMergeSetSync(makeMergeSet({ repos: [observed, repo('api')] }));
-    upsertMergeSetSync(makeMergeSet({
-      status: 'merging',
-      repos: [
-        observed,
-        repo('api', {
-          repoMerge: 'merging',
-          rebaseStatus: 'passed',
-          repoVerification: 'passed',
-        }),
-      ],
-    }));
-
-    const patched = patchMergeSetRepoSync('PAN-399', 'fe', observed, {
-      artifactId: '1',
-      artifactUrl: observed.artifactUrl,
-      repoMerge: 'merged',
-    });
-    const loaded = getMergeSetSync('PAN-399')!;
-
-    expect(patched).toBe(true);
-    expect(loaded.status).toBe('merging');
-    expect(loaded.repos.find((entry) => entry.repoKey === 'fe')?.repoMerge).toBe('merged');
-    expect(loaded.repos.find((entry) => entry.repoKey === 'api')).toEqual(expect.objectContaining({
-      repoMerge: 'merging',
-      rebaseStatus: 'passed',
-      repoVerification: 'passed',
-    }));
-  });
-
-  it('rejects an observed patch when the current artifact changed', () => {
-    seedIssue('PAN-399');
-    const observed = repo('fe');
-    upsertMergeSetSync(makeMergeSet({ repos: [repo('fe', { artifactId: '2' })] }));
-
-    const patched = patchMergeSetRepoSync('PAN-399', 'fe', observed, { repoMerge: 'merged' });
-
-    expect(patched).toBe(false);
-    expect(getMergeSetSync('PAN-399')?.repos[0]).toEqual(expect.objectContaining({
-      artifactId: '2',
-      repoMerge: 'pending',
-    }));
-  });
-
-  it('rolls back every repo patch when one batch comparison fails', () => {
-    seedIssue('PAN-399');
-    const observedFe = repo('fe');
-    const observedApi = repo('api');
-    upsertMergeSetSync(makeMergeSet({
-      repos: [observedFe, repo('api', { artifactId: '2' })],
-    }));
-
-    const patched = patchMergeSetReposSync('PAN-399', [
-      { repoKey: 'fe', expected: observedFe, patch: { repoMerge: 'merged' } },
-      { repoKey: 'api', expected: observedApi, patch: { repoMerge: 'skipped' } },
-    ]);
-    const loaded = getMergeSetSync('PAN-399')!;
-
-    expect(patched).toBe(false);
-    expect(loaded.repos.find((entry) => entry.repoKey === 'fe')?.repoMerge).toBe('pending');
-    expect(loaded.repos.find((entry) => entry.repoKey === 'api')).toEqual(expect.objectContaining({
-      artifactId: '2',
-      repoMerge: 'pending',
-    }));
-  });
 });

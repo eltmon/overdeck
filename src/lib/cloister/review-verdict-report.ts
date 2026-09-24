@@ -23,37 +23,3 @@ export function findVerdictReport(dirPath: string): VerdictReport | null {
   }
   return null;
 }
-
-export function parseVerdictReport(content: string): ParsedVerdictReport | null {
-  const verdictLine = content.match(/^##\s*Verdict:\s*(.+)$/im);
-  if (!verdictLine) return null;
-
-  const verdictText = verdictLine[1]!.trim();
-  if (/^(?:APPROVED|PASSED)\b/i.test(verdictText)) {
-    return { verdict: 'passed', topBlocker: '' };
-  }
-  if (/^FAILED\b/i.test(verdictText)) {
-    return { verdict: 'failed', topBlocker: '' };
-  }
-
-  const changesRequested = verdictText.match(/^CHANGES REQUESTED(?:\s*(?:—|–|:|-)\s*(.+))?$/i);
-  if (!changesRequested) return null;
-
-  const suffixBlocker = changesRequested[1]?.trim();
-  if (suffixBlocker) {
-    return { verdict: 'blocked', topBlocker: suffixBlocker };
-  }
-
-  const blockingHeading = content.match(/^##\s*Blocking Findings\s*$/im);
-  let blockingSection = '';
-  if (blockingHeading?.index !== undefined) {
-    const sectionStart = blockingHeading.index + blockingHeading[0].length;
-    const remainingContent = content.slice(sectionStart);
-    const nextSectionIndex = remainingContent.search(/^##\s/m);
-    blockingSection = nextSectionIndex === -1
-      ? remainingContent
-      : remainingContent.slice(0, nextSectionIndex);
-  }
-  const sectionBlocker = blockingSection.match(/^###\s*(.+)$/m)?.[1]?.trim() ?? '';
-  return { verdict: 'blocked', topBlocker: sectionBlocker };
-}

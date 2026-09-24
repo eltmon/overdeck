@@ -7,7 +7,7 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
-import { findPlanSync, isPlanningComplete, isPlanningProposed, normalizeXBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlanSync, isPlanningComplete, normalizeXBriefEnvelope, readPlanSync, readWorkspacePlanSync, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { planBuilder } from '../builder.js';
 import { subItemsOf, type XBriefDocument, type XBriefSubItem } from '../types.js';
 
@@ -438,46 +438,7 @@ describe('tierOverrides', () => {
     return createHash('sha256').update(readFileSync(path)).digest('hex');
   }
 
-  it('reads legacy tier state and writes promotions to canonical workspace continue.json', () => {
-    writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
-    const legacyPath = join(WORKSPACE_PATH, '.pan', 'continue.json');
-    mkdirSync(join(WORKSPACE_PATH, '.pan'), { recursive: true });
-    writeFileSync(
-      legacyPath,
-      JSON.stringify({ agentModel: 'claude-legacy' }, null, 2),
-    );
-    const legacyBefore = readFileSync(legacyPath, 'utf-8');
 
-    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'simple', 'medium', 'verification failed');
-    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'medium', 'complex', 'blocked by supervisor');
-
-    const canonicalPath = join(WORKSPACE_PATH, '.overdeck', 'continue.json');
-    const continueState = JSON.parse(readFileSync(canonicalPath, 'utf-8'));
-    expect(readFileSync(legacyPath, 'utf-8')).toBe(legacyBefore);
-    expect(continueState.agentModel).toBe('claude-legacy');
-    expect(continueState.tierOverrides['item-1'].effectiveDifficulty).toBe('complex');
-
-    const overrides = readTierOverrides(WORKSPACE_PATH);
-    expect(overrides['item-1']).toMatchObject({
-      effectiveDifficulty: 'complex',
-      promotions: 2,
-      history: [
-        { from: 'simple', to: 'medium', reason: 'verification failed' },
-        { from: 'medium', to: 'complex', reason: 'blocked by supervisor' },
-      ],
-    });
-    expect(overrides['item-1'].history[0].at).toEqual(expect.any(String));
-    expect(overrides['item-1'].history[1].at).toEqual(expect.any(String));
-  });
-
-  it('preserves the canonical spec byte-for-byte when recording a promotion', () => {
-    const specPath = writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
-    const beforeHash = hashFile(specPath);
-
-    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'simple', 'medium', 'verification failed');
-
-    expect(hashFile(specPath)).toBe(beforeHash);
-  });
 
   it('overlays promoted difficulty before tier resolution without changing unmatched items', () => {
     const config = {
@@ -604,92 +565,6 @@ describe('updateSubItemStatus', () => {
   });
 });
 
-function writeSpecWithPlanStatus(planStatus: string): void {
-  const doc = makePlanDoc();
-  doc.plan.status = planStatus;
-  // Use a valid PanSpecStatus for the spec's top-level status so parsePanSpecDocument passes.
-  // The tests exercise plan.status via checkPlanStatus, which reads doc.plan.status.
-  const specStatus = (['proposed', 'active', 'completed', 'cancelled'].includes(planStatus))
-    ? planStatus as 'proposed' | 'active' | 'completed' | 'cancelled'
-    : 'active';
-  writeMainSpec(doc, specStatus);
-}
-
-describe('isPlanningProposed', () => {
-  it('returns true when plan.status is "proposed"', () => {
-    writeSpecWithPlanStatus('proposed');
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(true);
-  });
-
-  it('returns false when plan.status is "draft"', () => {
-    // 'draft' is not a valid PanSpecStatus, so parsePanSpecDocument will fail
-    // unless we use a valid spec-level status. But the auto-recovery in
-    // parsePanSpecDocument tries plan.status, and 'draft' is not a valid
-    // PanSpecStatus either. So the spec won't parse, and isPlanningProposed returns false.
-    // We just need a valid spec on main for the test — use 'active' as spec status.
-    writeSpecWithPlanStatus('active');
-    // Overwrite with plan.status = 'draft' but keep spec status valid
-    const doc = makePlanDoc();
-    doc.plan.status = 'draft';
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    const specPath = join(specsDir, SPEC_FILENAME);
-    writeFileSync(specPath, JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when plan.status is "approved"', () => {
-    // 'approved' is not a PanSpecStatus; parsePanSpecDocument auto-recovers only when
-    // plan.status IS a valid PanSpecStatus. So this spec won't parse unless we set
-    // a valid top-level status.
-    const doc = makePlanDoc();
-    doc.plan.status = 'approved';
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when plan.status is "running"', () => {
-    const doc = makePlanDoc();
-    doc.plan.status = 'running';
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when plan.status is explicit but not "proposed"', () => {
-    const doc = makePlanDoc();
-    doc.plan.status = 'approved';
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when plan has no status field', () => {
-    const doc = makePlanDoc();
-    delete (doc.plan as Partial<typeof doc.plan>).status;
-    // Without plan.status, parsePanSpecDocument needs top-level status
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when there is no plan at all', () => {
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when no plan and no marker', () => {
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  // Note: "corrupt plan" test removed — corrupt JSON in .pan/specs/ causes
-  // parsePanSpecDocument to throw inside listSpecs/findSpecByIssue, which is
-  // the correct behavior for the single-spec-on-main model. The old test
-  // targeted workspace-local spec fallback which no longer exists.
-});
 
 describe('isPlanningComplete', () => {
   // isPlanningComplete checks plan.status against PLANNING_FINISHED_STATUSES:

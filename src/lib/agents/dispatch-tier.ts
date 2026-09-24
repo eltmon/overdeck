@@ -69,15 +69,3 @@ export function assignDispatchTier(
   const tier = resolveTier(item, config);
   return { dispatch, tierName: tier.tierName, model: tier.model, harness: tier.harness };
 }
-
-/**
- * Plan-metadata-agnostic entry point: honors only the global enabled flag.
- * Kept for callers that resolve the per-plan override themselves (or have
- * no plan in scope, e.g. the enablement-gate parity tests).
- */
-export function chooseTierAssignment(
-  item: Pick<XBriefItem, 'id' | 'title' | 'metadata'>,
-  tiering?: TierAssignmentConfig,
-): TierAssignment {
-  return assignDispatchTier(item, tiering);
-}

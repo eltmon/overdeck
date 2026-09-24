@@ -177,23 +177,3 @@ export function resolveBareNumericIdSync(input: string, overdeckHome?: string): 
   }
   return resolveIssueIdSync(input);
 }
-
-/**
- * Extract prefix from a standard format issue ID (PREFIX-NUMBER).
- * Returns null for non-standard formats like Rally IDs.
- * Use extractPrefixSync() for unified handling of all formats.
- */
-export function extractStandardPrefixSync(issueId: string): string | null {
-  const match = issueId.match(/^([A-Za-z]+)-\d+$/i);
-  return match ? match[1].toUpperCase() : null;
-}
-
-/**
- * Extract number from a standard format issue ID (PREFIX-NUMBER).
- * Returns null for non-standard formats like Rally IDs.
- * Use extractNumberSync() for unified handling of all formats.
- */
-export function extractStandardNumberSync(issueId: string): number | null {
-  const match = issueId.match(/^([A-Za-z]+)-(\d+)$/i);
-  return match ? parseInt(match[2], 10) : null;
-}

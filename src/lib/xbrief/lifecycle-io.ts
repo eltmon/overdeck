@@ -10,13 +10,10 @@
 import { basename, join } from 'path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { Effect } from 'effect';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 
 import type { ContinueFeedbackEntry, ContinueSessionEntry, ContinueState } from './continue-state.js';
 import {
-  LEGACY_VBRIEF_FILENAME_SUFFIX,
   LEGACY_VBRIEF_LIFECYCLE_DIRS,
-  XBRIEF_FILENAME_SUFFIX,
   ensureXBriefDirsSync,
   generateXBriefFilename,
   parseXBriefFilename,
@@ -301,32 +298,6 @@ export interface PromotedXBrief {
   destXBrief: string;
   destContinue: string | null;
   canonicalFilename: string;
-}
-
-export function promoteXBriefToProposed(
-  workspacePath: string,
-  projectRoot: string,
-  issueId: string,
-): PromotedXBrief {
-  const panDir = join(workspacePath, PAN_DIRNAME);
-  const sourceXBrief = join(panDir, PAN_SPEC_FILENAME);
-  if (!existsSync(sourceXBrief)) {
-    throw new Error(`No workspace spec found at ${join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)}`);
-  }
-
-  const planDoc = readPlanSync(sourceXBrief);
-  const upperIssueId = issueId.toUpperCase();
-  const existingFilename = planDoc.plan.metadata?.canonicalFilename;
-  const canonicalFilename = (existingFilename && typeof existingFilename === 'string')
-    ? existingFilename.endsWith(LEGACY_VBRIEF_FILENAME_SUFFIX)
-      ? `${existingFilename.slice(0, -LEGACY_VBRIEF_FILENAME_SUFFIX.length)}${XBRIEF_FILENAME_SUFFIX}`
-      : existingFilename
-    : generateXBriefFilename(upperIssueId, slugify(planDoc.plan.title || planDoc.plan.id || upperIssueId));
-
-  const promoted = writeSpecForIssueSync(projectRoot, planDoc, 'proposed', canonicalFilename);
-
-  invalidateXBriefIndex(projectRoot);
-  return { destXBrief: promoted.path, destContinue: null, canonicalFilename };
 }
 
 export function readContinueStateForIssue(

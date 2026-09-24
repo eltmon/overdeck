@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkCodexAuthStatus, evaluateBurnedFromLog } from '../codex-auth.js';
-import type { CodexAuthStatus } from '../codex-auth.js';
+import { checkCodexAuthStatus, evaluateBurnedFromLog, CODEX_AUTH_BURNED_REASON_PREFIX } from '../codex-auth.js';
+import type { CodexAuthStatus, CodexAuthBurnFlagState } from '../codex-auth.js';
 
 const mockCliproxy = vi.hoisted(() => ({
   authDir: '',
@@ -274,15 +274,36 @@ describe('evaluateBurnedFromLog CLIProxy-route coverage (PAN-3528)', () => {
 
 import {
   classifyNativeCodexAuth,
-  paneShowsCodexAuthBurn,
-  applyCodexAuthBurnFlag,
   codexAuthBurnFlaggedAtMs,
   filterCodexAuthBurnedAgentIds,
   combineCodexAuthStatuses,
-  isCodexAuthRouted,
-  CODEX_AUTH_BURNED_REASON_PREFIX,
-  type CodexAuthBurnFlagState,
 } from '../codex-auth.js';
+
+// Moved here from src/lib/codex-auth.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Mark an agent state as codex-auth-burned (PAN-2285). Pure mutation — the
+ * caller persists via the agent-state write door (saveAgentStateSync), which
+ * mirrors into the shared agents table so the flag crosses the deacon/server
+ * process boundary. Returns true only when the state was newly flagged
+ * (idempotent: an already-flagged state is left untouched), so callers can emit
+ * a single operator notice instead of one per patrol tick. The flag time is
+ * embedded in the reason (`codex-auth-burned[<ISO>]`) because the agents table
+ * has no dedicated column for it and `troubledAt` may predate the burn when the
+ * agent was already troubled for another reason.
+ */
+function applyCodexAuthBurnFlag(state: CodexAuthBurnFlagState, nowMs: number = Date.now()): boolean {
+  if (state.troubled && state.lastFailureReason?.startsWith(CODEX_AUTH_BURNED_REASON_PREFIX)) {
+    return false;
+  }
+  const nowIso = new Date(nowMs).toISOString();
+  state.troubled = true;
+  if (!state.troubledAt) state.troubledAt = nowIso;
+  state.lastFailureReason =
+    `${CODEX_AUTH_BURNED_REASON_PREFIX}[${nowIso}]: Codex refresh token was revoked — ` +
+    're-authenticate (dashboard Codex-auth banner has a Re-authenticate button, or run `codex login`)';
+  state.lastFailureAt = nowIso;
+  return true;
+}
 
 function makeJwt(payload: Record<string, unknown>): string {
   const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -331,47 +352,7 @@ describe('classifyNativeCodexAuth (PAN-2285)', () => {
   });
 });
 
-describe('paneShowsCodexAuthBurn (PAN-2285)', () => {
-  it('matches each revoked-token marker', () => {
-    expect(paneShowsCodexAuthBurn('… could not be refreshed because your refresh token was revoked')).toBe(true);
-    expect(paneShowsCodexAuthBurn('MCP error 401: token_invalidated')).toBe(true);
-    expect(paneShowsCodexAuthBurn('error: token_revoked')).toBe(true);
-  });
 
-  it('does not match a clean pane', () => {
-    expect(paneShowsCodexAuthBurn('❯ working on the task, all good')).toBe(false);
-  });
-
-  it('matches the CLIProxy 503 wrapper a gpt-5.x agent actually shows (PAN-3528)', () => {
-    // Verbatim from the burned 2026-08-03 pane. None of the native codex
-    // markers appear in it — CLIProxy absorbs the upstream 401 and re-surfaces
-    // it as a 503 that reads like a transient hiccup, so the agent retried 10×
-    // against a dead credential and nothing flagged it.
-    const pane =
-      'API Error: 503 auth_unavailable: no auth available (providers=codex, model=gpt-5.6-sol).\n' +
-      'This is a server-side issue, usually temporary — try again in a moment.';
-    expect(paneShowsCodexAuthBurn(pane)).toBe(true);
-  });
-});
-
-describe('isCodexAuthRouted (PAN-3528)', () => {
-  it('covers the native codex harness regardless of model', () => {
-    expect(isCodexAuthRouted('codex', 'gpt-5.6-sol')).toBe(true);
-  });
-
-  it('covers an openai-provider model under claude-code (the CLIProxy route)', () => {
-    expect(isCodexAuthRouted('claude-code', 'gpt-5.6-sol')).toBe(true);
-  });
-
-  it('excludes an Anthropic agent — its pane text is not codex-auth evidence', () => {
-    expect(isCodexAuthRouted('claude-code', 'claude-opus-5')).toBe(false);
-  });
-
-  it('returns false for an unset or unregistered model instead of throwing', () => {
-    expect(isCodexAuthRouted('claude-code', undefined)).toBe(false);
-    expect(isCodexAuthRouted('claude-code', 'model-that-no-longer-exists')).toBe(false);
-  });
-});
 
 describe('persisted codex burn flag (PAN-2285)', () => {
   const FLAG_NOW = ms('2026-07-15T02:00:00Z');

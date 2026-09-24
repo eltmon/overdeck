@@ -1436,3 +1436,420 @@ All paths are relative to `src/lib/`.
 | `xbrief/io.ts` | `readTierRetries`, `recordTierRetry` | — |
 | `xbrief/lifecycle-io.ts` | `writeContinueStateForIssue` | — |
 | `xbrief/lifecycle.ts` | `resolveXBriefRoot` | — |
+
+## CH-8a part 2: test-only exports, the collected candidates, and #4050 follow-ups (#4014)
+
+PRD W10 step 3 (`TESTONLY` rows), step 6 (dead files), and the candidates collected across the epic.
+`python3 .pan/notes/pan-3958-dead-exports.py v` on main at ba8dd403767 listed 214 `TESTONLY` exports (named only by
+tests outside their own file). Each was decided one of four ways.
+
+- **Deleted with their tests** (subject is dead in production): the export goes, and every `it`/`test` that exercised
+  it goes with it. A `describe` left empty goes too, and a test file left with no tests is deleted.
+- **Moved into the test that uses it**: 22 thin wrappers whose callees are live. The wrapper leaves `src` and
+  becomes a local function in its test file, doc comment and body unchanged, so the tests keep exercising the live
+  code underneath. They are listed as "moved to its test" below. `deterministicDocsTestEmbedding` moved to
+  `tests/helpers/docs-test-embedding.ts` because four test files share it.
+- **Ported**: tests of live code that used a deleted export only for setup or observation now go through the live
+  code. `prompts.test.ts` exercises frontmatter parsing through `renderPrompt` instead of the test-only
+  `loadPromptFrontmatter`. `agent-gc.test.ts` calls `resolveLiveAgentTerminalityEvidence` instead of
+  `confirmLiveAgentTerminality`. `flywheel-merge-order.test.ts` checks the advisory-only property on
+  `orderMergeCandidates` and builds declared footprints inline. `message-agent-interventions.test.ts` drops the
+  `isMonitorLive` setup, which `messageAgent` no longer consults. `pan-3859-no-loss-audit.test.ts` keeps its defaults
+  assertion and drops the one on `validateSettingsSync`. `settings-api.test.ts` sets the `readFile` mock that the
+  deleted `getRoleConfig` test used to leave behind. `memory/paths.test.ts` asserts that no caller of the deleted
+  `resolveIssueMemoryRoot` is left.
+- **Kept as test seams**: PRD W10 step 3 keeps names matching `ForTest(s|ing)?$`, names starting with `_`, and
+  documented `reset…`/`set…` hooks. This PR also keeps test-only helpers that tests of live code need to set up or
+  observe module-private state, where moving them would mean exporting that state. Each carries the doc line "Test
+  seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8)".
+  - Documented `reset`/`set`/`clear` hooks: `resetDeliveryBackendSelection`, `resetSystemCapabilitiesCache`,
+    `clearMemorySettingsCache`, `resetDiscoveredSessionsSchemaBootstrap`, `resetTitleRefinementState`,
+    `setCloisterService`, `setGlobalRegistry`, `resetPromptGuard`, `resetHostTerminalBackendName`,
+    `clearParentBranchCache`, `resetCostTrackingSync`.
+  - Given the seam doc line in this PR: `closeOverdeckDatabaseSync`, `resetXBriefIndex`,
+    `clearAutonomousWorkDispatchCaches`, `setStatusRollupEnqueuer`, `setStatusRollupProcessor`,
+    `resetPatrolDispatchBudget`, `invalidateProbeCacheSync`, `isHygieneSchedulerRunning`, `getInFlightForkPipelineCount`,
+    `createRunLogSync`, `appendToRunLogSync`, `logSpecialistHandoff`, `createSpecialistHandoff`, `recordCostSync`,
+    `getAgentCost`, `getIssueCost`, `getDailyTotal`, `readSessionBriefingMarker`, `getWorkspaceByName`, `createPiFifo`,
+    `destroyPiFifoSync`, and `ensureOrderIssueStore`. That last one is the only way the orders tests load the mocked
+    issue-service module into the resolver's cache, which the resolver's `require()` path cannot reach.
+
+After each deletion round the scan runs again, and anything left dead or test-only only because deleted code used
+it goes the same way. That repeats until the scan reports 0 `DEAD` rows and no non-seam `TESTONLY` rows.
+
+Two exports looked live to the scan only because a production comment named them: `tryReserveAdvancingSlot` (named
+in `memory-verdict-cache.ts`'s header) and `checkPostReviewCommits` (named in `concurrency.ts`'s reservation
+comment). Both had no production caller since the PAN-3917 cut and are deleted, with the comments updated.
+
+### Collected candidates
+
+| Candidate | Verdict on main | What this PR does |
+| --- | --- | --- |
+| `salvageStrandedMerge` | no caller (only a PRD plan names it) | deleted |
+| `stopSmeeClient` | test teardown only | deleted with the whole in-process smee mode (`startSmeeClient`, `isSmeeRunningSync`, the restart loop): the dashboard runs smee as a detached process (`startSmeeProcessSync`), and the in-process mode had no production caller. `tests/unit/lib/smee.test.ts` tested only that mode and goes with it |
+| `describeAgentDeath` | test-only | deleted; `cloister/agent-death.ts` is left empty and deleted |
+| `queryConfirmedSession` | test-only | deleted; `cloister/confirmed-session-query.ts` deleted |
+| `describeRunningAgents` | test-only | deleted |
+| `getShadowModeSummary`, `updateTrackerStatusCache`, `markAsSynced`, `getDisplayStatus` | test-only | deleted |
+| `ensureManagedTmuxContextOnce` | only named in comments (`main.ts`, `tmux.ts`) | deleted; both comments updated |
+| `extractAcceptanceCriteria` (`xbrief/acceptance-criteria.ts`) | test-only (`tier-supervisor.ts` has a separate, live function of the same name) | moved into `acceptance-criteria.test.ts` |
+| `getConversationsConfig` (`config.ts`) | already gone | nothing to do |
+| `CloisterService.getStatus()` | no production caller: every other `getStatus()` call site is the TLDR daemon service, and `/api/cloister/status` reads `readDurableCloisterStatus()` | deleted, with `service-status.ts` `getStatus` and the 3-second status cache it fed. Its three tests go, and so do three tests in the already-skipped (PAN-48) `reloadConfig`/`updateConfig` blocks that read config through it |
+| stall-sweeper default `isAgentLive` | `runStallSweeperPatrol` has no production caller (PAN-3917 W5 removed it); every test passes `isAgentLive` | default removed; the dependency is required. Its tmux-only default was wrong on Herdr hosts anyway |
+| `runPromiseOrProgram` (`tts-speak.ts`, `cli/commands/tts.ts`) | every value is a Promise since CH-4 | removed; defaults return the call, call sites await it; tests unchanged (their injected deps already resolved Promises) |
+| `acp.test.ts` / `kimi-code.test.ts` `sessionExists` mocks | the mocked function is `tmux-cli.ts`'s `tmuxSessionExists`, which returns a Promise, so `mockResolvedValue` was right | mock keys renamed to `tmuxCreateSession`/`tmuxKillSession`/`tmuxSessionExists` so the shape is plain; 35 tests pass before and after |
+| the 37 `…Sync` functions CH-1a orphaned | deleted by #4050 and this PR where dead or test-only | the survivors with no async twin are listed below for #4002 |
+| `codex-home-v2` helper (optional) | — | not done; see "Left undone" |
+
+### #4050 review follow-ups
+
+- `src/index.ts` header names its one in-repo consumer: `scripts/build-docs-index.mjs` (via `build-post-cli.mjs`)
+  loads `dist/index.js` for `buildDocsIndex`, `DEFAULT_DOCS_INDEX_PATH`, `DEFAULT_DOCS_INDEX_MAX_BYTES` and
+  `getDocsIndexPath`; those four stay exported.
+- `reference/architecture.mdx` drops `session-map.json` and `runtime-metrics.json` from the state-directory listing
+  and describes the Metrics page as it is (today's cost and top spenders from `/api/metrics/summary` and
+  `/api/metrics/costs`). The `runtime-metrics.json` reader in `routes/misc/meta.ts` serves `GET /api/metrics/runtimes`
+  and `GET /api/metrics/tasks`; nothing writes the file and no mounted UI calls the routes (the `RuntimeComparison`
+  component that did is not rendered). PRD NFR-2 forbids HTTP route changes in this epic, so the reader stays.
+- Orphans #4050 left: unused imports and the empty section/`CheckpointGitResult` in `checkpoint/checkpoint-manager.ts`,
+  the `Effect` import and empty trailer in `conversations/hash-resolver.ts`, the empty "HTTP API groups" header in
+  `overdeck/control-settings.ts`, `OverlayResult` in `claude-settings-overlay.ts` and `MergeHistoryEntry` in
+  `cloister/merge-agent.ts`. `src/lib/runtime/` (`index.ts`, `claude.ts`, `interface.ts`, `metrics.ts`) had no importer
+  once #4050 emptied `index.ts`, so the directory is deleted, with its `eslint-any-allowlist.json` row.
+
+### Removed from the `@overdeck/core` main entry (v0.61.0 release notes)
+
+`loadDocsCorpus` (`docs/corpus.ts`), `deterministicDocsTestEmbedding` (`docs/index-builder.ts`; now
+`tests/helpers/docs-test-embedding.ts`), `LEGACY_RUNTIME_DIRS`, `piExtensionCandidates`, `getDocsDir` (`paths.ts`),
+`saveSettingsSync`, `validateSettingsSync` (`settings.ts`).
+
+### Tests
+
+Across the touched test files, `it`/`test` calls go from 1,308 to 864 (after the #4051 review restores below). Every removed test exercised a deleted subject. The ports above keep the tests of
+live code. Whole test files deleted with a deleted module are exempt from the test-skip gate; the rest need
+`pan verify waive-test-removal 4014 --reason "PAN-3958 deleted subject, see no-loss ledger"` at the pushed HEAD.
+
+Test files deleted:
+
+- `src/lib/__tests__/pinned-launch.test.ts`
+- `src/lib/agents/__tests__/fast-track.test.ts`
+- `src/lib/agents/__tests__/supervisor-liveness.test.ts`
+- `src/lib/cloister/__tests__/agent-death.test.ts`
+- `src/lib/cloister/__tests__/confirmed-session-query.test.ts`
+- `src/lib/cloister/__tests__/database.test.ts`
+- `src/lib/cloister/__tests__/pan-2341-idle-terminal-reaper.test.ts`
+- `src/lib/cloister/__tests__/pan-2341-merged-advancing-reaper.test.ts`
+- `src/lib/cloister/__tests__/parked-residue.test.ts`
+- `src/lib/cloister/__tests__/post-review-commits.test.ts`
+- `src/lib/cloister/__tests__/reap-terminal-sessions.test.ts`
+- `src/lib/cloister/__tests__/recover-orphaned-agents-grace.test.ts`
+- `src/lib/cloister/__tests__/review-convoy-liveness.test.ts`
+- `src/lib/cloister/__tests__/uat-promote-notify.test.ts`
+- `src/lib/conversations/__tests__/switch-strategy.test.ts`
+- `src/lib/overdeck/__tests__/affected-criteria.test.ts`
+- `tests/lib/compliance/triggers.test.ts`
+- `tests/lib/hooks.test.ts`
+- `tests/lib/remote/remote-completion.test.ts`
+- `tests/lib/router-config.test.ts`
+- `tests/lib/tmux-detect-terminal-api-error.test.ts`
+- `tests/unit/lib/cloister/label-reconciler.test.ts`
+- `tests/unit/lib/cloister/merge-agent-quality-gates.test.ts`
+- `tests/unit/lib/cloister/resource-pressure-patrol.test.ts`
+- `tests/unit/lib/cloister/scan-git-patterns.test.ts`
+- `tests/unit/lib/cloister/stale-check-classifier.test.ts`
+- `tests/unit/lib/cloister/stale-check-github.test.ts`
+- `tests/unit/lib/cloister/uat-assemble.test.ts`
+- `tests/unit/lib/github-graphql-cooldown.test.ts`
+- `tests/unit/lib/overdeck/merge-queue.test.ts`
+- `tests/unit/lib/overdeck/process-services.test.ts`
+- `tests/unit/lib/smee.test.ts`
+- `tests/unit/lib/state-migration-lock.test.ts`
+
+### Findings for follow-up (no code change here)
+
+- `cloister/stall-sweeper.ts`: `runStallSweeperPatrol` lost its production caller in PAN-3917 W5. Only its tests and
+  the `patrolBudgets.exempt` name list in `cloister/config.ts` mention it.
+- Writers with no production caller, whose live readers now read nothing: Cloister's `cost-data.json`
+  (`cloister/cost-monitor.ts` `recordCostSync` feeds `getCostSummary`, which `/api/metrics/*` serves; the
+  `cost_events` table is a different store and has live writers), specialist run logs (`createRunLogSync`), and
+  specialist handoffs (`logSpecialistHandoff`). They are kept as test seams because tests of the live readers use
+  them; the coordinator is filing the gaps separately.
+- `GET /api/metrics/runtimes` and `/api/metrics/tasks` read a file nothing writes (see above).
+
+### Left undone
+
+- The optional `codex-home-v2` helper: `spawn.ts`, `runtime-command.ts`, `conversation-runtime.ts`, `runtimes/codex.ts`
+  and `companion-terminal/codex-adapter.ts` still build `<agentDir>/codex-home-v2` by hand. It was optional and this PR
+  is already large.
+
+### Deleted, by module
+
+All paths are relative to `src/lib/`.
+
+| Module | Test-only or dead exports deleted | Private code left unused, deleted with them |
+| --- | --- | --- |
+| `acp/host.ts` | `readPersistedAcpSessionId` (moved to its test) | — |
+| `acp/runtime-model.ts` | `parsePermissionRequest` | — |
+| `agent-directory-cleanup.ts` | `getPlanningIssueId` | — |
+| `agents/dispatch-tier.ts` | `chooseTierAssignment` (moved to its test) | — |
+| `agents/fast-track.ts (file deleted)` | `escalateFastTrackItem`, `groupFastTrack`, `autoMergeFastTrackBatch`, `DEFAULT_FAST_TRACK_MAX_SCOPE_FILES`, `FAST_TRACK_GATE_COMMANDS`, `isFastTrackAutoMergeAllowed` | `batchKey`, `isFastTrackEligible`, `FAST_TRACK_DIFFICULTIES` |
+| `agents/monitor-transport.ts` | `isMonitorLive`, `MONITOR_PRESENCE_FRESHNESS_MS` | `isPidAlive` |
+| `agents/pinned-launch.ts (file deleted)` | `parsePinnedAgentLaunch` | `parseFlagValue` |
+| `agents/runtime-command.ts` | `hasAgentRuntimeInSubtree` (moved to its test) | — |
+| `agents/spawn-prep.ts` | `applyTierAssignment` | — |
+| `agents/supervisor-liveness.ts (file deleted)` | `supervisorProcessAliveSync` | `defaultPgrep`, `Pgrep` |
+| `agents/tier-metrics.ts` | `readTierFeedDeliveries` (moved to its test), `computeWarmHitFractions`, `WARM_HIT_GAP_SECONDS` | — |
+| `artifacts/index-store.ts` | `createArtifactIndexRepository` (moved to its test) | — |
+| `backlog/backlog-auto-trigger.ts` | `startPeriodicReviewPass`, `stopPeriodicReviewPass` | `_reviewTimer` |
+| `backlog/pickup.ts` | `selectUnblockTargets`, `isUnblockEligible` | — |
+| `boot-no-resume.ts` | `getNoResumeMode` | `noResumeModeSince` |
+| `cliproxy.ts` | `netstatShowsListener` | — |
+| `cloister/agent-death.ts (file deleted)` | `describeAgentDeath`, `readAgentExitStatus` | `agentDir` |
+| `cloister/agent-gc.ts` | `confirmLiveAgentTerminality` | — |
+| `cloister/agent-grace.ts (file deleted)` | `isStartingWithinGrace`, `WORK_LAUNCHER_GRACE_MS` | — |
+| `cloister/complexity.ts` | `detectComplexity` | `detectComplexityFromEstimate`, `detectComplexityFromFileCount`, `detectComplexityFromKeywords`, `detectComplexityFromLabels`, `getHigherComplexity`, `COMPLEXITY_KEYWORDS`, `COMPLEXITY_LABELS`, `FILE_COUNT_THRESHOLDS` |
+| `cloister/concurrency.ts` | `describeRunningAgents`, `releaseAdvancingSlot`, `tryReserveAdvancingSlot` | `advancingReservedThisPatrol` |
+| `cloister/confirmed-session-query.ts (file deleted)` | `queryConfirmedSession`, `clearConfirmedSessionMiss` | `consecutiveMisses` |
+| `cloister/database.ts` | `writeHealthEventsSync`, `getDatabaseStatsSync`, `closeHealthDatabase` | — |
+| `cloister/deacon-post-review-commits.ts (file deleted)` | `checkPostReviewCommits`, `evaluateReviewFreshness` | — |
+| `cloister/deacon-swarm-record.ts` | `persistAndVerifySwarmSlotCompletion` | — |
+| `cloister/flywheel.ts` | `FLYWHEEL_ORCHESTRATOR_AGENT_ID` | — |
+| `cloister/handoff-logger.ts` | `readHandoffEventsSync` | — |
+| `cloister/health.ts` | `getMultipleAgentHealth`, `getAgentsToPoke`, `getAgentsToKill`, `getHealthEmoji`, `getHealthLabel`, `shouldPoke`, `shouldKill` | — |
+| `cloister/label-reconciler.ts` | `reconcilePipelineLabels`, `planLabelReconciliation` | — |
+| `cloister/memory-governor.ts` | `canAdmit` (moved to its test) | — |
+| `cloister/merge-agent.ts` | `scanGitPatterns`, `scanForConflictMarkers`, `runProjectQualityGates`, `salvageStrandedMerge`, `GIT_PATTERNS` | — |
+| `cloister/merge-completeness.ts` | `reconcileStrandedRepos` | — |
+| `cloister/modal-detector.ts` | `paneShowsModelSwitch`, `handleKnownAgentModal`, `KNOWN_AGENT_MODALS` | `MODEL_SHAPED_TOKEN`, `defaultDeps` |
+| `cloister/parked-residue.ts (file deleted)` | `reconcileTerminalIssueResidue`, `isIssueTerminal` | `defaultDeps`, `resolveClearGates`, `defaultListTerminalIssues` |
+| `cloister/pr-facts.ts` | `isAwaitingReview`, `getLatestPrReview` | `defaultRunGh` |
+| `cloister/preemption.ts` | `tryYieldForAdvancingDispatch`, `resumeYieldedVictim`, `yieldWorkAgentFor` | `buildCandidates`, `countYielded`, `reviewBlockedFor` |
+| `cloister/prompts.ts` | `loadPromptFrontmatter` | — |
+| `cloister/reap-terminal-sessions.ts` | `selectMergedWorkSessions`, `selectMergedAdvancingSessions`, `selectNonMergedTerminalAdvancingSessions`, `isIdlePastThreshold`, `selectAwaitingTestWorkSessions`, `classifyAdvancingSessionLifecycle`, `selectTerminalAdvancingSessions`, `isAwaitingTestReapable`, `sessionsToReapForRole`, `isWorkReapable` | — |
+| `cloister/resource-pressure-patrol.ts (file deleted)` | `patrolResourcePressure` | `ResourcePressurePatrolDeps` |
+| `cloister/review-convoy-liveness.ts (file deleted)` | `evaluateReviewConvoyLiveness`, `REVIEW_AGENT_IDLE_THRESHOLD_MS`, `REVIEWING_WATCHDOG_THRESHOLD_MS`, `reviewTimestampMs` | `ReviewAgentRow` |
+| `cloister/review-verdict-report.ts` | `parseVerdictReport` | — |
+| `cloister/specialist-context.ts` | `hasContextDigest`, `deleteContextDigest` | — |
+| `cloister/specialist-handoff-logger.ts` | `readIssueSpecialistHandoffs` (moved to its test), `getTodaySpecialistHandoffs` (moved to its test) | — |
+| `cloister/specialist-logs.ts` | `checkLogSizeLimit`, `getRunLogSize`, `MAX_LOG_SIZE` | — |
+| `cloister/stale-check-classifier.ts (file deleted)` | `selectRerunCandidates`, `computeRedWindows` | `isCompleted`, `isFailing` |
+| `cloister/stale-check-github.ts (file deleted)` | `listRecentMainRuns`, `listPrHeadFailingRuns`, `getPrHead`, `rerunFailedRun`, `probePrHeadFailingRuns`, `probeRecentMainRuns` | `RUN_FIELDS`, `execGh` |
+| `cloister/swarm-failed-slot.ts` | `SWARM_SUPERSEDED_RETENTION`, `nextSwarmSlotIndex` | — |
+| `cloister/swarm-slot-reconcile.ts` | `listSlotOwnership` | — |
+| `cloister/test-verdict.ts` | `decideUnsignaledTestAction` | — |
+| `cloister/uat-assemble.ts (file deleted)` | `assembleUatCandidate` | — |
+| `cloister/uat-promote-notify.ts (file deleted)` | `notifyFlywheelOfUatPromote` | `buildPromoteNudge` |
+| `codex-auth.ts` | `paneShowsCodexAuthBurn`, `isCodexAuthRouted`, `applyCodexAuthBurnFlag` (moved to its test) | `CODEX_AUTH_BURN_MARKERS` |
+| `compliance/triggers.ts` | `matchMemoryFirstTriggerPhrases`, `matchMemoryFirstTriggers`, `MEMORY_FIRST_TRIGGERS` | — |
+| `config-yaml/domain-mergers.ts` | `mergeRtkConfigs`, `mergeDocsConfigs` (moved to its test), `getDefaultRtkConfig` | — |
+| `conversation-search/chunker.ts` | `chunkConversationJsonlFile` (moved to its test) | — |
+| `conversations/switch-strategy.ts (file deleted)` | `getEffectiveTargetWindow`, `decideSwitchStrategy`, `SWITCH_MODEL_SAFETY_FACTOR` | `EXTENDED_CONTEXT_WINDOW_FLOOR` |
+| `docs/corpus.ts` | `loadDocsCorpus` | — |
+| `docs/index-builder.ts` | `deterministicDocsTestEmbedding` | — |
+| `flywheel-merge-order.ts` | `planMergeTrain`, `declaredIssueFootprint` (moved to its test), `planUatCandidate` | — |
+| `github-graphql-cooldown.ts (file deleted)` | `noteGraphQLRateLimit`, `isInGraphQLCooldown` | `GRAPHQL_COOLDOWN_MS`, `cooldownStartedAt`, `isGraphQLRateLimitError`, `messageFromError` |
+| `harness-skill-sync.ts` | `SKILL_SYNC_HARNESSES` (moved to its test) | — |
+| `herdr-setup/config.ts` | `setResumeAgentsOnRestore` (moved to its test) | — |
+| `hooks.ts` | `reorderHookItemsSync` | — |
+| `issue-id.ts` | `extractStandardPrefixSync`, `extractStandardNumberSync` | — |
+| `lifecycle/archive-planning.ts` | `inferBranchFromWorkspace` | — |
+| `memory/paths.ts` | `resolveIssueMemoryRoot`, `resolveCheckpointFile` | — |
+| `memory/worker-pool.ts` | `MemoryExtractionWorkerPool` | `QueuedMemoryExtractionJob` |
+| `merge-set.ts` | `deleteMergeSetSync`, `patchMergeSetRepoSync`, `patchMergeSetReposSync` | — |
+| `model-capabilities.ts` | `modelSupportsEffortSync` (moved to its test) | — |
+| `model-fallback.ts` | `requiresExternalKeySync` (moved to its test), `detectEnabledProvidersSync`, `filterAvailableModelsSync` (moved to its test) | — |
+| `orders/resolver.ts` | `ensureOrderIssueStore` | `loadIssueServiceModule` |
+| `overdeck/affected-criteria.ts (file deleted)` | `parseAffectedCriteria` | `addCriterion`, `MAX_CRITERION`, `MIN_CRITERION` |
+| `overdeck/control-settings.ts` | `SettingsResolverLive`, `SettingsWriterLive`, `getLastCleanShutdownAt` (moved to its test), `stampBootReconciliation` (moved to its test) | `appSettings` |
+| `overdeck/conversations.ts` | `ConversationsResolverLive`, `TranscriptsResolverLive`, `TranscriptsWriterLive`, `ConversationWriterLive`, `importLegacyConversation` | `favoritesTable`, `rowToConversation`, `rowToTranscript`, `decodeConversation`, `decodeTranscript`, `rowToBackingFile`, `decodeBackingFile`, `ConvRow`, `FileRow`, `TransRow`, `conversationFilesTable`, `conversationsTable`, `transcriptsTable` |
+| `overdeck/cost-sync.ts` | `queryCostEventsSync` | — |
+| `overdeck/event-reads.ts` | `listAgentRuntimeEventEvidenceSync` | `eventTimestamp`, `AgentRuntimeEventRow` |
+| `overdeck/issues.ts` | `makeIssueWriterLive` | `isLegalMove`, `outcomeForMove`, `LEGAL` |
+| `overdeck/merge-sync.ts` | `patchMergeSetRepo`, `patchMergeSetRepos` | `MERGE_SET_REPO_CAS_FAILED` |
+| `overdeck/merge.ts` | `MergeResolverLive`, `MergeWriterLive`, `getQueueForProject` | `buildAutoMerge`, `buildMergeSet`, `buildUatGeneration`, `reduceQueues`, `MergeQueueRow`, `MergeSetRepoRow`, `MergeSetRow`, `PendingAutoMergeRow`, `UatGenerationRow`, `UatMemberRow`, `UatResolutionRow`, `mergeQueue`, `mergeSetRepos`, `mergeSets`, `pendingAutoMerges`, `uatGenerationMembers`, `uatGenerationResolutions`, `uatGenerations` |
+| `overdeck/observability.ts` | `ObservabilityLive`, `makeObservabilityLive` | `toDomainEvent` |
+| `overdeck/planning-promotion.ts` | `completePlanningFilesToStage` | — |
+| `overdeck/process-services.ts (file deleted)` | `AgentPermissionsLive` | `failPersistence`, `permissionState`, `causeMessage`, `decodePermissionDecision`, `decodePermissionRequest`, `isRecord` |
+| `overdeck/release-sync.ts` | `deleteReleaseSet` | — |
+| `paths.ts` | `LEGACY_RUNTIME_DIRS`, `piExtensionCandidates`, `getDocsDir` (moved to its test) | — |
+| `planning/spawn-planning-session.ts` | `buildPlanningAgentState` | — |
+| `projects/create-errors.ts` | `timedOutFailure`, `unknownOutcomeFailure` | `TIMEOUT_MESSAGE` |
+| `release-set.ts` | `deleteReleaseSetSync` | — |
+| `remote/remote-completion.ts` | `refreshClaudeCredentialsForActiveRemoteAgents`, `resetRemoteClaudeCredentialRefreshForTests` | `REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS`, `getHostClaudeCredentialFingerprint`, `RemoteClaudeCredentialRefreshDeps`, `perVmCredentialRefreshState`, `PerVmCredentialRefreshState` |
+| `resource-utils.ts` | `parseContainerServiceNameSync` | — |
+| `router-config.ts (file deleted)` | `generateRouterConfigFromWorkTypes`, `writeRouterConfigSync`, `getRouterConfigPath` | `ROUTER_CONFIG_FILE`, `ROUTER_CONFIG_DIR` |
+| `runtime/claude.ts (file deleted)` | — | — |
+| `runtime/index.ts (file deleted)` | — | — |
+| `runtime/interface.ts (file deleted)` | — | — |
+| `runtime/metrics.ts (file deleted)` | — | — |
+| `settings-api.ts` | `getRoleConfig` | — |
+| `settings.ts` | `saveSettingsSync`, `validateSettingsSync` | — |
+| `shadow-mode.ts` | `hasProjectShadowConfig`, `getShadowModeSummary` | — |
+| `shadow-state.ts` | `updateTrackerStatusCache`, `markAsSynced`, `getDisplayStatus` | — |
+| `skills-merge.ts` | `cleanupWorkspaceGitignoreSync`, `cleanupGitignoreSync` | — |
+| `smee.ts` | `startSmeeClient`, `stopSmeeClient`, `isSmeeRunningSync` | `scheduleRestart`, `computeRestartDelay`, `activeClient`, `restartTimeout`, `restartAttempt`, `isShuttingDown`, `MAX_RESTART_ATTEMPTS`, `BASE_RESTART_DELAY_MS`, `MAX_RESTART_DELAY_MS` |
+| `stashes.ts` | `getNextReviewTempSequence`, `isOlderThanDays` | — |
+| `state-migration-lock.ts (file deleted)` | `acquireStateMigrationLock` | — |
+| `terminal-backends/registry.ts` | `registeredTerminalBackends` | — |
+| `tmux.ts` | `buildTmuxCommandString`, `detectTerminalApiErrorSync`, `ensureManagedTmuxContextOnce` | `shellQuote` |
+| `transcript-landing.ts` | `hasNewTranscriptUserRecord` | — |
+| `xbrief/io.ts` | `recordTierPromotion`, `isPlanningProposed` | `checkPlanStatus` |
+| `xbrief/lifecycle-io.ts` | `promoteXBriefToProposed` | — |
+| `xbrief/quality-lint.ts` | `qualityLintErrors` (moved to its test) | — |
+| `xbrief/swarm-readiness.ts` | `resolveIssueFootprint`, `computeIssueFootprint` | — |
+
+### Surviving `…Sync` functions with no async twin (scope for #4002)
+
+Every exported `…Sync` function in `src/lib` (tests excluded) that `scripts/audit-effect-boundary.mjs --json` does not
+pair with a twin, and whose module exports no `foo`/`fooAsync`/`fooPromise` of the same base name, after this PR. The
+number is how many times the name appears in production files under `src`, the declaration included. 372 functions;
+one is Oh My Pi (#4003).
+
+| Module | `…Sync` functions (production references) |
+| --- | --- |
+| `activity-logger.ts` | `emitActivityDetailedSync` (4), `emitActivityEntrySync` (159), `emitActivityTtsSync` (32), `emitDashboardLifecycleSync` (5) |
+| `agent-input-detection.ts` | `detectAwaitingInputFromPaneSync` (5) |
+| `agents/activity.ts` | `getLatestSessionIdSync` (27), `resolveClaudeSessionRecoverySync` (2), `resolveLatestSessionIdSync` (10) |
+| `agents/agent-state-read.ts` | `getAgentStateSync` (276) |
+| `agents/agent-state.ts` | `clearAgentOperatorGatesForIssueSync` (3), `clearAgentOperatorGatesForIssuesSync` (3), `clearYieldForResumeSync` (6), `recordAgentActivitySync` (3), `setAgentYieldedSync` (2), `writeAgentStateJsonSync` (4) |
+| `agents/identity.ts` | `resolveAgentTargetSync` (16) |
+| `agents/monitor-transport.ts` | `listInboxMessagesSync` (3) |
+| `agents/runtime-command.ts` | `parseRoleMcpServersSync` (4), `roleSystemPromptInjectionSync` (8) |
+| `agents/staffing.ts` | `providerDefaultHarnessSync` (2) |
+| `agents/tier-fitness-context.ts` | `buildTierFitnessContextSync` (5) |
+| `backup.ts` | `backupFileSync` (3), `cleanOldBackupsSync` (3), `createBackupSync` (3), `listBackupsSync` (6), `restoreBackupSync` (3) |
+| `bridge-token.ts` | `readBridgeTokenSync` (7), `writeBridgeTokenSync` (6) |
+| `child-env.ts` | `buildChildEnvSync` (9), `buildChildEnvWithoutTmuxSync` (13) |
+| `claude-mcp.ts` | `ensureExcalidrawMcpSync` (3), `ensurePlaywrightIsolationSync` (4), `getIsolatedPlaywrightMcpConfigSync` (3) |
+| `claude-permissions.ts` | `buildClaudeUserSettingsSync` (6), `bypassPrefixForAgentFlagSync` (1), `ensureClaudePermissionFlagSync` (3), `getClaudePermissionFlagsStringSync` (17), `getClaudePermissionFlagsSync` (6), `resolvePermissionModeSync` (5) |
+| `claude-settings-file.ts` | `atomicWriteJsonSync` (6), `backupSettingsSync` (6), `findNewestBackupSync` (3), `pruneBackupsSync` (6) |
+| `cloister/cost-monitor.ts` | `recordCostSync` (1), `resetCostTrackingSync` (1) |
+| `cloister/database.ts` | `cleanupOldEventsSync` (2) |
+| `cloister/handoff-logger.ts` | `logHandoffEventSync` (3) |
+| `cloister/merge-agent.ts` | `autoCommitWorkspaceChangesBeforeSync` (2) |
+| `cloister/specialist-logs.ts` | `appendToRunLogSync` (1), `cleanupAllLogsSync` (5), `cleanupOldLogsSync` (8), `createRunLogSync` (1), `finalizeRunLogSync` (5), `getRunLogSync` (6), `listRunLogsSync` (7) |
+| `cloister/test-skip-waiver.ts` | `resolveActiveTestSkipWaiverSync` (3) |
+| `cloister/verification-tests-mode.ts` | `detectGitHubActionsTestJobSync` (2) |
+| `codex-auth.ts` | `hasActiveBurnedCodexAgentsSync` (2), `listCodexAuthBurnedAgentsSync` (3), `probeNativeCodexAuthSync` (2) |
+| `config-migration.ts` | `cleanupLegacyRuntimeSymlinksSync` (3), `convertToYamlConfigSync` (2), `hasLegacySettingsSync` (3), `migrateConfigSync` (5), `migrateSyncTargetsSync` (3), `needsMigrationSync` (7) |
+| `config-yaml/load.ts` | `getConversationSearchConfigSync` (18), `isTldrEnabledSync` (7), `loadConfigSync` (219) |
+| `config.ts` | `getDashboardApiUrlSync` (40), `getDashboardLoopbackApiUrlSync` (5), `getDefaultConfigSync` (5), `getDevrootPathSync` (3), `saveConfigSync` (12) |
+| `context-layers/detach.ts` | `detachManagedContextSync` (4) |
+| `context.ts` | `appendSummarySync` (3), `estimateTokensSync` (3), `getRecentHistorySync` (3), `listMaterializedSync` (3), `logHistorySync` (4), `materializeOutputSync` (2), `readMaterializedSync` (3), `searchHistorySync` (3) |
+| `conversations/correlator.ts` | `buildCorrelationMapSync` (3), `buildLocatorCorrelationMapSync` (3) |
+| `cost-parsers/codex-parser.ts` | `parseCodexSessionCostEventsSync` (3), `parseCodexSessionSync` (6) |
+| `cost-parsers/jsonl-parser.ts` | `getActiveSessionModelSync` (4), `getAllSessionFilesSync` (3), `getProjectDirsSync` (5), `getSessionFilesSync` (7), `parseClaudeSessionSync` (7) |
+| `cost-parsers/kimi-parser.ts` | `parseKimiSessionSync` (7) |
+| `cost-parsers/muse-parser.ts` | `parseMuseSessionSync` (4) |
+| `cost-parsers/ohmypi-parser.ts` | `parseOhmypiSessionCostResultSync` (3) (Oh My Pi, #4003) |
+| `cost-parsers/pi-parser.ts` | `parsePiSessionSync` (2) |
+| `cost.ts` | `calculateCostSync` (20), `checkBudgetSync` (6), `createBudgetSync` (5), `deleteBudgetSync` (5), `formatCostSync` (26), `generateReportSync` (3), `getAllBudgetsSync` (5), `getBudgetSync` (2), `getDailySummarySync` (3), `getMonthlySummarySync` (3), `getPricingSync` (33), `getWeeklySummarySync` (3), `readCostsSync` (7), `readIssueCostsSync` (3), `readTodayCostsSync` (3), `summarizeCostsSync` (7) |
+| `costs/aggregator.ts` | `getCostsByIssueSync` (5), `getCostsForIssueSync` (7), `loadCacheSync` (6), `rebuildCacheSync` (8), `saveCacheSync` (5), `setIssueBudgetSync` (2), `syncCacheSync` (6), `updateCacheFromEventsSync` (3) |
+| `costs/attribution.ts` | `reclassifyUnknownCostEventsSync` (3) |
+| `costs/events.ts` | `appendCostEventSync` (8), `deduplicateEventsSync` (4), `forEachCostEventSync` (3), `getEventsFileSizeSync` (4), `getLastEventMetadataSync` (5), `readEventsFromByteOffsetSync` (3), `readEventsFromLineSync` (2), `readEventsSync` (11), `replaceEventsFileSync` (6), `tailEventsSync` (4) |
+| `costs/migration.ts` | `migrateAllSessionsSync` (5), `migrateIfNeededSync` (2), `needsMigrationSync` (7) |
+| `costs/retention.ts` | `getRetentionStatusSync` (2), `needsPruningSync` (2), `pruneOldEventsSync` (2) |
+| `costs/wal.ts` | `appendToWalSync` (4) |
+| `cv.ts` | `completeWorkSync` (3), `formatCVSync` (3), `getAgentCVSync` (6), `getAgentRankingsSync` (3), `readAgentCVSync` (4), `saveAgentCVSync` (4), `startWorkSync` (5) |
+| `deploy/active-dashboard-bundle.ts` | `readActiveDashboardBundleSync` (10) |
+| `env-loader.ts` | `loadOverdeckEnvSync` (3) |
+| `harness-policy.ts` | `canUseHarnessSync` (29), `canUseModelWithAuthSync` (4) |
+| `harness-skill-sync.ts` | `executeAgentSkillsSync` (3), `planAgentSkillsSync` (3) |
+| `hooks.ts` | `checkHookSync` (8), `clearHookSync` (5), `generateFixedPointPromptSync` (7), `getHookSync` (5), `initHookSync` (6), `popFromHookSync` (3), `pushToHookSync` (3), `sendMailSync` (3) |
+| `internal-token.ts` | `ensureInternalTokenSync` (21), `getInternalTokenSync` (27) |
+| `issue-id.ts` | `extractNumberSync` (21), `extractPrefixSync` (77), `normalizeIssueIdSync` (3), `parseIssueIdSync` (108), `resolveBareNumericIdSync` (15), `resolveIssueIdSync` (27) |
+| `kimi-claude-routing.ts` | `getClaudeCodeLaunchModelSync` (6) |
+| `launcher-generator.ts` | `generateLauncherScriptSync` (29) |
+| `manifest.ts` | `collectSourceFilesSync` (18), `hashFileSync` (23), `pruneStaleManifestEntriesSync` (8), `readManifestSync` (12), `writeManifestSync` (10) |
+| `memory/fts-operations.ts` | `getMemoryFtsDatabaseSync` (7), `runMemoryFtsStatementSync` (5), `runMemoryFtsTransactionSync` (5) |
+| `merge-set.ts` | `buildMergeSetForIssueSync` (4), `ensureMergeSetForIssueSync` (11), `getMergeSetSync` (17), `upsertMergeSetSync` (27), `withRepoArtifactUrlSync` (7), `withRepoStateSync` (24) |
+| `model-capabilities.ts` | `getModelCapabilitySync` (10), `getModelEffortLevelsSync` (8), `hasModelCapabilitySync` (6), `modelSupportsImagesSync` (4), `resolveModelIdSync` (28) |
+| `model-context-windows.ts` | `apiLaunchModelIdSync` (5), `isGpt56LongContextVariantSync` (2) |
+| `model-fallback.ts` | `applyFallbackSync` (4), `applyTierAwareFallbackSync` (2), `getAvailableModelsSync` (2), `getFallbackModelSync` (2), `getModelProviderSync` (3), `getModelsByProviderSync` (2), `isOpenRouterModelSync` (2) |
+| `model-validation.ts` | `normalizeModelOverrideSync` (17), `requireModelOverrideSync` (25), `shellQuoteModelIdSync` (18) |
+| `multi-tool-sync.ts` | `resolveAlsoSyncToolsSync` (4), `runMultiToolSyncSync` (3), `syncSkillsToToolsSync` (3) |
+| `overdeck/agents.ts` | `getIssueStageSync` (3), `listAgentIdsByPrefixSync` (6) |
+| `overdeck/control-settings.ts` | `getFlywheelActiveRunIdSync` (3), `isCloisterSpawnsPausedSync` (6), `setCloisterSpawnsPausedSync` (8) |
+| `overdeck/conversation-cost-session.ts` | `findConversationForCostSessionSync` (6) |
+| `overdeck/cost-agent-stats.ts` | `getAgentCostStatsSync` (4) |
+| `overdeck/cost-sync.ts` | `getAgentDailyCostSync` (3), `getBackgroundCostBySourceSync` (3), `getCavemanExperimentDataSync` (3), `getCostForIssueAggregateSync` (7), `getCostForIssueSync` (2), `getCostSinceSync` (2), `getCostsByIssueSync` (5), `getDailyTrendsSync` (4), `getModelRollupSync` (3), `getTodayCostSync` (3), `insertCostEventSync` (5), `queryMemoryExtractionCostUsdSync` (3) |
+| `overdeck/event-reads.ts` | `readLatestAgentClaudeSessionIdEventSync` (4) |
+| `overdeck/git-activity.ts` | `appendGitOperationSync` (10), `listGitOperationsSync` (7) |
+| `overdeck/infra.ts` | `closeOverdeckDatabaseSync` (1), `dropDeadIssuesForeignKeysSync` (4), `dropPipelineStateMirrorTablesSync` (4), `getOverdeckDatabaseSync` (140), `readPipelineMirrorMarkerSync` (2) |
+| `overdeck/issue-reads.ts` | `resolveIssueProjectPathSync` (16) |
+| `overdeck/merge-sync-uat.ts` | `getUatGenerationSync` (13), `hasUncleanedTerminalUatGenerationSync` (3), `insertUatGenerationSync` (4), `listUatGenerationNamesSync` (4), `listUatGenerationsSync` (10), `listUatGenerationsWithStacksSync` (4), `markUatGenerationRepoPromotedSync` (3), `setUatGenerationStackStartedAtSync` (4), `updateUatGenerationStatusSync` (2), `updateUatGenerationSync` (4) |
+| `pan-dir/drafts.ts` | `checkPrdGateSync` (7) |
+| `persistent-logger.ts` | `logAgentLifecycleSync` (69), `logDeaconEventSync` (16) |
+| `pipeline-notifier.ts` | `notifyPipelineSync` (23), `setPipelineHandlerSync` (3) |
+| `platform-lifecycle.ts` | `readPlatformConfigSync` (13) |
+| `prd-draft.ts` | `getPRDDraftPathSync` (3) |
+| `prd-locations.ts` | `canonicalPrdSubdirSync` (4), `findPrdAnywhereSync` (8), `findPrdAtStatusSync` (6) |
+| `project-repos.ts` | `computeWorkspaceRepoRootsSync` (7), `forgeFromRemoteUrlSync` (3), `inferProjectForgeSync` (10), `normalizeForgeSync` (3), `resolveConfiguredReposSync` (6), `resolvePrimaryWorkspaceRepoDirSync` (7), `resolveProjectReposForIssueSync` (19), `resolveProjectReposFromResolvedIssueSync` (6), `resolveSlotWorkspaceWorktreesSync` (5), `resolveWorkspaceRepoRootsSync` (34) |
+| `projects-writer.ts` | `setProjectVersionSync` (4) |
+| `projects.ts` | `findProjectByPathSync` (63), `findProjectByTeamSync` (51), `hasProjectsSync` (4), `initializeProjectsConfigSync` (3), `registerProjectSync` (14), `saveProjectsConfigSync` (1), `unregisterProjectSync` (4) |
+| `projects/project-key.ts` | `findProjectKeyByPathSync` (3) |
+| `provider-health.ts` | `invalidateProbeCacheSync` (1) |
+| `providers.ts` | `clearCredentialFileAuthSync` (9), `getProviderEnvSync` (13), `getProviderForModelSync` (53), `setupCredentialFileAuthSync` (9) |
+| `release-set.ts` | `getReleaseSetSync` (5), `upsertReleaseSetSync` (6), `withComponentStateSync` (4) |
+| `remote/fly-api.ts` | `createFlyApiClientSync` (3) |
+| `remote/workspace-metadata.ts` | `deleteWorkspaceMetadataSync` (7), `findRemoteWorkspaceMetadataSync` (7), `listWorkspaceMetadataSync` (4), `loadWorkspaceMetadataSync` (23), `saveWorkspaceMetadataSync` (7) |
+| `resource-utils.ts` | `parseIssueIdFromTextSync` (10) |
+| `runtimes/acp.ts` | `createAcpRuntimeSync` (5) |
+| `runtimes/claude-code.ts` | `createClaudeCodeRuntimeSync` (4) |
+| `runtimes/codex.ts` | `createCodexRuntimeSync` (4) |
+| `runtimes/kimi-code.ts` | `createKimiCodeRuntimeSync` (4) |
+| `runtimes/muse.ts` | `createMuseRuntimeSync` (4) |
+| `runtimes/pi-fifo.ts` | `destroyPiFifoSync` (1), `writePiCommandSync` (4) |
+| `session-history.ts` | `readLatestIndexedSessionIdSync` (11), `readSessionIndexSync` (2), `readSessionIndexWithLegacySync` (4) |
+| `settings.ts` | `getAgentCommandSync` (6), `getAvailableModelsSync` (2), `getClaudeModelFlagSync` (2), `getDefaultSettingsSync` (3), `isAnthropicModelSync` (2), `loadSettingsSync` (3) |
+| `shadow-state.ts` | `needsSync` (3) |
+| `shell.ts` | `addAliasSync` (3), `detectShellSync` (3), `getAliasInstructionsSync` (3), `getShellRcFileSync` (4), `hasAliasSync` (2) |
+| `skills-merge.ts` | `applyProjectTemplateOverlaySync` (3), `mergePanSkillsIntoWorkspaceSync` (3), `mergeSkillsIntoWorkspaceSync` (9) |
+| `smart-model-selector.ts` | `selectAllModelsSync` (6), `selectModelSync` (4) |
+| `smee.ts` | `isSmeeConfiguredSync` (5), `isSmeeProcessRunningSync` (8), `startSmeeProcessSync` (8), `stopSmeeProcessSync` (6) |
+| `supervisor.ts` | `getSupervisorPortSync` (9), `getSupervisorUrlSync` (3), `isSupervisorRunningSync` (4), `startSupervisorProcessSync` (10), `stopSupervisorProcessSync` (9) |
+| `sync-hooks.ts` | `planHooksSyncSync` (8), `syncHooksSync` (6) |
+| `sync-startup-gate.ts` | `isStartupSyncNeededSync` (6), `writeSyncManifestSync` (4) |
+| `sync.ts` | `executeSyncSync` (4), `migrateStalePersonalContentSync` (3), `mirrorProjectSkillsSync` (4), `planSyncSync` (4), `refreshCacheSync` (5), `removeLegacySkills070Sync` (3), `syncContextLayersSync` (5), `syncPiSettingsSync` (3), `syncStatuslineSync` (5) |
+| `tldr-daemon.ts` | `captureTldrMetricsSync` (1), `getTldrDaemonServiceSync` (47), `getTldrMetricsSync` (4), `listTldrDaemonServicesSync` (2) |
+| `tmux.ts` | `findManagedServerPidSync` (6), `sanitizeManagedServerGlobalEnvSync` (2) |
+| `tracker-utils.ts` | `isGitHubIssueSync` (4), `parseGitHubReposSync` (2), `resolveGitHubIssueSync` (70), `resolveTrackerTypeSync` (18) |
+| `traefik.ts` | `cleanupStaleTlsSectionsSync` (5), `cleanupTemplateFilesSync` (3), `ensureProjectCertsSync` (7), `generateOverdeckTraefikConfigSync` (8), `generateTlsConfigSync` (8) |
+| `tts-speak.ts` | `buildTtsSpeakPayloadSync` (2) |
+| `webhook-handlers.ts` | `isTrackedRepositorySync` (11) |
+| `work-agent-lifecycle.ts` | `assertCanResumeSessionSync` (3), `assertCanStartFreshSync` (8) |
+| `workspace-config.ts` | `getDefaultWorkspaceConfigSync` (7), `replacePlaceholdersSync` (24) |
+| `workspace-manager/create.ts` | `ensurePolyrepoWorkspaceGitignoreSync` (2) |
+| `workspace-manager/migration.ts` | `copyOverdeckSettingsToWorkspaceSync` (9), `ensurePanGitignoreSync` (4), `migrateOverdeckToPanSync` (4) |
+| `workspace-manager/worktree-ops.ts` | `mergeDirectoryWithoutOverwriteSync` (3), `preTrustDirectorySync` (8), `restorePreWorktreeMetadataSync` (4), `stagePreWorktreeMetadataSync` (3) |
+| `workspace/devcontainer-renderer.ts` | `createWorkspacePlaceholdersSync` (4), `processTemplatesSync` (6), `renderDevcontainerSync` (10), `sanitizeComposeFileSync` (4) |
+| `workspace/ensure-devcontainer.ts` | `ensureDevcontainerSync` (11) |
+| `xbrief/acceptance-criteria.ts` | `getXBriefACStatusSync` (4) |
+| `xbrief/io.ts` | `findSpecByIssueSync` (9) |
+| `xbrief/lifecycle-io.ts` | `findXBriefByIssueSync` (7) |
+| `xbrief/lifecycle.ts` | `ensureXBriefDirsSync` (3) |
+
+### #4051 review follow-ups
+
+- `tests/unit/lib/overdeck/merge-queue.test.ts` is restored. It was the only real-DB coverage of the live
+  `markMergeProcessing(key, id, false)` (called on the deferred-verification path, `merge-ops.ts`), which moves a
+  `processing` row back to `queued` and clears `started_at`. It now observes the row with a direct `odb.raw()` read
+  instead of the deleted `getQueueForProject`. A second test pins the `WHERE status = ?` source-state guard: un-marking
+  a queued row and re-marking a processing row both match nothing.
+- `tests/lib/overdeck/cost-sync.test.ts` gets back the `getAgentCostStatsSync` assertion (`burnUsdPerHour: 1.91,
+  hypotheticalUsdPerHour: 0.25, totalUsd: 1.96`) with its fixtures on the 30-minute boundary and its
+  subscription-covered rows; that function feeds `dashboard-db-worker.ts`. Only the comparison against the deleted
+  `queryCostEventsSync` is dropped; the zero-hypothetical-rate check now runs on the snapshot built from the aggregates.
+- `canDispatchAdvancing` (`cloister/concurrency.ts`) lost its only caller, `tryReserveAdvancingSlot`, in this PR. The
+  scan missed it because `memory-verdict-cache.ts`'s header named it. It is deleted with its tests
+  (`tests/unit/lib/cloister/concurrency.test.ts` and one test in `tests/lib/cloister/concurrency.test.ts`), and the header
+  now names `memoryDrivenWorkSlots`, the real consumer.
+- **The scan counts comment mentions as uses.** A variant that ignores comments in code files finds 9 more exports
+  live only through a comment: `DEAD` `decideEscalation` (`agents/tier-escalation.ts`), `parseAgentOutput`
+  (`cloister/merge-agent.ts`), `buildPiCommand` (`launcher-generator.ts`), `createSymlinks`
+  (`workspace-manager/worktree-ops.ts`); `TESTONLY` `assignDispatchTier` (`agents/dispatch-tier.ts`),
+  `swarmJanitorPass` (`cloister/deacon-swarm.ts`), `parsePiSessionSync` (`cost-parsers/pi-parser.ts`),
+  `listEligibleCandidatesByProject` and `pickFromSequence` (`flywheel-merge-order.ts`). They are not deleted here:
+  several of their tests exercise live code through them (the merge-train route tests mock
+  `listEligibleCandidatesByProject`; the swarm-foreman liveness tests drive through `swarmJanitorPass`), so each needs
+  the same port-or-delete review as the rows above. CH-8b handles them.

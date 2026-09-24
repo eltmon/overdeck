@@ -3,19 +3,36 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  logSpecialistHandoff,
-  createSpecialistHandoff,
-  readSpecialistHandoffs,
-  readIssueSpecialistHandoffs,
-  getSpecialistHandoffStats,
-  getTodaySpecialistHandoffs,
-  updateSpecialistHandoffStatus,
-} from '../../../src/lib/cloister/specialist-handoff-logger.js';
+import { logSpecialistHandoff, createSpecialistHandoff, readSpecialistHandoffs, getSpecialistHandoffStats, updateSpecialistHandoffStatus } from '../../../src/lib/cloister/specialist-handoff-logger.js';
 import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { getOverdeckHome } from '../../../src/lib/paths.js';
+import type { SpecialistHandoff } from '../../../src/lib/cloister/specialist-handoff-logger.js';
+
+// Moved here from src/lib/cloister/specialist-handoff-logger.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Get handoffs from today
+ *
+ * @returns Array of specialist handoff events from today
+ */
+function getTodaySpecialistHandoffs(): SpecialistHandoff[] {
+  const events = readSpecialistHandoffs();
+  const today = new Date().toISOString().split('T')[0];
+  return events.filter(e => e.timestamp.startsWith(today));
+}
+
+// Moved here from src/lib/cloister/specialist-handoff-logger.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Read specialist handoff events for a specific issue
+ *
+ * @param issueId - Issue ID
+ * @returns Array of specialist handoff events for the issue
+ */
+function readIssueSpecialistHandoffs(issueId: string): SpecialistHandoff[] {
+  const allEvents = readSpecialistHandoffs();
+  return allEvents.filter(e => e.issueId === issueId);
+}
 
 function getTestLogFile(): string {
   return join(getOverdeckHome(), 'logs', 'specialist-handoffs.jsonl');

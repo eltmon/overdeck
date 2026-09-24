@@ -6,9 +6,6 @@ import {
   type CompiledGlob,
   type Wave,
 } from './dag.js';
-import { Effect } from 'effect';
-import type { FsError } from '../errors.js';
-import { findSpecByIssue } from '../pan-dir/specs.js';
 import type { FilesScopeConfidence, ItemReadiness, XBriefDocument, XBriefItem } from './types.js';
 
 export interface SwarmReadinessOptions {
@@ -41,26 +38,6 @@ export interface SwarmReadinessVerdict {
   conflictGroups: SwarmReadinessConflictGroup[];
   overlapMatrix: Record<string, Record<string, string[]>>;
   swarmEligible: boolean;
-}
-
-export function computeIssueFootprint(doc: XBriefDocument): string[] {
-  const footprint = new Set<string>();
-  for (const item of doc.plan.items) {
-    for (const filePath of item.metadata?.files_scope ?? []) {
-      footprint.add(filePath);
-    }
-  }
-  return Array.from(footprint).sort();
-}
-
-export function resolveIssueFootprint(
-  projectRoot: string,
-  issueId: string,
-): Effect.Effect<string[], FsError> {
-  return Effect.gen(function* () {
-    const spec = yield* findSpecByIssue(projectRoot, issueId);
-    return spec ? computeIssueFootprint(spec.document) : [];
-  });
 }
 
 interface NormalizedItem {

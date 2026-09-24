@@ -308,19 +308,9 @@ describe('loadSettingsApi', () => {
     expect(settings.roles?.work?.sub?.inspect?.model).toBe('claude-haiku-4-5');
   });
 
-  it('exposes flywheel role config helpers', async () => {
-    mockReadFile.mockResolvedValue('{}\n');
-    const { getRoleConfig } = await import('../settings-api.js');
-
-    expect(getRoleConfig('flywheel')).toEqual({
-      model: 'claude-opus-4-7',
-      effort: 'high',
-      maxAgents: 8,
-      scope: 'pan-only',
-    });
-  });
-
   it('removes role harness overrides when saved as null or empty', async () => {
+    // The config file this save rewrites (the deleted getRoleConfig test used to leave this mock set).
+    mockReadFile.mockResolvedValue('{}\n');
     mockLoadConfig.mockReturnValue(baseConfig({
       roles: { work: { model: 'workhorse:mid', harness: 'ohmypi' } },
     }));

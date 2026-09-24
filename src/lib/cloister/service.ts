@@ -50,7 +50,7 @@ import {
   type HealthEvent, type HealthHost,
 } from './service-health.js';
 import { checkForMassDeaths as checkForMassDeathsWithHost, handleAgentCrash as handleAgentCrashWithHost, killAgent as killAgentWithHost, pauseSpawns as pauseSpawnsWithHost, pokeAgent as pokeAgentWithHost, pokeAgentWithEscalation as pokeAgentWithEscalationWithHost, progressFingerprint as progressFingerprintWithHost, restartAgent as restartAgentWithHost, type CrashEvent, type CrashHost } from './service-crash.js';
-import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, getStatus as getStatusWithHost, type CloisterStatus, type StatusHost } from './service-status.js';
+import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, type CloisterStatus, type StatusHost } from './service-status.js';
 export {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -188,13 +188,6 @@ export class CloisterService {
   private domainEventUnsubscribe: (() => void) | null = null;
   private eventStore: CloisterEventStore | null = null;
 
-  // ─── Status cache ────────────────────────────────────────────────────────────
-  // getStatus() reads every running agent's health. Cache for 3s
-  // to absorb high-frequency dashboard polls.
-  private _statusCache: CloisterStatus | null = null;
-  private _statusCacheAt = 0;
-  private readonly STATUS_CACHE_TTL_MS = 3_000;
-
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfigSync();
   }
@@ -247,11 +240,6 @@ export class CloisterService {
   private statusHost(): StatusHost {
     const service = this;
     return {
-      get statusCache() { return service._statusCache; },
-      set statusCache(value: CloisterStatus | null) { service._statusCache = value; },
-      get statusCacheAt() { return service._statusCacheAt; },
-      set statusCacheAt(value: number) { service._statusCacheAt = value; },
-      get statusCacheTtlMs() { return service.STATUS_CACHE_TTL_MS; },
       get lastCheck() { return service.lastCheck; },
       get config() { return service.config; },
       isRunning: () => service.isRunning(),
@@ -364,7 +352,6 @@ export class CloisterService {
 
     this.running = true;
     this.starting = false;
-    this._statusCache = null;
     writeStateFile(true);
     this.emit({ type: 'started' });
     emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
@@ -444,7 +431,6 @@ export class CloisterService {
 
     console.log('🔔 Stopping Cloister agent watchdog...');
     this.running = false;
-    this._statusCache = null;
     writeStateFile(false);
 
     if (this.checkInterval) {
@@ -667,17 +653,6 @@ export class CloisterService {
    */
   private mapHeartbeatSource(source: string): string {
     return mapHeartbeatSource(this.healthHost(), source);
-  }
-
-  /**
-   * Get current status
-   *
-   * Uses a 3-second TTL cache for repeated dashboard polls: the computation
-   * lists running agents and reads every agent's health, which scales poorly
-   * with agent count.
-   */
-  getStatus(): Promise<CloisterStatus> {
-    return getStatusWithHost(this.statusHost());
   }
 
   /**

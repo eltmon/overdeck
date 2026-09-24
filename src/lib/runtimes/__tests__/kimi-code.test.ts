@@ -6,15 +6,15 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const tmuxMocks = vi.hoisted(() => ({
-  createSession: vi.fn(),
-  killSession: vi.fn(),
-  sessionExists: vi.fn(),
+  tmuxCreateSession: vi.fn(),
+  tmuxKillSession: vi.fn(),
+  tmuxSessionExists: vi.fn(),
 }));
 
 vi.mock('../tmux-cli.js', () => ({
-  tmuxCreateSession: tmuxMocks.createSession,
-  tmuxKillSession: tmuxMocks.killSession,
-  tmuxSessionExists: tmuxMocks.sessionExists,
+  tmuxCreateSession: tmuxMocks.tmuxCreateSession,
+  tmuxKillSession: tmuxMocks.tmuxKillSession,
+  tmuxSessionExists: tmuxMocks.tmuxSessionExists,
 }));
 
 const agentStateMocks = vi.hoisted(() => ({ getAgentStateSync: vi.fn(), saveAgentStateSync: vi.fn() }));
@@ -61,9 +61,9 @@ function writeWireFixture(kimiHome: string, workDir: string, sessionId: string, 
 let originalOverdeckHome: string | undefined;
 
 beforeEach(() => {
-  tmuxMocks.createSession.mockReset();
-  tmuxMocks.killSession.mockReset();
-  tmuxMocks.sessionExists.mockReset();
+  tmuxMocks.tmuxCreateSession.mockReset();
+  tmuxMocks.tmuxKillSession.mockReset();
+  tmuxMocks.tmuxSessionExists.mockReset();
   agentStateMocks.getAgentStateSync.mockReset();
   agentStateMocks.saveAgentStateSync.mockReset();
   originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -278,10 +278,10 @@ describe('KimiCodeRuntimeSync', () => {
     // A pre-existing session in the bucket must NOT be mistaken for the new one.
     writeWireFixture(kimiHome, workspace, 'session_preexisting');
 
-    tmuxMocks.createSession.mockImplementation(async () => {
+    tmuxMocks.tmuxCreateSession.mockImplementation(async () => {
       writeWireFixture(kimiHome, workspace, 'session_fresh');
     });
-    tmuxMocks.sessionExists.mockResolvedValue(true);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
 
     const writePtyTokenFor = vi.fn(async (agentId: string) => {
       const dir = join(overdeckHome, 'agents', agentId);
@@ -321,7 +321,7 @@ describe('KimiCodeRuntimeSync', () => {
       model: 'k3',
       workspace,
     });
-    expect(tmuxMocks.createSession).toHaveBeenCalledWith(
+    expect(tmuxMocks.tmuxCreateSession).toHaveBeenCalledWith(
       'agent-kimi-spawn',
       workspace,
       expect.stringContaining('launcher.sh'),
@@ -360,7 +360,7 @@ describe('KimiCodeRuntimeSync', () => {
     // it BEFORE the tmux session (and thus the supervisor process) exists.
     expect(writePtyTokenFor).toHaveBeenCalledWith('agent-kimi-spawn');
     expect(writePtyTokenFor.mock.invocationCallOrder[0]).toBeLessThan(
-      tmuxMocks.createSession.mock.invocationCallOrder[0],
+      tmuxMocks.tmuxCreateSession.mock.invocationCallOrder[0],
     );
     const tokenPath = join(overdeckHome, 'agents', 'agent-kimi-spawn', 'pty-token');
     expect(existsSync(tokenPath)).toBe(true);
@@ -377,8 +377,8 @@ describe('KimiCodeRuntimeSync', () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
     const workspace = '/tmp/kimi-timeout-workspace';
-    tmuxMocks.createSession.mockResolvedValue(undefined);
-    tmuxMocks.sessionExists.mockResolvedValue(true);
+    tmuxMocks.tmuxCreateSession.mockResolvedValue(undefined);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
 
     const runtime = new KimiCodeRuntimeSync({
       overdeckHome,
@@ -400,7 +400,7 @@ describe('KimiCodeRuntimeSync', () => {
     await drainFakeTimersUntilSettled(spawn, 250);
 
     await rejection;
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-kimi-timeout');
+    expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith('agent-kimi-timeout');
   }, 30_000);
 
   it('sendMessage delegates to deliverAgentMessage and throws on failure (AC3)', async () => {
@@ -430,7 +430,7 @@ describe('KimiCodeRuntimeSync', () => {
   it('killAgent Ctrl-C\'s the pane then escalates to SIGTERM once the first poll window lapses (AC4)', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     let terminated = false;
-    tmuxMocks.sessionExists.mockImplementation(async () => !terminated);
+    tmuxMocks.tmuxSessionExists.mockImplementation(async () => !terminated);
     const execCommand = vi.fn(async (command: string) => {
       if (command.includes('list-panes')) return { stdout: '4242\n' };
       if (command.includes('kill -TERM')) terminated = true;
@@ -446,12 +446,12 @@ describe('KimiCodeRuntimeSync', () => {
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('send-keys -t \'agent-kill\' C-c'));
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('list-panes'));
     expect(execCommand).toHaveBeenCalledWith(expect.stringContaining('kill -TERM'));
-    expect(tmuxMocks.killSession).not.toHaveBeenCalled();
+    expect(tmuxMocks.tmuxKillSession).not.toHaveBeenCalled();
   });
 
   it('falls back to tmuxKillSession when the escalation ladder cannot confirm exit', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
-    tmuxMocks.sessionExists.mockResolvedValue(true);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
     const execCommand = vi.fn(async (command: string) => {
       if (command.includes('list-panes')) return { stdout: '' };
       return { stdout: '' };
@@ -463,14 +463,14 @@ describe('KimiCodeRuntimeSync', () => {
     await vi.advanceTimersByTimeAsync(5_000); // second poll window (session never dies — no pane pid to signal)
     await killPromise;
 
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-kill-fallback');
+    expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith('agent-kill-fallback');
   });
 
   it('isRunning mirrors tmuxSessionExists (AC4)', async () => {
-    tmuxMocks.sessionExists.mockResolvedValue(true);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
     const runtime = new KimiCodeRuntimeSync({ overdeckHome: makeHome(), kimiHome: makeHome() });
     await expect(runtime.isRunning('agent-x')).resolves.toBe(true);
-    expect(tmuxMocks.sessionExists).toHaveBeenCalledWith('agent-x');
+    expect(tmuxMocks.tmuxSessionExists).toHaveBeenCalledWith('agent-x');
   });
 
   it('listSessions returns only kimi-code agents with a captured session id (AC4)', () => {

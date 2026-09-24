@@ -5,8 +5,6 @@ import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
 import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
-import { computeIssueFootprint } from './xbrief/swarm-readiness.js';
-import type { XBriefDocument } from './xbrief/types.js';
 import { findProjectByPathSync, getProjectSwarmHotspots, resolveProjectFromIssueSync } from './projects.js';
 import type { ResolvedProjectRepo } from './project-repos.js';
 
@@ -72,25 +70,6 @@ export interface MergeTrainPlan {
   serialize: string[];
   /** Full ordered list (batch, then serialize). */
   order: string[];
-}
-
-/**
- * PAN-1691 merge-train plan. Partitions the conflict-aware order into the run of
- * disjoint candidates — which can all merge in a single verification pass — and
- * the conflicting remainder, which must serialize broadest-footprint first.
- * Pure; the executor consumes this once the merge-train flag is enabled.
- */
-export function planMergeTrain<T extends MergeCandidateMeta>(candidates: ReadonlyArray<T>): MergeTrainPlan {
-  const ordered = orderMergeCandidates(candidates);
-  return {
-    batch: ordered.filter((c) => c.conflictCount === 0).map((c) => c.issueId),
-    serialize: ordered.filter((c) => c.conflictCount > 0).map((c) => c.issueId),
-    order: ordered.map((c) => c.issueId),
-  };
-}
-
-export function declaredIssueFootprint(issueId: string, doc: XBriefDocument): IssueFileFootprint {
-  return { issueId, files: computeIssueFootprint(doc), source: 'declared' };
 }
 
 function pathMatchesAnyCompiled(filePath: string, patterns: CompiledGlob[]): boolean {
@@ -161,21 +140,6 @@ export interface UatCandidatePlan {
   branchName: string;
   /** Issue IDs bundled onto the candidate — the disjoint, mergeable-together batch. */
   bundled: string[];
-}
-
-/**
- * PAN-1691 on-demand UAT candidate. In auto-merge-OFF mode the disjoint "batch"
- * (everything that can merge together in one verification pass) is bundled onto
- * a single throwaway branch the human UATs in one sitting. Pure — `dateIso` is
- * injected, and it reads the already-computed `batchGroup` off the merge queue.
- */
-export function planUatCandidate(
-  queue: ReadonlyArray<MergeQueueItem>,
-  opts: { dateIso: string; label?: string },
-): UatCandidatePlan {
-  const bundled = queue.filter((i) => i.batchGroup === 'batch').map((i) => i.issueId);
-  const day = opts.dateIso.slice(0, 10);
-  return { branchName: `uat/${opts.label ?? 'candidate'}-${day}`, bundled };
 }
 
 const branchExists = (branch: string, cwd: string) =>

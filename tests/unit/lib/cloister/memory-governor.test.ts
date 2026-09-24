@@ -65,24 +65,21 @@ vi.mock('node:os', async (importOriginal) => ({
   loadavg: (...args: unknown[]) => osMocks.loadavg(...args),
 }));
 
-import {
-  assessMemoryPressure,
-  classifyMemoryPressure,
-  nextGovernorMode,
-  resetGovernorModeForTests,
-  computeLearnedFootprintBytes,
-  estimateFootprint,
-  canAdmit,
-  getCachedMemoryVerdict,
-  selectStackShedCandidates,
-  selectAgentToPause,
-  shed,
-  type GovernorReserves,
-} from '../../../../src/lib/cloister/memory-governor.js';
+import { assessMemoryPressure, classifyMemoryPressure, nextGovernorMode, resetGovernorModeForTests, computeLearnedFootprintBytes, estimateFootprint, getCachedMemoryVerdict, selectStackShedCandidates, selectAgentToPause, shed, type GovernorReserves, readGovernorReserves } from '../../../../src/lib/cloister/memory-governor.js';
 import {
   type ResourceStack,
   type StackContainerResource,
 } from '../../../../src/dashboard/server/routes/resources/stacks.js';
+
+// Moved here from src/lib/cloister/memory-governor.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Admission predicate (PRD AC-3, pinned public shape — specialist-budget,
+ * tiered-eviction, and memory-paced-boot all call this exact signature):
+ * fits only if the footprint leaves the SOFT reserve intact.
+ */
+function canAdmit(footprintBytes: number, availableBytes: number): boolean {
+  return footprintBytes <= availableBytes - readGovernorReserves().softBytes;
+}
 
 const GIB = 1024 ** 3;
 const GOVERNOR_RESOURCES = {

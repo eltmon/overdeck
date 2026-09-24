@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'path';
-import { registerTerminalBackend, registeredTerminalBackends, resolveTerminalBackend } from '../../../../src/lib/terminal-backends/registry.js';
+import { registerTerminalBackend, resolveTerminalBackend  } from '../../../../src/lib/terminal-backends/registry.js';
 import {
   describeTerminalBackendBoot,
   herdrSessionName,
@@ -288,10 +288,6 @@ describe('terminal backend registry', () => {
     registerTerminalBackend(fakeBackend('tmux'));
   });
 
-  it('returns the adapter registered under the requested name', () => {
-    expect(resolveTerminalBackend('tmux').name).toBe('tmux');
-    expect(registeredTerminalBackends()).toContain('tmux');
-  });
 
   // One test on purpose: the throw only holds while herdr is unregistered, and
   // registration is process-wide, so asserting it in a separate `it` would

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  confirmLiveAgentTerminality,
   resolveLiveAgentTerminalityEvidence,
   pruneTerminalStoppedAgents,
   type AgentGcDeps,
@@ -66,10 +65,10 @@ describe('PAN-3513 live terminality confirmation', () => {
   it('preserves a stopped agent when the tracker is open', async () => {
     const deps = terminalityDeps({ readTrackerState: vi.fn(async () => 'open') });
 
-    await expect(confirmLiveAgentTerminality(
+    await expect(resolveLiveAgentTerminalityEvidence(
       agent('agent-pan-2503', 'stopped', 'work'),
       deps,
-    )).resolves.toBe(false);
+    )).resolves.toBeNull();
 
     expect(deps.hasLiveTmuxSession).not.toHaveBeenCalled();
   });
@@ -77,10 +76,10 @@ describe('PAN-3513 live terminality confirmation', () => {
   it('preserves a stopped agent when its tmux session is live', async () => {
     const deps = terminalityDeps({ hasLiveTmuxSession: vi.fn(async () => true) });
 
-    await expect(confirmLiveAgentTerminality(
+    await expect(resolveLiveAgentTerminalityEvidence(
       agent('agent-pan-2503', 'stopped', 'work'),
       deps,
-    )).resolves.toBe(false);
+    )).resolves.toBeNull();
 
     expect(deps.hasOpenChangeRequest).not.toHaveBeenCalled();
   });
@@ -88,10 +87,10 @@ describe('PAN-3513 live terminality confirmation', () => {
   it('preserves a stopped agent when an open PR or MR exists', async () => {
     const deps = terminalityDeps({ hasOpenChangeRequest: vi.fn(async () => true) });
 
-    await expect(confirmLiveAgentTerminality(
+    await expect(resolveLiveAgentTerminalityEvidence(
       agent('agent-pan-2503', 'stopped', 'work'),
       deps,
-    )).resolves.toBe(false);
+    )).resolves.toBeNull();
 
     expect(deps.hasInFlightReviewOrTest).not.toHaveBeenCalled();
   });
@@ -99,10 +98,10 @@ describe('PAN-3513 live terminality confirmation', () => {
   it('preserves a stopped agent when review or test work is in flight', async () => {
     const deps = terminalityDeps({ hasInFlightReviewOrTest: vi.fn(() => true) });
 
-    await expect(confirmLiveAgentTerminality(
+    await expect(resolveLiveAgentTerminalityEvidence(
       agent('agent-pan-2503', 'stopped', 'work'),
       deps,
-    )).resolves.toBe(false);
+    )).resolves.toBeNull();
   });
 
   it('preserves a stopped agent when any live check throws', async () => {

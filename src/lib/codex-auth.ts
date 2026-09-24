@@ -4,7 +4,6 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { Data } from 'effect';
 import { decodeJwtPayload, getCliproxyAuthDir, getCliproxyLogPath } from './cliproxy.js';
-import { getProviderForModelSync } from './providers.js';
 
 /**
  * Which store a codex auth status came from (PAN-2285). 'native' = the codex
@@ -179,60 +178,6 @@ function nativeCodexAuthMtimeSync(): number {
 // table — and read back through the agents-table door
 // (listOverdeckAgentStatesSync). No new store, no in-memory registry.
 
-/**
- * The revoked-token markers that appear in a burned codex agent's pane.
- *
- * The first three are the NATIVE codex CLI's own error text. PAN-3528: a
- * gpt-5.x agent on the claude-code harness never emits them — CLIProxy absorbs
- * the upstream 401 and re-surfaces it as a 503 that reads like a transient
- * server hiccup ("usually temporary — try again in a moment"), so the agent
- * retries against a permanently dead credential while the pane detector sees
- * nothing. The last two are that CLIProxy signature; `no auth available
- * (providers=codex` means CLIProxy has disabled the codex provider outright,
- * which is the same dead-credential condition as a native revoke.
- */
-const CODEX_AUTH_BURN_MARKERS = [
-  'could not be refreshed because your refresh token was revoked',
-  'token_invalidated',
-  'token_revoked',
-  'auth_unavailable',
-  'no auth available (providers=codex',
-];
-
-/**
- * Pure classifier over a codex agent's pane tail (PAN-2285). True when the pane
- * shows the revoked/invalidated refresh-token error. Exported so it is testable
- * without tmux.
- */
-export function paneShowsCodexAuthBurn(paneText: string): boolean {
-  return CODEX_AUTH_BURN_MARKERS.some((marker) => paneText.includes(marker));
-}
-
-/**
- * Is this agent's traffic authenticated by the codex credential family (PAN-3528)?
- *
- * Two routes share one credential: the native `codex` harness reads
- * ~/.codex/auth.json directly, and an openai-provider model under any other
- * harness reaches OpenAI through CLIProxy, which serves the SAME token bridged
- * into codex-primary.json. A revoked refresh token kills both. The pane patrols
- * used to check burn markers only for `harness === 'codex'`, so the CLIProxy
- * route — the standing routing for GPT models on machines that set
- * `openai.harness: claude-code` — was never scanned at all.
- *
- * An unset or unregistered model resolves to "not codex-routed" rather than
- * throwing: this runs inside deacon patrols that sweep every tmux session, and
- * one stale agent row must not kill the sweep.
- */
-export function isCodexAuthRouted(harness: string | undefined, model: string | undefined): boolean {
-  if (harness === 'codex') return true;
-  if (!model) return false;
-  try {
-    return getProviderForModelSync(model).name === 'openai';
-  } catch {
-    return false;
-  }
-}
-
 /** lastFailureReason prefix that marks an agent as codex-auth-burned. */
 export const CODEX_AUTH_BURNED_REASON_PREFIX = 'codex-auth-burned';
 
@@ -247,31 +192,6 @@ export interface CodexAuthBurnFlagState {
   troubledAt?: string;
   lastFailureReason?: string;
   lastFailureAt?: string;
-}
-
-/**
- * Mark an agent state as codex-auth-burned (PAN-2285). Pure mutation — the
- * caller persists via the agent-state write door (saveAgentStateSync), which
- * mirrors into the shared agents table so the flag crosses the deacon/server
- * process boundary. Returns true only when the state was newly flagged
- * (idempotent: an already-flagged state is left untouched), so callers can emit
- * a single operator notice instead of one per patrol tick. The flag time is
- * embedded in the reason (`codex-auth-burned[<ISO>]`) because the agents table
- * has no dedicated column for it and `troubledAt` may predate the burn when the
- * agent was already troubled for another reason.
- */
-export function applyCodexAuthBurnFlag(state: CodexAuthBurnFlagState, nowMs: number = Date.now()): boolean {
-  if (state.troubled && state.lastFailureReason?.startsWith(CODEX_AUTH_BURNED_REASON_PREFIX)) {
-    return false;
-  }
-  const nowIso = new Date(nowMs).toISOString();
-  state.troubled = true;
-  if (!state.troubledAt) state.troubledAt = nowIso;
-  state.lastFailureReason =
-    `${CODEX_AUTH_BURNED_REASON_PREFIX}[${nowIso}]: Codex refresh token was revoked — ` +
-    're-authenticate (dashboard Codex-auth banner has a Re-authenticate button, or run `codex login`)';
-  state.lastFailureAt = nowIso;
-  return true;
 }
 
 /**

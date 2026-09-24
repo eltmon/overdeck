@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   clearTestVerdictArtifact,
-  decideUnsignaledTestAction,
   readTestVerdictArtifact,
   testVerdictArtifactPath,
 } from '../test-verdict.js';
@@ -119,62 +118,4 @@ describe('test-verdict artifact (PAN-1681)', () => {
     });
   });
 
-  describe('decideUnsignaledTestAction', () => {
-    const passed = { status: 'passed' as const, notes: 'ok' };
-    const failed = { status: 'failed' as const, notes: 'boom' };
-
-    it('dead session + artifact → auto-complete from the artifact', () => {
-      expect(decideUnsignaledTestAction({ sessionLive: false, idle: false, alreadyNudged: false, artifact: passed }))
-        .toEqual({ action: 'auto-complete', status: 'passed', notes: 'ok' });
-      expect(decideUnsignaledTestAction({ sessionLive: false, idle: false, alreadyNudged: false, artifact: failed }))
-        .toEqual({ action: 'auto-complete', status: 'failed', notes: 'boom' });
-    });
-
-    it('carries the UAT latch through artifact recovery', () => {
-      const uatBlocked = {
-        status: 'passed' as const,
-        notes: 'automated gates passed',
-        uatStatus: 'failed' as const,
-        uatNotes: 'required browser flow could not run',
-      };
-      expect(decideUnsignaledTestAction({
-        sessionLive: false,
-        idle: false,
-        alreadyNudged: false,
-        artifact: uatBlocked,
-      })).toEqual({ action: 'auto-complete', ...uatBlocked });
-    });
-
-    it('dead session + no artifact → none (never guesses pass/fail)', () => {
-      expect(decideUnsignaledTestAction({ sessionLive: false, idle: false, alreadyNudged: false, artifact: null }))
-        .toEqual({ action: 'none' });
-    });
-
-    it('alive but not idle → wait', () => {
-      expect(decideUnsignaledTestAction({ sessionLive: true, idle: false, alreadyNudged: false, artifact: passed }))
-        .toEqual({ action: 'wait' });
-    });
-
-    it('alive + idle + artifact + not yet nudged → nudge-verdict', () => {
-      expect(decideUnsignaledTestAction({ sessionLive: true, idle: true, alreadyNudged: false, artifact: passed }))
-        .toEqual({ action: 'nudge-verdict', status: 'passed', notes: 'ok' });
-    });
-
-    it('alive + idle + artifact + already nudged → auto-complete', () => {
-      expect(decideUnsignaledTestAction({ sessionLive: true, idle: true, alreadyNudged: true, artifact: failed }))
-        .toEqual({ action: 'auto-complete', status: 'failed', notes: 'boom' });
-    });
-
-    it('alive + idle + no artifact + not yet nudged → nudge-write', () => {
-      expect(decideUnsignaledTestAction({ sessionLive: true, idle: true, alreadyNudged: false, artifact: null }))
-        .toEqual({ action: 'nudge-write' });
-    });
-
-    it('alive + idle + no artifact + already nudged → escalate (PAN-3092, never guesses)', () => {
-      // MIN-858 sat here for six hours: a live agent holding a finished verdict
-      // in its pane only, with `none` making the deacon go quiet forever.
-      expect(decideUnsignaledTestAction({ sessionLive: true, idle: true, alreadyNudged: true, artifact: null }))
-        .toEqual({ action: 'escalate' });
-    });
-  });
 });

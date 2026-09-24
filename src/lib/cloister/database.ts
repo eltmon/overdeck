@@ -90,47 +90,6 @@ export function getHealthDatabase(): SqliteDatabase {
 }
 
 /**
- * Close the database connection
- */
-export function closeHealthDatabase(): void {
-  if (db) {
-    db.close();
-    db = null;
-  }
-}
-
-/**
- * Write multiple health events in a transaction
- *
- * @param events - Array of health events to store
- * @returns Number of events inserted
- */
-export function writeHealthEventsSync(events: Omit<HealthEvent, 'id'>[]): number {
-  const database = getHealthDatabase();
-
-  const stmt = database.prepare(`
-    INSERT INTO health_events (agent_id, timestamp, state, previous_state, source, metadata)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-
-  const insertMany = database.transaction((eventsToInsert: Omit<HealthEvent, 'id'>[]) => {
-    for (const event of eventsToInsert) {
-      stmt.run(
-        event.agentId,
-        event.timestamp,
-        event.state,
-        event.previousState || null,
-        event.source || null,
-        event.metadata || null
-      );
-    }
-    return eventsToInsert.length;
-  });
-
-  return insertMany(events);
-}
-
-/**
  * Delete health events older than the retention period
  *
  * @param database - Database instance
@@ -152,35 +111,4 @@ export function cleanupOldEventsSync(
 
   const result = stmt.run(cutoffTimestamp);
   return result.changes;
-}
-
-/**
- * Get database statistics
- *
- * @returns Statistics about the health history database
- */
-export function getDatabaseStatsSync(): {
-  totalEvents: number;
-  uniqueAgents: number;
-  oldestEvent: string | null;
-  newestEvent: string | null;
-} {
-  const database = getHealthDatabase();
-
-  const countStmt = database.prepare('SELECT COUNT(*) as count FROM health_events');
-  const agentStmt = database.prepare('SELECT COUNT(DISTINCT agent_id) as count FROM health_events');
-  const oldestStmt = database.prepare('SELECT MIN(timestamp) as oldest FROM health_events');
-  const newestStmt = database.prepare('SELECT MAX(timestamp) as newest FROM health_events');
-
-  const totalEvents = (countStmt.get() as { count: number }).count;
-  const uniqueAgents = (agentStmt.get() as { count: number }).count;
-  const oldestEvent = (oldestStmt.get() as { oldest: string | null }).oldest;
-  const newestEvent = (newestStmt.get() as { newest: string | null }).newest;
-
-  return {
-    totalEvents,
-    uniqueAgents,
-    oldestEvent,
-    newestEvent,
-  };
 }

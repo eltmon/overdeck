@@ -13,18 +13,14 @@ vi.mock('fs', async () => {
   };
 });
 
-import {
-  getDocsBudgetStatePath,
-  getDocsDir,
-  getDocsDisableStatePath,
-  getDocsIndexPath,
-  getDocsPaths,
-  getDocsTelemetryPath,
-  packageRoot,
-  piExtensionCandidates,
-  resolvePackageRootForDir,
-} from '../paths.js';
+import { getDocsBudgetStatePath, getDocsDisableStatePath, getDocsIndexPath, getDocsPaths, getDocsTelemetryPath, resolvePackageRootForDir } from '../paths.js';
 import { claudeSessionTranscriptExists, sessionFilePath } from '../runtimes/storage/claude-code.js';
+import type { DocsPathOverrides } from '../paths.js';
+
+// Moved here from src/lib/paths.ts, which no production code called (PAN-3958 CH-8).
+function getDocsDir(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir'> = {}): string {
+  return getDocsPaths(overrides).docsDir;
+}
 
 describe('Claude session transcript paths', () => {
   it.effect('reports a present transcript', () =>
@@ -112,22 +108,3 @@ describe('resolvePackageRootForDir', () => {
   );
 });
 
-describe('piExtensionCandidates', () => {
-  it.effect('resolves from packageRoot regardless of process cwd', () =>
-    Effect.sync(() => {
-      const originalCwd = process.cwd();
-      const expected = [
-        join(packageRoot, 'dist', 'extensions', 'pi.js'),
-        join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js'),
-      ];
-
-      try {
-        expect(piExtensionCandidates()).toEqual(expected);
-        process.chdir('/tmp');
-        expect(piExtensionCandidates()).toEqual(expected);
-      } finally {
-        process.chdir(originalCwd);
-      }
-    })
-  );
-});

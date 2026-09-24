@@ -474,12 +474,6 @@ async function ensureManagedTmuxConfigAsync(): Promise<void> {
   tmuxContextPrepared = true;
 }
 
-/** Prepare the managed tmux config + server (idempotent). */
-export async function ensureManagedTmuxContextOnce(): Promise<void> {
-  const mode = getTmuxConfigMode();
-  await ensureTmuxContextPreparedAsync(mode);
-}
-
 export function getTmuxConfigMode(): TmuxConfigMode {
   const { config } = loadConfigSync();
   return config.tmux.configMode;
@@ -509,13 +503,11 @@ async function ensureTmuxContextPreparedAsync(mode: TmuxConfigMode): Promise<voi
  * Pure: returns the tmux socket/config args for the active mode.
  *
  * Callers that build a tmux command line directly (e.g., `pty.spawn('tmux',
- * buildTmuxArgs(...))`) MUST have `ensureManagedTmuxContextOnce()` awaited
- * earlier in the process lifetime, or have run a tmux command through the
- * helpers below. The dashboard server's boot call in main.ts never ran
- * (see the PAN-3958 CH-3 note there). The `tmuxExecAsync` / `tmuxExecSync`
- * helpers still call `ensureTmuxContextPrepared*` themselves (cheap after the
- * first call) so CLI entry points that never went through the server init
- * still work on first use.
+ * buildTmuxArgs(...))`) MUST have run a tmux command through the helpers below
+ * earlier in the process lifetime: `tmuxExecAsync` / `tmuxExecSync` call
+ * `ensureTmuxContextPrepared*` themselves (cheap after the first call), which
+ * prepares the managed context on first use. There is no boot-time hook (see
+ * the PAN-3958 note in the dashboard's main.ts).
  */
 export function getTmuxBaseArgs(): string[] {
   return getTmuxContextArgsForMode(getTmuxConfigMode());
@@ -527,15 +519,6 @@ export function buildTmuxArgs(args: string[]): string[] {
 
 export function getTmuxCommand(args: string[]): { command: string; args: string[] } {
   return { command: 'tmux', args: buildTmuxArgs(args) };
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'"'"'`)}'`;
-}
-
-export function buildTmuxCommandString(args: string[]): string {
-  const { command, args: commandArgs } = getTmuxCommand(args);
-  return [command, ...commandArgs.map(shellQuote)].join(' ');
 }
 
 export async function tmuxExecAsync(args: string[], options?: Parameters<typeof execFileAsync>[2]) {
@@ -821,84 +804,6 @@ export async function isHarnessProcessAlive(sessionName: string): Promise<boolea
   return paneTreeHasHarnessProcess(panePids, psTable);
 }
 
-
-/**
- * Categorizes an API failure surfaced inside an interactive Claude Code pane.
- *
- * "Terminal" here means the upstream provider returned an error that won't be
- * fixed by waiting or retrying the same request — quota exhausted, auth/login
- * required, permission denied. The CLI prints the error and returns to the
- * input prompt, which means session-alive and pane-alive checks both pass:
- * callers polling for completion will sit idle until their timeout fires.
- * Detecting these in pane content is the only reliable signal.
- *
- * Distinct from the transient family the deacon already handles
- * (Overloaded / Rate limit / 5xx / Timed out), which are nudge-to-retry.
- */
-export type TerminalApiErrorKind =
-  | 'quota_exhausted'
-  | 'auth_failed'
-  | 'permission_denied'
-  | 'login_required';
-
-export interface TerminalApiError {
-  kind: TerminalApiErrorKind;
-  /** Short, user-facing summary suitable for review_notes / dashboard text. */
-  summary: string;
-  /** First matching line from the pane, for diagnostics. */
-  raw: string;
-}
-
-const TERMINAL_API_ERROR_PATTERNS: Array<{
-  re: RegExp;
-  kind: TerminalApiErrorKind;
-  summary: string;
-}> = [
-  // Specific quota messages precede generic status codes to preserve the actionable diagnosis.
-  { re: /usage limit for this billing cycle/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted (billing cycle limit reached)' },
-  { re: /reached your usage limit/i,           kind: 'quota_exhausted', summary: 'Provider quota exhausted (usage limit reached)' },
-  { re: /(?:^|[^a-z])quota[^a-z].{0,40}(?:exceeded|exhausted|reached)/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted' },
-  { re: /You've hit your limit/i,              kind: 'quota_exhausted', summary: 'Provider usage limit reached' },
-  { re: /credit balance is too low/i,          kind: 'quota_exhausted', summary: 'Provider credit balance too low' },
-  { re: /Please run \/login/i,                 kind: 'login_required',  summary: 'Provider login required' },
-  { re: /authentication_error/i,               kind: 'auth_failed',     summary: 'Provider authentication failed' },
-  { re: /API Error:\s*401\b/i,                 kind: 'auth_failed',     summary: 'Provider rejected request (401 unauthorized)' },
-  { re: /API Error:\s*402\b|unable to verify your membership benefits/i, kind: 'permission_denied', summary: 'Provider rejected request (402 account or membership required)' },
-  { re: /permission_error/i,                   kind: 'permission_denied', summary: 'Provider returned permission_error' },
-  { re: /API Error:\s*403\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (403 forbidden)' },
-];
-
-/**
- * Scan a captured tmux pane for terminal upstream-API failures.
- * Returns the first match, or null if none. Safe to call frequently — pure
- * regex, no I/O.
- *
- * Why we collapse whitespace: real tmux captures wrap long error messages at
- * the pane width, so a phrase like "usage limit for this billing cycle" can
- * land across two or three lines. Matching against the raw capture would miss
- * those. We normalize a copy to a single-spaced string for matching, then
- * preserve the original for the `raw` diagnostics field.
- */
-export function detectTerminalApiErrorSync(paneOutput: string): TerminalApiError | null {
-  if (!paneOutput) return null;
-  const normalized = paneOutput.replace(/\s+/g, ' ');
-  for (const entry of TERMINAL_API_ERROR_PATTERNS) {
-    const match = normalized.match(entry.re);
-    if (match) {
-      // For raw, find the original line that contained the start of the
-      // match. Approximate: match.index in normalized doesn't map 1:1 to
-      // paneOutput, so just grab the first 240 chars around any line in
-      // paneOutput that contains the matched substring.
-      const matchedText = match[0];
-      const rawIdx = paneOutput.indexOf(matchedText.split(' ')[0] ?? matchedText);
-      const lineStart = rawIdx >= 0 ? paneOutput.lastIndexOf('\n', rawIdx) + 1 : 0;
-      const lineEnd = rawIdx >= 0 ? paneOutput.indexOf('\n', rawIdx) : -1;
-      const raw = paneOutput.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim().slice(0, 240);
-      return { kind: entry.kind, summary: entry.summary, raw };
-    }
-  }
-  return null;
-}
 
 // waitForClaudePromptPromise / waitForClaudePrompt removed in PAN-1596.
 // Readiness is hook-driven now: ready.json (waitForReadySignal) for post-launch

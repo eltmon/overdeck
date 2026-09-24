@@ -67,8 +67,6 @@ Overdeck stores all runtime state in `~/.overdeck/`:
   config.yaml           # Main configuration
   projects.yaml         # Multi-project registry with issue routing
   project-mappings.json # Linear project → local path mappings (legacy)
-  session-map.json      # Claude sessions → issue linking
-  runtime-metrics.json  # Runtime performance metrics
 
   skills/               # Shared skills (SKILL.md format)
   commands/             # Slash commands
@@ -181,7 +179,7 @@ When an agent is stuck (no activity for 30+ minutes), Overdeck will:
 2. Record the kill in health.json
 3. Respawn with crash recovery context
 
-The runtime data captured here — persisted to `runtime-metrics.json` in the state directory — feeds the dashboard's **Metrics** page, where per-model runtime comparisons and performance analytics let you see how different models perform across your workflow.
+The dashboard's **Metrics** page shows today's cost, agent health counts and the top spenders, served by `/api/metrics/summary` and `/api/metrics/costs` from Cloister's cost tracking.
 
 <ThemedImage
   light="/images/dashboard/metrics-light.png"

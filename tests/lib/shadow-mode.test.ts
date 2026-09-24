@@ -14,8 +14,6 @@ import {
   resolveShadowMode,
   isShadowModeEnabled,
   shouldSkipTrackerUpdate,
-  hasProjectShadowConfig,
-  getShadowModeSummary,
 } from '../../src/lib/shadow-mode.js';
 
 import {
@@ -136,35 +134,5 @@ describe('shadow-mode', () => {
     });
   });
 
-  describe('getShadowModeSummary', () => {
-    it('should return summary object with expected keys', async () => {
-      const summary = await getShadowModeSummary();
 
-      expect(summary).toHaveProperty('globalEnabled');
-      expect(summary).toHaveProperty('perTracker');
-      expect(summary).toHaveProperty('envSet');
-      expect(summary).toHaveProperty('pendingSyncCount');
-
-      expect(typeof summary.globalEnabled).toBe('boolean');
-      expect(typeof summary.perTracker).toBe('object');
-      expect(typeof summary.envSet).toBe('boolean');
-      expect(typeof summary.pendingSyncCount).toBe('number');
-    });
-
-    it('should detect environment variable', async () => {
-      process.env.SHADOW_MODE = 'true';
-
-      const summary = await getShadowModeSummary();
-      expect(summary.envSet).toBe(true);
-
-      delete process.env.SHADOW_MODE;
-    });
-  });
-
-  describe('hasProjectShadowConfig', () => {
-    it('should return a boolean', () => {
-      const result = hasProjectShadowConfig();
-      expect(typeof result).toBe('boolean');
-    });
-  });
 });

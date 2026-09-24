@@ -191,68 +191,6 @@ export async function updateShadowState(
   return state;
 }
 
-/** Update the cached tracker status of a shadowed issue. Rejects when the issue is not shadowed. */
-export async function updateTrackerStatusCache(
-  issueId: string,
-  trackerStatus: IssueState
-): Promise<ShadowState> {
-  const state = await getShadowState(issueId);
-
-  if (!state) {
-    throw new Error(`Cannot update tracker status: ${issueId} is not in shadow mode`);
-  }
-
-  state.trackerStatus = trackerStatus;
-  state.trackerStatusUpdatedAt = new Date().toISOString();
-
-  const filePath = getShadowStatePath(issueId);
-  await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
-
-  return state;
-}
-
-/** Mark a shadowed issue as synced to the tracker. */
-export async function markAsSynced(
-  issueId: string,
-  syncedState: IssueState,
-  previousTrackerState?: IssueState
-): Promise<SyncResult> {
-  const state = await getShadowState(issueId);
-
-  if (!state) {
-    return {
-      success: false,
-      error: `Issue ${issueId} is not in shadow mode`,
-    };
-  }
-
-  const now = new Date().toISOString();
-  let entriesSynced = 0;
-
-  // Mark all unsynced history entries as synced
-  for (const entry of state.history) {
-    if (!entry.syncedToTracker) {
-      entry.syncedToTracker = true;
-      entriesSynced++;
-    }
-  }
-
-  // Update sync timestamp and tracker status
-  state.syncedAt = now;
-  state.trackerStatus = syncedState;
-  state.trackerStatusUpdatedAt = now;
-
-  const filePath = getShadowStatePath(issueId);
-  await writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
-
-  return {
-    success: true,
-    syncedState,
-    previousState: previousTrackerState,
-    entriesSynced,
-  };
-}
-
 /** List every shadowed issue's state. */
 export async function listShadowedIssues(): Promise<ShadowState[]> {
   const dir = shadowStateDir();
@@ -313,33 +251,6 @@ export function removeShadowState(
       error: `Failed to remove shadow state: ${error.message}`,
     };
   }
-}
-
-/** Resolve the status to display for an issue, noting whether it is shadowed and out of sync with the tracker. */
-export async function getDisplayStatus(
-  issueId: string,
-  trackerStatus: IssueState
-): Promise<{
-  status: IssueState;
-  isShadowed: boolean;
-  trackerStatus?: IssueState;
-  outOfSync?: boolean;
-}> {
-  const state = await getShadowState(issueId);
-
-  if (!state) {
-    return {
-      status: trackerStatus,
-      isShadowed: false,
-    };
-  }
-
-  return {
-    status: state.shadowStatus,
-    isShadowed: true,
-    trackerStatus: state.trackerStatus,
-    outOfSync: state.shadowStatus !== state.trackerStatus,
-  };
 }
 
 /** Whether a shadowed issue's shadow status differs from its tracker status. */

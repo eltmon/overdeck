@@ -11,17 +11,14 @@
  * The DB row IS the source of truth (schema 90-96). ConversationWriter has no Records dep.
  */
 
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-import { Context, Effect, Layer, Schema, Stream } from 'effect';
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { Context, Effect, Schema, Stream } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import type { RuntimeName } from '../runtimes/types.js';
-import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabaseSync } from './infra.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
@@ -30,67 +27,6 @@ import { readLatestIndexedSessionIdSync } from '../session-history.js';
 // ── Local Drizzle table definitions ──────────────────────────────────────────
 // Mirror locked schema (docs/overdeck-remodel/overdeck-schema.ts:97-163).
 // No FK or index annotations here — those live in the compiled migration only.
-
-const conversationsTable = sqliteTable('conversations', {
-  id:                  text('id').primaryKey(),
-  name:                text('name').notNull(),
-  cwd:                 text('cwd').notNull(),
-  issueId:             text('issue_id'),
-  harness:             text('harness'),
-  model:               text('model'),
-  effort:              text('effort'),
-  title:               text('title'),
-  titleSource:         text('title_source'),
-  createdAt:           integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  archivedAt:          integer('archived_at', { mode: 'timestamp_ms' }),
-  handoffDocPath:      text('handoff_doc_path'),
-  handoffTargetConvId: text('handoff_target_conv_id'),
-  clearedToConvId:     text('cleared_to_conv_id'),
-  tmuxSession:         text('tmux_session'),
-  status:              text('status').notNull().default('active'),
-  endedAt:             integer('ended_at', { mode: 'timestamp_ms' }),
-  lastAttachedAt:      integer('last_attached_at', { mode: 'timestamp_ms' }),
-  sessionFile:         text('session_file'),
-  totalCost:           real('total_cost').default(0),
-  totalTokens:         integer('total_tokens').default(0),
-  forkStatus:          text('fork_status'),
-  forkError:           text('fork_error'),
-  forkRetryCount:      integer('fork_retry_count').notNull().default(0),
-  forkRequest:         text('fork_request'),
-  forkFallbackReason:  text('fork_fallback_reason'),
-  deliveryMethod:      text('delivery_method'),
-  spawnError:          text('spawn_error'),
-  projectKey:          text('project_key'),
-});
-
-const conversationFilesTable = sqliteTable('conversation_files', {
-  id:             integer('id').primaryKey({ autoIncrement: true }),
-  conversationId: text('conversation_id').notNull(),
-  harness:        text('harness').notNull(),
-  locator:        text('locator').notNull(),
-  createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-});
-
-const favoritesTable = sqliteTable('favorites', {
-  type:      text('type').notNull(),
-  itemId:    text('item_id').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-});
-
-const transcriptsTable = sqliteTable('transcripts', {
-  backingFilePath: text('backing_file_path').primaryKey(),
-  sessionId:       text('session_id'),
-  harness:         text('harness'),
-  workspacePath:   text('workspace_path'),
-  messageCount:    integer('message_count'),
-  models:          text('models', { mode: 'json' }).$type<string[] | null>(),
-  tokenInput:      integer('token_input'),
-  tokenOutput:     integer('token_output'),
-  firstTs:         integer('first_ts', { mode: 'timestamp_ms' }),
-  lastTs:          integer('last_ts', { mode: 'timestamp_ms' }),
-  panIssueId:      text('pan_issue_id'),
-  panAgentId:      text('pan_agent_id'),
-});
 
 // ── Entity schemas ────────────────────────────────────────────────────────────
 
@@ -189,59 +125,9 @@ export class NotArchived extends Schema.TaggedErrorClass<NotArchived>()(
 
 // ── Internal sync decoders (known-shape DB rows) ──────────────────────────────
 
-const decodeConversation = Schema.decodeUnknownSync(Conversation);
-const decodeTranscript   = Schema.decodeUnknownSync(Transcript);
-const decodeBackingFile  = Schema.decodeUnknownSync(BackingFile);
-
 // ── Row type aliases ───────────────────────────────────────────────────────────
 
-type ConvRow  = typeof conversationsTable.$inferSelect;
-type FileRow  = typeof conversationFilesTable.$inferSelect;
-type TransRow = typeof transcriptsTable.$inferSelect;
-
 // ── Internal row mappers ───────────────────────────────────────────────────────
-
-function rowToBackingFile(r: FileRow): BackingFile {
-  return decodeBackingFile({ harness: r.harness, locator: r.locator, createdAt: r.createdAt });
-}
-
-function rowToConversation(row: ConvRow, files: FileRow[]): Conversation {
-  return decodeConversation({
-    id:                  row.id,
-    name:                row.name,
-    cwd:                 row.cwd,
-    issueId:             row.issueId ?? null,
-    harness:             row.harness ?? null,
-    model:               row.model ?? null,
-    effort:              row.effort ?? null,
-    title:               row.title ?? null,
-    titleSource:         row.titleSource ?? null,
-    createdAt:           row.createdAt,
-    archivedAt:          row.archivedAt ?? null,
-    handoffDocPath:      row.handoffDocPath ?? null,
-    handoffTargetConvId: row.handoffTargetConvId ?? null,
-    clearedToConvId:     row.clearedToConvId ?? null,
-    projectKey:          row.projectKey ?? null,
-    files:               files.map(rowToBackingFile),
-  });
-}
-
-function rowToTranscript(r: TransRow): Transcript {
-  return decodeTranscript({
-    backingFilePath: r.backingFilePath,
-    sessionId:       r.sessionId ?? null,
-    harness:         r.harness ?? null,
-    workspacePath:   r.workspacePath ?? null,
-    messageCount:    r.messageCount ?? null,
-    models:          r.models ?? null,
-    tokenInput:      r.tokenInput ?? null,
-    tokenOutput:     r.tokenOutput ?? null,
-    firstTs:         r.firstTs ?? null,
-    lastTs:          r.lastTs ?? null,
-    panIssueId:      r.panIssueId ?? null,
-    panAgentId:      r.panAgentId ?? null,
-  });
-}
 
 // ── ConversationsResolver — read door ─────────────────────────────────────────
 
@@ -251,55 +137,6 @@ export class ConversationsResolver extends Context.Service<ConversationsResolver
   readonly getCurrent:    ()                        => Effect.Effect<Conversation, ConversationNotFound>;
   readonly getHandoffDoc: (name: ConversationName)  => Effect.Effect<string, ConversationNotFound>;
 }>()('overdeck/ConversationsResolver') {}
-
-export const ConversationsResolverLive = Layer.effect(
-  ConversationsResolver,
-  Effect.gen(function* () {
-    const db = yield* Db;
-
-    const withFiles = (row: ConvRow): Effect.Effect<Conversation> =>
-      Effect.gen(function* () {
-        const files = yield* Effect.promise(() =>
-          db.q.select().from(conversationFilesTable).where(eq(conversationFilesTable.conversationId, row.id)),
-        );
-        return rowToConversation(row, files);
-      });
-
-    const get = (name: ConversationName): Effect.Effect<Conversation, ConversationNotFound> =>
-      Effect.gen(function* () {
-        const [row] = yield* Effect.promise(() =>
-          db.q.select().from(conversationsTable).where(eq(conversationsTable.name, name)),
-        );
-        if (!row) return yield* Effect.fail(new ConversationNotFound({ name }));
-        return yield* withFiles(row);
-      });
-
-    const list = (f: ConversationFilter): Effect.Effect<ReadonlyArray<Conversation>> =>
-      Effect.gen(function* () {
-        const rows = yield* Effect.promise(() => {
-          const base = db.q.select().from(conversationsTable);
-          const conds = [];
-          if (f.archived === true)  conds.push(isNotNull(conversationsTable.archivedAt));
-          if (f.archived === false) conds.push(isNull(conversationsTable.archivedAt));
-          if (f.issueId)            conds.push(eq(conversationsTable.issueId, f.issueId));
-          return conds.length > 0 ? base.where(and(...conds)) : base;
-        });
-        return yield* Effect.forEach(rows, withFiles);
-      });
-
-    const getCurrent = (): Effect.Effect<Conversation, ConversationNotFound> =>
-      Effect.fail(new ConversationNotFound({ name: '' as ConversationName }));
-
-    const getHandoffDoc = (name: ConversationName): Effect.Effect<string, ConversationNotFound> =>
-      Effect.gen(function* () {
-        const conv = yield* get(name);
-        if (!conv.handoffDocPath) return yield* Effect.fail(new ConversationNotFound({ name }));
-        return yield* Effect.promise(() => readFile(conv.handoffDocPath!, 'utf-8'));
-      });
-
-    return ConversationsResolver.of({ get, list, getCurrent, getHandoffDoc });
-  }),
-);
 
 // ── TranscriptsResolver — shared read door (JSONL index + sacred file reads) ──
 // Read-only: no method writes a backing file or the transcripts index.
@@ -315,54 +152,6 @@ export class TranscriptsResolver extends Context.Service<TranscriptsResolver, {
   readonly search:       (query: string)           => Effect.Effect<ReadonlyArray<Transcript>>;
 }>()('overdeck/TranscriptsResolver') {}
 
-export const TranscriptsResolverLive = Layer.effect(
-  TranscriptsResolver,
-  Effect.gen(function* () {
-    const db = yield* Db;
-
-    const resolveFiles = (_subject: TranscriptSubject): Effect.Effect<ReadonlyArray<string>> =>
-      Effect.succeed([]);
-
-    const parse = (_subject: TranscriptSubject): Effect.Effect<ParsedTranscript> =>
-      Effect.succeed({ messages: [], messageCount: 0, models: [], firstTs: null, lastTs: null });
-
-    const serialize = (_subject: TranscriptSubject): Effect.Effect<string> =>
-      Effect.succeed('');
-
-    const watch = (_subject: TranscriptSubject): Stream.Stream<ParsedTranscript> =>
-      Stream.empty;
-
-    const get = (key: string): Effect.Effect<Transcript> =>
-      Effect.gen(function* () {
-        const [row] = yield* Effect.promise(() =>
-          db.q.select().from(transcriptsTable).where(eq(transcriptsTable.backingFilePath, key)),
-        );
-        if (!row) return yield* Effect.die(`Transcript not found: ${key}`);
-        return rowToTranscript(row);
-      });
-
-    const list = (_f: ConversationFilter): Effect.Effect<ReadonlyArray<Transcript>> =>
-      Effect.gen(function* () {
-        const rows = yield* Effect.promise(() => db.q.select().from(transcriptsTable));
-        return rows.map(rowToTranscript);
-      });
-
-    const stats = (): Effect.Effect<{ count: number; managed: number }> =>
-      Effect.gen(function* () {
-        const rows = yield* Effect.promise(() => db.q.select().from(transcriptsTable));
-        return {
-          count:   rows.length,
-          managed: rows.filter(r => r.panAgentId != null).length,
-        };
-      });
-
-    const search = (_query: string): Effect.Effect<ReadonlyArray<Transcript>> =>
-      Effect.succeed([]);
-
-    return TranscriptsResolver.of({ resolveFiles, parse, serialize, watch, get, list, stats, search });
-  }),
-);
-
 // ── TranscriptsWriter — cache-maintenance write door ─────────────────────────
 // Mutates the `transcripts` index (rebuilt from JSONL); NEVER writes a sacred file.
 
@@ -372,16 +161,6 @@ export class TranscriptsWriter extends Context.Service<TranscriptsWriter, {
   readonly enrich:  (ids?: ReadonlyArray<string>)  => Effect.Effect<{ enriched: number }>;
   readonly embed:   (ids?: ReadonlyArray<string>)  => Effect.Effect<{ embedded: number }>;
 }>()('overdeck/TranscriptsWriter') {}
-
-export const TranscriptsWriterLive = Layer.succeed(
-  TranscriptsWriter,
-  TranscriptsWriter.of({
-    scan:    (_dirs?) => Effect.succeed({ scanned: 0 }),
-    rebuild: (_dirs?) => Effect.succeed({ scanned: 0 }),
-    enrich:  (_ids?)  => Effect.succeed({ enriched: 0 }),
-    embed:   (_ids?)  => Effect.succeed({ embedded: 0 }),
-  }),
-);
 
 // ── ConversationWriter — write door ───────────────────────────────────────────
 // Writes ONLY the DB (conversations / favorites / conversation_files tables) and
@@ -412,195 +191,6 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
   readonly compact:     (name: ConversationName) =>
     Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>;
 }>()('overdeck/ConversationWriter') {}
-
-export const ConversationWriterLive = Layer.effect(
-  ConversationWriter,
-  Effect.gen(function* () {
-    const db       = yield* Db;
-    const bus      = yield* EventBus;
-    const resolver = yield* ConversationsResolver;
-    const now      = () => new Date();
-
-    const create = (opts: {
-      name: ConversationName; cwd: string; model?: string; effort?: string;
-      harness?: Harness; issueId?: string; projectKey?: string; title?: string;
-    }): Effect.Effect<Conversation> =>
-      Effect.gen(function* () {
-        const id = randomUUID() as unknown as ConversationId;
-        const ts = now();
-        yield* Effect.promise(() =>
-          db.q.insert(conversationsTable).values({
-            id,
-            name:        opts.name,
-            cwd:         opts.cwd,
-            issueId:     opts.issueId ?? null,
-            projectKey:  opts.projectKey ?? null,
-            harness:     opts.harness ?? null,
-            model:       opts.model ?? null,
-            effort:      opts.effort ?? 'high',
-            title:       opts.title ?? null,
-            titleSource: opts.title ? 'manual' : null,
-            createdAt:   ts,
-          }).onConflictDoNothing(),
-        );
-        yield* bus.emit({ type: 'conversation.created', payload: { name: opts.name } });
-        return decodeConversation({
-          id, name: opts.name, cwd: opts.cwd,
-          issueId: opts.issueId ?? null, projectKey: opts.projectKey ?? null,
-          harness: opts.harness ?? null,
-          model: opts.model ?? null, effort: opts.effort ?? 'high',
-          title: opts.title ?? null, titleSource: opts.title ? 'manual' : null,
-          createdAt: ts, archivedAt: null,
-          handoffDocPath: null, handoffTargetConvId: null, clearedToConvId: null,
-          files: [],
-        });
-      });
-
-    const archive = (name: ConversationName): Effect.Effect<Conversation, ConversationNotFound | AlreadyArchived> =>
-      Effect.gen(function* () {
-        const conv = yield* resolver.get(name);
-        if (conv.archivedAt) return yield* Effect.fail(new AlreadyArchived({ name }));
-        yield* Effect.promise(() =>
-          db.q.update(conversationsTable).set({ archivedAt: now() }).where(eq(conversationsTable.name, name)),
-        );
-        yield* Effect.promise(() =>
-          db.q.delete(favoritesTable).where(
-            and(eq(favoritesTable.type, 'conversation'), eq(favoritesTable.itemId, name)),
-          ),
-        );
-        yield* bus.emit({ type: 'conversation.archived', payload: { name } });
-        return yield* resolver.get(name);
-      });
-
-    const unarchive = (name: ConversationName): Effect.Effect<Conversation, ConversationNotFound | NotArchived> =>
-      Effect.gen(function* () {
-        const conv = yield* resolver.get(name);
-        if (!conv.archivedAt) return yield* Effect.fail(new NotArchived({ name }));
-        yield* Effect.promise(() =>
-          db.q.update(conversationsTable).set({ archivedAt: null }).where(eq(conversationsTable.name, name)),
-        );
-        yield* bus.emit({ type: 'conversation.unarchived', payload: { name } });
-        return yield* resolver.get(name);
-      });
-
-    const setFavorite = (type: 'conversation' | 'project', itemId: string): Effect.Effect<void> =>
-      Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          db.q.insert(favoritesTable).values({ type, itemId, createdAt: now() }).onConflictDoNothing(),
-        );
-        yield* bus.emit({ type: 'conversation.favorited', payload: { type, itemId } });
-      });
-
-    const unsetFavorite = (type: 'conversation' | 'project', itemId: string): Effect.Effect<void> =>
-      Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          db.q.delete(favoritesTable).where(
-            and(eq(favoritesTable.type, type), eq(favoritesTable.itemId, itemId)),
-          ),
-        );
-        yield* bus.emit({ type: 'conversation.unfavorited', payload: { type, itemId } });
-      });
-
-    const retitle = (name: ConversationName, title: string, source: 'manual' | 'auto' | 'ai'):
-      Effect.Effect<Conversation, ConversationNotFound> =>
-      Effect.gen(function* () {
-        yield* resolver.get(name);
-        yield* Effect.promise(() =>
-          db.q.update(conversationsTable).set({ title, titleSource: source }).where(eq(conversationsTable.name, name)),
-        );
-        yield* bus.emit({ type: 'conversation.retitled', payload: { name, title, source } });
-        return yield* resolver.get(name);
-      });
-
-    const setModel = (name: ConversationName, model: string):
-      Effect.Effect<Conversation, ConversationNotFound> =>
-      Effect.gen(function* () {
-        yield* resolver.get(name);
-        yield* Effect.promise(() =>
-          db.q.update(conversationsTable).set({ model }).where(eq(conversationsTable.name, name)),
-        );
-        yield* bus.emit({ type: 'conversation.modelChanged', payload: { name, model } });
-        return yield* resolver.get(name);
-      });
-
-    const setHarness = (name: ConversationName, harness: Harness):
-      Effect.Effect<Conversation, ConversationNotFound> =>
-      Effect.gen(function* () {
-        yield* resolver.get(name);
-        yield* Effect.promise(() =>
-          db.q.update(conversationsTable).set({ harness }).where(eq(conversationsTable.name, name)),
-        );
-        yield* bus.emit({ type: 'conversation.harnessChanged', payload: { name, harness } });
-        return yield* resolver.get(name);
-      });
-
-    const setProjectKey = (name: ConversationName, projectKey: string | null):
-      Effect.Effect<Conversation, ConversationNotFound> =>
-      Effect.gen(function* () {
-        yield* resolver.get(name);
-        yield* Effect.promise(() =>
-          db.q.update(conversationsTable).set({ projectKey }).where(eq(conversationsTable.name, name)),
-        );
-        yield* bus.emit({ type: 'conversation.projectKeyChanged', payload: { name, projectKey } });
-        return yield* resolver.get(name);
-      });
-
-    // The fork primitive — the ONLY mechanism that creates a new backing file.
-    // Creates a fresh UUID locator, registers a conversation_files pointer, records lineage.
-    // NEVER opens an existing file for write.
-    const forkNewFile = (
-      source: ConversationName,
-      kind: 'handoff' | 'clear' | 'summary' | 'plain' | 'harness-switch' | 'compaction',
-      opts?: { docPath?: string },
-    ): Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound> =>
-      Effect.gen(function* () {
-        const conv = yield* resolver.get(source);
-        const newLocator = randomUUID();
-        yield* Effect.promise(() =>
-          db.q.insert(conversationFilesTable).values({
-            conversationId: conv.id,
-            harness:        conv.harness ?? 'claude-code',
-            locator:        newLocator,
-            createdAt:      now(),
-          }).onConflictDoNothing(),
-        );
-        if (kind === 'handoff') {
-          yield* Effect.promise(() =>
-            db.q.update(conversationsTable).set({
-              handoffDocPath:      opts?.docPath ?? null,
-              handoffTargetConvId: conv.id,
-            }).where(eq(conversationsTable.name, source)),
-          );
-        } else if (kind === 'clear') {
-          yield* Effect.promise(() =>
-            db.q.update(conversationsTable)
-              .set({ clearedToConvId: conv.id })
-              .where(eq(conversationsTable.name, source)),
-          );
-        }
-        yield* bus.emit({ type: 'conversation.forked', payload: { source, kind } });
-        return { conversation: conv, backingFile: newLocator };
-      });
-
-    const handoff = (source: ConversationName, _target: ConversationName, docPath: string) =>
-      forkNewFile(source, 'handoff', { docPath });
-
-    const clear = (source: ConversationName) =>
-      forkNewFile(source, 'clear');
-
-    const summaryFork = (source: ConversationName, opts: { mode: 'summary' | 'plain'; model?: string }) =>
-      forkNewFile(source, opts.mode === 'summary' ? 'summary' : 'plain');
-
-    const compact = (name: ConversationName) =>
-      forkNewFile(name, 'compaction');
-
-    return ConversationWriter.of({
-      create, archive, unarchive, setFavorite, unsetFavorite,
-      retitle, setModel, setHarness, setProjectKey,
-      handoff, clear, summaryFork, compact,
-    });
-  }),
-);
 
 // ── ConversationsApi — HttpApiGroup (controller declarations) ─────────────────
 // Handlers wire in at bootstrap; R = ConversationsResolver | TranscriptsResolver |
@@ -1519,52 +1109,4 @@ export interface ImportLegacyConversationMapped {
   forkFallbackReason: string | null;
   forkRequest: string | null;
   forkRetryCount: number;
-}
-
-export function importLegacyConversation(mapped: ImportLegacyConversationMapped): { uuid: string } {
-  const db = overdeckDb();
-  const uuid = randomUUID();
-  db.transaction(() => {
-    db.prepare(`
-      INSERT OR IGNORE INTO conversations
-        (id, name, cwd, harness, model, effort, title, title_source, created_at, archived_at,
-         tmux_session, status, ended_at, last_attached_at, session_file, total_cost, total_tokens,
-         fork_status, fork_error, fork_retry_count, fork_request, fork_fallback_reason,
-         delivery_method, spawn_error, handoff_doc_path, handoff_target_conv_id, cleared_to_conv_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
-    `).run(
-      uuid,
-      mapped.name,
-      mapped.cwd,
-      mapped.harness,
-      mapped.model,
-      mapped.effort,
-      mapped.title,
-      mapped.titleSource,
-      mapped.createdAt,
-      mapped.archivedAt,
-      mapped.tmuxSession ?? `conv-${mapped.name}`,
-      mapped.status,
-      mapped.endedAt,
-      mapped.lastAttachedAt,
-      mapped.sessionFile,
-      mapped.totalCost,
-      mapped.totalTokens,
-      mapped.forkStatus,
-      mapped.forkError,
-      mapped.forkRetryCount,
-      mapped.forkRequest,
-      mapped.forkFallbackReason,
-      mapped.deliveryMethod,
-      mapped.spawnError,
-      mapped.handoffDocPath,
-    );
-    if (mapped.claudeSessionId) {
-      db.prepare(`
-        INSERT OR IGNORE INTO conversation_files (conversation_id, harness, locator, created_at)
-        VALUES (?, ?, ?, ?)
-      `).run(uuid, mapped.harness ?? 'claude-code', mapped.claudeSessionId, mapped.createdAt);
-    }
-  })();
-  return { uuid };
 }

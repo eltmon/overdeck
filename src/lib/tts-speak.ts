@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import type { NormalizedTtsDaemonConfig } from './config-yaml.js';
 import { getTtsDaemonAuthHeaders } from './tts-daemon.js';
 import { findVoiceById, type TtsVoice } from './tts-voices.js';
@@ -35,17 +34,9 @@ export interface TtsSpeakPayload {
   embedding?: number[];
 }
 
-type PromiseOrProgram<T> = Promise<T> | Effect.Effect<T, unknown, never>;
-
-async function runPromiseOrProgram<T>(value: PromiseOrProgram<T>): Promise<T> {
-  return typeof (value as { pipe?: unknown }).pipe === 'function'
-    ? Effect.runPromise(value as Effect.Effect<T, unknown, never>)
-    : value as Promise<T>;
-}
-
 export interface ResolveAndSpeakDeps {
   config: NormalizedTtsDaemonConfig;
-  findVoiceById?: (id: string) => PromiseOrProgram<TtsVoice | undefined>;
+  findVoiceById?: (id: string) => Promise<TtsVoice | undefined>;
   fetch?: FetchLike;
   timeoutMs?: number;
 }
@@ -188,7 +179,7 @@ export async function resolveAndSpeak(
   const voiceId = resolveVoiceId(options, config).trim();
   if (!voiceId) return 'no-voice';
 
-  const voice = await runPromiseOrProgram((deps.findVoiceById ?? findVoiceById)(voiceId));
+  const voice = await (deps.findVoiceById ?? findVoiceById)(voiceId);
   if (!voice) return 'no-voice';
 
   return postSpeakPayload(buildTtsSpeakPayloadSync(voice, text, config), config, deps);

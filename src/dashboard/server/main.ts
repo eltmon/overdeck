@@ -120,12 +120,11 @@ await mkdir(getOverdeckHome(), { recursive: true });
 ensureInternalTokenSync();
 
 // PAN-785 prepared the managed tmux context here, before any code path could spawn
-// tmux. Since PAN-1379 made `ensureManagedTmuxContextOnce` an Effect, the
-// `await` here returned the unrun Effect and prepared nothing: the context has
-// been prepared lazily by the first `tmuxExecAsync` call instead. PAN-3958 CH-3
-// removed the dead call rather than start running it. Running it would start a
-// persistent (`exit-empty off`) managed tmux server at boot on Herdr hosts,
-// through a sync `execFileSync` path. Restoring it is an operator decision.
+// tmux. Since PAN-1379 made that boot hook an Effect, the `await` here returned
+// the unrun Effect and prepared nothing: the context has been prepared lazily by
+// the first `tmuxExecAsync` call instead. PAN-3958 CH-3 removed the dead call and
+// CH-8 the unused hook. Preparing the context at boot would start a persistent
+// (`exit-empty off`) managed tmux server on Herdr hosts; that is an operator decision.
 // Cache .overdeck.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 await initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .overdeck.env:', err.message);

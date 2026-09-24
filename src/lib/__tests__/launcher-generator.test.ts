@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
+import { generateLauncherScriptSync, type LauncherConfig  } from '../launcher-generator.js';
 
 // Pin OVERDECK_HOME to an empty temp dir so the COLORFGBG export (derived
 // from ~/.overdeck/ui-theme.json) deterministically uses the dark default
@@ -1248,48 +1248,9 @@ describe('generateLauncherScript', () => {
 });
 
 describe('generateLauncherWrapper', () => {
-  it('returns null when not using script wrapper', () => {
-    const wrapper = generateLauncherWrapperSync({
-      ...DEFAULT_CONFIG,
-      useScriptWrapper: false,
-    });
-    expect(wrapper).toBeNull();
-  });
 
-  it('returns null when scriptLogFile is missing', () => {
-    const wrapper = generateLauncherWrapperSync({
-      ...DEFAULT_CONFIG,
-      useScriptWrapper: true,
-    });
-    expect(wrapper).toBeNull();
-  });
 
-  it('generates script wrapper with innerScriptPath', () => {
-    const wrapper = generateLauncherWrapperSync({
-      ...DEFAULT_CONFIG,
-      useScriptWrapper: true,
-      scriptLogFile: '/tmp/log.txt',
-      innerScriptPath: '/tmp/run-claude.sh',
-    });
-    expect(wrapper).toMatchInlineSnapshot(`
-      "#!/bin/bash
-      exec script -qfaec "bash '/tmp/run-claude.sh'" '/tmp/log.txt'
-      "
-    `);
-  });
 
-  it('falls back to workingDir-based inner script path', () => {
-    const wrapper = generateLauncherWrapperSync({
-      ...DEFAULT_CONFIG,
-      useScriptWrapper: true,
-      scriptLogFile: '/tmp/log.txt',
-    });
-    expect(wrapper).toMatchInlineSnapshot(`
-      "#!/bin/bash
-      exec script -qfaec "bash '/workspace/project/run-claude.sh'" '/tmp/log.txt'
-      "
-    `);
-  });
 
   describe('channels bridge args', () => {
     const FIXTURE_CONFIG: LauncherConfig = {

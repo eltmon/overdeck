@@ -159,10 +159,3 @@ export function getReleaseSetFromDb(issueId: string): ReleaseSet | null {
   if (!row) return null;
   return rowToReleaseSet(row, loadComponentsForReleaseSet(db, issueId));
 }
-
-/** Delete a release set and its component rows. */
-export function deleteReleaseSet(issueId: string): void {
-  const db = getOverdeckDatabaseSync();
-  // Components are deleted via ON DELETE CASCADE; delete the parent explicitly.
-  db.prepare('DELETE FROM release_sets WHERE issue_id = ?').run(issueId);
-}

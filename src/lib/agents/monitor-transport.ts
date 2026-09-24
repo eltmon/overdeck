@@ -21,8 +21,6 @@ import { getAgentDir } from './agent-state.js';
 
 /** Presence heartbeat cadence for a running monitor. */
 export const MONITOR_HEARTBEAT_INTERVAL_MS = 15_000;
-/** A heartbeat older than this (3 missed beats) means the monitor is gone. */
-export const MONITOR_PRESENCE_FRESHNESS_MS = 45_000;
 /** Monitor stdout blocks truncate here; `pan inbox` re-reads full bodies. */
 export const MONITOR_BLOCK_MAX_BODY_CHARS = 4_000;
 
@@ -65,33 +63,6 @@ export function clearMonitorPresence(agentId: string): void {
     rmSync(monitorPresencePath(agentId), { force: true });
   } catch {
     // Best-effort; a stale file is caught by the freshness/pid checks.
-  }
-}
-
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * A monitor counts as live only with BOTH a fresh heartbeat and a live pid —
- * a dead monitor must fall through to keystroke transports, not strand the
- * message unread (it stays durable in mail/ either way).
- */
-export function isMonitorLive(agentId: string, nowMs: number = Date.now()): boolean {
-  try {
-    const raw = readFileSync(monitorPresencePath(agentId), 'utf-8');
-    const presence = JSON.parse(raw) as Partial<MonitorPresence>;
-    if (typeof presence.pid !== 'number' || typeof presence.heartbeatAt !== 'string') return false;
-    const beatMs = Date.parse(presence.heartbeatAt);
-    if (!Number.isFinite(beatMs) || nowMs - beatMs > MONITOR_PRESENCE_FRESHNESS_MS) return false;
-    return isPidAlive(presence.pid);
-  } catch {
-    return false;
   }
 }
 

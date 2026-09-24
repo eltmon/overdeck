@@ -194,22 +194,6 @@ export function listSlotCompletions(issueId: string, workspace: string): Record<
   return readSwarmSlotState(workspace, issueId)?.slotCompletions ?? {};
 }
 
-export function listSlotOwnership(issueId: string, workspace: string): ReconciledSlotAssignment[] {
-  const byItemId = new Map<string, ReconciledSlotAssignment>();
-  for (const assignment of listSlotAssignments(issueId, workspace)) {
-    byItemId.set(assignment.itemId, assignment);
-  }
-  for (const agent of listSlotAgents(issueId)) {
-    if (!agent.slotItemId || byItemId.has(agent.slotItemId)) continue;
-    byItemId.set(agent.slotItemId, {
-      slotIndex: agent.slotIndex,
-      itemId: agent.slotItemId,
-      agentId: agent.agentId,
-    });
-  }
-  return [...byItemId.values()].sort((a, b) => a.slotIndex - b.slotIndex);
-}
-
 async function gitBranchNames(workspace: string, pattern: string, merged: boolean): Promise<string[]> {
   const { stdout } = await execAsync(
     `git branch ${merged ? '--merged HEAD ' : ''}--list ${JSON.stringify(pattern)}`,

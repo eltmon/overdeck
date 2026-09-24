@@ -11,7 +11,6 @@ import {
   isValidAgentDirectoryName,
   isConversationDirectory,
   isExternalAgentDirectory,
-  getPlanningIssueId,
   getAgentDirectoryIssueId,
   findOrphanedAgentDirs,
   cleanupAgentDirectories,
@@ -140,27 +139,6 @@ describe('isConversationDirectory', () => {
     expect(isConversationDirectory('agent-pan-801')).toBe(false);
     expect(isConversationDirectory('planning-pan-801')).toBe(false);
     expect(isConversationDirectory('random-dir')).toBe(false);
-  });
-});
-
-// ------------------------------------------------------------------
-// getPlanningIssueId
-// ------------------------------------------------------------------
-
-describe('getPlanningIssueId', () => {
-  it('extracts issue ID from valid planning directories', () => {
-    expect(getPlanningIssueId('planning-pan-801')).toBe('pan-801');
-    expect(getPlanningIssueId('planning-min-5')).toBe('min-5');
-  });
-
-  it('returns null for invalid planning directories', () => {
-    expect(getPlanningIssueId('planning-PAN-123')).toBeNull(); // uppercase
-    expect(getPlanningIssueId('planning-108')).toBeNull(); // bare numeric
-  });
-
-  it('returns null for non-planning directories', () => {
-    expect(getPlanningIssueId('agent-pan-801')).toBeNull();
-    expect(getPlanningIssueId('conv-20260411-1125')).toBeNull();
   });
 });
 

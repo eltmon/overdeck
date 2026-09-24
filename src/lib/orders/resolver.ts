@@ -124,6 +124,13 @@ export const liveOrderIssueLookup: OrderIssueLookup = (issueIds) => {
   return result;
 };
 
+/**
+ * Load the issue-service module through `import()` and start the shared service without polling.
+ *
+ * Test seam: no production caller (the dashboard starts the shared service itself). Tests call it so
+ * the resolver's module cache holds the mocked issue-service module, which the `require()` path in
+ * `loadIssueServiceModuleSync` cannot reach (PAN-3958 CH-8).
+ */
 export async function ensureOrderIssueStore(): Promise<void> {
   const { startSharedIssueService } = await loadIssueServiceModule();
   await startSharedIssueService({ skipPolling: true });

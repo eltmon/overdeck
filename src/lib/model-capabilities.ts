@@ -1394,15 +1394,6 @@ export function getModelEffortLevelsSync(model: ModelId | string): readonly Effo
 }
 
 /**
- * Whether a model accepts the given effort level. Returns true when the model
- * has no enumerated effort levels (permissive fallback — see {@link getModelEffortLevelsSync}).
- */
-export function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
-  const levels = getModelEffortLevelsSync(model);
-  return levels === undefined || levels.length === 0 || levels.includes(effort);
-}
-
-/**
  * Whether image attachments may be sent to a model. Permissive by design:
  * returns `false` ONLY for models proven text-only (`supportsImages === false`);
  * `true` and unverified (`undefined`) both allow, so the harness/provider stays

@@ -347,15 +347,6 @@ export async function estimateFootprint(role: FootprintRole, projectKey: string)
   return learned ?? coldStartFootprintBytes(role);
 }
 
-/**
- * Admission predicate (PRD AC-3, pinned public shape — specialist-budget,
- * tiered-eviction, and memory-paced-boot all call this exact signature):
- * fits only if the footprint leaves the SOFT reserve intact.
- */
-export function canAdmit(footprintBytes: number, availableBytes: number): boolean {
-  return footprintBytes <= availableBytes - readGovernorReserves().softBytes;
-}
-
 // --- PAN-2500 tiered-eviction ------------------------------------------------
 //
 // shed() runs under HARD pressure, reclaiming cheapest-value-first: merged/

@@ -1,5 +1,5 @@
 import { getHarnessBehavior } from '@overdeck/contracts';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
 
 // Model identifiers
@@ -166,42 +166,6 @@ export function loadSettingsSync(): SettingsConfig {
   };
 
   return settings;
-}
-
-/**
- * Save settings to ~/.overdeck/settings.json
- * Writes with pretty formatting (2-space indent)
- */
-export function saveSettingsSync(settings: SettingsConfig): void {
-  const content = JSON.stringify(settings, null, 2);
-  writeFileSync(SETTINGS_FILE, content, 'utf8');
-}
-
-/**
- * Validate settings structure and model IDs
- * Returns error message if invalid, null if valid
- */
-export function validateSettingsSync(settings: SettingsConfig): string | null {
-  // Validate models structure
-  if (!settings.models) {
-    return 'Missing models configuration';
-  }
-
-  // Validate specialists
-  if (!settings.models.specialists) {
-    return 'Missing specialists configuration';
-  }
-  const specialists = settings.models.specialists;
-  if (!specialists.review_agent || !specialists.test_agent || !specialists.merge_agent) {
-    return 'Missing specialist agent model configuration';
-  }
-
-  // Validate api_keys structure (optional keys)
-  if (!settings.api_keys) {
-    return 'Missing api_keys configuration';
-  }
-
-  return null;
 }
 
 /**

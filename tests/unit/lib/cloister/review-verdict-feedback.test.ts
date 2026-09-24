@@ -72,7 +72,6 @@ vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/swarm-slot-reconcile.js', () => ({
-  listSlotOwnership: vi.fn(() => []),
 }));
 
 // The pipeline journal is real (temp workspaces); only its event fan-out is silenced.

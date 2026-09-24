@@ -1,10 +1,14 @@
 /**
  * Internal entry; not a supported library API (PAN-3958 Q1).
  *
- * `package.json` points `main` here so the build has an entry, but nothing in
- * this repository imports `@overdeck/core` as a library and no documentation
- * describes library use. Names re-exported below may be removed in any release;
- * removals are listed in the release notes.
+ * `package.json` points `main` here. No package imports `@overdeck/core` as a
+ * library and no documentation describes library use, so names re-exported
+ * below may be removed in any release; removals are listed in the release notes.
+ *
+ * One in-repo consumer: `scripts/build-docs-index.mjs` (run by `npm run build`
+ * through `scripts/build-post-cli.mjs`) loads `dist/index.js` and uses
+ * `buildDocsIndex`, `DEFAULT_DOCS_INDEX_PATH`, `DEFAULT_DOCS_INDEX_MAX_BYTES` and
+ * `getDocsIndexPath`. Keep those four exported.
  */
 export * from './lib/paths.js';
 export * from './lib/config.js';

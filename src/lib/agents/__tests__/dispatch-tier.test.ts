@@ -1,11 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { XBriefDocument, XBriefItem } from '../../xbrief/types.js';
-import {
-  assignDispatchTier,
-  chooseDispatchTier,
-  chooseTierAssignment,
-  type TierAssignmentConfig,
-} from '../dispatch-tier.js';
+import { assignDispatchTier, chooseDispatchTier, type TierAssignmentConfig } from '../dispatch-tier.js';
 import { ResolveTierError } from '../resolve-tier.js';
 
 vi.mock('../../config-yaml.js', async (importOriginal) => {
@@ -22,7 +17,21 @@ vi.mock('../../xbrief/io.js', () => ({
 
 import { loadConfigSync } from '../../config-yaml.js';
 import { readTierOverrides, readWorkspacePlanSync } from '../../xbrief/io.js';
-import { applyTierAssignment, logTierFitnessAtSpawn, resolveSingleWorkTierSpawnParams, resolveSlotSpawnFitness, resolveSlotTierSpawnParams } from '../spawn-prep.js';
+import { logTierFitnessAtSpawn, resolveSingleWorkTierSpawnParams, resolveSlotSpawnFitness, resolveSlotTierSpawnParams  } from '../spawn-prep.js';
+import type { TierAssignment } from '../dispatch-tier.js';
+
+// Moved here from src/lib/agents/dispatch-tier.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Plan-metadata-agnostic entry point: honors only the global enabled flag.
+ * Kept for callers that resolve the per-plan override themselves (or have
+ * no plan in scope, e.g. the enablement-gate parity tests).
+ */
+function chooseTierAssignment(
+  item: Pick<XBriefItem, 'id' | 'title' | 'metadata'>,
+  tiering?: TierAssignmentConfig,
+): TierAssignment {
+  return assignDispatchTier(item, tiering);
+}
 
 const TIER_CONFIG: TierAssignmentConfig = {
   enabled: true,
@@ -461,20 +470,6 @@ describe('resolveSingleWorkTierSpawnParams', () => {
   });
 });
 
-describe('applyTierAssignment', () => {
-  it('carries the resolved model and harness into spawn params over the parent default', () => {
-    const assignment = chooseTierAssignment(item({ difficulty: 'expert' }), TIERING);
-    const options = applyTierAssignment({ model: 'gpt-5.5', harness: 'codex' as const }, assignment);
-    expect(options.model).toBe('claude-opus-4-8');
-    expect(options.harness).toBe('claude-code');
-  });
-
-  it('passes spawn params through unchanged when no assignment resolved a tier', () => {
-    const parent = { model: 'gpt-5.5', harness: 'codex' as const };
-    expect(applyTierAssignment(parent, undefined)).toBe(parent);
-    expect(applyTierAssignment(parent, { dispatch: 'in-context' })).toBe(parent);
-  });
-});
 
 describe('spawn-time tier fitness logging (PAN-3842)', () => {
   function planDoc(items: XBriefItem[]): XBriefDocument {

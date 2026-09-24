@@ -158,23 +158,6 @@ export interface PlanningAgentStateInput {
   startedAt?: string;
 }
 
-export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<string, unknown> {
-  return {
-    id: input.sessionName,
-    issueId: input.issueId,
-    workspace: input.workspacePath,
-    model: input.model,
-    status: 'running',
-    startedAt: input.startedAt ?? new Date().toISOString(),
-    role: 'plan',
-    harness: input.harness,
-    location: input.workspaceLocation,
-    auto: input.auto === true,
-    autoSpawnOnFinalize: input.autoSpawnOnFinalize === true,
-    startedBy: input.startedBy,
-  };
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**

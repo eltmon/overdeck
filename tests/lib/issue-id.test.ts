@@ -7,8 +7,6 @@ import {
   extractPrefixSync,
   extractNumberSync,
   normalizeIssueIdSync,
-  extractStandardPrefixSync,
-  extractStandardNumberSync,
   resolveIssueIdSync,
   resolveBareNumericIdSync,
 } from '../../src/lib/issue-id.js';
@@ -242,33 +240,7 @@ describe('normalizeIssueId', () => {
   });
 });
 
-describe('extractStandardPrefix', () => {
-  it('extracts prefix from standard format', () => {
-    expect(extractStandardPrefixSync('MIN-123')).toBe('MIN');
-  });
 
-  it('returns null for Rally format', () => {
-    expect(extractStandardPrefixSync('F29698')).toBeNull();
-  });
-
-  it('returns null for invalid format', () => {
-    expect(extractStandardPrefixSync('notanid')).toBeNull();
-  });
-});
-
-describe('extractStandardNumber', () => {
-  it('extracts number from standard format', () => {
-    expect(extractStandardNumberSync('MIN-123')).toBe(123);
-  });
-
-  it('returns null for Rally format', () => {
-    expect(extractStandardNumberSync('F29698')).toBeNull();
-  });
-
-  it('returns null for invalid format', () => {
-    expect(extractStandardNumberSync('notanid')).toBeNull();
-  });
-});
 
 describe('resolveBareNumericIdSync (PAN-1173 regression)', () => {
   it('returns null when no agent state matches the bare number', () => {

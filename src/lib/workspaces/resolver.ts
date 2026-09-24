@@ -81,6 +81,7 @@ export function getWorkspaceById(id: string): WorkspaceRow | null {
   return row ? rowToWorkspace(row) : null;
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function getWorkspaceByName(projectId: string, name: string): WorkspaceRow | null {
   const db = getOverdeckDatabaseSync();
   const row = db

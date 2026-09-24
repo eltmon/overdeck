@@ -184,13 +184,6 @@ export async function resolveLiveAgentTerminalityEvidence(
   };
 }
 
-export async function confirmLiveAgentTerminality(
-  agent: AgentGcRow,
-  deps: AgentGcTerminalityDeps = defaultTerminalityDeps(),
-): Promise<boolean> {
-  return (await resolveLiveAgentTerminalityEvidence(agent, deps)) !== null;
-}
-
 function emitAgentGcPruneEvent(
   agent: AgentGcRow,
   entry: AgentGcPruneEntry,

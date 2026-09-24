@@ -221,10 +221,6 @@ export class ArtifactIndexRepository {
   }
 }
 
-export function createArtifactIndexRepository(options: ArtifactIndexOptions = {}): ArtifactIndexRepository {
-  return new ArtifactIndexRepository(options);
-}
-
 function initializeArtifactIndexSchema(db: SqliteDatabase): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS artifacts (

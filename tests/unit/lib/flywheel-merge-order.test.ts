@@ -1,14 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   computePredictedConflictSignals,
-  declaredIssueFootprint,
   orderMergeCandidates,
   pickFromSequence,
-  planMergeTrain,
-  planUatCandidate,
 } from '../../../src/lib/flywheel-merge-order.js';
 import type { SequenceNode } from '../../../src/lib/backlog/types.js';
 import type { XBriefDocument } from '../../../src/lib/xbrief/types.js';
+import type { IssueFileFootprint } from '../../../src/lib/flywheel-merge-order.js';
+
+// A declared footprint: the sorted union of every item's files_scope. (Built here since
+// PAN-3958 CH-8 deleted the test-only declaredIssueFootprint/computeIssueFootprint helpers.)
+function declaredIssueFootprint(issueId: string, doc: XBriefDocument): IssueFileFootprint {
+  const files = new Set<string>();
+  for (const item of doc.plan.items) for (const file of item.metadata?.files_scope ?? []) files.add(file);
+  return { issueId, files: Array.from(files).sort(), source: 'declared' };
+}
 
 const c = (issueId: string, footprint: number, conflictCount: number) => ({
   issueId,
@@ -81,25 +87,6 @@ describe('orderMergeCandidates (PAN-1691 conflict-aware order)', () => {
   });
 });
 
-describe('planMergeTrain (PAN-1691 batch/serialize plan)', () => {
-  it('batches all disjoint candidates with an empty serialize list', () => {
-    const plan = planMergeTrain([c('PAN-2', 4, 0), c('PAN-1', 9, 0)]);
-    expect(plan.batch).toEqual(['PAN-1', 'PAN-2']);
-    expect(plan.serialize).toEqual([]);
-    expect(plan.order).toEqual(['PAN-1', 'PAN-2']);
-  });
-
-  it('splits disjoint into batch and conflicting into serialize (broadest first)', () => {
-    const plan = planMergeTrain([c('PAN-10', 5, 0), c('PAN-20', 3, 1), c('PAN-30', 50, 2)]);
-    expect(plan.batch).toEqual(['PAN-10']);
-    expect(plan.serialize).toEqual(['PAN-30', 'PAN-20']);
-    expect(plan.order).toEqual(['PAN-10', 'PAN-30', 'PAN-20']);
-  });
-
-  it('returns empty plan for no candidates', () => {
-    expect(planMergeTrain([])).toEqual({ batch: [], serialize: [], order: [] });
-  });
-});
 
 describe('computePredictedConflictSignals (declared-footprint conflict signal)', () => {
   it('counts overlapping declared footprints before branches exist', () => {
@@ -145,8 +132,9 @@ describe('computePredictedConflictSignals (declared-footprint conflict signal)',
       declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts'])),
     ]);
 
-    expect(planMergeTrain(signals).order).toEqual(['PAN-10', 'PAN-20']);
-    expect(planMergeTrain(signals).serialize).toEqual(['PAN-10', 'PAN-20']);
+    const ordered = orderMergeCandidates(signals);
+    expect(ordered.map((candidate) => candidate.issueId)).toEqual(['PAN-10', 'PAN-20']);
+    expect(ordered.every((candidate) => candidate.conflictCount > 0)).toBe(true);
   });
 });
 
@@ -206,34 +194,6 @@ describe('pickFromSequence predicted-conflict signal', () => {
   });
 });
 
-describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
-  const qi = (issueId: string, batchGroup: 'batch' | 'serialize') => ({
-    issueId,
-    title: issueId,
-    branchName: `feature/${issueId.toLowerCase()}`,
-    mergeOrder: 1,
-    conflictsWith: [] as string[],
-    batchGroup,
-  });
-
-  it('bundles only the batch items and dates the branch name', () => {
-    const plan = planUatCandidate(
-      [qi('PAN-1', 'batch'), qi('PAN-2', 'serialize'), qi('PAN-3', 'batch')],
-      { dateIso: '2026-06-09T12:00:00.000Z' },
-    );
-    expect(plan.bundled).toEqual(['PAN-1', 'PAN-3']);
-    expect(plan.branchName).toBe('uat/candidate-2026-06-09');
-  });
-
-  it('uses the label in the branch name', () => {
-    const plan = planUatCandidate([qi('PAN-1', 'batch')], { dateIso: '2026-06-09T00:00:00Z', label: 'pan' });
-    expect(plan.branchName).toBe('uat/pan-2026-06-09');
-  });
-
-  it('returns an empty bundle when nothing is batchable', () => {
-    expect(planUatCandidate([qi('PAN-1', 'serialize')], { dateIso: '2026-06-09T00:00:00Z' }).bundled).toEqual([]);
-  });
-});
 
 describe('listEligibleCandidatesByProject ready set (PAN-1759, moved by PAN-1696)', () => {
   // PAN-3917: the ready set is the forge's answer — approved, checks green,

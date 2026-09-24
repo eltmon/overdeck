@@ -86,6 +86,8 @@ function ensureRunsDirectory(projectKey: string, specialistType: string): void {
  * @param issueId - Issue ID being worked on
  * @param contextSeed - Optional context digest that was provided to the specialist
  * @returns Run ID and file path
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function createRunLogSync(
   projectKey: string,
@@ -124,6 +126,8 @@ ${contextSeed ? contextSeed : '[No context digest available]'}
  * @param specialistType - Specialist type
  * @param runId - Run identifier
  * @param content - Content to append
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function appendToRunLogSync(
   projectKey: string,
@@ -429,68 +433,6 @@ export function isRunLogActive(
 
   // Check if Result section exists
   return !content.includes('## Result');
-}
-
-/**
- * Get file size of a run log (useful for truncation check)
- *
- * @param projectKey - Project identifier
- * @param specialistType - Specialist type
- * @param runId - Run identifier
- * @returns File size in bytes or null if not found
- */
-export function getRunLogSize(
-  projectKey: string,
-  specialistType: string,
-  runId: string
-): number | null {
-  const filePath = getRunLogPath(projectKey, specialistType, runId);
-
-  if (!existsSync(filePath)) {
-    return null;
-  }
-
-  try {
-    const stats = statSync(filePath);
-    return stats.size;
-  } catch (error) {
-    return null;
-  }
-}
-
-/**
- * Maximum log file size (10MB) before truncation warning
- */
-export const MAX_LOG_SIZE = 10 * 1024 * 1024;
-
-/**
- * Check if a log file is approaching or exceeding size limits
- *
- * @param projectKey - Project identifier
- * @param specialistType - Specialist type
- * @param runId - Run identifier
- * @returns Warning info or null if size is OK
- */
-export function checkLogSizeLimit(
-  projectKey: string,
-  specialistType: string,
-  runId: string
-): { exceeded: boolean; size: number; limit: number } | null {
-  const size = getRunLogSize(projectKey, specialistType, runId);
-
-  if (size === null) {
-    return null;
-  }
-
-  if (size >= MAX_LOG_SIZE) {
-    return {
-      exceeded: true,
-      size,
-      limit: MAX_LOG_SIZE,
-    };
-  }
-
-  return null;
 }
 
 /**

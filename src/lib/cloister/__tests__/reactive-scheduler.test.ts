@@ -137,7 +137,6 @@ vi.mock('../../persistent-logger.js', () => ({
 }));
 
 vi.mock('../no-resume-mode.js', () => ({
-  getNoResumeMode: () => ({ active: false, since: null }),
 }));
 
 vi.mock('../concurrency.js', () => ({
@@ -150,11 +149,8 @@ vi.mock('../concurrency.js', () => ({
     exemptOperatorStarted: true,
   }),
   resetPatrolDispatchBudget: vi.fn(),
-  tryReserveAdvancingSlot: () => true,
-  releaseAdvancingSlot: vi.fn(),
   tryReserveSwarmSlot: () => true,
   releaseSwarmSlot: vi.fn(),
-  describeRunningAgents: () => 'counts: work=0 advancing=0 total=0/9 | advancing=[] work=[]',
 }));
 
 vi.mock('../memory-governor.js', () => ({

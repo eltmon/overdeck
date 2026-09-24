@@ -100,6 +100,8 @@ export async function probeProvider(
 
 /**
  * Clear cached probe result for a provider (e.g. after key change).
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function invalidateProbeCacheSync(provider?: string): void {
   if (provider) {

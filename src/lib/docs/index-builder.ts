@@ -1,7 +1,6 @@
 import { openDatabase, type SqliteDatabase } from '../database/driver.js';
 import { mkdir, readFile, rename, rm, stat } from 'fs/promises';
 import { dirname, join } from 'path';
-import { createHash } from 'crypto';
 
 import type { DocsEmbeddingProvider, NormalizedDocsConfig } from '../config-yaml.js';
 import { getDefaultDocsConfig } from '../config-yaml.js';
@@ -381,21 +380,6 @@ export function bufferToFloat32Array(buffer: Uint8Array, dimensions: number): Fl
     throw new Error(`embedding blob dimension mismatch: expected ${dimensions} floats, got ${buffer.byteLength} bytes`);
   }
   return new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
-}
-
-export function deterministicDocsTestEmbedding(input: DocsEmbeddingInput): Float32Array {
-  const values = new Float32Array(input.dimensions);
-  let seed = `${input.model}\n${input.chunk.docPath}\n${input.chunk.sectionAnchor ?? ''}\n${input.chunk.content}`;
-
-  for (let offset = 0; offset < input.dimensions; offset += 8) {
-    const digest = createHash('sha256').update(seed).digest();
-    for (let i = 0; i < 8 && offset + i < input.dimensions; i++) {
-      values[offset + i] = (digest.readUInt32LE(i * 4) / 0xffffffff) * 2 - 1;
-    }
-    seed = digest.toString('hex');
-  }
-
-  return normalizeFloat32Embedding(values, input.dimensions);
 }
 
 function resolveDocsEmbeddingOutput(output: Float32Array | DocsEmbeddingOutput): DocsEmbeddingOutput {
