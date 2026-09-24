@@ -42,17 +42,28 @@ The default is `true` (auto-merge OFF — operator UAT required before merge).
 When the toggle is `false`, the dashboard schedules auto-merge for any issue
 that satisfies the eligibility predicate. No flywheel run is needed: every
 60 seconds, on the UAT batch-train reconciler tick, the primary dashboard walks
-each project whose merge train is on, takes the PRs the forge reports as
-approved, green, and mergeable, and schedules each one that passes the merge
-gate (`evaluateIssueMergeGate`) and is opted in to auto-merge (its `auto-merge`
-/ `hold-for-uat` label, then the project default, then this toggle). It
-schedules through the same door as `POST /api/merge-train/auto-merge/schedule`.
+each project whose merge train is on and takes its open PRs with green checks
+on the branches the merge gate links to an issue (`feature/<id>`,
+`strike/<id>`). For each one it checks, in order:
 
-The scheduler schedules each issue once. It leaves alone an issue whose latest
-auto-merge is still pending or merging, or was cancelled, blocked, or failed:
-a cancel sticks, and a blocked or failed entry waits for the operator, who can
-re-schedule it through the endpoint. Only a merged entry makes room for a new
-one.
+1. the issue is opted in to auto-merge: its `auto-merge` / `hold-for-uat`
+   label, then the project default, then this toggle (no forge read);
+2. the merge gate (`evaluateIssueMergeGate`) says the PR is ready. Approval is
+   a forge review or a trusted `overdeck-verdict` marker comment, so a repo
+   without branch protection still qualifies;
+3. the issue's latest auto-merge entry allows a new one.
+
+It schedules through the same door as `POST /api/merge-train/auto-merge/schedule`.
+GitLab projects are skipped, with one log line. `OVERDECK_DISABLE_AUTO_MERGE=1`
+stops the scheduler as well as the executor.
+
+Each entry records the PR head it was scheduled for. A pending or merging entry
+is left alone. A cancelled entry, or a failed one (the merge was attempted,
+including the retry circuit breaker), holds for that PR head only: a new push
+re-arms the issue. A blocked entry (the executor refused it before merging,
+for example because checks went red or the head moved during the cooldown)
+re-arms as soon as the merge gate passes again. The insert re-checks the latest
+entry, so a cancel that lands while the scheduler is reading the forge sticks.
 
 ## Per-project default
 
