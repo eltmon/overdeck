@@ -215,7 +215,13 @@ to the work agent, or to a needs-you when no agent can be reached. Delivery
 is keyed on the tested commit (`--tested-sha`, else the PR head) within the
 current UAT pass episode, as above; the command journals every UAT verdict
 as `uat.verdict`, and a passing one starts the next episode (PAN-4030,
-#4035).
+#4035). A repeated failure under an already-delivered key writes no new
+feedback file and is journaled as `feedback.skipped`; the second skip of one
+key surfaces a single needs-you ("UAT is not converging") instead of
+relaying again, so identical failures on one head reach the agent once and
+the operator once (PAN-3580). The key does not hash the UAT notes: they are
+free text that varies run to run, and a notes-keyed delivery would re-tell
+the agent on every re-run of an unchanged head.
 
 The UAT verdict comment ends with a machine marker carrying the outcome and
 the commit UAT exercised, `<!-- overdeck-uat: failed sha=<commit> -->` (the
