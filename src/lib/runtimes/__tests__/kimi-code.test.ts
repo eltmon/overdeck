@@ -390,17 +390,17 @@ describe('KimiCodeRuntimeSync', () => {
     );
   });
 
-  it('launches on Herdr through launchAgentPane with no PTY supervisor (PAN-3936)', async () => {
+  it('launches on Herdr through launchAgentPane and keeps the PTY supervisor as its delivery path (PAN-3936)', async () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
     process.env.OVERDECK_HOME = overdeckHome;
     const workspace = '/tmp/kimi-herdr-workspace';
     const backend = launchingBackend('herdr', () => writeWireFixture(kimiHome, workspace, 'session_herdr'));
     const state: Record<string, unknown> = {
-      id: 'agent-pan-3936-review', issueId: 'PAN-3936', role: 'review', workspace, supervisorEnabled: true,
+      id: 'agent-pan-3936-review', issueId: 'PAN-3936', role: 'review', workspace,
     };
     agentStateMocks.getAgentState.mockReturnValue(state);
-    const writePtyTokenFor = vi.fn(async () => 'unused');
+    const writePtyTokenFor = vi.fn(async () => 'test-token');
     const resolveSupervisorScriptPath = vi.fn(() => '/dist/pty-supervisor.js');
 
     const runtime = new KimiCodeRuntimeSync({
@@ -433,13 +433,16 @@ describe('KimiCodeRuntimeSync', () => {
       tokens: { issue: 'PAN-3936', role: 'review', harness: 'kimi-code', model: 'k3' },
     });
     const launcherContent = readFileSync(launcherScript, 'utf-8');
-    expect(launcherContent).not.toContain('pty-supervisor');
+    // Herdr holds no agent record for a pane-bound kimi, so the supervisor
+    // socket is its delivery path: the wrapper and its token stay (PAN-3921 rule).
+    expect(launcherContent).toContain("node '/dist/pty-supervisor.js'");
     expect(launcherContent).toMatch(/kimi -m 'kimi-code\/k3-256k' --yolo/);
-    expect(writePtyTokenFor).not.toHaveBeenCalled();
-    expect(resolveSupervisorScriptPath).not.toHaveBeenCalled();
-    // The state records the Herdr pane and no longer claims a supervisor.
-    expect(state).toMatchObject({ backend: 'herdr', paneId: 'w1:p-agent-pan-3936-review' });
-    expect(state.supervisorEnabled).toBeUndefined();
+    expect(writePtyTokenFor).toHaveBeenCalledWith('agent-pan-3936-review');
+    expect(writePtyTokenFor.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(backend.startAgent).mock.invocationCallOrder[0]!,
+    );
+    // The state records the Herdr pane and the supervisor.
+    expect(state).toMatchObject({ backend: 'herdr', paneId: 'w1:p-agent-pan-3936-review', supervisorEnabled: true });
   });
 
   it('closes the Herdr pane when no new session appears within the readiness timeout (PAN-3936)', async () => {
@@ -454,7 +457,8 @@ describe('KimiCodeRuntimeSync', () => {
       overdeckHome,
       kimiHome,
       prepareLaunch: async () => ({ binaryPath: '/opt/kimi/bin/kimi', pathExport: 'export PATH=/opt/kimi/bin:"$PATH"' }),
-      writePtyTokenFor: vi.fn(async () => 'unused'),
+      resolveSupervisorScriptPath: () => '/dist/pty-supervisor.js',
+      writePtyTokenFor: vi.fn(async () => 'test-token'),
       resolveBackend: async () => backend,
     });
 

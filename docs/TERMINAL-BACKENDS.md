@@ -275,8 +275,10 @@ abort (`planning-sessions.ts`), and the dashboard's planning status, message and
 The runtime-class `spawnAgent` of the muse and kimi-code runtimes, reached only from Cloister's
 session rotation and crash respawn (`session-rotation.ts`, `service-crash.ts`), launches through
 `launchRuntimePane` (`src/lib/runtimes/runtime-pane-launch.ts`, #3936): `launchAgentPane` on the
-host's backend with the same four tokens, the pane recorded on the agent state, and the PTY
-supervisor on tmux only. A failed start closes the Herdr pane with `closeBackendPane`. kimi-code's
+host's backend with the same four tokens and the pane recorded on the agent state. Both keep the
+PTY supervisor on Herdr too (`runtimeUsesSupervisor`, the rule conversations follow): they are
+pane-bound, so Herdr holds no agent record `agent.prompt` could reach and tmux `send-keys` cannot
+reach a Herdr pane — the supervisor socket is their delivery path. A failed start closes the Herdr pane with `closeBackendPane`. kimi-code's
 readiness is the new session directory under the kimi home, which does not depend on pane text.
 muse's is its prompt scan; on Herdr, where a TUI on the alternate screen reads back empty, a pane
 that is still present and has written its session log counts as started once the 60 s scan ends.
@@ -572,8 +574,8 @@ the same way `countRunningAgents` does. An unreadable inventory (`null`) fails o
 the pane.
 
 `overdeck/conversation-runtime.ts` still hardcodes `useSupervisor: true` (the muse and kimi-code
-runtime adapters wrap only on tmux since #3936), but that is no longer a launch failure: those
-harnesses are launched pane-bound, so nothing waits for a detection the supervisor's second pty
+runtime adapters decide it with `runtimeUsesSupervisor` since #3936, and keep it), but that is no
+longer a launch failure: those harnesses are launched pane-bound, so nothing waits for a detection the supervisor's second pty
 would have hidden, and their delivery already goes through the supervisor socket. Only `claude-code` needs the supervisor
 refused on Herdr, and `decideSupervisorForWorkAgent` does that.
 

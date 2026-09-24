@@ -554,15 +554,17 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       // Bucket doesn't exist yet — every session dir that appears is new.
     }
 
-    // PAN-3936: the PTY supervisor is tmux-only. Its tier of deliverAgentMessage
-    // requires BOTH the pty-<id>.sock (created when the supervisor process
-    // binds it) AND a readable pty-token it authenticates requests against —
-    // write the token and resolve the real, package/desktop-safe script path
-    // (not a hardcoded dist/ literal, which silently breaks under desktop
-    // packaging or a mid-reload generation, PAN-3172) before the pane exists.
+    // PAN-3936: the PTY supervisor is kimi's delivery path on tmux and on Herdr,
+    // where the pane is pane-bound and `agent.prompt` cannot reach it. Its tier
+    // of deliverAgentMessage requires BOTH the pty-<id>.sock (created when the
+    // supervisor process binds it) AND a readable pty-token it authenticates
+    // requests against — write the token and resolve the real,
+    // package/desktop-safe script path (not a hardcoded dist/ literal, which
+    // silently breaks under desktop packaging or a mid-reload generation,
+    // PAN-3172) before the pane exists.
     mkdirSync(join(this.home(), 'agents', config.agentId), { recursive: true });
     const backend = await this.resolveBackend();
-    const useSupervisor = runtimeUsesSupervisor(backend);
+    const useSupervisor = runtimeUsesSupervisor('kimi-code', backend);
     const supervisorScriptPath = useSupervisor ? this.resolveSupervisorScriptPath() : undefined;
     if (useSupervisor) await this.writePtyTokenFor(config.agentId);
 

@@ -226,7 +226,7 @@ describe('Muse model and harness support', () => {
     }
   }
 
-  it('launches on Herdr through launchAgentPane with no PTY supervisor (PAN-3936)', async () => {
+  it('launches on Herdr through launchAgentPane and keeps the PTY supervisor as its delivery path (PAN-3936)', async () => {
     const agentId = 'agent-muse-herdr-test';
     await withMuseHome(agentId, async (root) => {
       vi.mocked(tmuxCreateSession).mockClear();
@@ -242,7 +242,8 @@ describe('Muse model and harness support', () => {
         name: agentId, cwd: '/tmp/muse-workspace', argv: ['bash', launcher], detection: 'not-required',
         tokens: { harness: 'muse', model: 'muse-spark-1.3' },
       });
-      expect(await readFile(launcher, 'utf8')).not.toContain('pty-supervisor');
+      expect(await readFile(launcher, 'utf8')).toContain('pty-supervisor');
+      expect((await readFile(join(root, 'agents', agentId, 'pty-token'), 'utf8')).trim()).not.toBe('');
     });
   });
 

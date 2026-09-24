@@ -6,22 +6,24 @@
  * The pane goes through `launchAgentPane` on the host's backend, stamped with
  * the same four tokens `spawn.ts` and `recovery.ts` stamp, so on a Herdr host it
  * lands on Herdr (where liveness looks) rather than in a tmux session that
- * `isAliveOnHerdr` reads as dead. The PTY supervisor is tmux-only: on Herdr its
- * second pseudo-terminal hides the harness from the pane's foreground process
- * (docs/TERMINAL-BACKENDS.md, "The PTY supervisor is tmux-only").
+ * `isAliveOnHerdr` reads as dead.
  */
 import type { AgentState } from '../agents/agent-state-read.js';
-import { launchAgentPane } from '../terminal-backends/launch.js';
+import { detectionPolicyFor, launchAgentPane } from '../terminal-backends/launch.js';
 import { toPaneRole, tokensFromLaunchMetadata } from '../terminal-backends/prompt-guard.js';
 import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
 
 /**
- * Whether a runtime launch on this backend wraps the harness in the PTY
- * supervisor. On tmux these runtimes always did, whatever the agent's role; on
- * Herdr never.
+ * Whether a runtime launch wraps the harness in the PTY supervisor — the same
+ * rule conversations follow (PAN-3921). On Herdr it is refused only around a
+ * harness Herdr must detect (claude-code), whose foreground process node-pty
+ * would hide (PAN-3917 W12). muse and kimi-code are pane-bound: Herdr holds no
+ * agent record for them, so `agent.prompt` cannot reach them and tmux
+ * `send-keys` cannot reach a Herdr pane — the supervisor socket is their
+ * delivery path on both backends.
  */
-export function runtimeUsesSupervisor(backend: TerminalBackend): boolean {
-  return backend.name === 'tmux';
+export function runtimeUsesSupervisor(harness: string, backend: TerminalBackend): boolean {
+  return backend.name === 'tmux' || detectionPolicyFor(harness) !== 'required';
 }
 
 export interface RuntimePaneLaunch {

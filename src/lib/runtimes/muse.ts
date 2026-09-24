@@ -86,8 +86,8 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
     const launch = await prepareHarnessLaunch('muse');
     const dir = join(getOverdeckHome(), 'agents', config.agentId);
     await mkdir(dir, { recursive: true });
-    // PAN-3936: the PTY supervisor is tmux-only.
-    const useSupervisor = runtimeUsesSupervisor(backend);
+    // PAN-3936: the supervisor socket is muse's delivery path on both backends.
+    const useSupervisor = runtimeUsesSupervisor('muse', backend);
     if (useSupervisor) await writePtyToken(config.agentId);
     const launcher = join(dir, 'launcher.sh');
     const script = generateLauncherScript({
