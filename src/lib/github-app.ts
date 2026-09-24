@@ -26,6 +26,63 @@ const execFileAsync = promisify(execFile);
 
 const APP_DIR = join(homedir(), '.overdeck', 'github-app');
 
+/**
+ * Upper bound on one GitHub App API request, including reading its body
+ * (PAN-4047). Without it a hung connection blocks the caller forever.
+ */
+export const GITHUB_API_TIMEOUT_MS = 30_000;
+
+/**
+ * A GitHub App API request did not finish within its timeout. It is an Error,
+ * so every caller that already catches a failed forge call handles it.
+ */
+export class GitHubRequestTimeoutError extends Error {
+  readonly _tag = 'GitHubRequestTimeoutError';
+
+  constructor(
+    readonly operation: string,
+    readonly timeoutMs: number,
+  ) {
+    super(`GitHub API ${operation} timed out after ${timeoutMs}ms`);
+    this.name = 'GitHubRequestTimeoutError';
+  }
+}
+
+/**
+ * Run one GitHub request under an AbortController that fires after
+ * `timeoutMs`. `run` receives the signal to pass to fetch and should read the
+ * response body inside the callback so a stalled body is bounded too. The
+ * race makes the bound hold even if the request ignores the signal.
+ */
+async function withGitHubTimeout<T>(
+  operation: string,
+  run: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number = GITHUB_API_TIMEOUT_MS,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new GitHubRequestTimeoutError(operation, timeoutMs);
+      controller.abort(error);
+      reject(error);
+    }, timeoutMs);
+  });
+  const request = run(controller.signal);
+  try {
+    return await Promise.race([request, timedOut]);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new GitHubRequestTimeoutError(operation, timeoutMs);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    // The losing side of the race must not surface as an unhandled rejection.
+    request.catch(() => {});
+  }
+}
+
 export interface GitHubAppConfig {
   appId: string;
   installationId: string;
@@ -287,28 +344,31 @@ async function generateInstallationTokenBody(
 
   const jwt = generateJWT(appConfig.appId, appConfig.privateKey);
 
-  const response = await fetch(
-    `https://api.github.com/app/installations/${appConfig.installationId}/access_tokens`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'overdeck',
-      },
+  const data = await withGitHubTimeout('POST installation access token', async (signal) => {
+    const response = await fetch(
+      `https://api.github.com/app/installations/${appConfig.installationId}/access_tokens`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwt}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'overdeck',
+        },
+        signal,
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to generate installation token: ${response.status} ${text}`);
     }
-  );
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Failed to generate installation token: ${response.status} ${text}`);
-  }
-
-  const data = await response.json() as {
-    token: string;
-    expires_at: string;
-    permissions?: Record<string, string>;
-  };
+    return await response.json() as {
+      token: string;
+      expires_at: string;
+      permissions?: Record<string, string>;
+    };
+  });
   return {
     token: data.token,
     expiresAt: data.expires_at,
@@ -331,24 +391,27 @@ async function githubApiWithToken<T>(
   init: RequestInit = {},
   extraHeaders: Record<string, string> = {}
 ): Promise<{ data: T; headers: Headers; status: number }> {
-  const response = await fetch(`https://api.github.com${path}`, {
-    ...init,
-    headers: {
-      'Authorization': `token ${token}`,
-      'Accept': 'application/vnd.github+json',
-      'User-Agent': 'overdeck',
-      ...extraHeaders,
-      ...(init.headers || {}),
-    },
+  return withGitHubTimeout(`${init.method || 'GET'} ${path}`, async (signal) => {
+    const response = await fetch(`https://api.github.com${path}`, {
+      ...init,
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'overdeck',
+        ...extraHeaders,
+        ...(init.headers || {}),
+      },
+      signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`GitHub API ${init.method || 'GET'} ${path} failed: ${response.status} ${text}`);
+    }
+
+    const data = response.status === 204 ? undefined as T : await response.json() as T;
+    return { data, headers: response.headers, status: response.status };
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`GitHub API ${init.method || 'GET'} ${path} failed: ${response.status} ${text}`);
-  }
-
-  const data = response.status === 204 ? undefined as T : await response.json() as T;
-  return { data, headers: response.headers, status: response.status };
 }
 
 async function githubApi<T>(
@@ -650,33 +713,37 @@ export async function mergePullRequestWithApp(
   sha?: string,
 ): Promise<{ merged: boolean; message?: string }> {
   const token = await getInstallationAccessToken();
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/merge`,
-    {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'overdeck',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        merge_method: method,
-        ...(sha ? { sha } : {}),
-      }),
+  const path = `/repos/${owner}/${repo}/pulls/${number}/merge`;
+  return withGitHubTimeout(`PUT ${path}`, async (signal) => {
+    const response = await fetch(
+      `https://api.github.com${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'overdeck',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          merge_method: method,
+          ...(sha ? { sha } : {}),
+        }),
+        signal,
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json() as { merged?: boolean; message?: string };
+      return {
+        merged: data.merged === true,
+        message: data.message,
+      };
     }
-  );
 
-  if (response.ok) {
-    const data = await response.json() as { merged?: boolean; message?: string };
-    return {
-      merged: data.merged === true,
-      message: data.message,
-    };
-  }
-
-  const text = await response.text();
-  throw new Error(`GitHub merge failed: ${response.status} ${text}`);
+    const text = await response.text();
+    throw new Error(`GitHub merge failed: ${response.status} ${text}`);
+  });
 }
 
 /**
@@ -751,24 +818,28 @@ export async function reportCommitStatus(
 
   const { token } = await Effect.runPromise(generateInstallationToken(config));
 
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'overdeck',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ state: status, context, description }),
-    }
-  );
+  const path = `/repos/${owner}/${repo}/statuses/${sha}`;
+  await withGitHubTimeout(`POST ${path}`, async (signal) => {
+    const response = await fetch(
+      `https://api.github.com${path}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'overdeck',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state: status, context, description }),
+        signal,
+      }
+    );
 
-  if (!response.ok) {
-    const text = await response.text();
-    console.warn(`[github-app] Failed to report status: ${response.status} ${text}`);
-  }
+    if (!response.ok) {
+      const text = await response.text();
+      console.warn(`[github-app] Failed to report status: ${response.status} ${text}`);
+    }
+  });
 }
 
 /**
