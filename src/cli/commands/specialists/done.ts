@@ -29,6 +29,7 @@ import { getPrFacts, resetPrFactsCache } from '../../../lib/cloister/pr-facts.js
 import { formatUatMarker } from '../../../lib/cloister/uat-verdict-marker.js';
 import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/services/pr-tab-cache.js';
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
+import { reviewVerdictRefusal, verdictCallerFromEnv } from '../../../lib/cloister/verdict-caller.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
 import { appendPipelineEntry } from '../../../lib/cloister/pipeline-journal.js';
 
@@ -205,10 +206,28 @@ export async function doneCommand(
   // `CHANGES_REQUESTED` (rework delivery, the review-stale gate) sees nothing.
   // Completion fails when the post fails: an unrecorded verdict is not done.
   if (role === 'review') {
+    // #3853: the operator's override shares this door with the review agent's
+    // verdict. An agent session may not use the override half: it records a
+    // verdict only as the issue's review session, and never reverses the
+    // approval standing on an unchanged head.
+    const caller = verdictCallerFromEnv();
+    const facts = caller.kind === 'agent' ? await getPrFacts(normalizedIssueId) : undefined;
+    const refusal = reviewVerdictRefusal({
+      caller,
+      issueId: normalizedIssueId,
+      status: options.status,
+      facts: facts ?? null,
+    });
+    if (refusal) {
+      console.error(chalk.red(`Refusing the review verdict: ${refusal}`));
+      console.error(chalk.dim('An operator (a conv-* conversation or a shell outside any agent session) must record it.'));
+      return exitCli(1);
+    }
     const result = await postReviewVerdict({
       issueId: normalizedIssueId,
       verdict: options.status === 'passed' ? 'approve' : 'request-changes',
       body,
+      ...(facts ? { facts } : {}),
     });
     if (!result.posted) {
       console.error(chalk.red(

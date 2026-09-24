@@ -48,6 +48,14 @@ export interface PrFacts {
   headBranch: string | null;
   reviewDecision: PrReviewDecision;
   approved: boolean;
+  /**
+   * #3853: the approval was given on the current head commit, so a rejection
+   * on this head reverses a verdict instead of reviewing new code. A forge
+   * approval is dated against the head commit by its review's `submittedAt`
+   * (an approval the forge kept across a push is not at head); an approval
+   * marker only counts at head already. Unknown dating reads as at head.
+   */
+  approvedAtHead?: boolean;
   changesRequested: boolean;
   /** null when the forge has not computed mergeability yet. */
   mergeable: boolean | null;
@@ -348,6 +356,23 @@ function uatVerdictAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): Ua
   return null;
 }
 
+/**
+ * #3853: whether the PR's approval was given on its current head. The forge
+ * decision rides the newest APPROVED review, dated against the head commit the
+ * way the approval marker is; without review or commit dates it reads as at
+ * head, so the reversal guard holds rather than guessing the approval stale.
+ */
+function forgeApprovalAtHead(pr: IssuePullRequestData): boolean {
+  if (!pr.latestReviews) return true;
+  const headAt = headCommitTime(pr);
+  if (headAt === null) return true;
+  return pr.latestReviews.some((review) => {
+    if (normalize(review.state) !== 'APPROVED') return false;
+    const submittedAt = Date.parse(review.submittedAt ?? '');
+    return Number.isNaN(submittedAt) || submittedAt >= headAt;
+  });
+}
+
 function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: TrustedAuthors = new Set()): PrFacts {
   const state = normalize(pr.state);
   const merged = state === 'MERGED' || Boolean(pr.mergedAt);
@@ -372,6 +397,9 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
     headBranch: pr.headRefName ?? null,
     reviewDecision: effective,
     approved: effective === 'APPROVED',
+    // A marker approval only counts when it is at least as new as the head.
+    approvedAtHead: effective === 'APPROVED'
+      && (forgeDecision === 'APPROVED' ? forgeApprovalAtHead(pr) : true),
     changesRequested: effective === 'CHANGES_REQUESTED',
     mergeable: mergeable === 'MERGEABLE' ? true : mergeable === 'CONFLICTING' ? false : null,
     mergeableState: pr.mergeable ? pr.mergeable.toLowerCase() : null,
@@ -438,6 +466,8 @@ function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMr
     headBranch: view?.source_branch ?? row.source_branch ?? null,
     reviewDecision: approved ? 'APPROVED' : 'REVIEW_REQUIRED',
     approved,
+    // The MR view carries no approval date to hold against the head.
+    approvedAtHead: approved,
     changesRequested: false,
     mergeable,
     mergeableState: detailed ?? view?.merge_status ?? null,

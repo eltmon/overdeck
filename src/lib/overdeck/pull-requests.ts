@@ -54,6 +54,9 @@ const GH_PR_VIEW_FIELDS = [
   // merge newer code. Both fields ride the one `gh pr view` we already run.
   'comments',
   'commits',
+  // #3853: when each reviewer last decided, so an approval can be dated
+  // against the head commit like the marker comment is.
+  'latestReviews',
 ].join(',');
 
 export interface IssuePullRequestData {
@@ -97,6 +100,12 @@ export interface IssuePullRequestData {
     authorAssociation?: string;
   }>;
   commits?: Array<{ oid?: string; committedDate?: string; authoredDate?: string }>;
+  /** Optional: each reviewer's latest review (`gh pr view --json latestReviews`). */
+  latestReviews?: Array<{
+    state?: string;
+    submittedAt?: string;
+    author?: { login?: string } | null;
+  }>;
 }
 
 export interface CommitCheckRuns {
