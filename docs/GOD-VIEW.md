@@ -43,9 +43,15 @@ and status grounded in dashboard state.
   opens its full provenance tooltip and flashes the matching orb; clicking the
   row or orb opens `/issues/<id>` in the real issue drawer.
 - **The enriched top bar** shows the clock, event rate and ECG, CPU, memory,
-  swap, load, WIP, blocked and ready counts, merge queue, cost rate, merges,
-  tokens, stale count, oldest idle age, active count, help, and fullscreen.
-  Missing sources render `—` instead of a fabricated zero.
+  memory pressure (PSI), load, WIP, blocked and ready counts, merge queue, cost
+  rate, merges, tokens, stale count, oldest idle age, active count, help, and
+  fullscreen. Missing sources render `—` instead of a fabricated zero.
+- **Memory pressure is PSI, not swap fill.** The PSI meter (top bar and
+  sidebar gauge) reads `/proc/pressure/memory` `some` avg10. It turns amber at
+  `some` ≥ 5% or swap in/out ≥ 64 MiB/min and red at `full` ≥ 1% or swap in/out
+  ≥ 256 MiB/min, the bands the host collector uses. Swap occupancy appears only
+  in the hover detail: a full swap of cold pages is not pressure and can never
+  color the meter.
 
 ## Glyph language
 
@@ -94,6 +100,15 @@ before they enter the hook stream, so Confluence adds no polling loop for river
 or hook animation.
 The inherited host-health query and activity-feed REST fallback keep their
 existing polling cadence, but they do not synthesize visual events.
+
+Agent liveness comes from the terminal backend, not from agent rows. A row's
+stored status (`running`, `starting`, `warning`, …) counts only when the
+backend inventory (`backendPanesById`, the pane list the liveness oracle
+`src/lib/agents/liveness.ts` judges) holds a non-exited pane for that agent.
+A row that claims `running` with no pane is treated as stopped: it puts no orb
+on the river and is left out of the active count, the role-count box, and the
+AGENTS donut. An operator-paused issue still sits on the shelf, and an issue
+with an open PR still shows in the merge lane, as they do for any stopped agent.
 
 The contract is **cast real, motion real**:
 
