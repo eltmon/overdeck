@@ -254,7 +254,10 @@ door that does not exist; a real record read door would be a separate change.
   (`GET/POST/DELETE /api/conversations/:name/pull-requests`, the DELETE takes
   `?ref=`) and `pan conv link-pr`/`unlink-pr`/`prs` both call it. An unlink always
   sets `dismissed_at` rather than deleting, so the sweep cannot re-add the PR. A
-  `manual`/`agent` relink clears it; a `created` link does not. A new table
+  `manual`/`agent` relink clears it; a `created` link does not. `created` links
+  come from `linkCreatedPullRequestToIssueConversations`, called after
+  `createReviewArtifact` in `review-artifacts.ts` and `pan done`: every
+  non-archived agent conversation with that `issue_id` gets the PR. A new table
   goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
   and bumps `OVERDECK_TABLE_COUNT`.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered

@@ -19,7 +19,9 @@ import {
 } from '@overdeck/contracts';
 
 import { getEventStore } from '../../dashboard/server/event-store.js';
+import { isAgentConversationName } from './conversations.js';
 import { getOverdeckDatabase } from './infra.js';
+import { parsePullRequestRef } from './pull-request-ref.js';
 
 interface LinkRow {
   conversation_name: string;
@@ -177,6 +179,41 @@ export function unlinkConversationPullRequest(
     `)
     .run(now, conversationName, key.host, key.repository, key.number);
   return { unlinked: Number(result.changes) > 0 };
+}
+
+/**
+ * The pipeline opened (or found) the PR for an issue: link it with source
+ * `created` to every non-archived agent conversation for that issue, so they
+ * show it without waiting for a sweep. A link that is already `created`, or
+ * that the operator dismissed, is left alone. Emits one event per conversation
+ * that changed and returns their names. Never throws: a failed link must not
+ * fail the PR creation.
+ */
+export function linkCreatedPullRequestToIssueConversations(issueId: string, url: string | undefined): string[] {
+  try {
+    const ref = url ? parsePullRequestRef(url) : null;
+    if (!ref) return [];
+    const names = getOverdeckDatabase()
+      .prepare(`SELECT name FROM conversations WHERE lower(issue_id) = lower(?) AND archived_at IS NULL`)
+      .all<{ name: string }>(issueId)
+      .map((row) => row.name)
+      .filter(isAgentConversationName);
+    const linked: string[] = [];
+    for (const name of names) {
+      const before = findLink(name, ref);
+      if (before && (before.source === 'created' || before.dismissedAt !== null)) continue;
+      if (!linkConversationPullRequest(name, ref, 'created')) continue;
+      linked.push(name);
+      emitConversationPullRequestsChanged(name);
+    }
+    if (linked.length > 0) {
+      console.log(`[pr-link] linked #${ref.number} to ${linked.length} conversation(s) for ${issueId}`);
+    }
+    return linked;
+  } catch (error) {
+    console.warn(`[pr-link] linking the PR for ${issueId} failed:`, error);
+    return [];
+  }
 }
 
 function findLink(conversationName: string, key: PullRequestKey): PullRequestLink | null {

@@ -392,10 +392,15 @@ Rules:
 - A new link fetches the PR's state within seconds, so it doesn't wait for the
   next sweep.
 
+When the pipeline opens the pull request for an issue (`pan done`, or the review
+pipeline), it links that PR to every agent conversation for the issue, with the
+source `created`. Those conversations show the PR at once, without waiting for a
+sweep. The pipeline never restores a PR you unlinked.
+
 Linking never archives or stops a conversation.
 
 Not yet shipped (tracked in [#3822](https://github.com/eltmon/overdeck/issues/3822)):
-transcript right-click, pipeline-created links, GitLab merge request status,
+transcript right-click, GitLab merge request status,
 the Pull requests page, and search by PR number.
 
 ## See also

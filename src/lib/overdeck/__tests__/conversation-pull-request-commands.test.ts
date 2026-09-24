@@ -21,7 +21,12 @@ vi.mock('../../../dashboard/server/event-store.js', () => ({
 
 const { createConversation } = await import('../conversations.js');
 const { closeOverdeckDatabase, getOverdeckDatabase } = await import('../infra.js');
-const { listConversationPullRequests, upsertBranchPullRequestLink } = await import('../conversation-pull-requests.js');
+const {
+  linkCreatedPullRequestToIssueConversations,
+  listConversationPullRequests,
+  unlinkConversationPullRequest,
+  upsertBranchPullRequestLink,
+} = await import('../conversation-pull-requests.js');
 const {
   getConversationPullRequests,
   linkPullRequestToConversation,
@@ -32,8 +37,8 @@ const {
 const deps = { readOriginRemote: async (dir: string) => (dir === REPO_PATH ? 'git@github.com:eltmon/overdeck.git' : null) };
 const PR_URL = 'https://github.com/eltmon/overdeck/pull/42';
 
-function conversation(name: string, cwd: string = join(REPO_PATH, 'workspaces', name)): string {
-  createConversation({ name, tmuxSession: `conv-${name}`, cwd, title: name });
+function conversation(name: string, cwd: string = join(REPO_PATH, 'workspaces', name), issueId?: string): string {
+  createConversation({ name, tmuxSession: `conv-${name}`, cwd, title: name, issueId });
   return name;
 }
 
@@ -172,5 +177,46 @@ describe('unlinkPullRequestFromConversation', () => {
 
   it('returns 404 for an unknown conversation', async () => {
     expect(await unlinkPullRequestFromConversation('nope', PR_URL, deps)).toMatchObject({ status: 404, body: { code: 'not_found' } });
+  });
+});
+
+describe('linkCreatedPullRequestToIssueConversations (pipeline-opened PRs)', () => {
+  it('links the PR as created to every agent conversation for the issue, never an operator one', () => {
+    const work = conversation('agent-pan-3822', join(REPO_PATH, 'workspaces', 'feature-pan-3822'), 'PAN-3822');
+    const review = conversation('specialist-review-pan-3822', REPO_PATH, 'pan-3822');
+    const operator = conversation('operator-chat', REPO_PATH, 'PAN-3822');
+    conversation('agent-pan-9999', REPO_PATH, 'PAN-9999');
+
+    expect(linkCreatedPullRequestToIssueConversations('PAN-3822', PR_URL).sort()).toEqual([review, work].sort());
+    expect(listConversationPullRequests(work)).toEqual([expect.objectContaining({ number: 42, source: 'created', url: PR_URL })]);
+    expect(listConversationPullRequests(review)).toHaveLength(1);
+    expect(listConversationPullRequests(operator)).toEqual([]);
+    expect(listConversationPullRequests('agent-pan-9999')).toEqual([]);
+    expect(emitOnlyMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('is idempotent and leaves an operator dismissal alone', () => {
+    const work = conversation('agent-pan-1', REPO_PATH, 'PAN-1');
+    linkCreatedPullRequestToIssueConversations('PAN-1', PR_URL);
+    emitOnlyMock.mockClear();
+    expect(linkCreatedPullRequestToIssueConversations('PAN-1', PR_URL)).toEqual([]);
+    expect(emitOnlyMock).not.toHaveBeenCalled();
+
+    unlinkConversationPullRequest(work, { host: 'github.com', repository: 'eltmon/overdeck', number: 42 });
+    expect(linkCreatedPullRequestToIssueConversations('PAN-1', PR_URL)).toEqual([]);
+    expect(listConversationPullRequests(work)[0]?.dismissedAt).not.toBeNull();
+  });
+
+  it('upgrades an existing branch link to created', () => {
+    const work = conversation('agent-pan-2', REPO_PATH, 'PAN-2');
+    upsertBranchPullRequestLink(conversationId(work), { host: 'github.com', repository: 'eltmon/overdeck', number: 42, url: PR_URL }, {} as never);
+    expect(linkCreatedPullRequestToIssueConversations('PAN-2', PR_URL)).toEqual([work]);
+    expect(listConversationPullRequests(work)[0]?.source).toBe('created');
+  });
+
+  it('ignores a missing or unparseable URL', () => {
+    conversation('agent-pan-3', REPO_PATH, 'PAN-3');
+    expect(linkCreatedPullRequestToIssueConversations('PAN-3', undefined)).toEqual([]);
+    expect(linkCreatedPullRequestToIssueConversations('PAN-3', 'not a url')).toEqual([]);
   });
 });
