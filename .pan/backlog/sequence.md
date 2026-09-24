@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T17:50:07.342Z · model: claude-opus-5 · open: 826_
+_Last sequenced: 2026-09-24T17:56:00.085Z · model: claude-opus-5 · open: 827_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,6 +11,7 @@ _Last sequenced: 2026-09-24T17:50:07.342Z · model: claude-opus-5 · open: 826_
 | 8 | PAN-4098 | M | high | ok |  |  | Read model copies stored agent status: 330 rows read running while the backend has one live pane; derive liveness from the inventory |
 | 9 | PAN-4097 | M | high | ok |  |  | Output route, pan status --json and three skills read tmux only: on the default backend a live agent shows blank output and reads stopped |
 | 10 | PAN-4090 | S | high | ok |  |  | On a Herdr host pipeline-status, pan-agent-activity and pan-recap report every agent dead; pipeline-status 404s on a hardcoded project key |
+| 11 | PAN-4105 | S | high | ok |  |  | Crash detection and the pan start conflict check filter on tmuxActive: on Herdr every live agent reads crashed and no sibling blocks a start |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 17 | PAN-3982 | M | medium | ok |  |  | Palette hits 404: PAN-3950 dropped the unregistered-session fallback; subagent transcripts index as agent-* with no row |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
@@ -858,6 +859,10 @@ New issue filed 2026-09-24, placed at free rank 9 next to PAN-4090, which fixed 
 
 New this run. Herdr is the default terminal backend, but three operator-facing skills still find agents through `tmux -L overdeck`, so on a Herdr host they list no sessions, mark every agent dead in the AGENT column and read no pane output; pipeline-status additionally hardcodes project=overdeck against a registry that knows the project as panopticon-cli, so the membership call returns 404 and the board renders empty. The fix is named in the body and backend-agnostic - read liveness from GET /api/agents and output from GET /api/agents/:id/conversation, and resolve the key from `pan project list --json` - so this is a small, high-leverage repair of the operator's read path into the pipeline. Ranked into the tail of the cut-follow-up cluster and ahead of PAN-3929, which rewrites prose in two of the same SKILL.md files (pipeline-status, pan-recap) and should land on corrected commands.
 
+### PAN-4105 (rank 11)
+
+New since the prior run (opened ~2 min after it) — same Herdr-blindness wave as PAN-4096/4098/4097/4090, slotted into the free rank directly behind that cluster so no existing rank moves. detectCrashedAgents() and findConflictingWorkAgents() both decide liveness from tmuxActive, which is false for every agent on the default backend: pan recover --all reports the whole live fleet as crashed, and pan start will not refuse to launch over a live sibling work session, so a swarm slot can be double-spawned. The recover half is noisy rather than destructive (recoverAgent asks isAlive and answers already-running), which is why it sits at the reporting end of the cluster rather than above PAN-4096. The fix door already exists — the backend-aware isAlive in liveness.ts that #4088 moved the lifecycle guards to — so this is four small edits (recovery.ts, work-agent-conflicts.ts, the pan-status skill, the agents listing route) with a clear acceptance bar including runtime-indeterminate never counting as crashed.
+
 ### PAN-3930 (rank 15)
 
 In pipeline — rank pinned.
@@ -1142,10 +1147,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 
 Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boots.
 
-### PAN-3104 (rank 106)
-
-Triage: same as PAN-2700 — verify stale-artifact freshness against whatever recovers test verdicts today. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1153,10 +1154,10 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T17:50:07.342Z",
+  "generatedAt": "2026-09-24T17:56:00.085Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 826,
+  "openCount": 827,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11378,6 +11379,19 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
       "rationale": "New issue filed 2026-09-24, placed at free rank 9 next to PAN-4090, which fixed the same blindness in pipeline-status, pan-agent-activity and pan-recap (#4093). Herdr is the default backend, but GET /api/agents/:id/output still calls tmux capturePane alone, so the dashboard terminal excerpt and every output-reading skill see an empty pane; pan status --json reports tmuxActive, which is false for all 35 running agents on this host, and the human output prints them as stopped; pan-oversee and pan-stop-all-agents drive raw tmux -L overdeck, so a drain finds nothing to kill. The work is a route that reads the pane through the host’s terminal backend with output.log as the last fallback, a backend-neutral alive field from src/lib/agents/liveness.ts with tmuxActive kept and deprecated, and three skills moved onto pan verbs and the dashboard API. Scope is already bounded in the body: pan-peer-review waits on PAN-3921.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4105",
+      "rank": 11,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Crash detection and the pan start conflict check filter on tmuxActive: on Herdr every live agent reads crashed and no sibling blocks a start",
+      "rationale": "New since the prior run (opened ~2 min after it) — same Herdr-blindness wave as PAN-4096/4098/4097/4090, slotted into the free rank directly behind that cluster so no existing rank moves. detectCrashedAgents() and findConflictingWorkAgents() both decide liveness from tmuxActive, which is false for every agent on the default backend: pan recover --all reports the whole live fleet as crashed, and pan start will not refuse to launch over a live sibling work session, so a swarm slot can be double-spawned. The recover half is noisy rather than destructive (recoverAgent asks isAlive and answers already-running), which is why it sits at the reporting end of the cluster rather than above PAN-4096. The fix door already exists — the backend-aware isAlive in liveness.ts that #4088 moved the lifecycle guards to — so this is four small edits (recovery.ts, work-agent-conflicts.ts, the pan-status skill, the agents listing route) with a clear acceptance bar including runtime-indeterminate never counting as crashed.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12567,6 +12581,13 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
     {
       "from": "PAN-4090",
       "to": "PAN-4098",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4097",
+      "to": "PAN-4105",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
