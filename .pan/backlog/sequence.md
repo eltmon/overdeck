@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:03:54.905Z · model: claude-opus-5 · open: 810_
+_Last sequenced: 2026-09-24T22:11:32.223Z · model: claude-opus-5 · open: 810_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -832,7 +832,7 @@ In pipeline — rank pinned.
 
 ### PAN-3983 (rank 19)
 
-New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Inserted at rank 19, the first non-pinned slot; ranks 1-18 are in-pipeline and stay pinned. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
+New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
 
 ### PAN-3939 (rank 22)
 
@@ -1125,7 +1125,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:03:54.905Z",
+  "generatedAt": "2026-09-24T22:11:32.223Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 810,
@@ -1165,7 +1165,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "condition": "ok",
       "dependsOn": [],
       "why": "Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick",
-      "rationale": "New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Inserted at rank 19, the first non-pinned slot; ranks 1-18 are in-pipeline and stay pinned. Fix is small (reuse the per-project reconciler tick) with mechanical AC.",
+      "rationale": "New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11316,13 +11316,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "confidence": 0.8
     },
     {
-      "from": "PAN-3517",
-      "to": "PAN-3518",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-3460",
       "to": "PAN-3463",
       "type": "informs",
@@ -12231,13 +12224,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-3822",
-      "to": "PAN-4151",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     }
   ]
 }
