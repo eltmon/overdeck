@@ -83,7 +83,9 @@ reads the mode from the run itself (`currentRunIsConvoy` in
 `reviewRunId` names the current run. The tree shows the four convoy lanes only
 when a lane's state row carries that `reviewRunId`, or its `<role>.md` report
 is in `.pan/review/<runId>/`. A self-review writes into the same run directory,
-so the directory alone does not show the mode.
+so the directory alone does not show the mode. Each lane's status comes from
+that same directory: a lane whose `<role>.md` is there is done, and a live
+reviewer whose report isn't there yet is working on the current round.
 
 | Mode | Behavior |
 | --- | --- |
