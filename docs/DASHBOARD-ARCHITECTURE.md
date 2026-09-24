@@ -288,7 +288,9 @@ door that does not exist; a real record read door would be a separate change.
   (`fresh-sequence`), the runtime mirror reads idle (`idle`), or its Herdr pane is idle or done
   at its prompt after the prompt was delivered, with work activity older than 60 s
   (`pane-finished`, PAN-3923). The last one covers a dashboard restart, which empties the
-  in-process mirror, and a pass that failed before writing. `clearFinishedSequencerRun` probes a
+  in-process mirror, and a pass that failed before writing. After a restart the activity age
+  rests on the transcript heartbeat; if no activity signal resolves, the run is refused, never
+  reaped. `clearFinishedSequencerRun` probes a
   `pane-finished` run a second time 5 s later and stops it only if it still reads done; after the
   stop it waits up to 3 s for the backend to drop the pane.
 
