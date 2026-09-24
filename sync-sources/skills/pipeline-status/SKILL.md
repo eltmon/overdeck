@@ -219,35 +219,24 @@ for ps in sorted(n for n, a in agents.items() if n.startswith('planning-pan-') a
     if len(title) > W['title']: title = title[:W['title']-1] + '…'
     print(f"{iid:<{W['id']}}  {title:<{W['title']}}  {model:<{W['model']}}  ◐ planning")
 
+member_ids = {m['issueId'].upper() for m in membership if m.get('inPipeline') is True}
+ready = [r for r in resource
+         if (r.get('issueId') or '').upper() in member_ids and r.get('state') == 'ready']
+print(f"\nAwaiting Merge: {len(ready)} issue(s) ready for human approval")
+for r in ready:
+    print(f"  → {r['issueId']}  {(r.get('title') or '')[:80]}")
+
 print()
 print("✓ done/passing  ◐ in-progress  ✗ failed/blocked  · pending/n-a")
 print("Columns: AGENT (work agent alive) → STATE → NEEDS → PR-REVIEW → CHECKS → MERGEABLE (ready for merge)")
 PY
 ```
 
-### 2. Add an Awaiting Merge summary line
+### 2. Read the Awaiting Merge summary line
 
-After the main table, count and list canonical pipeline members whose derived
-`state` is `ready`:
-
-Use the project key step 1 printed (`project: <key>`) in place of `<key>`:
-
-```bash
-python3 -c "
-import json, subprocess
-resource = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues/resource-allocated']))
-membership = json.loads(subprocess.check_output([
-    'curl','-s','http://localhost:3011/api/pipeline/membership?project=<key>'
-]))
-member_ids = {m['issueId'].upper() for m in membership if m.get('inPipeline') is True}
-ready = [r for r in resource
-         if (r.get('issueId') or '').upper() in member_ids
-         and r.get('state') == 'ready']
-print(f'\\nAwaiting Merge: {len(ready)} issue(s) ready for human approval')
-for r in ready:
-    print(f'  → {r[\"issueId\"]}  {r[\"title\"][:80]}')
-"
-```
+The step 1 script also prints an **Awaiting Merge** line: the count and list of
+canonical pipeline members whose derived `state` is `ready`. Surface it
+directly under the table.
 
 ### 3. (Optional) Defer to other status skills if user wants more detail
 
