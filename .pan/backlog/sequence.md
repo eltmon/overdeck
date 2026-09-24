@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T17:00:19.712Z · model: claude-opus-5 · open: 838_
+_Last sequenced: 2026-09-24T17:04:09.991Z · model: claude-opus-5 · open: 838_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1173,7 +1173,7 @@ New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T17:00:19.712Z",
+  "generatedAt": "2026-09-24T17:04:09.991Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 838,
