@@ -1,18 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T18:11:58.685Z · model: claude-opus-5 · open: 824_
+_Last sequenced: 2026-09-24T18:17:09.398Z · model: claude-opus-5 · open: 822_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
-| 2 | PAN-4096 | S | critical | ok |  |  | Herdr restore drops the issue token: workspaceFor forks a duplicate workspace per launch and closeIssuePanes closes nothing |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
 | 9 | PAN-4097 | M | high | ok |  |  | Output route, pan status --json and three skills read tmux only: on the default backend a live agent shows blank output and reads stopped |
 | 11 | PAN-4105 | S | high | ok |  |  | Crash detection and the pan start conflict check filter on tmuxActive: on Herdr every live agent reads crashed and no sibling blocks a start |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
-| 20 | PAN-3981 | M | critical | ok |  |  | Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision) |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
 | 25 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
@@ -836,10 +834,6 @@ _Last sequenced: 2026-09-24T18:11:58.685Z · model: claude-opus-5 · open: 824_
 
 In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.
 
-### PAN-4096 (rank 2)
-
-New this run, filed from read-only evidence on the live Herdr session while landing #4076. A restore wipes the `issue` token from 16 of 17 workspaces and from every pane but the one created after it, while the durable `label` and pane `cwd` survive. Both lookups that matter key on `tokens.issue` alone: `workspaceFor` in src/lib/terminal-backends/herdr.ts therefore misses the issue's own workspace and forks a duplicate on every launch (two live `sequencer-runner` workspaces already), and `closeIssuePanes` in src/lib/terminal-backends/launch.ts sees no pane to close, so close-out teardown and reap-issue-residue leave the root shell, the pane set and the workspace behind — four residue workspaces with deleted cwds belong to already-closed issues. Herdr is the default backend, so this corrupts workspace identity and leaks residue on every host after every restart, and it is the same pane-lookup seam PAN-3966 (merged as #4076) just hardened. Ranked immediately behind PAN-3921 with the rest of the Herdr substrate cluster: the fix is small and bounded (token-else-label fallback, re-stamp the token on re-adoption, never close a pane that names another owner).
-
 ### PAN-3923 (rank 3)
 
 In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.
@@ -859,10 +853,6 @@ In pipeline — rank pinned.
 ### PAN-3983 (rank 19)
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Inserted at rank 19, the first non-pinned slot; ranks 1-18 are in-pipeline and stay pinned. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
-
-### PAN-3981 (rank 20)
-
-Rank held at 23, still behind its blocker PAN-3966 (Herdr-aware stopAgent, in pipeline at rank 18). The three issues it was cross-referenced with — PAN-2828, PAN-3898 and PAN-3967 — all closed since the prior run, so those informs edges drop. The squash blindness the body cites as 'same as PAN-2828' is now solved code rather than an open dependency: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) is the check the reaper's ahead-of-origin/main guard should adopt. The operator-decision framing is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, with the reaper as fallback. Rank lifted 23 -> 20 this run: its blocker PAN-3966 (tmux-only stopAgent/warm-idle reap) closed, so the Herdr pane-close primitive strike completion depends on now exists and this is startable.
 
 ### PAN-3939 (rank 22)
 
@@ -1147,10 +1137,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T18:11:58.685Z",
+  "generatedAt": "2026-09-24T18:17:09.398Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 824,
+  "openCount": 822,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1162,19 +1152,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane",
       "rationale": "In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4096",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Herdr restore drops the issue token: workspaceFor forks a duplicate workspace per launch and closeIssuePanes closes nothing",
-      "rationale": "New this run, filed from read-only evidence on the live Herdr session while landing #4076. A restore wipes the `issue` token from 16 of 17 workspaces and from every pane but the one created after it, while the durable `label` and pane `cwd` survive. Both lookups that matter key on `tokens.issue` alone: `workspaceFor` in src/lib/terminal-backends/herdr.ts therefore misses the issue's own workspace and forks a duplicate on every launch (two live `sequencer-runner` workspaces already), and `closeIssuePanes` in src/lib/terminal-backends/launch.ts sees no pane to close, so close-out teardown and reap-issue-residue leave the root shell, the pane set and the workspace behind — four residue workspaces with deleted cwds belong to already-closed issues. Herdr is the default backend, so this corrupts workspace identity and leaks residue on every host after every restart, and it is the same pane-lookup seam PAN-3966 (merged as #4076) just hardened. Ranked immediately behind PAN-3921 with the rest of the Herdr substrate cluster: the fix is small and bounded (token-else-label fallback, re-stamp the token on re-adoption, never close a pane that names another owner).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1214,19 +1191,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick",
       "rationale": "New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Inserted at rank 19, the first non-pinned slot; ranks 1-18 are in-pipeline and stay pinned. Fix is small (reuse the per-project reconciler tick) with mechanical AC.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3981",
-      "rank": 20,
-      "size": "M",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision)",
-      "rationale": "Rank held at 23, still behind its blocker PAN-3966 (Herdr-aware stopAgent, in pipeline at rank 18). The three issues it was cross-referenced with — PAN-2828, PAN-3898 and PAN-3967 — all closed since the prior run, so those informs edges drop. The squash blindness the body cites as 'same as PAN-2828' is now solved code rather than an open dependency: verifyStrikeBranchMergedIntoMain (src/cli/commands/strike-merge-verification.ts:76) is the check the reaper's ahead-of-origin/main guard should adopt. The operator-decision framing is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, with the reaper as fallback. Rank lifted 23 -> 20 this run: its blocker PAN-3966 (tmux-only stopAgent/warm-idle reap) closed, so the Herdr pane-close primitive strike completion depends on now exists and this is startable.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12468,27 +12432,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-3981",
-      "to": "PAN-3047",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.75
-    },
-    {
-      "from": "PAN-4096",
-      "to": "PAN-3981",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4096",
-      "to": "PAN-3923",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-3921",
