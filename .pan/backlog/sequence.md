@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T19:49:04.169Z · model: claude-opus-5 · open: 821_
+_Last sequenced: 2026-09-24T19:54:56.856Z · model: claude-opus-5 · open: 821_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -189,6 +189,7 @@ _Last sequenced: 2026-09-24T19:49:04.169Z · model: claude-opus-5 · open: 821_
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
+| 220 | PAN-4127 | S | high | ok |  |  | findLatestReviewRunDir scans for the retired review-<issue>-<millis> folder, so no current run ever marks a lane mid-round or done |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
@@ -307,7 +308,6 @@ _Last sequenced: 2026-09-24T19:49:04.169Z · model: claude-opus-5 · open: 821_
 | 346 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
 | 347 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 348 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 349 | PAN-4118 | S | medium | ok |  |  | Review menu's Full/Quick/None is parsed, validated, then dropped; every run uses roles.review.mode and the docs claim it is saved |
 | 350 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 351 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
 | 352 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
@@ -405,7 +405,7 @@ _Last sequenced: 2026-09-24T19:49:04.169Z · model: claude-opus-5 · open: 821_
 | 444 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 445 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 447 | PAN-4123 | S | medium | ok |  | PAN-4118 | Reviewer tree shows convoy lanes from roles.review.mode, so a per-run Full hides its four lanes and a per-run Quick shows four dead ones |
+| 447 | PAN-4123 | S | medium | ok |  |  | Reviewer tree shows convoy lanes from roles.review.mode, so a per-run Full hides its four lanes and a per-run Quick shows four dead ones |
 | 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 449 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
 | 450 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
@@ -1136,7 +1136,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T19:49:04.169Z",
+  "generatedAt": "2026-09-24T19:54:56.856Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 821,
@@ -11260,19 +11260,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-4118",
-      "rank": 349,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review menu's Full/Quick/None is parsed, validated, then dropped; every run uses roles.review.mode and the docs claim it is saved",
-      "rationale": "New since the prior pass. A post-Cut (PAN-3917 W6) leftover: the trigger route still validates reviewMode but spawnReviewRoleForIssue never receives it, so the operator's Full/Quick/None choice silently loses to roles.review.mode while the toast and docs/ISSUE-VIEW.md both claim it took effect. Nothing wedges — the run falls back to config — so it is medium, not high. The body carries a complete fix outline (optional reviewMode on spawnReviewRoleForIssue, pass it from the route, correct the doc) with verified file paths, so it is a cheap, self-contained win. Placed in the medium 62-63 band beside comparable operator-facing correctness bugs; no renumbering.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4121",
       "rank": 11,
       "size": "S",
@@ -11292,11 +11279,22 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "importance": "medium",
       "score": 59,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4118"
-      ],
+      "dependsOn": [],
       "why": "Reviewer tree shows convoy lanes from roles.review.mode, so a per-run Full hides its four lanes and a per-run Quick shows four dead ones",
-      "rationale": "New since the prior pass and a follow-on that only bites once PAN-4118 lands, so it sits behind it in the medium band at the free rank 447: buildReviewerNodes in src/dashboard/server/routes/reviewer-tree.ts gates convoy lanes on isExtendedReviewEnabled(issueId), which reads config, so a run whose mode came from the Request review menu renders the wrong lane set — display-only, nothing wedges, and the body already proposes inferring the mode from the run (convoy agent records or .pan/review/<runId>/) rather than persisting per-issue state the Cut removed.",
+      "rationale": "Its only blocker, PAN-4118 (the Request review menu Full/Quick/None choice), merged and closed at 2026-09-24T19:50:53Z, so the dependency is dropped and the issue is actionable now. Rank 447 and score 59 are held deliberately: nothing about the bug itself changed, and its fix PR #4126 is already open against the PAN-4118 branch and only needs retargeting to main once that lands — so pickup order is moot for it. PAN-4127 is the sibling bug in the same file found during that PR; it is ranked on its own merit rather than chained behind this one, because its fix (read reviewRunId from the review parent state row) stands alone.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4127",
+      "rank": 220,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "findLatestReviewRunDir scans for the retired review-<issue>-<millis> folder, so no current run ever marks a lane mid-round or done",
+      "rationale": "New since the prior pass, and a silent regression rather than a missing feature: findLatestReviewRunDir in reviewer-tree.ts still looks for directories named review-<ISSUE>-<unixMillis>, a naming scheme review-agent.ts stopped writing when runs moved to agent-<issue>-review-<head8>. It therefore returns null on every current run, which switches off two behaviours that already shipped — the PAN-915 mid-round check and the PAN-1048 lane-done check. The operator reads the reviewer tree to know where a convoy stands, so the cost is a status lie in both directions: a live reviewer working the new round renders as a stopped zombie and invites a kill, and a finished lane keeps showing as working until the synthesiser exits. The existing tests pass only because their fixtures still use the retired directory name, so the suite cannot catch it. Ranked high at 74 rather than critical because nothing wedges — dispatch, convoy and synthesis all run correctly and only the view is wrong — and placed in the score-72-to-76 band at a free rank, with no renumbering. Size S: the body carries a verified fix (read reviewRunId from the review parent state row instead of scanning, with no fallback needed since buildReviewerNodes already returns no lanes when reviewRunId is absent) plus acceptance criteria that fail before it.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12416,18 +12414,18 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "confidence": 0.5
     },
     {
-      "from": "PAN-4118",
-      "to": "PAN-4123",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4109",
       "to": "PAN-4121",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4123",
+      "to": "PAN-4127",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }
