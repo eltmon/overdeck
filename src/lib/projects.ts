@@ -73,6 +73,7 @@ import {
 } from './projects-config-write.js';
 import { extractPrefix, parseIssueId } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
+import { findContainingProject } from './projects/path-containment.js';
 import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
@@ -787,22 +788,12 @@ export function findProjectByTeam(teamPrefix: string): ProjectConfig | null {
 }
 
 /**
- * Find project by workspace path.
- * Matches any project whose root path is an ancestor of the given path.
+ * Find project by workspace path: the project whose root contains it, deepest
+ * root first. `~` is expanded and symlinks resolved on both sides (PAN-4046).
  * Used to resolve the tracker (GitHub/GitLab) from a workspace directory.
  */
 export function findProjectByPath(workspacePath: string): ProjectConfig | null {
-  const config = loadProjectsConfigSync();
-  const normalizedTarget = resolve(workspacePath);
-
-  for (const [, projectConfig] of Object.entries(config.projects)) {
-    const normalizedProject = resolve(projectConfig.path);
-    if (normalizedTarget === normalizedProject || normalizedTarget.startsWith(normalizedProject + '/')) {
-      return projectConfig;
-    }
-  }
-
-  return null;
+  return findContainingProject(loadProjectsConfigSync().projects, workspacePath)?.[1] ?? null;
 }
 
 
