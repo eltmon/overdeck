@@ -24,7 +24,7 @@ import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
-import { appendPipelineEntry, lastPipelineEntry } from './pipeline-journal.js';
+import { appendPipelineEntry, lastPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
 
 export { checkApiErrorAgents };
 
@@ -168,6 +168,11 @@ export const reapClosedIssueAgents = reconcileClosedIssueAgents;
 // forever (PAN-3939). The journal says what Overdeck last DID for an issue; if
 // that was "reviewers exist" and no reviewer pane does, the convoy is gone.
 //
+// When every lane of the run already wrote its report, there is no lane to
+// relaunch; what is missing is the synthesis (#4134). The synthesis parent is
+// re-dispatched only when no verdict is journaled for that run AND the liveness
+// oracle confirms the parent dead — "unknown" is never death.
+//
 // ACCEPTED v1 GAPS — stated, not built:
 //   - A convoy where some reviewers posted a verdict and one died is not
 //     recovered: the last entry is then `review.verdict`.
@@ -208,6 +213,55 @@ function stalledReviewReason(type: string): string | null {
     return 'the review was requested but the pipeline never dispatched reviewers';
   }
   return null;
+}
+
+/**
+ * Whether a review verdict is already journaled for `runId`. The run id embeds
+ * the reviewed head, so a verdict carrying it covers this head. A verdict with
+ * no run id (an older writer) counts when it landed after the run's last
+ * dispatch — a verdict must never be re-synthesized over.
+ */
+function verdictJournaledForRun(workspacePath: string, runId: string): boolean {
+  let dispatchedAt = Number.NEGATIVE_INFINITY;
+  const entries = readPipelineJournal(workspacePath);
+  for (const entry of entries) {
+    if (entry.type === 'review.dispatched' && entry.data?.['runId'] === runId) {
+      dispatchedAt = Math.max(dispatchedAt, Date.parse(entry.at));
+    }
+  }
+  return entries.some((entry) => {
+    if (entry.type !== 'review.verdict') return false;
+    const verdictRunId = entry.data?.['runId'];
+    if (verdictRunId !== undefined) return verdictRunId === runId;
+    return Date.parse(entry.at) >= dispatchedAt;
+  });
+}
+
+type SynthesisGate =
+  | { action: 'redispatched'; outcome: string }
+  | { action: 'cool-down' }
+  | { action: 'retry' };
+
+/**
+ * The synthesis step of a convoy whose lanes all reported (#4134). Re-runs it
+ * only when no verdict is journaled for the run and the parent is CONFIRMED
+ * dead; an indeterminate probe retries on the next tick instead of cooling down.
+ */
+async function recoverDeadSynthesis(issueId: string, workspacePath: string, runId: string): Promise<SynthesisGate> {
+  if (verdictJournaledForRun(workspacePath, runId)) return { action: 'cool-down' };
+  const parentId = `agent-${issueId.toLowerCase()}-review`;
+  const verdict = await isAlive(parentId);
+  if (verdict.alive) return { action: 'cool-down' };
+  if (!isConfirmedDead(verdict)) return { action: 'retry' };
+
+  const { redispatchReviewSynthesis } = await import('./review-agent.js');
+  const result = await redispatchReviewSynthesis(issueId, { workspace: workspacePath, runId, source: 'deacon-lite' });
+  if (!result.success) {
+    // One attempt per cooldown window: a spawn that failed is not retried every tick.
+    console.warn(`[deacon-lite] Synthesis recovery declined for ${issueId}: ${result.message}`);
+    return { action: 'cool-down' };
+  }
+  return { action: 'redispatched', outcome: result.message };
 }
 
 export async function recoverStalledReviews(now = Date.now()): Promise<string[]> {
@@ -254,6 +308,7 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     // re-verifies. Only a parent with no run state at all needs the full door.
     let via = 'convoy-recovery';
     let outcome: string;
+    let journalData: Record<string, unknown> = { reason };
     try {
       const { recoverMissingConvoyReviewers } = await import('./review-convoy.js');
       const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
@@ -274,11 +329,25 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
         console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);
         continue;
       } else if (!recovery.launched) {
-        // Every lane already reported: nothing to relaunch, so no re-dispatch
-        // to journal or report (PAN-3914). Cool down so the next tick does not
-        // re-probe the same convoy.
-        lastReviewRedispatchAt.set(issueId, now);
-        continue;
+        // Nothing to relaunch, so no lane re-dispatch to journal or report
+        // (PAN-3914). When every lane of the run reported, the synthesis may be
+        // what died (#4134).
+        const synthesis = recovery.allReported && recovery.runId
+          ? await recoverDeadSynthesis(issueId, workspace.path, recovery.runId)
+          : { action: 'cool-down' as const };
+        if (synthesis.action !== 'redispatched') {
+          // Cool down so the next tick does not re-probe the same convoy —
+          // except after an indeterminate probe, which must not buy the wedge
+          // an extra hour.
+          if (synthesis.action === 'cool-down') lastReviewRedispatchAt.set(issueId, now);
+          continue;
+        }
+        via = 'synthesis-recovery';
+        outcome = synthesis.outcome;
+        journalData = {
+          reason: 'every lane reported but the synthesis parent died before posting a verdict',
+          runId: recovery.runId,
+        };
       }
     } catch (err) {
       console.error(`[deacon-lite] Stalled-review recovery failed for ${issueId}:`, err);
@@ -290,7 +359,7 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
       type: 'review.redispatched',
       issueId,
       source: 'deacon-lite',
-      data: { reason, via },
+      data: { ...journalData, via },
     });
     actions.push(`recoverStalledReviews: re-dispatched ${issueId} via ${via} — ${outcome}`);
   }

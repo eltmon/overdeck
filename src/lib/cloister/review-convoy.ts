@@ -355,6 +355,21 @@ export async function launchConvoyReviewers(params: ConvoyLaunchParams): Promise
   return reviewerResults;
 }
 
+/** What `recoverMissingConvoyReviewers` did, and which run it looked at. */
+export interface ConvoyRecoveryResult {
+  success: boolean;
+  message: string;
+  launched?: number;
+  /** The parent's current run, when the recovery resolved one. */
+  runId?: string;
+  /**
+   * Set on the no-op answer: true only when every lane of `runId` has its
+   * report on disk (not merely a live pane). The synthesis-recovery gate reads
+   * it (#4134).
+   */
+  allReported?: boolean;
+}
+
 /**
  * Re-launch only convoy lanes whose report and session are both absent for the
  * current parent run. It is idempotent, so a repeated recovery request is a no-op.
@@ -362,7 +377,7 @@ export async function launchConvoyReviewers(params: ConvoyLaunchParams): Promise
 export async function recoverMissingConvoyReviewers(
   issueId: string,
   opts: { source?: string; model?: string; harness?: RuntimeName } = {},
-): Promise<{ success: boolean; message: string; launched?: number }> {
+): Promise<ConvoyRecoveryResult> {
   const normalized = issueId.toUpperCase();
   const parentId = `agent-${normalized.toLowerCase()}-review`;
   const { saveAgentState, getAgentState } = await import('../agents.js');
@@ -432,7 +447,14 @@ export async function recoverMissingConvoyReviewers(
     reviewersToLaunch.push(subRole);
   }
   if (reviewersToLaunch.length === 0) {
-    return { success: true, message: `Convoy already launched for ${normalized} run ${runId} — no-op` };
+    const allReported = REVIEW_SUB_ROLES.every((subRole) =>
+      existsSync(reviewerAgentOutputPath(workspace, runId, subRole)));
+    return {
+      success: true,
+      message: `Convoy already launched for ${normalized} run ${runId} — no-op`,
+      runId,
+      allReported,
+    };
   }
 
   // PAN-3917: the per-issue review-model override lived on the record and went
@@ -456,5 +478,5 @@ export async function recoverMissingConvoyReviewers(
   const message = `Convoy recovery for ${normalized}${opts.source ? ` (${opts.source})` : ''}: launched ${launched}/${reviewersToLaunch.length} missing reviewer(s)`;
   console.log(`[review-agent] ${message}`);
   emitActivityEntry({ source: 'review', level: 'info', message, issueId: normalized });
-  return { success: launched === reviewersToLaunch.length, message, launched };
+  return { success: launched === reviewersToLaunch.length, message, launched, runId };
 }

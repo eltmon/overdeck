@@ -762,6 +762,113 @@ export const spawnReviewRoleForIssue = (
     );
   });
 
+/**
+ * The addendum a recovered synthesis parent reads after the normal synthesis
+ * prompt (#4134). The reviewers' REVIEWER_READY signals went to the dead
+ * parent and are gone, so the STANDBY wait in `buildReviewRolePrompt` would
+ * never end: tell the new parent the reports are already on disk.
+ */
+function buildSynthesisRecoveryAddendum(reviewDir: string): string {
+  const reports = REVIEW_SUB_ROLES.map(r => `  ${join(reviewDir, `${r}.md`)}`).join('\n');
+  return [
+    '',
+    '── RECOVERY (overrides the STANDBY instructions above) ──',
+    'Every convoy reviewer already finished and wrote its report, but the previous synthesis',
+    'session died before posting a verdict. No REVIEWER_* signals will arrive.',
+    `Treat all ${REVIEW_SUB_ROLES.length} lanes as REVIEWER_READY now, skip the stale-signal check,`,
+    'and start the synthesis immediately from these reports:',
+    reports,
+  ].join('\n');
+}
+
+/**
+ * Re-run the synthesis step of a convoy review whose lanes all reported but
+ * whose synthesis parent died before posting a verdict (#4134). The caller
+ * owns the gates (every lane reported, no verdict for the run, parent
+ * confirmed dead, cooldown); this only relaunches the parent against `runId`.
+ *
+ * Resumes the saved parent session when the resume decision allows it (the
+ * resume path closes any residue pane through the terminal backend), otherwise
+ * closes the dead pane and spawns a fresh parent. It never launches reviewers.
+ */
+export async function redispatchReviewSynthesis(
+  issueId: string,
+  opts: { workspace: string; runId: string; source?: string },
+): Promise<{ success: boolean; message: string }> {
+  const normalized = issueId.toUpperCase();
+  return withReviewLifecycleGuard(normalized, async () => {
+    const parentId = `agent-${normalized.toLowerCase()}-review`;
+    const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', opts.runId);
+    const manifestPath = join(reviewDir, 'context.json');
+    const prompt = buildReviewRolePrompt({
+      issueId: normalized,
+      workspace: opts.workspace,
+      branch: `feature/${normalized.toLowerCase()}`,
+      runId: opts.runId,
+      reviewDir,
+      ...(existsSync(manifestPath) ? { contextManifestPath: manifestPath } : {}),
+    }) + buildSynthesisRecoveryAddendum(reviewDir);
+
+    const { spawnRun, saveAgentState, getLatestSessionId, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
+    const armRun = async (state: ReturnType<typeof getAgentState>): Promise<void> => {
+      if (!state) return;
+      state.reviewRunId = opts.runId;
+      state.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+      try {
+        await Effect.runPromise(saveAgentState(state));
+      } catch (err) {
+        console.warn(`[review-agent] Could not persist reviewRunId on ${parentId}:`, err);
+      }
+    };
+
+    const saved = getAgentState(parentId);
+    const canResume = reviewResumeDecision({
+      savedModel: saved?.model,
+      savedHarness: saved?.harness,
+      hasSavedState: !!saved,
+      hasSavedSession: !!getLatestSessionId(parentId),
+    });
+    let via: 'resumed' | 'spawned';
+    try {
+      if (canResume && (await resumeAgent(parentId, prompt)).success) {
+        via = 'resumed';
+        await armRun(getAgentState(parentId));
+      } else {
+        const { closeAgentPaneDetailed } = await import('../terminal-backends/launch.js');
+        const closed = await closeAgentPaneDetailed(parentId);
+        if (closed.outcome === 'failed') {
+          return { success: false, message: `Synthesis recovery for ${normalized} could not close the dead parent pane: ${closed.reason}` };
+        }
+        if (saved || getLatestSessionId(parentId)) {
+          try {
+            await wipeAgentStateDirs(normalized, { rolePrefix: 'review' });
+          } catch (wipeErr) {
+            console.warn(`[review-agent] review state wipe before synthesis respawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`);
+          }
+        }
+        const run = await spawnRun(normalized, 'review', {
+          workspace: opts.workspace,
+          prompt,
+          ...(saved?.hostOverride ? { allowHost: true } : {}),
+          startedBy: 'review-agent',
+        });
+        via = 'spawned';
+        await armRun(run);
+      }
+    } catch (err) {
+      return {
+        success: false,
+        message: `Synthesis recovery for ${normalized} failed: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+
+    const message = `Synthesis recovery for ${normalized}${opts.source ? ` (${opts.source})` : ''}: ${via} ${parentId} for run ${opts.runId}`;
+    console.log(`[review-agent] ${message}`);
+    emitActivityEntry({ source: 'review', level: 'info', message, issueId: normalized });
+    return { success: true, message };
+  });
+}
+
 // PAN-1862 resume-vs-fresh decision lives in its own pure module (review-resume-decision.ts) so
 // it is unit-testable without importing this heavy file. Re-exported for external callers.
 export { reviewResumeDecision } from './review-resume-decision.js';
