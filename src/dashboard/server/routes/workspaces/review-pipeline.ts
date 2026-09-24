@@ -43,8 +43,10 @@ import { transitionIssueToInReview } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
 import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-push.js';
 import {
+  registerGuardedReviewRequester,
   registerRequestReviewStarter,
   requestReviewPipeline,
+  type GuardedReviewRequestOutcome,
   type RequestReviewSource,
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
@@ -595,18 +597,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     });
   }))
 );
-/** What the guarded review request did (`requestReviewGuarded`). */
-export type GuardedReviewRequestOutcome =
-  | { kind: 'already-merged' }
-  | { kind: 'already-passed' }
-  | { kind: 'tests-requeued' }
-  | { kind: 'circuit-breaker'; autoRequeueCount: number }
-  | { kind: 'no-workspace' }
-  | { kind: 'dirty-workspace'; error: string }
-  | { kind: 'no-project'; autoRequeueCount: number }
-  | { kind: 'already-running' }
-  | { kind: 'started'; autoRequeueCount: number; remoteVmName?: string };
-
 /**
  * The guarded review request: what `POST /api/review/:issueId/request` does
  * without `force` or `nudge`, and what every re-request that is not an
@@ -714,6 +704,8 @@ export async function requestReviewGuarded(
     ...(outcome.remoteVmName ? { remoteVmName: outcome.remoteVmName } : {}),
   };
 }
+
+registerGuardedReviewRequester(requestReviewGuarded);
 
 // ─── Route: POST /api/review/:issueId/request ─────────────────────
 const postWorkspaceRequestReviewRoute = HttpRouter.add(

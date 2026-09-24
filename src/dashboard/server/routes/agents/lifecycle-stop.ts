@@ -25,7 +25,7 @@ import {
   type ReviewRequestOutcome,
 } from '../../../../lib/agents/issue-pause.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
-import { requestReviewGuarded } from '../workspaces/review-pipeline.js';
+import { getGuardedReviewRequester } from '../../../../lib/cloister/request-review-pipeline.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -291,6 +291,8 @@ export const postAgentPauseRoute = HttpRouter.add(
  * approved-head check, re-request breaker), never the bare pipeline starter.
  */
 async function requestReviewInProcess(issueId: string): Promise<ReviewRequestOutcome> {
+  const requestReviewGuarded = getGuardedReviewRequester();
+  if (!requestReviewGuarded) return { requested: false, reason: 'the review pipeline is not loaded in this process' };
   const outcome = await requestReviewGuarded(issueId, {
     message: 'review re-requested after pan unpause',
     source: 'pan-unpause',

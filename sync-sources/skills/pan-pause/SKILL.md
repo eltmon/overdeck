@@ -30,7 +30,7 @@ pan pause PAN-123 --reason "investigating bad loop"
 
 `pan pause <id>` sets a persistent pause gate in the agent state file. If the agent is currently running, it also stops the agent so it cannot keep working while paused.
 
-Pausing an issue (its work agent, `agent-<issue>`) holds the whole issue. Its running review convoy and test agent are stopped too, and the Deacon's stalled-review recovery leaves the issue alone. `pan unpause <id>` re-requests the review (a fresh convoy for the current head) or re-dispatches the test agent. Pausing a swarm slot agent pauses only that slot. `pan pause` exits 1 and names any agent it could not stop, including one whose terminal did not close and one whose liveness it could not determine.
+Pausing an issue (its work agent, `agent-<issue>`) holds the issue's review and test work. Its running test agent is stopped, and so is its review convoy when a review is in flight (no verdict yet); reviewers idle after their verdict are left alone. The Deacon's stalled-review recovery leaves the issue alone while it is paused. `pan unpause <id>` re-requests the halted review (a fresh convoy for the current head) or re-dispatches the test agent. If the pause ends any other way (`pan start --force`, dashboard Start with cleared gates), the Deacon re-requests the halted review. Pausing a swarm slot agent pauses only that slot. `pan pause` exits 1 and names any agent it could not stop, including one whose terminal did not close and one whose liveness it could not determine.
 
 Paused agents are skipped by auto-resume. A later `pan start <id>` refuses by default and tells the operator to run `pan unpause <id>` first; `pan start <id> --force` clears the pause gate and starts anyway.
 

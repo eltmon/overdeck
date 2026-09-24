@@ -75,8 +75,10 @@ const reviewPipelineMocks = vi.hoisted(() => ({
   requestReviewGuarded: vi.fn(),
 }));
 
-vi.mock('../workspaces/review-pipeline.js', () => ({
-  requestReviewGuarded: reviewPipelineMocks.requestReviewGuarded,
+// The guarded review request the review route registers (PAN-3911).
+vi.mock('../../../../lib/cloister/request-review-pipeline.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/cloister/request-review-pipeline.js')>()),
+  getGuardedReviewRequester: () => reviewPipelineMocks.requestReviewGuarded,
 }));
 
 vi.mock('../../../../lib/operator-interventions.js', () => ({

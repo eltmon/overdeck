@@ -29,7 +29,7 @@ pan unpause PAN-123
 
 `pan unpause <id>` clears the persistent pause fields from the agent state file, then resumes the agent's saved session when it has one. Without a saved session it prints `pan start <id>` for the operator to run.
 
-When the pause was an issue pause that stopped the issue's reviewers, unpause first re-requests the review through the normal review door (the same one `pan review request` uses), which starts a fresh review convoy for the current head. When it stopped only the test agent, unpause re-dispatches the test role. If the re-request fails (dashboard down, dirty tree), unpause exits 1 and tells you to run `pan review request <id>`.
+When the pause was an issue pause that stopped the issue's reviewers, unpause first re-requests the review through the normal review door (the same one `pan review request` uses), which starts a fresh review convoy for the current head. A merged issue or an already-approved head is reported as "No review re-requested", not as a request. When it stopped only the test agent, unpause re-dispatches the test role. If the re-request fails (dashboard down, dirty tree, re-review limit), unpause exits 1 and tells you to run `pan review request <id>`; the Deacon also re-requests the halted review on a later patrol.
 
 ## When to Use
 
