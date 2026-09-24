@@ -122,6 +122,35 @@ or export `OVERDECK_TERMINAL_BACKEND=tmux`. With `terminal.backend: tmux`,
 Overdeck skips all Herdr setup and runs agents on the `tmux -L overdeck`
 socket.
 
+## Reaching an agent from a shell
+
+`pan start` (including when the agent is already running), `pan strike` and
+`pan recover` end with a `Commands:` block. Its `Backend:` line says where the
+agent's pane lives, and its `Attach:` line is the command that opens it:
+
+```text
+  Backend:  herdr (pane wG:p2)
+  Attach:   herdr --session overdeck terminal attach <terminal-id>
+```
+
+The command depends on the backend the agent was launched on:
+
+| Backend | Command |
+| --- | --- |
+| Herdr | `herdr --session <session> terminal attach <terminal-id>` |
+| tmux | `tmux -L <session> attach -t <agent-id>` |
+
+`<session>` is `overdeck` for the default `~/.overdeck` home. Every Herdr
+command needs `--session`, because Herdr's own default session is `default`.
+The Herdr form uses the terminal id, which works for every harness, including
+codex, ACP and kimi, which have no Herdr agent record. Agents launched before
+the terminal id was recorded get
+`herdr --session <session> agent attach <agent-id>` instead.
+
+The hint follows the backend recorded in the agent's state at launch, so an
+agent started on tmux before a switch to Herdr still gets the tmux form. An
+agent with no recorded backend gets the host's current selection.
+
 ## Claude Code hooks
 
 If you install Herdr's `claude` integration yourself, it adds a

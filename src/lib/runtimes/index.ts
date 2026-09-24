@@ -169,5 +169,10 @@ export function getRuntimeForAgent(agentId: string): AgentRuntimeSync | null {
 // PAN-3849: register the transcript-heartbeat lookup with the liveness oracle
 // (agents/liveness.ts cannot import this barrel — that would close a module
 // cycle through agents.ts → messaging.ts → liveness.ts).
-import { registerLivenessHeartbeatLookup } from '../agents/liveness.js';
+import { isAlive, registerLivenessHeartbeatLookup } from '../agents/liveness.js';
+import { registerRuntimeLivenessProbe } from './runtime-liveness.js';
 registerLivenessHeartbeatLookup((agentId) => getRuntimeForAgent(agentId)?.getHeartbeat(agentId) ?? null);
+// #4116: every runtime's isRunning asks the backend-aware oracle through this
+// door (a runtime importing liveness.ts directly closes an import cycle).
+registerRuntimeLivenessProbe(async (agentId, harness) =>
+  (await isAlive(agentId, { readHarness: () => harness as RuntimeName })).alive);

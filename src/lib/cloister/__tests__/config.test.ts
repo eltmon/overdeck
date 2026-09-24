@@ -107,4 +107,25 @@ describe('loadCloisterConfig', () => {
     });
   });
 
+  it('loads a cloister.toml that still carries the retired specialists.review_agents list', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue([
+      '[specialists.review_agent]',
+      'enabled = false',
+      'auto_wake = false',
+      '',
+      '[[specialists.review_agents]]',
+      'name = "security"',
+      'model = "claude-opus-4-6"',
+      'focus = ["auth"]',
+      'enabled = true',
+      '',
+    ].join('\n'));
+
+    const config = loadCloisterConfigSync();
+
+    // The file parsed: its other settings apply instead of the defaults fallback.
+    expect(config.specialists?.review_agent).toEqual({ enabled: false, auto_wake: false });
+  });
+
 });
