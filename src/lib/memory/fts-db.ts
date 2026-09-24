@@ -1,5 +1,6 @@
-import { Worker } from 'node:worker_threads';
+import type { Worker } from 'node:worker_threads';
 import type { SqliteBindParams, SqliteRunResult } from '../database/driver.js';
+import { spawnModuleWorker } from '../module-worker.js';
 import {
   closeMemoryFtsDatabasesInProcess,
   getMemoryFtsDatabaseSync,
@@ -91,7 +92,10 @@ function postMemoryFtsRequest<T = unknown>(operation: MemoryFtsWorkerOperation, 
   if (shouldRunInline()) {
     return Promise.resolve().then(() => runInline<T>(operation, projectId, payload));
   }
+  return requestViaWorker<T>(operation, projectId, payload);
+}
 
+function requestViaWorker<T = unknown>(operation: MemoryFtsWorkerOperation, projectId?: string, payload: Record<string, unknown> = {}): Promise<T> {
   const id = nextRequestId++;
   return new Promise<T>((resolve, reject) => {
     pendingRequests.set(id, { resolve: resolve as (value: unknown) => void, reject });
@@ -130,10 +134,7 @@ function requireProjectId(projectId: string | undefined): string {
 function getMemoryFtsWorker(): Worker {
   if (worker) return worker;
 
-  const nextWorker = new Worker(memoryFtsWorkerUrl(), {
-    type: 'module',
-    execArgv: process.execArgv.filter((arg) => !arg.startsWith('--inspect')),
-  } as ConstructorParameters<typeof Worker>[1]);
+  const nextWorker = spawnModuleWorker(memoryFtsWorkerUrl());
 
   nextWorker.on('message', (message: MemoryFtsWorkerResponse) => {
     const request = pendingRequests.get(message.id);
@@ -182,4 +183,13 @@ function memoryFtsWorkerUrl(moduleUrl = import.meta.url): URL {
   return new URL('./fts-worker.js', moduleUrl);
 }
 
-export const __testInternals = { memoryFtsWorkerUrl };
+// A test that boots the real worker awaits its teardown instead of the fire-and-forget
+// terminate in closeMemoryFtsDatabases.
+async function terminateWorker(): Promise<void> {
+  const current = worker;
+  worker = null;
+  failPendingRequests(new Error('Memory FTS worker closed'));
+  if (current) await current.terminate();
+}
+
+export const __testInternals = { memoryFtsWorkerUrl, requestViaWorker, terminateWorker };
