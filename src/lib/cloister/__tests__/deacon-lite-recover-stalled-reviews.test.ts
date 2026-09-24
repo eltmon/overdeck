@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   recoverMissingConvoyReviewers: vi.fn(),
   getRequestReviewStarter: vi.fn(),
   notifyPipeline: vi.fn(),
+  isAlive: vi.fn(),
+  redispatchReviewSynthesis: vi.fn(),
 }));
 
 vi.mock('../../terminal-backends/inventory.js', () => ({ liveAgentInventory: mocks.liveAgentInventory }));
@@ -26,6 +28,11 @@ vi.mock('../../workspaces/resolver.js', () => ({ listWorkspaces: mocks.listWorks
 vi.mock('../review-convoy.js', () => ({ recoverMissingConvoyReviewers: mocks.recoverMissingConvoyReviewers }));
 vi.mock('../request-review-pipeline.js', () => ({ getRequestReviewStarter: mocks.getRequestReviewStarter }));
 vi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: mocks.notifyPipeline }));
+vi.mock('../../agents/liveness.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../agents/liveness.js')>()),
+  isAlive: mocks.isAlive,
+}));
+vi.mock('../review-agent.js', () => ({ redispatchReviewSynthesis: mocks.redispatchReviewSynthesis }));
 
 const { appendPipelineEntry, readPipelineJournal } = await import('../pipeline-journal.js');
 const { recoverStalledReviews, __resetStalledReviewCooldownForTests } = await import('../deacon-lite.js');
@@ -59,7 +66,12 @@ beforeEach(() => {
   mocks.recoverMissingConvoyReviewers.mockResolvedValue({
     success: true, message: 'Convoy recovery for PAN-3705 (deacon-lite): launched 4/4 missing reviewer(s)', launched: 4,
   });
+  mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+  mocks.redispatchReviewSynthesis.mockResolvedValue({
+    success: true, message: 'Synthesis recovery for PAN-3705 (deacon-lite): resumed agent-pan-3705-review for run r1',
+  });
   vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -156,7 +168,7 @@ describe('recoverStalledReviews', () => {
   // re-dispatch or report one, or the routine repeats that shape hourly.
   it('does not journal or report a convoy recovery that launched nothing', async () => {
     journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
-    // Every lane already wrote its report; the synthesis parent never posted a verdict.
+    // No lane to relaunch, and not every lane has a report on disk (allReported unset).
     mocks.recoverMissingConvoyReviewers.mockResolvedValue({
       success: true, message: 'Convoy already launched for PAN-3705 run r1 — no-op',
     });
@@ -209,5 +221,123 @@ describe('recoverStalledReviews', () => {
     mocks.listWorkspaces.mockReturnValue([{ id: 'ws1', issueId: 'PAN-3705', path: join(workspace, 'missing') }]);
 
     expect(await recoverStalledReviews(NOW)).toEqual([]);
+  });
+});
+
+// #4134: every lane of the run reported, but the synthesis parent died before
+// posting a verdict. Nothing relaunches a lane, so only the synthesis gate acts.
+describe('recoverStalledReviews — synthesis recovery', () => {
+  const RUN_ID = 'agent-pan-3705-review-abcd1234';
+
+  function allLanesReported(): void {
+    mocks.recoverMissingConvoyReviewers.mockResolvedValue({
+      success: true,
+      message: `Convoy already launched for PAN-3705 run ${RUN_ID} — no-op`,
+      runId: RUN_ID,
+      allReported: true,
+    });
+  }
+
+  it('re-dispatches synthesis when every lane reported and the parent is confirmed dead, and journals it', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    allLanesReported();
+
+    const actions = await recoverStalledReviews(NOW);
+
+    expect(mocks.isAlive).toHaveBeenCalledWith('agent-pan-3705-review');
+    expect(mocks.redispatchReviewSynthesis).toHaveBeenCalledWith('PAN-3705', {
+      workspace, runId: RUN_ID, source: 'deacon-lite',
+    });
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('re-dispatched PAN-3705 via synthesis-recovery');
+    const last = readPipelineJournal(workspace).at(-1);
+    expect(last).toMatchObject({ type: 'review.redispatched', issueId: 'PAN-3705', source: 'deacon-lite' });
+    expect(last?.data).toMatchObject({ via: 'synthesis-recovery', runId: RUN_ID });
+  });
+
+  it('takes no action while the parent liveness is unknown, and re-probes on the next tick', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    allLanesReported();
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(mocks.redispatchReviewSynthesis).not.toHaveBeenCalled();
+    expect(readPipelineJournal(workspace).map((entry) => entry.type)).toEqual(['review.dispatched']);
+
+    // An unknown answer buys no cooldown: once the probe answers "dead", it acts.
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    expect(await recoverStalledReviews(NOW + MINUTE)).toHaveLength(1);
+    expect(mocks.redispatchReviewSynthesis).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes no action while the parent is alive', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    allLanesReported();
+    mocks.isAlive.mockResolvedValue({ alive: true, paneAlive: true });
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(mocks.redispatchReviewSynthesis).not.toHaveBeenCalled();
+  });
+
+  it('takes no action when a verdict is already journaled for the run', async () => {
+    // The verdict landed, then an older recovery entry is last — so the
+    // last-entry rule lets the routine through and the verdict gate must hold.
+    vi.setSystemTime(NOW - 120 * MINUTE);
+    appendPipelineEntry(workspace, { type: 'review.dispatched', issueId: 'PAN-3705', data: { runId: RUN_ID } });
+    vi.setSystemTime(NOW - 100 * MINUTE);
+    appendPipelineEntry(workspace, { type: 'review.verdict', issueId: 'PAN-3705', data: { verdict: 'APPROVED', runId: RUN_ID } });
+    vi.setSystemTime(NOW - 90 * MINUTE);
+    appendPipelineEntry(workspace, { type: 'review.redispatched', issueId: 'PAN-3705', source: 'deacon-lite' });
+    vi.setSystemTime(NOW);
+    allLanesReported();
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(mocks.recoverMissingConvoyReviewers).toHaveBeenCalledTimes(1);
+    expect(mocks.isAlive).not.toHaveBeenCalled();
+    expect(mocks.redispatchReviewSynthesis).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a verdict for an older run as a verdict for this run', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    vi.setSystemTime(NOW - 20 * MINUTE);
+    appendPipelineEntry(workspace, {
+      type: 'review.verdict', issueId: 'PAN-3705', data: { verdict: 'CHANGES_REQUESTED', runId: 'agent-pan-3705-review-00000000' },
+    });
+    vi.setSystemTime(NOW - 16 * MINUTE);
+    appendPipelineEntry(workspace, { type: 'review.dispatched', issueId: 'PAN-3705', data: { runId: RUN_ID } });
+    vi.setSystemTime(NOW);
+    allLanesReported();
+
+    expect(await recoverStalledReviews(NOW)).toHaveLength(1);
+  });
+
+  it('holds the cooldown after a synthesis re-dispatch, in memory and across a restart', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    allLanesReported();
+
+    expect(await recoverStalledReviews(NOW)).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(30 * MINUTE);
+    expect(await recoverStalledReviews(NOW + 30 * MINUTE)).toEqual([]);
+
+    // A restarted deacon child reads the cooldown back from its journal entry.
+    __resetStalledReviewCooldownForTests();
+    expect(await recoverStalledReviews(NOW + 30 * MINUTE)).toEqual([]);
+    expect(mocks.redispatchReviewSynthesis).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(31 * MINUTE);
+    expect(await recoverStalledReviews(NOW + 61 * MINUTE)).toHaveLength(1);
+    expect(mocks.redispatchReviewSynthesis).toHaveBeenCalledTimes(2);
+  });
+
+  it('cools down after a failed synthesis re-dispatch instead of retrying every tick', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    allLanesReported();
+    mocks.redispatchReviewSynthesis.mockResolvedValue({ success: false, message: 'spawn failed' });
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(await recoverStalledReviews(NOW + MINUTE)).toEqual([]);
+    expect(mocks.redispatchReviewSynthesis).toHaveBeenCalledTimes(1);
+    expect(readPipelineJournal(workspace).map((entry) => entry.type)).toEqual(['review.dispatched']);
   });
 });
