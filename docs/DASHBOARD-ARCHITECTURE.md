@@ -211,8 +211,12 @@ door that does not exist; a real record read door would be a separate change.
   exist yet) is retried on the next event fired by a surviving watcher — there is no
   timer or poll. If every watch attempt fails, the stream stays in `discovering`
   until an operator or later launch creates one of the watched roots.
-- `GET /api/conversations/:name/messages` serves registered conversations only. It
-  never scans agent directories or global session UUIDs to resolve an agent-backed row.
+- `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
+  rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
+  indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
+  lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
+  names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
+  subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to

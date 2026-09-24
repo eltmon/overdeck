@@ -4,6 +4,8 @@ export interface RankedChunkRow {
   rowid: number;
   sessionId: string;
   projectId: string;
+  /** Parent session UUID when the chunk came from a Claude subagent transcript (PAN-3982). */
+  parentSessionId?: string | null;
   role: string;
   ts: string | null;
   byteOffset: number;

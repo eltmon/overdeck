@@ -13,13 +13,27 @@ interface SubagentTranscriptProps {
   resolvedTheme?: 'light' | 'dark';
   /** Return to the parent conversation (the rail's "Main agent" row does the same). */
   onBack: () => void;
+  /** Palette-search message target inside this subagent's transcript (PAN-3982). */
+  targetMessageId?: string;
+  targetMessageIndex?: number;
+  targetMessageNonce?: number;
+  onTargetMessageHandled?: () => void;
 }
 
 /**
  * Full-width transcript for one subagent. Rendered in place of the parent
  * conversation body while a rail row is selected. Direct input is capability-gated.
  */
-export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBack }: SubagentTranscriptProps) {
+export function SubagentTranscript({
+  conversation,
+  subagent,
+  resolvedTheme,
+  onBack,
+  targetMessageId,
+  targetMessageIndex,
+  targetMessageNonce,
+  onTargetMessageHandled,
+}: SubagentTranscriptProps) {
   const transcript = useSubagentTranscript(conversation, subagent.agentId);
   // Codex snapshots deliberately report streaming=false. Child lifecycle comes
   // from the subagent list; the parent's activity must never light up this view.
@@ -64,6 +78,10 @@ export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBa
             cwd={conversation.cwd}
             issueId={conversation.issueId}
             resolvedTheme={resolvedTheme}
+            targetMessageId={targetMessageId}
+            targetMessageIndex={targetMessageIndex}
+            targetMessageNonce={targetMessageNonce}
+            onTargetMessageHandled={onTargetMessageHandled}
           />
         )}
       </div>

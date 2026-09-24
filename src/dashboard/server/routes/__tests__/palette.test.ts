@@ -137,6 +137,8 @@ describe('palette conversation search', () => {
       conversationId: 'session-a',
       projectId: 'overdeck',
       projectKey: 'Overdeck',
+      parentSessionId: null,
+      subagentId: null,
       role: 'assistant',
     });
     expect(result.conversations[0]?.excerptSegments).toContainEqual({ text: 'needle', match: true });
@@ -155,6 +157,65 @@ describe('palette conversation search', () => {
       conversationId: 'managed-conversation',
       projectId: 'overdeck',
       projectKey: 'Target Project',
+    });
+  });
+
+  it('routes a subagent hit to its parent conversation (PAN-3982)', async () => {
+    const root = tmpDir!;
+    const parentSessionId = '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607';
+    const subagentsDir = join(root, 'projects', 'overdeck', parentSessionId, 'subagents');
+    mkdirSync(subagentsDir, { recursive: true });
+    const subagentFile = join(subagentsDir, 'agent-deadbeef01.jsonl');
+    writeFileSync(subagentFile, jsonlMessage('assistant', 'The needle appears in this subagent transcript.'));
+
+    const config: NormalizedConversationSearchConfig = {
+      enabled: true,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(root, 'embeddings.db'),
+    };
+    const dimensions = dimensionsForModel(config.model);
+    const provider = fakeProvider(dimensions);
+    vi.mocked(getConversationSearchConfig).mockReturnValue(config);
+    vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+    vi.mocked(listProjectsSync).mockReturnValue([{
+      key: 'target-key',
+      config: { name: 'Target Project', path: 'foreign-project' },
+    } as ReturnType<typeof listProjectsSync>[number]]);
+    vi.mocked(getConversationByClaudeSessionId).mockImplementation((sessionId: string) => (
+      sessionId === parentSessionId
+        ? { name: 'parent-conv', projectKey: 'target-key' } as NonNullable<ReturnType<typeof getConversationByClaudeSessionId>>
+        : null
+    ));
+
+    const db = openEmbeddingsDb(config.dbPath, dimensions);
+    expect(db.available).toBe(true);
+    await indexConversationFile({
+      filePath: subagentFile,
+      config,
+      db,
+      provider,
+      now: () => '2026-06-02T01:01:00.000Z',
+    });
+    db.close();
+
+    const result = await runPaletteSearch('needle', 5);
+    expect(result.conversations).toHaveLength(1);
+    expect(result.conversations[0]).toMatchObject({
+      sessionId: 'agent-deadbeef01',
+      parentSessionId,
+      subagentId: 'deadbeef01',
+      conversationId: 'parent-conv',
+      projectKey: 'Target Project',
+    });
+
+    vi.mocked(getConversationByClaudeSessionId).mockReturnValue(null);
+    const unregistered = await runPaletteSearch('needle', 5);
+    expect(unregistered.conversations[0]).toMatchObject({
+      conversationId: parentSessionId,
+      parentSessionId,
+      subagentId: 'deadbeef01',
     });
   });
 

@@ -4,16 +4,21 @@ import userEvent from '@testing-library/user-event';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentSummary } from './chat-types';
 
-const hookMocks = vi.hoisted(() => ({ useSubagentTranscript: vi.fn() }));
+const hookMocks = vi.hoisted(() => ({ useSubagentTranscript: vi.fn(), timelineProps: vi.fn() }));
 
 vi.mock('./useConversationMessagesStream', () => ({
   useSubagentTranscript: hookMocks.useSubagentTranscript,
 }));
 vi.mock('./SubagentComposer', () => ({ SubagentComposer: () => null }));
 vi.mock('./MessagesTimeline', () => ({
-  MessagesTimeline: ({ messages, streaming }: { messages: Array<{ text: string }>; streaming: boolean }) => (
-    <div data-testid="subagent-timeline" data-working={streaming}>{messages.map((message) => message.text).join(' ')}</div>
-  ),
+  MessagesTimeline: (props: { messages: Array<{ text: string }>; streaming: boolean }) => {
+    hookMocks.timelineProps(props);
+    return (
+      <div data-testid="subagent-timeline" data-working={props.streaming}>
+        {props.messages.map((message) => message.text).join(' ')}
+      </div>
+    );
+  },
 }));
 
 import { SubagentTranscript } from './SubagentTranscript';
@@ -95,6 +100,28 @@ describe('SubagentTranscript', () => {
     await user.click(screen.getByRole('button', { name: 'Back to main agent' }));
 
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands a palette message target to the subagent timeline (PAN-3982)', () => {
+    const onTargetMessageHandled = vi.fn();
+    render(
+      <SubagentTranscript
+        conversation={conversation}
+        subagent={subagent}
+        onBack={vi.fn()}
+        targetMessageId="sub-msg"
+        targetMessageIndex={0}
+        targetMessageNonce={7}
+        onTargetMessageHandled={onTargetMessageHandled}
+      />,
+    );
+
+    expect(hookMocks.timelineProps).toHaveBeenLastCalledWith(expect.objectContaining({
+      targetMessageId: 'sub-msg',
+      targetMessageIndex: 0,
+      targetMessageNonce: 7,
+      onTargetMessageHandled,
+    }));
   });
 
   it('surfaces load failures instead of an empty transcript', () => {
