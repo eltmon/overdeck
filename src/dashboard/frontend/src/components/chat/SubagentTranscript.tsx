@@ -11,6 +11,11 @@ interface SubagentTranscriptProps {
   resolvedTheme?: 'light' | 'dark';
   /** Return to the parent conversation (the rail's "Main agent" row does the same). */
   onBack: () => void;
+  /** Palette-search message target inside this subagent's transcript (PAN-3982). */
+  targetMessageId?: string;
+  targetMessageIndex?: number;
+  targetMessageNonce?: number;
+  onTargetMessageHandled?: () => void;
 }
 
 /**
@@ -18,7 +23,16 @@ interface SubagentTranscriptProps {
  * conversation body while a rail row is selected — no composer, because a
  * subagent has no input channel of its own.
  */
-export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBack }: SubagentTranscriptProps) {
+export function SubagentTranscript({
+  conversation,
+  subagent,
+  resolvedTheme,
+  onBack,
+  targetMessageId,
+  targetMessageIndex,
+  targetMessageNonce,
+  onTargetMessageHandled,
+}: SubagentTranscriptProps) {
   const transcript = useSubagentTranscript(conversation, subagent.agentId);
 
   return (
@@ -58,6 +72,10 @@ export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBa
             cwd={conversation.cwd}
             issueId={conversation.issueId}
             resolvedTheme={resolvedTheme}
+            targetMessageId={targetMessageId}
+            targetMessageIndex={targetMessageIndex}
+            targetMessageNonce={targetMessageNonce}
+            onTargetMessageHandled={onTargetMessageHandled}
           />
         )}
       </div>

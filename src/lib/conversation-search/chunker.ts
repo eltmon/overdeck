@@ -3,6 +3,8 @@ import { createReadStream, promises as fs } from 'node:fs';
 export interface ConversationChunkRecord {
   sessionId: string;
   projectId: string;
+  /** Parent session UUID when the source file is a Claude subagent transcript (PAN-3982). */
+  parentSessionId: string | null;
   role: string;
   ts: string | null;
   /** Byte offset of this chunk's text payload inside the source JSONL file. */
@@ -19,6 +21,7 @@ export interface ChunkConversationJsonlOptions {
   filePath: string;
   sessionId: string;
   projectId: string;
+  parentSessionId?: string | null;
   /** Start reading at this byte offset. Non-zero offsets are expected to be line boundaries/cursors. */
   fromOffset?: number;
   /** Stop before this byte offset. Defaults to the current file size. */
@@ -113,6 +116,7 @@ export async function* chunkConversationJsonl(
         yield {
           sessionId: options.sessionId,
           projectId: options.projectId,
+          parentSessionId: options.parentSessionId ?? null,
           role,
           ts,
           byteOffset: line.byteOffset + Buffer.byteLength(rawLine.slice(0, rawStart), 'utf8'),

@@ -45,8 +45,10 @@ export async function fetchBackendHealth(): Promise<{ version: string }> {
   return data;
 }
 
-export async function fetchConversationMessageLocator(name: string, byteOffset: number): Promise<ConversationMessageLocator> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/message-locator?byteOffset=${byteOffset}`);
+export async function fetchConversationMessageLocator(name: string, byteOffset: number, agentId?: string): Promise<ConversationMessageLocator> {
+  // A subagent hit's byte offset points into the subagent transcript (PAN-3982).
+  const agentParam = agentId ? `&agentId=${encodeURIComponent(agentId)}` : '';
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/message-locator?byteOffset=${byteOffset}${agentParam}`);
   if (!res.ok) throw new Error(`Unable to locate matching message (${res.status})`);
   return res.json();
 }
@@ -56,6 +58,7 @@ export function describeConversationHitOpenFailure(hit: ConversationPaletteOpenR
   const details = [
     hit.sourceLabel,
     hit.conversationId === hit.sessionId ? 'no dashboard conversation row' : null,
+    hit.subagentId ? `subagent ${hit.subagentId}` : null,
     hit.projectId ? `project ${hit.projectId}` : null,
   ].filter(Boolean).join(' · ');
   return details ? `${reason}. ${details}` : reason;
