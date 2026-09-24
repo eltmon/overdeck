@@ -443,7 +443,10 @@ full review door. At most one re-dispatch per issue per hour: the cooldown is
 held in memory and, because the deacon child's memory dies on restart, also read
 back from the routine's own `review.redispatched` entry. A recovery that launches
 nothing journals and reports nothing, so the routine never claims a re-dispatch
-that did not happen (PAN-3914).
+that did not happen (PAN-3914). While some lane is still live without a report
+and the synthesis parent `agent-<issue>-review` is confirmed dead, the routine
+logs a `[deacon-lite]` warning once per cooldown; a live or indeterminate parent
+stays quiet.
 
 When every lane of the run already wrote its report, there is no lane to
 relaunch; what is missing is the synthesis (#4134). The routine then re-runs the

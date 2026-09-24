@@ -330,11 +330,22 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
         continue;
       } else if (!recovery.launched) {
         // Nothing to relaunch, so no lane re-dispatch to journal or report
-        // (PAN-3914). When every lane of the run reported, the synthesis may be
-        // what died (#4134).
-        const synthesis = recovery.allReported && recovery.runId
-          ? await recoverDeadSynthesis(issueId, workspace.path, recovery.runId)
-          : { action: 'cool-down' as const };
+        // (PAN-3914). When every lane of the run has its report on disk, the
+        // synthesis may be what died (#4134).
+        if (!recovery.allReported || !recovery.runId) {
+          // Some lane is still live without a report. Cool down so the next
+          // tick does not re-probe the same convoy. A confirmed-dead parent is
+          // a stall that synthesis recovery takes over only once every report
+          // lands: say so, once per cooldown. A live or indeterminate parent
+          // may still be waiting on its lanes, so it stays quiet.
+          lastReviewRedispatchAt.set(issueId, now);
+          const parentId = `agent-${issueId.toLowerCase()}-review`;
+          if (isConfirmedDead(await isAlive(parentId))) {
+            console.warn(`[deacon-lite] ${issueId}: no review lane to relaunch, no verdict posted, and the synthesis parent ${parentId} is dead — synthesis is re-dispatched once every lane has its report (#4134)`);
+          }
+          continue;
+        }
+        const synthesis = await recoverDeadSynthesis(issueId, workspace.path, recovery.runId);
         if (synthesis.action !== 'redispatched') {
           // Cool down so the next tick does not re-probe the same convoy —
           // except after an indeterminate probe, which must not buy the wedge
