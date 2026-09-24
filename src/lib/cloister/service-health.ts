@@ -262,7 +262,7 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
           // are handled by the `pan done` → completion marker → specialist pipeline flow.
           // Do NOT perform a model-swap handoff here — it passes the specialist name as a model ID
           // which is invalid and causes the agent to respawn with an unusable model.
-          const specialistNames = ['review-agent', 'test-agent', 'merge-agent', 'inspect-agent', 'uat-agent'];
+          const specialistNames = ['review-agent', 'test-agent', 'merge-agent', 'uat-agent'];
           if (trigger.type === 'task_complete' && specialistNames.includes(trigger.suggestedModel || '')) {
             console.log(`[cloister] Skipping handoff for ${health.agentId}: task_complete triggers specialist dispatch via completion marker, not model swap`);
             continue;

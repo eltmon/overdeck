@@ -92,7 +92,7 @@ function isSpecialistAgent(agentId: string): boolean {
  * Returns null for global specialist sessions.
  */
 function parseEphemeralSession(agentId: string): { projectKey: string; issueId: string; specialistType: string } | null {
-  const match = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-(merge-agent|review-agent|test-agent|inspect-agent|uat-agent)$/);
+  const match = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-(merge-agent|review-agent|test-agent|uat-agent)$/);
   if (!match) return null;
   return { projectKey: match[1], issueId: match[2], specialistType: match[3] };
 }

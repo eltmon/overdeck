@@ -1,14 +1,13 @@
 export type SpecialistCompletionStatus = 'passed' | 'failed'
 
-export type SpecialistCompletionName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent'
+export type SpecialistCompletionName = 'review-agent' | 'test-agent' | 'merge-agent' | 'uat-agent'
 
-const RESULT_SENTINEL = /^OVERDECK_SPECIALIST_RESULT:\s*(review-agent|test-agent|merge-agent|inspect-agent|uat-agent)\s+(passed|failed)\s*$/i
+const RESULT_SENTINEL = /^OVERDECK_SPECIALIST_RESULT:\s*(review-agent|test-agent|merge-agent|uat-agent)\s+(passed|failed)\s*$/i
 
 const STRUCTURED_FAILURE_PATTERNS: Partial<Record<SpecialistCompletionName, RegExp[]>> = {
   'review-agent': [/^##\s*Verdict:\s*(CHANGES REQUESTED|FAILED)\s*$/im],
   'test-agent': [/^TESTS FAILED\s*$/im],
   'merge-agent': [/^MERGE FAILED\s*$/im],
-  'inspect-agent': [/^INSPECTION BLOCKED\s*$/im],
   'uat-agent': [/^UAT FAILED\s*$/im],
 }
 
@@ -24,9 +23,6 @@ export function normalizeSpecialistCompletionName(roleOrName: string | undefined
     case 'ship':
     case 'merge-agent':
       return 'merge-agent'
-    case 'inspect':
-    case 'inspect-agent':
-      return 'inspect-agent'
     case 'uat':
     case 'uat-agent':
       return 'uat-agent'

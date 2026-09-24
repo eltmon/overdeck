@@ -172,10 +172,10 @@ function cleanIssues(issues: unknown[]): unknown[] {
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
 const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer", "knowledge", "worker"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"]);
-type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent';
+type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'uat-agent';
 type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
 
-const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
+const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "uat-agent"]);
 const VALID_SPECIALIST_LIFECYCLE_STATES = new Set<SpecialistLifecycleState>(["active", "sleeping", "uninitialized"]);
 export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
