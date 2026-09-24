@@ -119,3 +119,5 @@
 1096 src/lib/config-yaml/schema.ts # PAN-4160
 # Typed PR-link methods on the ConversationsResolver/ConversationWriter service interfaces (types only).
 1094 src/lib/overdeck/conversations.ts # PAN-3822
+1186 src/lib/overdeck/conversation-runtime.ts # PAN-4185
+1111 src/lib/overdeck/conversations.ts # PAN-4185

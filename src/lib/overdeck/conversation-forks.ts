@@ -41,6 +41,7 @@ import {
   waitForTmuxSession,
 } from './conversation-runtime.js';
 import { resolveConversationDeliveryMethod } from './conversation-delivery.js';
+import { conversationLaunchContext } from './conversation-launch-context.js';
 import { deliverAgentMessage, getAgentRuntimeStateSync, waitForReadySignal } from '../agents.js';
 import { getTranscriptAdapter } from '../conversations/transcript-adapter.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
@@ -343,6 +344,7 @@ export async function ensureForkSessionReady(
     resume,
     conv.harness ?? 'claude-code',
     plainFork,
+    conversationLaunchContext(conv),
   );
   await forkWaitForTmuxSession(conv.tmuxSession);
 }
@@ -888,6 +890,8 @@ export async function handleConversationSummaryFork(
       effort: conv.effort ?? undefined,
       harness: launchHarness,
       forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
+      // PAN-4185: a fork of a bare conversation stays bare.
+      ...conversationLaunchContext(conv),
     });
     const forkRequest = buildForkRequest({
       parentConversationName: conv.name,

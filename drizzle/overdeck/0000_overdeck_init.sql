@@ -111,6 +111,8 @@ CREATE TABLE `conversations` (
 	`spawn_error` text,
 	`workspace_id` text,
 	`project_key` text,
+	`bare_context` integer NOT NULL DEFAULT 0,
+	`skip_claude_md` integer NOT NULL DEFAULT 0,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action
 );
