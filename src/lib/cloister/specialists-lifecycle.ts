@@ -60,14 +60,13 @@ export interface TaskContext {
  * SpecialistAgentName ('review-agent' | 'test-agent' | 'merge-agent' |
  * 'inspect-agent' | …) and shelled out a launcher specific to each. Under
  * the role primitive, those flavours are first-class roles
- * (review/test/ship) plus a single work sub-role (inspect / inspect-deep).
+ * (review/test/ship). The inspect flavour was deleted with the inspection
+ * gate (PAN-3917 FR-14).
  *
  * Replacements:
  * - Review/test/ship runs: spawnRun(issueId, role, opts) in src/lib/agents.ts.
  *   Reactive Cloister fires these on lifecycle transitions; the manual
  *   re-dispatch in routes/workspaces.ts also uses spawnRun.
- * - Inspect runs: spawnInspectAgent() in cloister/inspect-agent.ts owns
- *   its own minimal launcher path (single-bead-scoped, ephemeral).
  *
  * The specialist registry/run-log/grace-period machinery stays in this
  * file because the dashboard read-model and reset/init/grace endpoints
