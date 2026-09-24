@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T21:29:56.162Z · model: claude-opus-5 · open: 817_
+_Last sequenced: 2026-09-24T21:36:46.824Z · model: claude-opus-5 · open: 817_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -97,7 +97,7 @@ _Last sequenced: 2026-09-24T21:29:56.162Z · model: claude-opus-5 · open: 817_
 | 120 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
 | 121 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
 | 122 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 123 | PAN-4160 | M | high | ok |  |  | Four sites still fall back to a literal model: fork summary, Command Deck status review, the claude CLI flag map, Cloister handoff |
+| 123 | PAN-4172 | S | high | ok |  |  | Sequencer done-check clears a run on the mirror 'idle' label alone, against the liveness invariant — a live run can be reaped |
 | 124 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
 | 125 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
 | 126 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
@@ -308,7 +308,6 @@ _Last sequenced: 2026-09-24T21:29:56.162Z · model: claude-opus-5 · open: 817_
 | 346 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
 | 347 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 348 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 349 | PAN-4131 | M | medium | ok |  |  | Dead models.overrides still rewrites the user's config.yaml, and Command Deck status review silently falls back to a code default |
 | 350 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 351 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
 | 352 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
@@ -355,6 +354,7 @@ _Last sequenced: 2026-09-24T21:29:56.162Z · model: claude-opus-5 · open: 817_
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
+| 396 | PAN-4131 | M | medium | ok |  |  | Dead models.overrides still rewrites the operator's config.yaml for a key nothing reads; roles.review.sub.synthesis is never read |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -1132,7 +1132,7 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T21:29:56.162Z",
+  "generatedAt": "2026-09-24T21:36:46.824Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 817,
@@ -2294,19 +2294,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "dependsOn": [],
       "why": "Workspace init container's bun install doesn't populate container-node-modules named volume",
       "rationale": "Workspace init container bun install does not populate the container-node-modules named volume.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4160",
-      "rank": 123,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Four sites still fall back to a literal model: fork summary, Command Deck status review, the claude CLI flag map, Cloister handoff",
-      "rationale": "New since the prior run, inserted at the free rank-123 slot in the high/78 band. It violates the no-hardcoded-model-fallback rule at four live call sites: a fork with no summaryModel picks its harness for Sonnet 5 then summarizes on Sonnet 4.6; Command Deck status review always runs the literal because loadSettingsApi never carries models.overrides; getClaudeModelFlag maps any unknown claude-* ID to plain sonnet, so every new model release silently downgrades; and the Cloister handoff respawns a test_failure or task_complete agent on sonnet regardless of its role model. None of these wedge the pipeline, which keeps it out of the critical band, but each silently spends the operator’s money on a model they never chose, and the fix is fully specified (two config keys in defaults.ts, a pass-through in getClaudeModelFlag, determineModel in the handoff, plus the docs/MODEL-CALLS.md rows). Sibling work is already warm: #4131 owns the dead models.overrides code this shares, and the spawn-path half is in flight as PR #4154.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4898,14 +4885,14 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
     },
     {
       "issue": "PAN-4131",
-      "rank": 349,
+      "rank": 396,
       "size": "M",
       "importance": "medium",
-      "score": 60,
+      "score": 57,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Dead models.overrides still rewrites the user's config.yaml, and Command Deck status review silently falls back to a code default",
-      "rationale": "New since the prior run, a follow-up to the now-closed #4128. Scored 60 rather than treated as pure cleanup because two live defects ride along with the dead code: a load-time migration rewrites deprecated model IDs inside models.overrides, so Overdeck still edits the operator's own config.yaml for a key nothing reads, and command-deck.ts looks up a status-review key in data that never carries overrides, so the Command Deck status review always runs on a hardcoded code default the project's no-hardcoded-model-fallback rule forbids. Removal spans about ten files plus their tests and a docs/CONFIGURATION.md rewrite of the fallback-map sections that no longer describe src/lib, and it forces the roles.review.sub.synthesis decision: retire it alongside RETIRED_SUB_ROLES or wire it into the review parent's spawn, since synthesis currently runs on roles.review.model regardless.",
+      "why": "Dead models.overrides still rewrites the operator's config.yaml for a key nothing reads; roles.review.sub.synthesis is never read",
+      "rationale": "Moved 349→396 and 60→57 because PR #4164 (PAN-4160) landed the Command Deck status-review model key, leaving only dead-code removal, the roles.review.sub.synthesis decision, and the docs/CONFIGURATION.md rewrite.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11246,6 +11233,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "New this run (filed 2026-09-24T21:07:04Z, in the review of #4163/PAN-3905), and it takes the rank-25 slot PAN-3977 vacated when that issue closed. Since #4163, createWorkspace returns success:false when setup aborts after the worktree exists — a failed dependency install, pre-rebase hook install or workspace package build — but the rollback in src/lib/workspace-manager/create.ts deletes the workspace row only when !worktreeCreated, so the half-built worktree stays on disk. Every caller then guards on the directory existing rather than re-calling createWorkspace (workspace-service.ts, swarm.ts, swarm-gates.ts, remote-completion.ts, spawn-planning-session.ts, where any non-.pan file counts as created), so the first pan start fails loudly and the second one starts a work agent in a worktree with no dependencies, no pre-rebase hook and no synced skills. That is worse than the stall it replaces: a stall is visible, whereas this agent runs, burns tokens and produces failing work that looks real. It sits on the paved road (pan start), which is why it ranks critical despite the unlabelled P3 signal. The fix is small and the issue states both options (delete the worktree and its branch on abort, or write an incomplete-setup marker the existence guards check and resume from), with mechanically checkable acceptance criteria and a named test, so size S, condition ok.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4172",
+      "rank": 123,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Sequencer done-check clears a run on the mirror 'idle' label alone, against the liveness invariant — a live run can be reaped",
+      "rationale": "New since the prior run, inserted at the rank-123 slot PAN-4160 vacated. It is the last call site left behind by #4162: sequencer-agent.ts (~:69) can still call a run done from the runtime mirror's idle label with a single check, while the repo invariant (CLAUDE.md, src/lib/agents/liveness.ts) is that idleness means stale work activity — never the label alone — so a live sequencer run can be cleared and re-dispatched. Scored high rather than critical because the general role-run reap already requires the allowlist, a 60s idleAgeMs floor and a second Herdr probe, and the fix is specified as reusing that isFinishedRoleRun helper; two smaller notes ride along (a doubled tmux session check with a 2s timeout, and a stopped run with a live idle pane refused on every dispatch).",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12349,13 +12349,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "confidence": 0.9
     },
     {
-      "from": "PAN-4131",
-      "to": "PAN-4160",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3923",
       "to": "PAN-4166",
       "type": "informs",
@@ -12389,6 +12382,13 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4166",
+      "to": "PAN-4172",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
