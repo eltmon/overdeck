@@ -59,14 +59,21 @@ class FeedbackDeliveryTimeoutError extends Error {
   }
 }
 
+/**
+ * Bound the UAT verdict's PR-head lookup. The GitHub App path's `fetch` has
+ * no timeout of its own, and a stalled lookup would hang the verdict before it
+ * is posted; an unreadable head already means an unanchored verdict.
+ */
+export const UAT_ANCHOR_LOOKUP_TIMEOUT_MS = 30_000;
+
 /** Bound an advisory feedback delivery by {@link FEEDBACK_DELIVERY_TIMEOUT_MS}. */
-async function withFeedbackDeadline<T>(delivery: Promise<T>): Promise<T> {
+async function withFeedbackDeadline<T>(
+  delivery: Promise<T>,
+  timeoutMs: number = FEEDBACK_DELIVERY_TIMEOUT_MS,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new FeedbackDeliveryTimeoutError(FEEDBACK_DELIVERY_TIMEOUT_MS)),
-      FEEDBACK_DELIVERY_TIMEOUT_MS,
-    );
+    timer = setTimeout(() => reject(new FeedbackDeliveryTimeoutError(timeoutMs)), timeoutMs);
   });
   try {
     return await Promise.race([delivery, timeout]);
@@ -168,11 +175,19 @@ export async function doneCommand(
   // head — the work agent shares that worktree and may have moved it — so when
   // the SHA was not reported, fall back to the PR head: a push during the run
   // then mis-anchors the verdict onto the newer commit. An unreadable PR head
-  // leaves the verdict unanchored (merge readiness then dates it instead).
+  // leaves the verdict unanchored (merge readiness then dates it instead); so
+  // does a lookup that stalls past UAT_ANCHOR_LOOKUP_TIMEOUT_MS.
   const uatOutcome = role === 'test' ? options.uatStatus : role === 'uat' ? options.status : undefined;
   const uatAnchor = uatOutcome === 'passed' || uatOutcome === 'failed'
-    ? options.testedSha?.toLowerCase() ?? await getPrFacts(normalizedIssueId)
-      .then((facts) => facts.headSha?.toLowerCase() ?? undefined, () => undefined)
+    ? options.testedSha?.toLowerCase() ?? await withFeedbackDeadline(getPrFacts(normalizedIssueId), UAT_ANCHOR_LOOKUP_TIMEOUT_MS)
+      .then((facts) => facts.headSha?.toLowerCase() ?? undefined, (err: unknown) => {
+        if (err instanceof FeedbackDeliveryTimeoutError) {
+          console.warn(chalk.yellow(
+            `Reading the PR head for ${normalizedIssueId} exceeded ${err.timeoutMs}ms; recording the UAT verdict unanchored.`,
+          ));
+        }
+        return undefined;
+      })
     : undefined;
 
   const body = formatVerdictBody(

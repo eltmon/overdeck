@@ -131,12 +131,20 @@ export async function deliverVerificationFeedback(
   // un-pause the agent it just paused. While the stuck pause holds, nothing is
   // revived: a live target gets the notice (a paused agent's messageAgent
   // queues it to mail without resuming), and the operator is told either way.
+  // The CI relay and the local gate deliver independently, so the other one
+  // may escalate while this delivery is resolving its target: `keepPause`
+  // re-checks the reason at the moment of resurrection.
   const stuckPaused = isVerificationStuckPaused(issueId);
   const target = await resolveIssueFeedbackTarget(
     issueId,
-    stuckPaused ? { revivePipelinePausedAgent: async () => false } : {},
+    stuckPaused
+      ? { revivePipelinePausedAgent: async () => false }
+      : { keepPause: (reason) => reason.startsWith(VERIFICATION_STUCK_PAUSE_PREFIX) },
   );
   if (await skipMergedVerification(issueId, logPrefix)) return false;
+  // A stuck pause that landed during resolution is reported like one that was
+  // already there.
+  const heldForOperator = stuckPaused || isVerificationStuckPaused(issueId);
 
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
@@ -154,7 +162,7 @@ export async function deliverVerificationFeedback(
       return true;
     }
     const reason = outcome.reason ?? 'delivery was not accepted';
-    if (stuckPaused && outcome.queuedToMail) {
+    if (heldForOperator && outcome.queuedToMail) {
       console.log(`[${logPrefix}] ${target.agentId} is paused for verification stuck; the notice for ${issueId} is queued to its mail`);
       await surfaceIssueFeedbackNeedsYou(
         issueId,
@@ -173,7 +181,7 @@ export async function deliverVerificationFeedback(
 
   await surfaceIssueFeedbackNeedsYou(
     issueId,
-    stuckPaused
+    heldForOperator
       ? `Verification stuck: agent-${issueId.toLowerCase()} is paused for the operator and was not resumed to receive the notice. ${target.reason}`
       : target.reason,
     { specialist: 'verification-gate', ...details },

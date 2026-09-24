@@ -119,10 +119,12 @@ export interface AgentDirectoryDeps {
   readonly projectKeyForPath?: (path: string) => string | null;
 }
 
-/** The two `remote-state.json` facts the directory reads. */
+/** The `remote-state.json` facts the directory reads. */
 export interface RemoteStateFacts {
   readonly location: string | null;
   readonly status: string | null;
+  /** When the current remote run started; a state.json stop older than this is a previous run's. */
+  readonly startedAt?: string | null;
 }
 
 // ─── default sources ─────────────────────────────────────────────────────────
@@ -130,10 +132,11 @@ export interface RemoteStateFacts {
 async function defaultReadRemoteState(agentId: string): Promise<RemoteStateFacts | null> {
   try {
     const raw = await readFile(join(getOverdeckHome(), 'agents', agentId, 'remote-state.json'), 'utf8');
-    const parsed = JSON.parse(raw) as { location?: unknown; status?: unknown };
+    const parsed = JSON.parse(raw) as { location?: unknown; status?: unknown; startedAt?: unknown };
     return {
       location: typeof parsed.location === 'string' ? parsed.location : null,
       status: typeof parsed.status === 'string' ? parsed.status : null,
+      startedAt: typeof parsed.startedAt === 'string' ? parsed.startedAt : null,
     };
   } catch {
     return null;
@@ -265,6 +268,19 @@ function nativeLabel(state: AgentState, workerName: string | null): string {
   return state.issueId ? `${role} · ${state.issueId.toUpperCase()}` : `${role} · ${state.id}`;
 }
 
+/**
+ * True when state.json records a stop or failure written after the current
+ * remote run started. With no readable remote start, a stop cannot be dated
+ * against the run and is trusted.
+ */
+function stateStoppedSinceRemoteStart(state: AgentState, remoteStartedAt: string | null): boolean {
+  if (state.status !== 'stopped' && state.status !== 'error') return false;
+  const remoteStart = remoteStartedAt ? Date.parse(remoteStartedAt) : Number.NaN;
+  if (!Number.isFinite(remoteStart)) return true;
+  const stoppedAt = Math.max(timeOf(state.stoppedAt ?? null), timeOf(state.lastActivity ?? null));
+  return stoppedAt > remoteStart;
+}
+
 /** Candidate plus the path used for the D5 project fallback; `cwd` never leaves the server. */
 interface Candidate {
   entry: DirectoryEntry;
@@ -324,7 +340,13 @@ export async function buildAgentDirectory(
     const remote = remoteState?.location === 'remote';
     // A remote agent's terminal is on the Fly VM: unknown while it runs, stopped once
     // remote-state.json says it stopped or failed, so it windows out (D3/D4).
-    const remoteStopped = remote && (remoteState?.status === 'stopped' || remoteState?.status === 'error');
+    // `pan kill` with the remote unreachable writes only state.json, so its stop
+    // counts too, but only when it is newer than the current remote run: a
+    // relaunch writes only remote-state.json over a previous run's stop.
+    const remoteStopped = remote && (
+      remoteState?.status === 'stopped' || remoteState?.status === 'error'
+      || stateStoppedSinceRemoteStart(state, remoteState?.startedAt ?? null)
+    );
     const worker = workerFacts[index];
     const localState = worker ? workerState(pane, worker.reportAt) : paneState(pane);
     const entry: DirectoryEntry = {

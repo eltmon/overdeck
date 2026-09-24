@@ -16,7 +16,7 @@ import { TellComposer } from '../../issue-view/TellComposer';
 import { DirectoryIssueContext } from './DirectoryIssueContext';
 import { DirectoryStateBadge } from './DirectoryStateBadge';
 import { displayStateOf, externalSourceLabel, hoursSince, known } from './directory-state';
-import { DirectoryTranscript } from './DirectoryTranscript';
+import { agentSubagentTranscriptQueryKey, DirectoryTranscript } from './DirectoryTranscript';
 import { isLiveState, parentLabel } from './directory-tree';
 
 function formatCost(value: number): string {
@@ -26,19 +26,25 @@ function formatCost(value: number): string {
 }
 
 /**
- * Cost for kinds the list does not price (D-cost): the agent transcript's
- * `totalCost`, read from the cache ConversationPanel already fills — never a
- * second transcript fetch and no second observer on that query.
+ * Cost for kinds the list does not price (D-cost): the transcript's
+ * `totalCost`, read from the cache the transcript pane already fills (the
+ * agent transcript ConversationPanel loads, or the agent-subagent transcript
+ * DirectoryTranscript fetches) — never a second transcript fetch and no
+ * second observer on that query.
  */
 function useTranscriptCost(entry: DirectoryEntry): number | null {
   const queryClient = useQueryClient();
-  const agentId = entry.costUsd === null && entry.transcript?.route === 'agent' ? entry.transcript.agentId : null;
+  const ref = entry.costUsd === null ? entry.transcript : null;
+  const agentId = ref?.route === 'agent' || ref?.route === 'agent-subagent' ? ref.agentId : null;
+  const subagentId = ref?.route === 'agent-subagent' ? ref.subagentId : null;
   const read = useCallback((): number | null => {
     if (!agentId) return null;
-    const data = queryClient.getQueryData(conversationMessagesQueryKey(agentId));
+    const data = queryClient.getQueryData(subagentId
+      ? agentSubagentTranscriptQueryKey(agentId, subagentId)
+      : conversationMessagesQueryKey(agentId));
     const total = (data as { totalCost?: unknown } | null | undefined)?.totalCost;
     return typeof total === 'number' && total > 0 ? total : null;
-  }, [agentId, queryClient]);
+  }, [agentId, subagentId, queryClient]);
   const subscribe = useCallback((onChange: () => void) => queryClient.getQueryCache().subscribe(onChange), [queryClient]);
   const transcriptCost = useSyncExternalStore(subscribe, read, read);
   return entry.costUsd ?? transcriptCost;

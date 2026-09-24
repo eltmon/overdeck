@@ -285,6 +285,37 @@ describe('buildAgentDirectory', () => {
     ]);
   });
 
+  it('treats a remote agent whose state.json says stopped as stopped, even while remote-state.json says running', async () => {
+    // `pan kill` with the remote unreachable skips the VM teardown and writes
+    // only state.json; the directory must not keep that agent live forever.
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [
+        agent({ id: 'agent-pan-6', issueId: 'PAN-6', status: 'stopped', lastActivity: iso(HOUR) }),
+        agent({ id: 'agent-pan-7', issueId: 'PAN-7', status: 'error', lastActivity: iso(HOUR) }),
+        agent({ id: 'agent-pan-8', issueId: 'PAN-8', status: 'stopped', lastActivity: iso(30 * HOUR) }),
+      ],
+      readRemoteState: async () => ({ location: 'remote', status: 'running', startedAt: iso(40 * HOUR) }),
+    }));
+    expect(result.entries.map((entry) => [entry.id, entry.state])).toEqual([
+      ['agent-pan-6', 'stopped'],
+      ['agent-pan-7', 'stopped'],
+    ]);
+  });
+
+  it('keeps a relaunched remote agent live although state.json still holds the previous run\'s stop', async () => {
+    // `pan start --remote` writes only remote-state.json; state.json keeps the
+    // `stopped` that remote completion (or a killed local run) wrote earlier.
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [
+        agent({ id: 'agent-pan-9', issueId: 'PAN-9', status: 'stopped', stoppedAt: iso(3 * HOUR), lastActivity: iso(3 * HOUR) }),
+      ],
+      readRemoteState: async () => ({ location: 'remote', status: 'running', startedAt: iso(HOUR) }),
+    }));
+    expect(result.entries.map((entry) => [entry.id, entry.state, entry.location])).toEqual([
+      ['agent-pan-9', 'unknown', 'remote'],
+    ]);
+  });
+
   it('consults the project lookups once per distinct issue and path in a build', async () => {
     const projectKeyForIssue = vi.fn(() => 'overdeck');
     const projectKeyForPath = vi.fn(() => 'overdeck');
