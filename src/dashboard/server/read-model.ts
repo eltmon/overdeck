@@ -19,6 +19,7 @@ import {
   getMaxTurnDiffSummariesPerAgent,
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
+  withPaneLivenessAlias,
 } from '@overdeck/contracts';
 import type { AgentSnapshot, AgentStatus, Role, AgentResolution, BackendPane, DerivedIssueState } from '@overdeck/contracts';
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
@@ -172,10 +173,10 @@ function cleanIssues(issues: unknown[]): unknown[] {
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
 const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer", "knowledge", "worker"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"]);
-type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent';
+type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'uat-agent';
 type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
 
-const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
+const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "uat-agent"]);
 const VALID_SPECIALIST_LIFECYCLE_STATES = new Set<SpecialistLifecycleState>(["active", "sleeping", "uninitialized"]);
 export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
@@ -303,11 +304,19 @@ export function deriveServedAgentStatuses(
     livePaneAgentIds.add(pane.terminalId ?? pane.id);
     if (pane.agentId) livePaneAgentIds.add(pane.agentId);
   }
-  return agents.map((agent) => {
+  return agents.map((stored) => {
+    // #4105: a row restored from an older event may carry only the deprecated
+    // `hasLiveTmuxSession`; serve `hasLivePane` beside it.
+    const agent = withPaneLivenessAlias(stored);
     if (!CLAIMED_LIVE_STATUSES.has(agent.status)) return agent;
     if (!isInventoryAnsweredAgentId(agent.id)) return agent;
     if (livePaneAgentIds.has(agent.id)) return agent;
-    return { ...agent, status: inventory === 'trusted' ? 'stopped' as const : 'unknown' as const };
+    // A trusted inventory with no live pane is a fact: the liveness flags follow
+    // the derived status, so no reader sees `stopped` beside a stale `true`.
+    // An inventory that never answered proves nothing, so they pass through.
+    return inventory === 'trusted'
+      ? { ...agent, status: 'stopped' as const, hasLivePane: false, hasLiveTmuxSession: false }
+      : { ...agent, status: 'unknown' as const };
   });
 }
 

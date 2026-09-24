@@ -553,8 +553,8 @@ pan up --no-https
 ### Agent Sessions Not Appearing
 
 ```bash
-# Check tmux sessions
-tmux list-sessions
+# Check which agents are alive (either terminal backend)
+pan status --json   # read each agent's `alive` and `livenessReason`
 
 # Restart dashboard
 pan restart

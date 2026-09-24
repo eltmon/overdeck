@@ -71,12 +71,12 @@ describe('toSpecialistAgentName', () => {
     expect(toSpecialistAgentName('review-agent')).toBe('review-agent')
     expect(toSpecialistAgentName('test-agent')).toBe('test-agent')
     expect(toSpecialistAgentName('merge-agent')).toBe('merge-agent')
-    expect(toSpecialistAgentName('inspect-agent')).toBe('inspect-agent')
     expect(toSpecialistAgentName('uat-agent')).toBe('uat-agent')
   })
 
   it('returns undefined for invalid values', () => {
     expect(toSpecialistAgentName('deploy-agent')).toBeUndefined()
+    expect(toSpecialistAgentName('inspect-agent')).toBeUndefined()
     expect(toSpecialistAgentName('REVIEW-AGENT')).toBeUndefined()
     expect(toSpecialistAgentName(null)).toBeUndefined()
     expect(toSpecialistAgentName(undefined)).toBeUndefined()

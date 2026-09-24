@@ -25,7 +25,7 @@ export async function mergeCancelCommand(issueId: string, fetchImpl: typeof fetc
   try {
     if (!normalizedIssueId) throw new Error('Issue ID is required');
 
-    const res = await fetchImpl(`${dashboardBaseUrl()}/api/flywheel/auto-merge/${encodeURIComponent(normalizedIssueId)}`, {
+    const res = await fetchImpl(`${dashboardBaseUrl()}/api/merge-train/auto-merge/${encodeURIComponent(normalizedIssueId)}`, {
       method: 'DELETE',
       headers: {
         [INTERNAL_TOKEN_HEADER]: ensureInternalToken(),

@@ -65,11 +65,11 @@ export function openRecoveryForStartBlock(status: number, body: unknown, issueId
 export function recoveryFromBody(body: unknown): RecoveryRequest | null {
   if (!body || typeof body !== 'object') return null;
 
-  const lifecycle = (body as { lifecycle?: { agentId?: string; canResumeSession?: boolean; hasLiveTmuxSession?: boolean } }).lifecycle;
+  const lifecycle = (body as { lifecycle?: { agentId?: string; canResumeSession?: boolean; hasLivePane?: boolean } }).lifecycle;
   // A live tmux session blocks everything (restart-fresh, resume, start) —
   // offer Stop & retry. Checked first: a stopped-on-paper agent with a live
   // session can also look resumable, but resume would just 409 again.
-  if (lifecycle?.hasLiveTmuxSession === true && typeof lifecycle.agentId === 'string') {
+  if (lifecycle?.hasLivePane === true && typeof lifecycle.agentId === 'string') {
     return { kind: 'live-session', agentId: lifecycle.agentId };
   }
   if (lifecycle?.canResumeSession === true && typeof lifecycle.agentId === 'string') {

@@ -190,6 +190,7 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
           agentId: 'planning-pan-3230',
           status: 'stopped',
           previousStatus: 'running',
+          hasLivePane: true,
           hasLiveTmuxSession: true,
         },
       }),

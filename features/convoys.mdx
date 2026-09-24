@@ -279,8 +279,9 @@ Convoy agents share the same lifecycle surfaces as the rest of the pipeline. The
 # Watch convoy progress
 pan convoy status <convoy-id>
 
-# Tail logs from specific agent
-tmux attach -t convoy-<convoy-id>-security
+# Watch a specific agent: open it in the dashboard, or run the
+# backend-aware Attach: command that pan start prints
+# (see "Reaching an agent from a shell" in docs/TERMINAL-BACKENDS.md)
 
 # View all output files
 ls -lh ~/.overdeck/convoys/<convoy-id>/output/
@@ -354,11 +355,11 @@ When convoys are running across several projects at once, the God View gives an 
 
 **Convoy stuck in "running" state:**
 ```bash
-# Check individual agent status
-tmux list-sessions | grep convoy-<convoy-id>
+# Check individual agent status (either terminal backend)
+pan status --json   # read each agent's `alive`
 
 # View agent output
-tmux attach -t convoy-<convoy-id>-<role>
+curl -s "http://localhost:3011/api/agents/<agent-id>/output?lines=100"
 
 # Force stop if needed
 pan convoy stop <convoy-id>
@@ -367,7 +368,7 @@ pan convoy stop <convoy-id>
 **Synthesis agent fails:**
 - Check that all parallel agents completed successfully
 - Verify output files exist in expected location
-- Review synthesis agent logs in tmux session
+- Review the synthesis agent's output in the dashboard or via `GET /api/agents/<agent-id>/output`
 
 **Agents completing too quickly:**
 - Check for permission issues (can they access files?)

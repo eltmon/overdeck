@@ -234,7 +234,6 @@ export function TieredExecutionSection({
         model: DEFAULT_SUPERVISOR_MODEL,
         harness: 'claude-code',
         subscribe: 'flagged',
-        owns_inspection: true,
       },
     };
     setAssignmentError(null);
@@ -306,7 +305,6 @@ export function TieredExecutionSection({
         model: rest.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL,
         harness: rest.supervisor?.harness ?? 'claude-code',
         subscribe: rest.supervisor?.subscribe ?? 'flagged',
-        owns_inspection: rest.supervisor?.owns_inspection ?? true,
         ...patch,
       },
     });
@@ -579,7 +577,7 @@ export function TieredExecutionSection({
         <div className="rounded-lg border border-border/70">
           <button type="button" aria-expanded={supervisorOpen} onClick={() => setSupervisorOpen(!supervisorOpen)} className="flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-primary">
             <span>{supervisorOpen ? '▾' : '▸'}</span><span className="text-sm font-medium text-foreground">Standing reviewer</span>
-            <span className="text-xs text-muted-foreground">— {supervisor?.subscribe === 'all' ? 'reviews every commit' : supervisor?.subscribe === 'sampled' ? 'reviews a sample' : 'wakes on flagged commits'} · {supervisorModelName} · {supervisor?.owns_inspection ?? true ? 'owns inspection' : 'inspection stays separate'}</span>
+            <span className="text-xs text-muted-foreground">— {supervisor?.subscribe === 'all' ? 'reviews every commit' : supervisor?.subscribe === 'sampled' ? 'reviews a sample' : 'wakes on flagged commits'} · {supervisorModelName}</span>
             {fitness.filter((w) => w.tierName === 'supervisor').map((w, index) => <span key={`${w.code}:${w.model}:${index}`} data-testid="tier-fitness-warning" title={w.message} className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">⚠ {w.message.replace(/^tiered_execution\.supervisor: /, '')}</span>)}
           </button>
           {supervisorOpen && <div className="grid gap-3 border-t border-border/70 px-4 py-3 @xl:grid-cols-2">
@@ -622,23 +620,6 @@ export function TieredExecutionSection({
                 <option value="all">every commit (all)</option><option value="flagged">only commits flagged for inspection (flagged)</option><option value="sampled">a sample, for cost measurement (sampled)</option>
               </select>
             </label>
-            <div className="flex items-end justify-between gap-3">
-              <span className="text-xs font-medium text-foreground">Owns inspection</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={supervisor?.owns_inspection ?? true}
-                aria-label="Supervisor owns inspection"
-                onClick={() => handleSupervisorPatch({ owns_inspection: !(supervisor?.owns_inspection ?? true) })}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                  supervisor?.owns_inspection ?? true ? 'bg-primary' : 'bg-muted'
-                }`}
-              >
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                  supervisor?.owns_inspection ?? true ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                }`} />
-              </button>
-            </div>
           </div>}
           {supervisorError && <p className="mt-3 text-xs text-destructive">{supervisorError}</p>}
         </div>
