@@ -181,17 +181,32 @@ function tmuxView(census: RuntimeCensus, herdr: HerdrConversationInventory | nul
   };
 }
 
+/** tmux's own answer when no server runs on the socket (as opposed to a probe that failed). */
+const NO_TMUX_SERVER = /no server running|error connecting to/i;
+
+/**
+ * Whether the census can answer for legacy tmux sessions. No tmux server at
+ * all is the normal state of a Herdr host and means "no legacy session"; any
+ * other census failure (a `list-panes` timeout under load) means "unknown".
+ */
+function legacyCensusKnown(census: RuntimeCensus): boolean {
+  return census.available || NO_TMUX_SERVER.test(census.error ?? '');
+}
+
 function herdrView(inventory: HerdrConversationInventory, census: RuntimeCensus, sampledAt: number): ConversationLivenessView {
-  // No tmux server on a Herdr host is the normal case: no legacy session then.
   const legacySession = (name: string) => census.available && census.sessionNames.has(name);
+  // A name Herdr does not list, while the census could not answer, is unknown:
+  // never gone (review of #4104, F1 — a failed census once ended every legacy conversation).
+  const unknown = (name: string) => !inventory.alive.has(name) && !inventory.exited.has(name) && !legacyCensusKnown(census);
   return {
     sampledAt,
     census,
     graceMs: HERDR_SPAWN_GRACE_PERIOD_MS,
-    sessionGone: (name) => !inventory.alive.has(name) && !inventory.exited.has(name) && !legacySession(name),
+    sessionGone: (name) => !unknown(name) && !inventory.alive.has(name) && !inventory.exited.has(name) && !legacySession(name),
     harnessGone: async (name) => {
       if (inventory.alive.has(name)) return false;
       if (inventory.exited.has(name)) return true;
+      if (unknown(name)) return false;
       return legacySession(name) && !(await runtimeCensusHasHarnessProcess(census, name));
     },
     harnessAlive: (name) => conversationHarnessAlive(name),

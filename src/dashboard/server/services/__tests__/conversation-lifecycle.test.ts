@@ -877,6 +877,7 @@ describe('ConversationLifecycleService — pollConversations on a Herdr host (PA
   const noTmuxServer = async () => ({
     sampledAt: Date.now(),
     available: false,
+    error: 'Command failed: tmux list-panes -a\nerror connecting to /tmp/tmux-1000/overdeck (No such file or directory)',
     sessionNames: new Set<string>(),
     panesBySession: new Map(),
   });
@@ -971,6 +972,29 @@ describe('ConversationLifecycleService — pollConversations on a Herdr host (PA
     await pollConversations();
 
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  it('marks nothing Herdr does not list while the tmux census is failing', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'legacy-a', tmuxSession: 'conv-legacy-a', status: 'active', cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(300) },
+      { name: 'legacy-b', tmuxSession: 'conv-legacy-b', status: 'active', cwd: '/tmp/work', claudeSessionId: null, createdAt: secondsAgo(300) },
+    ]);
+    mockListHerdrAgents.mockResolvedValue([{ agentId: 'conv-other', state: 'idle' }]);
+    const failingCensus = async () => ({
+      sampledAt: Date.now(),
+      available: false,
+      error: 'Command failed: tmux list-panes -a: timed out',
+      sessionNames: new Set<string>(),
+      panesBySession: new Map(),
+    });
+    mockGetRuntimeCensus.mockImplementation(failingCensus);
+    mockRefreshRuntimeCensus.mockImplementation(failingCensus);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+    expect(mockCloseCompanionTerminalForOwner).not.toHaveBeenCalled();
   });
 
   it('marks nothing when Herdr does not answer', async () => {
