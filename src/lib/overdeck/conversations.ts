@@ -17,6 +17,9 @@ import { randomUUID } from 'node:crypto';
 import { Context, Effect, Schema, Stream } from 'effect';
 
 import type { RuntimeName } from '../runtimes/types.js';
+import type {
+  ConversationPullRequests, PullRequestKey, PullRequestLink, PullRequestLinkedConversation, PullRequestLinkSource,
+} from '@overdeck/contracts';
 import { getOverdeckDatabase } from './infra.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
@@ -135,6 +138,10 @@ export class ConversationsResolver extends Context.Service<ConversationsResolver
   readonly list:          (f: ConversationFilter)  => Effect.Effect<ReadonlyArray<Conversation>>;
   readonly getCurrent:    ()                        => Effect.Effect<Conversation, ConversationNotFound>;
   readonly getHandoffDoc: (name: ConversationName)  => Effect.Effect<string, ConversationNotFound>;
+  /** PAN-3822: every PR link on a conversation (dismissed included) + the effective one. */
+  readonly listPullRequests:   (name: ConversationName) => Effect.Effect<ConversationPullRequests, ConversationNotFound>;
+  /** PAN-3822 reverse index: the conversations with a live link to a PR. */
+  readonly linkedToPullRequest: (key: PullRequestKey) => Effect.Effect<ReadonlyArray<PullRequestLinkedConversation>>;
 }>()('overdeck/ConversationsResolver') {}
 
 // ── TranscriptsResolver — shared read door (JSONL index + sacred file reads) ──
@@ -181,6 +188,10 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
   readonly setHarness: (name: ConversationName, harness: Harness) => Effect.Effect<Conversation, ConversationNotFound>;
   /** Explicit project assignment override (PAN-1577); pass null to clear it back to cwd-derived grouping. */
   readonly setProjectKey: (name: ConversationName, projectKey: string | null) => Effect.Effect<Conversation, ConversationNotFound>;
+  /** PAN-3822: explicit PR link (upsert) and unlink (tombstone via dismissed_at). */
+  readonly linkPullRequest:   (name: ConversationName, ref: PullRequestKey & { url: string }, source: Exclude<PullRequestLinkSource, 'branch'>) =>
+    Effect.Effect<PullRequestLink, ConversationNotFound>;
+  readonly unlinkPullRequest: (name: ConversationName, key: PullRequestKey) => Effect.Effect<{ unlinked: boolean }, ConversationNotFound>;
   readonly handoff:     (source: ConversationName, target: ConversationName, docPath: string) =>
     Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>;
   readonly clear:       (source: ConversationName) =>
