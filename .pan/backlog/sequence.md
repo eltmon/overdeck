@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:10:04.567Z · model: claude-opus-5 · open: 819_
+_Last sequenced: 2026-09-24T20:13:34.051Z · model: claude-opus-5 · open: 820_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -189,6 +189,7 @@ _Last sequenced: 2026-09-24T20:10:04.567Z · model: claude-opus-5 · open: 819_
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 220 | PAN-4127 | S | high | ok |  |  | findLatestReviewRunDir scans for the retired review-<issue>-<millis> folder, so no current run ever marks a lane mid-round or done |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
+| 228 | PAN-4145 | S | medium | ok |  |  | restart-fresh, restartAgent and resume relaunch fall back to literal model IDs, so harness policy checks a model pan start will not staff |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
@@ -1134,10 +1135,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:10:04.567Z",
+  "generatedAt": "2026-09-24T20:13:34.051Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 819,
+  "openCount": 820,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11269,6 +11270,20 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "rationale": "New since the prior pass and the missing half of the review-recovery door that PAN-3939 (rank 22) already owns, so it takes the free rank 23 beside it and nothing renumbers. deacon-lite's recoverStalledReviews -> recoverMissingConvoyReviewers only looks for lanes with no report on disk; when every reviewer has written .pan/review/<runId>/<role>.md and the synthesis parent then dies, the scan finds nothing to launch and no step re-runs the synthesis, so the review sits without a verdict until an operator intervenes -- the same wedge shape as the closed PAN-1864, reached by a different path. It is critical because a wedged review stops the issue from ever reaching the merge gate, and it is silent: before PR #4133 the patrol even journaled review.redispatched for the no-op, so the journal read as if recovery had fired. The fix is small and fully specified in the body -- when every lane of the current run has a report, no verdict exists for the current head, and the parent is confirmed dead through the liveness door (src/lib/agents/liveness.ts, isConfirmedDead, where \"unknown\" never counts as dead), re-dispatch synthesis once per cooldown and journal it. Liveness must be read backend-aware because Herdr is the default, which ties it to the same Herdr-blindness wave as PAN-4109; it should land after PAN-3939 so both recovery paths share one guard rather than growing two.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4145",
+      "rank": 228,
+      "size": "S",
+      "importance": "medium",
+      "score": 63,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "restart-fresh, restartAgent and resume relaunch fall back to literal model IDs, so harness policy checks a model pan start will not staff",
+      "rationale": "New since the prior pass; placed in the free rank slot beside its family (PAN-3022 work-spawn override, PAN-3855 stale recorded model) because it is the same spawn-path model-resolution defect, scored lower because the hardcoded literal only fires when no model is recorded.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
     }
   ],
   "edges": [
@@ -12398,6 +12413,20 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-3855",
+      "to": "PAN-4145",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3022",
+      "to": "PAN-4145",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.55
     }
   ]
 }
