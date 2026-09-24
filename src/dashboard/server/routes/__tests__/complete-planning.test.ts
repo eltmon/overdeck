@@ -417,6 +417,8 @@ describe('completePlanningArtifacts', () => {
         role: 'work',
         startedBy: 'planning-auto-handoff',
         autoSpawnConsentRequired: true,
+        // PAN-3977: the launch-time consent covers advisory health warnings.
+        guardrailAcknowledged: true,
       });
       return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 });
     };
@@ -430,6 +432,30 @@ describe('completePlanningArtifacts', () => {
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1146',
     });
+  });
+
+  // PAN-3977: the acknowledgement covers advisory warnings only. A hard
+  // guardrail block still refuses the spawn and fails the handoff.
+  it('still reports a hard guardrail block as a failed handoff', async () => {
+    const result = await completePlanningAutoSpawn({
+      issueId: 'PAN-3977',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async () => new Response(JSON.stringify({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: 'Available RAM is critically low (1.2 GB).',
+        guardrails: { blocked: true, requiresAcknowledgement: false, status: 503 },
+      }), { status: 503 }),
+    });
+
+    expect(result).toEqual({
+      workAgentSpawned: false,
+      workAgentError: 'Available RAM is critically low (1.2 GB).',
+      workAgentSkipReason: 'guardrails',
+    });
+    expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
   });
 
   it('reports queued container startup without claiming launch acceptance', async () => {
