@@ -459,8 +459,18 @@ describe('bounded slot index allocation (PAN-2214 slot-5..slot-20 climb regressi
 
 type RunningAgentRow = Parameters<typeof countRunningSwarmSlotsForIssue>[1] extends (infer R)[] | undefined ? R : never;
 
-function agentRow(id: string, tmuxActive: boolean): RunningAgentRow {
-  return { id, role: 'work', status: 'running', tmuxActive } as unknown as RunningAgentRow;
+// PAN-3926: liveness is the terminal backend's inventory, not the rows'
+// tmux-only `tmuxActive` flag. Every row here is Herdr-shaped
+// (`tmuxActive: false`); `live` puts the row's id in the inventory.
+const inventory = new Set<string>();
+
+function agentRow(id: string, live: boolean): RunningAgentRow {
+  if (live) inventory.add(id);
+  return { id, role: 'work', status: 'running', tmuxActive: false } as unknown as RunningAgentRow;
+}
+
+function liveIdsOf(rows: RunningAgentRow[]): Set<string> {
+  return new Set(rows.map(row => row.id).filter(id => inventory.has(id)));
 }
 
 describe('registered slot capacity (PAN-2214 cap-reached-at-zero-live-slots regression)', () => {
@@ -473,10 +483,32 @@ describe('registered slot capacity (PAN-2214 cap-reached-at-zero-live-slots regr
       agentRow('agent-pan-1791-slot-7', false),
     ];
 
-    const live = countRunningSwarmSlotsForIssue('PAN-1791', stale);
+    const live = countRunningSwarmSlotsForIssue('PAN-1791', stale, liveIdsOf(stale));
 
     expect(live).toBe(0);
     expect(registeredSlotCapacityAvailable('PAN-1791', 0, live, limits)).toBe(true);
+  });
+
+  it('Herdr slots (no tmux session) in the backend inventory consume capacity (PAN-3926)', () => {
+    const herdr = [
+      agentRow('agent-pan-1791-slot-1', true),
+      agentRow('agent-pan-1791-slot-2', true),
+      agentRow('agent-pan-1791-slot-3', true),
+    ];
+
+    const live = countRunningSwarmSlotsForIssue('PAN-1791', herdr, liveIdsOf(herdr));
+
+    expect(live).toBe(3);
+    expect(registeredSlotCapacityAvailable('PAN-1791', 0, live, limits)).toBe(false);
+  });
+
+  it('an unreadable inventory fails open: every running slot row counts', () => {
+    const rows = [
+      agentRow('agent-pan-1791-slot-1', false),
+      { ...agentRow('agent-pan-1791-slot-2', false), status: 'stopped' } as RunningAgentRow,
+    ];
+
+    expect(countRunningSwarmSlotsForIssue('PAN-1791', rows, null)).toBe(1);
   });
 
   it('does not charge terminal slot agents against live capacity', () => {
@@ -489,6 +521,7 @@ describe('registered slot capacity (PAN-2214 cap-reached-at-zero-live-slots regr
     const live = countRunningSwarmSlotsForIssue(
       'PAN-1791',
       alive,
+      liveIdsOf(alive),
       agent => agent.id === 'agent-pan-1791-slot-2',
     );
 
@@ -504,10 +537,10 @@ describe('registered slot capacity (PAN-2214 cap-reached-at-zero-live-slots regr
     ];
 
     expect(registeredSlotCapacityAvailable(
-      'PAN-1791', 0, countRunningSwarmSlotsForIssue('PAN-1791', alive), limits,
+      'PAN-1791', 0, countRunningSwarmSlotsForIssue('PAN-1791', alive, liveIdsOf(alive)), limits,
     )).toBe(false);
     expect(registeredSlotCapacityAvailable(
-      'PAN-1791', 0, countRunningSwarmSlotsForIssue('PAN-1791', alive.slice(0, 2)), limits,
+      'PAN-1791', 0, countRunningSwarmSlotsForIssue('PAN-1791', alive.slice(0, 2), liveIdsOf(alive.slice(0, 2))), limits,
     )).toBe(true);
   });
 
@@ -517,7 +550,7 @@ describe('registered slot capacity (PAN-2214 cap-reached-at-zero-live-slots regr
       agentRow('agent-pan-9999-slot-1', true),
     ];
 
-    const live = countRunningSwarmSlotsForIssue('PAN-1791', alive);
+    const live = countRunningSwarmSlotsForIssue('PAN-1791', alive, liveIdsOf(alive));
 
     expect(live).toBe(1);
     expect(registeredSlotCapacityAvailable('PAN-1791', 1, live, limits)).toBe(true);
@@ -529,7 +562,7 @@ describe('registered slot capacity (PAN-2214 cap-reached-at-zero-live-slots regr
       agentRow('agent-pan-1791-slot-1', true),
       agentRow('agent-pan-1791-slot-2', true),
     ];
-    const live = countRunningSwarmSlotsForIssue('PAN-1791', alive);
+    const live = countRunningSwarmSlotsForIssue('PAN-1791', alive, liveIdsOf(alive));
     const base = {
       maxWorkAgents: 4,
       reservedAdvancingSlots: 2,

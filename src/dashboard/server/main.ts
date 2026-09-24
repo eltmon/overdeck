@@ -34,6 +34,7 @@ import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { initRestartGate } from './services/restart-gate.js';
+import { initDeployProgress } from './services/deploy-progress.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { ensureInternalToken } from '../../lib/internal-token.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
@@ -811,6 +812,12 @@ if (isPeerDashboard) {
 // requests so the approval banner clears itself.
 await initRestartGate().catch((err: unknown) => {
   console.warn(`[overdeck] Restart gate init failed: ${err instanceof Error ? err.message : String(err)}`);
+});
+
+// Deploy progress (PAN-3751): derive the in-flight `pan reload` from the restart
+// lock, gate and status journal, and publish it on the owning project's row.
+await initDeployProgress().catch((err: unknown) => {
+  console.warn(`[overdeck] Deploy progress init failed: ${err instanceof Error ? err.message : String(err)}`);
 });
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches

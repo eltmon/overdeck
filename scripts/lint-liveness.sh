@@ -36,11 +36,17 @@ ban_pattern() {
 }
 
 check_all() {
-  # The oracle module must exist and export the four entry points.
+  # The oracle module must exist and export the three entry points.
   require_reference "$LIVENESS_MODULE" 'export async function isAlive' 'liveness module'
-  require_reference "$LIVENESS_MODULE" 'export function isAliveSync' 'liveness module'
   require_reference "$LIVENESS_MODULE" 'export function isIdle' 'liveness module'
   require_reference "$LIVENESS_MODULE" 'export function idleAgeMs' 'liveness module'
+
+  # PAN-3926: no synchronous liveness door. A sync probe can only ask tmux
+  # (Herdr answers over an async socket), so it reads every Herdr agent dead.
+  if rg -n 'function isAliveSync' "$LIVENESS_MODULE"; then
+    echo "✗ liveness boundary: a sync liveness door is tmux-only — await isAlive instead (PAN-3926)"
+    fail=1
+  fi
 
   # Each migrated consumer delegates to the oracle (specifier is
   # './liveness.js' from inside src/lib/agents, '../agents/liveness.js' elsewhere)...

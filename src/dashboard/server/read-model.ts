@@ -320,6 +320,8 @@ export const ReadModelServiceLive = Layer.effect(
         // snapshot on connect and from restart_gate.changed events after that
         // — the frontend never polls the gate endpoints.
         restartGate: state.restartGate ?? undefined,
+        // PAN-3751: in-flight deploys, derived server-side from runtime files.
+        deployByProjectKey: state.deployByProjectKey,
         timestamp: new Date().toISOString(),
       };
     }

@@ -14,7 +14,7 @@ import {
 } from '../../lib/cloister/deacon-swarm.js';
 import { reconcileSlotState } from '../../lib/cloister/swarm-slot-reconcile.js';
 import { readSwarmHold, readSwarmInterventions } from '../../lib/cloister/deacon-swarm-record.js';
-import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
+import { countLiveSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 
 type ConsoleLike = Pick<typeof console, 'log' | 'error'>;
@@ -38,7 +38,7 @@ export interface SwarmStatusCommandDeps {
   readItemStatuses: (workspacePath: string, issueId: string) => Promise<Record<string, string>>;
   listSessionNamesSync: () => string[];
   getConcurrencyLimits: typeof getConcurrencyLimits;
-  countRunningSwarmSlotsForIssue: (issueId: string) => number;
+  countRunningSwarmSlotsForIssue: (issueId: string) => Promise<number>;
   console: ConsoleLike;
 }
 
@@ -86,7 +86,7 @@ const defaultStatusDeps: SwarmStatusCommandDeps = {
   readItemStatuses: (workspacePath, issueId) => readItemStatusesAsync(resolvePlanHome(workspacePath), issueId),
   listSessionNamesSync,
   getConcurrencyLimits,
-  countRunningSwarmSlotsForIssue,
+  countRunningSwarmSlotsForIssue: countLiveSwarmSlotsForIssue,
   console,
 };
 
@@ -140,7 +140,7 @@ export async function deriveSwarmStatus(
     foreman: { agentId: foremanId, alive: liveSessions.has(foremanId) },
     hold: deps.readSwarmHold(workspacePath, issue),
     interventions: deps.readSwarmInterventions(workspacePath, issue),
-    capacity: { used: deps.countRunningSwarmSlotsForIssue(issue), limit: limits.reservedSwarmSlots },
+    capacity: { used: await deps.countRunningSwarmSlotsForIssue(issue), limit: limits.reservedSwarmSlots },
     slots: rows.map(row => {
       const branch = row.branch ?? `feature/${issueLower}-slot-${row.slotIndex}`;
       const sessionName = row.agentId ?? `agent-${issueLower}-slot-${row.slotIndex}`;

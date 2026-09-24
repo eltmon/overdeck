@@ -1,6 +1,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
+import { attachHintLines } from '../../lib/terminal-backends/attach-hint.js';
 import {
   detectCrashedAgents,
   recoverAgent,
@@ -140,8 +141,8 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
     console.log(`  Model:     ${state.model}`);
     console.log('');
     console.log(chalk.dim('Commands:'));
-    console.log(`  Attach:  tmux attach -t ${state.id}`);
-    console.log(`  Message: pan tell ${state.issueId} "your message"`);
+    for (const line of await attachHintLines(state)) console.log(line);
+    console.log(`  Message:  pan tell ${state.issueId} "your message"`);
 
   } catch (error: any) {
     spinner.fail(error.message);

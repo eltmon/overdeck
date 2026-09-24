@@ -86,6 +86,7 @@ describe('markSpawnFailed', () => {
       startedAt: '2026-09-19T10:03:00.960Z',
       backend: 'herdr',
       paneId: 'wE:p2',
+      terminalId: 'term_e2',
     });
 
     await markSpawnFailed('agent-pan-3705', 'launch failed: boom');
@@ -93,6 +94,8 @@ describe('markSpawnFailed', () => {
     const saved = JSON.parse(readFileSync(path, 'utf-8'));
     expect(saved.backend).toBe('herdr');
     expect(saved.paneId).toBe('wE:p2');
+    // PAN-3928: the terminal id is what `herdr terminal attach` takes.
+    expect(saved.terminalId).toBe('term_e2');
   });
 
   it('is a no-op for an agent with no state file, and never throws', async () => {

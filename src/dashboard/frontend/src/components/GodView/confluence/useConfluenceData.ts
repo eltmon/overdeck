@@ -18,6 +18,7 @@ import {
   type OrbState,
   type Stage,
 } from './model';
+import { isClaimedLiveStatus, withObservedLiveness } from './liveness';
 
 const HOOK_STREAM_LIMIT = 500;
 const EVENT_WINDOW_MS = 60_000;
@@ -214,6 +215,7 @@ function latestActivity(agents: readonly AgentSnapshot[], runtimeById: Readonly<
 function activeStatus(status: AgentSnapshot['status']): boolean {
   return status === 'running' || status === 'starting';
 }
+
 
 /** "Active" means PRODUCING, not registered: activity inside this window. */
 const ACTIVE_RECENT_WINDOW_MS = 15 * 60_000;
@@ -627,8 +629,12 @@ export function useConfluenceOrbs(
   const agentRuntimeById = useDashboardStore((state) => state.agentRuntimeById);
   const issuesRaw = useDashboardStore((state) => state.issuesRaw);
   const derivedIssueStateByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
+  const backendPanesById = useDashboardStore((state) => state.backendPanesById);
   const parked = useParked();
-  const agents = useMemo(() => Object.values(agentsById), [agentsById]);
+  const agents = useMemo(
+    () => withObservedLiveness(Object.values(agentsById), backendPanesById),
+    [agentsById, backendPanesById],
+  );
   const issueIds = useMemo(
     () => Array.from(new Set(agents.map((agent) => agent.issueId).filter(Boolean))).sort(),
     [agents],
@@ -802,6 +808,7 @@ export function useConfluenceMeta(
   const agentsById = useDashboardStore((state) => state.agentsById);
   const agentRuntimeById = useDashboardStore((state) => state.agentRuntimeById);
   const derivedIssueStateByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
+  const backendPanesById = useDashboardStore((state) => state.backendPanesById);
   const recentActivity = useDashboardStore((state) => state.recentActivity);
   const system = useGodViewStore((state) => state.systemHealth);
   const { data: costSummary } = useQuery({
@@ -828,8 +835,12 @@ export function useConfluenceMeta(
   return useMemo(() => {
     const now = new Date();
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    // The census counts agents the terminal backend hosts, not agent rows:
+    // a stored `running` with no pane behind it is not an agent (PAN-3540).
+    const liveAgents = withObservedLiveness(Object.values(agentsById), backendPanesById)
+      .filter((agent) => isClaimedLiveStatus(agent.status));
     const roleCounts: Record<string, number> = {};
-    for (const agent of Object.values(agentsById)) {
+    for (const agent of liveAgents) {
       const role = agent.role ?? 'work';
       roleCounts[role] = (roleCounts[role] ?? 0) + 1;
     }
@@ -858,8 +869,8 @@ export function useConfluenceMeta(
       // actually producing (activity in the last 15 minutes, event-driven via
       // agentRuntimeById) — a 'running' registry row that has sat idle for
       // hours is not live work.
-      active: Object.values(agentsById).filter((agent) => recentlyActive(agent, agentRuntimeById[agent.id], now.getTime())).length,
-      total: Object.keys(agentsById).length,
+      active: liveAgents.filter((agent) => recentlyActive(agent, agentRuntimeById[agent.id], now.getTime())).length,
+      total: liveAgents.length,
       roleCounts,
       parkedTotal: parked?.summary.total ?? null,
       parkedByOrbit: parked?.summary.byOrbit ?? null,
@@ -867,7 +878,7 @@ export function useConfluenceMeta(
         ? { transitionsPerHour: velocity.transitionsPerHour, byStage: velocity.byStage ?? {} }
         : null,
     };
-  }, [agentsById, agentRuntimeById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, derivedIssueStateByIssueId, system, parked, velocity]);
+  }, [agentsById, agentRuntimeById, backendPanesById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, derivedIssueStateByIssueId, system, parked, velocity]);
 }
 
 export function useConfluenceData(): ConfluenceData {

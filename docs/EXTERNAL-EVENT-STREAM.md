@@ -118,6 +118,7 @@ Canonical schemas live in `packages/contracts/src/events.ts`. The catalog above 
 
 - The event store retains events for **7 days** (`src/dashboard/server/event-store.ts`). Replay via `?since=` or `Last-Event-ID` only works within that window. Older sequence numbers receive a `410 Gone`.
 - **`agent.output_received` is live-only.** It is streamed in real time to connected clients, but it is **not persisted** and will **not** appear in `?since=` or `Last-Event-ID` replay. Consumers that need historical terminal output should read the agent's tmux session directly.
+- **`restart_gate.changed` and `project.deploy_changed` are in-memory only** (outside the public catalog). Each carries a complete runtime-plane projection, the restart gate and the in-flight `pan reload` per project key (PAN-3751). The server re-derives it after every boot, so it is never persisted or replayed. Dashboard clients get it in the snapshot (`restartGate`, `deployByProjectKey`) and then from live events.
 - Consumers that need longer retention must persist their own state.
 - On reconnect with `Last-Event-ID`, the server replays any missed events (up to the retention window) before resuming the live tail, so at-least-once delivery is guaranteed across transient disconnects for replayable event types.
 - No deduplication is performed — if a sidecar crashes mid-event, it may receive the same event twice on reconnect. Consumers should be idempotent or track the last `sequence` they processed.

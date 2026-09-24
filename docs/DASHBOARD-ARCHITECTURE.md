@@ -254,6 +254,8 @@ marker so the no-loss gate proves that no existing surface disappeared.
 
 **God View:** `/god-view` centers the Confluence production canvas from [PAN-3447](https://github.com/eltmon/overdeck/issues/3447); its deliberate style-guide exemption and live-data contract are documented in `docs/GOD-VIEW.md`.
 
+**Derived issue state on board routes (PAN-3925):** routes that derive many issues go through the server adapter's batch doors in `services/derived-issue-state.ts`: `loadIssueStatesForProject` for one project, and `loadIssueStatesForIssues` for ids from many projects (one batch per project, the projects in parallel). A batch costs one `gh pr list` per repo, two `git for-each-ref` calls, and no per-issue spawn. The server batch doors read the PR listing stale-while-revalidate (`listRepoPullRequestsStaleOk`): a busy repo's listing takes ~11s, so once the 30s TTL passes, reads get the last listing immediately while a single refresh runs. A read waits for the forge only when no listing is younger than two minutes. Gates that act on readiness (merge scheduling, the ready set) keep the strict `listRepoPullRequests`. Route code must not call `getDerivedIssueState` in a loop.
+
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.
 - Do NOT pre-resize tmux windows. Let the PTY spawn handle sizing via client dimensions.

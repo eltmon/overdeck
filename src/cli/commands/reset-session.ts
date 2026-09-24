@@ -5,7 +5,7 @@ import { existsSync } from 'fs';
 import { getAgentState, getAgentDir, getLatestSessionId } from '../../lib/agents.js';
 import { clearAgentSessionPointers } from '../../lib/agents/session-pointers.js';
 import { listAgentIdsByPrefix } from '../../lib/overdeck/agents.js';
-import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 import { resolveIssueId } from '../../lib/issue-id.js';
 
 export function registerResetSessionCommand(program: Command): void {
@@ -16,11 +16,11 @@ export function registerResetSessionCommand(program: Command): void {
 
 async function resetAgentSessions(agentIds: string[]): Promise<void> {
   const targets = [...new Set(agentIds)];
-  const running = targets.find((agentId) => getWorkAgentLifecycleStateSync(agentId).hasLiveTmuxSession);
-  if (running) {
-    console.log(chalk.red(`Agent ${running} is running. Stop it first before resetting its session.`));
-    return exitCli(1);
-    return;
+  for (const agentId of targets) {
+    if ((await getWorkAgentLifecycleState(agentId)).hasLiveTmuxSession) {
+      console.log(chalk.red(`Agent ${agentId} is running. Stop it first before resetting its session.`));
+      return exitCli(1);
+    }
   }
 
   for (const agentId of targets) {

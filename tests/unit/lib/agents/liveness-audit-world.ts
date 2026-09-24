@@ -176,10 +176,10 @@ export function normalizeForAudit(value: unknown, volatileHome?: string): unknow
 }
 
 export async function runLifecycleConsumer(): Promise<unknown> {
-  const { getWorkAgentLifecycleStateSync } = await import('../../../../src/lib/work-agent-lifecycle.js');
+  const { getWorkAgentLifecycleState } = await import('../../../../src/lib/work-agent-lifecycle.js');
   const out: Record<string, unknown> = {};
   for (const agentId of Object.values(AGENTS)) {
-    out[agentId] = getWorkAgentLifecycleStateSync(agentId);
+    out[agentId] = await getWorkAgentLifecycleState(agentId);
   }
   return out;
 }
