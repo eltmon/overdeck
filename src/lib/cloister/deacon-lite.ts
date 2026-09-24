@@ -263,6 +263,9 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
 
     const lastRedispatch = lastReviewRedispatchAt.get(issueId);
     if (lastRedispatch !== undefined && now - lastRedispatch < STALLED_REVIEW_COOLDOWN_MS) continue;
+    // The in-memory map dies with the deacon child; our own journal entry is
+    // the cooldown that survives a restart (PAN-3914).
+    if (last.type === 'review.redispatched' && now - at < STALLED_REVIEW_COOLDOWN_MS) continue;
 
     // Cheapest first: relaunching missing lanes against the existing run reuses
     // the parent's own state.json, which survives a server restart, so nothing
@@ -287,6 +290,19 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
       } else if (!recovery.success) {
         // Nothing was launched: do not journal a re-dispatch that never happened.
         console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);
+        continue;
+      } else if (!recovery.launched) {
+        // Every lane already reported: nothing to relaunch, so no re-dispatch
+        // to journal or report (PAN-3914). Cool down so the next tick does not
+        // re-probe the same convoy.
+        lastReviewRedispatchAt.set(issueId, now);
+        // A confirmed-dead synthesis parent is a real stall nothing here can
+        // recover (#4134): say so, once per cooldown. A live or indeterminate
+        // parent may still be synthesizing, so it stays quiet.
+        const parentId = `agent-${issueId.toLowerCase()}-review`;
+        if (isConfirmedDead(await isAlive(parentId))) {
+          console.warn(`[deacon-lite] ${issueId}: every review lane reported but no verdict was posted and the synthesis parent ${parentId} is dead — not recoverable here (#4134)`);
+        }
         continue;
       }
     } catch (err) {

@@ -471,7 +471,14 @@ PAN-3939 wedge this routine exists to clear.
 It then relaunches the missing lanes against the existing run
 (`recoverMissingConvoyReviewers`), which reuses the parent's own `state.json` and
 so re-verifies nothing; only a parent with no run state at all falls back to the
-full review door. At most one re-dispatch per issue per hour.
+full review door. At most one re-dispatch per issue per hour: the cooldown is
+held in memory and, because the deacon child's memory dies on restart, also read
+back from the routine's own `review.redispatched` entry. A recovery that launches
+nothing (every lane already wrote its report) journals and reports nothing, so
+the routine never claims a re-dispatch that did not happen (PAN-3914). When the
+synthesis parent `agent-<issue>-review` is also confirmed dead, that stall is not
+recoverable here (#4134), so the routine logs a `[deacon-lite]` warning once per
+cooldown; a live or indeterminate parent stays quiet.
 
 **Accepted v1 gaps** (stated in the module, deliberately not built): a convoy
 where some reviewers posted a verdict and one died is not recovered, because the
