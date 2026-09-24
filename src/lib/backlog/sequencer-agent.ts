@@ -11,7 +11,13 @@ import {
   stopAgent,
 } from '../agents.js';
 import { idleAgeMs, isAlive } from '../agents/liveness.js';
-import { FINISHED_REPROBE_DELAY_MS, isFinishedRoleRun, waitForPaneGone } from '../agents/warm-idle-reap.js';
+import {
+  FINISHED_REPROBE_DELAY_MS,
+  isFinishedRoleRun,
+  needsTurnSignal,
+  roleRunTurnFinished,
+  waitForPaneGone,
+} from '../agents/warm-idle-reap.js';
 import { closeAgentPane } from '../terminal-backends/launch.js';
 import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
 import type { PassMode } from './types.js';
@@ -76,10 +82,16 @@ export async function getSequencerRunStatus(projectRoot: string): Promise<Sequen
   const runtimeState = alive ? getAgentRuntimeStateSync(SEQUENCER_AGENT_ID)?.state ?? null : null;
   const mirrorIdle = runtimeState === 'idle' || runtimeState === 'stopped' || runtimeState === 'suspended';
   const mirrorHinted = verdict.alive && verdict.backendState === undefined && mirrorIdle;
+  // A pane Herdr does not track (codex, kimi, pi, ACP) reads `unknown`; its
+  // transcript's turn-complete marker stands in for the label (#4169).
+  const turnFinished = run !== undefined && needsTurnSignal(verdict, run)
+    ? await roleRunTurnFinished(SEQUENCER_AGENT_ID, run).catch(() => false)
+    : false;
   const finished = verdict.alive && isFinishedRoleRun(
     mirrorHinted ? { ...verdict, backendState: 'idle' } : verdict,
     run,
     idleAgeMs(SEQUENCER_AGENT_ID),
+    turnFinished,
   );
   const doneReason = paneDead
     ? 'pane-dead'

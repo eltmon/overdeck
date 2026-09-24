@@ -29,6 +29,7 @@ import {
 } from '../terminal-backends/launch.js';
 import type { AgentPaneRef } from '../terminal-backends/types.js';
 import { createWorkspace, preTrustDirectory } from '../workspace-manager.js';
+import { isWorkspaceSetupIncomplete } from '../workspace-manager/setup-marker.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentState } from '../agents.js';
 import { claudeSystemPromptFiles, getAcpLauncherFields, getCodexLauncherFields, getKimiCodeLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
@@ -398,7 +399,9 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     let workspaceCreated = false;
     if (existsSync(workspacePath)) {
       const files = await readdir(workspacePath);
-      workspaceCreated = !files.every((f: string) => f === '.pan');
+      // PAN-4171: a worktree whose setup never finished is not created;
+      // createWorkspace resumes its setup.
+      workspaceCreated = !files.every((f: string) => f === '.pan') && !isWorkspaceSetupIncomplete(workspacePath);
     }
 
     if (!workspaceCreated) {

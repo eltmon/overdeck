@@ -222,7 +222,9 @@ Who uses them:
   | `pane-dead`, `runtime-missing`, `no-session` (no live harness in the pane) | status past `starting` | reaped |
   | alive, Herdr `idle` or `done` on two probes 5 s apart, work activity older than 60 s | one-shot role (`sequencer`), `running` | reaped |
   | alive, Herdr `idle` or `done` | any other role, fresh activity, or a second probe that no longer reads idle/done | refused |
-  | alive, Herdr `working`, `blocked`, `unknown` | any | refused |
+  | alive, Herdr `unknown`, transcript says the newest turn ended, on two probes 5 s apart, work activity older than 60 s | one-shot role (`sequencer`), `running`, transcript written since the run started | reaped |
+  | alive, Herdr `unknown` | any other role, fresh activity, a turn still running, no readable transcript, or a Claude Code or Muse transcript | refused |
+  | alive, Herdr `working` or `blocked` | any | refused |
   | alive on tmux (no per-pane agent state) | any | refused |
   | `runtime-indeterminate`, or the probe threw | any | refused |
 
@@ -242,10 +244,26 @@ Who uses them:
   the same name, because Herdr drops the record asynchronously. On Herdr, `isAlive` carries the pane's
   `agent_status` as `backendState` on an alive verdict; tmux verdicts carry none.
 
-  **Gap: non-Claude harnesses on Herdr.** Herdr tracks `agent_status` only for Claude Code panes
+  **Non-Claude harnesses on Herdr (#4169).** Herdr tracks `agent_status` only for Claude Code panes
   (`detectionPolicyFor` in `src/lib/terminal-backends/launch.ts`). Codex, kimi-code, pi, opencode and
-  ACP panes are pane-bound and read `unknown`, so a finished role run on one of those harnesses is
-  still refused as "already running" until its process exits and it reads confirmed dead (#4169).
+  ACP panes are pane-bound and read `unknown`. For those, the run's own transcript stands in for the
+  label: `roleRunTurnFinished` (`warm-idle-reap.ts`) resolves the transcript through
+  `resolveAgentTranscriptCandidate` and `transcriptTurnFinished` (`src/lib/agents/transcript-turn.ts`)
+  reads its tail for the newest record that starts or ends a turn:
+
+  | Harness | Transcript | Finished when the newest turn record is |
+  | --- | --- | --- |
+  | codex | rollout JSONL | `task_complete` or `turn_aborted` (not `task_started`) |
+  | kimi-code | `wire.jsonl` | a `step.end` with `finishReason: end_turn` (not `turn.prompt`, `step.begin`, or a `step.end` for a tool call) |
+  | pi, ohmypi | session JSONL | an assistant `message` with `stopReason` `stop` or `aborted` (not `toolUse`, and not `error`, which Pi may retry) |
+  | acp, opencode | ACP host transcript | `turn_completed` or `prompt_failed` (not a user prompt or `prompt_queued`; `prompt_stalled` is skipped) |
+
+  Every #4162 guard still applies: only a one-shot role that is `running`, work activity older than
+  60 s, and a second probe 5 s later that re-reads the transcript. The transcript must also have been
+  written since the run's `startedAt`, so an earlier run's finished transcript never counts. A missing
+  or unreadable transcript, a Claude Code pane that reads `unknown`, and Muse panes stay refused until
+  the process exits and the pane reads confirmed dead. The signal is consulted only for Herdr's
+  `unknown`; tmux panes are unchanged. `getSequencerRunStatus` uses the same reader.
 - **tmux `has-session` errors** — on the tmux path, `isAlive` re-asks a false `sessionExists` through the
   three-part `queryTmuxSession` (`src/lib/agents/tmux-session-query.ts`). Only a clean "no such
   session" is `no-session`; a tmux error or timeout is `runtime-indeterminate`, never a confirmed death.

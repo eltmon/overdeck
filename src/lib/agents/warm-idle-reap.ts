@@ -9,6 +9,11 @@ export interface PriorRoleRun {
   readonly role?: string;
   readonly status?: string;
   readonly reviewSubRole?: string;
+  /** The harness the run launched with (`state.json` `harness`); picks the transcript reader. */
+  readonly harness?: string;
+  readonly workspace?: string;
+  /** When the run was spawned; a transcript not written since then belongs to an earlier run. */
+  readonly startedAt?: string;
 }
 
 /** Inputs to `reapWarmIdleRoleRun`; every field except `readRun` is a test seam. */
@@ -25,6 +30,12 @@ export interface WarmIdleReapDeps {
   readonly idleAgeMs?: (agentId: string) => number | null;
   /** Whether the backend still reports the agent's pane (settle wait after the stop). */
   readonly paneExists?: (agentId: string) => Promise<boolean>;
+  /**
+   * Whether the run's own transcript says its newest turn finished (#4169);
+   * defaults to `roleRunTurnFinished`. Asked only for a live pane Herdr reads
+   * as `unknown`.
+   */
+  readonly turnFinished?: (agentId: string, run: PriorRoleRun) => Promise<boolean>;
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
@@ -58,6 +69,40 @@ export const FINISHED_REPROBE_DELAY_MS = 5_000;
 export const REAP_SETTLE_MS = 3_000;
 const REAP_SETTLE_POLL_MS = 200;
 
+/**
+ * Whether the run's transcript says its newest turn ended (#4169): the
+ * turn-complete marker of a codex, kimi-code, pi/ohmypi, ACP or OpenCode
+ * transcript (`transcript-turn.ts`), in a transcript written since the run
+ * started. Claude Code and Muse transcripts, a missing transcript, and a run
+ * with no `startedAt` answer false.
+ */
+export async function roleRunTurnFinished(agentId: string, run: PriorRoleRun): Promise<boolean> {
+  const startedAtMs = run.startedAt ? new Date(run.startedAt).getTime() : NaN;
+  if (!Number.isFinite(startedAtMs)) return false;
+  const [{ resolveAgentTranscriptCandidate }, { transcriptTurnFinished }, { stat }] = await Promise.all([
+    import('./transcript-resolver.js'),
+    import('./transcript-turn.js'),
+    import('node:fs/promises'),
+  ]);
+  const candidate = await resolveAgentTranscriptCandidate(agentId, run.workspace ?? '');
+  if (!candidate) return false;
+  const mtimeMs = await stat(candidate.path).then((info) => info.mtimeMs, () => null);
+  if (mtimeMs === null || mtimeMs < startedAtMs) return false;
+  return transcriptTurnFinished(candidate.kind, candidate.path);
+}
+
+/**
+ * Whether `isFinishedRoleRun` needs the transcript signal for this probe: a
+ * live pane Herdr reads as `unknown` (pane-bound, not Claude Code), for a
+ * one-shot run that is `running`. Everything else is decided without it.
+ */
+export function needsTurnSignal(verdict: LivenessVerdict, run: PriorRoleRun | undefined): boolean {
+  return verdict.alive
+    && verdict.backendState === 'unknown'
+    && isOneShotRoleRun(run)
+    && run?.status === 'running';
+}
+
 /** A one-shot role run (see `ONE_SHOT_ROLES`); a review sub-role is never one. */
 export function isOneShotRoleRun(run: PriorRoleRun | undefined): boolean {
   return run?.role !== undefined && ONE_SHOT_ROLES.has(run.role) && !run.reviewSubRole;
@@ -74,19 +119,26 @@ export function isOneShotRoleRun(run: PriorRoleRun | undefined): boolean {
  *   is `running` (its prompt was delivered) with work activity older than
  *   `FINISHED_IDLE_MIN_AGE_MS`, the liveness.ts idleness rule. The Herdr label
  *   alone never counts. `reapWarmIdleRoleRun` also requires a second probe.
+ * - Alive on Herdr and `unknown` (a pane-bound harness Herdr does not track,
+ *   #4169): the same rule, with `turnFinished` (the run's transcript says its
+ *   newest turn ended, `roleRunTurnFinished`) standing in for the label.
  *
- * `working`, `blocked`, `unknown`, a live tmux pane (tmux has no per-pane
- * agent state), and an unprobeable verdict (`runtime-indeterminate`) are active.
+ * `working`, `blocked`, `unknown` without a finished turn, a live tmux pane
+ * (tmux has no per-pane agent state), and an unprobeable verdict
+ * (`runtime-indeterminate`) are active.
  */
 export function isFinishedRoleRun(
   verdict: LivenessVerdict,
   run: PriorRoleRun | undefined,
   workIdleAgeMs: number | null,
+  turnFinished = false,
 ): boolean {
   if (run?.status === undefined || run.status === 'starting') return false;
   if (!verdict.alive) return isConfirmedDead(verdict);
-  return verdict.backendState !== undefined
-    && FINISHED_BACKEND_STATES.has(verdict.backendState)
+  const finishedSignal = verdict.backendState !== undefined
+    && (FINISHED_BACKEND_STATES.has(verdict.backendState)
+      || (verdict.backendState === 'unknown' && turnFinished));
+  return finishedSignal
     && isOneShotRoleRun(run)
     && run.status === 'running'
     && workIdleAgeMs !== null
@@ -95,16 +147,22 @@ export function isFinishedRoleRun(
 
 /**
  * Probe twice: a finished verdict from a live (idle) pane must hold on a
- * second probe `FINISHED_REPROBE_DELAY_MS` later, re-reading the state and the
- * activity. A confirmed death needs no second look.
+ * second probe `FINISHED_REPROBE_DELAY_MS` later, re-reading the state, the
+ * activity and, for an `unknown` pane, the transcript. A confirmed death needs
+ * no second look.
  */
 export async function confirmFinishedRoleRun(agentId: string, deps: WarmIdleReapDeps): Promise<boolean> {
   const probe = deps.isAlive ?? ((id: string) => isAlive(id));
   const readIdleAge = deps.idleAgeMs ?? ((id: string) => idleAgeMs(id));
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const readTurn = deps.turnFinished ?? roleRunTurnFinished;
   const check = async (): Promise<{ finished: boolean; alive: boolean }> => {
     const verdict = await probe(agentId).catch((): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }));
-    return { finished: isFinishedRoleRun(verdict, deps.readRun(agentId), readIdleAge(agentId)), alive: verdict.alive };
+    const run = deps.readRun(agentId);
+    const turnFinished = run !== undefined && needsTurnSignal(verdict, run)
+      ? await readTurn(agentId, run).catch(() => false)
+      : false;
+    return { finished: isFinishedRoleRun(verdict, run, readIdleAge(agentId), turnFinished), alive: verdict.alive };
   };
   const first = await check();
   if (!first.finished) return false;

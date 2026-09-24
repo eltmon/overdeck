@@ -30,6 +30,12 @@ vi.mock('../backlog-input.js', () => ({
 
 vi.mock('node:fs', () => ({ existsSync: vi.fn(), statSync: vi.fn() }));
 
+// #4169: the transcript turn-complete reader for panes Herdr does not track.
+vi.mock('../../agents/warm-idle-reap.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agents/warm-idle-reap.js')>()),
+  roleRunTurnFinished: vi.fn().mockResolvedValue(false),
+}));
+
 import { existsSync, statSync } from 'node:fs';
 import {
   clearFinishedSequencerRun,
@@ -44,7 +50,11 @@ import {
   getAgentRuntimeStateSync,
 } from '../../../lib/agents.js';
 import { idleAgeMs, isAlive } from '../../agents/liveness.js';
-import { FINISHED_IDLE_MIN_AGE_MS, FINISHED_REPROBE_DELAY_MS } from '../../agents/warm-idle-reap.js';
+import {
+  FINISHED_IDLE_MIN_AGE_MS,
+  FINISHED_REPROBE_DELAY_MS,
+  roleRunTurnFinished,
+} from '../../agents/warm-idle-reap.js';
 
 const livePane = () => vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true });
 
@@ -272,6 +282,28 @@ describe('spawnSequencerAgent', () => {
       done: true,
       doneReason: 'pane-finished',
     });
+  });
+
+  // #4169: a codex/kimi/pi/ACP pane reads `unknown` on Herdr; its transcript's
+  // turn-complete marker stands in for the idle label.
+  it('treats an unknown Herdr pane as done only when its transcript says the turn ended and work activity is stale', async () => {
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const run = { role: 'sequencer', status: 'running', harness: 'codex', startedAt: '2026-01-01T00:00:01.000Z' };
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue(run);
+    vi.mocked(isAlive).mockResolvedValue({ alive: true, paneAlive: true, backendState: 'unknown' });
+
+    vi.mocked(idleAgeMs).mockReturnValue(STALE_WORK_MS);
+    vi.mocked(roleRunTurnFinished).mockResolvedValueOnce(true);
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ done: true, doneReason: 'pane-finished' });
+    expect(roleRunTurnFinished).toHaveBeenCalledWith(SEQUENCER_AGENT_ID, run);
+
+    vi.mocked(roleRunTurnFinished).mockResolvedValueOnce(false);
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ running: true, done: false, doneReason: null });
+
+    vi.mocked(idleAgeMs).mockReturnValue(5_000);
+    vi.mocked(roleRunTurnFinished).mockResolvedValueOnce(true);
+    expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({ running: true, done: false, doneReason: null });
   });
 
   it('keeps a Herdr pane running while it works, before its prompt is delivered, or while its work activity is fresh', async () => {

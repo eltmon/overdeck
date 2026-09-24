@@ -10,6 +10,7 @@ import { join, dirname, basename } from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect, Layer, Context } from 'effect';
+import { workspaceNeedsSetup } from '../../../lib/workspace-manager/setup-marker.js';
 
 const execAsync = promisify(exec);
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
@@ -114,8 +115,10 @@ export const WorkspaceServiceLive = Layer.effect(
             const { workspacePath, branch } = getWorkspacePath(issueId);
             const issueLower = issueId.toLowerCase();
 
-            // Idempotent: if workspace already exists, return the path without error
-            if (existsSync(workspacePath)) {
+            // Idempotent: if workspace already exists, return the path without error.
+            // PAN-4171: an existing worktree whose setup never finished is
+            // passed to createWorkspace, which resumes the setup.
+            if (!workspaceNeedsSetup(workspacePath)) {
               return workspacePath;
             }
 

@@ -5,6 +5,7 @@ import { Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { createWorkspace } from '../../lib/workspace-manager.js';
+import { workspaceNeedsSetup } from '../../lib/workspace-manager/setup-marker.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { analyzeSwarmReadiness } from '../../lib/xbrief/swarm-readiness.js';
@@ -192,7 +193,7 @@ export async function swarmMergeCommand(
 
 async function ensureFeatureWorkspace(issueId: string, project: ResolvedProjectLike): Promise<string> {
   const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  if (existsSync(workspacePath)) return workspacePath;
+  if (!workspaceNeedsSetup(workspacePath)) return workspacePath;
   const projectConfig: ProjectConfig = { name: project.projectName, path: project.projectPath };
   const result = await createWorkspace({
     projectConfig,

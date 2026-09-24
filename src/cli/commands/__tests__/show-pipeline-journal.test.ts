@@ -54,6 +54,17 @@ describe('summarizePipelineEntry', () => {
       .toBe('2 reviewers — no live reviewer');
   });
 
+  it('follows a deferred planning hand-off (PAN-4155)', () => {
+    expect(summarizePipelineEntry(entry('handoff.deferred', { attempt: 0, reason: 'guardrails' })))
+      .toBe('attempt 0: guardrails');
+    expect(summarizePipelineEntry(entry('handoff.retried', { attempt: 2, skipReason: 'guardrails' })))
+      .toBe('attempt 2: guardrails');
+    expect(summarizePipelineEntry(entry('handoff.started', { attempt: 3, agentId: 'agent-pan-3705' })))
+      .toBe('agent-pan-3705 on attempt 3');
+    expect(summarizePipelineEntry(entry('handoff.abandoned', { outcome: 'gave-up', error: 'Agent ceiling reached' })))
+      .toBe('gave-up — Agent ceiling reached');
+  });
+
   it('shows the verdict and the role that posted it', () => {
     expect(summarizePipelineEntry(entry('review.verdict', { verdict: 'APPROVED', subRole: 'review' })))
       .toBe('APPROVED (review)');

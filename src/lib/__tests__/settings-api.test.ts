@@ -38,7 +38,7 @@ vi.mock('../config-yaml.js', () => ({
   DEFAULT_ROLES: {
     plan: { model: 'workhorse:expensive' },
     work: { model: 'workhorse:mid' },
-    review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' }, synthesis: { model: 'workhorse:expensive' } } },
+    review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' } } },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
     strike: { model: 'workhorse:expensive' },
@@ -48,7 +48,7 @@ vi.mock('../config-yaml.js', () => ({
     flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
-  RETIRED_SUB_ROLES: { work: ['inspect', 'inspect-deep'] },
+  RETIRED_SUB_ROLES: { work: ['inspect', 'inspect-deep'], review: ['synthesis'] },
   loadConfigSync: () => mockLoadConfig(),
   getGlobalConfigPath: () => '/tmp/config.yaml',
   clearConfigCache: () => mockClearConfigCache(),
@@ -91,7 +91,6 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
   return {
     config: {
       enabledProviders: new Set(['anthropic']),
-      overrides: {},
       geminiThinkingLevel: 3,
       apiKeys: {},
       providerAuth: {},
@@ -243,7 +242,6 @@ describe('loadSettingsApi', () => {
           correctness: { model: 'workhorse:mid' },
           performance: { model: 'workhorse:mid' },
           requirements: { model: 'workhorse:mid' },
-          synthesis: { model: 'workhorse:expensive' },
         },
       },
       test: { model: 'workhorse:mid' },
@@ -851,7 +849,7 @@ describe('validateSettingsApi', () => {
     roles: {
       plan: { model: 'workhorse:expensive' },
       work: { model: 'workhorse:mid' },
-      review: { model: 'workhorse:expensive', sub: { security: { model: 'claude-opus-4-7' }, correctness: { model: 'claude-haiku-4-5' }, synthesis: { model: 'workhorse:expensive' } } },
+      review: { model: 'workhorse:expensive', sub: { security: { model: 'claude-opus-4-7' }, correctness: { model: 'claude-haiku-4-5' } } },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
       flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
@@ -900,6 +898,20 @@ describe('validateSettingsApi', () => {
       roles: {
         ...validSettings.roles,
         work: { model: 'workhorse:mid', sub: { inspect: { model: 'parent' }, 'inspect-deep': { model: 'parent' } } },
+      },
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('accepts, and ignores, the retired review.synthesis sub-role (#4131)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        review: { model: 'workhorse:expensive', sub: { synthesis: { model: 'workhorse:expensive' } } },
       },
     });
 
