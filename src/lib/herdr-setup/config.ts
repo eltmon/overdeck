@@ -67,18 +67,6 @@ export function herdrConfigPath(deps: {
 }
 
 /**
- * Pure: the text with `[session] resume_agents_on_restore = false`, touching
- * nothing else. Returns the input unchanged when it already says so. Throws
- * `HerdrConfigEditError` when no safe edit exists.
- */
-export function setResumeAgentsOnRestore(text: string): string {
-  const plan = planResumeAgentsOnRestore(text);
-  if (plan.kind === 'unchanged') return text;
-  if (plan.kind === 'edited') return plan.text;
-  throw new HerdrConfigEditError('config.toml', plan.reason, plan.hint);
-}
-
-/**
  * True only when the file says `[session] resume_agents_on_restore = false`.
  * A file Overdeck's parser cannot read counts only when its one key line reads
  * exactly `false` AND `herdrAccepts` (`herdr config check`) passes.

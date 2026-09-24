@@ -589,6 +589,7 @@ export function registerInFlightForkPipeline(pipeline: Promise<void>): Promise<v
   return tracked;
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function getInFlightForkPipelineCount(): number {
   return inFlightForkPipelines.size;
 }

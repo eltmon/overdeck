@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { renderPrompt, loadPromptFrontmatter, PromptError } from '../prompts.js';
+import { renderPrompt, PromptError } from '../prompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const PROMPTS_DIR = join(dirname(__filename), '..', 'prompts');
@@ -40,11 +40,14 @@ optional:
 ---
 Issue: {{ISSUE_ID}}`
         );
-        const fm = yield* loadPromptFrontmatter(SCRATCH);
-        expect(fm.name).toBe('scratch');
-        expect(fm.description).toBe('A scratch template for tests');
-        expect(fm.requires).toEqual(['ISSUE_ID']);
-        expect(fm.optional).toEqual(['LOCAL', 'REMOTE']);
+        // The frontmatter is observable through renderPrompt: `requires` makes ISSUE_ID
+        // mandatory, and `requires` + `optional` are the only variables it accepts.
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-1', LOCAL: 'l', REMOTE: 'r' } });
+        expect(out).toBe('Issue: PAN-1');
+        const missing = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: { LOCAL: 'l' } }));
+        expect(missing.message).toMatch(/requires variables that are missing: ISSUE_ID/);
+        const unknown = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-1', OTHER: 'x' } }));
+        expect(unknown.message).toMatch(/unknown variables: OTHER/);
       })
     );
 
@@ -57,16 +60,17 @@ description: minimal
 ---
 hello`
         );
-        const fm = yield* loadPromptFrontmatter(SCRATCH);
-        expect(fm.requires).toEqual([]);
-        expect(fm.optional).toEqual([]);
+        // No requires/optional: renders with no variables and accepts none.
+        expect(yield* renderPrompt({ name: SCRATCH, vars: {} })).toBe('hello');
+        const unknown = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: { ANY: 'x' } }));
+        expect(unknown.message).toMatch(/unknown variables: ANY/);
       })
     );
 
     it.effect('fails when frontmatter is missing entirely', () =>
       Effect.gen(function* () {
         writeScratch('hello world');
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err).toBeInstanceOf(PromptError);
         expect(err.message).toMatch(/missing YAML frontmatter/);
       })
@@ -80,7 +84,7 @@ description: no name
 ---
 body`
         );
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err.message).toMatch(/missing required field "name"/);
       })
     );
@@ -93,7 +97,7 @@ name: scratch
 ---
 body`
         );
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err.message).toMatch(/missing required field "description"/);
       })
     );
@@ -109,7 +113,7 @@ requires:
 ---
 body`
         );
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err.message).toMatch(/"requires" must be a list of strings/);
       })
     );
@@ -124,14 +128,14 @@ optional: [unclosed
 ---
 body`
         );
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err.message).toMatch(/invalid YAML frontmatter/);
       })
     );
 
     it.effect('fails when template file is missing', () =>
       Effect.gen(function* () {
-        const err = yield* Effect.flip(loadPromptFrontmatter('definitely-not-a-real-template'));
+        const err = yield* Effect.flip(renderPrompt({ name: 'definitely-not-a-real-template', vars: {} }));
         expect(err.message).toMatch(/Failed to load prompt template/);
       })
     );

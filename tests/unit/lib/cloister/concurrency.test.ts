@@ -8,7 +8,6 @@ vi.mock('../../../../src/lib/cloister/memory-verdict-cache.js', () => ({
 
 import {
   canDispatchAdvancing,
-  tryReserveAdvancingSlot,
   resetPatrolDispatchBudget,
   type ConcurrencyLimits,
   type RunningCounts,
@@ -30,22 +29,12 @@ describe('canDispatchAdvancing / tryReserveAdvancingSlot — memory gate (PAN-25
     getCachedMemoryVerdictMock.mockReturnValue(null);
   });
 
-  it('withholds dispatch when the cached band is soft, even though a count slot is free (PRD AC-5)', () => {
-    getCachedMemoryVerdictMock.mockReturnValue({ band: 'soft', availableBytes: 3 * GIB, thresholds: { warningBytes: 8 * GIB, criticalBytes: 4 * GIB } });
-    expect(canDispatchAdvancing(countsWithFreeSlot, limits)).toBe(false);
-    expect(tryReserveAdvancingSlot(countsWithFreeSlot, limits)).toBe(false);
-  });
 
   it('withholds dispatch when the cached band is hard', () => {
     getCachedMemoryVerdictMock.mockReturnValue({ band: 'hard', availableBytes: 1 * GIB, thresholds: { warningBytes: 8 * GIB, criticalBytes: 4 * GIB } });
     expect(canDispatchAdvancing(countsWithFreeSlot, limits)).toBe(false);
   });
 
-  it('proceeds with unchanged count-slot semantics when the cached band is ok', () => {
-    getCachedMemoryVerdictMock.mockReturnValue({ band: 'ok', availableBytes: 20 * GIB, thresholds: { warningBytes: 8 * GIB, criticalBytes: 4 * GIB } });
-    expect(canDispatchAdvancing(countsWithFreeSlot, limits)).toBe(true);
-    expect(tryReserveAdvancingSlot(countsWithFreeSlot, limits)).toBe(true);
-  });
 
   it('proceeds normally when no patrol has assessed memory yet (cached verdict null)', () => {
     getCachedMemoryVerdictMock.mockReturnValue(null);

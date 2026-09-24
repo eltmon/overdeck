@@ -84,24 +84,6 @@ export interface RunningCounts {
   total: number;
 }
 
-/**
- * Human-readable breakdown of what currently counts against the ceiling, for
- * deferral diagnostics (PAN-1716). Lists the offending session ids so a
- * starvation is diagnosable from the patrol log alone — the original livelock
- * (completed review/test sessions that never get reaped) is invisible from a
- * bare "ceiling reached" line.
- */
-export function describeRunningAgents(): string {
-  const alive = listRunningAgentsSync().filter(a => a.tmuxActive);
-  const swarm = alive.filter(a => a.role === 'work' && SWARM_SLOT_ID.test(a.id) && !isTerminalSwarmSlotAgent(a)).map(a => a.id);
-  const work = alive.filter(a => a.role === 'work' && !SWARM_SLOT_ID.test(a.id)).map(a => a.id);
-  const advancing = alive.filter(a => a.role && ADVANCING_ROLES.has(a.role)).map(a => a.id);
-  const warmIdle = countWarmIdleAdvancingAgents(alive);
-  const { totalCeiling } = getConcurrencyLimits();
-  return `counts: work=${work.length} advancing=${advancing.length} (warm-idle=${warmIdle}, excluded) swarm=${swarm.length} total=${work.length + Math.max(0, advancing.length - warmIdle)}/${totalCeiling}`
-    + ` | advancing=[${advancing.join(', ')}] work=[${work.join(', ')}] swarm=[${swarm.join(', ')}]`;
-}
-
 /** Count currently-running agents by role class.
  *
  * PAN-1908: the agents table is the authoritative runtime registry. Counts are
@@ -269,46 +251,23 @@ export function canDispatchAdvancing(
 }
 
 // ---------------------------------------------------------------------------
-// Per-patrol advancing-dispatch reservation
+// Swarm-dispatch reservation
 //
-// countRunningAgents() only sees tmux-alive sessions. Agents dispatched earlier
-// in the SAME patrol haven't registered a session yet, so several dispatch
-// functions (checkOrphanedReviewStatuses, checkMissingReviewStatuses,
-// checkPendingTestDispatch, checkPostReviewCommits) running back-to-back would
-// each see the stale low count and blow past the ceiling. runPatrol() resets
-// this counter at the top of every cycle; each dispatch site reserves a slot.
+// countRunningAgents() only sees live sessions. Slots dispatched earlier in the
+// same pass haven't registered a session yet, so each dispatch reserves one
+// here. Swarm dispatch runs from one-shot `pan swarm` processes, so the budget
+// starts at zero with each run.
 // ---------------------------------------------------------------------------
-let advancingReservedThisPatrol = 0;
-/** Dedicated per-patrol swarm-dispatch budget, isolated from advancing (PAN-2212). */
+/** Dedicated swarm-dispatch budget, isolated from advancing (PAN-2212). */
 let swarmReservedThisPatrol = 0;
 
-/** Reset the per-patrol dispatch budgets. Called once at patrol start. */
-export function resetPatrolDispatchBudget(): void {
-  advancingReservedThisPatrol = 0;
-  swarmReservedThisPatrol = 0;
-}
-
 /**
- * Claim one advancing-role (review/test/ship) dispatch slot for this patrol.
- * Returns false when the total ceiling is reached, or (PAN-2500 specialist-budget)
- * when the memory governor's cached band is not 'ok' — the caller must DEFER
- * (leave status untouched so a later patrol retries), never fail. Counts both
- * tmux-alive agents and advancing dispatches already reserved this patrol.
+ * Reset the swarm-dispatch budget.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function tryReserveAdvancingSlot(
-  counts: RunningCounts,
-  limits: ConcurrencyLimits = getConcurrencyLimits(),
-): boolean {
-  const verdict = getCachedMemoryVerdict();
-  if (verdict && verdict.band !== 'ok') return false;
-  if (counts.total + advancingReservedThisPatrol >= limits.totalCeiling) return false;
-  advancingReservedThisPatrol++;
-  return true;
-}
-
-/** Release a same-patrol advancing reservation when dispatch was calmly gated. */
-export function releaseAdvancingSlot(): void {
-  advancingReservedThisPatrol = Math.max(0, advancingReservedThisPatrol - 1);
+export function resetPatrolDispatchBudget(): void {
+  swarmReservedThisPatrol = 0;
 }
 
 /**

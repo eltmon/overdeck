@@ -159,6 +159,8 @@ function checkDailyReset(): void {
  * @param agentId - Agent ID
  * @param cost - Cost in USD
  * @param issueId - Optional issue ID
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function recordCostSync(agentId: string, cost: number, issueId?: string): void {
   checkDailyReset();
@@ -298,6 +300,8 @@ export function checkCostLimits(
  *
  * @param agentId - Agent ID
  * @returns Current cost
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function getAgentCost(agentId: string): number {
   return costData.perAgent.get(agentId) || 0;
@@ -308,6 +312,8 @@ export function getAgentCost(agentId: string): number {
  *
  * @param issueId - Issue ID
  * @returns Current cost
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function getIssueCost(issueId: string): number {
   return costData.perIssue.get(issueId) || 0;
@@ -317,6 +323,8 @@ export function getIssueCost(issueId: string): number {
  * Get current daily total cost
  *
  * @returns Current daily total
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function getDailyTotal(): number {
   checkDailyReset();

@@ -1,18 +1,44 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  ModelProvider,
-  getModelProviderSync,
-  requiresExternalKeySync,
-  getModelsByProviderSync,
-  isProviderEnabled,
-  applyFallbackSync,
-  getFallbackModelSync,
-  detectEnabledProvidersSync,
-  filterAvailableModelsSync,
-  getAvailableModelsSync,
-} from '../../src/lib/model-fallback.js';
+import { ModelProvider, getModelProviderSync, getModelsByProviderSync, isProviderEnabled, applyFallbackSync, getFallbackModelSync, getAvailableModelsSync  } from '../../src/lib/model-fallback.js';
 import { ModelId } from '../../src/lib/settings.js';
-import { hasModelCapabilitySync, getModelCapabilitySync, getModelEffortLevelsSync, modelSupportsEffortSync, MODEL_CAPABILITIES, modelSupportsImagesSync } from '../../src/lib/model-capabilities.js';
+import { hasModelCapabilitySync, getModelCapabilitySync, getModelEffortLevelsSync, MODEL_CAPABILITIES, modelSupportsImagesSync } from '../../src/lib/model-capabilities.js';
+import type { EffortLevel } from '../../src/lib/model-capability-types.js';
+
+// Moved here from src/lib/model-fallback.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Filter a list of models to only those available with enabled providers
+ *
+ * @param models List of models to filter
+ * @param enabledProviders Set of enabled provider names
+ * @returns Filtered list of models
+ */
+function filterAvailableModelsSync(
+  models: ModelId[],
+  enabledProviders: Set<ModelProvider>
+): ModelId[] {
+  return models.filter((modelId) => {
+    const provider = getModelProviderSync(modelId);
+    return isProviderEnabled(provider, enabledProviders);
+  });
+}
+
+// Moved here from src/lib/model-fallback.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Check if a model requires an external API key
+ */
+function requiresExternalKeySync(modelId: ModelId | string): boolean {
+  return getModelProviderSync(modelId) !== 'anthropic';
+}
+
+// Moved here from src/lib/model-capabilities.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Whether a model accepts the given effort level. Returns true when the model
+ * has no enumerated effort levels (permissive fallback — see {@link getModelEffortLevelsSync}).
+ */
+function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
+  const levels = getModelEffortLevelsSync(model);
+  return levels === undefined || levels.length === 0 || levels.includes(effort);
+}
 
 describe('model-fallback', () => {
   // Spy on console.warn to test warning logs
@@ -273,61 +299,6 @@ describe('model-fallback', () => {
     });
   });
 
-  describe('detectEnabledProviders', () => {
-    it('should always include Anthropic', () => {
-      const enabled = detectEnabledProvidersSync({});
-      expect(enabled.has('anthropic')).toBe(true);
-    });
-
-    it('should detect OpenAI when key present', () => {
-      const enabled = detectEnabledProvidersSync({ openai: 'sk-test' });
-      expect(enabled.has('openai')).toBe(true);
-    });
-
-    it('should detect Google when key present', () => {
-      const enabled = detectEnabledProvidersSync({ google: 'test-key' });
-      expect(enabled.has('google')).toBe(true);
-    });
-
-    it('should detect Nous Portal when key present', () => {
-      const enabled = detectEnabledProvidersSync({ nous: 'nous-key' });
-      expect(enabled.has('nous')).toBe(true);
-    });
-
-    it('should detect multiple providers', () => {
-      const enabled = detectEnabledProvidersSync({
-        openai: 'sk-test',
-        google: 'test-key',
-      });
-
-      expect(enabled.size).toBe(3); // anthropic + 2 others
-      expect(enabled.has('anthropic')).toBe(true);
-      expect(enabled.has('openai')).toBe(true);
-      expect(enabled.has('google')).toBe(true);
-    });
-
-    it('should ignore empty strings', () => {
-      const enabled = detectEnabledProvidersSync({
-        openai: '',
-        google: '  ',
-      });
-
-      expect(enabled.size).toBe(1); // Only anthropic
-      expect(enabled.has('anthropic')).toBe(true);
-      expect(enabled.has('openai')).toBe(false);
-      expect(enabled.has('google')).toBe(false);
-    });
-
-    it('should handle undefined values', () => {
-      const enabled = detectEnabledProvidersSync({
-        openai: undefined,
-        google: undefined,
-      });
-
-      expect(enabled.size).toBe(1); // Only anthropic
-      expect(enabled.has('anthropic')).toBe(true);
-    });
-  });
 
   describe('filterAvailableModels', () => {
     it('should include Anthropic models when only Anthropic enabled', () => {
@@ -633,10 +604,6 @@ describe('model-fallback', () => {
       expect(getModelProviderSync('ql-future-model')).toBe('quantumllama');
     });
 
-    it('detectEnabledProviders enables quantumllama from its API key', () => {
-      const enabled = detectEnabledProvidersSync({ quantumllama: 'test-key' });
-      expect(enabled.has('quantumllama')).toBe(true);
-    });
 
     it('getAvailableModels includes ql-* models only when quantumllama is enabled', () => {
       const withQl = getAvailableModelsSync(new Set<ModelProvider>(['anthropic', 'quantumllama']));

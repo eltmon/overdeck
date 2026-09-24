@@ -114,21 +114,6 @@ export function isExternalAgentDirectory(name: string): boolean {
   return name.startsWith('ext-');
 }
 
-/**
- * Extract the issue ID from a planning-* directory name.
- * Returns null if the name is not a planning directory or the issue ID is invalid.
- */
-export function getPlanningIssueId(name: string): string | null {
-  const match = name.match(/^planning-(.+)$/);
-  if (!match) return null;
-
-  const issueId = match[1]!;
-  if (issueId !== issueId.toLowerCase()) return null;
-  if (parseIssueIdSync(issueId) === null) return null;
-
-  return issueId;
-}
-
 export function getAgentDirectoryIssueId(name: string): string | null {
   const match = name.match(/^(?:agent|planning)-(.+)$/);
   if (!match) return null;

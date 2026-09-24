@@ -70,7 +70,6 @@ vi.mock('../../paths.js', async (importOriginal) => {
 });
 
 vi.mock('../monitor-transport.js', () => ({
-  isMonitorLive: vi.fn(() => false),
   formatMailFileContent: vi.fn(
     (body: string, source: string, date: Date) =>
       `# Message\n\nsource: ${source}\ndate: ${date.toISOString()}\n\n${body}\n`,

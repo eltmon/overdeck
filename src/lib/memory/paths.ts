@@ -33,15 +33,6 @@ export function resolveWorkspaceMemoryRoot(projectId: string, workspaceId: strin
   return assertUnderMemoryBase(path);
 }
 
-/**
- * @deprecated Memory storage is keyed by workspaceId (see resolveWorkspaceMemoryRoot).
- * Retained only for the memory-paths-rekey migration path (reading pre-rekey layouts).
- */
-export function resolveIssueMemoryRoot(projectId: string, issueId: string): string {
-  const path = join(resolveMemoryRoot(projectId), assertMemorySafeSegment(issueId, 'issueId'));
-  return assertUnderMemoryBase(path);
-}
-
 export function resolveObservationsFile(projectId: string, workspaceId: string, date: string | Date | number): string {
   return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'observations', `${dateKey(date)}.jsonl`);
 }
@@ -64,10 +55,6 @@ export function resolveSummariesDir(projectId: string, workspaceId: string): str
 
 export function resolveRagRunsFile(projectId: string, workspaceId: string, date: string | Date | number): string {
   return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'rag-runs', `${dateKey(date)}.jsonl`);
-}
-
-export function resolveCheckpointFile(workspacePath: string): string {
-  return join(workspacePath, '.pan', 'memory-checkpoint.json');
 }
 
 export function resolveFtsDbPath(projectId: string): string {

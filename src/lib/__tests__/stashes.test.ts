@@ -11,8 +11,6 @@ import {
   buildStashMessage,
   createRecoveryBranchFromStash,
   dropStash,
-  getNextReviewTempSequence,
-  isOlderThanDays,
   isSalvageableStash,
   listStashes,
   parseCanonicalStashMessage,
@@ -118,13 +116,6 @@ describe('stashes', () => {
     });
   });
 
-  it('computes next review-temp sequence for an issue', () => {
-    expect(getNextReviewTempSequence([
-      { ref: 'stash@{0}', kind: 'review-temp', issueId: 'PAN-879', message: 'review-temp:PAN-879:2', sequence: 2 },
-      { ref: 'stash@{1}', kind: 'review-temp', issueId: 'PAN-879', message: 'review-temp:PAN-879:4', sequence: 4 },
-      { ref: 'stash@{2}', kind: 'review-temp', issueId: 'PAN-880', message: 'review-temp:PAN-880:9', sequence: 9 },
-    ] as any, 'pan-879')).toBe(5);
-  });
 
   it('lists stashes with stable refs and stack refs', async () => {
     mockExecImplementation((cmd) => {
@@ -214,9 +205,4 @@ describe('stashes', () => {
     expect(isSalvageableStash(unknown)).toBe(false);
   });
 
-  it('identifies stale timed stashes by age', () => {
-    const stash = parseCanonicalStashMessage('pre-merge:PAN-879:2026-03-01T00:00:00Z');
-    expect(isOlderThanDays(stash, 28, new Date('2026-04-27T00:00:00Z'))).toBe(true);
-    expect(isOlderThanDays(stash, 80, new Date('2026-04-27T00:00:00Z'))).toBe(false);
-  });
 });

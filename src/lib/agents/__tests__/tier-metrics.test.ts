@@ -1,14 +1,25 @@
-import { mkdtemp, rm } from 'fs/promises';
+import { mkdtemp, rm, readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  computeWarmHitFractions,
-  deriveTieredAgentCostRole,
-  recordTierFeedDelivery,
-  readTierFeedDeliveries,
-  type TierFeedDeliveryMetric,
-} from '../tier-metrics.js';
+import { deriveTieredAgentCostRole, recordTierFeedDelivery, type TierFeedDeliveryMetric, tierFeedDeliveriesPath  } from '../tier-metrics.js';
+
+// Moved here from src/lib/agents/tier-metrics.ts, which no production code called (PAN-3958 CH-8).
+async function readTierFeedDeliveries(
+  options: { overdeckHome?: string } = {},
+): Promise<TierFeedDeliveryMetric[]> {
+  let body: string;
+  try {
+    body = await readFile(tierFeedDeliveriesPath(options.overdeckHome), 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw err;
+  }
+  return body
+    .split('\n')
+    .filter(line => line.trim().length > 0)
+    .map(line => JSON.parse(line) as TierFeedDeliveryMetric);
+}
 
 let tempDir: string | undefined;
 
@@ -48,31 +59,6 @@ describe('tier metrics', () => {
     ]);
   });
 
-  it('computes warm-hit fraction from delivery-to-delivery gaps under 300 seconds per agent', () => {
-    const fractions = computeWarmHitFractions([
-      metric('agent-pan-1-slot-1', '2026-07-02T12:00:00.000Z'),
-      metric('agent-pan-1-slot-1', '2026-07-02T12:04:59.000Z'),
-      metric('agent-pan-1-slot-1', '2026-07-02T12:10:00.000Z'),
-      metric('agent-pan-1-slot-2', '2026-07-02T12:00:00.000Z'),
-    ]);
-
-    expect(fractions).toEqual([
-      {
-        agentId: 'agent-pan-1-slot-1',
-        deliveryCount: 3,
-        measuredGapCount: 2,
-        warmHitCount: 1,
-        warmHitFraction: 0.5,
-      },
-      {
-        agentId: 'agent-pan-1-slot-2',
-        deliveryCount: 1,
-        measuredGapCount: 0,
-        warmHitCount: 0,
-        warmHitFraction: 0,
-      },
-    ]);
-  });
 
   it('derives tiered execution cost roles from registered agent ids', () => {
     expect(deriveTieredAgentCostRole('agent-pan-1', 'PAN-1')).toBe('foreman');

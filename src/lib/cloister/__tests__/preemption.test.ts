@@ -2,9 +2,9 @@
  * PAN-2507 preemptive scheduler — unit tests for the yield mechanic.
  *
  * `selectYieldVictim` is pure (time injected as a param), so its cooldown test
- * needs no timers. `yieldWorkAgentFor` / `resumeYieldedAgents` are covered with
- * mocked dependencies; the cooldown behavior is exercised through the pure
- * selector with an injected `nowMs` (NFR-2: no real wall-clock delays).
+ * needs no timers. `resumeYieldedAgents` is covered with mocked dependencies;
+ * the cooldown behavior is exercised through the pure selector with an injected
+ * `nowMs` (NFR-2: no real wall-clock delays).
  */
 
 import { Effect } from 'effect';
@@ -12,9 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   selectYieldVictim,
-  yieldWorkAgentFor,
   resumeYieldedAgents,
-  tryYieldForAdvancingDispatch,
   type YieldCandidate,
 } from '../preemption.js';
 
@@ -32,7 +30,6 @@ const mocks = vi.hoisted(() => ({
   assessMemoryPressure: vi.fn(),
   emitActivityEntrySync: vi.fn(),
   logDeaconEventSync: vi.fn(),
-  tryReserveAdvancingSlot: vi.fn(),
   countRunningAgents: vi.fn(async () => ({ work: 0, advancing: 0, swarm: 0, total: 0 })),
 }));
 
@@ -77,7 +74,6 @@ vi.mock('../memory-governor.js', () => ({
 }));
 
 vi.mock('../concurrency.js', () => ({
-  tryReserveAdvancingSlot: mocks.tryReserveAdvancingSlot,
   // PAN-3917: the running count is read from the selected backend's inventory,
   // so it is async and preemption awaits it before reserving.
   countRunningAgents: mocks.countRunningAgents,
@@ -150,102 +146,7 @@ describe('selectYieldVictim (pure predicate + ordering)', () => {
   });
 });
 
-describe('yieldWorkAgentFor', () => {
-  it('is a no-op when preemption is disabled', async () => {
-    mocks.loadCloisterConfigSync.mockReturnValue({ concurrency: { preemption: false } });
-    const outcome = await yieldWorkAgentFor('review', 'PAN-5678');
-    expect(outcome.yielded).toBe(false);
-    expect(mocks.setAgentYieldedSync).not.toHaveBeenCalled();
-    expect(mocks.stopAgent).not.toHaveBeenCalled();
-  });
 
-  it('refuses to yield beyond max_yielded', async () => {
-    mocks.listAgentStates.mockReturnValue([
-      { id: 'y1', yieldedByScheduler: true },
-      { id: 'y2', yieldedByScheduler: true },
-      { id: 'y3', yieldedByScheduler: true },
-    ]);
-    const outcome = await yieldWorkAgentFor('review', 'PAN-5678');
-    expect(outcome.yielded).toBe(false);
-    expect(outcome.reason).toContain('max_yielded');
-    expect(mocks.setAgentYieldedSync).not.toHaveBeenCalled();
-  });
-
-  it('yields an idle work agent, pauses+stops it, and emits observability', async () => {
-    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
-      { id: 'agent-pan-1000', issueId: 'PAN-1000', role: 'work', status: 'running', lastActivity: '2026-07-08T00:00:00.000Z' },
-    ]));
-    mocks.isAgentIdleForNudge.mockReturnValue(true);
-
-    const outcome = await yieldWorkAgentFor('review', 'PAN-5678');
-
-    expect(outcome.yielded).toBe(true);
-    expect(outcome.victimId).toBe('agent-pan-1000');
-    expect(mocks.setAgentYieldedSync).toHaveBeenCalledWith(
-      'agent-pan-1000',
-      'yield: making room for review of PAN-5678',
-    );
-    expect(mocks.stopAgent).toHaveBeenCalledWith('agent-pan-1000');
-    // FR-8: a plain-sentence activity entry naming both issues.
-    const activity = mocks.emitActivityEntrySync.mock.calls[0][0];
-    expect(activity.message).toContain('agent-pan-1000');
-    expect(activity.message).toContain('review for PAN-5678');
-  });
-
-  it('does not yield when no running work agent is idle', async () => {
-    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
-      { id: 'agent-pan-1000', issueId: 'PAN-1000', role: 'work', status: 'running', lastActivity: '2026-07-08T00:00:00.000Z' },
-    ]));
-    mocks.isAgentIdleForNudge.mockReturnValue(false);
-
-    const outcome = await yieldWorkAgentFor('review', 'PAN-5678');
-    expect(outcome.yielded).toBe(false);
-    expect(mocks.setAgentYieldedSync).not.toHaveBeenCalled();
-  });
-});
-
-describe('tryYieldForAdvancingDispatch', () => {
-  beforeEach(() => {
-    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
-      { id: 'agent-pan-1000', issueId: 'PAN-1000', role: 'work', status: 'running', lastActivity: '2026-07-08T00:00:00.000Z' },
-    ]));
-    mocks.isAgentIdleForNudge.mockReturnValue(true);
-  });
-
-  it('returns false without yielding when no victim is available', async () => {
-    mocks.isAgentIdleForNudge.mockReturnValue(false);
-    const ok = await tryYieldForAdvancingDispatch('review', 'PAN-5678');
-    expect(ok).toBe(false);
-    expect(mocks.tryReserveAdvancingSlot).not.toHaveBeenCalled();
-  });
-
-  it('returns true immediately when the freed slot lets the count-gated retry reserve', async () => {
-    mocks.tryReserveAdvancingSlot.mockReturnValueOnce(true);
-    const ok = await tryYieldForAdvancingDispatch('review', 'PAN-5678');
-    expect(ok).toBe(true);
-    expect(mocks.stopAgent).toHaveBeenCalledWith('agent-pan-1000');
-    expect(mocks.assessMemoryPressure).not.toHaveBeenCalled();
-    expect(mocks.clearYieldForResumeSync).not.toHaveBeenCalled();
-  });
-
-  it('resumes the victim (FR-6c) and returns false when the retry still fails', async () => {
-    // Both reservation attempts fail ⇒ settle path runs (fake timers).
-    vi.useFakeTimers();
-    try {
-      mocks.tryReserveAdvancingSlot.mockReturnValue(false);
-      const pending = tryYieldForAdvancingDispatch('review', 'PAN-5678');
-      await vi.runAllTimersAsync();
-      const ok = await pending;
-      expect(ok).toBe(false);
-      expect(mocks.assessMemoryPressure).toHaveBeenCalled();
-      // FR-6c: victim put back.
-      expect(mocks.clearYieldForResumeSync).toHaveBeenCalledWith('agent-pan-1000');
-      expect(mocks.resumeAgent).toHaveBeenCalledWith('agent-pan-1000');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
 
 describe('resumeYieldedAgents', () => {
   it('resumes yielded agents oldest-first, clearing yield + stamping cooldown', async () => {

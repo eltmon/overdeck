@@ -540,6 +540,7 @@ function getOverdeckDatabaseReadOnlySync(dbPath: string): SqliteDatabase {
   return db;
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function closeOverdeckDatabaseSync(): void {
   overdeckDbSync?.db.close();
   overdeckDbSync = null;

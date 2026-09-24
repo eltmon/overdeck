@@ -1,8 +1,7 @@
-import { Context, Effect, Layer, Schema, Stream } from 'effect';
+import { Context, Effect, Schema, Stream } from 'effect';
 import * as Rpc from 'effect/unstable/rpc/Rpc';
 import * as RpcGroup from 'effect/unstable/rpc/RpcGroup';
 
-import { EventBus, type StoredOverdeckEvent } from './infra.js';
 import { Issue } from './issues.js';
 import { Agent } from './agents.js';
 
@@ -58,56 +57,9 @@ export class Observability extends Context.Service<Observability, ObservabilityS
   'overdeck/Observability',
 ) {}
 
-function toDomainEvent(event: StoredOverdeckEvent): DomainEvent {
-  return {
-    sequence: event.sequence,
-    type: event.type,
-    timestamp: event.timestamp,
-    payload: event.payload,
-  };
-}
-
 export interface ObservabilityLiveOptions {
   readonly oldestRetainedSequence?: number;
 }
-
-export function makeObservabilityLive(options: ObservabilityLiveOptions = {}): Layer.Layer<Observability, never, EventBus> {
-  const oldestRetainedSequence = options.oldestRetainedSequence ?? 0;
-  const minimumReplayFromSequence = Math.max(0, oldestRetainedSequence - 1);
-
-  return Layer.effect(
-    Observability,
-    Effect.gen(function* () {
-      const bus = yield* EventBus;
-
-      return Observability.of({
-        getSnapshot: bus.getLatestSequence.pipe(
-          Effect.map((sequence) => ({
-            sequence,
-            generatedAt: new Date(),
-          })),
-        ),
-        subscribeDomainEvents: bus.stream.pipe(Stream.map(toDomainEvent)),
-        replayEvents: (fromSequence) =>
-          fromSequence < minimumReplayFromSequence
-            ? bus.getLatestSequence.pipe(
-              Effect.flatMap((snapshotSequence) =>
-                Effect.fail(new SnapshotRequired({
-                  requestedFromSequence: fromSequence,
-                  snapshotSequence,
-                  message: 'Replay offset predates retained events; refresh the snapshot before replaying.',
-                })),
-              ),
-            )
-            : bus.readFrom(fromSequence).pipe(
-              Effect.map((events) => events.map(toDomainEvent)),
-            ),
-      });
-    }),
-  );
-}
-
-export const ObservabilityLive = makeObservabilityLive();
 
 export const GetSnapshotRpc = Rpc.make('pan.getSnapshot', {
   payload: Schema.Struct({}),

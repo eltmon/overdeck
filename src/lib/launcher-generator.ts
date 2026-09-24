@@ -490,19 +490,6 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   return script;
 }
 
-/**
- * Generate the outer `script -qfaec` wrapper for launchers that need tty logging.
- * Returns null if useScriptWrapper is false.
- */
-export function generateLauncherWrapperSync(config: LauncherConfig): string | null {
-  if (!config.useScriptWrapper || !config.scriptLogFile) {
-    return null;
-  }
-
-  const inner = (config.innerScriptPath ?? `${config.workingDir}/run-claude.sh`).replace(/'/g, "'\\'");
-  return `#!/bin/bash\nexec script -qfaec "bash '${inner}'" ${shellQuote(config.scriptLogFile)}\n`;
-}
-
 /** Env vars that may leak from a parent tmux server and must be unset. */
 const PROVIDER_ENV_UNSETS = [
   'ANTHROPIC_API_KEY',

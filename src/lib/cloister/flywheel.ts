@@ -19,8 +19,6 @@ import type { OrderBook } from '@overdeck/contracts';
 
 import { listBooks } from '../orders/resolver.js';
 
-export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
-
 export interface ActiveOrderBookIssuesDeps {
   planHome?: (projectRoot: string) => string | null;
   listBooks?: typeof listBooks;

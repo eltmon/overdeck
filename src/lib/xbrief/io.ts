@@ -32,7 +32,7 @@
  * Do not add new synchronous callers; server-reachable code uses the async variants.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
@@ -41,7 +41,7 @@ import { getProjectPanPaths } from '../pan-dir/specs.js';
 import { resolvePlanHome } from '../pan-dir/paths.js';
 import { parseXBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
-import { subItemsOf, type XBriefDifficulty, type XBriefDocument, type XBriefInfo, type XBriefItemStatus } from './types.js';
+import { subItemsOf, type XBriefDocument, type XBriefInfo, type XBriefItemStatus } from './types.js';
 import {
   readItemStatuses,
   readItemStatusesAsync,
@@ -342,49 +342,6 @@ export function readTierOverrides(workspacePath: string): TierOverridesMap {
   }
 }
 
-export function recordTierPromotion(
-  workspacePath: string,
-  itemId: string,
-  from: XBriefDifficulty,
-  to: XBriefDifficulty,
-  reason: string,
-): void {
-  const path = workspaceContinuePath(workspacePath);
-  const readablePath = readableWorkspaceContinuePath(workspacePath);
-  let state: Record<string, unknown> = {};
-  try {
-    state = JSON.parse(readFileSync(readablePath, 'utf-8')) as Record<string, unknown>;
-  } catch {
-    state = {};
-  }
-
-  const current = (state.tierOverrides && typeof state.tierOverrides === 'object')
-    ? state.tierOverrides as TierOverridesMap
-    : {};
-  const existing = current[itemId];
-  const nextOverrides: TierOverridesMap = {
-    ...current,
-    [itemId]: {
-      effectiveDifficulty: to,
-      promotions: (existing?.promotions ?? 0) + 1,
-      history: [
-        ...(existing?.history ?? []),
-        { at: new Date().toISOString(), from, to, reason },
-      ],
-    },
-  };
-
-  // A promotion moves the item to a new tier, so its retry count at the old
-  // tier is discarded (PAN-3858).
-  const currentRetries = (state.tierRetries && typeof state.tierRetries === 'object')
-    ? { ...(state.tierRetries as TierRetriesMap) }
-    : {};
-  delete currentRetries[itemId];
-
-  mkdirSync(getWorkspacePanPaths(workspacePath).panDir, { recursive: true });
-  writeFileSync(path, JSON.stringify({ ...state, tierOverrides: nextOverrides, tierRetries: currentRetries }, null, 2), 'utf-8');
-}
-
 /**
  * PAN-2401: overlay the continue file's item statuses onto an already-loaded
  * plan document. The single overlay door for read paths that resolve the spec
@@ -417,35 +374,6 @@ export function readWorkspacePlanSync(workspacePath: string): XBriefDocument | n
  * written) and 'cancelled' (abandoned).
  */
 const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
-
-/**
- * Check whether planning has reached the "proposed" state for this workspace.
- *
- * Returns true ONLY when `plan.status === 'proposed'`. Used to gate the
- * dashboard Done button which should hide once the user has approved the plan
- * (status moves out of 'proposed').
- */
-export function isPlanningProposed(workspacePath: string, planningDir?: string): boolean {
-  return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
-}
-
-function checkPlanStatus(
-  workspacePath: string,
-  _planningDir: string | undefined,
-  matchStatus: (status: string) => boolean,
-): boolean {
-  const planPath = findPlanSync(workspacePath);
-  if (!planPath) return false;
-  try {
-    const doc = readPlanSync(planPath);
-    const status = doc.plan?.status;
-    if (status && matchStatus(status)) return true;
-    if (status) return false;
-  } catch {
-    // Corrupt / unreadable plan
-  }
-  return false;
-}
 
 
 /**

@@ -1,11 +1,9 @@
 /** Cloister status and health snapshot seam. */
 import { Effect } from 'effect';
 import type { CloisterConfig } from './config.js';
-import { getDeaconLiteStatus, type DeaconLiteStatus } from './deacon-lite.js';
+import { type DeaconLiteStatus } from './deacon-lite.js';
 import {
   getAgentHealth,
-  generateHealthSummary,
-  getAgentsNeedingAttention,
   type AgentHealth,
   type HealthSummary,
 } from './health.js';
@@ -26,57 +24,9 @@ export interface CloisterStatus {
 }
 
 export interface StatusHost {
-  statusCache: CloisterStatus | null;
-  statusCacheAt: number;
-  statusCacheTtlMs: number;
   lastCheck: Date | null;
   config: CloisterConfig;
   isRunning(): boolean;
-}
-
-/**
- * Get current status
- *
- * Uses a 3-second TTL cache for repeated dashboard polls: the computation
- * lists running agents and reads every agent's health, which scales poorly
- * with agent count.
- */
-export async function getStatus(host: StatusHost): Promise<CloisterStatus> {
-  const now = Date.now();
-  if (host.statusCache && now - host.statusCacheAt < host.statusCacheTtlMs) {
-    return host.statusCache;
-  }
-
-  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
-  const agentIds = runningAgents.map((a) => a.id);
-
-  const agentHealths: AgentHealth[] = [];
-
-  for (const agentId of agentIds) {
-    const runtime = getRuntimeForAgent(agentId);
-    if (runtime) {
-      const health = getAgentHealth(agentId, runtime);
-      agentHealths.push(health);
-    }
-  }
-
-  const summary = generateHealthSummary(agentHealths);
-  const needsAttention = getAgentsNeedingAttention(agentHealths).map((h) => h.agentId);
-
-  const patrol = getDeaconLiteStatus();
-
-  const status: CloisterStatus = {
-    running: host.isRunning(),
-    lastCheck: host.lastCheck,
-    config: host.config,
-    summary,
-    agentsNeedingAttention: needsAttention,
-    patrol,
-  };
-
-  host.statusCache = status;
-  host.statusCacheAt = now;
-  return status;
 }
 
 /**

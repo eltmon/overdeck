@@ -9,11 +9,8 @@ import {
   drainMailOnce,
   formatAgentMessageBlock,
   formatMailFileContent,
-  isMonitorLive,
   listInboxMessagesSync,
-  MONITOR_PRESENCE_FRESHNESS_MS,
   parseMailFile,
-  writeMonitorPresence,
 } from '../monitor-transport.js';
 
 const AGENT_ID = 'agent-pan-test';
@@ -66,33 +63,6 @@ describe('formatAgentMessageBlock', () => {
   });
 });
 
-describe('isMonitorLive', () => {
-  it('is live with a fresh heartbeat and a live pid', () => {
-    const now = new Date('2026-07-24T12:00:00.000Z');
-    writeMonitorPresence(AGENT_ID, process.pid, now, now);
-    expect(isMonitorLive(AGENT_ID, now.getTime())).toBe(true);
-  });
-
-  it('is dead when the heartbeat exceeds the freshness window', () => {
-    const beat = new Date('2026-07-24T12:00:00.000Z');
-    writeMonitorPresence(AGENT_ID, process.pid, beat, beat);
-    const later = beat.getTime() + MONITOR_PRESENCE_FRESHNESS_MS + 1;
-    expect(isMonitorLive(AGENT_ID, later)).toBe(false);
-  });
-
-  it('is dead when the pid is gone', () => {
-    const now = new Date('2026-07-24T12:00:00.000Z');
-    writeMonitorPresence(AGENT_ID, process.pid, now, now);
-    vi.spyOn(process, 'kill').mockImplementation(() => {
-      throw new Error('ESRCH');
-    });
-    expect(isMonitorLive(AGENT_ID, now.getTime())).toBe(false);
-  });
-
-  it('is dead with no presence file', () => {
-    expect(isMonitorLive(AGENT_ID, Date.now())).toBe(false);
-  });
-});
 
 describe('drainMailOnce', () => {
   it('emits plain mail oldest-first, moves it to read/, and skips pending/json', async () => {

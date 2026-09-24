@@ -63,7 +63,7 @@ src/dashboard/frontend/
 
 The specialist pipeline (review → test → merge) has dedicated tests in `tests/cloister/`:
 
-- `sync-main.test.ts` — Tests for the Sync with Main feature: uncommitted changes auto-commit, merge with stats, fetch failure, conflict delegation to merge-agent, wake failure, git lock blocking, `scanForConflictMarkers`
+- `sync-main.test.ts` — Tests for the Sync with Main feature: uncommitted changes auto-commit, merge with stats, fetch failure, conflict delegation to merge-agent, wake failure, git lock blocking
 
 ## Writing Tests
 

@@ -42,7 +42,6 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sessionExistsAsync: vi.fn().mockResolvedValue(true),
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
   listSessionNamesAsync: vi.fn().mockResolvedValue(['specialist-merge-agent']),
-  buildTmuxCommandString: vi.fn().mockReturnValue(''),
   createSessionAsync: vi.fn().mockResolvedValue(undefined),
   killSession: vi.fn(),
   killSessionSync: vi.fn(),
@@ -139,7 +138,6 @@ vi.mock('fs', async (importOriginal) => {
 // Import under test (after mocks)
 import {
   isSyncMainMainPreferredPath,
-  scanForConflictMarkers,
   syncMainIntoWorkspace,
 } from '../../src/lib/cloister/merge-agent.js';
 import { cleanupStaleLocks } from '../../src/lib/git-utils.js';
@@ -169,40 +167,6 @@ function mockExecSequence(responses: Record<string, { stdout: string; stderr?: s
 // scanForConflictMarkers tests (unit — uses mocked exec)
 // ---------------------------------------------------------------------------
 
-describe('scanForConflictMarkers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    execMock.mockResolvedValue({ stdout: '', stderr: '' });
-  });
-
-  it('returns empty array when git diff --check reports no conflicts', async () => {
-    execMock.mockResolvedValue({ stdout: '', stderr: '' });
-    const result = await scanForConflictMarkers('/some/path');
-    expect(result).toEqual([]);
-  });
-
-  it('returns files with leftover conflict markers', async () => {
-    execMock.mockResolvedValue({
-      stdout: [
-        'src/foo.ts:12: leftover conflict marker',
-        'src/bar.ts:45: leftover conflict marker',
-        'src/foo.ts:20: leftover conflict marker',
-      ].join('\n'),
-      stderr: '',
-    });
-    const result = await scanForConflictMarkers('/some/path');
-    expect(result).toContain('src/foo.ts');
-    expect(result).toContain('src/bar.ts');
-    // deduplicates
-    expect(result).toHaveLength(2);
-  });
-
-  it('returns empty array when exec throws (non-fatal)', async () => {
-    execMock.mockRejectedValue(new Error('not a git repo'));
-    const result = await scanForConflictMarkers('/some/path');
-    expect(result).toEqual([]);
-  });
-});
 
 describe('isSyncMainMainPreferredPath', () => {
   it('matches only pipeline-owned sync state paths', () => {

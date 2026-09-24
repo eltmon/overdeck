@@ -4,7 +4,7 @@
 
 import { existsSync } from 'fs';
 import { writeFile } from 'fs/promises';
-import { join, dirname, basename, relative } from 'path';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
@@ -153,11 +153,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
-import { runQualityGates } from './validation.js';
-import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
-import { gitPush, MainDivergedError } from '../git/operations.js';
-import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
 
@@ -935,149 +931,10 @@ function announceMerge(
   });
 }
 
-/** Patterns to match in tmux capture-pane output (git push/fetch lines) */
-export const GIT_PATTERNS: Array<{ re: RegExp; operation: GitOperationType; level: 'info' | 'warn' | 'error' }> = [
-  { re: /force-with-lease/i,             operation: 'force_push_cmd',  level: 'warn' },
-  { re: /git push/i,                     operation: 'push_attempt',    level: 'info' },
-  { re: /git fetch/i,                    operation: 'fetch_attempt',   level: 'info' },
-  { re: /\[rejected\]/i,                 operation: 'push_rejected',   level: 'error' },
-  { re: /non-fast-forward/i,             operation: 'non_ff',          level: 'error' },
-  { re: /retrying/i,                     operation: 'retry',           level: 'warn' },
-  { re: /\[remote rejected\]/i,          operation: 'remote_rejected', level: 'error' },
-  { re: /Everything up-to-date/i,        operation: 'push_noop',       level: 'info' },
-];
-
-/**
- * Scan tmux capture-pane output for git push/fetch patterns and emit each
- * as a git_operations row. Uses seenLineHashes to dedupe within a session.
- */
-export function scanGitPatterns(
-  output: string,
-  seenLineHashes: Set<string>,
-  issueId: string,
-  branch?: string,
-): void {
-  const lines = output.split('\n');
-  const ts = new Date().toISOString();
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    // Simple hash: first 120 chars (avoids hashing megabytes)
-    const hash = trimmed.slice(0, 120);
-    if (seenLineHashes.has(hash)) continue;
-
-    for (const { re, operation, level } of GIT_PATTERNS) {
-      if (re.test(trimmed)) {
-        seenLineHashes.add(hash);
-        appendGitOperationSync({
-          operation,
-          branch,
-          issueId,
-          status: level === 'error' ? 'failure' : 'success',
-          error: level !== 'info' ? trimmed.slice(0, 200) : undefined,
-          ts,
-        });
-        emitActivityEntrySync({
-          source: 'ship',
-          level,
-          message: `[git] ${trimmed.slice(0, 100)}`,
-          issueId,
-        });
-        break; // only match one pattern per line
-      }
-    }
-  }
-}
-
 // PAN-1531: ship-role machinery (buildShipPreparationPrompt, buildShipSyncMainPrompt,
 // spawnShipRoleForTask, spawnMergeAgentForBranches, spawnRebaseAgentForBranch,
 // defaultWorkspaceForIssue) removed. Rebase is now performed in-process via
 // rebaseFeatureBranch() in src/lib/cloister/merge-rebase.ts. See docs/MERGE-WORKFLOW.md.
-
-export async function salvageStrandedMerge(
-  projectPath: string,
-  targetBranch: string,
-  headBefore: string,
-  issueId: string,
-  logActivity: (action: string, detail: string) => void,
-): Promise<{ success: boolean; reason?: string } | null> {
-  try {
-    const { stdout: currentHeadRaw } = await execAsync('git rev-parse HEAD', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-    const currentHead = currentHeadRaw.trim();
-
-    if (currentHead === headBefore) {
-      // No local merge happened — nothing to salvage
-      return null;
-    }
-
-    // Local HEAD changed — check if it's ahead of remote
-    await execAsync(`git fetch origin ${targetBranch}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-      timeout: 10000,
-    }).catch(() => {});
-
-    const { stdout: remoteHeadRaw } = await execAsync(`git rev-parse origin/${targetBranch}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-
-    if (remoteHeadRaw.trim() === currentHead) {
-      // Already pushed (maybe by another process)
-      console.log(`[merge-agent] Salvage check: merge already pushed`);
-      return { success: true };
-    }
-
-    // Stranded merge detected — push it (with divergence guard to protect hotfixes)
-    console.log(`[merge-agent] SALVAGING stranded merge for ${issueId}: local HEAD ${currentHead.slice(0, 8)} != remote ${remoteHeadRaw.trim().slice(0, 8)}`);
-    logActivity('merge_salvage', `Pushing stranded merge commit ${currentHead.slice(0, 8)} for ${issueId}`);
-
-    try {
-      await gitPush(projectPath, 'origin', targetBranch, { issueId });
-    } catch (pushErr: unknown) {
-      if (pushErr instanceof MainDivergedError) {
-        // origin has advanced past our local ancestor — a hotfix landed. Report
-        // the divergence and let the caller handle it (PAN-3917: no stuck flag
-        // is stored; the diverged branch is visible in git).
-        logActivity('merge_salvage_diverged', `Salvage aborted: origin/${targetBranch} diverged (remote ${pushErr.remoteSha.slice(0, 7)} not ancestor of local ${pushErr.localSha.slice(0, 7)})`);
-        return { success: false, reason: pushErr.message };
-      }
-      throw pushErr;
-    }
-
-    console.log(`[merge-agent] Salvage push successful for ${issueId}`);
-    logActivity('merge_salvage_success', `Stranded merge pushed successfully`);
-    return { success: true };
-  } catch (error: any) {
-    console.error(`[merge-agent] Salvage failed: ${error.message}`);
-    logActivity('merge_salvage_failed', `Salvage push failed: ${error.message}`);
-    return null;
-  }
-}
-
-/**
- * Scan workspace for leftover git conflict markers (async)
- */
-export async function scanForConflictMarkers(projectPath: string): Promise<string[]> {
-  try {
-    // git diff --check exits non-zero and prints filenames when conflict markers exist
-    const { stdout } = await execAsync('git diff --check 2>&1 || true', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-    const files = stdout
-      .split('\n')
-      .filter(line => line.includes('leftover conflict marker'))
-      .map(line => line.split(':')[0].trim())
-      .filter(f => f.length > 0);
-    return [...new Set(files)];
-  } catch {
-    return [];
-  }
-}
 
 async function collectSyncMergeStats(projectPath: string, signal?: AbortSignal): Promise<Pick<SyncMainResult, 'commitCount' | 'changedFiles'>> {
   const run = (command: string) => runSyncGitCommand(command, {
@@ -1225,61 +1082,4 @@ export async function syncMainIntoWorkspace(
   signal?: AbortSignal,
 ): Promise<SyncMainResult> {
   return syncMainAcrossWorkspaceRepos(projectPath, issueId, signal, syncMainIntoRepo, logActivity);
-}
-
-/**
- * Look up and run quality gates for the project at projectPath.
- * Returns empty array if no quality gates are configured.
- *
- * In polyrepo mode (projectPath is a sub-repo of project.path), only gates
- * whose `path` field matches the relative sub-repo path are run. Gates with
- * no `path` field are skipped in polyrepo context.
- */
-export async function runProjectQualityGates(
-  projectPath: string,
-  phase: 'pre_push' | 'post_push'
-): Promise<import('./validation.js').QualityGateResult[]> {
-  try {
-    const config = loadProjectsConfigSync();
-    // Find the project whose path matches
-    const project = Object.values(config.projects).find(p => projectPath.startsWith(p.path));
-    if (!project?.quality_gates || Object.keys(project.quality_gates).length === 0) {
-      console.log(`[merge-agent] No quality gates configured for ${projectPath}`);
-      return [];
-    }
-
-    // Detect polyrepo context: if projectPath is a subdirectory of project.path,
-    // repoRelPath is non-empty (e.g., 'frontend' or 'backend').
-    const repoRelPath = relative(project.path, projectPath);
-    const matchedRepo = project.workspace?.repos?.find(repo => (
-      repoRelPath === repo.path ||
-      projectPath === join(project.path, repo.path)
-    ));
-    const repoIdentifiers = matchedRepo
-      ? new Set([matchedRepo.path, matchedRepo.name])
-      : new Set(repoRelPath && !repoRelPath.startsWith('..') ? [repoRelPath] : []);
-
-    let gatesToRun = project.quality_gates;
-    if (repoRelPath && !repoRelPath.startsWith('..')) {
-      // Polyrepo: gates can target either the repo path ("frontend") or the
-      // configured repo key/alias ("fe"). Both map to the same sub-repo.
-      const filtered = Object.entries(project.quality_gates).filter(
-        ([, gate]) => gate.path && repoIdentifiers.has(gate.path)
-      );
-      if (filtered.length === 0) {
-        console.log(`[merge-agent] No quality gates configured for repo path "${repoRelPath}"`);
-        return [];
-      }
-      gatesToRun = Object.fromEntries(filtered);
-      console.log(
-        `[merge-agent] Polyrepo: running ${Object.keys(gatesToRun).length} gate(s) for path "${repoRelPath}" (${[...repoIdentifiers].join(', ')})`
-      );
-    }
-
-    console.log(`[merge-agent] Running ${phase} quality gates for project "${project.name}"`);
-    return await runQualityGates(gatesToRun, projectPath, phase);
-  } catch (error: any) {
-    console.error(`[merge-agent] Failed to load quality gates: ${error.message}`);
-    return [];
-  }
 }

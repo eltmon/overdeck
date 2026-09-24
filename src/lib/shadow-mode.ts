@@ -7,7 +7,7 @@
 
 import { loadConfigSync } from './config-yaml.js';
 import { getShadowModeFromEnv } from './env-loader.js';
-import { isShadowed, getPendingSyncCount } from './shadow-state.js';
+import { isShadowed } from './shadow-state.js';
 import type { TrackerType } from './tracker/interface.js';
 
 /**
@@ -103,37 +103,4 @@ export async function shouldSkipTrackerUpdate(
     issueId,
     trackerType,
   }));
-}
-
-/**
- * Check if shadow mode is configured at the project level
- */
-export function hasProjectShadowConfig(): boolean {
-  const { config } = loadConfigSync();
-
-  // Check if there's any project-specific shadow configuration
-  // This is a heuristic - if shadow is enabled but not from env, it's likely project config
-  if (config.shadow.enabled && process.env.SHADOW_MODE === undefined) {
-    return true;
-  }
-
-  // Check if any per-tracker overrides are set
-  return Object.values(config.shadow.trackers).some(v => v !== false);
-}
-
-/** Summarise shadow-mode configuration and the number of issues pending sync. */
-export async function getShadowModeSummary(): Promise<{
-  globalEnabled: boolean;
-  perTracker: Record<TrackerType, boolean>;
-  envSet: boolean;
-  pendingSyncCount: number;
-}> {
-  const { config } = loadConfigSync();
-
-  return {
-    globalEnabled: config.shadow.enabled,
-    perTracker: config.shadow.trackers,
-    envSet: process.env.SHADOW_MODE !== undefined,
-    pendingSyncCount: await getPendingSyncCount(),
-  };
 }

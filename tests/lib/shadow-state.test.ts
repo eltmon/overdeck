@@ -15,14 +15,11 @@ import {
   getShadowState,
   createShadowState,
   updateShadowState,
-  markAsSynced,
   listShadowedIssues,
   isShadowed,
   needsSync,
-  updateTrackerStatusCache,
   removeShadowState,
   getPendingSyncCount,
-  getDisplayStatus,
 } from '../../src/lib/shadow-state.js';
 import { getOverdeckHome } from '../../src/lib/paths.js';
 
@@ -148,31 +145,6 @@ describe('shadow-state', () => {
     });
   });
 
-  describe('markAsSynced', () => {
-    it('should mark shadow state as synced', async () => {
-      const id = getUniqueId('sync');
-      await createShadowState(id, 'open');
-      await updateShadowState(id, 'in_progress', 'test');
-
-      const result = await markAsSynced(id, 'in_progress', 'open');
-
-      expect(result.success).toBe(true);
-      expect(result.syncedState).toBe('in_progress');
-      expect(result.previousState).toBe('open');
-      expect(result.entriesSynced).toBe(1);
-
-      const state = await getShadowState(id);
-      expect(state?.syncedAt).toBeDefined();
-      expect(state?.history[0].syncedToTracker).toBe(true);
-    });
-
-    it('should return error for non-existent issue', async () => {
-      const result = await markAsSynced(getUniqueId('noexist'), 'closed');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('not in shadow mode');
-    });
-  });
 
   describe('needsSync', () => {
     it('should return false when shadow status matches tracker status', async () => {
@@ -237,43 +209,7 @@ describe('shadow-state', () => {
     });
   });
 
-  describe('getDisplayStatus', () => {
-    it('should return non-shadowed status for non-shadowed issues', async () => {
-      const status = await getDisplayStatus(getUniqueId('notshadowed'), 'open');
 
-      expect(status.status).toBe('open');
-      expect(status.isShadowed).toBe(false);
-      expect(status.trackerStatus).toBeUndefined();
-    });
-
-    it('should return shadow status with tracker info for shadowed issues', async () => {
-      const id = getUniqueId('display');
-      await createShadowState(id, 'open');
-      await updateShadowState(id, 'in_progress', 'test');
-
-      const status = await getDisplayStatus(id, 'open');
-
-      expect(status.status).toBe('in_progress');
-      expect(status.isShadowed).toBe(true);
-      expect(status.trackerStatus).toBe('open');
-      expect(status.outOfSync).toBe(true);
-    });
-  });
-
-  describe('updateTrackerStatusCache', () => {
-    it('should update tracker status cache', async () => {
-      const id = getUniqueId('cache');
-      await createShadowState(id, 'open');
-      const updated = await updateTrackerStatusCache(id, 'in_progress');
-
-      expect(updated.trackerStatus).toBe('in_progress');
-      expect(updated.trackerStatusUpdatedAt).toBeDefined();
-    });
-
-    it('should throw error for non-shadowed issue', async () => {
-      await expect(updateTrackerStatusCache(getUniqueId('noexist'), 'open')).rejects.toThrow('not in shadow mode');
-    });
-  });
 
   describe('removeShadowState', () => {
     it('should remove shadow state for an issue', async () => {

@@ -59,7 +59,6 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/swarm-slot-reconcile.js', () => ({
-  listSlotOwnership: mockListSlotOwnership,
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({

@@ -15,7 +15,6 @@ import type { RoleEffort } from '../config-yaml.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { findAgentRuntimePidInSubtree } from './runtime-pid-probe.js';
 import { initCodexHome } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
 import { piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
@@ -89,15 +88,6 @@ export { claudeSystemPromptFiles } from '../context-layers/launch-sources.js';
 
 function isNodeNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
-}
-
-/**
- * True when the pane's process subtree contains the expected harness runtime.
- * The walk lives in runtime-pid-probe.ts (PAN-3849) so the liveness oracle and
- * its no-loss audit share one mockable boundary.
- */
-export async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
-  return (await findAgentRuntimePidInSubtree(rootPid, harness)) !== null;
 }
 
 export async function getOhmypiLauncherFields(agentId: string, model: string, effort?: string): Promise<{

@@ -784,18 +784,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 }
 
-export async function readPersistedAcpSessionId(
-  overdeckHome: string,
-  agentId: string,
-): Promise<string | undefined> {
-  try {
-    return (await readFile(join(overdeckHome, "agents", agentId, "acp-session-id"), "utf-8")).trim() || undefined;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
-  }
-}
-
 if (basename(fileURLToPath(import.meta.url)) === basename(process.argv[1] ?? "")) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.stack ?? error.message : String(error));

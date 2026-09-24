@@ -4,17 +4,22 @@ import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  HerdrConfigEditError,
-  ensureHerdrConfig,
-  herdrConfigDisablesResume,
-  herdrConfigPath,
-  lineLevelResumeDisabled,
-  planResumeAgentsOnRestore,
-  setResumeAgentsOnRestore,
-} from '../../../../src/lib/herdr-setup/config.js';
+import { HerdrConfigEditError, ensureHerdrConfig, herdrConfigDisablesResume, herdrConfigPath, lineLevelResumeDisabled, planResumeAgentsOnRestore } from '../../../../src/lib/herdr-setup/config.js';
 import type { HerdrExec } from '../../../../src/lib/herdr-setup/status.js';
 import { DEFAULT_CONFIG_SESSION_SECTION } from './fixtures.js';
+
+// Moved here from src/lib/herdr-setup/config.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Pure: the text with `[session] resume_agents_on_restore = false`, touching
+ * nothing else. Returns the input unchanged when it already says so. Throws
+ * `HerdrConfigEditError` when no safe edit exists.
+ */
+function setResumeAgentsOnRestore(text: string): string {
+  const plan = planResumeAgentsOnRestore(text);
+  if (plan.kind === 'unchanged') return text;
+  if (plan.kind === 'edited') return plan.text;
+  throw new HerdrConfigEditError('config.toml', plan.reason, plan.hint);
+}
 
 const DESIRED = 'resume_agents_on_restore = false';
 

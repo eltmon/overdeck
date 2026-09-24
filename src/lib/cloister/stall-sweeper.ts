@@ -30,7 +30,6 @@
  *    flood the feed at once;
  *  - this module holds no door to any mutation — there is nothing to force.
  */
-import { Effect } from 'effect';
 import { emitActivityEntrySync, type ActivityLevel } from '../activity-logger.js';
 import {
   PARKED_ORBIT_SEVERITY,
@@ -38,7 +37,6 @@ import {
   type ParkedOrbit,
   type ParkedRow,
 } from '../parked/resolver.js';
-import { sessionExists } from '../tmux.js';
 import { getCloisterEventStore } from './event-store-provider.js';
 import {
   readSweeperRowState,
@@ -76,7 +74,8 @@ const NO_ACTION_TRAILER = 'Observability-only: no action taken.';
 export interface StallSweeperDeps {
   now?: number;
   resolveRows?: () => Promise<ParkedRow[]>;
-  isAgentLive?: (agentId: string) => boolean | Promise<boolean>;
+  /** Required: the tmux-only default this had was wrong on Herdr hosts, and every caller passes one (PAN-3958 CH-8). */
+  isAgentLive: (agentId: string) => boolean | Promise<boolean>;
   emitActivity?: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
 }
@@ -144,10 +143,10 @@ function recordEscalation(issueId: string, orbit: ParkedOrbit, state: StallSweep
 
 // ─── The patrol ───────────────────────────────────────────────────────────────
 
-export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promise<string[]> {
+export async function runStallSweeperPatrol(deps: StallSweeperDeps): Promise<string[]> {
   const now = deps.now ?? Date.now();
   const resolveRows = deps.resolveRows ?? resolveParkedPopulation;
-  const isAgentLive = deps.isAgentLive ?? ((agentId: string) => Effect.runPromise(sessionExists(agentId)));
+  const isAgentLive = deps.isAgentLive;
   const emitActivity = deps.emitActivity ?? defaultEmitActivity;
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
 

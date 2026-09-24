@@ -17,8 +17,6 @@ import {
   generateContextDigest,
   regenerateContextDigest,
   scheduleDigestGeneration,
-  hasContextDigest,
-  deleteContextDigest,
 } from '../../../src/lib/cloister/specialist-context.js';
 import * as specialistLogs from '../../../src/lib/cloister/specialist-logs.js';
 
@@ -134,60 +132,7 @@ describe('specialist-context', () => {
     });
   });
 
-  describe('hasContextDigest', () => {
-    it('should return false if digest does not exist', () => {
-      expect(hasContextDigest('testproject', 'review-agent')).toBe(false);
-    });
 
-    it('should return true if digest exists', () => {
-      const contextDir = getContextDirectory('testproject', 'review-agent');
-      mkdirSync(contextDir, { recursive: true });
-
-      const digestPath = getContextDigestPath('testproject', 'review-agent');
-      writeFileSync(digestPath, 'test digest', 'utf-8');
-
-      expect(hasContextDigest('testproject', 'review-agent')).toBe(true);
-    });
-  });
-
-  describe('deleteContextDigest', () => {
-    it('should return false if digest does not exist', () => {
-      const result = deleteContextDigest('testproject', 'review-agent');
-      expect(result).toBe(false);
-    });
-
-    it('should delete existing digest and return true', () => {
-      const contextDir = getContextDirectory('testproject', 'review-agent');
-      mkdirSync(contextDir, { recursive: true });
-
-      const digestPath = getContextDigestPath('testproject', 'review-agent');
-      writeFileSync(digestPath, 'test digest', 'utf-8');
-
-      expect(existsSync(digestPath)).toBe(true);
-
-      const result = deleteContextDigest('testproject', 'review-agent');
-      expect(result).toBe(true);
-      expect(existsSync(digestPath)).toBe(false);
-    });
-
-    it('should return false on delete error', () => {
-      const contextDir = getContextDirectory('testproject', 'review-agent');
-      mkdirSync(contextDir, { recursive: true });
-
-      const digestPath = getContextDigestPath('testproject', 'review-agent');
-      writeFileSync(digestPath, 'test digest', 'utf-8');
-
-      // Mock unlinkSync to throw via the mocked fs module
-      vi.spyOn(fs, 'unlinkSync').mockImplementationOnce(() => {
-        throw new Error('Delete error');
-      });
-
-      const result = deleteContextDigest('testproject', 'review-agent');
-      expect(result).toBe(false);
-
-      vi.restoreAllMocks();
-    });
-  });
 
   describe('generateContextDigest', () => {
     beforeEach(() => {

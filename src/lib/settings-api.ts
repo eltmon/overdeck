@@ -1194,10 +1194,6 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
   return merged;
 }
 
-export function getRoleConfig(role: Role): RoleConfig | undefined {
-  return loadSettingsApi().roles?.[role];
-}
-
 /** Set (or clear) one provider's API key in the API settings. */
 export async function updateProviderApiKey(
   provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope',

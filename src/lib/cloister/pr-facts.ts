@@ -661,59 +661,10 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   return { ready: true };
 }
 
-/** True when the issue is in review: an open PR that is neither approved nor rejected. */
-export function isAwaitingReview(facts: PrFacts): boolean {
-  return facts.open && !facts.approved && !facts.changesRequested;
-}
-
 export interface LatestPrReview {
   state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED' | string;
   /** The commit the reviewer reviewed. */
   commitId: string | null;
   submittedAt: string | null;
   author: string | null;
-}
-
-/**
- * The most recent non-comment review on the issue's PR.
- *
- * `reviewDecision` says what the forge concluded; this says which commit the
- * conclusion was reached against, which is how "the branch moved since the
- * review" is answered without storing a reviewed anchor.
- */
-export async function getLatestPrReview(
-  facts: PrFacts,
-  runGh: (args: string[]) => Promise<string> = defaultRunGh,
-): Promise<LatestPrReview | null> {
-  if (facts.forge !== 'github' || !facts.url || !facts.number) return null;
-  const match = facts.url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
-  if (!match) return null;
-  try {
-    const stdout = await runGh([
-      'api',
-      `repos/${match[1]}/${match[2]}/pulls/${facts.number}/reviews?per_page=100`,
-      '-H', 'Accept: application/vnd.github+json',
-    ]);
-    const reviews = JSON.parse(stdout) as Array<{
-      state?: string; commit_id?: string; submitted_at?: string; user?: { login?: string };
-    }>;
-    const decisive = reviews.filter((review) => review.state === 'APPROVED' || review.state === 'CHANGES_REQUESTED');
-    const latest = decisive[decisive.length - 1];
-    if (!latest) return null;
-    return {
-      state: latest.state ?? 'COMMENTED',
-      commitId: latest.commit_id ?? null,
-      submittedAt: latest.submitted_at ?? null,
-      author: latest.user?.login ?? null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function defaultRunGh(args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync('gh', args, {
-    encoding: 'utf-8', timeout: 20_000, maxBuffer: 8 * 1024 * 1024,
-  });
-  return stdout;
 }

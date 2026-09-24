@@ -3,12 +3,31 @@ import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import {
-  extractAcceptanceCriteria,
-  extractACFromDocument,
-  formatAcceptanceCriteria,
-} from '../acceptance-criteria.js';
+import { extractACFromDocument, formatAcceptanceCriteria } from '../acceptance-criteria.js';
 import type { XBriefDocument } from '../types.js';
+import type { AcceptanceCriterion } from '../acceptance-criteria.js';
+import { readWorkspacePlan } from '../io.js';
+import type { XBriefReadError } from '../io.js';
+
+// Moved here from src/lib/xbrief/acceptance-criteria.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Extract all acceptance criteria from an xBRIEF plan.
+ *
+ * Reads the merged xBRIEF plan and returns all child items
+ * where metadata.kind === 'acceptance_criterion', enriched with parent
+ * task context.
+ *
+ * @returns Array of acceptance criteria, or empty array if no plan exists
+ *          or no AC are found (legacy workspace compatibility).
+ */
+const extractAcceptanceCriteria = (
+  workspacePath: string,
+): Effect.Effect<AcceptanceCriterion[], XBriefReadError> =>
+  Effect.gen(function* () {
+    const doc = yield* readWorkspacePlan(workspacePath);
+    if (!doc) return [];
+    return extractACFromDocument(doc);
+  });
 
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;

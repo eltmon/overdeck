@@ -12,13 +12,10 @@ import {
   getRecentRunLogs,
   cleanupOldLogsSync,
   isRunLogActive,
-  getRunLogSize,
-  checkLogSizeLimit,
   cleanupAllLogsSync,
   getRunsDirectory,
   generateRunId,
   getRunLogPath,
-  MAX_LOG_SIZE,
 } from '../../../src/lib/cloister/specialist-logs.js';
 
 describe('specialist-logs', () => {
@@ -229,38 +226,7 @@ describe('specialist-logs', () => {
     });
   });
 
-  describe('getRunLogSize', () => {
-    it('should return file size in bytes', () => {
-      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
-      const size = getRunLogSize('testproject', 'review-agent', runId);
-      expect(size).toBeGreaterThan(0);
-    });
 
-    it('should return null for non-existent log', () => {
-      const size = getRunLogSize('testproject', 'review-agent', 'nonexistent');
-      expect(size).toBeNull();
-    });
-  });
-
-  describe('checkLogSizeLimit', () => {
-    it('should return null if size is under limit', () => {
-      const { runId } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
-      const result = checkLogSizeLimit('testproject', 'review-agent', runId);
-      expect(result).toBeNull();
-    });
-
-    it('should return warning if size exceeds limit', () => {
-      const { runId, filePath } = createRunLogSync('testproject', 'review-agent', 'TEST-123');
-      // Append large content to exceed limit
-      const largeContent = 'x'.repeat(MAX_LOG_SIZE + 1000);
-      appendToRunLogSync('testproject', 'review-agent', runId, largeContent);
-
-      const result = checkLogSizeLimit('testproject', 'review-agent', runId);
-      expect(result).toBeTruthy();
-      expect(result!.exceeded).toBe(true);
-      expect(result!.limit).toBe(MAX_LOG_SIZE);
-    });
-  });
 
   describe('cleanupOldLogs', () => {
     it('should delete logs older than maxDays', () => {

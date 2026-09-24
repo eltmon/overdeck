@@ -14,7 +14,6 @@ import {
 import {
   getReleaseSetSync,
   upsertReleaseSetSync,
-  deleteReleaseSetSync,
 } from '../../../src/lib/release-set.js';
 import type { ReleaseSet } from '../../../src/lib/release-set-types.js';
 
@@ -77,13 +76,4 @@ describe('release-set sync accessors', () => {
     expect(row!.issue_id).toBe('PAN-399');
   });
 
-  it('deleteReleaseSetSync normalizes lowercase IDs to uppercase', () => {
-    seedIssue('PAN-399');
-    upsertReleaseSetSync(makeReleaseSet());
-
-    deleteReleaseSetSync('pan-399');
-
-    const row = odb.raw().prepare('SELECT issue_id FROM release_sets WHERE issue_id = ?').get('PAN-399') as { issue_id: string } | undefined;
-    expect(row).toBeUndefined();
-  });
 });

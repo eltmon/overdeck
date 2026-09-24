@@ -123,23 +123,6 @@ export async function captureTranscriptUserRecordSnapshot(
   }
 }
 
-export function hasNewTranscriptUserRecord(
-  before: TranscriptUserRecordSnapshot,
-  after: TranscriptUserRecordSnapshot,
-): boolean {
-  if (before.sessionFile !== after.sessionFile) return after.userRecordCount > 0;
-
-  if (
-    before.readOffset !== undefined &&
-    after.rangeStartByte !== undefined &&
-    after.rangeStartByte === before.readOffset
-  ) {
-    return after.userRecordCount > 0;
-  }
-
-  return after.userRecordCount > before.userRecordCount;
-}
-
 export interface TranscriptWatchProbe {
   /** A landed user record whose content contains the watched message text. */
   matchedUserRecord: boolean;

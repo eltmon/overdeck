@@ -61,7 +61,11 @@ export function piFifoPaths(agentId: string, home?: string): PiFifoPaths {
   }
 }
 
-/** Create the Pi RPC FIFO for an agent and return its path. */
+/**
+ * Create the Pi RPC FIFO for an agent and return its path.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
+ */
 export async function createPiFifo(agentId: string, home?: string): Promise<string> {
   const paths = piFifoPaths(agentId, home)
   mkdirSync(paths.agentDir, { recursive: true, mode: 0o700 })
@@ -77,6 +81,8 @@ export async function createPiFifo(agentId: string, home?: string): Promise<stri
 
 /**
  * Unlink the fifo. Safe to call when the fifo does not exist.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function destroyPiFifoSync(agentId: string, home?: string): void {
   const paths = piFifoPaths(agentId, home)

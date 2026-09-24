@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Schema } from 'effect';
 import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-import { Db, EventBus, Records } from './infra.js';
+import { Db, Records } from './infra.js';
 
 export const overdeckIssues = sqliteTable('issues', {
   id: text('id').primaryKey(),
@@ -104,42 +104,6 @@ type IssueRow = typeof overdeckIssues.$inferSelect;
 
 const decodeIssue = Schema.decodeUnknownSync(Issue);
 
-const LEGAL: Record<Stage, ReadonlyArray<Stage>> = {
-  todo: ['planning', 'cancelled'],
-  planning: ['planned', 'working', 'todo', 'cancelled'],
-  planned: ['working', 'todo', 'cancelled'],
-  working: ['in_review', 'todo', 'cancelled'],
-  in_review: ['testing', 'working', 'cancelled'],
-  testing: ['verifying', 'merging', 'working', 'cancelled'],
-  verifying: ['merging', 'working', 'cancelled'],
-  merging: ['verifying_on_main', 'working', 'cancelled'],
-  verifying_on_main: ['closed', 'cancelled'],
-  closed: ['todo'],
-  cancelled: ['todo'],
-};
-
-function isLegalMove(from: Stage, to: Stage): boolean {
-  return to === 'todo' || (LEGAL[from]?.includes(to) ?? false);
-}
-
-function outcomeForMove(
-  from: Stage,
-  to: Stage,
-  hint?: 'skipped',
-): Partial<Pick<Issue, 'reviewOutcome' | 'testOutcome' | 'verificationOutcome'>> {
-  if (from === 'in_review' && to === 'testing') return { reviewOutcome: 'passed' };
-  if (from === 'in_review' && to === 'working') return { reviewOutcome: 'failed' };
-  if (from === 'testing' && to === 'verifying') return { testOutcome: hint === 'skipped' ? 'skipped' : 'passed' };
-  if (from === 'testing' && to === 'merging') return { testOutcome: hint === 'skipped' ? 'skipped' : 'passed' };
-  if (from === 'testing' && to === 'working') return { testOutcome: 'failed' };
-  if (from === 'verifying' && to === 'merging') return { verificationOutcome: 'passed' };
-  if (from === 'verifying' && to === 'working') return { verificationOutcome: 'failed' };
-  if (to === 'working' || to === 'todo') {
-    return { reviewOutcome: 'pending', testOutcome: 'pending', verificationOutcome: 'pending' };
-  }
-  return {};
-}
-
 function rowToIssue(row: IssueRow): Issue {
   return decodeIssue({
     id: row.id,
@@ -236,71 +200,4 @@ export interface IssueWriterServiceShape {
 }
 
 export class IssueWriter extends Context.Service<IssueWriter, IssueWriterServiceShape>()('overdeck/IssueWriter') {}
-
-export function makeIssueWriterLive(): Layer.Layer<IssueWriter, never, Db | EventBus> {
-  return Layer.effect(
-    IssueWriter,
-    Effect.gen(function* () {
-      const db = yield* Db;
-      const bus = yield* EventBus;
-      const now = () => new Date();
-
-      const advance: IssueWriterServiceShape['advance'] = (id, to, reason, hint) =>
-        Effect.gen(function* () {
-          const resolver = yield* IssuesResolver;
-          const issue = yield* resolver.get(id);
-          if (!isLegalMove(issue.stage, to)) {
-            return yield* Effect.fail(new IllegalTransition({ from: issue.stage, to }));
-          }
-
-          const next: Issue = { ...issue, ...outcomeForMove(issue.stage, to, hint), stage: to, updatedAt: now() };
-          yield* Effect.promise(() =>
-            db.q.update(overdeckIssues).set({
-              stage: next.stage,
-              reviewOutcome: next.reviewOutcome,
-              testOutcome: next.testOutcome,
-              verificationOutcome: next.verificationOutcome,
-              updatedAt: next.updatedAt,
-            }).where(eq(overdeckIssues.id, id)).run(),
-          );
-          yield* bus.emit({ type: 'issue.advanced', payload: { id, from: issue.stage, to, reason } });
-          return next;
-        });
-
-      const setPr: IssueWriterServiceShape['setPr'] = (id, pr) =>
-        Effect.gen(function* () {
-          const resolver = yield* IssuesResolver;
-          const issue = yield* resolver.get(id);
-          const next: Issue = { ...issue, pr, updatedAt: now() };
-          yield* Effect.promise(() =>
-            db.q.update(overdeckIssues).set({
-              prUrl: pr?.url ?? null,
-              prNumber: pr?.number ?? null,
-              prHeadSha: pr?.headSha ?? null,
-              updatedAt: next.updatedAt,
-            }).where(eq(overdeckIssues.id, id)).run(),
-          );
-          yield* bus.emit({ type: 'issue.pr_updated', payload: { id, pr } });
-          return next;
-        });
-
-      const setBlockers: IssueWriterServiceShape['setBlockers'] = (id, blockers, reason) =>
-        Effect.gen(function* () {
-          const resolver = yield* IssuesResolver;
-          const issue = yield* resolver.get(id);
-          const next: Issue = { ...issue, blockers: [...blockers], updatedAt: now() };
-          yield* Effect.promise(() =>
-            db.q.update(overdeckIssues).set({
-              blockers: [...blockers],
-              updatedAt: next.updatedAt,
-            }).where(eq(overdeckIssues.id, id)).run(),
-          );
-          yield* bus.emit({ type: 'issue.blockers_changed', payload: { id, blockers, reason } });
-          return next;
-        });
-
-      return IssueWriter.of({ advance, setPr, setBlockers });
-    }),
-  );
-}
 

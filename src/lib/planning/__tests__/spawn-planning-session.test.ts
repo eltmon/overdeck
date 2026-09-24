@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPlanningAgentState, buildPlanningPrompt, buildPlanningSessionEnv, writeFeatureContext, type PlanningIssue } from '../spawn-planning-session.js';
+import { buildPlanningPrompt, buildPlanningSessionEnv, writeFeatureContext, type PlanningIssue  } from '../spawn-planning-session.js';
 import { PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME } from '../../pan-dir/index.js';
 
 describe('buildPlanningPrompt', () => {
@@ -137,54 +137,6 @@ describe('buildPlanningSessionEnv', () => {
   });
 });
 
-describe('buildPlanningAgentState', () => {
-  const baseState = {
-    sessionName: 'planning-pan-123',
-    issueId: 'PAN-123',
-    workspacePath: '/repo/workspaces/feature-pan-123',
-    model: 'claude-opus-4-7',
-    harness: 'claude-code' as const,
-    workspaceLocation: 'local' as const,
-    startedBy: 'test:planning-session',
-    startedAt: '2026-06-12T00:00:00.000Z',
-  };
-
-  it('defaults autoSpawnOnFinalize to false', () => {
-    expect(buildPlanningAgentState(baseState)).toMatchObject({
-      id: 'planning-pan-123',
-      issueId: 'PAN-123',
-      auto: false,
-      autoSpawnOnFinalize: false,
-    });
-  });
-
-  it('persists auto mode when requested', () => {
-    expect(buildPlanningAgentState({
-      ...baseState,
-      auto: true,
-    })).toMatchObject({
-      auto: true,
-    });
-  });
-
-  it('persists planning start provenance', () => {
-    expect(buildPlanningAgentState({
-      ...baseState,
-      startedBy: 'flywheel:RUN-81',
-    })).toMatchObject({
-      startedBy: 'flywheel:RUN-81',
-    });
-  });
-
-  it('persists autoSpawnOnFinalize when requested', () => {
-    expect(buildPlanningAgentState({
-      ...baseState,
-      autoSpawnOnFinalize: true,
-    })).toMatchObject({
-      autoSpawnOnFinalize: true,
-    });
-  });
-});
 
 describe('writeFeatureContext', () => {
   const baseIssue: PlanningIssue = {

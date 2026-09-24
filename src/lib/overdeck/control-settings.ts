@@ -1,19 +1,11 @@
 import { Context, Effect, Layer, Schema } from 'effect';
-import { eq } from 'drizzle-orm';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
 import type { ProjectConfig as RawProjectConfig } from '../projects.js';
 import { getProjectSync, loadProjectsConfigSync } from '../projects.js';
 
 // ── Local Drizzle table definitions ─────────────────────────────────────────
-
-const appSettings = sqliteTable('app_settings', {
-  key: text('key').primaryKey(),
-  value: text('value', { mode: 'json' }),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
-});
 
 // ── Schema entities ──────────────────────────────────────────────────────────
 
@@ -69,51 +61,6 @@ export class SettingsResolver extends Context.Service<
   }
 >()('overdeck/SettingsResolver') {}
 
-export const SettingsResolverLive = Layer.effect(
-  SettingsResolver,
-  Effect.gen(function* () {
-    const { q } = yield* Db;
-
-    const readFlag = async (key: string, dflt: boolean): Promise<boolean> => {
-      const [row] = await q.select().from(appSettings).where(eq(appSettings.key, key));
-      return row?.value === undefined || row.value === null ? dflt : Boolean(row.value);
-    };
-
-    const isDeaconPaused = () => Effect.promise(() => readFlag('deacon.globally_paused', false));
-
-    const getFlywheelConfig = () =>
-      Effect.promise(async () => {
-        // Read merge-train enabled with new key and fallback to legacy
-        const [newRow] = await q.select().from(appSettings).where(eq(appSettings.key, 'merge_train.enabled'));
-        let mergeTrainEnabled: boolean;
-        if (newRow?.value !== undefined && newRow.value !== null) {
-          mergeTrainEnabled = Boolean(newRow.value);
-        } else {
-          // Fall back to legacy key
-          mergeTrainEnabled = await readFlag('flywheel.merge_train_enabled', false);
-        }
-        return {
-          autoPickupBacklog: await readFlag('flywheel.auto_pickup_backlog', false),
-          requireUatBeforeMerge: await readFlag('flywheel.require_uat_before_merge', true),
-          mergeTrainEnabled,
-        };
-      });
-
-    const getFlywheelRuntime = () =>
-      Effect.promise(async () => {
-        const paused = await readFlag('flywheel.globally_paused', false);
-        const [row] = await q
-          .select()
-          .from(appSettings)
-          .where(eq(appSettings.key, 'flywheel.active_run_id'));
-        const activeRunId = (row?.value as string | null | undefined) ?? null;
-        return { activeRunId, paused };
-      });
-
-    return SettingsResolver.of({ isDeaconPaused, getFlywheelConfig, getFlywheelRuntime });
-  }),
-);
-
 // ── SettingsWriter — write door (data verbs only) ────────────────────────────
 //
 // Runtime-control verbs (startFlywheel, pauseFlywheel, resumeFlywheel,
@@ -128,68 +75,6 @@ export class SettingsWriter extends Context.Service<
     readonly setFlywheelConfig: (patch: FlywheelConfigPatch) => Effect.Effect<FlywheelConfig>;
   }
 >()('overdeck/SettingsWriter') {}
-
-export const SettingsWriterLive = Layer.effect(
-  SettingsWriter,
-  Effect.gen(function* () {
-    const { q } = yield* Db;
-    const bus = yield* EventBus;
-    const now = () => new Date();
-
-    const setFlag = async (key: string, value: unknown): Promise<void> => {
-      await q
-        .insert(appSettings)
-        .values({ key, value, updatedAt: now() })
-        .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: now() } });
-    };
-
-    const readFlag = async (key: string, dflt: boolean): Promise<boolean> => {
-      const [row] = await q.select().from(appSettings).where(eq(appSettings.key, key));
-      return row?.value === undefined || row.value === null ? dflt : Boolean(row.value);
-    };
-
-    const readFlywheelConfig = async (): Promise<FlywheelConfig> => {
-      // Read merge-train enabled with new key and fallback to legacy
-      const [newRow] = await q.select().from(appSettings).where(eq(appSettings.key, 'merge_train.enabled'));
-      let mergeTrainEnabled: boolean;
-      if (newRow?.value !== undefined && newRow.value !== null) {
-        mergeTrainEnabled = Boolean(newRow.value);
-      } else {
-        // Fall back to legacy key
-        mergeTrainEnabled = await readFlag('flywheel.merge_train_enabled', false);
-      }
-      return {
-        autoPickupBacklog: await readFlag('flywheel.auto_pickup_backlog', false),
-        requireUatBeforeMerge: await readFlag('flywheel.require_uat_before_merge', true),
-        mergeTrainEnabled,
-      };
-    };
-
-    const setDeaconPaused = (paused: boolean) =>
-      Effect.gen(function* () {
-        yield* Effect.promise(() => setFlag('deacon.globally_paused', paused));
-        yield* bus.emit({ type: 'settings.deacon_paused', payload: { paused } });
-      });
-
-    const setFlywheelConfig = (patch: FlywheelConfigPatch) =>
-      Effect.gen(function* () {
-        yield* Effect.promise(async () => {
-          if (patch.autoPickupBacklog !== undefined)
-            await setFlag('flywheel.auto_pickup_backlog', patch.autoPickupBacklog);
-          if (patch.requireUatBeforeMerge !== undefined)
-            await setFlag('flywheel.require_uat_before_merge', patch.requireUatBeforeMerge);
-          if (patch.mergeTrainEnabled !== undefined)
-            // Write to new key only; never write to legacy key
-            await setFlag('merge_train.enabled', patch.mergeTrainEnabled);
-        });
-        const next = yield* Effect.promise(readFlywheelConfig);
-        yield* bus.emit({ type: 'settings.flywheel_config', payload: next });
-        return next;
-      });
-
-    return SettingsWriter.of({ setDeaconPaused, setFlywheelConfig });
-  }),
-);
 
 // ── ConfigResolver — read-only file door (no Db, no writer) ─────────────────
 
@@ -292,10 +177,6 @@ export function setSetting(key: string, value: string): void {
   ).run(key, value, now);
 }
 
-export function getLastCleanShutdownAt(): string | null {
-  return getSetting(DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY);
-}
-
 export function setLastCleanShutdownAt(iso: string): void {
   setSetting(DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY, iso);
 }
@@ -346,14 +227,6 @@ export function getBootReconciliationState(): BootReconciliationState {
       getSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY),
     ),
   };
-}
-
-export function stampBootReconciliation(bootId: string, graceDeadline: string, bootStartedAt: string): void {
-  setSetting(BOOT_RECONCILIATION_BOOT_ID_KEY, bootId);
-  setSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, bootStartedAt);
-  setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
-  // A fresh boot starts with a fresh extension budget.
-  setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, '0');
 }
 
 /** Synchronous check of the global Deacon pause flag; a failed read logs and reports not paused. */

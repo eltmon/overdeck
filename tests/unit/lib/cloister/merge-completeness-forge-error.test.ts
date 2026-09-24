@@ -45,8 +45,6 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
 vi.mock('../../../../src/lib/merge-set.js', () => ({
   ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
   getMergeSetSync: getMergeSetMock,
-  patchMergeSetRepoSync: patchMergeSetRepoMock,
-  patchMergeSetReposSync: patchMergeSetReposMock,
   upsertMergeSetSync: upsertMergeSetMock,
   withRepoArtifactUrlSync: vi.fn(),
   withRepoStateSync: withRepoStateMock,
@@ -58,7 +56,6 @@ vi.mock('../../../../src/lib/project-repos.js', () => ({
 
 import {
   assessMergeCompleteness,
-  reconcileStrandedRepos,
 } from '../../../../src/lib/cloister/merge-completeness.js';
 
 describe('merge completeness forge error propagation', () => {
@@ -104,32 +101,4 @@ describe('merge completeness forge error propagation', () => {
     );
   });
 
-  it('returns an unverifiable blocker and writes nothing when stranded merge lookup fails', async () => {
-    const initial = {
-      repos: [{
-        repoKey: 'api',
-        repoPath: '/projects/myn/api',
-        forge: 'github',
-        sourceBranch: 'feature/min-857',
-        targetBranch: 'main',
-        artifactUrl: 'https://github.com/org/api/pull/56',
-        required: true,
-      }],
-    };
-
-    const result = await reconcileStrandedRepos(initial as any);
-
-    expect(result.mergeSet).toBe(initial);
-    expect(result.blockers).toEqual([
-      expect.objectContaining({
-        repoKey: 'api',
-        state: 'unverifiable',
-        reason: expect.stringContaining('gh authentication failed'),
-      }),
-    ]);
-    expect(patchMergeSetRepoMock).not.toHaveBeenCalled();
-    expect(patchMergeSetReposMock).not.toHaveBeenCalled();
-    expect(withRepoStateMock).not.toHaveBeenCalled();
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
 });

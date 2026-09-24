@@ -63,6 +63,8 @@ function ensureLogDir(): void {
  * Log a specialist handoff event
  *
  * @param event - Specialist handoff event to log
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function logSpecialistHandoff(event: SpecialistHandoff): void {
   ensureLogDir();
@@ -80,6 +82,8 @@ export function logSpecialistHandoff(event: SpecialistHandoff): void {
  * @param priority - Task priority
  * @param context - Additional context
  * @returns Specialist handoff event
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
 export function createSpecialistHandoff(
   fromSpecialist: string,
@@ -137,17 +141,6 @@ export function readSpecialistHandoffs(limit?: number): SpecialistHandoff[] {
   }
 
   return events;
-}
-
-/**
- * Read specialist handoff events for a specific issue
- *
- * @param issueId - Issue ID
- * @returns Array of specialist handoff events for the issue
- */
-export function readIssueSpecialistHandoffs(issueId: string): SpecialistHandoff[] {
-  const allEvents = readSpecialistHandoffs();
-  return allEvents.filter(e => e.issueId === issueId);
 }
 
 /** Aggregate specialist handoff statistics. Read-only and best-effort; never rejects. */
@@ -212,17 +205,6 @@ export async function getSpecialistHandoffStats(options?: { agentsDir?: string }
   stats.queueDepth = await getLiveQueueDepth();
 
   return stats;
-}
-
-/**
- * Get handoffs from today
- *
- * @returns Array of specialist handoff events from today
- */
-export function getTodaySpecialistHandoffs(): SpecialistHandoff[] {
-  const events = readSpecialistHandoffs();
-  const today = new Date().toISOString().split('T')[0];
-  return events.filter(e => e.timestamp.startsWith(today));
 }
 
 /**

@@ -2,7 +2,19 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { afterEach, describe, expect, it } from 'vitest';
-import { executeAgentSkillsSync, planAgentSkillsSync, SKILL_SYNC_HARNESSES } from '../harness-skill-sync.js';
+import { executeAgentSkillsSync, planAgentSkillsSync} from '../harness-skill-sync.js';
+
+// Moved here from src/lib/harness-skill-sync.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Every harness whose native skill discovery is supplied by `pan sync`.
+ *
+ * kimi-code (PAN-1837): confirmed on the shared ~/.agents/skills discovery
+ * path — the wi-fixture capture's system prompt listed the same skill
+ * catalog Overdeck syncs there, so no second ~/.kimi-code/skills target is
+ * needed. Muse Code 1.0.2 also discovers ~/.agents/skills and ~/.claude/skills
+ * natively (verified with muse skills list --source user --json).
+ */
+const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'acp', 'pi', 'ohmypi', 'kimi-code', 'opencode', 'muse'] as const;
 
 const roots: string[] = [];
 

@@ -4,7 +4,7 @@
  * Logs handoff events to JSONL file for tracking and analysis.
  */
 
-import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { OVERDECK_HOME } from '../paths.js';
 import type { HandoffContext } from './handoff-context.js';
@@ -134,32 +134,4 @@ export function createHandoffEvent(
     success,
     errorMessage,
   };
-}
-
-/**
- * Read all handoff events from log
- *
- * @param limit - Maximum number of events to return (most recent first)
- * @returns Array of handoff events
- */
-export function readHandoffEventsSync(limit?: number): HandoffEvent[] {
-  ensureLogDir();
-
-  if (!existsSync(HANDOFF_LOG_FILE)) {
-    return [];
-  }
-
-  const content = readFileSync(HANDOFF_LOG_FILE, 'utf-8');
-  const lines = content.trim().split('\n').filter(line => line.trim());
-
-  const events = lines.map(line => JSON.parse(line) as HandoffEvent);
-
-  // Return most recent first
-  events.reverse();
-
-  if (limit) {
-    return events.slice(0, limit);
-  }
-
-  return events;
 }
