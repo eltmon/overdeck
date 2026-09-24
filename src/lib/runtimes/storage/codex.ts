@@ -23,6 +23,20 @@ export function codexSessionsRoot(codexHomeDir: string): string {
   return join(codexHomeDir, 'sessions')
 }
 
+/**
+ * An Overdeck agent's persistent Codex home, `<agentDir>/codex-home`. Rollouts
+ * live under it even when the agent runs with `codex-home-v2` as CODEX_HOME,
+ * whose `sessions/` is a symlink back here.
+ */
+export function codexAgentHome(agentDir: string): string {
+  return join(agentDir, 'codex-home')
+}
+
+/** An Overdeck agent's rollout directory: `<agentDir>/codex-home/sessions`. */
+export function codexAgentSessionsDir(agentDir: string): string {
+  return codexSessionsRoot(codexAgentHome(agentDir))
+}
+
 /** Resolve $CODEX_HOME: env var → ~/.codex fallback. */
 export function codexHome(): string {
   return process.env.CODEX_HOME ?? join(homedir(), '.codex')

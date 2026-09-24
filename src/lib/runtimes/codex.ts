@@ -25,7 +25,7 @@ import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { request as httpRequest } from 'node:http'
-import { codexDefaultHome, codexHome, codexSessionsRoot, extractThreadIdFromRollout, findLatestRollout, findRolloutPath } from './storage/codex.js'
+import { codexAgentHome, codexAgentSessionsDir, codexDefaultHome, codexHome, codexSessionsRoot, extractThreadIdFromRollout, findLatestRollout, findRolloutPath } from './storage/codex.js'
 import yaml from 'js-yaml'
 import type {
   AgentRuntimeSync,
@@ -266,7 +266,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   if (codexHomeDir.endsWith('/codex-home-v2')) {
     // Keep transcript data in the established private root while using a new
     // config root that cannot discover historical codex-home/AGENTS.md.
-    const persistentSessions = join(dirname(codexHomeDir), 'codex-home', 'sessions')
+    const persistentSessions = codexAgentSessionsDir(dirname(codexHomeDir))
     mkdirSync(persistentSessions, { recursive: true, mode: 0o700 })
     const sessionsLink = codexSessionsRoot(codexHomeDir)
     if (!existsSync(sessionsLink)) {
@@ -498,7 +498,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (!threadId) return null
     // Use per-agent CODEX_HOME, not the global ~/.codex; each agent's rollouts
     // are written to ~/.overdeck/agents/<id>/codex-home/sessions/.
-    return findRolloutPath(join(agentDirFor(agentId), 'codex-home'), threadId)
+    return findRolloutPath(codexAgentHome(agentDirFor(agentId)), threadId)
   }
 
   getLastActivity(agentId: string): Date | null {

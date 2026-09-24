@@ -5,6 +5,7 @@ import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../cost-
 import { getOverdeckHome } from '../paths.js';
 import type { IssueId } from '../overdeck/issues.js';
 import { lookupSkipVerdict, type SkipVerdict } from './skip-cache.js';
+import { codexAgentSessionsDir } from '../runtimes/storage/codex.js';
 
 export type SkipVerdictEntry = { path: string; mtimeMs: number; size: number; verdict: SkipVerdict };
 
@@ -60,7 +61,7 @@ export async function collectCodexCostEvents(opts: {
   const agentsDir = join(getOverdeckHome(), 'agents');
   const names = existsSync(agentsDir)
     ? readdirSync(agentsDir, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name) : [];
-  const roots = names.map(agentName => ({ root: join(agentsDir, agentName, 'codex-home', 'sessions'),
+  const roots = names.map(agentName => ({ root: codexAgentSessionsDir(join(agentsDir, agentName)),
     agentName, issueId: issueIdFromAgentName(agentName), inferIssueFromCwd: false }));
   for (const root of opts.extraRoots ?? []) roots.push({ root, agentName: 'codex-global', issueId: null, inferIssueFromCwd: true });
   for (const extra of opts.extraRootSpecs ?? []) if (extra.kind === 'codex-global') {

@@ -10,7 +10,7 @@ import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
 import { claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
-import { codexDefaultHome, codexSessionsRoot } from '../runtimes/storage/codex.js';
+import { codexAgentSessionsDir, codexDefaultHome, codexSessionsRoot } from '../runtimes/storage/codex.js';
 import { piSessionsRoot, piUserAgentDir } from '../runtimes/storage/pi.js';
 import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 
@@ -155,7 +155,7 @@ async function collectAgentDirFiles(root: string, warnings: string[] = []): Prom
 
     result.push(...await collectPiFamilyRoot(piSessionsRoot(agentDir), piHarness, warnings));
     await collectAgentRootFiles(agentDir, piHarness, warnings, result, agentHarness === 'opencode' ? 'opencode' : 'acp');
-    await collectJsonlFiles(join(agentDir, 'codex-home', 'sessions'), join(agentDir, 'codex-home', 'sessions'), 'codex', warnings, result);
+    await collectJsonlFiles(codexAgentSessionsDir(agentDir), codexAgentSessionsDir(agentDir), 'codex', warnings, result);
     for (const jsonlPath of await listMuseSessionPaths(entry.name, root)) {
       result.push({ projectDir: agentDir, jsonlPath, harness: 'muse' });
     }

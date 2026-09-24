@@ -11,7 +11,7 @@ import { resolveLatestSessionIdSync } from '../agents/activity.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { extractPiTranscript, extractCodexTranscript } from '../session-format-converter.js';
 import { writeThreadId as _writeThreadId } from '../runtimes/codex.js';
-import { findRolloutPath } from '../runtimes/storage/codex.js';
+import { codexAgentHome, findRolloutPath } from '../runtimes/storage/codex.js';
 import { compressJsonlBuffer } from './compress.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
 
@@ -233,7 +233,7 @@ export class CodexTranscriptSource implements TranscriptSource {
 
     // Use per-agent CODEX_HOME, not the global ~/.codex; rollouts are written to
     // ~/.overdeck/agents/<id>/codex-home/sessions/ by the per-agent spawn.
-    const rolloutPath = findRolloutPath(join(getAgentDir(agent.id), 'codex-home'), threadId);
+    const rolloutPath = findRolloutPath(codexAgentHome(getAgentDir(agent.id)), threadId);
     if (!rolloutPath) return null;
 
     let fileStat: { size: number; mtimeMs: number };

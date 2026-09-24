@@ -8,6 +8,7 @@ const SCRIPT_SOURCE = new URL('../../../scripts/lint-harness-storage.sh', import
 // Built from parts so this test file carries no storage literal of its own.
 const CLAUDE_PROJECTS = ["'.cl" + "aude'", "'proj" + "ects'"].join(', ');
 const KIMI_HOME = "'.ki" + "mi-code'";
+const CODEX_AGENT_HOME = "'codex" + "-home'";
 
 const roots: string[] = [];
 
@@ -63,13 +64,51 @@ describe('lint-harness-storage.sh', () => {
     expect(result.stdout).toContain('harness storage paths live only in src/lib/runtimes/storage/');
   });
 
+  it('flags a hand-built per-agent codex-home join', () => {
+    const root = makeRepo();
+    writeSource(root, 'src/lib/agents/finder.ts', [
+      "import { join } from 'node:path';",
+      `export const home = (agentDir: string) => join(agentDir, ${CODEX_AGENT_HOME}, 'sessions');`,
+    ]);
+    const result = runGuard(root);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('src/lib/agents/finder.ts:2');
+  });
+
   it('passes an allowlisted line', () => {
-    const root = makeRepo(['src/lib/harness-binary.ts:2 # PAN-3958 binary dir, not transcript storage']);
+    const root = makeRepo([`src/lib/harness-binary.ts|${KIMI_HOME}, 'bin') # PAN-3958 binary dir, not transcript storage`]);
     writeSource(root, 'src/lib/harness-binary.ts', [
       "import { join } from 'node:path';",
       `export const bin = join('/home/u', ${KIMI_HOME}, 'bin');`,
     ]);
     expect(runGuard(root).status).toBe(0);
+  });
+
+  it('still passes an allowlisted line after an edit above it moves the line', () => {
+    const root = makeRepo([`src/lib/harness-binary.ts|${KIMI_HOME}, 'bin') # PAN-3958 binary dir, not transcript storage`]);
+    const body = [`export const bin = join('/home/u', ${KIMI_HOME}, 'bin');`];
+    writeSource(root, 'src/lib/harness-binary.ts', ["import { join } from 'node:path';", ...body]);
+    expect(runGuard(root).status).toBe(0);
+    writeSource(root, 'src/lib/harness-binary.ts', [
+      "import { join } from 'node:path';",
+      "import { homedir } from 'node:os';",
+      'export const home = homedir();',
+      '',
+      ...body,
+    ]);
+    expect(runGuard(root).status).toBe(0);
+  });
+
+  it('allows only the anchored line, not another literal in the same file', () => {
+    const root = makeRepo([`src/lib/harness-binary.ts|${KIMI_HOME}, 'bin') # PAN-3958 binary dir, not transcript storage`]);
+    writeSource(root, 'src/lib/harness-binary.ts', [
+      "import { join } from 'node:path';",
+      `export const bin = join('/home/u', ${KIMI_HOME}, 'bin');`,
+      `export const home = join('/home/u', ${KIMI_HOME});`,
+    ]);
+    const result = runGuard(root);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('src/lib/harness-binary.ts:3');
   });
 
   it('ignores comment lines and test files', () => {
@@ -84,7 +123,7 @@ describe('lint-harness-storage.sh', () => {
   });
 
   it('fails on a stale allowlist row', () => {
-    const root = makeRepo(['src/lib/gone.ts:9 # PAN-3958 no longer here']);
+    const root = makeRepo([`src/lib/gone.ts|${KIMI_HOME} # PAN-3958 no longer here`]);
     writeSource(root, 'src/lib/gone.ts', ['export const x = 1;']);
     const result = runGuard(root);
     expect(result.status).toBe(1);

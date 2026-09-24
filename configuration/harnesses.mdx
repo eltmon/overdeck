@@ -726,7 +726,7 @@ module for a path instead of building one.
 | Module | What it owns |
 | --- | --- |
 | `storage/claude-code.ts` | `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl` (`claudeProjectsRoot`, `claudeProjectDir`, `sessionFilePath`) |
-| `storage/codex.ts` | `$CODEX_HOME/sessions/**/rollout-*.jsonl` and the per-conversation `CODEX_HOME` (`codexHome`, `codexSessionsRoot`, `findRolloutPath`) |
+| `storage/codex.ts` | `$CODEX_HOME/sessions/**/rollout-*.jsonl`, the per-conversation `CODEX_HOME`, and each agent's `<agentDir>/codex-home/sessions` (`codexHome`, `codexSessionsRoot`, `codexAgentHome`, `codexAgentSessionsDir`, `findRolloutPath`) |
 | `storage/kimi-code.ts` | `~/.kimi-code/sessions/<work-dir-key>/<session-id>/agents/main/wire.jsonl` (`kimiHomeDefault`, `kimiSessionsRoot`, `kimiWirePath`) |
 | `storage/pi.ts` | `<agentDir>/sessions/**.jsonl` and the user's own `~/.pi/agent` (`piSessionsRoot`, `findPiTranscriptPath`) |
 | `storage/acp.ts` | `<agentDir>/acp-session.jsonl`, the transcript for ACP agents including OpenCode (`ACP_TRANSCRIPT_FILE`, `acpTranscriptPath`) |
@@ -741,7 +741,9 @@ before PAN-3959.
 `npm run lint:harness-storage` (part of `npm run lint`) fails when a storage
 path literal appears in `src/` outside `src/lib/runtimes/storage/`. A line that
 needs one for another reason, such as a permission rule, goes in the allowlist
-at the top of `scripts/lint-harness-storage.sh` with a reason.
+at the top of `scripts/lint-harness-storage.sh` as `file|anchor # reason`. The
+anchor is a fixed piece of the allowed line's text, so edits elsewhere in the
+file don't break the row.
 
 ## See also
 

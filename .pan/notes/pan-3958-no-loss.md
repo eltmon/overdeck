@@ -1216,6 +1216,8 @@ left behind when the async pair moved to `kimi-context-envelope.ts`; it now sits
 | `storage/kimi-code.ts` | `kimiWirePath(home, workDir, sessionId)` | `join(kimiSessionsRoot(...), id, 'agents', 'main', 'wire.jsonl')` |
 | `storage/kimi-code.ts` | `isKimiWirePath(path)` | `endsWith('/agents/main/wire.jsonl')` |
 | `storage/pi.ts` | `piUserAgentDir()` | `join(homedir(), '.pi', 'agent')` (with `piSessionsRoot` for `…/sessions`) |
+| `storage/codex.ts` | `codexAgentHome(agentDir)` | `join(<agentDir>, 'codex-home')` (#4049 review) |
+| `storage/codex.ts` | `codexAgentSessionsDir(agentDir)` | `join(<agentDir>, 'codex-home', 'sessions')` (#4049 review) |
 | `storage/acp.ts` | `ACP_TRANSCRIPT_FILE` | the `'acp-session.jsonl'` literal |
 | `storage/muse.ts` | `isMuseSessionPath(path)` | the `/muse-data/muse/sessions/…/session.jsonl` test in `overdeck/conversation-reads.ts` |
 
@@ -1243,10 +1245,10 @@ Claude: `agent-enrichment.ts`, `agents/activity.ts` (private `claudeProjectDir` 
 
 | Site | Why |
 | --- | --- |
-| `claude-settings-overlay.ts:73-75,93-94` | permission deny rules that protect transcripts from `rm`; allowlisted in the lint |
-| `remote/remote-completion.ts:198` | a shell glob run on a remote Fly VM, not a local path; allowlisted |
-| `harness-binary.ts:193` | Kimi's binary install dir, not transcript storage; allowlisted |
-| `cli/commands/conversations/index.ts:31,33` | CLI help text; allowlisted |
+| `claude-settings-overlay.ts` `'Bash(rm …` rules | permission deny rules that protect transcripts from `rm`; allowlisted in the lint |
+| `remote/remote-completion.ts` `fly.ssh(… 'ls /.claude/projects/…')` | a shell glob run on a remote Fly VM, not a local path; allowlisted |
+| `harness-binary.ts` `join(home, '.kimi-code', 'bin')` | Kimi's binary install dir, not transcript storage; allowlisted |
+| `cli/commands/conversations/index.ts` `.description`/`.option` text | CLI help text; allowlisted |
 | `~/.codex/auth.json` (`codex-auth.ts`, `cliproxy.ts`, `openai-auth.ts`, `autopreso/agent.ts`), `~/.pi/agent/auth.json`, `~/.pi/agent/settings.json`, context-layer `AGENTS.md`, `paths.ts` `LEGACY_RUNTIME_DIRS`, `config-migration.ts` legacy dirs | auth and config, not transcript storage; out of scope |
 | `runtimes/ohmypi.ts`, `ohmypi-models.ts`, the `.omp` discovery root | Oh My Pi is #4003 |
 | `overdeck/conversation-reads.ts` `isCodexSessionFile`, `memory/reconciliation.ts`, `runtimes/codex-subagents.ts`, `runtimes/codex.ts` rollout recognizers | classify a path already in hand by its `codex-home/sessions` or `rollout-*.jsonl` shape; no storage literal the lint names |
@@ -1261,3 +1263,23 @@ None are deleted. The golden test and `tests/unit/scripts/lint-harness-storage.t
 factories, namespace spies (`vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists')`) and dynamic imports in tests
 follow the moved exports to their storage module; `registry-dispatch.test.ts` drops an `encodeClaudeProjectDir` entry
 from its `paths.js` mock, which no longer exports it.
+
+### #4049 review follow-ups
+
+- **Allowlist rows are keyed on `file|anchor`, not `file:line`.** This deviates from the PRD's W9 checkpoint, which
+  specified `file:line`. Line-number rows broke the lint for any edit above an allowlisted line (a one-line insertion
+  in `claude-settings-overlay.ts` failed four rows). A row now allows any flagged line in its file whose text contains
+  the anchor, a fixed substring. The stale-row check stays: a row whose anchor matches no flagged line in its file
+  fails. `tests/unit/scripts/lint-harness-storage.test.ts` covers an edit above an allowlisted line, and a second
+  literal in the same file that the anchor does not allow.
+- **The per-agent Codex home has an owner.** `storage/codex.ts` gains `codexAgentHome(agentDir)` (`<agentDir>/codex-home`)
+  and `codexAgentSessionsDir(agentDir)` (`<agentDir>/codex-home/sessions`). They replace the hand-built joins in
+  `conversations/harness-discovery.ts`, `costs/codex-collector.ts`, `runtimes/codex.ts` (`initCodexHome`'s
+  `codex-home-v2/sessions` symlink target and `CodexRuntimeSync.getSessionPath`), `agents/activity.ts`,
+  `memory/transcript-source.ts`, and `context-layers/detach.ts` (its historical `codex-home/AGENTS.md` scan). The
+  lint now flags a hand-built `, 'codex-home'` join argument. The recognizers that test a directory name with
+  `startsWith('codex-home')` (`agents/state-dir-removal.ts`, `agents/transcript-resolver.ts`,
+  `cloister/transcript-retention.ts`) and the `codex-home-v2` config-home joins are left as they are.
+  `tests/unit/lib/agents/codex-agent-home-golden.test.ts` pins all six call paths; it was committed and passing
+  before the helpers replaced the joins, and passes unchanged after.
+- `docs/MUSE-HARNESS.md` names `src/lib/runtimes/storage/muse.ts`.

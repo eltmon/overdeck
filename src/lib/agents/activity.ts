@@ -3,7 +3,7 @@ import { join } from 'path';
 import { getAgentDir, getAgentStateSync } from './agent-state-read.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import { claudeProjectDir } from '../runtimes/storage/claude-code.js';
-import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
+import { codexAgentHome, extractThreadIdFromRollout, findLatestRollout } from '../runtimes/storage/codex.js';
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { readLatestAgentClaudeSessionIdEventSync } from '../overdeck/event-reads.js';
@@ -110,7 +110,7 @@ function resolveCodexThreadIdSync(agentId: string): string | null {
       if (id) return id;
     }
   } catch { /* non-fatal */ }
-  const codexHome = join(agentDir, 'codex-home');
+  const codexHome = codexAgentHome(agentDir);
   if (!existsSync(codexHome)) return null;
   try {
     const rollout = findLatestRollout(codexHome);
