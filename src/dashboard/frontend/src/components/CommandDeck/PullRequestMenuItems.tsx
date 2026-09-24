@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { GitPullRequest, Unlink } from 'lucide-react';
 import type { PullRequestLink } from '@overdeck/contracts';
-import type { ConversationMutations } from './useConversationMutations';
 import { MenuItemButton } from '../shared/ContextMenu';
 import styles from './styles/command-deck.module.css';
 
 interface PullRequestMenuItemsProps {
   conversation: { name: string; pullRequest?: PullRequestLink | null };
-  mutations: Pick<ConversationMutations, 'linkPullRequest' | 'unlinkPullRequest'>;
+  /** The `linkPullRequest`/`unlinkPullRequest` pair from useConversationMutations
+   *  (typed structurally so this file adds no import cycle through it). */
+  mutations: {
+    linkPullRequest: (opts: { name: string; ref: string }) => void;
+    unlinkPullRequest: (opts: { name: string; ref: string }) => void;
+  };
   onClose: () => void;
 }
 
