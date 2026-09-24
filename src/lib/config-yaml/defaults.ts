@@ -51,6 +51,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   // This is the explicit product default, shown and changeable in Settings —
   // a user-set models.default_conversation_model always overrides it.
   defaultConversationModel: 'claude-sonnet-5',
+  // models.provider_fallback_model: the Anthropic model substituted when a
+  // selected model's provider is disabled and the model has no explicit entry
+  // in FALLBACK_MAP (src/lib/model-fallback.ts). Sonnet, not Opus, to keep the
+  // silent substitute's cost reasonable.
+  providerFallbackModel: 'claude-sonnet-5',
   apiKeys: {},
   providerAuth: {},
   providerPlan: {},

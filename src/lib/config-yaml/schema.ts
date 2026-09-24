@@ -494,6 +494,9 @@ export interface YamlConfig {
 
     /** Persisted default conversation model (overrides dynamic provider-based selection) */
     default_conversation_model?: ModelId;
+
+    /** Anthropic substitute for an unmapped model whose provider is disabled (model-fallback.ts) */
+    provider_fallback_model?: ModelId;
   };
 
   /** OpenRouter-specific configuration */
@@ -841,6 +844,9 @@ export interface NormalizedConfig {
 
   /** Persisted default conversation model (overrides dynamic provider-based selection) */
   defaultConversationModel?: ModelId;
+
+  /** models.provider_fallback_model: Anthropic substitute for an unmapped model whose provider is disabled */
+  providerFallbackModel: ModelId;
 
   /** Tracker API keys */
   trackerKeys: {

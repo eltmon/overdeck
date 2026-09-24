@@ -651,6 +651,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       result.defaultConversationModel = config.models.default_conversation_model;
     }
 
+    if (config.models?.provider_fallback_model) {
+      result.providerFallbackModel = config.models.provider_fallback_model;
+    }
+
     // Merge tracker keys
     if (config.tracker_keys) {
       if (config.tracker_keys.linear) {

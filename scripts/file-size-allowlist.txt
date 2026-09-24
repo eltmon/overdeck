@@ -111,3 +111,4 @@
 1124 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3982
 # Two registration lines; implementation is in the extracted child input route module.
 1072 src/dashboard/server/routes/conversations.ts # PAN-3787
+1088 src/lib/config-yaml/schema.ts # PAN-4160
