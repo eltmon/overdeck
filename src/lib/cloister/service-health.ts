@@ -6,6 +6,7 @@ import type { HealthState } from '../runtimes/types.js';
 import { writeHealthEvent } from '../overdeck/health-events.js';
 import type { CloisterConfig } from './config.js';
 import { checkCostLimits, type CostAlert } from './cost-monitor.js';
+import { determineModel } from '../agents/provider-env.js';
 import { performHandoff } from './handoff.js';
 import { createHandoffEvent, logHandoffEvent } from './handoff-logger.js';
 import { getAgentHealth, getAgentsNeedingAttention, type AgentHealth } from './health.js';
@@ -272,9 +273,24 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
 
           console.log(`🔔 Handoff triggered for ${health.agentId}: ${trigger.reason}`);
 
+          // PAN-4160: a trigger without a suggested model hands off to the
+          // agent's configured role model — the routing spawns use — never a literal.
+          let targetModel = trigger.suggestedModel;
+          if (!targetModel) {
+            try {
+              targetModel = determineModel({ role: agentState.role, spawnKey: `${agentState.role}:${agentState.issueId}` });
+            } catch (error) {
+              const reason = error instanceof Error ? error.message : String(error);
+              const message = `No default model configured for role "${agentState.role}" (${agentState.issueId}): ${reason}. Set roles.${agentState.role}.model in config.yaml.`;
+              host.emit({ type: 'handoff_completed', agentId: health.agentId, result: { success: false, method: 'kill-spawn', error: message } });
+              console.error(`✗ Handoff skipped for ${health.agentId}: ${message}`);
+              continue;
+            }
+          }
+
           // Perform handoff
           const result = await performHandoff(health.agentId, {
-            targetModel: trigger.suggestedModel || 'sonnet',
+            targetModel,
             reason: trigger.reason,
           });
 
@@ -294,7 +310,7 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
           }
 
           if (result.success) {
-            console.log(`✓ Handoff completed: ${health.agentId} → ${result.newAgentId} (${trigger.suggestedModel})`);
+            console.log(`✓ Handoff completed: ${health.agentId} → ${result.newAgentId} (${targetModel})`);
           } else {
             console.error(`✗ Handoff failed: ${result.error}`);
           }
