@@ -152,6 +152,13 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return typeof data.reason === 'string' ? data.reason : '';
     case 'strike.landed':
       return `worktree ${data.worktreeRemoved ? 'removed' : 'kept'}, branch ${data.branchDeleted ? 'deleted' : 'kept'}`;
+    case 'handoff.deferred':
+    case 'handoff.retried':
+      return `attempt ${data.attempt ?? 0}: ${data.skipReason ?? data.reason ?? 'refused'}`;
+    case 'handoff.started':
+      return `${data.agentId ?? 'work agent'} on attempt ${data.attempt ?? '?'}`;
+    case 'handoff.abandoned':
+      return `${data.outcome ?? 'abandoned'}${typeof data.reason === 'string' ? ` — ${data.reason}` : typeof data.error === 'string' ? ` — ${data.error}` : ''}`;
     default:
       return '';
   }

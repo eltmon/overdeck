@@ -6,7 +6,7 @@ scope: universal
 **Agents never run `git stash`.** This applies to every project, every harness, every role. If you find your worktree dirty when you need it clean, the correct moves are:
 
 1. **Commit** the changes (with a meaningful message)
-2. **Discard** them via the project's discard primitive (e.g. `pan workspace discard --confirm` for Overdeck projects) — destructive, requires typed confirmation
+2. **Discard** them with `git restore --staged --worktree -- <paths>` (plus `git clean` for untracked files) — destructive, so name the paths and do it only when you are sure the changes are not wanted
 3. **Surface to the user** if neither commit nor discard is appropriate — let the human decide
 
 Never `git stash push`, `git stash save`, `git stash apply`, `git stash pop`, or any other stash operation. Stashes are silent state movement: dirty work goes into `refs/stash` where it is hard to find later and easy to lose. Explicit commit/discard/surface is the only acceptable disposition.

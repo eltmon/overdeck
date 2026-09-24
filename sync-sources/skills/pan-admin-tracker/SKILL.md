@@ -1,6 +1,6 @@
 ---
 name: pan-admin-tracker
-description: "pan admin tracker <cmd> — tracker-specific operations (Linear states, cleanup, sync)"
+description: "pan admin tracker <cmd> — tracker-specific operations (Linear states, cleanup)"
 triggers:
   - pan admin tracker
   - tracker operations
@@ -23,7 +23,6 @@ pan admin tracker <subcommand>
 ```
 pan admin tracker linear-states    # List Linear workflow states
 pan admin tracker linear-cleanup   # Clean up stale Linear issues
-pan admin tracker sync             # Sync issue state from tracker
 ```
 
 ## What It Does

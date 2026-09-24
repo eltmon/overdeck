@@ -82,7 +82,7 @@ export { messageAgent } from './agents/messaging.js';
 
 export { buildCompactRecoverySeed, resumeAgent } from './agents/resume.js';
 
-export { autoRecoverAgents, detectCrashedAgents, recoverAgent, restartAgent, type RestartAgentOptions } from './agents/recovery.js';
+export { autoRecoverAgents, detectCrashedAgents, recoverAgent, resolveRoutedSpawnModel, restartAgent, type RestartAgentOptions } from './agents/recovery.js';
 // PAN-3917: tier-replay.ts (standing-tier swarm replay) deleted — it depended
 // on agents/slot-reconcile.ts and agents/standing-tiers.ts (Appendix A.5,
 // permanently gone) and had no surviving caller outside this barrel and its

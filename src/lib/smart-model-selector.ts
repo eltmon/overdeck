@@ -370,17 +370,11 @@ export function selectModel(
       .sort((a, b) => b.score - a.score)[0];
 
     if (!fallback) {
-      // No available models at all - use Anthropic default
-      return {
-        model: 'claude-sonnet-4-6',
-        score: 0,
-        reason: 'No models available, falling back to default',
-        candidates: candidates.map((c) => ({
-          model: c.model,
-          score: c.score,
-          available: c.available,
-        })),
-      };
+      // No available models at all: there is nothing to select, and picking
+      // a model the caller did not offer would hide the misconfiguration.
+      throw new Error(
+        `No models available to select for ${workType}; enable a provider in Settings`,
+      );
     }
 
     return {

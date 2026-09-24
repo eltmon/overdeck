@@ -316,16 +316,18 @@ describe('collectRetrospectiveEvidence — data flow through the read door', () 
     expect(formatEvidence([project])).toContain('No evidence found for this project');
   });
 
-  it('discloses a failed read door instead of implying nothing happened', async () => {
+  it('discloses a failed tracker query instead of implying nothing happened', async () => {
     const [project] = await collectRetrospectiveEvidence({
       projects: [MIGRATED],
       windowStart: WINDOW_START,
       now: NOW_BOUND,
-      listRecords: async () => { throw new Error('state worktree missing'); },
+      listRecords: async () => { throw new Error('gh: HTTP 502'); },
     });
-    expect(project.unavailable).toBe('state worktree missing');
+    expect(project.unavailable).toBe('gh: HTTP 502');
     const rendered = formatEvidence([project]);
     expect(rendered).toContain('EVIDENCE UNAVAILABLE');
+    expect(rendered).toContain('the tracker query for this project');
+    expect(rendered).not.toContain('read door');
     expect(rendered).toContain('do not infer that nothing happened');
   });
 

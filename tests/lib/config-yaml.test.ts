@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import {
   loadConfigSync,
@@ -81,6 +81,79 @@ models:
       }
     });
 
+    // Loads `original` as the global config.yaml twice (cache cleared between) in a
+    // fresh module instance, so the module-level warn-once guard starts clean.
+    async function loadRetiredOverridesConfig(original: string) {
+      const prevOverdeckHome = process.env.OVERDECK_HOME;
+      const overdeckHome = join(testDir, 'overdeck-home');
+      mkdirSync(overdeckHome, { recursive: true });
+      const configPath = join(overdeckHome, 'config.yaml');
+      writeFileSync(configPath, original, 'utf-8');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      process.env.OVERDECK_HOME = overdeckHome;
+      try {
+        vi.resetModules();
+        const isolated = await import('../../src/lib/config-yaml.js');
+        expect(isolated.getGlobalConfigPath()).toBe(configPath);
+
+        const { config } = isolated.loadConfigSync();
+        isolated.clearConfigCache();
+        isolated.loadConfigSync();
+
+        return {
+          config,
+          configPath,
+          fileAfter: readFileSync(configPath, 'utf-8'),
+          backupExists: existsSync(`${configPath}.bak`),
+          overridesWarnings: warn.mock.calls.filter(([msg]) => String(msg).includes('models.overrides')),
+        };
+      } finally {
+        warn.mockRestore();
+        if (prevOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+        else process.env.OVERDECK_HOME = prevOverdeckHome;
+        vi.resetModules();
+      }
+    }
+
+    it('loads a config that still carries the retired models.overrides key without rewriting it, and warns once (#4131)', async () => {
+      // claude-opus-4-5 is a deprecated ID: the old load-time migration rewrote it and wrote config.yaml.bak.
+      const original = [
+        '# operator comment',
+        'models:',
+        '  overrides:',
+        '    issue-agent:planning: claude-opus-4-5',
+        '    review:security: claude-sonnet-4-5',
+        'roles:',
+        '  work:',
+        '    model: claude-sonnet-4-6',
+        '',
+      ].join('\n');
+
+      const result = await loadRetiredOverridesConfig(original);
+
+      expect(result.fileAfter).toBe(original);
+      expect(result.backupExists).toBe(false);
+      expect(result.config.roles?.work?.model).toBe('claude-sonnet-4-6');
+      expect(result.config).not.toHaveProperty('overrides');
+      expect(result.overridesWarnings).toHaveLength(1);
+    });
+
+    it('does not warn for an empty models.overrides map, as pan admin migrate-config wrote (#4131)', async () => {
+      const original = [
+        'models:',
+        '  providers:',
+        '    anthropic: true',
+        '  overrides: {}',
+        '',
+      ].join('\n');
+
+      const result = await loadRetiredOverridesConfig(original);
+
+      expect(result.fileAfter).toBe(original);
+      expect(result.config).not.toHaveProperty('overrides');
+      expect(result.overridesWarnings).toHaveLength(0);
+    });
+
     it.skip('should merge project config with higher precedence', () => {
       // Skipped: Cannot isolate from real config file without mocking module-level imports
       // Write global config
@@ -97,15 +170,12 @@ models:
       const projectYaml = `
 models:
   preset: premium
-  overrides:
-    issue-agent:exploration: claude-opus-4-6
 `;
       writeFileSync(testProjectConfig, projectYaml, 'utf-8');
 
       const config = loadConfigSync();
 
       expect(config.preset).toBe('premium');
-      expect(config.overrides['issue-agent:exploration']).toBe('claude-opus-4-6');
     });
 
     it.skip('should handle legacy api_keys format', () => {

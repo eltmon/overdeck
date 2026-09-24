@@ -95,6 +95,7 @@ import { normalizeModelOverride } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 import type { IssueOptions } from './start-options.js';
 import { prepareFreshWorkAgentSession } from './start-fresh-session.js';
+import { isWorkspaceSetupIncomplete } from '../../lib/workspace-manager/setup-marker.js';
 
 /**
  * Determine workspace location based on flags and config
@@ -956,17 +957,16 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     let workspaceCreatedThisRun = false;
     let skipSyncMainForUnsafeWorkspace = false;
 
-    if (!workspace) {
-      prep.update(`Creating workspace for ${id}...`);
-      const expectedWorkspacePath = join(projectRoot, 'workspaces', `feature-${normalizedId}`);
+    // PAN-4171: `pan workspace create` resumes an unfinished setup; a resumed worktree is never rolled back.
+    const resumingSetup = !!workspace && isWorkspaceSetupIncomplete(workspace);
+    if (!workspace || resumingSetup) {
+      prep.update(resumingSetup ? `Finishing workspace setup for ${id}...` : `Creating workspace for ${id}...`);
+      const expectedWorkspacePath = workspace ?? join(projectRoot, 'workspaces', `feature-${normalizedId}`);
       try {
-        const nodeDir = dirname(process.execPath);
-        await execAsync(
-          `pan workspace create ${id} --local`,
-          { cwd: projectRoot, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
-        );
+        await execAsync(`pan workspace create ${id} --local`,
+          { cwd: projectRoot, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH}` } });
         workspace = expectedWorkspacePath;
-        workspaceCreatedThisRun = true;
+        workspaceCreatedThisRun = !resumingSetup;
       } catch (wsErr) {
         spinner.fail(`Failed to create workspace for ${id}: ${(wsErr as Error).message}`);
         return exitCli(1);

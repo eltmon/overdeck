@@ -61,6 +61,7 @@ const EXPECTED_EXPORTS = Object.freeze([
   'recoverAgent',
   'resetAgentFailureCount',
   'resolveAgentTarget',
+  'resolveRoutedSpawnModel',
   'restartAgent',
   'resumeAgent',
   'retrieveSpawnTimeMemoryContext',

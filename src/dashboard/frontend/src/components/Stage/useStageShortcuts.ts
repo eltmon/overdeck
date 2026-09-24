@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { usePanesStore, type WorkspaceId } from '../../lib/panesStore'
 import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
+import { isBackendOutage } from '../../lib/backendOutageState'
 
 /** True when focus is in a text-entry context where the Launcher / fields own
  * the keyboard (so the Stage must not hijack ⌘-combos). */
@@ -25,6 +26,7 @@ export function useStageShortcuts(workspaceId: WorkspaceId): void {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (!e.metaKey) return
+      if (isBackendOutage()) return // page hidden by the outage boundary (PAN-3867)
       if (e.altKey || e.ctrlKey || e.shiftKey) return // leave ⌥/⌃/⇧ combos (Launcher etc.) alone
       if (isTextEntryFocused()) return
 

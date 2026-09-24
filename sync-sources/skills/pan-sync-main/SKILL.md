@@ -83,6 +83,6 @@ The "Sync with Main" button appears in the workspace detail panel:
 
 ## Related Commands
 
-- `pan approve <id>` — Review and merge to main
+- `gh pr review <pr-number> --approve` — Approve the PR (merge from the dashboard MERGE button)
 - `pan review request <id>` — Trigger review pipeline
 - `pan tell <id> "<message>"` — Send message to agent

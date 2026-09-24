@@ -83,6 +83,25 @@ const {
 
 vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
   agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
+  // PAN-3939: reviewer kills close through the terminal backend. Here the close
+  // stands in for the tmux kill the assertions below count.
+  closeAgentPaneDetailed: async (agentId: string) => {
+    await mockKillSessionAsync(agentId);
+    return { outcome: 'closed' };
+  },
+}));
+
+// PAN-3939: the synthesis dispatch guard asks the liveness oracle. These tests
+// run with no reviewer alive; the backend paths are covered end to end in
+// src/lib/cloister/__tests__/review-agent-terminal-backend.test.ts.
+vi.mock('../../../src/lib/agents/liveness.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/agents/liveness.js')>(),
+  isAlive: vi.fn(async () => ({ alive: false, reason: 'no-session' })),
+}));
+
+vi.mock('../../../src/lib/overdeck/agents.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/overdeck/agents.js')>(),
+  listAgentIdsByPrefix: vi.fn(() => []),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {

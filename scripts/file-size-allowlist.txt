@@ -20,6 +20,7 @@
 254 src/lib/overdeck/memory.ts # PAN-1990
 849 src/lib/overdeck/planning-promotion.ts # PAN-3229
 1009 src/dashboard/server/routes/agents/lifecycle-restart.ts # PAN-3858
+1018 src/dashboard/server/routes/agents/lifecycle-restart.ts # PAN-4145
 1083 src/lib/overdeck/conversations.ts # PAN-3419
 1083 src/lib/overdeck/conversations.ts # PAN-3671
 1083 src/lib/overdeck/conversations.ts # PAN-3774
@@ -111,3 +112,4 @@
 1124 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3982
 # Two registration lines; implementation is in the extracted child input route module.
 1072 src/dashboard/server/routes/conversations.ts # PAN-3787
+1096 src/lib/config-yaml/schema.ts # PAN-4160

@@ -204,11 +204,6 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 };
 
 /**
- * Default fallback when model not in explicit mapping
- */
-const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-5';
-
-/**
  * Tier rank for OpenAI models: higher = more powerful, needs higher subscription
  * Used for within-provider tier-aware fallback.
  */
@@ -339,11 +334,9 @@ function getBestAnthropicAtTier(
   if (targetRank >= 2 || originalRank >= 2) {
     // User is pro-tier or original was top-tier → use the current Sonnet.
     return 'claude-sonnet-5';
-  } else if (targetRank >= 0) {
-    // User is free or plus tier → use Haiku 4.5 for economy
-    return 'claude-haiku-4-5';
   }
-  return DEFAULT_FALLBACK;
+  // User is free or plus tier → use Haiku 4.5 for economy
+  return 'claude-haiku-4-5';
 }
 
 /**
@@ -363,6 +356,7 @@ function getBestAnthropicAtTier(
 function applyTierAwareFallbackSync(
   modelId: ModelId,
   enabledProviders: Set<ModelProvider>,
+  unmappedFallback: ModelId,
   userTier?: SubscriptionPlan
 ): ModelId {
   const provider = getModelProvider(modelId);
@@ -374,7 +368,7 @@ function applyTierAwareFallbackSync(
 
   // Case 1: Provider disabled — use Anthropic equivalent if available
   if (!isProviderEnabled(provider, enabledProviders)) {
-    const fallback = getFallbackModel(modelId);
+    const fallback = getFallbackModel(modelId, unmappedFallback);
     if (isProviderEnabled('anthropic', enabledProviders)) {
       console.warn(
         `Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`
@@ -442,28 +436,33 @@ function applyTierAwareFallbackSync(
  *
  * @param modelId Requested model
  * @param enabledProviders Set of enabled provider names
+ * @param unmappedFallback Configured `models.provider_fallback_model`, used for
+ *   a disabled-provider model with no FALLBACK_MAP entry
  * @returns Original model if provider enabled, otherwise Anthropic fallback
  */
 export function applyFallback(
   modelId: ModelId,
-  enabledProviders: Set<ModelProvider>
+  enabledProviders: Set<ModelProvider>,
+  unmappedFallback: ModelId,
 ): ModelId {
-  return applyTierAwareFallbackSync(modelId, enabledProviders, undefined);
+  return applyTierAwareFallbackSync(modelId, enabledProviders, unmappedFallback, undefined);
 }
 
 /**
  * Get the fallback model for a given model (useful for preview/display)
  *
  * @param modelId Model to get fallback for
+ * @param unmappedFallback Configured `models.provider_fallback_model`, returned
+ *   when the model has no FALLBACK_MAP entry
  * @returns Anthropic fallback model
  */
-export function getFallbackModel(modelId: ModelId): AnthropicModel {
+export function getFallbackModel(modelId: ModelId, unmappedFallback: ModelId): ModelId {
   // Anthropic models fallback to themselves
   if (getModelProvider(modelId) === 'anthropic') {
     return modelId as AnthropicModel;
   }
 
-  return FALLBACK_MAP[modelId] || DEFAULT_FALLBACK;
+  return FALLBACK_MAP[modelId] || unmappedFallback;
 }
 
 /**

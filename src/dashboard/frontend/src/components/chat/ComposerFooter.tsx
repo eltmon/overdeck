@@ -11,6 +11,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { isBackendOutage } from '../../lib/backendOutageState';
 import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
@@ -610,7 +611,7 @@ export function ComposerFooter({
       const isMac = navigator.platform.toLowerCase().includes('mac');
       const usesModifier = isMac ? event.metaKey : event.ctrlKey;
       if (!usesModifier || !event.shiftKey || event.altKey || event.key.toLowerCase() !== 'm') return;
-      if (isDisabled) return;
+      if (isDisabled || isBackendOutage()) return;
       event.preventDefault();
       setIsVoiceWidgetOpen(true);
       setVoiceAutoStartToken((token) => token + 1);
