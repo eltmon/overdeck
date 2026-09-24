@@ -1,13 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const capturePane = vi.fn(async (_name: string, _lines?: number) => '');
-const isHarnessProcessAlive = vi.fn(async (_name: string) => true);
+// The deadline probe's tmux calls: `has-session` then `list-panes`.
+const hasSession = vi.fn(async (): Promise<unknown> => ({ stdout: '' }));
+const listPanes = vi.fn(async (): Promise<unknown> => ({ stdout: '100\n' }));
+const tmuxExecAsync = vi.fn(async (args: string[]) => (args[0] === 'has-session' ? hasSession() : listPanes()));
+// Pane 100 is the launcher shell; by default a live claude runs under it.
+const readProcessTable = vi.fn(async () => '100 1 bash\n110 100 claude\n');
 
 vi.mock('../../tmux.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../tmux.js')>()),
   capturePane,
-  isHarnessProcessAlive,
+  tmuxExecAsync,
 }));
+vi.mock('../../tmux-process-tree.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../tmux-process-tree.js')>()),
+  readProcessTable,
+}));
+
+function tmuxFailure(stderr: string): Error {
+  return Object.assign(new Error(`tmux failed: ${stderr}`), { code: 1, stderr });
+}
 
 const { waitForConversationRuntimeReady } = await import('../conversation-runtime.js');
 const { CONVERSATION_SESSION_ENDED_MARKER } = await import('../../launcher-generator.js');
@@ -21,11 +34,16 @@ describe('waitForConversationRuntimeReady — Claude Code exits before its promp
   beforeEach(() => {
     vi.useFakeTimers();
     capturePane.mockReset();
-    isHarnessProcessAlive.mockReset();
-    isHarnessProcessAlive.mockResolvedValue(true);
+    hasSession.mockReset();
+    hasSession.mockResolvedValue({ stdout: '' });
+    listPanes.mockReset();
+    listPanes.mockResolvedValue({ stdout: '100\n' });
+    readProcessTable.mockReset();
+    readProcessTable.mockResolvedValue('100 1 bash\n110 100 claude\n');
   });
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('throws the harness output as the exit reason once the launcher reports the session ended', async () => {
@@ -45,12 +63,22 @@ describe('waitForConversationRuntimeReady — Claude Code exits before its promp
     await settled;
   });
 
-  it('throws on timeout when no harness process is left in the pane', async () => {
+  it('throws on timeout when the process table shows no harness left in the pane', async () => {
     capturePane.mockResolvedValue('');
-    isHarnessProcessAlive.mockResolvedValue(false);
+    readProcessTable.mockResolvedValue('100 1 bash\n130 100 sleep\n');
 
     const ready = waitForConversationRuntimeReady('conv-gone', 'claude-code', 'spawn');
     const settled = expect(ready).rejects.toThrow('Claude Code exited before writing a transcript, with no output in its pane.');
+    await vi.advanceTimersByTimeAsync(31_000);
+    await settled;
+  });
+
+  it('throws on timeout when the tmux session is confirmed gone', async () => {
+    capturePane.mockResolvedValue('');
+    hasSession.mockRejectedValue(tmuxFailure("can't find session: conv-vanished"));
+
+    const ready = waitForConversationRuntimeReady('conv-vanished', 'claude-code', 'spawn');
+    const settled = expect(ready).rejects.toThrow(/exited before/);
     await vi.advanceTimersByTimeAsync(31_000);
     await settled;
   });
@@ -63,7 +91,24 @@ describe('waitForConversationRuntimeReady — Claude Code exits before its promp
     await vi.advanceTimersByTimeAsync(31_000);
     await expect(ready).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Timed out waiting for Claude Code prompt'));
-    warn.mockRestore();
+  });
+
+  // Review of #4137 (finding 1): a failed tmux or ps call at the deadline says
+  // nothing about the harness, so a healthy slow start must not become a
+  // permanent spawn error.
+  it.each([
+    ['list-panes fails', () => listPanes.mockRejectedValue(tmuxFailure('lost server'))],
+    ['has-session errors without confirming the session is gone', () => hasSession.mockRejectedValue(tmuxFailure('error connecting to /tmp/tmux-1000/overdeck (Connection refused)'))],
+    ['ps fails', () => readProcessTable.mockRejectedValue(new Error('ps: spawn EAGAIN'))],
+  ])('only warns on timeout when the liveness probe fails (%s)', async (_label, failProbe) => {
+    capturePane.mockResolvedValue('loading MCP servers…');
+    failProbe();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const ready = waitForConversationRuntimeReady('conv-probe-failed', 'claude-code', 'spawn');
+    await vi.advanceTimersByTimeAsync(31_000);
+    await expect(ready).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Timed out waiting for Claude Code prompt'));
   });
 
   it('resolves once the prompt renders', async () => {

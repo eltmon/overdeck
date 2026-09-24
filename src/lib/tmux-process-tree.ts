@@ -1,3 +1,8 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
 const KEEPALIVE_FOREGROUND_COMMANDS = new Set(['sleep', 'bash', 'sh', 'dash', 'zsh', 'ash']);
 
 /**
@@ -30,4 +35,10 @@ export function paneTreeHasHarnessProcess(panePids: number[], psTable: string): 
     if (children) queue.push(...children);
   }
   return false;
+}
+
+/** The `ps -eo pid=,ppid=,comm=` table {@link paneTreeHasHarnessProcess} reads; rejects when `ps` fails. */
+export async function readProcessTable(): Promise<string> {
+  const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,comm='], { encoding: 'utf-8' });
+  return String(stdout);
 }

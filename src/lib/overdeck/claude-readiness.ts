@@ -1,5 +1,7 @@
 import { CONVERSATION_SESSION_ENDED_MARKER } from '../launcher-generator.js';
-import { capturePane, isHarnessProcessAlive } from '../tmux.js';
+import { LEGACY_TMUX_PROBE_TIMEOUT_MS, queryTmuxSession } from '../agents/tmux-session-query.js';
+import { capturePane, exactPaneTarget, tmuxExecAsync } from '../tmux.js';
+import { paneTreeHasHarnessProcess, readProcessTable } from '../tmux-process-tree.js';
 
 /**
  * The error for a harness that exited before its conversation started, with
@@ -20,6 +22,47 @@ function harnessEarlyExitError(paneText: string): Error {
 }
 
 /**
+ * What the deadline probe could establish about the pane. Only `session-gone`
+ * and `harness-gone` are answers; `unknown` means a tmux or `ps` call failed
+ * (a server hiccup, a socket race during a reload), which says nothing about
+ * the harness, so it must never become a spawn error (review of #4137).
+ */
+type HarnessExitProbe = 'alive' | 'session-gone' | 'harness-gone' | 'unknown';
+
+/**
+ * Tmux-only: conversations run in tmux on every host until PAN-3921. When they
+ * move to Herdr, this probe must switch to the backend-aware liveness module
+ * (`src/lib/agents/liveness.ts`), or every slow start would read as `unknown`.
+ */
+async function probeHarnessExit(tmuxSession: string): Promise<HarnessExitProbe> {
+  const session = await queryTmuxSession(tmuxSession);
+  if (session === 'missing') return 'session-gone';
+  if (session === 'error') return 'unknown';
+  let panePids: number[];
+  try {
+    const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactPaneTarget(tmuxSession), '-F', '#{pane_pid}'], {
+      encoding: 'utf-8',
+      timeout: LEGACY_TMUX_PROBE_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
+    });
+    panePids = String(stdout)
+      .split('\n')
+      .map((value) => Number.parseInt(value.trim(), 10))
+      .filter((pid) => Number.isInteger(pid) && pid > 0);
+  } catch {
+    return 'unknown';
+  }
+  if (panePids.length === 0) return 'unknown';
+  let psTable: string;
+  try {
+    psTable = await readProcessTable();
+  } catch {
+    return 'unknown';
+  }
+  return paneTreeHasHarnessProcess(panePids, psTable) ? 'alive' : 'harness-gone';
+}
+
+/**
  * Wait for Claude Code's prompt. A harness that exits first leaves only the
  * launcher's keep-alive loop holding the pane, which reads as a live, empty
  * conversation (PAN-3827), so that exit is thrown as a spawn error.
@@ -36,6 +79,7 @@ export async function waitForClaudeReady(tmuxSession: string): Promise<void> {
     }
     await new Promise<void>((r) => setTimeout(r, 500));
   }
-  if (!(await isHarnessProcessAlive(tmuxSession))) throw harnessEarlyExitError(output);
-  console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
+  const probe = await probeHarnessExit(tmuxSession);
+  if (probe === 'session-gone' || probe === 'harness-gone') throw harnessEarlyExitError(output);
+  console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession} (harness probe: ${probe})`);
 }
