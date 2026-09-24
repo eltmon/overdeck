@@ -32,7 +32,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { Effect } from 'effect';
 import type { PullRequestKey, PullRequestLink, PullRequestSnapshot } from '@overdeck/contracts';
 
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -61,7 +60,7 @@ import {
 } from '../../../lib/overdeck/derived-issue-state.js';
 import { getRepoTargetBranch } from '../../../lib/project-repos.js';
 import { findProjectByPath, type ProjectConfig } from '../../../lib/projects.js';
-import { listSessionNames } from '../../../lib/tmux.js';
+import { tmuxExecAsync } from '../../../lib/tmux.js';
 
 export const PR_SYNC_BOOT_DELAY_MS = 30_000;
 export const PR_SYNC_INTERVAL_MS = 60_000;
@@ -179,11 +178,17 @@ function applySnapshot(link: PullRequestLink, row: GhPrRow, ctx: SweepContext): 
  */
 async function autoArchiveSettledConversations(
   ctx: SweepContext,
-  listLiveSessions: () => Promise<readonly string[]>,
+  listLiveSessions: () => Promise<readonly string[] | null>,
 ): Promise<string[]> {
   const candidates = [...ctx.settled].filter((name) => !isAgentConversationName(name));
   if (candidates.length === 0 || !isConversationsAutoArchiveOnMerge()) return [];
-  const live = new Set(await listLiveSessions());
+  const liveNames = await listLiveSessions();
+  if (liveNames === null) {
+    // Liveness unknown: archiving now could archive a live conversation.
+    console.warn(`${LOG_PREFIX} terminal sessions could not be listed; skipping auto-archive this sweep`);
+    return [];
+  }
+  const live = new Set(liveNames);
   const archived: string[] = [];
   for (const name of candidates) {
     const conversation = getConversationByName(name);
@@ -351,13 +356,29 @@ export async function refreshPullRequestLinkNow(
 }
 
 /**
+ * Live tmux session names, or null when they could not be read (unlike
+ * `listSessionNames`, which reports a failure as "none alive"). A tmux with no
+ * server running has no live sessions. Conversations are tmux-hosted on every
+ * host for now; PAN-3921 moves this to the backend-agnostic inventory.
+ */
+async function listLiveConversationSessions(): Promise<readonly string[] | null> {
+  try {
+    const { stdout } = await tmuxExecAsync(['list-sessions', '-F', '#{session_name}'], { encoding: 'utf-8' });
+    return String(stdout).split('\n').map((line) => line.trim()).filter(Boolean);
+  } catch (error) {
+    const stderr = String((error as { stderr?: unknown }).stderr ?? '');
+    return /no server running|error connecting to .*No such file or directory/i.test(stderr) ? [] : null;
+  }
+}
+
+/**
  * One full sweep. Exported for tests; `readPullRequest` is the `gh pr view`
  * fallback and `listLiveSessions` the terminal sessions auto-archive checks.
  */
 export async function runPullRequestSyncOnce(
   now: number = Date.now(),
   readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
-  listLiveSessions: () => Promise<readonly string[]> = () => Effect.runPromise(listSessionNames()),
+  listLiveSessions: () => Promise<readonly string[] | null> = listLiveConversationSessions,
 ): Promise<PullRequestSyncResult> {
   const ctx: SweepContext = {
     now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set(), settled: new Set(),

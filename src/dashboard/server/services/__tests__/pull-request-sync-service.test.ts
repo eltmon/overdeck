@@ -40,6 +40,12 @@ vi.mock('../../../../lib/overdeck/derived-issue-state.js', async (importOriginal
   };
 });
 
+const tmuxExecAsyncMock = vi.fn(async (_args: string[], _options?: unknown): Promise<{ stdout: string; stderr: string }> => ({ stdout: '', stderr: '' }));
+vi.mock('../../../../lib/tmux.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/tmux.js')>()),
+  tmuxExecAsync: (args: string[], options?: unknown) => tmuxExecAsyncMock(args, options),
+}));
+
 const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
 const { setConversationsAutoArchiveOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
 const { closeOverdeckDatabase, getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
@@ -112,6 +118,8 @@ beforeEach(() => {
   prRows = [];
   listRepoPullRequestsMock.mockClear();
   emitOnlyMock.mockClear();
+  tmuxExecAsyncMock.mockReset();
+  tmuxExecAsyncMock.mockResolvedValue({ stdout: '', stderr: '' });
 });
 
 afterEach(() => {
@@ -399,6 +407,32 @@ describe('runPullRequestSyncOnce — auto-archive on merge (WI-11)', () => {
     setConversationsAutoArchiveOnMerge(true);
     const name = await openThenMerge('feature/live', { name: 'live-chat' }, async () => ['conv-live-chat']);
     expect(archivedAt(name)).toBeNull();
+  });
+
+  it('skips auto-archive for the sweep when the terminal sessions cannot be listed', async () => {
+    setConversationsAutoArchiveOnMerge(true);
+    const name = await openThenMerge('feature/unknown-liveness', {}, async () => null);
+    expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('merged');
+    expect(archivedAt(name)).toBeNull();
+  });
+
+  it('by default reads tmux, skipping on a failed read and treating "no server running" as none alive', async () => {
+    setConversationsAutoArchiveOnMerge(true);
+    tmuxExecAsyncMock.mockRejectedValue(Object.assign(new Error('tmux failed'), { stderr: 'server exited unexpectedly' }));
+    const failed = conversation('feature/tmux-failed');
+    prRows = [pr(30, 'feature/tmux-failed')];
+    await runPullRequestSyncOnce(T0, async () => null);
+    prRows = [merged(30, 'feature/tmux-failed')];
+    await runPullRequestSyncOnce(T0 + 60_000, async () => null);
+    expect(archivedAt(failed)).toBeNull();
+
+    tmuxExecAsyncMock.mockRejectedValue(Object.assign(new Error('tmux failed'), { stderr: 'no server running on /tmp/tmux-1000/overdeck' }));
+    const noServer = conversation('feature/tmux-no-server');
+    prRows = [pr(31, 'feature/tmux-no-server')];
+    await runPullRequestSyncOnce(T0 + 120_000, async () => null);
+    prRows = [merged(31, 'feature/tmux-no-server')];
+    await runPullRequestSyncOnce(T0 + 180_000, async () => null);
+    expect(archivedAt(noServer)).not.toBeNull();
   });
 
   it('waits while another linked PR is still open', async () => {
