@@ -10,7 +10,7 @@
  */
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -110,7 +110,8 @@ vi.mock('../agent-runtime.js', async (importOriginal) => {
   return { ...actual, emitAgentEvent: vi.fn(() => E.void) };
 });
 
-import { stopAgent } from '../agents.js';
+import { saveAgentStateSync, stopAgent } from '../agents.js';
+import { getAgentStateFilePath } from '../agents/agent-state-read.js';
 import { closeAgentPane, closeIssuePanes } from '../terminal-backends/launch.js';
 import { findHerdrAgentPane, HerdrBackend } from '../terminal-backends/herdr.js';
 import { tmuxBackend } from '../terminal-backends/tmux.js';
@@ -248,6 +249,147 @@ describe('closeAgentPane', () => {
   it('is a no-op on tmux when the session is already gone', async () => {
     expect(await closeAgentPane(AGENT, tmuxBackend)).toBe(false);
     expect(tmux.killed).toEqual([]);
+  });
+});
+
+describe('PAN-3966: stop closes the agent\'s Herdr terminals when tokens are gone', () => {
+  const recorded = 'w12:p2';
+
+  /**
+   * The live shape seen on 2026-09-24 after a Herdr restore: three idle shells
+   * in the issue workspace, none carrying a token, no agent record for the
+   * exited harness. Only state.json's `paneId` still names the agent's pane.
+   */
+  function restoredIssueWorkspace(extra: Record<string, unknown>[] = []): void {
+    herdr.handler = (method) => {
+      if (method === 'agent.get') return new Error('agent_not_found');
+      if (method === 'session.snapshot') {
+        return {
+          snapshot: {
+            panes: [
+              { pane_id: 'w12:p1', terminal_id: 't1', workspace_id: 'w12' },
+              { pane_id: 'w12:p2', terminal_id: 't2', workspace_id: 'w12' },
+              { pane_id: 'w12:p3', terminal_id: 't3', workspace_id: 'w12' },
+              ...extra,
+            ],
+          },
+        };
+      }
+      if (method === 'workspace.list') return { workspaces: [{ workspace_id: 'w12', label: 'PAN-3947' }] };
+      return {};
+    };
+  }
+
+  it('stopAgent closes the pane state.json recorded', async () => {
+    backendSelection.name = 'herdr';
+    restoredIssueWorkspace();
+    saveAgentStateSync({
+      id: AGENT, issueId: 'PAN-3947', workspace: '/tmp/ws', harness: 'claude-code', role: 'work',
+      status: 'running', startedAt: '2026-09-24T00:00:00.000Z', backend: 'herdr', paneId: recorded,
+    } as never);
+
+    try {
+      await Effect.runPromise(stopAgent(AGENT, 'operator'));
+    } finally {
+      rmSync(dirname(getAgentStateFilePath(AGENT)), { recursive: true, force: true });
+    }
+
+    expect(herdrPaneCloses()).toEqual([recorded]);
+    // The issue workspace is shared by the issue's agents: never closed by a stop.
+    expect(herdr.calls.some((call) => call.method === 'workspace.close')).toBe(false);
+  });
+
+  it('closeAgentPane takes an explicit recorded pane id', async () => {
+    restoredIssueWorkspace();
+    const api = { call: vi.fn(async () => ({})) };
+
+    expect(await closeAgentPane(AGENT, new HerdrBackend(api as never), { recordedPaneId: recorded })).toBe(true);
+    expect(api.call).toHaveBeenCalledWith('pane.close', { pane_id: recorded });
+    expect(api.call).toHaveBeenCalledTimes(1);
+  });
+
+  it('never closes a recorded pane another agent now owns', async () => {
+    herdr.handler = (method) => {
+      if (method === 'agent.get') return new Error('agent_not_found');
+      if (method === 'session.snapshot') {
+        return {
+          snapshot: {
+            panes: [
+              { pane_id: 'w12:p2', terminal_id: 't2', workspace_id: 'w12', tokens: { agentId: 'agent-pan-3947-review' } },
+              { pane_id: 'w12:p3', terminal_id: 't3', workspace_id: 'w12', agent: 'claude', name: 'someone-else' },
+            ],
+          },
+        };
+      }
+      return {};
+    };
+    const api = { call: vi.fn(async () => ({})) };
+    const backend = new HerdrBackend(api as never);
+
+    expect(await closeAgentPane(AGENT, backend, { recordedPaneId: 'w12:p2' })).toBe(false);
+    expect(await closeAgentPane(AGENT, backend, { recordedPaneId: 'w12:p3' })).toBe(false);
+    expect(api.call).not.toHaveBeenCalled();
+  });
+
+  it('closes every pane stamped with the agent id, not only the first', async () => {
+    herdr.handler = (method) => {
+      if (method === 'agent.get') return new Error('agent_not_found');
+      if (method === 'session.snapshot') {
+        return {
+          snapshot: {
+            panes: [
+              { pane_id: 'wG:p2', terminal_id: 't2', workspace_id: 'wG', tokens: { agentId: AGENT } },
+              { pane_id: 'wG:p5', terminal_id: 't5', workspace_id: 'wG', tokens: { agentId: AGENT } },
+              { pane_id: 'wG:p6', terminal_id: 't6', workspace_id: 'wG', tokens: { agentId: `${AGENT}-review` } },
+            ],
+          },
+        };
+      }
+      return {};
+    };
+    const api = { call: vi.fn(async () => ({})) };
+
+    expect(await closeAgentPane(AGENT, new HerdrBackend(api as never))).toBe(true);
+    expect(api.call.mock.calls.map((call) => (call as unknown[])[1])).toEqual([
+      { pane_id: 'wG:p2' },
+      { pane_id: 'wG:p5' },
+    ]);
+  });
+
+  it('closes a workspace the agent owns alone, root shell and residue included', async () => {
+    const runner = 'sequencer-runner';
+    herdr.handler = (method, params) => {
+      if (method === 'agent.get' && params['target'] === runner) {
+        return { agent: { pane_id: 'w13:p18', terminal_id: 't18', workspace_id: 'w13', agent_status: 'idle' } };
+      }
+      if (method === 'session.snapshot') {
+        return {
+          snapshot: {
+            panes: [
+              { pane_id: 'w13:p1', terminal_id: 'r1', workspace_id: 'w13' },
+              { pane_id: 'w13:p18', terminal_id: 't18', workspace_id: 'w13', tokens: { agentId: runner } },
+            ],
+          },
+        };
+      }
+      if (method === 'workspace.list') {
+        return {
+          workspaces: [
+            { workspace_id: 'wD', label: runner },
+            { workspace_id: 'w13', label: runner, tokens: { issue: runner } },
+            { workspace_id: 'w12', label: 'PAN-3947' },
+          ],
+        };
+      }
+      return {};
+    };
+    const api = { call: vi.fn(async () => ({})) };
+
+    expect(await closeAgentPane(runner, new HerdrBackend(api as never))).toBe(true);
+    expect(api.call.mock.calls.map((call) => (call as unknown[]).slice(0, 2))).toEqual([
+      ['workspace.close', { workspace_id: 'wD' }],
+      ['workspace.close', { workspace_id: 'w13' }],
+    ]);
   });
 });
 

@@ -22,7 +22,6 @@ interface SupervisorRestartSpawnerOptions {
 
 export interface SpawnSupervisorRestartOptions {
   restartLockHeld?: boolean;
-  bootId?: string | null;
 }
 
 export function buildSupervisorRestartArgs(): string[] {
@@ -101,7 +100,6 @@ export function createSupervisorRestartSpawner(options: SupervisorRestartSpawner
           OVERDECK_RESTART_LOCK_HELD: '1',
           OVERDECK_RESTART_INITIATOR: 'supervisor-watchdog',
           OVERDECK_SKIP_SUPERVISOR_CYCLE: '1',
-          ...(spawnOptions.bootId ? { OVERDECK_BOOT_ID: spawnOptions.bootId } : {}),
         },
       });
 

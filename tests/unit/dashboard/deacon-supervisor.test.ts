@@ -162,4 +162,76 @@ describe('deacon supervisor', () => {
     child.connected = false;
     expect(supervisor.reloadConfig()).toBe(false);
   });
+
+  describe('lastPatrolReport', () => {
+    it('is null before and after startDeaconChild()', async () => {
+      const child = fakeChild(501);
+      const supervisor = createDeaconSupervisor({
+        fork: vi.fn(() => child as never),
+        readState: () => ({ running: false }),
+      });
+
+      expect(supervisor.lastPatrolReport()).toBeNull();
+      await supervisor.startDeaconChild();
+      expect(supervisor.lastPatrolReport()).toBeNull();
+    });
+
+    it('stores the latest of two patrol-done reports', async () => {
+      const child = fakeChild(502);
+      const supervisor = createDeaconSupervisor({
+        fork: vi.fn(() => child as never),
+        readState: () => ({ running: false }),
+      });
+      await supervisor.startDeaconChild();
+
+      child.emit('message', { type: 'patrol-done', at: '2026-09-19T12:00:00.000Z', error: null });
+      expect(supervisor.lastPatrolReport()).toEqual({ at: '2026-09-19T12:00:00.000Z', error: null });
+
+      child.emit('message', { type: 'patrol-done', at: '2026-09-19T12:01:00.000Z', error: 'tracker down' });
+      expect(supervisor.lastPatrolReport()).toEqual({ at: '2026-09-19T12:01:00.000Z', error: 'tracker down' });
+    });
+
+    it('ignores a bare string, a patrol-done without a string at, and another message type', async () => {
+      const child = fakeChild(503);
+      const supervisor = createDeaconSupervisor({
+        fork: vi.fn(() => child as never),
+        readState: () => ({ running: false }),
+      });
+      await supervisor.startDeaconChild();
+
+      expect(() => child.emit('message', 'hello')).not.toThrow();
+      expect(() => child.emit('message', { type: 'patrol-done' })).not.toThrow();
+      expect(() => child.emit('message', { type: 'other', at: 'x' })).not.toThrow();
+
+      expect(supervisor.lastPatrolReport()).toBeNull();
+    });
+
+    it('keeps the stored report across an exit + respawn until the new child reports', async () => {
+      const children = [fakeChild(504), fakeChild(505)];
+      const fork = vi.fn(() => {
+        const next = children.shift();
+        if (!next) throw new Error('unexpected spawn');
+        return next as never;
+      });
+      const supervisor = createDeaconSupervisor({
+        fork,
+        readState: () => ({ running: false }),
+        restartDelayMs: 1_000,
+      });
+      await supervisor.startDeaconChild();
+
+      const first = fork.mock.results[0]?.value as ReturnType<typeof fakeChild>;
+      first.emit('message', { type: 'patrol-done', at: '2026-09-19T12:00:00.000Z', error: null });
+      expect(supervisor.lastPatrolReport()).toEqual({ at: '2026-09-19T12:00:00.000Z', error: null });
+
+      first.emit('exit', 1, null);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(fork).toHaveBeenCalledTimes(2);
+      expect(supervisor.lastPatrolReport()).toEqual({ at: '2026-09-19T12:00:00.000Z', error: null });
+
+      const second = fork.mock.results[1]?.value as ReturnType<typeof fakeChild>;
+      second.emit('message', { type: 'patrol-done', at: '2026-09-19T12:05:00.000Z', error: null });
+      expect(supervisor.lastPatrolReport()).toEqual({ at: '2026-09-19T12:05:00.000Z', error: null });
+    });
+  });
 });

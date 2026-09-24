@@ -266,6 +266,36 @@ export class CodexAppServerManager extends EventEmitter {
     return this.request('thread/read', { threadId, includeTurns: true });
   }
 
+  /**
+   * Read-only capability check. Never resumes or forks a child as a side
+   * effect. Only a thread classified as a descendant of the owner accepts
+   * input (PAN-3835 classification): the owner, a foreign thread (a native
+   * `/new` or `/fork`), and a thread never announced to this client do not.
+   */
+  async readSubagentInput(threadId: string, includeTurns = false): Promise<{ direct: boolean; activeTurnId?: string }> {
+    if (this.threadScope(threadId) !== 'descendant') return { direct: false };
+    const child = asRecord(asRecord(await this.request('thread/read', { threadId, includeTurns })).thread);
+    if (child.id !== threadId) return { direct: false };
+    const status = asRecord(child.status).type;
+    const turns = Array.isArray(child.turns) ? child.turns.map(asRecord) : [];
+    const activeTurn = turns.findLast(turn => turn.status === 'inProgress');
+    if (status === 'active' && !includeTurns) return { direct: true };
+    if (status === 'active' && typeof activeTurn?.id === 'string') {
+      return { direct: true, activeTurnId: activeTurn.id };
+    }
+    return { direct: status === 'idle' };
+  }
+
+  async sendSubagentMessage(threadId: string, text: string): Promise<unknown> {
+    const inputState = await this.readSubagentInput(threadId, true);
+    if (!inputState.direct) throw new Error('Direct input is unavailable for this subagent.');
+    const input = [{ type: 'text', text, text_elements: [] }];
+    // A raced turn completion is rejected by Codex; never retry as a new turn.
+    return inputState.activeTurnId
+      ? this.request('turn/steer', { threadId, input, expectedTurnId: inputState.activeTurnId })
+      : this.request('turn/start', { threadId, input });
+  }
+
   readAccount(): Promise<unknown> {
     return this.request('account/read', {});
   }

@@ -84,6 +84,7 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
+import { reapWarmIdleRoleRun } from './warm-idle-reap.js';
 import {
   appendSessionIdToHistory,
   createFreshSessionIdentity,
@@ -180,19 +181,10 @@ async function spawnRunWithoutConsentClaim(
     // the pane process has exited. A live pane is a genuinely active run, so
     // keep throwing and let the operator message it (PAN-3917 removed the
     // stored phase verdict that used to be the second signal).
-    let reapWarmIdle = false;
-    try {
-      const { isPaneDead } = await import('../tmux.js');
-      if (await Effect.runPromise(isPaneDead(agentId))) {
-        reapWarmIdle = true;
-      }
-    } catch { /* probe failure → conservative: treat as active */ }
-    if (!reapWarmIdle) {
+    if (!(await reapWarmIdleRoleRun(agentId))) {
       throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
     }
-    console.log(`[spawn] ${agentId} is warm-idle from the previous cycle — reaping it for the new ${role} dispatch (PAN-2579)`);
-    const { killSession } = await import('../tmux.js');
-    await Effect.runPromise(killSession(agentId)).catch(() => {});
+    console.log(`[spawn] ${agentId} is warm-idle from the previous cycle — reaped it for the new ${role} dispatch (PAN-2579)`);
   }
   await prepareWorkspaceForAgentSpawn(issueId, role, options.allowHost, workspace);
   initHook(agentId);

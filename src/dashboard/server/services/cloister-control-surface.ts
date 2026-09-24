@@ -1,13 +1,14 @@
 import { Effect } from 'effect';
 import { listRunningAgents } from '../../../lib/agents.js';
 import { loadCloisterConfigSync } from '../../../lib/cloister/config.js';
-import { getDeaconLiteStatus, type DeaconLiteStatus } from '../../../lib/cloister/deacon-lite.js';
+import { DEACON_LITE_INTERVAL_MS, type DeaconLiteStatus } from '../../../lib/cloister/deacon-lite.js';
 import { generateHealthSummary, getAgentHealth, getAgentsNeedingAttention } from '../../../lib/cloister/health.js';
 import { readCloisterStateFile, type CloisterStatus } from '../../../lib/cloister/service.js';
 import { isCloisterSpawnsPaused, setCloisterSpawnsPaused } from '../../../lib/overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 import {
   isChildRunning,
+  lastPatrolReport,
   reloadDeaconConfig,
   sendPatrolNow,
   startDeaconChild,
@@ -21,19 +22,31 @@ export interface CloisterControlDeps {
   sendPatrolNow?: typeof sendPatrolNow;
   reloadDeaconConfig?: typeof reloadDeaconConfig;
   isChildRunning?: typeof isChildRunning;
-  readDeaconLiteStatus?: typeof getDeaconLiteStatus;
+  lastPatrolReport?: typeof lastPatrolReport;
+  readDeaconLiteStatus?: () => DeaconLiteStatus;
   readSpawnPaused?: typeof isCloisterSpawnsPaused;
   writeSpawnPaused?: typeof setCloisterSpawnsPaused;
 }
 
 /**
- * PAN-3917 W4: deacon-lite keeps no heartbeat file and no patrol-result
- * aggregation, so status here is derived from its in-memory
- * running/lastRunAt/lastRunError only — never from a stored artifact.
+ * PAN-3922: deacon-lite runs only in the forked deacon child, so the
+ * dashboard process composes status from what the supervisor last relayed
+ * over IPC (see deacon-supervisor.ts) rather than reading deacon-lite's own
+ * in-memory state, which in this process is never updated.
  */
+export function readRelayedDeaconLiteStatus(deps: CloisterControlDeps = {}): DeaconLiteStatus {
+  const report = (deps.lastPatrolReport ?? lastPatrolReport)();
+  return {
+    running: (deps.isChildRunning ?? isChildRunning)(),
+    intervalMs: DEACON_LITE_INTERVAL_MS,
+    lastRunAt: report?.at ?? null,
+    lastRunError: report?.error ?? null,
+  };
+}
+
 export async function readDurableCloisterStatus(deps: CloisterControlDeps = {}): Promise<CloisterStatus> {
   const cloisterState = (deps.readCloisterStateFile ?? readCloisterStateFile)();
-  const deaconLite = (deps.readDeaconLiteStatus ?? getDeaconLiteStatus)();
+  const deaconLite = deps.readDeaconLiteStatus ? deps.readDeaconLiteStatus() : readRelayedDeaconLiteStatus(deps);
   const agentHealths = (await Effect.runPromise(listRunningAgents()))
     .filter((agent) => agent.tmuxActive)
     .flatMap((agent) => {
@@ -74,7 +87,7 @@ export function readDurableDeaconStatus(deps: CloisterControlDeps = {}): {
   deaconLite: DeaconLiteStatus;
 } {
   const cloisterState = (deps.readCloisterStateFile ?? readCloisterStateFile)();
-  const deaconLite = (deps.readDeaconLiteStatus ?? getDeaconLiteStatus)();
+  const deaconLite = deps.readDeaconLiteStatus ? deps.readDeaconLiteStatus() : readRelayedDeaconLiteStatus(deps);
   return {
     isRunning: cloisterState.running,
     pid: cloisterState.pid ?? null,

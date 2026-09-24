@@ -15,6 +15,13 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `src/dashboard/server/services/*.ts` — domain services (cache, agent enrichment, TTS runtime/playback, etc.)
 - `src/dashboard/server/event-store.ts`, `read-model.ts` — event store and in-memory read model, at the server root
 
+**Deacon child process** (PAN-3922):
+- The dashboard forks `dist/dashboard/deacon.js` (`src/dashboard/server/deacon-main.ts`) through `services/deacon-supervisor.ts`. Cloister and deacon-lite run only in that child, never in the dashboard process.
+- IPC, parent to child: `{type:'patrol'}` (run one patrol now) and `{type:'reload-config'}`. Child to parent: `{type:'patrol-done', at, error}` after every completed deacon-lite tick, scheduled or manual.
+- The supervisor keeps the latest `patrol-done` report in memory, across child restarts. Nothing is written to disk.
+- `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
+- The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
+
 **Two WebSocket endpoints:**
 - `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
 - `/ws/terminal?session=<name>` — Raw WebSocket: live PTY terminal streaming via `ws` library.
@@ -49,6 +56,12 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
+- The Command Deck project list (`command-deck-projects`), project registry
+  (`registered-projects`) and conversation list (`conversations`) still load over
+  REST. `lib/queryRecovery.ts` (PAN-3527) retries any failure of them with
+  backoff (1s, 2s, 4s, 8s, 16s) and, when EventRouter re-bootstraps after a
+  `/ws/rpc` reconnect, cancels in-flight fetches and refetches them, so a failed
+  or hung fetch during a dashboard restart does not leave the sidebar empty.
 
 **Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
 starts a discuss-first conversation through `POST /api/conversations` and opens
@@ -136,6 +149,17 @@ door that does not exist; a real record read door would be a separate change.
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.
+- The dashboard runs the built bundle, where `dashboard-db-worker.js` is its own entry in
+  `dist/dashboard/` (`src/dashboard/server/tsdown.config.ts`). `dashboard-db-task.ts`
+  resolves it from the `dist/` root, like the memory FTS worker, so it is found whichever
+  chunk the bundler puts the task module in.
+- Under a source run (Vitest, `tsx`) `dashboard-db-task.ts` loads as `.ts`. Node's type
+  stripping does not rewrite the worker's `.js` import specifiers, and a `--import tsx`
+  flag in `execArgv` does not reach a worker thread, so a raw `.ts` worker dies on its
+  first relative import. The `.ts` branch instead boots the thread through an `eval`
+  bootstrap that registers `tsx`'s resolver and then imports `dashboard-db-worker.ts`
+  (PAN-3930). Bun runs the `.ts` worker directly. Tests that boot the real worker call
+  `__testInternals.terminateWorkers()` in `afterEach`.
 - Jobs that wait or run for more than one second emit
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.

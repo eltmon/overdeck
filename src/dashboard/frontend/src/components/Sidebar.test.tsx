@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar';
 import { useDashboardStore } from '../lib/store';
 import type { Tab } from './Header';
 import type { Issue } from '../types';
+import { installQueryRecovery } from '../lib/queryRecovery';
 
 vi.mock('./FreshnessIndicator', () => ({ FreshnessIndicator: () => <div data-testid="freshness-indicator" /> }));
 vi.mock('./DeaconPauseToggle', () => ({
@@ -391,5 +392,52 @@ describe('Sidebar drag-drop move (PAN-1577)', () => {
       expect.stringContaining('/move'),
       expect.anything(),
     );
+  });
+});
+
+describe('Sidebar project registry recovery (PAN-3527)', () => {
+  it('retries a failed registered-projects fetch instead of caching it as an empty list', async () => {
+    vi.useFakeTimers();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, refetchInterval: false }, mutations: { retry: false } },
+    });
+    const uninstall = installQueryRecovery(client);
+    let registryCalls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/registered-projects') {
+        registryCalls += 1;
+        // Both the project list and the registry query read this route on
+        // mount; fail both initial reads.
+        return registryCalls <= 2
+          ? new Response('restarting', { status: 503 })
+          : Response.json([{ key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' }]);
+      }
+      if (url === '/api/version') return Response.json({ version: '0.5.0', isDev: false });
+      if (url === '/api/issues/resource-allocated' || url === '/api/conversations') return Response.json([]);
+      return Response.json({});
+    }));
+
+    try {
+      const { unmount } = render(
+        <QueryClientProvider client={client}>
+          <Sidebar activeTab="pipeline" onTabChange={vi.fn()} onSearchOpen={vi.fn()} />
+        </QueryClientProvider>,
+      );
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(registryCalls).toBe(2);
+      // The failure is not cached as a settled empty registry.
+      expect(client.getQueryData(['registered-projects'])).toBeUndefined();
+
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expect(client.getQueryData(['registered-projects'])).toEqual([
+        { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+      ]);
+      unmount();
+    } finally {
+      uninstall();
+      client.clear();
+      vi.useRealTimers();
+    }
   });
 });
