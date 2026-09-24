@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('../../lib/wsTransport.js', () => ({
   dashboardMutationJsonHeaders: vi.fn().mockResolvedValue({ 'content-type': 'application/json' }),
@@ -358,8 +359,10 @@ describe('keystrokes typed before the first resolve lands (PAN-3867)', () => {
     const user = userEvent.setup();
     routeFetch();
     const page = <NewProjectPage onCancel={vi.fn()} onCreated={vi.fn()} />;
+    const queryClient = new QueryClient();
     const { rerender } = render(
       <BackendConnectionBoundary backendDown={false} restarting={false}>{page}</BackendConnectionBoundary>,
+      { wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider> },
     );
     await user.type(screen.getByLabelText('Repository URL'), 'acme/widget');
 
