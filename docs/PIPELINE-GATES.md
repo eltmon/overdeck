@@ -48,7 +48,9 @@ the **CI test job on the PR head is the test gate**:
   the whole-issue agent holds it, the verification feedback door (local gate
   and CI test gate) skips the resurrection ladder, a still-live pane gets the
   notice queued to its mail (a paused agent is never resumed to receive a
-  message), and a needs-you says the agent is waiting for the operator.
+  message), and a needs-you says the agent is waiting for the operator. The
+  ladder re-reads the pause when it reaches the agent, so a stuck pause that
+  the other gate set while this delivery was resolving its target is kept too.
   Further verification failures keep holding it. Exactly four things lift
   the stuck pause: a local verification pass, a CI test-gate pass on the PR
   head (`recordCiTestGatePass`; both through `liftVerificationStuckPause`),

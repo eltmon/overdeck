@@ -5,6 +5,7 @@ import {
   markAgentRunning,
   clearAgentOperatorGatesForIssueSync,
   clearAgentOperatorGatesForIssuesSync,
+  clearAgentPausedSync,
   saveAgentStateSync,
   getAgentStateSync,
   type AgentState,
@@ -271,5 +272,49 @@ describe('clearAgentOperatorGatesForIssuesSync (batch, PAN-3727 review finding)'
 
     expect(mutated.size).toBe(0);
     expect(getAgentStateSync('agent-pan-1-work')?.stoppedByUser).toBe(true);
+  });
+});
+
+describe('clearAgentPausedSync compare-and-clear', () => {
+  let odb: OverdeckTestDb;
+  beforeEach(() => { odb = setupOverdeckTestDb(); });
+  afterEach(() => { teardownOverdeckTestDb(odb); });
+
+  function paused(reason: string): AgentState {
+    return {
+      id: 'agent-pan-4045',
+      issueId: 'PAN-4045',
+      workspace: '/tmp/workspace',
+      role: 'work',
+      model: 'claude-opus-4-8',
+      status: 'stopped',
+      startedAt: '2026-09-23T00:00:00.000Z',
+      paused: true,
+      pausedReason: reason,
+    } as AgentState;
+  }
+
+  it('lifts the pause when the predicate accepts the state it reads', () => {
+    saveAgentStateSync(paused('needs-you: verification failed 3x'));
+
+    expect(clearAgentPausedSync('agent-pan-4045', (state) => state.pausedReason?.startsWith('needs-you:') === true)).toBe(true);
+    expect(getAgentStateSync('agent-pan-4045')?.paused).toBeUndefined();
+  });
+
+  it('leaves the pause and returns false when the predicate refuses the state it reads', () => {
+    saveAgentStateSync(paused('needs-you: verification stuck after 3/3 attempts (test)'));
+
+    expect(clearAgentPausedSync('agent-pan-4045', (state) => !state.pausedReason?.startsWith('needs-you: verification stuck'))).toBe(false);
+    expect(getAgentStateSync('agent-pan-4045')).toMatchObject({
+      paused: true,
+      pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
+    });
+  });
+
+  it('without a predicate lifts any pause, as before', () => {
+    saveAgentStateSync(paused('operator: hold'));
+
+    expect(clearAgentPausedSync('agent-pan-4045')).toBe(true);
+    expect(getAgentStateSync('agent-pan-4045')?.paused).toBeUndefined();
   });
 });

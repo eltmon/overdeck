@@ -84,7 +84,7 @@ A **handoff fork** asks the live source agent to write the seed text itself, the
 - Workspace devcontainer sources cannot write to the host `${OVERDECK_HOME}/handoffs/` in v1, so Overdeck falls back to summary fork when the source cwd is a workspace path and that workspace stack is up.
 - Handoff seed text is portable Markdown, so Pi targets consume it the same way they consume summary forks. Plain forks remain Claude-Code-only because Pi cannot resume Claude JSONL history.
 
-Implementation lives in `src/lib/conversations/summary-fork.ts`; the authoring prompt template lives in `roles/handoff.md`.
+The pipeline lives in `src/lib/overdeck/conversation-forks.ts` and its seed helpers in `src/lib/conversations/summary-fork.ts`; the authoring prompt template lives in `roles/handoff.md`.
 
 ## Fork Options
 
@@ -152,10 +152,11 @@ Agent-authored handoff forks use the orchestrator-injected template in `roles/ha
 
 ## Developer Notes
 
-See `src/lib/conversations/summary-fork.ts` for the fork pipeline implementation.
+The fork pipeline lives in `src/lib/overdeck/conversation-forks.ts`; the seed and session helpers it calls live in `src/lib/conversations/summary-fork.ts`.
 
 Key functions:
-- `runForkPipeline()` (`src/lib/overdeck/conversation-forks.ts`) — entry point, orchestrates session reservation, seed generation, spawn and summary injection
+- `handleConversationSummaryFork()` (`src/lib/overdeck/conversation-forks.ts`) — request handler; reserves the new session with `reserveSummaryForkSession()`, then starts the pipeline with that `sessionId`
+- `runForkPipeline()` (`src/lib/overdeck/conversation-forks.ts`) — receives the reserved `sessionId` (`recoverStuckForks()` passes the persisted one after a restart) and orchestrates seed generation, spawn and summary injection
 - `reserveSummaryForkSession()` — reserves the new session id and file path
 - `requestHandoffFromAgent()` — live-agent handoff prompt delivery, doc/sentinel polling, and validation
 - `validateHandoffDoc()` — handoff document contract check

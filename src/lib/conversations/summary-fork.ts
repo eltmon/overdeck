@@ -12,11 +12,13 @@
  *    into a new session file. Thinking blocks are sanitized (converted to text)
  *    to prevent signature validation errors on cross-model resumes.
  *
- * Entry point: runForkPipeline() in src/lib/overdeck/conversation-forks.ts. It
- * reserves the session (reserveSummaryForkSession), generates the seed
- * (generateSummaryForFork, requestHandoffFromAgent / authorHandoffExternal, or
- * copySessionFromCompactBoundary for a plain fork), and handles the spawn and
- * summary injection. This module holds those helpers.
+ * Entry point: handleConversationSummaryFork() in
+ * src/lib/overdeck/conversation-forks.ts reserves the session
+ * (reserveSummaryForkSession) and hands its id to runForkPipeline(), which
+ * generates the seed (generateSummaryForFork, requestHandoffFromAgent /
+ * authorHandoffExternal, or copySessionFromCompactBoundary for a plain fork)
+ * and handles the spawn and summary injection. This module holds those
+ * helpers.
  */
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';

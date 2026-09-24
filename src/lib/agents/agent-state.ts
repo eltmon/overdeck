@@ -2,7 +2,10 @@
  * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
  * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
  * as sync) and cannot await:
- * - `saveAgentStateSync` (async: `saveAgentState`): 12 sites in lib/agents/agent-state.ts,
+ * - `clearAgentPausedSync` (async: `clearAgentPaused`): src/lib/cloister/feedback-target.ts:254. Its callers are
+ *   async; it stays because its `onlyIf` compare-and-clear (#4045) must read and write state.json with no await in
+ *   between, which the Effect variant cannot promise.
+ * - `saveAgentStateSync` (async: `saveAgentState`): 13 sites in lib/agents/agent-state.ts,
  *   lib/agents/messaging.ts, lib/agents/spawn.ts, lib/agents/supervisor-channels.ts, lib/agents/termination.ts,
  *   lib/lifecycle/teardown-workspace.ts, lib/runtimes/claude-code.ts, lib/runtimes/kimi-code.ts.
  * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
@@ -348,6 +351,26 @@ function applyAgentUnpaused(state: AgentState): void {
 function isAgentPauseClear(state: AgentState): boolean {
   return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined
     && state.yieldedByScheduler === undefined && state.yieldedAt === undefined;
+}
+
+/**
+ * Clears the persistent manual pause gate without spawning the agent.
+ *
+ * `onlyIf` makes it a compare-and-clear: the pause is lifted only when the
+ * predicate accepts the state read here, immediately before the write, and
+ * false is returned otherwise. That is as close as the pause gets to atomic:
+ * state.json is a plain read-modify-write with no lock, so a writer in another
+ * process can still land between this read and the write.
+ */
+export function clearAgentPausedSync(agentId: string, onlyIf?: (state: AgentState) => boolean): boolean {
+  const state = getAgentStateSync(agentId);
+  if (!state) return false;
+  if (isAgentPauseClear(state)) return true;
+  if (onlyIf && !onlyIf(state)) return false;
+
+  applyAgentUnpaused(state);
+  saveAgentStateSync(state);
+  return true;
 }
 
 /** Clears the persistent manual pause gate without spawning the agent; resolves the state (unchanged when already clear), or null when the agent has no state. */

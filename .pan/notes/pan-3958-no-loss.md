@@ -1036,9 +1036,15 @@ PRD W8 and W11 part 3. Every Shape C pair outside Oh My Pi was re-decided with i
 `tmuxExecSync`, or another twin that does (`listRunningAgentsSync` → `listSessionsSync`, `stopAgentSync` →
 `capturePaneSync`/`killSessionSync`, `sessionExistsSync` → `querySessionSync`).
 
-Ratchet: C 52 → 34 (33 pairs plus the Oh My Pi runtime row). A 1 and B 4 are Oh My Pi only (#4003). Effect diagnostics
+Ratchet: C 52 → 35 (34 pairs plus the Oh My Pi runtime row). A 1 and B 4 are Oh My Pi only (#4003). Effect diagnostics
 unchanged at 250. `src/lib/tmux.ts` (1322) and `src/lib/projects.ts` (1253) gain audited file-size exceptions (PAN-4012)
 for their sync-twin headers.
+
+`agents/agent-state.ts` `clearAgentPausedSync` stays (C6 with a stated reason) after the merge of #4045: its
+`onlyIf` compare-and-clear, used by `cloister/feedback-target.ts`, must read and write state.json with no await in
+between, which the Effect variant (async mkdir and write) cannot promise. Its other callers (`pan start` ×2,
+`pan unpause`) moved to the `clearAgentPaused` Effect in this PR, as the C4 rule has it; the compare-and-clear caller
+keeps the sync twin.
 
 A C5 row whose remaining Effect-variant caller is server-reachable keeps the async variant: server callers use the async
 twin. So `cloister/config.ts` `loadCloisterConfig`/`saveCloisterConfig` (caller: `lifecycle/workflows.ts` close-out)
@@ -1050,7 +1056,6 @@ resolves avoid sync syscalls, PAN-3330) stay as C6 rows instead of the PRD's C5.
 | Module | Deleted | Survivor | Rule | Callers moved |
 | --- | --- | --- | --- | --- |
 | `agents/agent-state.ts` | `setAgentPausedSync` | `setAgentPaused` (Effect) | C4 | `cli/commands/pause.ts`, `cli/commands/workspace-migrate.ts`, `cloister/memory-governor.ts`, `cloister/service-crash.ts` (all async) |
-| `agents/agent-state.ts` | `clearAgentPausedSync` | `clearAgentPaused` (Effect) | C4 | `cli/commands/start.ts` (2), `cli/commands/unpause.ts`, `cloister/feedback-target.ts` |
 | `agents/agent-state.ts` | `clearAgentTroubledSync` | `clearAgentTroubled` (Effect) | C4 | `cloister/feedback-target.ts` |
 | `agents/activity.ts` | `getLatestSessionId` (Effect.sync) | `getLatestSessionIdSync` | C5 | `routes/agents/lifecycle-restart.ts` (generator), `work-agent-lifecycle.ts` |
 | `cliproxy.ts` | `startCliproxySync` | `startCliproxy` | C4 | `cli/commands/dev.ts`, `cli/up-sidecars.ts`, `cli/commands/restart.ts` (injected) |
@@ -1105,9 +1110,10 @@ Converted to the async twin:
 | `cloister/stall-sweeper.ts` `runStallSweeperPatrol` | default `isAgentLive` = `sessionExistsSync` | default awaits `sessionExists`; the dependency may return a Promise |
 | `cloister/concurrency.ts` `countRunningAgents` | `listRunningAgentsSync` | `listRunningAgents` |
 
-Left for the operator (decision item on the PR): `cloister/concurrency.ts` `describeRunningAgents` (no production
-caller), `countRunningSwarmSlotsForIssue` and `countWarmIdleAdvancingAgents` (default parameters),
-`emergencyBrake`, and `cloister/service.ts` `emergencyStop` still call `listRunningAgentsSync` / `stopAgentSync`.
+Operator decision (#4048): the six remaining sync calls stay as they are. `cloister/concurrency.ts`
+`describeRunningAgents`, `countRunningSwarmSlotsForIssue` and `countWarmIdleAdvancingAgents` (default parameters) and
+`emergencyBrake` (`listRunningAgentsSync`, `stopAgentSync`), and `cloister/service.ts` `emergencyStop`
+(`listRunningAgentsSync`). The emergency brake and stop stay synchronous on purpose; CH-8 handles the dead ones.
 
 ### Behaviour notes for reviewers
 
