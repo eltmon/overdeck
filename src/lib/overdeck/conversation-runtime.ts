@@ -36,13 +36,11 @@ import {
   sessionExists,
   isHarnessProcessAlive,
   killSession,
-  setOption,
-  exactPaneTarget,
   listSessionNames,
   findManagedServerPid,
 } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
-import { closeAgentPane, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import { closeAgentPane, keepTmuxSessionOpen, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
 import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
@@ -769,7 +767,8 @@ export async function spawnConversationSession(
         setTerminalEnv: true,
         unsetProviderEnv: true,
         managedStateKey: tmuxSession,
-        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+        // Hooks attribute by OVERDECK_AGENT_ID when there is no $TMUX to read (Herdr).
+        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor || backend.name !== 'tmux') ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [
           harnessLaunch.pathExport,
           `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
@@ -888,11 +887,7 @@ export async function spawnConversationSession(
       console.error(`[conversations] dismissDevChannelsDialog failed for ${tmuxSession}: ${msg}`);
     });
   }
-  // tmux-only session options: Herdr owns its panes' lifetime itself.
-  if ((pane as AgentPaneRef | null)?.backend === 'tmux') {
-    await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
-    await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
-  }
+  await keepTmuxSessionOpen(pane);
 }
 export interface ResolvedRegisteredProject {
   key: string;
