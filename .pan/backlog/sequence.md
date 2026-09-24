@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T20:02:47.390Z · model: claude-opus-5 · open: 820_
+_Last sequenced: 2026-09-24T20:04:12.283Z · model: claude-opus-5 · open: 820_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -787,7 +787,7 @@ _Last sequenced: 2026-09-24T20:02:47.390Z · model: claude-opus-5 · open: 820_
 | 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 835 | PAN-3914 | S | low | needs-refinement |  |  | Stale: checkOrphanedCompletions / deacon.ts patrol deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 835 | PAN-3914 | S | low | needs-refinement |  |  | Live, not dead: PR #4133 fixes its false review.redispatched journaling and PAN-4134 split off the synthesis gap; rest still needs re-triage |
 | 836 | PAN-3868 | XS | low | stale |  |  | Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists |
 | 837 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
 | 838 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
@@ -1135,7 +1135,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T20:02:47.390Z",
+  "generatedAt": "2026-09-24T20:04:12.283Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 820,
@@ -10755,8 +10755,8 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "score": 18,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Stale: checkOrphanedCompletions / deacon.ts patrol deleted by the PAN-3917 cut (ca15def); re-triage or close",
-      "rationale": "Triage: the looping patrol maps to two surviving deacon-lite routines; verify tombstone-respecting logic against them before pickup. Rank held.",
+      "why": "Live, not dead: PR #4133 fixes its false review.redispatched journaling and PAN-4134 split off the synthesis gap; rest still needs re-triage",
+      "rationale": "Rank, score, gate and planning held verbatim; only the verdict text moves. The prior why read \"stale, re-triage or close\" because the PAN-3917 cut deleted checkOrphanedCompletions and deacon.ts, but open PR #4133 (fix(cloister): stop recoverStalledReviews journaling no-op re-dispatches) is an active fix against this issue and PAN-4134 was carved out of it while that work was in flight, so calling it a candidate for closure is wrong. What remains after #4133 lands is the original claim -- a patrol looping nine times on PAN-3842 despite its panDoneRecoveredAt tombstone -- which still has to be re-verified against the two surviving deacon-lite routines before pickup, so the condition stays needs-refinement.",
       "gate": "auto",
       "planning": "auto"
     },
