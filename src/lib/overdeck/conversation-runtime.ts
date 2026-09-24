@@ -223,10 +223,19 @@ async function validateCwdContainment(cwd: string): Promise<boolean> {
     return false;
   }
 }
+/**
+ * The conversation pane's screen on the host's backend (PAN-3921): tmux
+ * `capture-pane`, or Herdr `pane.read`. `''` when it cannot be read yet — a
+ * readiness waiter keeps polling until its own deadline.
+ */
+async function readConversationPane(tmuxSession: string, lines: number): Promise<string> {
+  const { readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
+  return readAgentPaneText(tmuxSession, lines).catch(() => '');
+}
 async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const output = await capturePane(tmuxSession, 200);
+    const output = await readConversationPane(tmuxSession, 200);
     if (output.includes('❯')) {
       console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
       return;
@@ -243,7 +252,7 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000)
   const deadline = Date.now() + timeoutMs;
   let stableV17FooterPolls = 0;
   while (Date.now() < deadline) {
-    const snapshot = await capturePane(tmuxSession, 40).catch(() => '');
+    const snapshot = await readConversationPane(tmuxSession, 40);
     const mcpConnecting = /Connecting to MCP servers/i.test(snapshot) && !/MCP finished/i.test(snapshot);
     // omp v17 paints its footer before MCP startup and redraws again afterward.
     stableV17FooterPolls = /⬢[^\n]*[◕◉]/.test(snapshot) && !mcpConnecting ? stableV17FooterPolls + 1 : 0;

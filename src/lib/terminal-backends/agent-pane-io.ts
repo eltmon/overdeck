@@ -7,8 +7,8 @@
  * a relaunch that now lands on Herdr never looked ready, and a menu on its
  * screen was never seen.
  *
- * Conversations stay on tmux on every host until PAN-3921, so the conversation
- * pane-choice route keeps its own tmux reads; this module is for agents.
+ * Conversation readiness reads through here too (PAN-3921); only the
+ * conversation pane-choice route keeps its own tmux reads.
  */
 
 import { Effect } from 'effect';
