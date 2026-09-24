@@ -141,6 +141,15 @@ hooks, and `ask-user-question-hook` (its deny message is what lets the
 dashboard surface AskUserQuestion). The guard hooks (`auto-approve-hook`,
 `gh-issue-trailer-hook`, `tmux-send-keys-guard`) also stay on.
 
+Two consequences to know. A managed Codex session runs in a private
+`CODEX_HOME`, so Overdeck normally re-delivers the user's `~/.codex/AGENTS.md`
+inside the launch bundle; a bare Codex conversation drops the bundle and with it
+that file (Codex project `AGENTS.md` discovery still works). The resume bar's
+**Send resume message** checkbox has no effect on a bare conversation, which
+never gets a resume message. A bare session also skips the memory
+session-start call, so it is not registered for memory observation until the
+memory-reconciliation sweep picks up its transcript.
+
 **Native memory.** Claude Code still loads its own `CLAUDE.md` files and auto
 memory in a bare conversation; those are not Overdeck layers. The separate
 **Skip CLAUDE.md** checkbox (Claude Code only, stored as
