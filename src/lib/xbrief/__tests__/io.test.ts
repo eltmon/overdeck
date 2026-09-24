@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { createHash } from 'crypto';
 import { dirname, join } from 'path';
@@ -6,7 +7,7 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
-import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeXBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlanSync, isPlanningComplete, normalizeXBriefEnvelope, readPlanSync, readWorkspacePlanSync, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { planBuilder } from '../builder.js';
 import { subItemsOf, type XBriefDocument, type XBriefSubItem } from '../types.js';
 
@@ -74,23 +75,21 @@ function writeWorkspaceDraft(doc: XBriefDocument, runtimeDir = '.overdeck'): str
   return planPath;
 }
 
-function writeRecord(statusOverrides: Record<string, string>): void {
-  const recordsDir = join(WORKSPACE_PATH, '.pan', 'records');
-  mkdirSync(recordsDir, { recursive: true });
-  writeFileSync(join(recordsDir, `${ISSUE_ID.toLowerCase()}.json`), JSON.stringify({
+/** Seed item statuses in the plan home's continue file (PAN-3917 W9: the workspace). */
+function writeContinueItems(statuses: Record<string, string>): void {
+  const continuesDir = join(WORKSPACE_PATH, '.pan', 'continues');
+  mkdirSync(continuesDir, { recursive: true });
+  writeFileSync(join(continuesDir, `${ISSUE_ID.toUpperCase()}.xbrief.json`), JSON.stringify({
+    version: '1',
     issueId: ISSUE_ID,
-    schemaVersion: 2,
     created: '2026-01-01T00:00:00Z',
     updated: '2026-01-01T00:00:00Z',
-    pipeline: {
-      issueId: ISSUE_ID,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      readyForMerge: false,
-      updatedAt: '2026-01-01T00:00:00Z',
-    },
-    closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
-    statusOverrides,
+    gitState: {},
+    decisions: [],
+    hazards: [],
+    resumePoint: null,
+    sessionHistory: [],
+    items: Object.fromEntries(Object.entries(statuses).map(([key, status]) => [key, { status }])),
   }, null, 2));
 }
 
@@ -123,22 +122,22 @@ describe('findPlan', () => {
     expect(existsSync(result!)).toBe(true);
   });
 
-  it('resolves the parent project spec (PAN-1124: single spec on main, workspace-first lookup removed)', () => {
-    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    // Workspace spec is no longer preferred — verify the canonical project spec wins.
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+  it('resolves the workspace spec over the main checkout spec (PAN-3917 W9: the workspace owns its plan artifacts)', () => {
+    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    // The workspace's own .pan/specs is the plan home now — it wins over main.
+    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
-    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
   });
 
-  it('resolves the parent project spec when the workspace is itself a git worktree', () => {
+  it('resolves the workspace spec when the workspace is itself a git worktree', () => {
     createWorktreeShape();
-    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
-    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {
@@ -179,10 +178,9 @@ describe('findPlan', () => {
     expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('canonical-draft-item');
   });
 
-  it('resolves post-promotion specs from the main project specs directory, not the workspace specs directory', () => {
+  it('falls back to the main checkout specs directory when the workspace has no spec of its own (an already-merged spec, PAN-3917 W9)', () => {
     createWorktreeShape();
     const projectSpec = writePlanDoc(makePlanDoc([{ id: 'canonical-item' }]));
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
     const result = findPlanSync(WORKSPACE_PATH);
 
@@ -421,14 +419,17 @@ describe('updateItemStatus', () => {
     expect(item2?.status).toBe('in_progress');
   });
 
-  it('writes status to per-issue record statusOverrides (not the spec)', () => {
+  it('writes status to the plan-home continue file, not the spec', () => {
     writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
     updateItemStatus(WORKSPACE_PATH, 'item-1', 'completed');
 
-    // The spec on main should NOT be modified
+    // The canonical spec is immutable after planning.
     const specPath = join(PROJECT_ROOT, '.pan', 'specs', SPEC_FILENAME);
     const raw = JSON.parse(readFileSync(specPath, 'utf-8'));
     expect(raw.plan.items[0].status).toBe('pending');
+
+    const continuePath = join(WORKSPACE_PATH, '.pan', 'continues', `${ISSUE_ID}.xbrief.json`);
+    expect(JSON.parse(readFileSync(continuePath, 'utf-8')).items['item-1'].status).toBe('completed');
   });
 });
 
@@ -437,46 +438,7 @@ describe('tierOverrides', () => {
     return createHash('sha256').update(readFileSync(path)).digest('hex');
   }
 
-  it('reads legacy tier state and writes promotions to canonical workspace continue.json', () => {
-    writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
-    const legacyPath = join(WORKSPACE_PATH, '.pan', 'continue.json');
-    mkdirSync(join(WORKSPACE_PATH, '.pan'), { recursive: true });
-    writeFileSync(
-      legacyPath,
-      JSON.stringify({ statusOverrides: { 'item-2': 'running' } }, null, 2),
-    );
-    const legacyBefore = readFileSync(legacyPath, 'utf-8');
 
-    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'simple', 'medium', 'verification failed');
-    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'medium', 'complex', 'blocked by supervisor');
-
-    const canonicalPath = join(WORKSPACE_PATH, '.overdeck', 'continue.json');
-    const continueState = JSON.parse(readFileSync(canonicalPath, 'utf-8'));
-    expect(readFileSync(legacyPath, 'utf-8')).toBe(legacyBefore);
-    expect(continueState.statusOverrides).toEqual({ 'item-2': 'running' });
-    expect(continueState.tierOverrides['item-1'].effectiveDifficulty).toBe('complex');
-
-    const overrides = readTierOverrides(WORKSPACE_PATH);
-    expect(overrides['item-1']).toMatchObject({
-      effectiveDifficulty: 'complex',
-      promotions: 2,
-      history: [
-        { from: 'simple', to: 'medium', reason: 'verification failed' },
-        { from: 'medium', to: 'complex', reason: 'blocked by supervisor' },
-      ],
-    });
-    expect(overrides['item-1'].history[0].at).toEqual(expect.any(String));
-    expect(overrides['item-1'].history[1].at).toEqual(expect.any(String));
-  });
-
-  it('preserves the canonical spec byte-for-byte when recording a promotion', () => {
-    const specPath = writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
-    const beforeHash = hashFile(specPath);
-
-    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'simple', 'medium', 'verification failed');
-
-    expect(hashFile(specPath)).toBe(beforeHash);
-  });
 
   it('overlays promoted difficulty before tier resolution without changing unmatched items', () => {
     const config = {
@@ -567,7 +529,7 @@ describe('updateSubItemStatus', () => {
   it('applies compact subItem status overrides whose keys equal dotted subItem IDs', () => {
     const doc = makePlanWithSubItems();
     writePlanDoc(doc);
-    writeRecord({ 'item-1.ac1': 'completed' });
+    writeContinueItems({ 'item-1.ac1': 'completed' });
 
     const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
@@ -577,7 +539,7 @@ describe('updateSubItemStatus', () => {
   it('applies compact status overrides to v0.6 items children', () => {
     const doc = makePlanWithItems();
     writePlanDoc(doc);
-    writeRecord({ 'item-1.ac1': 'completed' });
+    writeContinueItems({ 'item-1.ac1': 'completed' });
 
     const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = subItemsOf(updated.plan.items[0]).find(s => s.id === 'item-1.ac1');
@@ -603,92 +565,6 @@ describe('updateSubItemStatus', () => {
   });
 });
 
-function writeSpecWithPlanStatus(planStatus: string): void {
-  const doc = makePlanDoc();
-  doc.plan.status = planStatus;
-  // Use a valid PanSpecStatus for the spec's top-level status so parsePanSpecDocument passes.
-  // The tests exercise plan.status via checkPlanStatus, which reads doc.plan.status.
-  const specStatus = (['proposed', 'active', 'completed', 'cancelled'].includes(planStatus))
-    ? planStatus as 'proposed' | 'active' | 'completed' | 'cancelled'
-    : 'active';
-  writeMainSpec(doc, specStatus);
-}
-
-describe('isPlanningProposed', () => {
-  it('returns true when plan.status is "proposed"', () => {
-    writeSpecWithPlanStatus('proposed');
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(true);
-  });
-
-  it('returns false when plan.status is "draft"', () => {
-    // 'draft' is not a valid PanSpecStatus, so parsePanSpecDocument will fail
-    // unless we use a valid spec-level status. But the auto-recovery in
-    // parsePanSpecDocument tries plan.status, and 'draft' is not a valid
-    // PanSpecStatus either. So the spec won't parse, and isPlanningProposed returns false.
-    // We just need a valid spec on main for the test — use 'active' as spec status.
-    writeSpecWithPlanStatus('active');
-    // Overwrite with plan.status = 'draft' but keep spec status valid
-    const doc = makePlanDoc();
-    doc.plan.status = 'draft';
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    const specPath = join(specsDir, SPEC_FILENAME);
-    writeFileSync(specPath, JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when plan.status is "approved"', () => {
-    // 'approved' is not a PanSpecStatus; parsePanSpecDocument auto-recovers only when
-    // plan.status IS a valid PanSpecStatus. So this spec won't parse unless we set
-    // a valid top-level status.
-    const doc = makePlanDoc();
-    doc.plan.status = 'approved';
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when plan.status is "running"', () => {
-    const doc = makePlanDoc();
-    doc.plan.status = 'running';
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when plan.status is explicit but not "proposed"', () => {
-    const doc = makePlanDoc();
-    doc.plan.status = 'approved';
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when plan has no status field', () => {
-    const doc = makePlanDoc();
-    delete (doc.plan as Partial<typeof doc.plan>).status;
-    // Without plan.status, parsePanSpecDocument needs top-level status
-    const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
-    mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when there is no plan at all', () => {
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  it('returns false when no plan and no marker', () => {
-    expect(isPlanningProposed(WORKSPACE_PATH)).toBe(false);
-  });
-
-  // Note: "corrupt plan" test removed — corrupt JSON in .pan/specs/ causes
-  // parsePanSpecDocument to throw inside listSpecs/findSpecByIssue, which is
-  // the correct behavior for the single-spec-on-main model. The old test
-  // targeted workspace-local spec fallback which no longer exists.
-});
 
 describe('isPlanningComplete', () => {
   // isPlanningComplete checks plan.status against PLANNING_FINISHED_STATUSES:
@@ -704,67 +580,66 @@ describe('isPlanningComplete', () => {
     ['completed', 'completed'],
   ] as const)(
     'returns true when plan.status is "%s" (valid PanSpecStatus)',
-    (planStatus, specStatus) => {
+    async (planStatus, specStatus) => {
       writeMainSpec({ ...makePlanDoc(), plan: { ...makePlanDoc().plan, status: planStatus } }, specStatus);
-      expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(true);
+      expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(true);
     },
   );
 
   it.each(['approved', 'pending', 'running', 'blocked'])(
     'returns true when plan.status is "%s" (non-PanSpecStatus, needs top-level status)',
-    (planStatus) => {
+    async (planStatus) => {
       const doc = makePlanDoc();
       doc.plan.status = planStatus;
       const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
       mkdirSync(specsDir, { recursive: true });
       writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-      expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(true);
+      expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(true);
     },
   );
 
-  it('returns false when plan.status is "draft"', () => {
+  it('returns false when plan.status is "draft"', async () => {
     const doc = makePlanDoc();
     doc.plan.status = 'draft';
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 
-  it('returns false when plan.status is "cancelled"', () => {
+  it('returns false when plan.status is "cancelled"', async () => {
     writeMainSpec({ ...makePlanDoc(), plan: { ...makePlanDoc().plan, status: 'cancelled' } }, 'cancelled');
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 
-  it('returns false when plan has no status field', () => {
+  it('returns false when plan has no status field', async () => {
     const doc = makePlanDoc();
     delete (doc.plan as Partial<typeof doc.plan>).status;
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 
-  it('returns false when no plan exists', () => {
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+  it('returns false when no plan exists', async () => {
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 
-  it('returns false when plan.status is an explicit non-finished value', () => {
+  it('returns false when plan.status is an explicit non-finished value', async () => {
     const doc = makePlanDoc();
     doc.plan.status = 'draft';
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 });
 
-// PAN-2401: the plan read door must overlay the per-issue record's
-// statusOverrides — merged tasks read 'completed', never the spec's
-// immutable 'pending'.
-describe('mergeRecordStatusOverrides (PAN-2401)', () => {
-  it('applies record overrides onto a loaded doc', async () => {
-    const { mergeRecordStatusOverrides, applyStatusOverrides } = await import('../io.js');
+// PAN-2401: the plan read door must overlay the continue file's item statuses
+// — completed tasks read 'completed', never the spec's immutable 'pending'.
+describe('mergeContinueItemStatuses (PAN-2401)', () => {
+  it('applies continue-file item statuses onto a loaded doc', async () => {
+    const { mergeContinueItemStatuses, applyItemStatuses } = await import('../io.js');
     const doc = {
       plan: {
         id: 'pan-2401', title: 't', status: 'running',
@@ -775,14 +650,14 @@ describe('mergeRecordStatusOverrides (PAN-2401)', () => {
         edges: [],
       },
     } as never;
-    // applyStatusOverrides is the underlying pure transform — assert the
+    // applyItemStatuses is the underlying pure transform — assert the
     // shape it produces so the route-level wiring has a locked contract.
-    const merged = applyStatusOverrides(doc, { a: 'completed' });
+    const merged = applyItemStatuses(doc, { a: 'completed' });
     expect(merged.plan.items.find((i: { id: string }) => i.id === 'a')!.status).toBe('completed');
     expect(merged.plan.items.find((i: { id: string }) => i.id === 'b')!.status).toBe('pending');
-    // mergeRecordStatusOverrides with a workspace that has no record is a
-    // pass-through (no throw, doc unchanged).
-    const untouched = mergeRecordStatusOverrides(doc, '/nonexistent/workspace-path');
+    // mergeContinueItemStatuses with a workspace that has no continue file is
+    // a pass-through (no throw, doc unchanged).
+    const untouched = mergeContinueItemStatuses(doc, '/nonexistent/workspace-path');
     expect(untouched.plan.items[0]!.status).toBe('pending');
   });
 });

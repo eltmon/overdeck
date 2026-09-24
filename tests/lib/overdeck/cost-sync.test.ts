@@ -5,12 +5,14 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  insertCostEventSync,
-  getTodayCostSync,
-  getCostsByIssueSync,
-  getCostForIssueAggregateSync,
+  insertCostEvent,
+  getTodayCost,
+  getCostsByIssue,
+  getCostForIssueAggregate,
+  getAgentCostStats,
 } from '../../../src/lib/overdeck/cost-sync.js';
-import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../../../src/lib/overdeck/infra.js';
+import { buildAgentStatsSnapshot } from '../../../src/dashboard/server/routes/resources/agents-stats.js';
+import { closeOverdeckDatabase, getOverdeckDatabase } from '../../../src/lib/overdeck/infra.js';
 import type { CostEvent } from '../../../src/lib/costs/events.js';
 
 let originalOverdeckHome: string | undefined;
@@ -24,7 +26,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   if (originalOverdeckHome === undefined) {
     delete process.env.OVERDECK_HOME;
   } else {
@@ -48,48 +50,48 @@ function costEvent(overrides: Partial<CostEvent> = {}): CostEvent {
   };
 }
 
-describe('getTodayCostSync', () => {
+describe('getTodayCost', () => {
   it('sums cost_events from UTC midnight only', () => {
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       ts: '2026-06-24T23:59:59.999Z',
       cost: 99,
       requestId: 'previous-day',
     }));
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       ts: '2026-06-25T00:00:00.000Z',
       cost: 0.4,
       requestId: 'midnight',
     }));
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       ts: '2026-06-25T18:30:00.000Z',
       cost: 1.1,
       requestId: 'same-day',
     }));
 
-    expect(getTodayCostSync(new Date('2026-06-25T23:59:00.000Z'))).toBeCloseTo(1.5, 8);
+    expect(getTodayCost(new Date('2026-06-25T23:59:00.000Z'))).toBeCloseTo(1.5, 8);
   });
 });
 
-describe('getCostsByIssueSync', () => {
+describe('getCostsByIssue', () => {
   it('aggregates totals with per-model and per-stage breakdowns, case-folding issue ids (PAN-472)', () => {
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       issueId: 'pan-9', sessionType: 'work', model: 'gpt-test', cost: 1,
       input: 100, output: 50, requestId: 'a1',
     }));
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       issueId: 'PAN-9', sessionType: 'work', model: 'gpt-test', cost: 2,
       input: 200, output: 100, requestId: 'a2',
     }));
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       issueId: 'PAN-9', sessionType: 'review', model: 'claude-test', cost: 4,
       input: 10, output: 5, requestId: 'a3',
     }));
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       issueId: 'PAN-10', sessionType: 'planning', model: 'gpt-test', cost: 8,
       input: 1, output: 1, requestId: 'b1',
     }));
 
-    const result = getCostsByIssueSync();
+    const result = getCostsByIssue();
 
     // 'pan-9' and 'PAN-9' fold into one issue.
     expect(Object.keys(result).sort()).toEqual(['PAN-10', 'PAN-9']);
@@ -106,11 +108,11 @@ describe('getCostsByIssueSync', () => {
   });
 
   it('returns provider totals that sum to the issue total', () => {
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       issueId: 'pan-42', provider: 'openai', sessionType: 'work', model: 'gpt-test', cost: 1.25,
       input: 100, output: 50, requestId: 'provider-openai',
     }));
-    insertCostEventSync(costEvent({
+    insertCostEvent(costEvent({
       issueId: 'PAN-42', provider: 'anthropic', sessionType: 'review', model: 'claude-test', cost: 2.75,
       input: 200, output: 100, requestId: 'provider-anthropic',
     }));
@@ -120,7 +122,7 @@ describe('getCostsByIssueSync', () => {
       requestId: 'provider-null',
     });
 
-    const result = getCostForIssueAggregateSync('pan-42');
+    const result = getCostForIssueAggregate('pan-42');
 
     expect(result).not.toBeNull();
     expect(result!.totalCost).toBeCloseTo(4.5, 8);
@@ -135,7 +137,7 @@ describe('getCostsByIssueSync', () => {
 });
 
 function insertRawCostEventWithNullProvider(input: { issueId: string; cost: number; requestId: string }): void {
-  getOverdeckDatabaseSync()
+  getOverdeckDatabase()
     .prepare(
       `INSERT INTO cost_events (
         ts, agent_id, issue_id, session_type, provider, model,
@@ -145,3 +147,55 @@ function insertRawCostEventWithNullProvider(input: { issueId: string; cost: numb
     )
     .run(Date.parse('2026-06-25T12:00:00.000Z'), input.issueId, input.cost, input.requestId);
 }
+
+describe('agent resource cost aggregates', () => {
+  it('sums the burn window, hypothetical rate and total per agent with grouped SQL', () => {
+    const nowMs = Date.parse('2026-06-25T12:00:00.000Z');
+    // Rows on both sides of the 30-minute burn window, a future row, subscription-covered
+    // rows (hypothetical rate only), a zero-cost agent and an unrelated agent.
+    const fixtures = [
+      { agentId: 'agent-a', ageMs: 30 * 60_000 + 1, cost: 1 },
+      { agentId: 'agent-a', ageMs: 30 * 60_000, cost: 0.5 },
+      { agentId: 'agent-a', ageMs: 60_000, cost: 0.256 },
+      { agentId: 'agent-a', ageMs: -60_000, cost: 0.2 },
+      { agentId: 'agent-a', ageMs: 30 * 60_000 + 1, cost: 5, source: 'subscription-covered' },
+      { agentId: 'agent-a', ageMs: 30 * 60_000, cost: 0.125, source: 'subscription-covered' },
+      { agentId: 'agent-b', ageMs: 60_000, cost: 0 },
+      { agentId: 'unrelated', ageMs: 60_000, cost: 90 },
+    ];
+    fixtures.forEach((fixture, index) => insertCostEvent(costEvent({
+      ...fixture, ts: new Date(nowMs - fixture.ageMs).toISOString(), requestId: `agent-aggregate-${index}`,
+    })));
+    const agentIds = ['agent-a', 'agent-b', 'agent-empty'];
+    const aggregates = getAgentCostStats({ agentIds, nowMs });
+
+    expect(new Map(aggregates).get('agent-a')).toEqual({
+      burnUsdPerHour: 1.91, hypotheticalUsdPerHour: 0.25, totalUsd: 1.96,
+    });
+    expect(aggregates).toHaveLength(2);
+
+    // The resources snapshot built from these aggregates omits a zero hypothetical rate.
+    const snapshot = buildAgentStatsSnapshot({
+      nowMs,
+      agents: agentIds.map(id => ({ id, issueId: 'PAN-1', role: 'work' as const, model: 'fixture',
+        status: 'running' as const, startedAt: new Date(nowMs - 3_600_000).toISOString() })),
+      sessionRoots: [{ agentId: 'agent-a', rootPid: 123 }],
+      processes: [{ pid: 123, ppid: 1, cpuPercent: 1.5, rssBytes: 1024 }],
+      costStatsByAgent: new Map(aggregates),
+    });
+    expect(snapshot.agents[1]).not.toHaveProperty('hypotheticalUsdPerHour');
+  });
+
+  it('returns no aggregates for an empty fleet or missing ledger history', () => {
+    expect(getAgentCostStats({ agentIds: [], nowMs: 0 })).toEqual([]);
+    expect(getAgentCostStats({ agentIds: ['missing'], nowMs: 0 })).toEqual([]);
+  });
+
+  it('rounds SQLite sums at half-cent boundaries without the old JS accumulation error', () => {
+    [1, 0.5, 0.255, 0.2].forEach((cost, index) => insertCostEvent(costEvent({
+      agentId: 'agent-rounding', cost, requestId: `rounding-${index}`,
+    })));
+    expect(new Map(getAgentCostStats({ agentIds: ['agent-rounding'], nowMs: Date.now() }))
+      .get('agent-rounding')?.totalUsd).toBe(1.96);
+  });
+});

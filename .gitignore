@@ -163,7 +163,7 @@ temp/
 .pan/spec.vbrief.json
 .pan/agent-mcp.json
 # Machine-local Overdeck config (config.yaml, projects.yaml, settings.json) —
-# copied into workspaces by copyOverdeckSettingsToWorkspaceSync, never committed.
+# copied into workspaces by copyOverdeckSettingsToWorkspace, never committed.
 # Spec-writer crash debris — the writer should self-clean these on dead-PID detection.
 # Tracking them lets stale locks contaminate fresh worktrees.
 .pan/specs/*.tmp
@@ -228,8 +228,11 @@ __pycache__/
 /reports/
 .vercel
 
-# PAN-2541: permanent state is on overdeck-state; workspace runtime stays local.
-.pan/
+# PAN-3917: planning artifacts live in `.pan/` in this repo and are TRACKED
+# (specs, drafts, continues, orders, notes, backlog/sequence.md). Only the
+# workspace working copies are ignored — see the `.pan/` entries above.
+# Records are gone with the state layer; if one is ever written, do not track it.
+.pan/records/
 .beads/
 .overdeck/continue.json
 .overdeck/pending-promotion.json
@@ -237,6 +240,11 @@ __pycache__/
 .overdeck/sessions.jsonl
 .overdeck/pipeline-verdict.json
 .overdeck/verification-latest.json
+# PAN-3944 follow-up: per-issue pipeline journal + verification run artifacts + feedback
+# files are workspace runtime, never tracked (the dirty-tree gate refuses review otherwise).
+.overdeck/pipeline.jsonl
+.overdeck/verification/
+.overdeck/feedback/
 .overdeck/feedback/
 .overdeck/review/
 .overdeck/test/
@@ -247,3 +255,9 @@ __pycache__/
 # (config.yaml) make these non-portable — they must never be committed.
 .overdeck/config.yaml
 .overdeck/projects.yaml
+
+# pan reload keeps a rollback copy of the previous build next to dist/
+dist.rollback.*/
+
+# Item and worker worktrees under a workspace (pan spawn, pan worker run, PAN-3920)
+.swarm/

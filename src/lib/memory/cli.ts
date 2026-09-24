@@ -16,9 +16,8 @@ import {
 } from './paths.js';
 import { readVerifiedPinFile, resolveContainedPinPath } from './pin-path.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
-import { mirrorDailySummary } from './state-mirror.js';
 import { readArchivedStatusEntries, readCurrentStatus, readObservationsSince, type ArchivedStatusEntry } from './rollup.js';
-import { getAgentStateSync } from '../agents.js';
+import { getAgentState } from '../agents.js';
 import {
   getWorkspaceForIssue,
   listProjects,
@@ -221,20 +220,10 @@ async function resolveObservationFromHit(
   return observations.find((observation) => observation.id === hit.source) ?? null;
 }
 
-/**
- * Issue-shaped facade over `getMemoryStatusForWorkspace`, retained as the
- * pre-PAN-3286 public entry point (the CLI now resolves a workspace first).
- */
-export async function getMemoryStatus(projectId: string, issueId: string): Promise<MemoryStatus | undefined> {
-  const workspaceId = getWorkspaceForIssue(issueId)?.id;
-  if (!workspaceId) return undefined;
-  return getMemoryStatusForWorkspace(projectId, workspaceId);
-}
-
 export interface MemoryWorkspaceTargetInput {
   /**
    * `--project`, used only by the issue-positional arm so its memory-root
-   * resolution stays byte-identical to `getMemoryStatus` (PAN-3286 FR-5).
+   * resolution stays byte-identical to the issue-keyed memory root (PAN-3286 FR-5).
    */
   projectId?: string;
   issueId?: string;
@@ -313,7 +302,7 @@ export interface MemoryTimelineOptions {
 
 /** Default day window and row cap for `pan memory timeline` (PAN-3286 FR-8). */
 export const MEMORY_TIMELINE_DEFAULT_DAYS = 7;
-export const MEMORY_TIMELINE_DEFAULT_LIMIT = 50;
+const MEMORY_TIMELINE_DEFAULT_LIMIT = 50;
 
 /**
  * Chronological observations for a resolved workspace, oldest-first
@@ -469,7 +458,10 @@ export async function generateDailySummary(input: {
   await ensureParentDir(path);
   await writeFile(path, markdown, 'utf8');
   await indexDailySummary(projectId, target, date, observations, markdown);
-  await mirrorDailySummary(projectId, target.workspaceName, date, markdown);
+  // PAN-3917: this used to also mirror the summary onto the project's
+  // deleted state branch (memory/state-mirror.ts) as a durability
+  // convenience — that branch and its state-door commit path are gone; the
+  // memory-home file written above is already the source of truth.
   return { status: 'generated', path, markdown, observationCount: observations.length, previousObservationCount };
 }
 
@@ -661,7 +653,7 @@ async function readActiveAgents(): Promise<Array<{ id: string; issueId: string }
   const agents: Array<{ id: string; issueId: string }> = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const state = getAgentStateSync(entry.name);
+    const state = getAgentState(entry.name);
     if ((state?.status === 'running' || state?.status === 'starting') && state?.issueId) {
       agents.push({ id: entry.name, issueId: state.issueId });
     }

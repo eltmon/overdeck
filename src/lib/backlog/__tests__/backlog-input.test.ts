@@ -4,12 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Issue } from '../../tracker/interface.js';
 
-vi.mock('../../review-status.js', () => ({
-  getReviewStatusSync: vi.fn().mockReturnValue(null),
-}));
-
 import { collectOpenBacklog } from '../backlog-input.js';
-import { getReviewStatusSync } from '../../review-status.js';
 
 const BASE_ISSUE: Issue = {
   id: '1',
@@ -33,7 +28,6 @@ describe('collectOpenBacklog', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'backlog-input-test-'));
-    vi.mocked(getReviewStatusSync).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -58,23 +52,12 @@ describe('collectOpenBacklog', () => {
     expect(result.manifest[0].id).toBe('PAN-1');
   });
 
-  it('sets inPipeline=false when review_status is null', async () => {
-    vi.mocked(getReviewStatusSync).mockReturnValue(null);
+  it('sets inPipeline=false when the issue has no workspace', async () => {
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
     expect(result.manifest[0].inPipeline).toBe(false);
   });
 
-  it('sets inPipeline=true when review_status is non-pending', async () => {
-    vi.mocked(getReviewStatusSync).mockReturnValue({
-      issueId: 'PAN-1', reviewStatus: 'reviewing', testStatus: 'pending',
-      readyForMerge: false, updatedAt: new Date().toISOString(),
-    } as any);
-    const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
-    expect(result.manifest[0].inPipeline).toBe(true);
-  });
-
-  it('sets inPipeline=true when workspace dir exists (no review status needed)', async () => {
-    vi.mocked(getReviewStatusSync).mockReturnValue(null);
+  it('sets inPipeline=true when the workspace dir exists — the pipeline has no stored row', async () => {
     mkdirSync(join(tmpDir, 'workspaces', 'feature-pan-1'), { recursive: true });
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
     expect(result.manifest[0].inPipeline).toBe(true);

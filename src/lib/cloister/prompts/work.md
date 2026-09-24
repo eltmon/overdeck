@@ -18,6 +18,8 @@ optional:
   - TLDR_AVAILABLE
   - MEMORY_CONTEXT
   - RECORD_CONTEXT
+  - TESTS_ON_CI
+  - USES_VITEST
 ---
 # Working on Issue: {{ISSUE_ID}}
 
@@ -97,12 +99,12 @@ These files contain critical context that may have been updated since the last s
 {{/LOCAL}}
 {{#REMOTE}}
 Your workspace is at /workspace (a full clone of the repo, checked out on your feature branch). Check for planning artifacts:
-- `/workspace/.pan/records/{{ISSUE_ID_LOWER}}.json` — per-issue record: decisions, hazards, resumePoint, sessionHistory from planning. Do NOT read `.pan/continue.json` (retired).
+- `/workspace/.overdeck/continue.json` — decisions, hazards, and approach context carried over from planning.
 - `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.xbrief.json` — the canonical xBRIEF plan. READ-ONLY: never edit a spec file.
 - `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
 - Task state is read from the merged xBRIEF with `pan task next {{ISSUE_ID}}` and `pan task show {{ISSUE_ID}} <item>`.
 
-Start by reading the per-issue record (if present) and the spec to understand the plan, then begin implementation.
+Start by reading the continue file (if present) and the spec to understand the plan, then begin implementation.
 If neither exists, check the issue tracker for requirements.
 {{/REMOTE}}
 
@@ -122,7 +124,7 @@ If neither exists, check the issue tracker for requirements.
 
 ### Subagent permission prompts — never self-approve
 
-If you observe that any subagent (the inspector spawned by `pan inspect`, or any other Claude Code subagent in a tmux session you can see) appears stuck waiting on a permission prompt, do **NOT** send keystrokes via `tmux send-keys` to approve, decline, or otherwise interact with the prompt.
+If you observe that any subagent (a review or tier-supervisor subagent, or any other Claude Code subagent in a tmux session you can see) appears stuck waiting on a permission prompt, do **NOT** send keystrokes via `tmux send-keys` to approve, decline, or otherwise interact with the prompt.
 
 Permission prompts indicate a permissions configuration issue that must be raised to the user. Self-approving via `tmux send-keys` can silently authorize destructive operations (file deletion, force-pushes, outbound network calls) that the user did not intend to allow.
 
@@ -180,7 +182,7 @@ Specialist agents have left feedback that you MUST address:
 
 **After addressing ALL feedback:** commit your fixes, then invoke the `/rebase-and-submit` skill — it will run `pan review request {{ISSUE_ID}} -m "Addressed feedback: <summary>"` for you (the correct re-review entry point; `pan done` is only for the first submission).
 
-`pan review request` can take several minutes while verification runs. A yielded exec result, session ID, or "background terminal running" notice means the command is still running — it is not success. Set a long enough exec yield when possible; otherwise poll that same background terminal until it exits and inspect its real exit code. After exit code 0, run `pan show {{ISSUE_ID}}` or `pan review pending` and confirm the issue actually entered the review pipeline before reporting completion. If the command exits non-zero or the pipeline state did not change, keep working and reconcile the failure.
+`pan review request` returns as soon as the request is accepted — verification runs afterwards, on the server. When it exits 0 you are done: end your turn and wait. Do not poll `pan show`, files, or terminals. Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, keep working and reconcile the failure.
 
 Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint — those routes are for specialist/system use only, not for direct agent invocation. The `pan review request` CLI command is the only supported path. Do NOT poll specialist APIs or wait for results — the pipeline is event-driven.
 {{/PENDING_FEEDBACK}}
@@ -304,7 +306,7 @@ writes.
 
 **You are NOT done until ALL of these are true:**
 
-1. **Tests pass** - Run the full test suite (`npm test` or equivalent)
+1. **Touched tests pass** - Run the tests for the files you changed or whose subjects you changed ({{#USES_VITEST}}`npx vitest run <test files you changed or whose subjects you changed>`{{/USES_VITEST}}{{^USES_VITEST}}the project's test runner, scoped to those test files or packages{{/USES_VITEST}}). {{#TESTS_ON_CI}}Do NOT run the full suite on the host — it runs on CI after `pan done`, and a red CI test job comes back to you as `VERIFICATION FAILED … Failed check: test`.{{/TESTS_ON_CI}}{{^TESTS_ON_CI}}Do NOT run the full suite yourself — `pan done` runs it as the verification gate's test step, and a failure comes back to you as `VERIFICATION FAILED`.{{/TESTS_ON_CI}}
 2. **All changes committed** - `git status` shows "nothing to commit, working tree clean"
 3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`
 
@@ -317,7 +319,7 @@ reporting failure. If there are genuinely no anomalies, say "No deviations." fir
 
 **Before declaring work complete, run these as BASH COMMANDS (using the Bash tool):**
 ```bash
-npm test                                         # Run tests
+{{#USES_VITEST}}npx vitest run <changed test files>              # Run only the tests you touched{{/USES_VITEST}}{{^USES_VITEST}}<test runner> <changed test files or packages>   # Run only the tests you touched{{/USES_VITEST}}
 git add -A && git commit -m "feat: description"  # Commit ALL changes
 git push -u origin $(git branch --show-current)  # Push
 git status                                       # Must show "nothing to commit"
@@ -343,7 +345,7 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 {{#REMOTE}}
 When ALL tasks are complete:
 ```bash
-npm test
+{{#USES_VITEST}}npx vitest run <changed test files>{{/USES_VITEST}}{{^USES_VITEST}}<test runner> <changed test files or packages>{{/USES_VITEST}}   # only the tests you touched; the full suite runs {{#TESTS_ON_CI}}on CI{{/TESTS_ON_CI}}{{^TESTS_ON_CI}}in the verification gate{{/TESTS_ON_CI}}
 pan task done {{ISSUE_ID}} <item-id>   # complete every implemented item
 git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)

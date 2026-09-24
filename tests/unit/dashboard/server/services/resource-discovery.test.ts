@@ -19,7 +19,6 @@ const mocks = vi.hoisted(() => ({
   listSessionNames: vi.fn(),
   listWorkspaces: vi.fn(),
   listConversations: vi.fn(),
-  loadReadyForMergeFlags: vi.fn(),
   openPullRequests: [] as unknown[],
   readdir: vi.fn(),
   resolveAgentGitInfo: vi.fn(),
@@ -74,6 +73,11 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
+  // PAN-3917 FR-12: the backend inventory's tmux fallback probes panes directly.
+  listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
+  listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
 }));
 
 vi.mock('../../../../../src/lib/workspaces/resolver.js', () => ({
@@ -82,10 +86,6 @@ vi.mock('../../../../../src/lib/workspaces/resolver.js', () => ({
 
 vi.mock('../../../../../src/lib/runtime-census.js', () => ({
   getRuntimeCensus: mocks.getRuntimeCensus,
-}));
-
-vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
-  loadReadyForMergeFlags: mocks.loadReadyForMergeFlags,
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/git-info.js', () => ({
@@ -144,7 +144,6 @@ beforeEach(() => {
     lastActivity: '2026-06-27T00:00:00.000Z',
   }));
   mocks.getGitHubConfig.mockReturnValue({ repos: [] });
-  mocks.loadReadyForMergeFlags.mockReturnValue(new Map());
   mocks.listProjectsSync.mockReturnValue([
     { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' } },
   ]);
@@ -157,7 +156,7 @@ beforeEach(() => {
   mocks.openPullRequests = [];
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
-  mocks.findDraftPrd.mockReturnValue(Effect.succeed(null));
+  mocks.findDraftPrd.mockResolvedValue(null);
   mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
   mocks.getPipelineMembershipForProjects.mockResolvedValue([]);
   mocks.membershipSnapshotResults = [];
@@ -242,7 +241,7 @@ describe('resource-discovery grouping', () => {
         hasState: false,
         isShadow: false,
         isRally: false,
-        readyForMerge: false,
+        state: null,
         resourceSources: ['workspace'],
         resourceDetails: {
           hasWorkspace: true,
@@ -279,7 +278,7 @@ describe('resource-discovery grouping', () => {
         childCount: 3,
         completedCount: 1,
         inProgressCount: 1,
-        readyForMerge: false,
+        state: null,
         resourceSources: ['branch'],
         resourceDetails: {
           hasWorkspace: false,
@@ -313,7 +312,7 @@ describe('resource-discovery grouping', () => {
         hasState: true,
         isShadow: false,
         isRally: false,
-        readyForMerge: false,
+        state: null,
         resourceSources: ['tmux', 'pr'],
         resourceDetails: {
           hasWorkspace: true,
@@ -367,7 +366,7 @@ describe('resource-discovery sanitization', () => {
         hasState: false,
         isShadow: false,
         isRally: false,
-        readyForMerge: false,
+        state: null,
         resourceSources: ['workspace', 'branch', 'tmux', 'docker', 'pr'],
         resourceDetails: {
           hasWorkspace: true,
@@ -480,11 +479,11 @@ describe('resource-discovery membership-aware state labels', () => {
     mocks.issueService.getIssues.mockReturnValue([
       { identifier: 'PAN-3341', title: 'Merged work without cached tracker state' },
     ]);
-    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+    mocks.findDraftPrd.mockResolvedValue({
       path: '/state/drafts/PAN-3341.md',
       format: 'pan-draft',
       status: 'draft',
-    }));
+    });
     mocks.getPipelineMembershipForProjects.mockResolvedValue([{
       issueId: 'PAN-3341',
       inPipeline: true,
@@ -500,32 +499,6 @@ describe('resource-discovery membership-aware state labels', () => {
       expect.objectContaining({
         issueId: 'PAN-3341',
         hasPrd: true,
-        stateLabel: 'Merged — Needs Close-Out',
-      }),
-    ]);
-  });
-
-  it('lets post-merge limbo outrank a stale ready-for-merge flag', async () => {
-    mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-3342', title: 'Merged work with stale review state', state: 'in_progress' },
-    ]);
-    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3342']));
-    mocks.loadReadyForMergeFlags.mockReturnValue(new Map([['PAN-3342', true]]));
-    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
-      issueId: 'PAN-3342',
-      inPipeline: true,
-      bucket: 'post_merge_limbo',
-      reasons: ['merged but never closed out'],
-      labelDrift: null,
-      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: false, L4_phaseLabel: 'in_review' },
-    }]);
-
-    await refreshResourceAllocatedProjects([project]);
-
-    await expect(getCachedResourceAllocatedIssues()).resolves.toEqual([
-      expect.objectContaining({
-        issueId: 'PAN-3342',
-        readyForMerge: true,
         stateLabel: 'Merged — Needs Close-Out',
       }),
     ]);
@@ -609,11 +582,11 @@ describe('resource-discovery membership-aware state labels', () => {
       { identifier: 'PAN-3346', title: 'Planning work without membership' },
     ]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3346']));
-    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+    mocks.findDraftPrd.mockResolvedValue({
       path: '/state/drafts/PAN-3346.md',
       format: 'pan-draft',
       status: 'draft',
-    }));
+    });
 
     await refreshResourceAllocatedProjects([project], { refreshMembership: false });
 
@@ -726,13 +699,10 @@ describe('resource-discovery review-status batching', () => {
 
     const discovered = await discoverResourceAllocatedIssues();
 
-    const activeIds = activeIssues.map((issue) => issue.identifier);
-    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledTimes(1);
-    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledWith(activeIds);
     expect(discovered).toEqual([]);
   });
 
-  it('loads ready-for-merge status for a terminal issue that still has an open PR', async () => {
+  it('surfaces a terminal issue that still has an open PR', async () => {
     mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-2054', 'zombie_pr')]);
     mocks.issueService.getIssues.mockReturnValue([
       {
@@ -754,13 +724,9 @@ describe('resource-discovery review-status batching', () => {
         baseRefName: 'main',
       },
     ];
-    mocks.loadReadyForMergeFlags.mockReturnValue(new Map([['PAN-2054', true]]));
-
     const discovered = await discoverResourceAllocatedIssues();
 
-    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledWith(['PAN-2054']);
     expect(discovered.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
-    expect(discovered[0]?.readyForMerge).toBe(true);
   });
 });
 
@@ -943,11 +909,11 @@ describe('resource-discovery PRD signal', () => {
   });
 
   it('adds the canonical PRD source and detail flag when a draft exists', async () => {
-    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+    mocks.findDraftPrd.mockResolvedValue({
       path: '/state/drafts/PAN-9004.md',
       format: 'pan-draft',
       status: 'draft',
-    }));
+    });
 
     const discovered = await discoverResourceAllocatedIssues();
     const issue = discovered.find((entry) => entry.issueId === 'PAN-9004');

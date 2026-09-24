@@ -18,12 +18,11 @@ import {
 } from '../../lib/pan-dir/index.js';
 import {
   extractTeamPrefix,
-  findProjectByTeamSync,
-  hasProjectsSync,
+  findProjectByTeam,
+  hasProjects,
   resolveProjectFromIssueSync,
 } from '../../lib/projects.js';
-import { mergeSkillsIntoWorkspaceSync } from '../../lib/skills-merge.js';
-import { generateClaudeMdSync, TemplateVariables } from '../../lib/template.js';
+import { mergeSkillsIntoWorkspace } from '../../lib/skills-merge.js';
 import { createWorkspace as createWorkspaceFromConfig } from '../../lib/workspace-manager.js';
 import { createWorktree } from '../../lib/worktree.js';
 import { createRemoteWorkspace } from './workspace-remote.js';
@@ -81,18 +80,18 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
 
     // Try to find project config from registry
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
     // Priority 1: Use workspace-manager if project has workspace config
     if (projectConfig?.workspace) {
       spinner.text = 'Creating workspace from config...';
 
-      const result = await Effect.runPromise(createWorkspaceFromConfig({
+      const result = await createWorkspaceFromConfig({
         projectConfig,
         featureName: normalizedId,
         startDocker: options.docker,
         dryRun: options.dryRun,
-      }));
+      });
 
       if (options.dryRun) {
         spinner.info('Dry run - no changes made');
@@ -200,7 +199,7 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
         projectRoot = resolved.projectPath;
         projectName = resolved.projectName;
         spinner.text = `Resolved project: ${projectName} (${projectRoot})`;
-      } else if (hasProjectsSync()) {
+      } else if (hasProjects()) {
         spinner.warn(`No project found for ${issueId} in registry. Using current directory.`);
         spinner.start('Creating workspace...');
         projectRoot = process.cwd();
@@ -268,28 +267,14 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
       console.log('  Cleared stale workspace-local .pan runtime state');
     }
 
-    // Generate CLAUDE.md
-    spinner.text = 'Generating CLAUDE.md...';
-    const variables: TemplateVariables = {
-      FEATURE_FOLDER: folderName,
-      BRANCH_NAME: branchName,
-      ISSUE_ID: issueId.toUpperCase(),
-      WORKSPACE_PATH: workspacePath,
-      FRONTEND_URL: `https://${folderName}.localhost:3000`,
-      API_URL: `https://api-${folderName}.localhost:8080`,
-      PROJECT_NAME: projectName,
-    };
-
-    const claudeMd = generateClaudeMdSync(variables);
-    writeFileSync(join(workspacePath, 'CLAUDE.md'), claudeMd);
-
-    // PAN-1201: assemble the workspace context layer. The bundle composes the
-    // parent project's layer with issue metadata; PAN-1052 memory injection
-    // and live status are layered on at spawn time. Non-fatal on failure.
+    // Assemble the Overdeck-owned workspace context layer. Native harness
+    // instruction files in the worktree remain exactly as Git/user authored them.
+    spinner.text = 'Assembling managed-session context...';
+    // PAN-1201: persist only harness-neutral issue/workspace metadata. The
+    // canonical project layer is rendered for the active harness at launch;
+    // PAN-1052 memory injection and live status can join this neutral bundle.
     try {
       const wsContext = assembleWorkspaceContext({
-        projectRoot,
-        harness: 'claude-code',
         issueId: issueId.toUpperCase(),
         workspacePath,
         branch: branchName,
@@ -312,7 +297,7 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
     };
     if (options.skills !== false) {
       spinner.text = 'Merging skills and agents...';
-      skillsResult = mergeSkillsIntoWorkspaceSync(workspacePath);
+      skillsResult = mergeSkillsIntoWorkspace(workspacePath);
     }
 
     // Start Docker containers if requested
@@ -334,8 +319,8 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
       // it from the project template before looking for a compose file.
       // Idempotent — no-op when `.devcontainer/` is already present.
       if (!composeLocations.some(f => existsSync(f))) {
-        const { ensureDevcontainerSync } = await import('../../lib/workspace/ensure-devcontainer.js');
-        const ensure = ensureDevcontainerSync({ workspacePath, issueId });
+        const { ensureDevcontainer } = await import('../../lib/workspace/ensure-devcontainer.js');
+        const ensure = ensureDevcontainer({ workspacePath, issueId });
         if (ensure.rendered) {
           spinner.text = 'Regenerated .devcontainer/ from project template';
         }

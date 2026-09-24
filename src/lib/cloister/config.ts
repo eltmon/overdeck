@@ -4,6 +4,19 @@
  * Loads and manages Cloister configuration from ~/.overdeck/cloister.toml
  */
 
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `loadCloisterConfigSync` (async: `loadCloisterConfig`): 11 sites in dashboard/server/routes/cloister.ts,
+ *   lib/cloister/concurrency.ts, lib/cloister/config.ts, lib/cloister/cost-monitor.ts,
+ *   lib/cloister/deacon-swarm-completion.ts, lib/cloister/patrol-budget.ts, lib/cloister/service.ts,
+ *   lib/cloister/triggers.ts.
+ * - `saveCloisterConfigSync` (async: `saveCloisterConfig`): src/lib/cloister/config.ts:613.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { parse, stringify } from '@iarna/toml';
@@ -336,6 +349,22 @@ export interface DeployConfig {
 }
 
 /**
+ * PAN-3850 (W39, FR-26): per-patrol firing budgets. Each budgeted patrol
+ * may take at most `default` actions per UTC day
+ * (per-patrol `overrides` win); exceeding the budget suspends the patrol
+ * until the next UTC day and emits a needs-you. `exempt` patrols (the alarms:
+ * Appendix C #3, #64, #70, #71, #77) tally but never suspend.
+ */
+export interface PatrolBudgetsConfig {
+  /** Default action budget per patrol per UTC day. */
+  default: number;
+  /** Patrol names that are never suspended. */
+  exempt: string[];
+  /** Per-patrol budget overrides. */
+  overrides: Record<string, number>;
+}
+
+/**
  * Complete Cloister configuration
  */
 export interface CloisterConfig {
@@ -358,6 +387,7 @@ export interface CloisterConfig {
   close_out?: CloseOutConfig;
   orphanProposedReconciler?: OrphanProposedReconcilerConfig;
   deploy: DeployConfig;
+  patrolBudgets?: PatrolBudgetsConfig;
 }
 
 /**
@@ -398,6 +428,19 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     auto_deploy: true,
     debounce_minutes: 5,
     queue_deadline_minutes: 30,
+  },
+  patrolBudgets: {
+    default: 50,
+    // Alarms (Appendix C #3, #64, #70, #71, #77): tally for `pan doctor`
+    // visibility, but a firing alarm must never go silent for the day.
+    exempt: [
+      'runStallSweeperPatrol',
+      'checkApiErrorAgents',
+      'recreatedStateWarnings',
+      'recordMainDivergenceHealth',
+      'checkMassDeath',
+    ],
+    overrides: {},
   },
   concurrency: {
     max_work_agents: 6,
@@ -607,25 +650,6 @@ export function saveCloisterConfigSync(config: CloisterConfig): void {
 }
 
 /**
- * Update Cloister configuration
- *
- * Merges partial config updates with existing config.
- */
-export function updateCloisterConfigSync(updates: Partial<CloisterConfig>): CloisterConfig {
-  const current = loadCloisterConfigSync();
-  const updated = deepMerge(current, updates);
-  saveCloisterConfigSync(updated);
-  return updated;
-}
-
-/**
- * Get the path to the Cloister config file
- */
-export function getCloisterConfigPath(): string {
-  return CLOISTER_CONFIG_FILE;
-}
-
-/**
  * Check if Cloister should auto-start
  */
 export function shouldAutoStart(): boolean {
@@ -649,12 +673,10 @@ export function getHealthThresholdsMs(): {
   };
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
+// ─── Effect API ───────────────────────────────────────────────────────────────
 //
-// Additive Effect-channel variants of the config helpers above. The sync
-// variants are preserved so existing callers (CLI scripts, top-level module
-// initialization) do not have to migrate; new Effect-based callers can compose
-// these directly without `Effect.runSync` round-tripping.
+// Effect twins of the config helpers above; the sync twins stay for the callers
+// this module's header names.
 
 /** Effect variant of `loadCloisterConfig`. Falls back to defaults on read/parse failures. */
 export const loadCloisterConfig = (): Effect.Effect<CloisterConfig, FsError | ConfigError> =>
@@ -712,15 +734,4 @@ export const saveCloisterConfig = (config: CloisterConfig): Effect.Effect<void, 
       try: () => writeFile(CLOISTER_CONFIG_FILE, content, 'utf-8'),
       catch: (cause) => new FsError({ path: CLOISTER_CONFIG_FILE, operation: 'writeFile', cause }),
     });
-  });
-
-/** Effect variant of `updateCloisterConfig`. */
-export const updateCloisterConfig = (
-  updates: Partial<CloisterConfig>,
-): Effect.Effect<CloisterConfig, FsError | ConfigError> =>
-  Effect.gen(function* () {
-    const current = yield* loadCloisterConfig();
-    const updated = deepMerge(current, updates);
-    yield* saveCloisterConfig(updated);
-    return updated;
   });

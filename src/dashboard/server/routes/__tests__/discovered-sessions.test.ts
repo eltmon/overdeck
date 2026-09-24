@@ -55,8 +55,8 @@ const SESSION_JSONL = [
 ].join('\n') + '\n';
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
   resetDiscoveredSessionsSchemaBootstrap();
 }
 

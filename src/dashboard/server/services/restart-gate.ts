@@ -15,11 +15,14 @@
  *
  * ── Doors ──────────────────────────────────────────────────────────────────
  * This module is the ONE read door and the ONE write door for gate state. No
- * route handler, CLI, or script reads or writes `restart-gate.json` directly.
- * The gate is runtime-plane state — the same plane as
- * `~/.overdeck/dashboard-restarting.json` — so it is NOT canonical, NOT
- * mirrored to git, and NOT persisted to the event log. It is a single JSON
- * file that survives exactly one restart, which is all the protocol needs.
+ * route handler, CLI, or script reads or writes it.
+ *
+ * PAN-3917 D2: the gate is an in-memory request map. There is no claim store
+ * on disk. A restart therefore starts the map empty — which is correct, not a
+ * loss: a requester polls every 5s and simply re-registers against the fresh
+ * server, and an involuntary restart was never gated in the first place. The
+ * gate is runtime-plane state, never canonical, never mirrored, never written
+ * to the event log.
  *
  * ── Expiry rules ───────────────────────────────────────────────────────────
  * - A pending request not refreshed for 20s expires (a poll IS the refresh).
@@ -32,11 +35,8 @@
  *   → clear the gate, restart nothing". That drop records `lastOutcome` on the
  *   projection for 15s so the banner can say the approval restarted nothing
  *   instead of silently vanishing (PAN-3731).
- * - Satisfied ids are served to polls for 10 minutes after boot, then pruned.
+ * - Satisfied ids are served to late polls for 10 minutes, then pruned.
  */
-
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 
 import type {
   RestartGateKind,
@@ -44,8 +44,6 @@ import type {
   RestartGateRequest,
   RestartGateSnapshot,
 } from '@overdeck/contracts';
-
-import { OVERDECK_HOME } from '../../../lib/paths.js';
 
 // ─── Constants (pinned by the PAN-3729 wire contract) ────────────────────────
 
@@ -64,8 +62,6 @@ export const SWEEP_INTERVAL_MS = 5_000;
  * see a stale one.
  */
 export const OUTCOME_TTL_MS = 15_000;
-
-export const RESTART_GATE_FILE = join(OVERDECK_HOME, 'restart-gate.json');
 
 // ─── State shapes ────────────────────────────────────────────────────────────
 
@@ -332,39 +328,7 @@ export function satisfyRestartGateForDirectRestart(
   };
 }
 
-/**
- * Boot-time epoch resolution: this process starting IS the restart completing.
- *
- * A persisted epoch in `claimed` state means the previous server died to
- * perform an approved restart, so every member of that epoch got what it asked
- * for. An approved-but-unclaimed epoch is left alone — nobody performed a
- * restart for it, so its members keep waiting and can still claim.
- */
-export function resolveRestartGateBoot(
-  state: RestartGateState,
-  nowMs: number,
-): { state: RestartGateState; satisfiedIds: string[] } {
-  if (!state.epoch?.claimedBy) {
-    return { state: pruneRestartGateState(state, nowMs), satisfiedIds: [] };
-  }
-
-  const satisfiedAt = new Date(nowMs).toISOString();
-  const satisfiedIds = state.epoch.requesterIds;
-  const satisfied = [
-    ...state.satisfied.filter((entry) => !satisfiedIds.includes(entry.requesterId)),
-    ...satisfiedIds.map((requesterId) => ({ requesterId, satisfiedAt })),
-  ];
-  return {
-    state: pruneRestartGateState({ ...state, pending: [], epoch: null, satisfied }, nowMs),
-    satisfiedIds,
-  };
-}
-
-// ─── Service (the doors) ─────────────────────────────────────────────────────
-
 export interface RestartGateDeps {
-  /** Overridden in tests; production uses `~/.overdeck/restart-gate.json`. */
-  filePath?: string;
   now?: () => number;
   /** Publishes the projection to the read model; defaults to the event store. */
   emit?: (snapshot: RestartGateSnapshot) => void;
@@ -399,68 +363,14 @@ function emitThroughEventStore(snapshot: RestartGateSnapshot): void {
 }
 
 export function createRestartGate(deps: RestartGateDeps = {}): RestartGate {
-  const filePath = deps.filePath ?? RESTART_GATE_FILE;
   const now = deps.now ?? (() => Date.now());
   const emit = deps.emit ?? emitThroughEventStore;
 
-  let state: RestartGateState | null = null;
-  let loading: Promise<void> | null = null;
-  let writing: Promise<void> = Promise.resolve();
+  let state: RestartGateState = emptyRestartGateState();
   let lastPublished: string | null = null;
 
-  async function loadState(): Promise<void> {
-    let parsed: RestartGateState;
-    try {
-      const raw = await readFile(filePath, 'utf-8');
-      const candidate = JSON.parse(raw) as Partial<RestartGateState>;
-      parsed = {
-        version: 1,
-        pending: Array.isArray(candidate.pending) ? candidate.pending : [],
-        epoch: candidate.epoch ?? null,
-        satisfied: Array.isArray(candidate.satisfied) ? candidate.satisfied : [],
-        ...(candidate.lastOutcome === undefined ? {} : { lastOutcome: candidate.lastOutcome }),
-      };
-    } catch {
-      // Missing or unreadable file — a fresh gate is the correct fallback,
-      // never a reason to fail a restart request.
-      parsed = emptyRestartGateState();
-    }
-
-    const resolved = resolveRestartGateBoot(parsed, now());
-    state = resolved.state;
-    if (resolved.satisfiedIds.length > 0) {
-      console.log(
-        `[restart-gate] Boot completed an approved restart — satisfied ${resolved.satisfiedIds.length} request(s): ${resolved.satisfiedIds.join(', ')}`,
-      );
-      await persist();
-    }
-  }
-
-  function ensureLoaded(): Promise<void> {
-    if (!loading) loading = loadState();
-    return loading;
-  }
-
-  /** Atomic tmp+rename so a crash mid-write cannot leave a truncated gate. */
-  async function persist(): Promise<void> {
-    const current = state;
-    if (!current) return;
-    const body = JSON.stringify(current, null, 2);
-    writing = writing.then(async () => {
-      try {
-        await mkdir(dirname(filePath), { recursive: true });
-        const tmp = `${filePath}.tmp`;
-        await writeFile(tmp, body, 'utf-8');
-        await rename(tmp, filePath);
-      } catch (error) {
-        console.error('[restart-gate] Failed to persist gate state:', error);
-      }
-    });
-    await writing;
-  }
-
   function publish(): RestartGateSnapshot {
-    const snapshot = toRestartGateSnapshot(state ?? emptyRestartGateState(), now());
+    const snapshot = toRestartGateSnapshot(state, now());
     const serialized = JSON.stringify(snapshot);
     if (serialized !== lastPublished) {
       lastPublished = serialized;
@@ -469,39 +379,31 @@ export function createRestartGate(deps: RestartGateDeps = {}): RestartGate {
     return snapshot;
   }
 
-  async function mutate<T>(
+  function mutate<T>(
     apply: (current: RestartGateState, nowMs: number) => { state: RestartGateState; result: T },
-  ): Promise<T> {
-    await ensureLoaded();
-    const { state: next, result } = apply(state ?? emptyRestartGateState(), now());
+  ): T {
+    const { state: next, result } = apply(state, now());
     state = next;
-    await persist();
     publish();
     return result;
   }
 
   return {
-    request: (input) => mutate((current, nowMs) => upsertRestartRequest(current, input, nowMs)),
-    claim: (requesterId) => mutate((current, nowMs) => claimRestartGate(current, requesterId, nowMs)),
-    approve: () => mutate((current, nowMs) => approveRestartGate(current, nowMs)),
+    request: async (input) => mutate((current, nowMs) => upsertRestartRequest(current, input, nowMs)),
+    claim: async (requesterId) => mutate((current, nowMs) => claimRestartGate(current, requesterId, nowMs)),
+    approve: async () => mutate((current, nowMs) => approveRestartGate(current, nowMs)),
     read: async () => {
-      await ensureLoaded();
-      state = pruneRestartGateState(state ?? emptyRestartGateState(), now());
+      state = pruneRestartGateState(state, now());
       return publish();
     },
-    satisfyForDirectRestart: (claimedBy) =>
+    satisfyForDirectRestart: async (claimedBy) => {
       mutate((current, nowMs) => ({
         state: satisfyRestartGateForDirectRestart(current, nowMs, claimedBy),
         result: undefined,
-      })),
+      }));
+    },
     sweep: async () => {
-      await ensureLoaded();
-      const before = state ?? emptyRestartGateState();
-      const after = pruneRestartGateState(before, now());
-      state = after;
-      if (after.pending.length !== before.pending.length || after.epoch !== before.epoch) {
-        await persist();
-      }
+      state = pruneRestartGateState(state, now());
       return publish();
     },
   };
@@ -539,13 +441,7 @@ export function startRestartGateSweep(
   return timer;
 }
 
-/**
- * Resolve the persisted epoch and start the sweep.
- *
- * Boot resolution is lazy inside the gate too, so a requester polling a
- * still-booting server gets the same answer this call produces — there is no
- * window where a poll races ahead of startup.
- */
+/** Publish the empty projection and start the sweep. */
 export async function initRestartGate(
   deps: { setIntervalFn?: typeof setInterval } = {},
 ): Promise<void> {

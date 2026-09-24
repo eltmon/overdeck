@@ -23,7 +23,7 @@ vi.mock('../../../../lib/paths.js', async () => {
 import {
   getProjectSync,
   PROJECTS_CONFIG_FILE,
-  registerProjectSync,
+  registerProject,
 } from '../../../../lib/projects.js';
 import {
   _resetInternalTokenCacheForTests,
@@ -71,8 +71,8 @@ beforeEach(() => {
   _resetInternalTokenCacheForTests();
   mkdirSync(TEST_HOME, { recursive: true });
   rmSync(PROJECTS_CONFIG_FILE, { force: true });
-  registerProjectSync('alpha', { name: 'Alpha Project', path: '/projects/alpha' });
-  registerProjectSync('beta', { name: 'Beta Project', path: '/projects/beta' });
+  registerProject('alpha', { name: 'Alpha Project', path: '/projects/alpha' });
+  registerProject('beta', { name: 'Beta Project', path: '/projects/beta' });
 });
 
 afterEach(() => {
@@ -103,8 +103,8 @@ describe('POST /api/projects/:projectKey/rename', () => {
   });
 
   it('prefers a registration key over another project\'s matching display name', async () => {
-    registerProjectSync('myn', { name: 'Mind Your Now', path: '/projects/myn' });
-    registerProjectSync('other', { name: 'myn', path: '/projects/other' });
+    registerProject('myn', { name: 'Mind Your Now', path: '/projects/myn' });
+    registerProject('other', { name: 'myn', path: '/projects/other' });
 
     const result = await requestProjectRename('myn', { name: 'Renamed Key Project' });
 

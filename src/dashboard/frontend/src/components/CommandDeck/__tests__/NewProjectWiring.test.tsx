@@ -1,5 +1,6 @@
 /**
- * Verifies the success-path wiring for NewProjectModal in App:
+ * Verifies the success-path wiring for project creation in App (the modal this
+ * once named was replaced by the /projects/new page in PAN-3836):
  *   - Both ['command-deck-projects'] and ['registered-projects'] are invalidated
  *   - The new project key is selected (setSelectedProjectKey called)
  *   - ensureHome is called with the new key
@@ -17,6 +18,7 @@ vi.mock('../../../lib/panesStore', () => ({
 }));
 
 import { usePanesStore } from '../../../lib/panesStore';
+import { getProjectCreatedNavigation } from '../../../App/routes';
 
 describe('handleProjectCreated wiring', () => {
   let queryClient: QueryClient;
@@ -47,5 +49,12 @@ describe('handleProjectCreated wiring', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['registered-projects'] });
     expect(setSelectedProjectKey).toHaveBeenCalledWith('my-app');
     expect(usePanesStore.getState().ensureHome).toHaveBeenCalledWith('my-app');
+  });
+
+  it('returns to /workspaces/new with the new project preselected when returnTo is set (PAN-3836)', () => {
+    window.history.replaceState(null, '', '/projects/new?mode=clone&returnTo=%2Fworkspaces%2Fnew');
+    expect(getProjectCreatedNavigation('my-app')).toEqual({ tab: 'workspace-new', path: '/workspaces/new?project=my-app', state: { tab: 'workspace-new' } });
+    window.history.replaceState(null, '', '/projects/new');
+    expect(getProjectCreatedNavigation('my-app')).toEqual({ tab: 'command-deck', path: '/command-deck/my-app', state: { tab: 'command-deck', project: 'my-app' } });
   });
 });

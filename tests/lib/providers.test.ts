@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, piProviderForModel, qualifyPiModel, resolveKimiCodeModelAlias, PROVIDERS } from '../../src/lib/providers.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnv, getProviderForModel, piProviderForModel, qualifyPiModel, resolveKimiCodeModelAlias, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
   it('returns no provider-native env for OpenAI subscription routing through CLIProxy', () => {
-    expect(getProviderEnvSync(PROVIDERS.openai, 'subscription-oauth')).toEqual({});
+    expect(getProviderEnv(PROVIDERS.openai, 'subscription-oauth')).toEqual({});
   });
 
   it('does not expose OpenAI API keys through provider env construction', () => {
-    expect(getProviderEnvSync(PROVIDERS.openai, 'sk-test-123')).toEqual({});
+    expect(getProviderEnv(PROVIDERS.openai, 'sk-test-123')).toEqual({});
   });
 
   it('returns Anthropic-compatible env for Google direct routing', () => {
-    expect(getProviderEnvSync(PROVIDERS.google, 'AIza-test')).toEqual({
+    expect(getProviderEnv(PROVIDERS.google, 'AIza-test')).toEqual({
       ANTHROPIC_AUTH_TOKEN: 'AIza-test',
       GEMINI_API_KEY: 'AIza-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-3.1-pro-preview',
@@ -23,7 +23,7 @@ describe('providers', () => {
   });
 
   it('routes sk-kimi-* coding keys to the Kimi coding Anthropic endpoint', () => {
-    expect(getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test')).toEqual({
+    expect(getProviderEnv(PROVIDERS.kimi, 'sk-kimi-test')).toEqual({
       ANTHROPIC_BASE_URL: KIMI_CODING_BASE_URL,
       ANTHROPIC_AUTH_TOKEN: 'sk-kimi-test',
       KIMI_API_KEY: 'sk-kimi-test',
@@ -36,7 +36,7 @@ describe('providers', () => {
   });
 
   it('routes Moonshot platform keys to the Moonshot Anthropic endpoint', () => {
-    expect(getProviderEnvSync(PROVIDERS.kimi, 'sk-platform-test')).toEqual({
+    expect(getProviderEnv(PROVIDERS.kimi, 'sk-platform-test')).toEqual({
       ANTHROPIC_BASE_URL: KIMI_PLATFORM_BASE_URL,
       ANTHROPIC_AUTH_TOKEN: 'sk-platform-test',
       KIMI_API_KEY: 'sk-platform-test',
@@ -49,9 +49,9 @@ describe('providers', () => {
   });
 
   it('resolves the kimi provider for K2.7 and K3 Claude Code model ids', () => {
-    expect(getProviderForModelSync('kimi-k2.7-code')).toBe(PROVIDERS.kimi);
-    expect(getProviderForModelSync('k3')).toBe(PROVIDERS.kimi);
-    expect(getProviderForModelSync('k3[1m]')).toBe(PROVIDERS.kimi);
+    expect(getProviderForModel('kimi-k2.7-code')).toBe(PROVIDERS.kimi);
+    expect(getProviderForModel('k3')).toBe(PROVIDERS.kimi);
+    expect(getProviderForModel('k3[1m]')).toBe(PROVIDERS.kimi);
   });
 
   describe('resolveKimiCodeModelAlias (PAN-1837 review fix)', () => {
@@ -77,11 +77,11 @@ describe('providers', () => {
   });
 
   it('resolves the zai provider for glm-5.2', () => {
-    expect(getProviderForModelSync('glm-5.2').name).toBe('zai');
+    expect(getProviderForModel('glm-5.2').name).toBe('zai');
   });
 
   it('rejects unknown model ids with a nearest-match suggestion', () => {
-    expect(() => getProviderForModelSync('glm5.2')).toThrow('Unknown model "glm5.2". Did you mean "glm-5.2"?');
+    expect(() => getProviderForModel('glm5.2')).toThrow('Unknown model "glm5.2". Did you mean "glm-5.2"?');
   });
 
   it('qualifies kimi-k2.7-code under the pi kimi-coding provider', () => {
@@ -91,7 +91,7 @@ describe('providers', () => {
 
   it('routes MiniMax through its direct Anthropic-compatible endpoint', () => {
     expect(PROVIDERS.minimax.compatibility).toBe('direct');
-    expect(getProviderEnvSync(PROVIDERS.minimax, 'sk-minimax-test')).toEqual({
+    expect(getProviderEnv(PROVIDERS.minimax, 'sk-minimax-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-minimax-test',
       MINIMAX_API_KEY: 'sk-minimax-test',
@@ -106,7 +106,7 @@ describe('providers', () => {
 
   it('routes Z.AI through its direct Anthropic-compatible endpoint', () => {
     expect(PROVIDERS.zai.compatibility).toBe('direct');
-    expect(getProviderEnvSync(PROVIDERS.zai, 'sk-zai-test')).toEqual({
+    expect(getProviderEnv(PROVIDERS.zai, 'sk-zai-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-zai-test',
       ZAI_API_KEY: 'sk-zai-test',
@@ -121,7 +121,7 @@ describe('providers', () => {
 
   it('routes Mimo through its direct Anthropic-compatible endpoint', () => {
     expect(PROVIDERS.mimo.compatibility).toBe('direct');
-    expect(getProviderEnvSync(PROVIDERS.mimo, 'sk-mimo-test')).toEqual({
+    expect(getProviderEnv(PROVIDERS.mimo, 'sk-mimo-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-mimo-test',
       MIMO_API_KEY: 'sk-mimo-test',
@@ -138,7 +138,7 @@ describe('providers', () => {
     expect(PROVIDERS.openrouter.compatibility).toBe('direct');
     // The harness appends /v1/messages itself, so the base URL must NOT end
     // in /v1 — '/api/v1' produced /api/v1/v1/messages (707089c5711).
-    expect(getProviderEnvSync(PROVIDERS.openrouter, 'sk-or-test')).toEqual({
+    expect(getProviderEnv(PROVIDERS.openrouter, 'sk-or-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://openrouter.ai/api',
       ANTHROPIC_AUTH_TOKEN: 'sk-or-test',
       OPENROUTER_API_KEY: 'sk-or-test',
@@ -147,13 +147,13 @@ describe('providers', () => {
 
   it('routes DashScope Qwen models to the DashScope provider', () => {
     for (const model of ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max']) {
-      expect(getProviderForModelSync(model)).toBe(PROVIDERS.dashscope);
+      expect(getProviderForModel(model)).toBe(PROVIDERS.dashscope);
     }
-    expect(getProviderForModelSync('qwen/qwen3.6-plus')).toBe(PROVIDERS.nous);
+    expect(getProviderForModel('qwen/qwen3.6-plus')).toBe(PROVIDERS.nous);
   });
 
   it('returns Anthropic-compatible env for DashScope direct routing', () => {
-    expect(getProviderEnvSync(PROVIDERS.dashscope, 'sk-test')).toEqual({
+    expect(getProviderEnv(PROVIDERS.dashscope, 'sk-test')).toEqual({
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:12436/dashscope',
       ANTHROPIC_AUTH_TOKEN: 'sk-test',
       DASHSCOPE_API_KEY: 'sk-test',
@@ -166,7 +166,7 @@ describe('providers', () => {
   });
 
   it('resolves the xai provider for grok-build-0.1', () => {
-    expect(getProviderForModelSync('grok-build-0.1').name).toBe('xai');
+    expect(getProviderForModel('grok-build-0.1').name).toBe('xai');
   });
 
   it('qualifies grok-build-0.1 under the pi xai provider', () => {
@@ -176,7 +176,7 @@ describe('providers', () => {
 
   it('routes xAI through its direct Anthropic-compatible endpoint', () => {
     expect(PROVIDERS.xai.compatibility).toBe('direct');
-    expect(getProviderEnvSync(PROVIDERS.xai, 'xai-test-key')).toEqual({
+    expect(getProviderEnv(PROVIDERS.xai, 'xai-test-key')).toEqual({
       ANTHROPIC_BASE_URL: 'https://api.x.ai/v1',
       ANTHROPIC_AUTH_TOKEN: 'xai-test-key',
       XAI_API_KEY: 'xai-test-key',
@@ -190,13 +190,13 @@ describe('providers', () => {
 
   it('resolves the quantumllama provider for all ql-* model ids', () => {
     for (const model of ['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']) {
-      expect(getProviderForModelSync(model)).toBe(PROVIDERS.quantumllama);
+      expect(getProviderForModel(model)).toBe(PROVIDERS.quantumllama);
     }
   });
 
   it('routes QuantumLlama through its direct Anthropic-compatible endpoint', () => {
     expect(PROVIDERS.quantumllama.compatibility).toBe('direct');
-    expect(getProviderEnvSync(PROVIDERS.quantumllama, 'ql-test-key')).toEqual({
+    expect(getProviderEnv(PROVIDERS.quantumllama, 'ql-test-key')).toEqual({
       ANTHROPIC_BASE_URL: 'https://api.quantumllama.ai/v1',
       ANTHROPIC_AUTH_TOKEN: 'ql-test-key',
       QUANTUMLLAMA_API_KEY: 'ql-test-key',

@@ -8,13 +8,15 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Data, Effect } from 'effect';
+import { Effect } from 'effect';
 import type { TokenUsage, RuntimeName } from '../runtimes/types.js';
-import type { ComplexityLevel } from './complexity.js';
+import type { XBriefDifficulty } from '../xbrief/types.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
 import type { ContinueState } from '../xbrief/continue-state.js';
-import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
+import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../overdeck/issue-projects.js';
+import { resolvePlanHome } from '../pan-dir/paths.js';
+import { readContinueState } from '../xbrief/continue-state.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 
 const execAsync = promisify(exec);
@@ -29,7 +31,7 @@ export interface HandoffTask {
   status: string;
   priority: number;
   labels?: string[];
-  complexity?: ComplexityLevel;
+  complexity?: XBriefDifficulty;
 }
 
 /**
@@ -75,7 +77,10 @@ export interface HandoffContext {
   // New agent target
   targetModel: string;
   reason: string;
-}async function captureHandoffContextPromise(
+}
+
+/** Capture an agent's state, git status and plan progress for a model handoff. */
+export async function captureHandoffContext(
   agentState: AgentState,
   targetModel: string,
   reason: string
@@ -113,13 +118,11 @@ async function captureFiles(
   issueId: string,
 ): Promise<void> {
   try {
-    // Read continue context from the per-issue record (PAN-1919).
+    // Read continue context from the plan home's continue file (PAN-3917).
     try {
       const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspace);
-      const recordView = readRecordContinueViewSync(project, issueId);
-      if (recordView) {
-        context.continueState = recordView as unknown as ContinueState;
-      }
+      const state = readContinueState(resolvePlanHome(project.path), issueId.toUpperCase());
+      if (state) context.continueState = state;
     } catch { /* ignore */ }
 
     // Read CLAUDE.md if it exists
@@ -194,7 +197,7 @@ function captureTasks(context: HandoffContext, workspace: string): void {
  * @param context - Handoff context
  * @returns Markdown representation
  */
-export function serializeHandoffContext(context: HandoffContext): string {
+function serializeHandoffContext(context: HandoffContext): string {
   const lines: string[] = [];
 
   lines.push('# Handoff Context');
@@ -317,33 +320,3 @@ export function buildHandoffPrompt(
     },
   }));
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel variants. The async variants above stay so existing
-// callers keep working; Effect-based callers can compose without runPromise.
-
-/** Tagged error for handoff-context Effect variants. */
-export class HandoffContextError extends Data.TaggedError('HandoffContextError')<{
-  readonly issueId: string;
-  readonly stage: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `captureHandoffContext`. */
-export const captureHandoffContext = (
-  agentState: AgentState,
-  targetModel: string,
-  reason: string,
-): Effect.Effect<HandoffContext, HandoffContextError> =>
-  Effect.tryPromise({
-    try: () => captureHandoffContextPromise(agentState, targetModel, reason),
-    catch: (cause) =>
-      new HandoffContextError({
-        issueId: agentState.issueId,
-        stage: 'captureHandoffContext',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

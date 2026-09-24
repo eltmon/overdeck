@@ -1,5 +1,5 @@
 import type { ModelId } from '../settings.js';
-import { getModelEffortLevelsSync, resolveModelIdSync } from '../model-capabilities.js';
+import { getModelEffortLevels, resolveModelId } from '../model-capabilities.js';
 import { derivePercentPick, pickPercentModelRef, representativeModelRef } from './percent.js';
 import {
   PARENT_MODEL_REF,
@@ -27,6 +27,7 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
   strike: 'workhorse:expensive',
   sequencer: 'workhorse:expensive',
   knowledge: 'workhorse:expensive',
+  worker: 'workhorse:mid',
 };
 
 export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
@@ -62,6 +63,7 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   strike: { model: 'workhorse:expensive' },
   sequencer: { model: 'workhorse:expensive' },
   knowledge: { model: 'workhorse:expensive' },
+  worker: { model: 'workhorse:mid' },
   flywheel: {
     model: 'claude-opus-4-8',
     effort: 'high',
@@ -100,7 +102,7 @@ export function derefWorkhorse(
   if (ref === PARENT_MODEL_REF) {
     throw new Error(`config.yaml: ${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is a resolve-only sub-role sentinel`);
   }
-  if (!isWorkhorseRef(ref)) return resolveModelIdSync(ref) as ModelId;
+  if (!isWorkhorseRef(ref)) return resolveModelId(ref) as ModelId;
 
   const slot = workhorseSlotFromRef(ref) as WorkhorseSlot;
   const resolved = config.workhorses?.[slot];
@@ -110,7 +112,7 @@ export function derefWorkhorse(
   if (isWorkhorseRef(resolved)) {
     throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
   }
-  return resolveModelIdSync(resolved) as ModelId;
+  return resolveModelId(resolved) as ModelId;
 }
 
 export function resolveModel(
@@ -285,8 +287,8 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.autonomousModel !== undefined && typeof roleConfig.autonomousModel !== 'string') {
     throw new Error(`config.yaml: roles.${role}.autonomousModel must be a scalar model reference`);
   }
-  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'ohmypi' && roleConfig.harness !== 'codex' && roleConfig.harness !== 'acp' && roleConfig.harness !== 'kimi-code') {
-    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, codex, acp, or kimi-code`);
+  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'ohmypi' && roleConfig.harness !== 'codex' && roleConfig.harness !== 'acp' && roleConfig.harness !== 'kimi-code' && roleConfig.harness !== 'opencode' && roleConfig.harness !== 'muse') {
+    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse`);
   }
   if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
     throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
@@ -320,7 +322,7 @@ export function validateRoleModelRefs(config: NormalizedConfig): void {
     if (isWorkhorseRef(ref)) {
       throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
     }
-    resolveModelIdSync(ref);
+    resolveModelId(ref);
   }
 
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
@@ -336,7 +338,7 @@ export function validateRoleModelRefs(config: NormalizedConfig): void {
     } else if (roleConfig.model) {
       const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
       if (roleConfig.effort !== undefined) {
-        const supported = getModelEffortLevelsSync(resolvedModel);
+        const supported = getModelEffortLevels(resolvedModel);
         if (supported !== undefined && supported.length > 0 && !supported.includes(roleConfig.effort)) {
           throw new Error(
             `config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,

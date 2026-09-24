@@ -27,14 +27,14 @@ const mockCleanupMergedLabels = vi.hoisted(() => vi.fn(() => Effect.succeed({ su
 const mockSetAgentPaused = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
   agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
 )));
-const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(
+const mockGetAgentState = vi.hoisted(() => vi.fn((agentId: string) =>
   agentId === 'strike-pan-399' ? { id: agentId, paused: true } : null,
-)));
+));
 const mockSessionExists = vi.hoisted(() => vi.fn((agentId: string) => Effect.succeed(agentId === 'strike-pan-399')));
 const mockKillSession = vi.hoisted(() => vi.fn(() => Effect.void));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
-const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(() => Effect.succeed({ killed: [] as string[] })));
+const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(async () => ({ killed: [] as string[] })));
 const mockEnqueueMergedDockerCleanup = vi.hoisted(() => vi.fn());
 const mockTeardownWorkspaceDockerByNamePromise = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] }),
@@ -112,7 +112,19 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   killSession: mockKillSession,
   killSessionSync: vi.fn(() => Effect.void),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
+}));
+
+// PAN-3947: post-merge closes terminals through the terminal backend. Model a
+// tmux host: closing an agent's terminal kills its tmux session, and there are
+// no Herdr panes to close by issue token.
+vi.mock('../../../../src/lib/terminal-backends/launch.js', () => ({
+  closeAgentPane: vi.fn(async (agentId: string) => {
+    if (!(await Effect.runPromise(mockSessionExists(agentId)))) return false;
+    await Effect.runPromise(mockKillSession(agentId));
+    return true;
+  }),
+  closeIssuePanes: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../src/lib/paths.js', () => ({
@@ -130,9 +142,7 @@ vi.mock('../../../../src/lib/paths.js', () => ({
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
-  resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 399 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
-  resolveTrackerTypeSync: vi.fn().mockReturnValue('github'),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -147,7 +157,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
       },
     },
   }),
-  findProjectByPathSync: vi.fn().mockReturnValue(null),
+  findProjectByPath: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
   loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));
@@ -156,6 +166,9 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
   setReviewStatusSync: mockSetReviewStatusSync,
   setReviewStatus: vi.fn(),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/config-yaml.js', () => ({
@@ -172,11 +185,11 @@ vi.mock('../../../../src/lib/git-utils.js', () => ({
 
 vi.mock('../../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: vi.fn().mockReturnValue(false),
-  listPullRequestsForHead: vi.fn().mockReturnValue(Effect.succeed([])),
+  listPullRequestsForHead: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  getMergeSetSync: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
+  getMergeSet: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
 }));
 
 vi.mock('../../../../src/lib/activity-log.js', () => ({
@@ -192,13 +205,12 @@ vi.mock('../../../../src/lib/cloister/merged-docker-cleanup-worker.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/workspace-manager/docker.js', () => ({
-  teardownWorkspaceDockerByNamePromise: mockTeardownWorkspaceDockerByNamePromise,
+  teardownWorkspaceDockerByName: mockTeardownWorkspaceDockerByNamePromise,
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   setAgentPaused: mockSetAgentPaused,
   getAgentState: mockGetAgentState,
-  getAgentStateSync: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({
@@ -244,7 +256,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
   });
 
   it('runs post-merge cleanup while the release engine is still pending', async () => {
-    const lifecyclePromise = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true });
+    const lifecyclePromise = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
 
     // Wait for the release engine to have started but NOT resolve it yet.
     // The release path begins behind several dynamic imports. Under the full
@@ -272,24 +284,16 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     releaseResolve!();
 
     await lifecyclePromise;
-    expect(mockSetReviewStatusSync).toHaveBeenLastCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'merged' }),
-    );
   }, 30_000);
 
   it('runs name-based teardown before a verifying-on-main tracker transition fails', async () => {
     mockTransitionState.shouldFail = true;
 
     await expect(
-      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH),
     ).rejects.toThrow('tracker transition failed');
 
     expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
-    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'post-merge-cleanup' }),
-    );
   });
 
   it('queues retry ownership when teardown and tracker transition both fail', async () => {
@@ -300,32 +304,10 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     });
 
     await expect(
-      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH),
     ).rejects.toThrow('tracker transition failed');
 
     expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(ISSUE_ID, { mergeVerified: true });
-    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'post-merge-cleanup' }),
-    );
-  });
-
-  it('preserves verified retry ownership when the initial merged-status write fails', async () => {
-    mockSetReviewStatusSync.mockImplementationOnce(() => {
-      throw new Error('status write failed');
-    });
-    mockTeardownWorkspaceDockerByNamePromise.mockRejectedValueOnce(
-      new Error('network teardown failed'),
-    );
-
-    await expect(
-      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
-    ).resolves.toBeUndefined();
-
-    expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(
-      ISSUE_ID,
-      { mergeVerified: true },
-    );
   });
 
   it('continues post-merge cleanup when Docker network teardown fails', async () => {
@@ -334,7 +316,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     try {
-      await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true })).resolves.toBeUndefined();
+      await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).resolves.toBeUndefined();
 
       expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
       expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(ISSUE_ID, { mergeVerified: true });

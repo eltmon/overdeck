@@ -7,7 +7,7 @@ import { scan, validateEstimatedCost } from '../scanner.js';
 import { discoverJsonlFiles, type DiscoveredFile } from '../harness-discovery.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../tests/helpers/overdeck-test-db.js';
 import { findDiscoveredSessions } from '../../overdeck/discovered-sessions.js';
-import { insertCostEventSync } from '../../overdeck/cost-sync.js';
+import { insertCostEvent } from '../../overdeck/cost-sync.js';
 
 // Allow individual tests to inject a parse failure for a specific file path
 let failParseForPath: string | null = null;
@@ -247,7 +247,7 @@ describe('scanner', () => {
     await scan({ mode: 'system', watchDirs: [] });
     expect(findDiscoveredSessions().find((s) => s.jsonlPath === p)?.overdeckManaged).toBe(false);
 
-    insertCostEventSync({
+    insertCostEvent({
       ts: '2025-01-01T10:02:00Z',
       type: 'cost',
       agentId: 'agent-late',
@@ -383,7 +383,7 @@ describe('scanner', () => {
   it('validates estimated scan cost against matching cost_events records', async () => {
     const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'cost-session.jsonl');
     writeFileSync(p, SESSION_JSONL, 'utf8');
-    insertCostEventSync({
+    insertCostEvent({
       ts: '2025-01-01T10:02:00Z',
       type: 'cost',
       agentId: 'agent-cost',
@@ -587,6 +587,10 @@ function seedConversationFile(
   ).run(input.id, input.harness, input.locator, Date.parse('2026-07-02T00:00:00.000Z'));
 }
 
+/**
+ * PAN-3917: an agent's workspace is read from its own state file, not from the
+ * dropped overdeck.db mirror.
+ */
 function seedAgent(
   dbHandle: OverdeckTestDb,
   id: string,
@@ -594,15 +598,16 @@ function seedAgent(
   harness = 'codex',
   model = 'gpt-5.5',
 ): void {
-  const now = new Date('2026-07-02T00:00:00.000Z').toISOString();
-  const db = dbHandle.raw();
-  db.exec('PRAGMA foreign_keys = OFF');
-  try {
-    db.prepare(
-      `INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, 'PAN-2224', 'work', 'stopped', workspace, harness, model, now);
-  } finally {
-    db.exec('PRAGMA foreign_keys = ON');
-  }
+  const dir = join(dbHandle.home, 'agents', id);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'state.json'), JSON.stringify({
+    id,
+    issueId: 'PAN-2224',
+    role: 'work',
+    status: 'stopped',
+    workspace,
+    harness,
+    model,
+    startedAt: '2026-07-02T00:00:00.000Z',
+  }), 'utf8');
 }

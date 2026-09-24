@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   claimAutoSpawnConsentForWorkStart,
   completeAutoSpawnConsentClaim,
-  readAutoSpawnOnFinalizeFlag,
+  readAutoSpawnOnFinalizeFlagAsync,
   releaseAutoSpawnConsentClaim,
   resolveAutoSpawnOnFinalize,
   withAutoSpawnConsentClaim,
@@ -40,13 +40,13 @@ describe('resolveAutoSpawnOnFinalize', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('reads a stamped flag (true)', () => {
+  it('reads a stamped flag (true)', async () => {
     stampFlag(true);
-    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(ISSUE)).resolves.toBe(true);
   });
 
-  it('returns false when no flag file exists', () => {
-    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
+  it('returns false when no flag file exists', async () => {
+    await expect(readAutoSpawnOnFinalizeFlagAsync(ISSUE)).resolves.toBe(false);
   });
 
   it('an explicit request value replaces prior-cycle consent', async () => {
@@ -68,30 +68,30 @@ describe('resolveAutoSpawnOnFinalize', () => {
   it('consumes consent only after a work start is accepted', async () => {
     stampFlag(true);
     await withAutoSpawnConsentClaim(ISSUE, async () => 'not-running', { isAccepted: () => false });
-    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(ISSUE)).resolves.toBe(true);
 
     await withAutoSpawnConsentClaim(ISSUE, async () => 'running');
-    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(ISSUE)).resolves.toBe(false);
   });
 
   it('keeps old claims from consuming a newer planning cycle', async () => {
     await writeAutoSpawnOnFinalizeFlag(ISSUE, true);
     const oldClaim = await claimAutoSpawnConsentForWorkStart(ISSUE);
     expect(oldClaim).not.toBeNull();
-    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(ISSUE)).resolves.toBe(false);
 
     await writeAutoSpawnOnFinalizeFlag(ISSUE, true);
     await completeAutoSpawnConsentClaim(oldClaim!);
-    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(ISSUE)).resolves.toBe(true);
 
     const currentClaim = await claimAutoSpawnConsentForWorkStart(ISSUE);
     expect(currentClaim).not.toBeNull();
     await releaseAutoSpawnConsentClaim(currentClaim!);
-    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(ISSUE)).resolves.toBe(true);
 
     const acceptedClaim = await claimAutoSpawnConsentForWorkStart(ISSUE);
     await completeAutoSpawnConsentClaim(acceptedClaim!);
-    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(ISSUE)).resolves.toBe(false);
   });
 
   it('falls back to the current-cycle flag when the request omits autoSpawn', async () => {

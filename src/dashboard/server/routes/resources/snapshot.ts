@@ -1,8 +1,7 @@
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
-import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
-import { getRuntimeCensus } from '../../../../lib/runtime-census.js';
+import { getBackendPanes } from '../../services/backend-inventory.js';
 import { jsonResponse, jsonStringResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { getAgentStatsSnapshotEffect } from './agents-stats.js';
@@ -11,13 +10,13 @@ import { buildCapacityForecast } from './forecast.js';
 import { getHostProcessesSnapshot } from './host-processes.js';
 import { buildHostVitalsSnapshot } from './host-vitals.js';
 import { enrichContainersWithLimits } from './limits.js';
-import { buildReclaimPayload } from './reclaim.js';
+import { buildReclaimPayload, listReclaimVenvIssueIds, loadClosedIssueIds } from './reclaim.js';
 import { getCurrentDockerStats } from './shared.js';
 import {
   getResourcesHealthEvidenceEffect,
   getSpawnGatePayloadEffect,
 } from './spawn-gate.js';
-import { getResourceStacks } from './stacks.js';
+import { buildResourceStacks, loadStackIssueStates } from './stacks.js';
 
 export const RESOURCES_SNAPSHOT_INTERVAL_MS = 3_000;
 
@@ -25,7 +24,7 @@ let resourcesSnapshotJson: string | null = null;
 let resourcesSnapshotRefresh: Promise<void> | null = null;
 let resourcesSnapshotTimer: ReturnType<typeof setInterval> | null = null;
 
-/** Build the resources payload from cached collectors and the SQLite agents table. */
+/** Build the resources payload from cached collectors and the live backend inventory. */
 export function buildResourcesPayloadEffect() {
   return Effect.gen(function* () {
     const containers = enrichContainersWithLimits(getCurrentDockerStats());
@@ -34,31 +33,42 @@ export function buildResourcesPayloadEffect() {
     const spawnGate = yield* getSpawnGatePayloadEffect(healthEvidence);
     const stoppedContainers: unknown[] = [];
 
-    // PAN-1908: authoritative agent registry is the SQLite agents table.
-    // Read active agent states from the table and cross-check tmux liveness.
-    const runtimeCensus = yield* Effect.promise(() => getRuntimeCensus()).pipe(
-      Effect.catch(() => Effect.succeed(null)),
-    );
-    const tmuxSessionNames = runtimeCensus?.sessionNames ?? new Set<string>();
-    const agents: Record<string, unknown>[] = listAgentStates()
-      .filter((state: AgentState) => state.status !== 'stopped')
-      .map((state: AgentState) => ({
-        ...state,
-        hasLiveTmuxSession: tmuxSessionNames.has(state.id),
-      }));
+    // PAN-3917 FR-12: the agent inventory is the terminal backend's, read
+    // live. There is no agents table and no tmux cross-check — a pane in the
+    // inventory is the agent, and its state is the backend's answer.
+    const panes = (yield* Effect.promise(() => getBackendPanes()))
+      .filter((pane) => pane.state !== 'exited');
+    const agents = panes.map((pane) => ({
+      id: pane.id,
+      issueId: pane.issue,
+      role: pane.role,
+      harness: pane.harness,
+      model: pane.model,
+      state: pane.state,
+      workspace: pane.workspace,
+      terminalId: pane.terminalId,
+      lastActivity: pane.stateSince === undefined ? undefined : new Date(pane.stateSince).toISOString(),
+    }));
     const agentStatsById = new Map(agentStats.agents.map((agent) => [agent.id, agent]));
     const baseHostVitals = buildHostVitalsSnapshot({
       hostMetrics: healthEvidence.accepted?.host.metrics,
       containers,
       agents: agents.map((agent) => ({
-        id: String(agent.id),
-        lastActivity: typeof agent.lastActivity === 'string' ? agent.lastActivity : undefined,
-        hasLiveTmuxSession: agent.hasLiveTmuxSession === true,
+        id: agent.id,
+        lastActivity: agent.lastActivity,
+        hasLiveTmuxSession: true,
       })),
       agentFleet: agentStats.hostVitals.agents,
     });
-    const stacks = getResourceStacks(containers);
-    const reclaim = buildReclaimPayload(stacks, agents);
+    const stacks = buildResourceStacks(containers, yield* Effect.promise(() => loadStackIssueStates(containers)));
+    // Only the venv candidates need a derived read: a stack already carries
+    // its own state.
+    const closedIssueIds = yield* Effect.promise(() => loadClosedIssueIds(listReclaimVenvIssueIds()));
+    const reclaim = buildReclaimPayload(
+      stacks,
+      agents.map((agent) => ({ issueId: agent.issueId, hasLiveTmuxSession: true })),
+      { closedIssueIds },
+    );
     const hostVitals = {
       ...baseHostVitals,
       disk: {
@@ -70,7 +80,7 @@ export function buildResourcesPayloadEffect() {
     return {
       agents: agents.map((agent) => ({
         ...agent,
-        resourceStats: agentStatsById.get(String(agent.id)) ?? null,
+        resourceStats: agentStatsById.get(agent.id) ?? null,
       })),
       coreServices: getCoreServicesSnapshot(),
       containers,

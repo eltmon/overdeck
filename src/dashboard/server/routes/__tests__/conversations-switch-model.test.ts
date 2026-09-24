@@ -48,26 +48,30 @@ vi.mock('../../../../lib/background-ai/features.js', () => ({
 }));
 
 vi.mock('../../../../lib/conversations/smart-compaction.js', () => ({
-  generateSmartSummary: vi.fn(() => Effect.succeed({
+  generateSmartSummary: vi.fn(async () => ({
     summary: 'Mocked compact summary for switch-model coverage.',
     summaryModel: 'claude-haiku-4-5',
   })),
 }));
 
 vi.mock('../../../../lib/providers.js', () => ({
-  getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
+  getProviderForModel: vi.fn(() => ({ name: 'anthropic' })),
   piProviderForModel: vi.fn(() => 'anthropic'),
   qualifyPiModel: vi.fn((m: string) => m),
 }));
 
-vi.mock('../../../../lib/workspace-manager.js', () => ({
-  preTrustDirectory: vi.fn(),
-}));
+vi.mock('../../../../lib/workspace-manager.js', () => ({}));
 
 vi.mock('../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
+  listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   sendRawKeystroke: vi.fn(),
   MessageDeliveryFailed: class MessageDeliveryFailed extends Error {},
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   sessionExists: vi.fn(() => Effect.succeed(true)),
   isHarnessProcessAlive: vi.fn(() => Effect.succeed(true)),
   killSession: killSessionMock,
@@ -104,8 +108,8 @@ async function postSwitchModel(conversationName: string, body: Record<string, un
 }
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 describe('POST /api/conversations/:name/switch-model', () => {

@@ -5,8 +5,8 @@ import { join } from 'path';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { augmentCommentWithWaiver, recordTestWaiver } from '../done.js';
-import { buildStrikeBypassStamp, verifyStrikeBranchMergedIntoMain } from '../strike-merge-verification.js';
-import { getProjectConfigFromWorkspacePath, readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
+import { verifyStrikeBranchMergedIntoMain } from '../strike-merge-verification.js';
+import { readContinueState } from '../../../lib/xbrief/continue-state.js';
 
 const execFileAsync = promisify(execFile);
 const CLI = join(process.cwd(), 'dist', 'cli', 'index.js');
@@ -38,10 +38,7 @@ async function createStrikeRepo(issueId = 'PAN-2013'): Promise<{ projectPath: st
 describe('pan done CLI options', () => {
   beforeAll(() => {
     if (!existsSync(CLI)) {
-      execSync('npm run build:cli', { cwd: process.cwd(), stdio: 'pipe', timeout: 300_000 });
-    }
-    if (!existsSync(CLI)) {
-      throw new Error(`CLI dist missing after build:cli: ${CLI}`);
+      execFileSync('npm', ['run', 'build:cli'], { cwd: process.cwd(), stdio: 'pipe', timeout: 300_000 });
     }
   }, 310_000);
 
@@ -73,38 +70,19 @@ describe('augmentCommentWithWaiver', () => {
 });
 
 describe('recordTestWaiver', () => {
-  it('appends a D-test-waived decision to the per-issue record (AC1/AC4)', async () => {
-    // Workspace path must end in feature-pan-<N> for issueId detection
-    const workspace = mkdtempSync(join(tmpdir(), 'pan-done-waiver-feature-pan-1501-'));
+  it('appends a D-test-waived decision to the issue continue file', async () => {
+    // Workspace path must end in feature-pan-<N> for issueId detection.
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-done-waiver-'));
     const workspacePath = join(workspace, 'feature-pan-1501');
-    mkdirSync(join(workspacePath, '.pan'), { recursive: true });
-    const project = getProjectConfigFromWorkspacePath(workspacePath);
-    const now = '2026-01-01T00:00:00.000Z';
-    writeIssueRecordSync(project, 'PAN-1501', {
-      issueId: 'PAN-1501',
-      schemaVersion: 2,
-      created: now,
-      updated: now,
-      decisions: [{ id: 'D1', summary: 'Existing decision', recordedAt: now }],
-      hazards: [],
-      resumePoint: null,
-      tasksMapping: {},
-      statusOverrides: {},
-      sessionHistory: [],
-      feedback: [],
-      pipeline: null,
-      closeOut: null,
-    });
+    mkdirSync(join(workspacePath, '.pan', 'continues'), { recursive: true });
+    await execFileAsync('git', ['init', '-b', 'main'], { cwd: workspacePath });
 
     await recordTestWaiver(workspacePath, 'covered by existing test at abc123');
 
-    const updated = readIssueRecordSync(project, 'PAN-1501');
-    expect(updated?.decisions).toHaveLength(2);
-    expect(updated?.decisions[1].id).toBe('D-test-waived');
-    expect(updated?.decisions[1].summary).toBe(
-      'Test gate waived: covered by existing test at abc123',
-    );
-    expect(updated?.decisions[1].recordedAt).toMatch(/^\d{4}-/);
+    const state = readContinueState(workspacePath, 'PAN-1501');
+    expect(state?.decisions).toHaveLength(1);
+    expect(state?.decisions[0].id).toBe('D-test-waived');
+    expect(state?.decisions[0].summary).toBe('Test gate waived: covered by existing test at abc123');
     rmSync(workspace, { recursive: true, force: true });
   });
 });
@@ -207,27 +185,5 @@ describe('verifyStrikeBranchMergedIntoMain', () => {
     await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).rejects.toThrow(
       /strike\.txt/,
     );
-  });
-});
-
-describe('buildStrikeBypassStamp (PAN-3067)', () => {
-  it('stamps verification and tests as skipped when no review status exists', () => {
-    const stamp = buildStrikeBypassStamp(null);
-    expect(stamp.verificationStatus).toBe('skipped');
-    expect(stamp.verificationNotes).toContain('bypassed by design');
-    expect(stamp.testStatus).toBe('skipped');
-    expect(stamp.testNotes).toContain('by design');
-  });
-
-  it('stamps only the missing verdicts when tests already passed', () => {
-    const stamp = buildStrikeBypassStamp({ testStatus: 'passed', verificationStatus: 'pending' });
-    expect(stamp.verificationStatus).toBe('skipped');
-    expect(stamp.testStatus).toBeUndefined();
-    expect(stamp.testNotes).toBeUndefined();
-  });
-
-  it('leaves already-terminal verdicts untouched', () => {
-    expect(buildStrikeBypassStamp({ testStatus: 'skipped', verificationStatus: 'passed' })).toEqual({});
-    expect(buildStrikeBypassStamp({ testStatus: 'passed', verificationStatus: 'skipped' })).toEqual({});
   });
 });

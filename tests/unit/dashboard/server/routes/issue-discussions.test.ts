@@ -61,9 +61,7 @@ vi.mock('../../../../../src/lib/tracker-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveGitHubIssue: (...args: unknown[]) => mockResolveGitHubIssue(...args),
-    resolveGitHubIssueSync: (...args: unknown[]) => mockResolveGitHubIssue(...args),
     resolveTrackerType: (...args: unknown[]) => mockResolveTrackerType(...args),
-    resolveTrackerTypeSync: (...args: unknown[]) => mockResolveTrackerType(...args),
   };
 });
 
@@ -90,10 +88,6 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentStateAsync: vi.fn(),
   normalizeAgentId: vi.fn((s: string) => s),
-}));
-vi.mock('../../../../../src/lib/database/index.js', () => ({
-  getDatabase: vi.fn(() => ({ prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn(), all: vi.fn() })) })),
-  resetDatabase: vi.fn(),
 }));
 vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
   getSharedIssueService: vi.fn(),

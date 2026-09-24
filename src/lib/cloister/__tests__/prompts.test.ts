@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { renderPrompt, loadPromptFrontmatter, PromptError } from '../prompts.js';
+import { renderPrompt, PromptError } from '../prompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const PROMPTS_DIR = join(dirname(__filename), '..', 'prompts');
@@ -40,11 +40,14 @@ optional:
 ---
 Issue: {{ISSUE_ID}}`
         );
-        const fm = yield* loadPromptFrontmatter(SCRATCH);
-        expect(fm.name).toBe('scratch');
-        expect(fm.description).toBe('A scratch template for tests');
-        expect(fm.requires).toEqual(['ISSUE_ID']);
-        expect(fm.optional).toEqual(['LOCAL', 'REMOTE']);
+        // The frontmatter is observable through renderPrompt: `requires` makes ISSUE_ID
+        // mandatory, and `requires` + `optional` are the only variables it accepts.
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-1', LOCAL: 'l', REMOTE: 'r' } });
+        expect(out).toBe('Issue: PAN-1');
+        const missing = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: { LOCAL: 'l' } }));
+        expect(missing.message).toMatch(/requires variables that are missing: ISSUE_ID/);
+        const unknown = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: { ISSUE_ID: 'PAN-1', OTHER: 'x' } }));
+        expect(unknown.message).toMatch(/unknown variables: OTHER/);
       })
     );
 
@@ -57,16 +60,17 @@ description: minimal
 ---
 hello`
         );
-        const fm = yield* loadPromptFrontmatter(SCRATCH);
-        expect(fm.requires).toEqual([]);
-        expect(fm.optional).toEqual([]);
+        // No requires/optional: renders with no variables and accepts none.
+        expect(yield* renderPrompt({ name: SCRATCH, vars: {} })).toBe('hello');
+        const unknown = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: { ANY: 'x' } }));
+        expect(unknown.message).toMatch(/unknown variables: ANY/);
       })
     );
 
     it.effect('fails when frontmatter is missing entirely', () =>
       Effect.gen(function* () {
         writeScratch('hello world');
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err).toBeInstanceOf(PromptError);
         expect(err.message).toMatch(/missing YAML frontmatter/);
       })
@@ -80,7 +84,7 @@ description: no name
 ---
 body`
         );
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err.message).toMatch(/missing required field "name"/);
       })
     );
@@ -93,7 +97,7 @@ name: scratch
 ---
 body`
         );
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err.message).toMatch(/missing required field "description"/);
       })
     );
@@ -109,7 +113,7 @@ requires:
 ---
 body`
         );
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err.message).toMatch(/"requires" must be a list of strings/);
       })
     );
@@ -124,14 +128,14 @@ optional: [unclosed
 ---
 body`
         );
-        const err = yield* Effect.flip(loadPromptFrontmatter(SCRATCH));
+        const err = yield* Effect.flip(renderPrompt({ name: SCRATCH, vars: {} }));
         expect(err.message).toMatch(/invalid YAML frontmatter/);
       })
     );
 
     it.effect('fails when template file is missing', () =>
       Effect.gen(function* () {
-        const err = yield* Effect.flip(loadPromptFrontmatter('definitely-not-a-real-template'));
+        const err = yield* Effect.flip(renderPrompt({ name: 'definitely-not-a-real-template', vars: {} }));
         expect(err.message).toMatch(/Failed to load prompt template/);
       })
     );
@@ -320,7 +324,6 @@ optional:
             BASELINE_COMMANDS: 'git checkout main && npm test',
             TEST_CONFIG_SUMMARY: 'default test suite',
             TIMEOUT_MS: 600000,
-            API_URL: 'http://localhost:3011',
             FEATURE_NAME: 'pan-611',
             DOCKER_PS_FORMAT: '{{.Names}}',
             MEMORY_CONTEXT: memoryContext,
@@ -358,36 +361,6 @@ optional:
         }
         expect(emptyWork).not.toContain('## Memory Context');
         expect(emptyWork).not.toContain('no context found');
-      })
-    );
-
-    it.effect('renders planning TLDR guidance only when TLDR_AVAILABLE is true', () =>
-      Effect.gen(function* () {
-        const baseVars = {
-          ISSUE_ID: 'PAN-611',
-          ISSUE_ID_LOWER: 'pan-611',
-          ISSUE_TITLE: 'TLDR planning',
-          ISSUE_URL: 'https://example.test/PAN-611',
-          ISSUE_DESCRIPTION: 'Need TLDR planning context',
-          VERSION: '0.0.0',
-          MODEL_AUTHOR: 'agent:test',
-        };
-        const enabled = yield* renderPrompt({
-          name: 'planning',
-          vars: { ...baseVars, TLDR_AVAILABLE: true },
-        });
-        const disabled = yield* renderPrompt({
-          name: 'planning',
-          vars: { ...baseVars, TLDR_AVAILABLE: false },
-        });
-        const absent = yield* renderPrompt({ name: 'planning', vars: baseVars });
-
-        expect(enabled).toContain('### TLDR: Token-Efficient Code Discovery');
-        expect(enabled).toContain('PreToolUse hook on `Read`');
-        expect(enabled).toContain('.venv/bin/tldr context');
-        expect(enabled).toContain('not registered in agent');
-        expect(disabled).not.toContain('### TLDR: Token-Efficient Code Discovery');
-        expect(absent).not.toContain('### TLDR: Token-Efficient Code Discovery');
       })
     );
 
@@ -457,7 +430,6 @@ optional:
           BASELINE_COMMANDS: 'git checkout main && npm test',
           TEST_CONFIG_SUMMARY: 'default test suite',
           TIMEOUT_MS: 600000,
-          API_URL: 'http://localhost:3011',
           FEATURE_NAME: 'pan-611',
           DOCKER_PS_FORMAT: '{{.Names}}',
         };
@@ -505,7 +477,7 @@ optional:
       })
     );
 
-    it.effect('requires observing review request completion after an exec yield', () =>
+    it.effect('tells the agent to end its turn after pan review request exits 0, not to poll', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({
           name: 'work',
@@ -525,11 +497,15 @@ optional:
           },
         });
 
-        expect(out).toContain('A yielded exec result');
-        expect(out).toContain('poll that same background terminal until it exits');
-        expect(out).toContain('inspect its real exit code');
-        expect(out).toContain('pan show PAN-611');
-        expect(out).toContain('pan review pending');
+        // PAN-3705: the old wording told the agent to poll `pan show` until it
+        // "confirmed the pipeline state change", which it did for ten minutes.
+        // Every path that starts the review pipeline is fire-and-forget, so
+        // exit 0 IS the confirmation and Overdeck messages the agent after.
+        expect(out).toContain('returns as soon as the request is accepted');
+        expect(out).toContain('end your turn and wait');
+        expect(out).toContain('Do not poll `pan show`, files, or terminals');
+        expect(out).not.toContain('pan review pending');
+        expect(out).not.toContain('poll that same background terminal until it exits');
       })
     );
 

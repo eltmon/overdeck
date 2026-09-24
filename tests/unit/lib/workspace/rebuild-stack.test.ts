@@ -23,13 +23,19 @@ vi.mock('node:child_process', () => ({
     if (value instanceof Error) return cb(value, { stdout: '', stderr: '' });
     return cb(null, { stdout: value, stderr: '' });
   },
+  // PAN-3917: pr-facts imports `exec` at module load; the mock must supply it.
+  exec: (_cmd: string, _opts: unknown, cb?: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
+    cb?.(null, { stdout: '', stderr: '' });
+    return { on: () => {} };
+  },
 }));
 
 const mocks = vi.hoisted(() => ({
   isIssueClosed: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
-  ensureDevcontainerSync: vi.fn(),
+  ensureDevcontainer: vi.fn(),
+  getPrFacts: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
@@ -48,14 +54,16 @@ vi.mock('../../../../src/lib/docker-stats.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/workspace/ensure-devcontainer.js', () => ({
-  ensureDevcontainerSync: mocks.ensureDevcontainerSync,
+  ensureDevcontainer: mocks.ensureDevcontainer,
+}));
+
+// PAN-3917: the terminal guard asks the forge; keep the subprocess out.
+// (was: review-status.ts, deleted with the row plane)
+vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
+  getPrFacts: mocks.getPrFacts,
 }));
 
 import { rebuildWorkspaceStack } from '../../../../src/lib/workspace/rebuild-stack.js';
-import {
-  registerCanonicalReviewStatusResolver,
-  registerReviewStatusMapReader,
-} from '../../../../src/lib/cloister/review-status-source.js';
 
 let tmpRoot: string | null = null;
 
@@ -89,8 +97,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   calls.length = 0;
   responses = {};
-  registerReviewStatusMapReader(() => ({}));
-  registerCanonicalReviewStatusResolver(() => null);
+  mocks.getPrFacts.mockResolvedValue({ merged: false });
   mocks.isIssueClosed.mockResolvedValue(false);
 });
 
@@ -108,7 +115,7 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
     const workspacePath = makeWorkspace();
     setupProject(workspacePath);
     // No .devcontainer at all yet — mirrors a spawn-time rebuild on a brand-new workspace.
-    mocks.ensureDevcontainerSync.mockImplementation(() => {
+    mocks.ensureDevcontainer.mockImplementation(() => {
       writeComposeFile(workspacePath, 'name: myn-feature-min-901\nservices:\n  api:\n    image: test\n');
       return { step: { success: true } };
     });
@@ -128,7 +135,7 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
     setupProject(workspacePath);
     // Pre-existing render with no declared name anywhere — resolves to the overdeck- fallback.
     writeComposeFile(workspacePath, 'services:\n  api:\n    image: test\n');
-    mocks.ensureDevcontainerSync.mockImplementation(() => {
+    mocks.ensureDevcontainer.mockImplementation(() => {
       writeComposeFile(workspacePath, 'name: myn-feature-min-901\nservices:\n  api:\n    image: test\n');
       return { step: { success: true } };
     });
@@ -157,7 +164,7 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
     // No pre-existing .devcontainer — mirrors a spawn-time rebuild where the
     // fallback-named stack was brought up by another process (e.g.
     // spawn-prep.ts) before this render ever ran, so it is genuinely live.
-    mocks.ensureDevcontainerSync.mockImplementation(() => {
+    mocks.ensureDevcontainer.mockImplementation(() => {
       writeComposeFile(workspacePath, 'name: myn-feature-min-901\nservices:\n  api:\n    image: test\n');
       return { step: { success: true } };
     });
@@ -193,7 +200,7 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
     // tryComposeProjectNameForWorkspace(...) ?? fallback and ran `down`
     // against the guessed fallback name anyway; that must not happen.
     writeComposeFile(workspacePath, 'name: victim-project\nservices:\n  api:\n    image: test\n');
-    mocks.ensureDevcontainerSync.mockImplementation(() => {
+    mocks.ensureDevcontainer.mockImplementation(() => {
       writeComposeFile(workspacePath, 'name: myn-feature-min-901\nservices:\n  api:\n    image: test\n');
       return { step: { success: true } };
     });
@@ -212,7 +219,7 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
   it('ac3: fails loudly instead of starting a stack under the fallback when no name is resolvable', async () => {
     const workspacePath = makeWorkspace();
     setupProject(workspacePath);
-    mocks.ensureDevcontainerSync.mockImplementation(() => {
+    mocks.ensureDevcontainer.mockImplementation(() => {
       writeComposeFile(workspacePath, 'services:\n  api:\n    image: test\n');
       return { step: { success: true } };
     });

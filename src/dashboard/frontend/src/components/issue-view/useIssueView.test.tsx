@@ -6,17 +6,14 @@ import React from 'react';
 import {
   useActivityQuery,
   useIssueCostsQuery,
-  useReviewStatusQuery,
-  useShipLogQuery,
   useWorkspaceQuery,
   type ActivityResponse,
-  type IssueCostData,
-  type ReviewStatusData,
   type WorkspaceData,
 } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { useDashboardStore } from '../../lib/store';
+import { useBackendPanes, useDashboardStore, useDerivedIssueState } from '../../lib/store';
 import { buildIssueViewModel, useIssueView } from './useIssueView';
-import { isAgentRunning, mergeStep, readyForMerge, stuckReason } from './index';
+import { isAgentRunning, isReadyToMerge, stuckReason } from './index';
+import type { DerivedIssueState, DerivedIssueStateName } from '../../types';
 
 vi.mock('../CommandDeck/ZoneCOverviewTabs/queries');
 vi.mock('../../lib/store');
@@ -43,8 +40,6 @@ function makeSession(overrides: Partial<SessionNode> & { sessionId: string; type
     awaitingInput: overrides.awaitingInput,
     paused: overrides.paused,
     pausedReason: overrides.pausedReason,
-    troubled: overrides.troubled,
-    troubledReason: overrides.troubledReason,
   };
 }
 
@@ -78,8 +73,6 @@ function makeAgent(overrides: Partial<AgentSnapshot> & { id: string }): AgentSna
     role: overrides.role,
     paused: overrides.paused,
     pausedReason: overrides.pausedReason,
-    troubled: overrides.troubled,
-    troubledReason: overrides.troubledReason,
     hasPendingQuestion: overrides.hasPendingQuestion,
     pendingInputCount: overrides.pendingInputCount,
     pendingAskUserQuestion: overrides.pendingAskUserQuestion,
@@ -87,22 +80,16 @@ function makeAgent(overrides: Partial<AgentSnapshot> & { id: string }): AgentSna
   } as AgentSnapshot;
 }
 
-function makeReviewStatus(overrides: Partial<ReviewStatusData> = {}): ReviewStatusData {
-  return {
-    issueId: 'PAN-2499',
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    readyForMerge: false,
-    updatedAt: new Date().toISOString(),
-    ...overrides,
-  };
+function makeDerived(state: DerivedIssueStateName, overrides: Partial<DerivedIssueState> = {}): DerivedIssueState {
+  return { issueId: 'PAN-2499', state, ...overrides };
 }
 
+const GREEN_PR = { url: 'https://example.test/pr/2499', number: 2499, reviewState: 'approved', checks: 'green' as const, mergeable: true };
+
 describe('buildIssueViewModel', () => {
-  it('exports the four canonical issue-view derivations from the component family', () => {
+  it('exports the canonical issue-view derivations from the component family', () => {
     expect(isAgentRunning).toBeTypeOf('function');
-    expect(readyForMerge).toBeTypeOf('function');
-    expect(mergeStep).toBeTypeOf('function');
+    expect(isReadyToMerge).toBeTypeOf('function');
     expect(stuckReason).toBeTypeOf('function');
   });
 
@@ -119,13 +106,13 @@ describe('buildIssueViewModel', () => {
     expect(model.operator).toBeDefined();
   });
 
-  it('populates header from options and review status', () => {
+  it('populates header from options and the derived state', () => {
     const model = buildIssueViewModel(
       'PAN-2499',
       'Unified issue view',
       'feature/pan-2499',
       'overdeck',
-      makeReviewStatus({ readyForMerge: true }),
+      makeDerived('ready', { pr: GREEN_PR }),
       { issueId: 'PAN-2499', totalCost: 4.56, totalTokens: 9000, sessions: [], byModel: {} },
       undefined,
       undefined,
@@ -247,78 +234,25 @@ describe('buildIssueViewModel', () => {
 
   it('derives merged ship status', () => {
     const model = buildIssueViewModel(
-      'PAN-2499',
-      undefined,
-      undefined,
-      undefined,
-      makeReviewStatus({ mergeStatus: 'merged', readyForMerge: true }),
-      undefined,
-      undefined,
-      undefined,
-      {},
+      'PAN-2499', undefined, undefined, undefined,
+      makeDerived('merged', { pr: GREEN_PR }),
+      undefined, undefined, undefined, {},
     );
     expect(model.ship.status).toBe('merged');
-    expect(model.ship.readyForMerge).toBe(true);
-    expect(model.ship.mergeStep).toBe('merged');
+    expect(model.ship.prUrl).toBe(GREEN_PR.url);
     expect(model.ship.blockerReason).toBeUndefined();
     expect(model.header.phase).toBe('merged');
   });
 
-  it('derives ready-for-merge ship status and blocker reason when not ready', () => {
+  it('derives the blocker reason from the forge when the PR is not mergeable', () => {
     const model = buildIssueViewModel(
-      'PAN-2499',
-      undefined,
-      undefined,
-      undefined,
-      makeReviewStatus({ reviewStatus: 'passed', testStatus: 'failed', readyForMerge: false }),
-      undefined,
-      undefined,
-      undefined,
-      {},
+      'PAN-2499', undefined, undefined, undefined,
+      makeDerived('in-review', { pr: { ...GREEN_PR, checks: 'red', mergeable: true } }),
+      undefined, undefined, undefined, {},
     );
     expect(model.ship.status).toBe('pending');
-    expect(model.ship.readyForMerge).toBe(false);
-    expect(model.ship.blockerReason).toBe('Tests failed');
-  });
-
-  it('uses explicit mergeStep when available', () => {
-    const model = buildIssueViewModel(
-      'PAN-2499',
-      undefined,
-      undefined,
-      undefined,
-      makeReviewStatus({ mergeStatus: 'queued', readyForMerge: false, mergeStep: 'awaiting-queue-slot' } as ReviewStatusData),
-      undefined,
-      undefined,
-      undefined,
-      {},
-    );
-    expect(model.ship.mergeStep).toBe('awaiting-queue-slot');
-  });
-
-  it('reports operator troubled state from agent snapshot', () => {
-    const sessions = [makeSession({ type: 'work', sessionId: 'agent-pan-2499-slot-2', status: 'error', presence: 'ended' })];
-    const model = buildIssueViewModel(
-      'PAN-2499',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      makeActivity(sessions),
-      {
-        'agent-pan-2499-slot-2': makeAgent({
-          id: 'agent-pan-2499-slot-2',
-          sessionId: 'agent-pan-2499-slot-2',
-          troubled: true,
-          troubledReason: 'crash loop',
-        }),
-      },
-    );
-    expect(model.operator.needsYou?.kind).toBe('troubled');
-    expect(model.operator.needsYou?.sessionId).toBe('agent-pan-2499-slot-2');
-    expect(model.operator.needsYou?.reason).toBe('crash loop');
+    expect(model.ship.checks).toBe('red');
+    expect(model.ship.blockerReason).toBe('Checks are red');
   });
 
   it('reports operator paused state from agent snapshot', () => {
@@ -352,7 +286,7 @@ describe('buildIssueViewModel', () => {
       undefined,
       undefined,
       undefined,
-      makeReviewStatus(),
+      makeDerived('working'),
       undefined,
       undefined,
       makeActivity(sessions),
@@ -372,7 +306,7 @@ describe('buildIssueViewModel', () => {
       undefined,
       undefined,
       undefined,
-      makeReviewStatus({ readyForMerge: true }),
+      makeDerived('ready', { pr: GREEN_PR }),
       undefined,
       undefined,
       makeActivity(sessions),
@@ -395,7 +329,7 @@ describe('buildIssueViewModel', () => {
       undefined,
       undefined,
       undefined,
-      makeReviewStatus({ reviewStatus: 'reviewing' }),
+      makeDerived('in-review', { pr: { ...GREEN_PR, reviewState: 'review-requested', checks: 'pending' } }),
       undefined,
       undefined,
       makeActivity(sessions),
@@ -404,26 +338,6 @@ describe('buildIssueViewModel', () => {
 
     expect(model.operator.needsYouItems).toEqual([]);
     expect(model.operator.needsYou).toBeNull();
-  });
-
-  it('classifies ended reviewers as stale only while a fresh review is pending', () => {
-    const sessions = [
-      makeSession({ type: 'reviewer', sessionId: 'review-security', status: 'stopped', presence: 'ended', role: 'security' }),
-    ];
-    const model = buildIssueViewModel(
-      'PAN-2499',
-      undefined,
-      undefined,
-      undefined,
-      makeReviewStatus({ reviewStatus: 'pending' }),
-      undefined,
-      undefined,
-      makeActivity(sessions),
-      {},
-    );
-
-    expect(model.operator.needsYou?.kind).toBe('stale_review');
-    expect(model.operator.needsYouItems[0]?.kind).toBe('stale_review');
   });
 
   it('marks pipeline steps done/active based on sessions and review status', () => {
@@ -448,71 +362,50 @@ describe('buildIssueViewModel', () => {
     expect(model.pipeline.ship.status).toBe('pending');
   });
 
-  it('does not treat historical review and test sessions as successful completion', () => {
+  it('reads the review step off the derived state, not off historical sessions', () => {
     const sessions = [
       makeSession({ type: 'review', sessionId: 'review-old', status: 'stopped', presence: 'ended' }),
       makeSession({ type: 'test', sessionId: 'test-old', status: 'stopped', presence: 'ended' }),
     ];
     const model = buildIssueViewModel(
       'PAN-2499', undefined, undefined, undefined,
-      makeReviewStatus({ reviewStatus: 'failed', testStatus: 'dispatch_failed' }),
+      makeDerived('changes-requested', { pr: { ...GREEN_PR, reviewState: 'changes-requested', checks: 'red' } }),
       undefined, undefined, makeActivity(sessions), {},
     );
 
     expect(model.pipeline.review).toEqual({ status: 'failed', active: false, done: false });
-    expect(model.pipeline.test).toEqual({ status: 'dispatch_failed', active: false, done: false });
+    expect(model.pipeline.test).toEqual({ status: 'failed', active: false, done: false });
   });
 
-  it('uses live sessions only to mark pending canonical stages active', () => {
+  it('uses live reviewer sessions only to mark the review step active', () => {
     const sessions = [
       makeSession({ type: 'review', sessionId: 'review-live', status: 'running', presence: 'active' }),
-      makeSession({ type: 'test', sessionId: 'test-live', status: 'running', presence: 'active' }),
     ];
     const model = buildIssueViewModel(
       'PAN-2499', undefined, undefined, undefined,
-      makeReviewStatus({ reviewStatus: 'pending', testStatus: 'pending' }),
+      makeDerived('in-review', { pr: { ...GREEN_PR, reviewState: 'review-requested', checks: 'pending' } }),
       undefined, undefined, makeActivity(sessions), {},
     );
 
-    expect(model.pipeline.review).toEqual({ status: 'pending', active: true, done: false });
+    expect(model.pipeline.review).toEqual({ status: 'passed', active: true, done: true });
     expect(model.pipeline.test).toEqual({ status: 'pending', active: true, done: false });
   });
 
-  it('includes verification gates', () => {
-    const model = buildIssueViewModel(
-      'PAN-2499',
-      undefined,
-      undefined,
-      undefined,
-      makeReviewStatus({ verificationStatus: 'failed', verificationNotes: 'Verification FAILED at lint' }),
-      undefined,
-      undefined,
-      undefined,
-      {},
+  it('renders the PR check runs as the one verification gate (FR-8)', () => {
+    const failing = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined,
+      makeDerived('in-review', { pr: { ...GREEN_PR, checks: 'red' } }),
+      undefined, undefined, undefined, {},
     );
-    expect(model.verification.status).toBe('failed');
-    expect(model.verification.gates.map((g) => `${g.id}:${g.status}`)).toEqual([
-      'typecheck:passed',
-      'lint:failed',
-      'test:pending',
-      'uat:infra-unavailable',
-    ]);
-  });
+    expect(failing.verification.status).toBe('failed');
+    expect(failing.verification.gates.map((g) => `${g.id}:${g.status}`)).toEqual(['checks:failed']);
 
-  it('maps uat status from review status when workspace has docker', () => {
-    const workspace: WorkspaceData = { exists: true, issueId: 'PAN-2499', hasDocker: true };
-    const model = buildIssueViewModel(
-      'PAN-2499',
-      undefined,
-      undefined,
-      undefined,
-      makeReviewStatus({ uatStatus: 'passed' }),
-      undefined,
-      workspace,
-      undefined,
-      {},
+    const green = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined,
+      makeDerived('ready', { pr: GREEN_PR }),
+      undefined, undefined, undefined, {},
     );
-    expect(model.verification.gates.find((g) => g.id === 'uat')?.status).toBe('passed');
+    expect(green.verification.gates.map((g) => `${g.id}:${g.status}`)).toEqual(['checks:passed']);
   });
 
   it('exposes resources from workspace query', () => {
@@ -539,32 +432,33 @@ describe('useIssueView hook', () => {
     vi.resetAllMocks();
   });
 
-  it('reuses the four existing query hooks', () => {
-    vi.mocked(useReviewStatusQuery).mockReturnValue({ data: makeReviewStatus() } as ReturnType<typeof useReviewStatusQuery>);
+  it('reads the derived state and the backend panes alongside the artifact queries', () => {
+    vi.mocked(useDerivedIssueState).mockReturnValue(makeDerived('working'));
+    vi.mocked(useBackendPanes).mockReturnValue([]);
     vi.mocked(useIssueCostsQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useIssueCostsQuery>);
     vi.mocked(useWorkspaceQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useWorkspaceQuery>);
     vi.mocked(useActivityQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useActivityQuery>);
-    vi.mocked(useShipLogQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useShipLogQuery>);
     vi.mocked(useDashboardStore).mockImplementation((selector) => selector({ agentsById: {} } as never));
 
     const { result } = renderHook(() => useIssueView('PAN-2499'), { wrapper: wrapper(queryClient) });
 
-    expect(useReviewStatusQuery).toHaveBeenCalledWith('PAN-2499');
+    expect(useDerivedIssueState).toHaveBeenCalledWith('PAN-2499');
+    expect(useBackendPanes).toHaveBeenCalledWith('PAN-2499');
     expect(useIssueCostsQuery).toHaveBeenCalledWith('PAN-2499');
     expect(useWorkspaceQuery).toHaveBeenCalledWith('PAN-2499');
     expect(useActivityQuery).toHaveBeenCalledWith('PAN-2499');
-    expect(useShipLogQuery).toHaveBeenCalledWith('PAN-2499');
     expect(result.current.header.issueId).toBe('PAN-2499');
+    expect(result.current.header.phase).toBe('working');
   });
 
   it('passes store agents into the model', () => {
     const agent = makeAgent({ id: 'agent-pan-2499-slot-2', sessionId: 'agent-pan-2499-slot-2', status: 'running' });
     const activity = makeActivity([makeSession({ type: 'work', sessionId: 'agent-pan-2499-slot-2', status: 'running', presence: 'active' })]);
-    vi.mocked(useReviewStatusQuery).mockReturnValue({ data: makeReviewStatus() } as ReturnType<typeof useReviewStatusQuery>);
+    vi.mocked(useDerivedIssueState).mockReturnValue(makeDerived('working'));
+    vi.mocked(useBackendPanes).mockReturnValue([]);
     vi.mocked(useIssueCostsQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useIssueCostsQuery>);
     vi.mocked(useWorkspaceQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useWorkspaceQuery>);
     vi.mocked(useActivityQuery).mockReturnValue({ data: activity } as ReturnType<typeof useActivityQuery>);
-    vi.mocked(useShipLogQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useShipLogQuery>);
     vi.mocked(useDashboardStore).mockImplementation((selector) => selector({ agentsById: { 'agent-pan-2499-slot-2': agent } } as never));
 
     const { result } = renderHook(() => useIssueView('PAN-2499'), { wrapper: wrapper(queryClient) });

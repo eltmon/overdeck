@@ -23,19 +23,19 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { loadConfigSync } from '../../lib/config.js';
-import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, type ProjectConfig } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam, type ProjectConfig } from '../../lib/projects.js';
 import {
-  loadWorkspaceMetadataSync,
-  saveWorkspaceMetadataSync,
-  deleteWorkspaceMetadataSync,
+  loadWorkspaceMetadata,
+  saveWorkspaceMetadata,
+  deleteWorkspaceMetadata,
 } from '../../lib/remote/workspace-metadata.js';
 import {
   createFlyProviderFromConfig,
 } from '../../lib/remote/index.js';
 import { PAN_CONTEXT_FILENAME, PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_FEEDBACK_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import { createWorkspace, removeWorkspace } from '../../lib/workspace-manager.js';
-import { stopAgentSync, setAgentPausedSync } from '../../lib/agents.js';
-import { sessionExistsSync } from '../../lib/tmux.js';
+import { stopAgent, setAgentPaused } from '../../lib/agents.js';
+import { sessionExists } from '../../lib/tmux.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { RemoteProvider } from '../../lib/remote/interface.js';
 
@@ -63,7 +63,7 @@ function detectWorkspaceLocation(issueId: string): 'local' | 'remote' | 'none' {
   const normalizedId = issueId.toLowerCase();
 
   // Check for remote workspace metadata
-  const remoteMetadata = loadWorkspaceMetadataSync(issueId);
+  const remoteMetadata = loadWorkspaceMetadata(issueId);
   if (remoteMetadata) {
     return 'remote';
   }
@@ -292,7 +292,7 @@ export async function migrateLocalToRemote(
     result.steps.push(`Found local workspace: ${localPath}`);
 
     // 2. Check if remote already exists
-    const existingRemote = loadWorkspaceMetadataSync(issueId);
+    const existingRemote = loadWorkspaceMetadata(issueId);
     if (existingRemote && !options.force) {
       spinner.fail('Remote workspace already exists');
       result.errors.push(`Remote workspace already exists for ${issueId}. Use --force to overwrite.`);
@@ -322,7 +322,7 @@ export async function migrateLocalToRemote(
     // is single-repo. The old polyrepo path was already broken on fly (SSH
     // URLs on keyless VMs, macOS-only creds) — refuse honestly instead.
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeam(teamPrefix) : null;
     const subRepos = readdirSync(localPath, { withFileTypes: true })
       .filter(d => d.isDirectory() && !d.name.startsWith('.') && existsSync(join(localPath, d.name, '.git')));
     if (subRepos.length > 0) {
@@ -336,12 +336,17 @@ export async function migrateLocalToRemote(
     // it so deacon auto-resume can't respawn a local duplicate while the
     // issue runs remotely. `pan start <id> --remote --force` clears the gate.
     const agentId = `agent-${issueId.toLowerCase()}`;
-    if (sessionExistsSync(agentId)) {
+    // PAN-4012: gate on the backend-aware pane check, not the tmux-only session
+    // probe, and stop through the backend, so a Herdr pane is closed too.
+    const { agentPaneExists } = await import('../../lib/terminal-backends/launch.js');
+    const localLive = (await agentPaneExists(agentId).catch(() => false))
+      || (await Effect.runPromise(sessionExists(agentId)).catch(() => false));
+    if (localLive) {
       spinner.text = 'Stopping local agent...';
-      stopAgentSync(agentId);
+      await Effect.runPromise(stopAgent(agentId));
       result.steps.push(`Stopped local agent ${agentId}`);
     }
-    setAgentPausedSync(agentId, 'migrated to remote (fly.io)');
+    await Effect.runPromise(setAgentPaused(agentId, 'migrated to remote (fly.io)'));
     result.steps.push('Paused local agent (deacon resume gate)');
 
     // 6. Make sure ALL local work reaches origin before anything else:
@@ -377,7 +382,7 @@ export async function migrateLocalToRemote(
       } catch (error: any) {
         result.steps.push(`Warning: could not destroy old VM: ${error.message}`);
       }
-      deleteWorkspaceMetadataSync(issueId);
+      deleteWorkspaceMetadata(issueId);
     }
 
     // 8. Create the remote workspace via the shared module: VM, credential
@@ -386,7 +391,7 @@ export async function migrateLocalToRemote(
     // the local workspace.
     spinner.text = 'Creating remote workspace...';
     const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
-    const metadata = await Effect.runPromise(createRemoteWorkspace(issueId, { spinner }));
+    const metadata = await createRemoteWorkspace(issueId, { spinner });
     result.steps.push(`Remote workspace ready on ${metadata.vmName}`);
 
     // 9. Copy remaining workspace .pan state (feature context, feedback,
@@ -419,10 +424,10 @@ export async function migrateLocalToRemote(
       spinner.text = 'Cleaning up local workspace...';
       try {
         if (projectConfig) {
-          const removeResult = await Effect.runPromise(removeWorkspace({
+          const removeResult = await removeWorkspace({
             projectConfig,
             featureName: issueId.toLowerCase(),
-          }));
+          });
           result.steps.push(...removeResult.steps);
           if (removeResult.errors.length > 0) {
             result.errors.push(...removeResult.errors);
@@ -465,7 +470,7 @@ export async function migrateRemoteToLocal(
 
   try {
     // 1. Load remote workspace metadata
-    const remoteMetadata = loadWorkspaceMetadataSync(issueId);
+    const remoteMetadata = loadWorkspaceMetadata(issueId);
     if (!remoteMetadata) {
       spinner.fail('Remote workspace not found');
       result.errors.push(`No remote workspace found for ${issueId}`);
@@ -504,18 +509,18 @@ export async function migrateRemoteToLocal(
     spinner.text = 'Creating local workspace...';
     const resolved = resolveProjectFromIssueSync(issueId, []);
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeam(teamPrefix) : null;
     if (!projectConfig) {
       spinner.fail('Cannot resolve project config');
       result.errors.push(`Cannot resolve project config for ${issueId}`);
       return result;
     }
 
-    const workspaceResult = await Effect.runPromise(createWorkspace({
+    const workspaceResult = await createWorkspace({
       projectConfig,
       featureName: issueId.toLowerCase(),
       startDocker: !options.noDocker,
-    }));
+    });
 
     if (!workspaceResult.success) {
       spinner.fail('Failed to create local workspace');
@@ -549,7 +554,7 @@ export async function migrateRemoteToLocal(
       } catch (error: any) {
         result.errors.push(`Warning: Failed to delete VM: ${error.message}`);
       }
-      deleteWorkspaceMetadataSync(issueId);
+      deleteWorkspaceMetadata(issueId);
       result.steps.push('Deleted workspace metadata');
     } else {
       result.steps.push('Remote workspace kept (--keep flag)');

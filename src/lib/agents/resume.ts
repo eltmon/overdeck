@@ -1,30 +1,29 @@
 import { existsSync, unlinkSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
-import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { buildCompactRecoverySeedMessage } from '../context-overflow.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
-import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
-import { claudeSessionTranscriptExists, sessionFilePath } from '../paths.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
+import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
+import { claudeSessionTranscriptExists, sessionFilePath } from '../runtimes/storage/claude-code.js';
+import { logAgentLifecycle } from '../persistent-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
-import { createSession, isPaneDead, killSession, listPaneValues, sessionExists } from '../tmux.js';
+import { closeAgentPane, launchAgentPane } from '../terminal-backends/launch.js';
+import { toPaneRole } from '../terminal-backends/prompt-guard.js';
 import {
   decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
-  getAgentStateSync,
+  getAgentState,
   markAgentRunning,
   saveAgentStateSync,
 } from './agent-state.js';
-import { resolveLatestSessionIdSync, saveSessionId } from './activity.js';
+import { resolveLatestSessionId, saveSessionId } from './activity.js';
 import { clearAgentSessionPointers } from './session-pointers.js';
 import {
   deliverInitialPromptWithRetry,
@@ -32,6 +31,7 @@ import {
   resilientDeliveryMethod,
 } from './delivery.js';
 import { clearReadySignal, normalizeAgentId, waitForReadySignal } from './identity.js';
+import { isAlive, isConfirmedDead } from './liveness.js';
 import {
   getAgentRuntimeStateSync,
   saveAgentRuntimeState,
@@ -40,7 +40,6 @@ import {
 import { decideResumeSpawnPlan } from './resume-spawn-plan.js';
 import { prepareAutonomousAgentResumePane } from './resume-pane-choice.js';
 import {
-  hasAgentRuntimeInSubtree,
   writeLauncherScriptAtomic,
   writeOhmypiAgentPrompt,
 } from './runtime-command.js';
@@ -55,11 +54,13 @@ import {
   buildAgentLaunchConfig,
 } from './spawn-prep.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
+import { withReviewLifecycleGuardForAgent } from '../review-lifecycle-guard.js';
 
 /**
  * Resume a suspended agent (PAN-80)
  *
- * Reads saved session ID and creates new tmux session with --resume flag.
+ * Reads saved session ID and relaunches the agent's pane with --resume, on the
+ * terminal backend the host selects now (PAN-3960).
  * Optionally sends a message after resuming.
  *
  * Auto-resume triggers:
@@ -80,8 +81,8 @@ import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
  */
 export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed: string; summarized: boolean }> {
   const normalizedId = normalizeAgentId(agentId);
-  const agentState = getAgentStateSync(normalizedId);
-  const sessionId = resolveLatestSessionIdSync(normalizedId).sessionId;
+  const agentState = getAgentState(normalizedId);
+  const sessionId = resolveLatestSessionId(normalizedId).sessionId;
   const issueId = agentState?.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
 
   let summary: string | null = null;
@@ -95,22 +96,22 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
         import('../conversations/smart-compaction.js'),
       ]);
       const settings = getConversationCompactionSettings();
-      const result = await Effect.runPromise(generateSmartSummary({
+      const result = await generateSmartSummary({
         jsonlPath: sessionFile,
         model: settings.model,
         richMode: settings.richCompaction,
         mode: 'fork',
-      }));
+      });
       summary = result.summary;
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      logAgentLifecycleSync(normalizedId, `compact-recovery smart summary failed (${error}); trying heuristic fallback`);
+      logAgentLifecycle(normalizedId, `compact-recovery smart summary failed (${error}); trying heuristic fallback`);
       try {
         const { generateFallbackSummary } = await import('../conversations/summary-fork.js');
-        summary = await Effect.runPromise(generateFallbackSummary(sessionFile));
+        summary = await generateFallbackSummary(sessionFile);
       } catch (fallbackErr) {
         const fallbackError = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-        logAgentLifecycleSync(normalizedId, `compact-recovery fallback summary failed (${fallbackError}); seeding with reseed instructions only`);
+        logAgentLifecycle(normalizedId, `compact-recovery fallback summary failed (${fallbackError}); seeding with reseed instructions only`);
       }
     }
   }
@@ -121,41 +122,39 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
   };
 }
 
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; startedBy?: string; resumeCause?: ResumeCause }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+type ResumeAgentOptions = { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; startedBy?: string; resumeCause?: ResumeCause };
+type ResumeAgentResult = { success: boolean; messageDelivered?: boolean; error?: string };
+
+export async function resumeAgent(agentId: string, message?: string, opts?: ResumeAgentOptions): Promise<ResumeAgentResult> {
   const normalizedId = normalizeAgentId(agentId);
-  const requestedModel = normalizeModelOverrideSync(opts?.model);
-  logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
+  return withReviewLifecycleGuardForAgent(
+    normalizedId,
+    () => resumeAgentWithinLifecycle(normalizedId, message, opts),
+  );
+}
+
+async function resumeAgentWithinLifecycle(normalizedId: string, message?: string, opts?: ResumeAgentOptions): Promise<ResumeAgentResult> {
+  const requestedModel = normalizeModelOverride(opts?.model);
+  logAgentLifecycle(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
-  const agentState = getAgentStateSync(normalizedId);
+  const agentState = getAgentState(normalizedId);
   const gateBlock = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
   const gateDecision = decideResumeGate(gateBlock, 'operator-start');
   const bypassTroubledGate = opts?.compact === true && opts.recoverGated === true && agentState?.troubled === true && agentState.paused !== true;
   if (gateDecision.decision === 'block' && !bypassTroubledGate) {
     const reason = `Cannot resume ${normalizedId}: ${gateDecision.reason}. Clear the gate before resuming.`;
-    logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
   }
   if (gateDecision.decision === 'proceed' && gateDecision.warning) {
-    logAgentLifecycleSync(normalizedId, `resumeAgent: ${gateDecision.warning}`);
+    logAgentLifecycle(normalizedId, `resumeAgent: ${gateDecision.warning}`);
   }
   if (bypassTroubledGate) {
-    logAgentLifecycleSync(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlock?.reason})`);
+    logAgentLifecycle(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlock?.reason})`);
   }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
-  // A `pending-` model (e.g. 'pending-work-spawn') is a mid-spawn placeholder
-  // written before real model resolution; such an agent never produced a
-  // resumable session, so it is a placeholder in ANY status — not only
-  // 'starting'. Detecting it by status alone (the old gate) let a placeholder
-  // that had transitioned to 'stopped' slip through to model resolution below,
-  // where requireModelOverrideSync('pending-work-spawn') throws "Unknown model"
-  // — which the deacon records as a resume failure and, after 3, trips the
-  // troubled gate, stranding the agent forever (PAN-2377/PAN-2829). Reject on
-  // the model prefix regardless of status so it hits the graceful "start a
-  // fresh agent" path instead of crashing. A non-placeholder agent (real model)
-  // is unaffected.
-  const isPlaceholder = !!agentState && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const allowedRuntimeStates = ['suspended', 'idle'];
   const allowedAgentStatuses = ['stopped', 'completed'];
 
@@ -178,10 +177,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // dead) was misclassified as a healthy running agent and refused resume with a
   // reasonless "Cannot resume … runtime=active, status=running". Treat a dead pane
   // as crashed too, matching the start path (flywheel-actions.ts isPaneDead).
+  // PAN-3960: the verdict comes from liveness.ts, the one backend-aware oracle —
+  // a Herdr agent has no tmux session, so a tmux probe would call every healthy
+  // Herdr agent crashed. `runtime-indeterminate` is never a crash. On a Herdr
+  // host a live tmux session of this name (an agent from before the switch)
+  // answers alive too, so it is never killed and relaunched (review of #3992, M3).
   const isRunningOrStarting = agentState?.status === 'running' || agentState?.status === 'starting';
-  const sessionAlive = isRunningOrStarting ? await Effect.runPromise(sessionExists(normalizedId)) : false;
-  const paneDead = isRunningOrStarting && (!sessionAlive || await Effect.runPromise(isPaneDead(normalizedId)));
-  const isCrashed = isRunningOrStarting && paneDead;
+  const isCrashed = isRunningOrStarting && isConfirmedDead(await isAlive(normalizedId));
 
   // PAN-1675 (keystone): a `compact` resume exists specifically to recover a
   // context-wedged agent, which is typically status='running' with a LIVE (but
@@ -205,9 +207,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // that reached here has a live session AND a live pane (a crash would have set
     // isCrashed above), so it is genuinely healthy and there is nothing to resume.
     const reason = isRunningOrStarting
-      ? `Cannot resume ${normalizedId}: it appears healthy (tmux session up, harness process alive) — there is nothing to resume. Stop it first if you intend to restart it.`
+      ? `Cannot resume ${normalizedId}: it appears healthy (its pane is up and the harness process is alive) — there is nothing to resume. Stop it first if you intend to restart it.`
       : `Cannot resume ${normalizedId}: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'} is not a resumable state.`;
-    logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
       error: reason
@@ -215,7 +217,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   }
 
   // Get saved session ID from any available source
-  const sessionResolution = resolveLatestSessionIdSync(normalizedId);
+  const sessionResolution = resolveLatestSessionId(normalizedId);
   const sessionId = sessionResolution.sessionId;
   if (!sessionId) {
     // PAN-2098: state the concrete reason and enumerate the sources actually
@@ -223,20 +225,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // failed durable-plane/event-store reconstruction.
     const harnessLabel = agentState?.harness ?? 'unknown';
     const reason = `Cannot resume ${normalizedId} (harness=${harnessLabel}): no resumable session id found. Checked ${sessionResolution.checked.join(', ')}. Start a fresh agent instead.`;
-    logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
       error: reason
     };
   }
-  if (sessionResolution.needsPointerRepair) {
-    saveSessionId(normalizedId, sessionId, 'recovered');
-    logAgentLifecycleSync(normalizedId, `resume pointer reconstructed from durable metadata: sessionId=${sessionId}`);
-  }
-
-  if (!agentState || !hasWorkspace || isPlaceholder) {
-    const reason = 'Saved Claude session is orphaned because the backing workspace/agent state is missing or placeholder-only. Start a fresh agent instead.';
-    logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+  if (!agentState || !hasWorkspace) {
+    const reason = 'Saved Claude session is orphaned because the backing workspace/agent state is missing. Start a fresh agent instead.';
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
       error: reason
@@ -252,7 +249,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
   }
 
@@ -270,7 +267,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   if (opts?.compact) {
     const seedResult = await buildCompactRecoverySeed(normalizedId);
     compactSeed = seedResult.seed;
-    logAgentLifecycleSync(normalizedId, `compact recovery: respawning fresh session (seed=${seedResult.summarized ? 'summary' : 'reseed-only'})`);
+    logAgentLifecycle(normalizedId, `compact recovery: respawning fresh session (seed=${seedResult.summarized ? 'summary' : 'reseed-only'})`);
   }
 
   // PAN-2009: capture whether the ohmypi process is actually alive BEFORE we kill any
@@ -280,15 +277,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // protect, so it must be fresh-launched (recovery, not rotation). A live
   // (suspended) omp process stays on the normal resume path.
   const piProcessWasAlive = getHarnessBehavior(agentState.harness).usesRpcFifo
-    ? await hasAgentRuntimeInSession(normalizedId, 'ohmypi')
+    ? (await isAlive(normalizedId)).alive
     : false;
 
-  // Kill any zombie tmux session (crashed agent left behind)
-  if (await Effect.runPromise(sessionExists(normalizedId))) {
-    try {
-      await Effect.runPromise(killSession(normalizedId));
-    } catch { /* non-fatal */ }
-  }
+  // Close any zombie pane or tmux session (crashed agent left behind). On a
+  // Herdr host this also closes a tmux session the agent had before the host
+  // moved to Herdr — the relaunch below lands on the backend selected now.
+  await closeAgentPane(normalizedId);
 
   // Remove completed marker so the agent can work again
   const completedFile = join(getAgentDir(normalizedId), 'completed');
@@ -319,7 +314,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    const model = requestedModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
+    // PAN-3859: no hardcoded model fallback — a state file with no model and
+    // no explicit override fails loudly here, naming the agent, instead of
+    // silently resuming on a model nobody chose.
+    if (!requestedModel && !agentState.model) {
+      throw new Error(
+        `Cannot resume ${normalizedId}: agent state has no model and no model override was requested (PAN-3859: no hardcoded fallback)`,
+      );
+    }
+    const model = requestedModel || requireModelOverride(agentState.model);
     if (requestedModel && requestedModel !== agentState.model) {
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);
@@ -361,11 +364,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     });
     const piDeadRecovery = spawnPlan.freshReason === 'pi-dead-recovery';
     if (piDeadRecovery) {
-      logAgentLifecycleSync(normalizedId, 'resumeAgent: dead ohmypi process — fresh-launching for recovery instead of omp --resume (PAN-2009)');
+      logAgentLifecycle(normalizedId, 'resumeAgent: dead ohmypi process — fresh-launching for recovery instead of omp --resume (PAN-2009)');
     }
     const claudeJsonlMissingRecovery = spawnPlan.freshReason === 'claude-jsonl-missing';
     if (spawnPlan.clearSessionPointers) {
-      logAgentLifecycleSync(
+      logAgentLifecycle(
         normalizedId,
         `resumeAgent: saved Claude transcript is missing at ${expectedClaudeJsonl} — clearing stale pointers and fresh-launching (PAN-2895)`,
       );
@@ -380,23 +383,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         ? 'context-overflow compaction would respawn a fresh session'
         : `session drift (${resumeDriftReasons.join(', ')})`;
       const errMsg = `Refusing to rotate ${normalizedId} to a new session — ${reason}; session rotation is disabled (PAN-1980). Agent left stopped.`;
-      logAgentLifecycleSync(normalizedId, `resumeAgent: ${errMsg}`);
-      emitActivityEntrySync({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${errMsg}`, issueId: agentState.issueId });
+      logAgentLifecycle(normalizedId, `resumeAgent: ${errMsg}`);
+      emitActivityEntry({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${errMsg}`, issueId: agentState.issueId });
       return { success: false, error: errMsg };
     }
     const freshSessionId = !shouldResumeSavedSession && effectiveHarness === 'claude-code'
       ? randomUUID()
       : undefined;
     if (resumeDriftReasons.length > 0) {
-      logAgentLifecycleSync(normalizedId, `resumeAgent: starting fresh session instead of --resume because session origin drifted (${resumeDriftReasons.join(', ')})`);
+      logAgentLifecycle(normalizedId, `resumeAgent: starting fresh session instead of --resume because session origin drifted (${resumeDriftReasons.join(', ')})`);
     }
     if (freshSessionId) {
       saveSessionId(normalizedId, freshSessionId);
       agentState.sessionId = freshSessionId;
-    } else if (!shouldResumeSavedSession) {
-      try {
-        unlinkSync(join(getAgentDir(normalizedId), 'session.id'));
-      } catch { /* absent or already cleared */ }
     }
 
     // Compute the effective message before building the launcher so codex can
@@ -414,7 +413,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       : await buildResumeMessageForAgent(agentState, defaultResumeMessage, message, resumeCause);
     if (resumeMessage.error) {
       console.error(`[resumeAgent] ${resumeMessage.error}`);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'work-agent',
         level: 'error',
         message: `${normalizedId}: ${resumeMessage.error}`,
@@ -443,9 +442,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    const claudeCmd = `bash ${launcherScript}`;
 
-    await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
+    // PAN-3960: relaunch through the terminal backend the host selects NOW —
+    // never the backend the agent's previous pane used — with the same four
+    // pane tokens spawn.ts stamps.
+    const pane = await launchAgentPane({
+      issueId,
+      cwd: agentState.workspace,
+      agentId: normalizedId,
+      argv: ['bash', launcherScript],
       env: {
         ...BLANKED_PROVIDER_ENV,
         OVERDECK_AGENT_ID: normalizedId,
@@ -454,8 +459,17 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         OVERDECK_AGENT_STARTED_BY: startedBy,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
-      }
-    }));
+      },
+      tokens: {
+        issue: issueId,
+        role: toPaneRole(agentState.role),
+        harness: effectiveHarness,
+        model,
+      },
+    });
+    agentState.backend = pane.backend;
+    agentState.paneId = pane.paneId;
+    saveAgentStateSync(agentState);
     if (freshSessionId) {
       await saveAgentRuntimeState(normalizedId, {
         claudeSessionId: freshSessionId,
@@ -482,7 +496,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[resumeAgent] ohmypi prompt delivery failed: ${msg}`);
       }
-    } else if (effectiveHarness === 'acp') {
+    } else if (effectiveHarness === 'acp' || effectiveHarness === 'opencode') {
       const delivery = await deliverInitialPromptWithRetry(
         normalizedId,
         effectiveMessage,
@@ -491,7 +505,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       messageDelivered = delivery.ok;
       if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       if (!delivery.ok) {
-        await Effect.runPromise(killSession(normalizedId));
+        await closeAgentPane(normalizedId);
         return {
           success: false,
           error: `ACP continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
@@ -527,7 +541,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       messageDelivered = delivery.ok;
       if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       if (!delivery.ok) {
-        await Effect.runPromise(killSession(normalizedId));
+        await closeAgentPane(normalizedId);
         return {
           success: false,
           error: `Kimi Code continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
@@ -552,12 +566,14 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         // resume-summary gate instead of a composer. Autonomous pipeline agents
         // have no operator attached to answer it, so cross only that exact menu
         // through the typed pane-choice door before injecting the continuation.
-        const panePreparation = await prepareAutonomousAgentResumePane(normalizedId, agentState.role);
+        // Review of #3992 (M2): the relaunched pane is read and keyed on the
+        // backend it landed on; a Herdr pane that cannot be read fails safe.
+        const panePreparation = await prepareAutonomousAgentResumePane(normalizedId, agentState.role, { pane });
         if (!panePreparation.ready) {
           console.error(`[resumeAgent] Auto-continue prompt not sent: ${panePreparation.reason}`);
         } else {
           if (panePreparation.action === 'resumed-from-summary') {
-            logAgentLifecycleSync(normalizedId, 'resumeAgent: selected Claude Resume from summary before continuation delivery');
+            logAgentLifecycle(normalizedId, 'resumeAgent: selected Claude Resume from summary before continuation delivery');
           }
           try {
             const delivery = await deliverResumeMessageWithTranscriptConfirmation({
@@ -595,28 +611,28 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
 
     if (!messageDelivered) {
-      await Effect.runPromise(killSession(normalizedId)).catch(() => undefined);
+      await closeAgentPane(normalizedId);
       const error = `Resume continue prompt did not become a confirmed turn for ${normalizedId}`;
-      logAgentLifecycleSync(normalizedId, `resumeAgent FAILED: ${error}`);
+      logAgentLifecycle(normalizedId, `resumeAgent FAILED: ${error}`);
       return { success: false, messageDelivered: false, error };
     }
 
     const resumedAt = new Date().toISOString();
     if (compactSeed) {
       console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
-      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
+      logAgentLifecycle(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
     } else if (piDeadRecovery) {
       console.log(`[agents] Respawned ${normalizedId} fresh because the prior Pi process was dead (archived session ${sessionId})`);
-      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after dead Pi process (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
+      logAgentLifecycle(normalizedId, `resumeAgent SUCCESS: fresh respawn after dead Pi process (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
     } else if (claudeJsonlMissingRecovery) {
       console.log(`[agents] Respawned ${normalizedId} fresh because the saved Claude transcript was missing (stale session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
-      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after missing Claude JSONL (stale sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
+      logAgentLifecycle(normalizedId, `resumeAgent SUCCESS: fresh respawn after missing Claude JSONL (stale sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
     } else if (!shouldResumeSavedSession) {
       console.log(`[agents] Respawned ${normalizedId} fresh because session origin drifted (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
-      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after origin drift (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
+      logAgentLifecycle(normalizedId, `resumeAgent SUCCESS: fresh respawn after origin drift (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
     } else {
       console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
-      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);
+      logAgentLifecycle(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);
     }
     await saveAgentRuntimeState(normalizedId, {
       state: 'active',
@@ -639,35 +655,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       saveAgentStateSync(agentState);
     }
 
-    // PAN-1675: a successful compaction-resume genuinely recovers a
-    // context-overflow-wedged agent — so clear a context_overflow `stuck` flag
-    // here (set by markWorkspaceStuck once the old /compact+/clear ladder
-    // exhausted). Without this the agent would stay flagged stuck forever and
-    // the deacon's overflowBlocked gate would keep skipping its recovery, even
-    // though the agent is now healthy. Only clear when the stuck reason is
-    // context_overflow (don't clobber an unrelated stuck state).
-    if (opts?.compact && agentState?.issueId) {
-      try {
-        const db = getOverdeckDatabaseSync();
-        const row = db.prepare('SELECT stuck, stuck_reason FROM review_status WHERE issue_id = ?')
-          .get(agentState.issueId.toUpperCase()) as { stuck?: number; stuck_reason?: string | null } | undefined;
-        if (row?.stuck === 1 && row.stuck_reason === 'context_overflow') {
-          db.prepare(`
-            UPDATE review_status
-            SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, updated_at = ?
-            WHERE issue_id = ?
-          `).run(Date.now(), agentState.issueId.toUpperCase());
-          logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
-        }
-      } catch (clearErr) {
-        console.warn(`[agents] Could not clear stuck flag after compaction-resume for ${normalizedId}:`, clearErr);
-      }
-    }
+    // PAN-3917: the context_overflow `stuck` flag this used to clear lived on a
+    // `review_status` row. The table is dropped and nothing writes the flag any
+    // more — a resumed agent is simply running again, which every surface reads
+    // from its liveness.
 
     return { success: true, messageDelivered };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
-    logAgentLifecycleSync(normalizedId, `resumeAgent FAILED: ${msg}`);
+    logAgentLifecycle(normalizedId, `resumeAgent FAILED: ${msg}`);
     return {
       success: false,
       error: `Failed to resume agent: ${msg}`
@@ -675,16 +671,3 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   }
 }
 
-/**
- * Check whether a tmux session has an active agent runtime.
- * A session may exist with only a bare bash shell after Claude exits.
- */
-async function hasAgentRuntimeInSession(sessionName: string, harness: RuntimeName): Promise<boolean> {
-  try {
-    const panePids = await Effect.runPromise(listPaneValues(sessionName, '#{pane_pid}'));
-    if (panePids.length === 0) return false;
-    return hasAgentRuntimeInSubtree(panePids[0]!, harness);
-  } catch {
-    return false;
-  }
-}

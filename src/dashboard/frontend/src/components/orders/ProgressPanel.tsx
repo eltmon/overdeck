@@ -1,27 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { FlywheelPipelineItem, FlywheelStatus } from '@overdeck/contracts';
-import { ExternalLink } from 'lucide-react';
+import { useMemo } from 'react';
 
 import { evaluateOrderDispatchEligibility } from '../../../../../lib/orders/eligibility.js';
-import { subscribeFlywheelStatus } from '../../lib/wsTransport';
+import { IN_FLIGHT_STATES } from '../../lib/pipeline-state';
+import { useDashboardStore } from '../../lib/store';
+import type { DerivedIssueState } from '../../types';
 import type { OrderBookView } from './BookStrip';
 
 interface ProgressPanelProps {
   book: OrderBookView;
-  initialStatus?: FlywheelStatus | null;
-  onOpenReport: (runId: string) => void;
 }
 
 type ItemLiveStatus = 'queued' | 'planning' | 'working' | 'review' | 'merged' | 'closed';
 
-function liveStatus(pipeline: FlywheelPipelineItem | undefined, closed: boolean): ItemLiveStatus {
+/**
+ * PAN-3917: item status is the issue's derived state, not a flywheel run's
+ * pipeline copy. Planning is 'planned' — the spec exists but no pane is live.
+ */
+function liveStatus(derived: DerivedIssueState | undefined, closed: boolean): ItemLiveStatus {
   if (closed) return 'closed';
-  if (!pipeline) return 'queued';
-  if (pipeline.status === 'merged' || pipeline.verb === 'shipping' || pipeline.verb === 'merging') return 'merged';
-  if (pipeline.verb === 'planning') return 'planning';
-  if (pipeline.verb === 'reviewing' || pipeline.verb === 'testing') return 'review';
-  return 'working';
+  if (!derived) return 'queued';
+  if (derived.state === 'merged') return 'merged';
+  if (derived.state === 'closed') return 'closed';
+  if (derived.state === 'planned') return 'planning';
+  if (derived.state === 'in-review' || derived.state === 'changes-requested' || derived.state === 'ready') return 'review';
+  if (derived.state === 'working') return 'working';
+  return 'queued';
 }
+
+
 
 function statusTone(status: ItemLiveStatus): string {
   if (status === 'planning' || status === 'working') return 'border-l-info bg-info/[0.08] text-info';
@@ -37,37 +43,22 @@ const CONDITION_LABELS: Record<string, string> = {
   'prd-reverified': 'PRD re-verified',
 };
 
-export function ProgressPanel({ book, initialStatus, onOpenReport }: ProgressPanelProps) {
-  const [status, setStatus] = useState<FlywheelStatus | null>(initialStatus ?? null);
+export function ProgressPanel({ book }: ProgressPanelProps) {
+  const derivedById = useDashboardStore((s) => s.derivedIssueStateByIssueId);
 
-  useEffect(() => {
-    let current = true;
-    if (initialStatus !== undefined) {
-      setStatus(initialStatus);
-    } else {
-      void fetch('/api/flywheel/current')
-        .then((response) => response.ok ? response.json() as Promise<FlywheelStatus | null> : null)
-        .then((value) => { if (current && value) setStatus(value); })
-        .catch(() => {});
-    }
-    const unsubscribe = subscribeFlywheelStatus((value) => {
-      if (current) setStatus(value);
-    });
-    return () => {
-      current = false;
-      unsubscribe();
-    };
-  }, [initialStatus]);
-
-  const matchingStatus = status?.orders?.bookId === book.id ? status : null;
-  const pipeline = useMemo(
-    () => new Map((matchingStatus?.activePipeline ?? []).map((item) => [item.issueId.toUpperCase(), item])),
-    [matchingStatus],
+  const derived = useMemo(
+    () => new Map(Object.values(derivedById).map((entry) => [entry.issueId.toUpperCase(), entry])),
+    [derivedById],
   );
-  const inFlight = useMemo(() => new Set([
-    ...(matchingStatus?.orders?.laneAInFlight ?? []),
-    ...(matchingStatus?.orders?.laneBInFlight ? [matchingStatus.orders.laneBInFlight] : []),
-  ].map((issue) => issue.toUpperCase())), [matchingStatus]);
+  const inFlight = useMemo(
+    () => new Set(
+      book.items
+        .map((item) => derived.get(item.issue.toUpperCase()))
+        .filter((entry): entry is DerivedIssueState => !!entry && IN_FLIGHT_STATES.has(entry.state))
+        .map((entry) => entry.issueId.toUpperCase()),
+    ),
+    [book.items, derived],
+  );
   const prerequisiteTerminal = useMemo(
     () => new Map(Object.entries(book.prerequisiteTerminal ?? {})),
     [book.prerequisiteTerminal],
@@ -89,14 +80,12 @@ export function ProgressPanel({ book, initialStatus, onOpenReport }: ProgressPan
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex items-center gap-3 text-xs">
           <h2 className="font-medium text-foreground">Live checklist</h2>
-          <span className="font-mono text-muted-foreground">{matchingStatus?.orders?.landed ?? book.progress.landed}/{matchingStatus?.orders?.total ?? book.progress.total} landed</span>
-          {matchingStatus && <span className="ml-auto font-mono text-[11px] text-muted-foreground">{matchingStatus.runId}</span>}
+          <span className="font-mono text-muted-foreground">{book.progress.landed}/{book.progress.total} landed</span>
         </div>
         <div className="mt-3 overflow-hidden rounded-lg border border-border">
           {book.items.map((item) => {
             const progress = progressItems.find((entry) => entry.issue === item.issue)!;
-            const pipelineItem = pipeline.get(item.issue.toUpperCase());
-            const currentStatus = liveStatus(pipelineItem, progress.terminal);
+            const currentStatus = liveStatus(derived.get(item.issue.toUpperCase()), progress.terminal);
             const eligibility = evaluateOrderDispatchEligibility({
               book,
               progress: { bookId: book.id, total: book.progress.total, landed: book.progress.landed, drained: book.progress.drained, items: progressItems },
@@ -129,12 +118,9 @@ export function ProgressPanel({ book, initialStatus, onOpenReport }: ProgressPan
         </div>
       </div>
 
-      {matchingStatus?.orders?.drained && (
+      {book.progress.drained && (
         <div className="flex items-center gap-3 rounded-lg border border-success/30 bg-success/[0.08] p-4 text-xs text-success" role="status">
-          <span>✓ Order book drained. The run is over; report and retrospective are ready.</span>
-          <button type="button" onClick={() => onOpenReport(matchingStatus.runId)} className="ml-auto flex items-center gap-1 rounded-md border border-success/30 px-2.5 py-1.5 text-[11px] hover:bg-success/10">
-            Open report &amp; retro <ExternalLink className="h-3 w-3" />
-          </button>
+          <span>✓ Order book drained — every item has landed.</span>
         </div>
       )}
     </section>

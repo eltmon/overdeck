@@ -37,11 +37,13 @@ function snapshotFor(stage) {
     sequence: stage === 'ready' ? 1 : stage === 'verifying' ? 2 : 3,
     agents: [],
     specialists: [],
-    reviewStatuses: [
+    // PAN-3917 FR-6: the pipeline position is derived, not a status row.
+    derivedIssueStates: [
       stage === 'ready'
-        ? { issueId: ISSUE_ID, reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending', readyForMerge: true, updatedAt: '2026-05-18T00:00:00.000Z' }
-        : { issueId: ISSUE_ID, reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: false, updatedAt: '2026-05-18T00:01:00.000Z' },
+        ? { issueId: ISSUE_ID, state: 'ready', pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true } }
+        : { issueId: ISSUE_ID, state: 'merged', pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true } },
     ],
+    backendPanes: [],
     issues: [issue],
     channelPermissionRequests: [],
     timestamp: new Date().toISOString(),

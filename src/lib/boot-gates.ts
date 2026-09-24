@@ -20,6 +20,23 @@ function isTruthyGateValue(value: string | undefined): boolean {
   return TRUTHY_GATE_VALUES.has(value?.trim().toLowerCase() ?? '');
 }
 
+/**
+ * The single answer to "is this a peer dashboard process?".
+ *
+ * A peer is a read/UI process that shares another dashboard's `~/.overdeck`:
+ * a workspace container, an isolated verification host, an operator's throwaway
+ * `node dist/dashboard/server.js` boot. It is never a second orchestrator, so
+ * it must not poll trackers, run destructive migrations, or start anything that
+ * can spawn an agent (PAN-1817, PAN-3917 fix10).
+ *
+ * Reads the raw env, not the normalized boot gates: `applyBootGateEnv` only
+ * runs under `pan up`, and the incident that made this necessary was a hand-run
+ * `OVERDECK_DISABLE_DEACON=1 node dist/dashboard/server.js`.
+ */
+export function isPeerDashboardProcess(env: NodeJS.ProcessEnv = process.env): boolean {
+  return isTruthyGateValue(env.OVERDECK_DISABLE_DEACON);
+}
+
 function gateSourceFromEnv(value: string | undefined): BootGateSource | null {
   const normalized = value?.trim().toLowerCase();
   if (normalized === 'flag' || normalized === 'env' || normalized === 'default') return normalized;

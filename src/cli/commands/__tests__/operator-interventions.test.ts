@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 
 const agentMocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
-  clearAgentTroubledSync: vi.fn(),
-  setAgentPausedSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  getAgentState: vi.fn(),
+  clearAgentPaused: vi.fn(),
+  clearAgentTroubled: vi.fn(),
+  setAgentPaused: vi.fn(),
+  stopAgent: vi.fn(),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -29,9 +29,9 @@ const projectMocks = vi.hoisted(() => ({
 }));
 
 const issueIdMocks = vi.hoisted(() => ({
-  resolveBareNumericIdSync: vi.fn((id: string) => id.replace(/^agent-/i, '').toUpperCase()),
-  resolveIssueIdSync: vi.fn((id: string) => id),
-  extractPrefixSync: vi.fn((id: string) => id.split('-')[0]?.toUpperCase()),
+  resolveBareNumericId: vi.fn((id: string) => id.replace(/^agent-/i, '').toUpperCase()),
+  resolveIssueId: vi.fn((id: string) => id),
+  extractPrefix: vi.fn((id: string) => id.split('-')[0]?.toUpperCase()),
 }));
 
 const fsMocks = vi.hoisted(() => ({
@@ -65,20 +65,26 @@ vi.mock('../../../lib/agents.js', () => {
     return lower === 'flywheel-orchestrator' || AGENT_PREFIXES.some(p => lower.startsWith(p));
   };
   return {
-    getAgentStateSync: agentMocks.getAgentStateSync,
-    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
-    clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
-    setAgentPausedSync: agentMocks.setAgentPausedSync,
-    stopAgentSync: agentMocks.stopAgentSync,
+    getAgentState: agentMocks.getAgentState,
+    clearAgentPaused: agentMocks.clearAgentPaused,
+    clearAgentTroubled: agentMocks.clearAgentTroubled,
+    setAgentPaused: agentMocks.setAgentPaused,
+    stopAgent: agentMocks.stopAgent,
     isQualifiedAgentId,
     normalizeAgentId: (id: string) => (isQualifiedAgentId(id) ? id : `agent-${id.toLowerCase()}`),
-    resolveAgentTargetSync: (input: string) => {
+    resolveAgentTarget: (input: string) => {
       if (isQualifiedAgentId(input)) return input.toLowerCase();
-      const issueId = issueIdMocks.resolveBareNumericIdSync(input);
+      const issueId = issueIdMocks.resolveBareNumericId(input);
       return issueId ? `agent-${String(issueId).toLowerCase()}` : null;
     },
   };
 });
+
+// PAN-3947: pan kill/pause probe liveness through the terminal backend;
+// the fake mirrors the tmux session mock so each case sets liveness once.
+vi.mock('../../../lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: vi.fn(async (id: string) => (tmuxMocks.sessionExistsSync as (name: string) => boolean)(id)),
+}));
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsSync: tmuxMocks.sessionExistsSync,
@@ -106,9 +112,9 @@ vi.mock('../../../lib/projects.js', () => ({
 }));
 
 vi.mock('../../../lib/issue-id.js', () => ({
-  resolveBareNumericIdSync: issueIdMocks.resolveBareNumericIdSync,
-  resolveIssueIdSync: issueIdMocks.resolveIssueIdSync,
-  extractPrefixSync: issueIdMocks.extractPrefixSync,
+  resolveBareNumericId: issueIdMocks.resolveBareNumericId,
+  resolveIssueId: issueIdMocks.resolveIssueId,
+  extractPrefix: issueIdMocks.extractPrefix,
 }));
 
 vi.mock('fs', () => ({
@@ -142,11 +148,15 @@ describe('operator intervention CLI emission', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    agentMocks.getAgentStateSync.mockReset();
-    agentMocks.clearAgentPausedSync.mockReset();
-    agentMocks.clearAgentTroubledSync.mockReset();
-    agentMocks.setAgentPausedSync.mockReset();
-    agentMocks.stopAgentSync.mockReset();
+    agentMocks.getAgentState.mockReset();
+    agentMocks.clearAgentPaused.mockReset();
+    agentMocks.clearAgentTroubled.mockReset();
+    agentMocks.setAgentPaused.mockReset();
+    agentMocks.setAgentPaused.mockReturnValue(Effect.succeed(null));
+    agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
+    agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed(null));
+    agentMocks.stopAgent.mockReset();
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
     tmuxMocks.sessionExistsSync.mockReset();
     remoteMocks.isRemoteAvailable.mockReset();
     remoteMocks.killRemoteAgent.mockReset();
@@ -154,12 +164,12 @@ describe('operator intervention CLI emission', () => {
     workspaceMocks.findWorkspacePath.mockReset();
     projectMocks.resolveProjectFromIssueSync.mockReset();
     projectMocks.getIssuePrefix.mockReset();
-    issueIdMocks.resolveBareNumericIdSync.mockReset();
-    issueIdMocks.resolveBareNumericIdSync.mockImplementation((id: string) => id.replace(/^agent-/i, '').toUpperCase());
-    issueIdMocks.resolveIssueIdSync.mockReset();
-    issueIdMocks.resolveIssueIdSync.mockImplementation((id: string) => id);
-    issueIdMocks.extractPrefixSync.mockReset();
-    issueIdMocks.extractPrefixSync.mockImplementation((id: string) => id.split('-')[0]?.toUpperCase());
+    issueIdMocks.resolveBareNumericId.mockReset();
+    issueIdMocks.resolveBareNumericId.mockImplementation((id: string) => id.replace(/^agent-/i, '').toUpperCase());
+    issueIdMocks.resolveIssueId.mockReset();
+    issueIdMocks.resolveIssueId.mockImplementation((id: string) => id);
+    issueIdMocks.extractPrefix.mockReset();
+    issueIdMocks.extractPrefix.mockImplementation((id: string) => id.split('-')[0]?.toUpperCase());
     fsMocks.existsSync.mockReset();
     fsMocks.readFileSync.mockReset();
     yamlMocks.load.mockReset();
@@ -170,7 +180,7 @@ describe('operator intervention CLI emission', () => {
     unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: false });
     unpauseMocks.resumeAgent.mockReset();
     unpauseMocks.resumeAgent.mockResolvedValue({ success: true });
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({ containersFound: false, steps: [] }));
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({ containersFound: false, steps: [] });
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -184,13 +194,13 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('emits a pause intervention when pan pause sets the pause gate', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-1', status: 'stopped' });
+    agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-1', status: 'stopped' });
     tmuxMocks.sessionExistsSync.mockReturnValue(false);
 
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('PAN-1', { reason: 'operator requested' });
 
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('agent-pan-1', 'operator requested', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1', 'operator requested', false);
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-1',
       kind: 'pause',
@@ -199,7 +209,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('emits a pause intervention when pan kill stops a local agent', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-2', status: 'running' });
+    agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-2', status: 'running' });
     tmuxMocks.sessionExistsSync.mockReturnValue(true);
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project' });
     workspaceMocks.findWorkspacePath.mockReturnValue(null);
@@ -207,7 +217,7 @@ describe('operator intervention CLI emission', () => {
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-2', {});
 
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-2', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-2', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-2',
       kind: 'pause',
@@ -216,7 +226,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('tears down the issue workspace when pan kill stops a ship specialist (PAN-1326)', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({
+    agentMocks.getAgentState.mockReturnValue({
       issueId: 'PAN-1326',
       status: 'running',
       role: 'ship',
@@ -225,10 +235,10 @@ describe('operator intervention CLI emission', () => {
     tmuxMocks.sessionExistsSync.mockReturnValue(true);
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/overdeck' });
     workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/overdeck/workspaces/feature-pan-1326');
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({
       containersFound: true,
       steps: ['docker compose down', 'docker network prune'],
-    }));
+    });
 
     const { killCommand } = await import('../kill.js');
     await killCommand('agent-pan-1326-ship', {});
@@ -241,7 +251,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('tears down the issue workspace when pan kill stops a work agent (PAN-1326)', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({
+    agentMocks.getAgentState.mockReturnValue({
       issueId: 'PAN-1326',
       status: 'running',
       role: 'work',
@@ -250,10 +260,10 @@ describe('operator intervention CLI emission', () => {
     tmuxMocks.sessionExistsSync.mockReturnValue(true);
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/overdeck' });
     workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/overdeck/workspaces/feature-pan-1326');
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({
       containersFound: true,
       steps: ['docker compose down', 'docker network prune'],
-    }));
+    });
 
     const { killCommand } = await import('../kill.js');
     await killCommand('agent-pan-1326', {});
@@ -305,13 +315,13 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('emits an unpause intervention and resumes when pan unpause clears a pause gate', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-1', paused: true });
+    agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-1', paused: true });
     unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: true });
 
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('PAN-1');
 
-    expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('agent-pan-1');
+    expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('agent-pan-1');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-1',
       kind: 'unpause',
@@ -321,7 +331,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('does not emit an intervention or resume when the agent was already unpaused', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-1', paused: false });
+    agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-1', paused: false });
     unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: true });
 
     const { unpauseCommand } = await import('../unpause.js');
@@ -332,26 +342,5 @@ describe('operator intervention CLI emission', () => {
     expect(unpauseMocks.resumeAgent).not.toHaveBeenCalled();
   });
 
-  it('emits an untroubled intervention when pan untroubled clears a troubled gate', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-2', troubled: false, consecutiveFailures: 2 });
 
-    const { untroubledCommand } = await import('../untroubled.js');
-    await untroubledCommand('PAN-2');
-
-    expect(agentMocks.clearAgentTroubledSync).toHaveBeenCalledWith('agent-pan-2');
-    expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
-      issueId: 'PAN-2',
-      kind: 'untroubled',
-      source: 'pan untroubled',
-    });
-  });
-
-  it('does not emit an untroubled intervention when the agent was already untroubled', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-2', troubled: false, consecutiveFailures: 0 });
-
-    const { untroubledCommand } = await import('../untroubled.js');
-    await untroubledCommand('PAN-2');
-
-    expect(interventionMocks.appendOperatorInterventionEvent).not.toHaveBeenCalled();
-  });
 });

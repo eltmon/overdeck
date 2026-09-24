@@ -116,10 +116,10 @@ The existing rollout path helpers worked unchanged:
 - `findRolloutPath(codexHome, "019f5796-a6eb-7ec0-91e6-ac452b37e193")`
   returned the same JSONL.
 
-The existing cost parser also worked unchanged. `parseCodexSessionSync` returned
+The existing cost parser also worked unchanged. `parseCodexSession` returned
 one assistant message, model `gpt-5.6-sol`, 26,389 input tokens, 9,984 cached
 input tokens, 5 output tokens, and total cost `0.087167`.
-`parseCodexSessionCostEventsSync` emitted one cost event with the same usage.
+`parseCodexSessionCostEvents` emitted one cost event with the same usage.
 
 The existing conversation reader path worked unchanged. `getCachedMessages`
 already treats `rollout-*.jsonl` as Codex and dispatches to
@@ -150,3 +150,130 @@ needed for Codex CLI 0.144.x.
 2. The plan shorthand "integer id counter" is an Overdeck/t3code implementation
    choice, not a schema restriction. The generated `RequestId` allows string or
    integer IDs; Overdeck uses integers.
+
+## Native Terminal Attachment (PAN-3835)
+
+A Codex conversation's app-server can take a second client: the native Codex
+TUI, attached with `codex resume --remote`. The dashboard keeps its structured
+connection; the TUI is an optional extra client of the same app-server and the
+same thread.
+
+### Protocol experiment, 2026-09-23, codex-cli 0.153.4
+
+Run in isolation: a throwaway `codex app-server --listen unix://<path>` under a
+temporary `CODEX_HOME` (auth symlinked the way `initCodexHome` does it), an
+Overdeck-style JSON-RPC client written against `ws`, and the native TUI in a
+private `tmux -L pan3835-test` server. Model `gpt-5.6-luna`, effort `low`.
+
+| Check | Result |
+| --- | --- |
+| Transport | `--listen unix://<path>` serves WebSocket over the Unix socket (HTTP `101 Switching Protocols`, one JSON-RPC message per text frame). The socket is created `0600`. The handshake is hung up when the client offers `permessage-deflate`; a client must disable it. |
+| Attach before any turn | Fails: `thread/resume failed: no rollout found for thread id …`. `thread/start` reports the rollout path but Codex writes the file with the first turn, so the TUI can only attach after one turn. |
+| Idle attach | Pass. The TUI shows the full history of the thread. The other client sees only `thread/goal/cleared`. |
+| Active-turn attach | Pass. Attaching while a turn ran a 25 s shell command showed `Working (… esc to interrupt)` and the streamed result. The turn was not interrupted and completed for both clients. |
+| Shared events | Turn, item, token-usage and status events for the thread reach every subscribed client, whichever client started the turn. A turn typed in the TUI appears in the other client's stream and in the same rollout. |
+| Foreign threads | `thread/started` is broadcast to every client: a TUI turn also starts an ephemeral system title thread (`ephemeral: true`), and `/new` starts a separate, non-ephemeral thread with its own rollout in the same `CODEX_HOME`. `thread/status/changed` is broadcast for every thread; turn and item events arrive only for subscribed threads. A client that adopts the thread id from any `thread/started` is rebound to the wrong thread. |
+| Approval ownership | A server request (`item/commandExecution/requestApproval`) goes to every subscribed client, including a TUI that attaches while the request is pending. The first answer wins; the server then sends `serverRequest/resolved { threadId, requestId }` to every client and the other client's prompt disappears. Request ids are per connection. A second answer to a resolved id is ignored silently. Verified in both directions. |
+| User-input requests | Not exercised: `request_user_input` is not offered in the Default collaboration mode. Resolution uses the same method-agnostic `serverRequest/resolved`. |
+| Settings | A `/model` change in the TUI emits `thread/settings/updated` (model, effort, approval policy, sandbox) to every client. A `turn/start` with `effort` from the other client becomes the thread's setting, and the TUI status line follows it. The TUI also writes `model` and `model_reasoning_effort` into `CODEX_HOME/config.toml`. |
+| Permissions and instructions | Every turn in the rollout kept `approval_policy` and `sandbox_policy` from the thread; the thread's developer instructions stayed in place after TUI turns. |
+| Disconnect and reconnect | Killing the TUI or `/quit` ("Disconnected from this task. Any running work continues.") leaves the thread loaded and the other client working. A new client can `thread/resume` a thread another client holds loaded; there is no active-writer refusal. |
+| Unload or stop | Neither client unloads the thread by leaving. Esc in a TUI approval prompt cancels that request and interrupts the turn, like the dashboard's interrupt. |
+| Owner death | When the app-server exits it removes its socket, and the TUI does not exit: it loops on `Reconnecting to app-server…`. The owner's teardown must close it. |
+| Malformed client | Raw bytes on the socket close that connection; the server keeps running. |
+| Update prompt | A TUI started without `check_for_update_on_startup = false` blocks on an update modal before attaching. |
+
+Decision: simultaneous attachment is safe, including during an active turn and
+with a pending approval, provided the dashboard client pins its own thread and
+ignores foreign-thread traffic. No handover or second runtime is needed.
+
+### Sub-agents and process lifetime (review follow-up, same version)
+
+| Check | Result |
+| --- | --- |
+| Sub-agent threads | `multi_agent` spawns a sub-agent on its own thread. The client gets **no `thread/started`** for it. The only announcement is an `item/started` / `item/completed` of type `collabAgentToolCall` (`tool: "spawnAgent"`) on the spawning thread, whose `receiverThreadIds` names the new thread. The sub-agent's first `thread/status/changed` can arrive before that item. |
+| Sub-agent approvals | The sub-agent's `item/commandExecution/requestApproval` carries the sub-agent's `threadId` and goes to the parent's client. The parent turn waits on it (`collabAgentToolCall` `wait`). A client that drops requests for threads other than its own hangs the turn. Answering it from the dashboard let the parent turn complete. |
+| `--listen unix://` and stdin | The app-server does not exit when its stdin closes (stdio mode does). A host killed with SIGKILL outside tmux leaves the app-server serving the socket. Inside a tmux pane the pane's process group gets SIGHUP, which stops it. |
+| Wrapper signals | `codex` is a Node wrapper around the native binary; it forwards SIGINT, SIGTERM and SIGHUP to it, so signalling the wrapper pid stops the server. |
+
+### How Overdeck uses it
+
+- Conversation launches pass `--native-endpoint` to `codex-app-server-host.js`;
+  work and review agents never do and keep stdio. The manager spawns
+  `codex app-server --listen unix://~/.overdeck/agents/<id>/codex-native/app.sock`
+  (directory `0700`, socket `0600`) and connects with `ws` and
+  `perMessageDeflate: false`. It falls back to stdio, and records why, when the
+  CLI is older than 0.153.4, the socket path is longer than 100 bytes, or the
+  socket never accepts. The native child is stopped before the stdio child starts.
+- The host records `unix://…` in `~/.overdeck/agents/<id>/codex-native-endpoint`
+  and removes it on stop. Its `status` op reports `generation` (random per host
+  process), `nativeEndpoint` and `navigationEpoch`.
+- The manager pins the owner thread from its own `thread/start` or
+  `thread/resume` response and keeps a thread tree: the owner, plus every
+  thread named in a `collabAgentToolCall` `receiverThreadIds` from inside the
+  tree, plus any `thread/started` whose `parentThreadId` is in the tree. A
+  `thread/started` outside the tree (a title thread, a native `/new` or
+  `/fork`) marks that thread **foreign**; its events go out as `foreign-thread`
+  and never touch state, pending requests, activity, cost, or
+  `codex-thread-id`. Only the owner thread moves the owner's turn state. A
+  `spawnAgent` `collabAgentToolCall` from inside the tree that names a foreign
+  thread as a receiver moves it into the tree (PAN-4031), so a sub-agent
+  announced before its parent joined does not stay foreign with its approvals
+  unanswered. Other collab tools (`wait`, `sendInput`, `resumeAgent`,
+  `closeAgent`) never adopt.
+- Server requests fail open: a request from the owner, a sub-agent, or a thread
+  the manager cannot classify is pending in the host and shown in the pane. Only
+  a request for a thread positively known to be foreign is left to the client
+  that opened it, with one pane line. Activity and live cost include sub-agent
+  threads (cost is the sum of each thread's running total). The host writes
+  `codex-thread-id` from its own start only.
+- Live cost prices each sub-agent at its own model (PAN-4031): the model the
+  `spawnAgent` item requested (`item.model`), replaced by a later
+  `thread/settings/updated` for that thread. A spawn with `model: null` takes
+  its spawner's model as it was at spawn time. A sub-agent with no recorded
+  model, or a model with no pricing entry, is priced at the owner's current
+  model. `model/rerouted`
+  is not tracked. This is the live figure only; the final ledger
+  (`codex-collector.ts`) reads each rollout and is exact.
+- Runtime-log lines from a sub-agent carry a thread label, for example
+  `[turn sub:0000beef] started` and `[assistant sub:0000beef] …` (the last
+  8 characters of the thread id). Owner lines are unlabeled.
+- The host kills its app-server on every exit path (SIGTERM, SIGINT, SIGHUP,
+  `process.on('exit')`). The manager records the app-server pid in
+  `codex-native/app.pid`; on the next start, if that pid is still alive and its
+  `/proc/<pid>/cmdline` is a codex app-server on the same socket, it is sent
+  SIGTERM (SIGKILL after 5 s) before the socket is reused.
+- When the app-server exits while the host's pane stays alive, the host removes
+  `codex-native-endpoint`, marks the endpoint unavailable (`exited`), closes the
+  conversation's companion through the companion-terminal lifecycle, and
+  prints a line in Runtime log.
+- The host drops a pending request on `serverRequest/resolved`, refuses a
+  second answer to user-input requests (approvals already refused one), and adopts
+  `thread/settings/updated` model and effort so the next dashboard turn keeps
+  a TUI choice. The dashboard effort picker still applies when used afterwards.
+- `navigationEpoch` counts native navigation and only ever goes up, so the
+  companion fingerprint never changes back and forth (PAN-4031). It counts
+  foreign threads from a `thread/started` that are neither ephemeral (title
+  threads) nor have a `parentThreadId` (sub-agents), which is a TUI `/new` or
+  `/fork`. It also counts a TUI `/resume` of an existing thread. Codex 0.153.4
+  sends no `thread/started` or other resume notification for that; the only
+  trace is the thread's `thread/status/changed`, broadcast to every client, and
+  a sub-agent's first status looks the same until its spawn item adopts it. So
+  a thread still unclassified when the epoch is read is counted, unless an
+  in-tree `spawnAgent` call is open (`item/started` seen, `item/completed`
+  not yet, or cleared by the owner's `turn/completed`). A sub-agent status
+  that arrived before its spawn call started, read in that instant, bumps the
+  epoch once and replaces an attached CLI once. That is the chosen failure:
+  missing a `/resume` would leave every later Terminal open on the wrong
+  thread.
+- A new `prepare-terminal` op is the companion adapter's health check. It
+  strictly resumes a saved thread the host has not loaded yet (never a fresh
+  thread), never starts a turn, and answers only when the pinned thread's rollout
+  exists.
+- The companion adapter runs
+  `codex resume -c check_for_update_on_startup=false --remote <endpoint> <threadId>`
+  with the conversation's `CODEX_HOME`. It passes no model, sandbox or approval
+  flags, so attaching never changes the thread's settings.
+
+Minimum CLI for the native terminal: **0.153.4** (the version verified here).
+Ordinary app-server use keeps its 0.144.0 floor.

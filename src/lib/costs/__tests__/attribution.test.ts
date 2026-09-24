@@ -10,7 +10,7 @@ import {
   teardownOverdeckTestDb,
   type OverdeckTestDb,
 } from '../../../../tests/helpers/overdeck-test-db.js';
-import { findConversationForCostSessionSync } from '../../overdeck/conversations.js';
+import { findConversationForCostSession } from '../../overdeck/conversations.js';
 
 describe('classifySessionBucket', () => {
   it('returns FLYWHEEL for the flywheel-orchestrator conversation', () => {
@@ -34,7 +34,7 @@ describe('classifySessionBucket', () => {
   });
 });
 
-describe('findConversationForCostSessionSync', () => {
+describe('findConversationForCostSession', () => {
   let odb: OverdeckTestDb;
 
   beforeEach(() => {
@@ -53,8 +53,8 @@ describe('findConversationForCostSessionSync', () => {
       locator: 'session-123',
     });
 
-    expect(findConversationForCostSessionSync({ sessionId: 'session-123' })).toEqual({ name: 'launch-video' });
-    expect(findConversationForCostSessionSync({ sessionId: 'missing' })).toBeNull();
+    expect(findConversationForCostSession({ sessionId: 'session-123' })).toEqual({ name: 'launch-video' });
+    expect(findConversationForCostSession({ sessionId: 'missing' })).toBeNull();
   });
 
   it('returns the conversation name for a conv-* agentId tmux_session match', () => {
@@ -65,8 +65,8 @@ describe('findConversationForCostSessionSync', () => {
       locator: 'session-456',
     });
 
-    expect(findConversationForCostSessionSync({ agentId: 'conv-operator-chat' })).toEqual({ name: 'operator-chat' });
-    expect(findConversationForCostSessionSync({ agentId: 'agent-pan-2387' })).toBeNull();
+    expect(findConversationForCostSession({ agentId: 'conv-operator-chat' })).toEqual({ name: 'operator-chat' });
+    expect(findConversationForCostSession({ agentId: 'agent-pan-2387' })).toBeNull();
   });
 });
 

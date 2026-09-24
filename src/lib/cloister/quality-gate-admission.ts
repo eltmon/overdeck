@@ -4,11 +4,16 @@ import { join } from 'node:path'
 
 import { getOverdeckHome } from '../paths.js'
 
-export const QUALITY_GATE_CPU_START_THRESHOLD = 0.75
-export const QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1
-export const QUALITY_GATE_ADMISSION_POLL_MS = 1_000
-export const QUALITY_GATE_ADMISSION_SETTLE_MS = 1_500
-export const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
+/**
+ * Machine-wide CPU admission for quality gates and direct Vitest runs.
+ * Admitted parents set OVERDECK_GATE_ADMITTED=1 for child-process reentrancy.
+ */
+
+const QUALITY_GATE_CPU_START_THRESHOLD = 0.75
+const QUALITY_GATE_LOAD_PER_CORE_START_THRESHOLD = 1
+const QUALITY_GATE_ADMISSION_POLL_MS = 1_000
+const QUALITY_GATE_ADMISSION_SETTLE_MS = 1_500
+const QUALITY_GATE_ADMISSION_STALE_MS = 25 * 60 * 1_000
 
 export interface QualityGatePressureSample {
   cpuUtilization: number
@@ -53,6 +58,14 @@ export interface QualityGateAdmissionDeps {
   pollMs?: number
   settleMs?: number
   staleMs?: number
+  maxWaitMs?: number
+}
+
+export class QualityGateAdmissionTimeoutError extends Error {
+  constructor(readonly maxWaitMs: number) {
+    super(`quality-gate CPU admission timed out after ${maxWaitMs}ms`)
+    this.name = 'QualityGateAdmissionTimeoutError'
+  }
 }
 
 let ticketSequence = 0
@@ -85,7 +98,7 @@ function cpuTotals() {
   return { idle, total, cores: Math.max(1, records.length) }
 }
 
-export async function sampleQualityGatePressure(
+async function sampleQualityGatePressure(
   sleep: (ms: number) => Promise<void> = delay,
 ): Promise<QualityGatePressureSample> {
   const before = cpuTotals()
@@ -243,6 +256,7 @@ export async function acquireQualityGateAdmission(
   const pollMs = deps.pollMs ?? QUALITY_GATE_ADMISSION_POLL_MS
   const settleMs = deps.settleMs ?? QUALITY_GATE_ADMISSION_SETTLE_MS
   const staleMs = deps.staleMs ?? QUALITY_GATE_ADMISSION_STALE_MS
+  const maxWaitMs = deps.maxWaitMs
 
   await mkdir(root, { recursive: true })
   const createdAt = now()
@@ -253,6 +267,9 @@ export async function acquireQualityGateAdmission(
 
   try {
     for (;;) {
+      if (maxWaitMs != null && now() - createdAt > maxWaitMs) {
+        throw new QualityGateAdmissionTimeoutError(maxWaitMs)
+      }
       const waiters = await listLiveTickets(root, isProcessAlive)
       if (waiters[0]?.ticketId !== ticketId) {
         await sleep(pollMs)

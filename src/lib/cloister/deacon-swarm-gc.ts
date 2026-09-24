@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { Effect } from 'effect';
-import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
+import type { ReconciledSlotItem } from './swarm-slot-reconcile.js';
+import { getAgentState } from '../agents/agent-state.js';
 import { stopAgent } from '../agents/termination.js';
 import {
-  resolveSlotWorkspaceWorktreesSync,
-  resolveWorkspaceRepoRootsSync,
+  resolveSlotWorkspaceWorktrees,
+  resolveWorkspaceRepoRoots,
   type NestedSlotWorktree,
   type SlotWorkspaceWorktrees,
   type WorkspaceRepoRoot,
@@ -82,7 +82,7 @@ export async function gcMergedSlotsWithStatus(
     let reapAction: string | null = null;
     if (sessionNames.has(agentId)) {
       const completionProven = slot.mergedVia === 'completed-status';
-      const lastActivity = (deps.getAgentLastActivity ?? (id => getAgentStateSync(id)?.lastActivity))(agentId);
+      const lastActivity = (deps.getAgentLastActivity ?? (id => getAgentState(id)?.lastActivity))(agentId);
       const idleFor = lastActivity ? Date.now() - Date.parse(lastActivity) : 0;
       if (!completionProven && (!Number.isFinite(idleFor) || idleFor < MERGED_LIVE_SLOT_IDLE_MS)) {
         actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
@@ -200,7 +200,7 @@ async function removeSlotWorkspace(
     return false;
   };
 
-  const { isPolyrepo, nested } = (deps.listSlotWorkspaceWorktrees ?? resolveSlotWorkspaceWorktreesSync)(issueId, slotWorkspace);
+  const { isPolyrepo, nested } = (deps.listSlotWorkspaceWorktrees ?? resolveSlotWorkspaceWorktrees)(issueId, slotWorkspace);
 
   // ── Integration (PAN-3695): merge unmerged nested slot branches through the
   // canonical nested merge path before any removal. A merged-status slot whose
@@ -349,7 +349,7 @@ async function mergeNestedSlotBranches(
 ): Promise<string[]> {
   const failures: string[] = [];
   const baseRoots = new Map(
-    (deps.listFeatureWorkspaceRepoRoots ?? resolveWorkspaceRepoRootsSync)(issueId, workspacePath)
+    (deps.listFeatureWorkspaceRepoRoots ?? resolveWorkspaceRepoRoots)(issueId, workspacePath)
       .map(root => [root.repoKey, root]),
   );
   for (const worktree of nested) {

@@ -1,1000 +1,271 @@
-import { exec, spawn } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
-import { freemem, totalmem } from 'node:os';
-import { join } from 'node:path';
-import { promisify } from 'node:util';
-import { Effect, Schema } from 'effect';
-import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
+/**
+ * `pan flywheel start | stop | abort | pause | resume | report | status | stats`
+ * (PAN-3964 FR-6; PAN-3917 D12).
+ *
+ * The flywheel is a conversation running the `pan-flywheel` skill, not a
+ * service with a run record. Every verb here is a thin wrapper over
+ * `src/lib/flywheel/` — the same functions the `/api/flywheel/*` routes call —
+ * so the CLI and the Flywheel page cannot disagree. Status is derived on read
+ * from the conversation, its transcript's tick markers, the pipeline journals,
+ * the policies, and the running order book.
+ */
+
+import chalk from 'chalk';
 import { Command } from 'commander';
+import type { FlywheelDerivedStatus, FlywheelStats } from '@overdeck/contracts';
+
+import { FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_SKILL_COMMAND } from '../../lib/flywheel/constants.js';
 import {
-  FlywheelStats,
-  FlywheelStatus,
-  type FlywheelStats as FlywheelStatsPayload,
-  type FlywheelStatsCriteria,
-  type FlywheelStatsCriterion,
-  type FlywheelStatsCriterionStatus,
-  type FlywheelStatsTrend,
-} from '@overdeck/contracts';
-import { abortFlywheelRun, clearFlywheelGate, getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
-import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
-import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
-import { stopAgent } from '../../lib/agents.js';
-import type { RuntimeName } from '../../lib/runtimes/types.js';
-import { resolveHarness } from '../../lib/harness-resolve.js';
-import {
-  FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
-  FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
-  getFlywheelActiveRunId,
-  isFlywheelAutoPickupBacklog,
-  isFlywheelGloballyPaused,
-  isFlywheelRequireUatBeforeMerge,
-  setFlywheelAutoPickupBacklog,
-  setFlywheelRequireUatBeforeMerge,
-} from '../../lib/overdeck/control-settings.js';
-import { sessionExists } from '../../lib/tmux.js';
-import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
-import { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
-import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
-import { compactFlywheelStateFile } from '../../lib/flywheel-state-retention.js';
-import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
-import { compensateFailedFlywheelStart, resolveFlywheelOrderBriefOverlay, resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';
-import { createFlywheelCompleteCommand } from './flywheel-complete.js';
-import { registerFlywheelSurfaceCommands } from './flywheel-surfaces.js';
+  abortFlywheel,
+  pauseFlywheel,
+  requestFlywheelReport,
+  resumeFlywheel,
+  startFlywheel,
+  stopFlywheel,
+  type FlywheelStartOptions,
+} from '../../lib/flywheel/actions.js';
+import { deriveFlywheelStatus, readFlywheelRun, resolveFlywheelProjectRoot } from '../../lib/flywheel/derive-status.js';
+import { FlywheelAlreadyRunning, isFlywheelActionError } from '../../lib/flywheel/errors.js';
+import { readFlywheelReportFile } from '../../lib/flywheel/files.js';
+import { computeSubstrateStats } from '../../lib/flywheel/substrate-stats.js';
 
-type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
+export { FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_SKILL_COMMAND };
+export type { FlywheelStartOptions };
 
-interface EmitStatusOptions {
-  file: string;
-}
-
-interface StatusOptions {
+export interface FlywheelStatusOptions {
   json?: boolean;
 }
 
-interface StatsOptions {
+export interface FlywheelStatsOptions {
+  json?: boolean;
   window?: string;
-  json?: boolean;
 }
 
-interface FormatStatsOptions {
-  color?: boolean;
+export interface FlywheelStopOptions {
+  timeout?: string;
 }
 
-interface ConfigOptions {
-  get?: true | string;
-  set?: string;
-}
-
-interface StartOptions { brief?: string; cwd?: string; orders?: string }
-
-export interface StartFlywheelRunDeps extends FlywheelOrderStartDeps {
-  resolvePrimaryRoot?: typeof resolvePrimaryWorktreeRoot;
-  nextRunId?: typeof nextFlywheelRunId;
-  writeLaunchMetadata?: typeof writeFlywheelLaunchMetadata;
-  resolveRoleConfig?: () => Promise<ResolvedFlywheelRoleConfig>;
-  spawn?: typeof spawnFlywheel;
-  writeStatus?: typeof writeLatestFlywheelStatus;
-}
-
-interface StartFlywheelRunResult {
-  runId: string;
-  briefDisplayPath: string;
-  agentModel?: string;
-}
-
-interface ReportOptions { cwd?: string; force?: boolean }
-
-interface ReportOpenOptions {
-  runId?: string;
-  opener?: (path: string) => void | Promise<void>;
-}
-
-interface FlywheelGateSnapshot {
-  paused: boolean;
-  activeRunId: string | null;
-}
-
-interface ResolvedFlywheelRoleConfig {
-  harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
-  model: string;
-  effort: RoleEffort;
-  minAgents: number;
-  maxAgents: number;
-  scope: FlywheelScope;
-  autoPickupBacklog: boolean;
-  requireUatBeforeMerge: boolean;
-}
-
-const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
-const decodeFlywheelStats = Schema.decodeUnknownSync(FlywheelStats);
-const execAsync = promisify(exec);
-const DEFAULT_STATS_WINDOW = '30d';
-
-function dashboardBaseUrl(): string {
-  return (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
-}
-
-export async function readFlywheelStatusJson(file: string, input: InputStream = process.stdin): Promise<string> {
-  if (file !== '-') return readFile(file, 'utf8');
-
-  const chunks: string[] = [];
-  for await (const chunk of input) {
-    chunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
-  }
-  return chunks.join('');
-}
-
-export function parseFlywheelStatusJson(raw: string): unknown {
+/** Typed flywheel errors are operator facts, not crashes: print and exit 1. */
+async function runVerb(action: () => Promise<void>): Promise<void> {
   try {
-    return JSON.parse(raw);
+    await action();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid JSON: ${message}`);
+    if (!isFlywheelActionError(error)) throw error;
+    console.error(chalk.yellow(error.message));
+    process.exitCode = 1;
   }
 }
 
-export function validateFlywheelStatusPayload(payload: unknown): FlywheelStatus {
+export async function flywheelStartCommand(options: FlywheelStartOptions = {}): Promise<void> {
+  await runVerb(async () => {
+    const result = await startFlywheel(options);
+    console.log(chalk.green(`✓ Flywheel started in ${result.session} (${result.harness}, ${result.model})`));
+    console.log(chalk.dim(`  Running ${result.prompt} in ${result.cwd}`));
+  });
+}
+
+/**
+ * `pan orders start <book>` — the order book is an input to the flywheel, so
+ * starting one starts the flywheel conversation and names the book. A flywheel
+ * that is already running keeps running; the dashboard's orders route calls
+ * this too, so it never prints or sets an exit code.
+ */
+export async function startFlywheelRun(options: FlywheelStartOptions = {}): Promise<{ runId: string }> {
   try {
-    return decodeFlywheelStatus(payload);
+    await startFlywheel(options);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid FlywheelStatus: ${message}`);
+    if (!(error instanceof FlywheelAlreadyRunning)) throw error;
   }
+  return { runId: FLYWHEEL_CONVERSATION_SESSION };
 }
 
-function isFlywheelConfigKey(key: string): key is FlywheelConfigKey {
-  return FLYWHEEL_CONFIG_KEYS.includes(key as FlywheelConfigKey);
-}
-
-function parseFlywheelConfigKey(key: string): FlywheelConfigKey {
-  if (!isFlywheelConfigKey(key)) throw new Error(`Unknown flywheel config key: ${key}`);
-  return key;
-}
-
-function readFlywheelConfigValue(key: FlywheelConfigKey): boolean {
-  switch (key) {
-    case FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY:
-      return isFlywheelAutoPickupBacklog();
-    case FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY:
-      return isFlywheelRequireUatBeforeMerge();
-  }
-}
-
-function writeFlywheelConfigValue(key: FlywheelConfigKey, value: boolean): void {
-  switch (key) {
-    case FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY:
-      setFlywheelAutoPickupBacklog(value);
-      return;
-    case FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY:
-      setFlywheelRequireUatBeforeMerge(value);
-      return;
-  }
-}
-
-function formatFlywheelConfigValue(key: FlywheelConfigKey): string {
-  return `${key}=${readFlywheelConfigValue(key)}`;
-}
-
-function parseConfigBoolean(key: string, rawValue: string): boolean {
-  if (rawValue === 'true') return true;
-  if (rawValue === 'false') return false;
-  throw new Error(`Boolean value required for ${key}: ${rawValue}`);
-}
-
-function parseFlywheelConfigAssignment(assignment: string): { key: FlywheelConfigKey; value: boolean } {
-  const separator = assignment.indexOf('=');
-  if (separator === -1) throw new Error('Flywheel config assignment must use <key>=<bool>');
-  const key = parseFlywheelConfigKey(assignment.slice(0, separator));
-  const value = parseConfigBoolean(key, assignment.slice(separator + 1));
-  return { key, value };
-}
-
-export async function flywheelConfigCommand(options: ConfigOptions = {}): Promise<void> {
-  try {
-    if (options.get !== undefined && options.set !== undefined) {
-      throw new Error('Use either --get or --set, not both');
-    }
-
-    if (options.set !== undefined) {
-      const { key, value } = parseFlywheelConfigAssignment(options.set);
-      writeFlywheelConfigValue(key, value);
-      console.log(`${key}=${value}`);
+export async function flywheelStopCommand(options: FlywheelStopOptions = {}): Promise<void> {
+  await runVerb(async () => {
+    const timeoutMs = options.timeout !== undefined ? Number(options.timeout) : undefined;
+    if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs < 0)) {
+      console.error(chalk.red(`--timeout must be a non-negative number of milliseconds, got ${options.timeout}`));
+      process.exitCode = 1;
       return;
     }
-
-    if (typeof options.get === 'string') {
-      console.log(formatFlywheelConfigValue(parseFlywheelConfigKey(options.get)));
-      return;
-    }
-
-    console.log(FLYWHEEL_CONFIG_KEYS.map(formatFlywheelConfigValue).join('\n'));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-const FLYWHEEL_CONFIG_KEYS = [
-  FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
-  FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
-] as const;
-
-type FlywheelConfigKey = typeof FLYWHEEL_CONFIG_KEYS[number];
-
-function mb(bytes: number): number {
-  return Math.round(bytes / 1024 / 1024);
-}
-
-async function resolveFlywheelRoleConfig(): Promise<ResolvedFlywheelRoleConfig> {
-  const { config } = loadConfigSync();
-  const flywheel = config.roles?.flywheel;
-  const model = resolveModel('flywheel', undefined, config);
-  // PAN-1984/PAN-1865: derive the harness from the model provider; never pin
-  // flywheel to claude-code or a hardcoded fallback.
-  const harness = await resolveHarness({ model });
-  return {
-    harness,
-    model,
-    effort: flywheel?.effort ?? 'high',
-    minAgents: flywheel?.minAgents ?? 20,
-    maxAgents: flywheel?.maxAgents ?? 30,
-    scope: flywheel?.scope ?? 'pan-only',
-    autoPickupBacklog: isFlywheelAutoPickupBacklog(),
-    requireUatBeforeMerge: isFlywheelRequireUatBeforeMerge(),
-  };
-}
-
-async function createInitialFlywheelStatus(
-  runId: string,
-  startedAt: string,
-  cwd: string,
-  agentModel: string | undefined,
-  agentHarness: RuntimeName | undefined,
-  roleConfig: ResolvedFlywheelRoleConfig,
-): Promise<FlywheelStatus> {
-  const ramTotalMb = mb(totalmem());
-  return {
-    runId,
-    startedAt,
-    elapsedMs: 0,
-    orchestrator: {
-      harness: agentHarness ?? roleConfig.harness,
-      model: agentModel ?? roleConfig.model,
-      effort: roleConfig.effort,
-      ctxPercent: 0,
-    },
-    headline: {
-      bugsFixed: 0,
-      swarmItemsMerged: 0,
-      swarmItemsTotal: 0,
-      prsMerged: 0,
-      awaitingUat: 0,
-    },
-    activePipeline: [],
-    substrateBugs: [],
-    agents: [{
-      id: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
-      label: 'flywheel-orchestrator',
-      status: 'running',
-      role: 'flywheel',
-      model: agentModel,
-    }],
-    parked: [],
-    suggestions: [],
-    system: {
-      mainHead: await gitOutput('git rev-parse --short HEAD', cwd).catch(() => 'unknown'),
-      ramUsedMb: Math.max(0, ramTotalMb - mb(freemem())),
-      ramTotalMb,
-      swapUsedMb: 0,
-      swapTotalMb: 0,
-      agentsActive: 1,
-      agentsCap: roleConfig.maxAgents,
-    },
-    openQuestions: [],
-    ticks: 0,
-    lastTickAt: startedAt,
-  };
-}
-
-export async function postFlywheelStatus(status: FlywheelStatus, fetchImpl: typeof fetch = fetch): Promise<void> {
-  const internalToken = ensureInternalTokenSync();
-  const res = await fetchImpl(`${dashboardBaseUrl()}/api/flywheel/status`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      [INTERNAL_TOKEN_HEADER]: internalToken,
-    },
-    body: JSON.stringify(status),
+    console.log(chalk.dim('Asking the loop to write, commit, and push .pan/flywheel/report.md…'));
+    const { reportWritten, stopped } = await stopFlywheel(timeoutMs !== undefined ? { timeoutMs } : {});
+    console.log(stopped
+      ? chalk.green('✓ The loop confirmed its stop. Flywheel paused (row and transcript kept).')
+      : chalk.yellow('The loop did not confirm its stop within the timeout. Flywheel paused anyway (row and transcript kept).'));
+    if (!reportWritten) console.log(chalk.dim('  .pan/flywheel/report.md was not updated.'));
   });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Dashboard rejected FlywheelStatus (${res.status})${body ? `: ${body}` : ''}`);
-  }
 }
 
-export async function emitStatusCommand(options: EmitStatusOptions): Promise<void> {
-  try {
-    const raw = await readFlywheelStatusJson(options.file);
-    const payload = parseFlywheelStatusJson(raw);
-    const status = validateFlywheelStatusPayload(payload);
-    await postFlywheelStatus(status);
-    console.log(`Flywheel status emitted for ${status.runId}`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-export async function startFlywheelRun(
-  options: StartOptions = {},
-  deps: StartFlywheelRunDeps = {},
-): Promise<StartFlywheelRunResult> {
-  const cwd = options.cwd ?? await (deps.resolvePrimaryRoot ?? resolvePrimaryWorktreeRoot)(process.cwd());
-  const brief = await (deps.requireBrief ?? requireFlywheelBrief)(cwd, options.brief);
-  const orderContext = options.orders ? await resolveFlywheelOrderStart(cwd, options.orders, deps) : null;
-  const book = orderContext?.book ?? null;
-  const overlay = await resolveFlywheelOrderBriefOverlay(cwd, book, deps);
-  const runId = await (deps.nextRunId ?? nextFlywheelRunId)();
-  const startedAt = new Date().toISOString();
-  const launchMetadata = {
-    version: 1 as const,
-    runId,
-    workspace: cwd,
-    briefPath: brief.absolutePath,
-    briefDisplayPath: brief.displayPath,
-    ...(overlay.briefOverlayPath ? { briefOverlayPath: overlay.briefOverlayPath } : {}),
-    ...(book ? { orders: { bookId: book.id } } : {}),
-  };
-  await (deps.writeLaunchMetadata ?? writeFlywheelLaunchMetadata)(launchMetadata);
-  const roleConfig = await (deps.resolveRoleConfig ?? resolveFlywheelRoleConfig)();
-  const agent = await (deps.spawn ?? spawnFlywheel)({
-    runId,
-    briefPath: brief.absolutePath,
-    ...overlay,
-    workspace: cwd,
-    model: roleConfig.model,
-    harness: roleConfig.harness,
-    effort: roleConfig.effort,
-    minAgents: roleConfig.minAgents,
-    maxAgents: roleConfig.maxAgents,
-    scope: roleConfig.scope,
-    autoPickupBacklog: roleConfig.autoPickupBacklog,
-    requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
+export async function flywheelAbortCommand(): Promise<void> {
+  await runVerb(async () => {
+    await abortFlywheel();
+    console.log(chalk.green('✓ Flywheel aborted without a report (row and transcript kept).'));
   });
-  try {
-    if (orderContext) await setFlywheelOrderStatus(orderContext, 'running', runId, deps);
-    await (deps.writeStatus ?? writeLatestFlywheelStatus)(await createInitialFlywheelStatus(
-      runId,
-      startedAt,
-      cwd,
-      agent.model,
-      agent.harness,
-      roleConfig,
-    ));
-    return { runId, briefDisplayPath: brief.displayPath, agentModel: agent.model };
-  } catch (error) {
-    return compensateFailedFlywheelStart(orderContext, runId, error, deps);
-  }
-}
-
-export async function flywheelStartCommand(options: StartOptions = {}): Promise<void> {
-  try {
-    const result = await startFlywheelRun(options);
-
-    console.log(`Flywheel started: ${result.runId}`);
-    console.log(`Brief: ${result.briefDisplayPath}`);
-    console.log(`Run URL: ${dashboardBaseUrl()}/flywheel`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-function formatElapsed(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
-
-async function loadActiveFlywheelStatus(): Promise<FlywheelStatus | null> {
-  // resolveLiveFlywheelRunId self-heals the SQLite gate when the prior run
-  // has ended or its on-disk state is gone (PAN-1245). Status and start now
-  // consult the same source of truth.
-  const activeRunId = await resolveLiveFlywheelRunId();
-  if (!activeRunId) return null;
-  const detail = await getFlywheelRunDetail(activeRunId);
-  return detail?.status === 'running' ? detail.latest : null;
-}
-
-export function formatFlywheelStatus(status: FlywheelStatus): string {
-  return [
-    `Run: ${status.runId}`,
-    `Elapsed: ${formatElapsed(status.elapsedMs)}`,
-    `Bugs fixed: ${status.headline.bugsFixed}`,
-    `SWARM items: ${status.headline.swarmItemsMerged}/${status.headline.swarmItemsTotal}`,
-    `PRs merged: ${status.headline.prsMerged}`,
-    `Awaiting UAT: ${status.headline.awaitingUat}`,
-    `Active agents: ${status.system.agentsActive}/${status.system.agentsCap}`,
-    `RAM: ${status.system.ramUsedMb} MiB used / ${status.system.ramTotalMb} MiB total`,
-    `Main HEAD: ${status.system.mainHead.slice(0, 7)}`,
-    `Last tick: ${status.lastTickAt}`,
-  ].join('\n');
-}
-
-async function formatMergeQueueForCli(cwd: string, json?: boolean): Promise<string> {
-  const q = await Effect.runPromise(computeMergeQueueFromCandidates(await listEligibleCandidatesByProject(cwd), cwd).pipe(Effect.provide(nodeServicesLayer)));
-  return json ? JSON.stringify({ mergeQueue: q }, null, 2) : `Merge queue:\n${q.map(i => `  ${i.pr ? `#${i.pr}` : 'no-pr'} ${i.issueId} ${i.title}`).join('\n') || '  (empty)'}`;
-}
-
-export async function flywheelStatusCommand(options: StatusOptions): Promise<void> {
-  try {
-    const status = await loadActiveFlywheelStatus();
-    if (!status) {
-      console.log(await formatMergeQueueForCli(process.cwd(), options.json));
-      return;
-    }
-    const mergeBackend = await loadMergeBackendStatusForCli();
-    console.log(options.json
-      ? JSON.stringify({ ...status, mergeBackend }, null, 2)
-      : `${formatFlywheelStatus(status)}\n${formatMergeBackendStatus(mergeBackend)}`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-const STATS_CRITERION_KEYS = [
-  'c1_bugRate',
-  'c2_p0Bugs',
-  'c3_passRate',
-  'c4_mttr',
-  'c5_intervention',
-  'c6_timeConsistency',
-  'c7_flake',
-] as const satisfies readonly (keyof FlywheelStatsCriteria)[];
-
-const STATUS_GLYPH: Record<FlywheelStatsCriterionStatus, string> = {
-  green: '● green',
-  yellow: '● yellow',
-  red: '● red',
-  insufficient_data: '○ insufficient_data',
-};
-
-const STATUS_COLOR: Record<FlywheelStatsCriterionStatus, string> = {
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  red: '\x1b[31m',
-  insufficient_data: '\x1b[90m',
-};
-
-const TREND_LABEL: Record<FlywheelStatsTrend, string> = {
-  up: '↗ up',
-  down: '↘ down',
-  flat: '→ flat',
-};
-
-export async function fetchFlywheelStats(window: string, fetchImpl: typeof fetch = fetch): Promise<FlywheelStatsPayload> {
-  const internalToken = ensureInternalTokenSync();
-  const url = new URL(`${dashboardBaseUrl()}/api/flywheel/stats`);
-  url.searchParams.set('window', window);
-  const res = await fetchImpl(url.toString(), {
-    headers: {
-      [INTERNAL_TOKEN_HEADER]: internalToken,
-    },
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Dashboard rejected Flywheel stats request (${res.status})${body ? `: ${body}` : ''}`);
-  }
-
-  return decodeFlywheelStats(await res.json());
-}
-
-function formatScalar(value: number): string {
-  if (!Number.isFinite(value)) return '—';
-  if (value > 0 && Math.abs(value) < 1) return `${(value * 100).toFixed(1)}%`;
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
-
-function formatDuration(ms: number): string {
-  const abs = Math.abs(ms);
-  if (abs >= 24 * 60 * 60 * 1000) return `${(ms / (24 * 60 * 60 * 1000)).toFixed(1)}d`;
-  if (abs >= 60 * 60 * 1000) return `${(ms / (60 * 60 * 1000)).toFixed(1)}h`;
-  if (abs >= 60 * 1000) return `${(ms / (60 * 1000)).toFixed(1)}m`;
-  return `${Math.round(ms)}ms`;
-}
-
-function formatObjectValue(value: Record<string, unknown>): string {
-  return Object.entries(value)
-    .map(([key, entry]) => {
-      if (typeof entry === 'number' && key.toLowerCase().endsWith('ms')) return `${key}: ${formatDuration(entry)}`;
-      if (typeof entry === 'number') return `${key}: ${formatScalar(entry)}`;
-      if (typeof entry === 'string' || typeof entry === 'boolean' || entry === null) return `${key}: ${String(entry)}`;
-      return `${key}: ${JSON.stringify(entry)}`;
-    })
-    .join(', ');
-}
-
-function formatCriterionValue(value: FlywheelStatsCriterion['value']): string {
-  return typeof value === 'number' ? formatScalar(value) : formatObjectValue(value as Record<string, unknown>);
-}
-
-function colorStatus(status: FlywheelStatsCriterionStatus, color: boolean): string {
-  if (!color) return STATUS_GLYPH[status];
-  const [glyph, label] = STATUS_GLYPH[status].split(' ');
-  return `${STATUS_COLOR[status]}${glyph}\x1b[0m ${label}`;
-}
-
-function tableStatsCell(value: string | number | undefined): string {
-  return String(value ?? '—').replace(/\|/g, '\\|').replace(/\n/g, ' ');
-}
-
-export function formatFlywheelStats(stats: FlywheelStatsPayload, options: FormatStatsOptions = {}): string {
-  const color = options.color ?? process.stdout.isTTY === true;
-  const rows = STATS_CRITERION_KEYS.map((key) => {
-    const criterion = stats.criteria[key];
-    return `| ${tableStatsCell(criterion.label)} | ${tableStatsCell(formatCriterionValue(criterion.value))} | ${tableStatsCell(formatCriterionValue(criterion.target))} | ${tableStatsCell(colorStatus(criterion.status, color))} | ${tableStatsCell(criterion.trend ? TREND_LABEL[criterion.trend] : '—')} | ${criterion.sampleSize} |`;
-  });
-  return [
-    `Flywheel stats (${stats.window})`,
-    `Generated: ${stats.generatedAt}`,
-    '',
-    '| Criterion | Value | Target | Status | Trend | Sample |',
-    '|---|---:|---:|---|---|---:|',
-    ...rows,
-  ].join('\n');
-}
-
-export async function flywheelStatsCommand(options: StatsOptions = {}): Promise<void> {
-  try {
-    const stats = await fetchFlywheelStats(options.window ?? DEFAULT_STATS_WINDOW);
-    console.log(options.json ? JSON.stringify(stats, null, 2) : formatFlywheelStats(stats));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-function runNumberFromRunId(runId: string): number {
-  const match = /^RUN-(\d+)$/.exec(runId);
-  if (!match) throw new Error(`Invalid Flywheel run id for report: ${runId}`);
-  return Number(match[1]);
-}
-
-function reportDate(status: FlywheelStatus): string {
-  return status.lastTickAt.slice(0, 10);
-}
-
-function tableCell(value: string | number | undefined): string {
-  return String(value ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
-}
-
-export function formatFlywheelStateReport(status: FlywheelStatus, mergeQueue: MergeQueueItem[] = []): string {
-  const runNumber = runNumberFromRunId(status.runId);
-  const suggestionRows = status.suggestions.length > 0
-    ? status.suggestions.map((suggestion) => `| ${tableCell(suggestion.priority)} | ${tableCell(suggestion.action)} | ${tableCell(suggestion.issueId)} | ${tableCell(suggestion.rationale)} |`).join('\n')
-    : 'No suggestions emitted this run.';
-  const activePipelineRows = status.activePipeline.length > 0
-    ? status.activePipeline.map((item) => `| ${tableCell(item.issueId)} | ${tableCell(item.verb)} | ${tableCell(item.status)} | ${tableCell(item.title)} | ${tableCell(item.progressPercent)} | ${tableCell(item.pr)} |`).join('\n')
-    : '| _None_ |  |  |  |  |  |';
-  const substrateRows = status.substrateBugs.length > 0
-    ? status.substrateBugs.map((bug) => `| ${tableCell(bug.issueId)} | ${tableCell(bug.status)} | ${tableCell(bug.title)} | ${tableCell(bug.commitSha?.slice(0, 10))} |`).join('\n')
-    : '| _None_ |  |  |  |';
-  const patternLines = status.parked.length > 0
-    ? status.parked.map((item) => `- **${item.issueId}** (${item.reason}) — ${item.title}`).join('\n')
-    : '- None recorded this run.';
-  const questionLines = status.openQuestions.length > 0
-    ? status.openQuestions.map((question) => `- ${question}`).join('\n')
-    : '- None.';
-  const mergeQueueSection = mergeQueue.length > 0
-    ? `## Merge Queue
-
-Merge ship-ready PRs in this order to avoid rebase conflicts. Branches with overlapping file changes must be merged in sequence; non-overlapping branches can be merged in any order.
-
-| # | Issue | PR | Conflicts With |
-|---|---|---|---|
-${mergeQueue.map((item) => {
-  const prCell = item.pr != null ? `#${item.pr}` : '—';
-  const conflictsCell = item.conflictsWith.length > 0 ? item.conflictsWith.join(', ') : '—';
-  return `| ${item.mergeOrder} | ${item.issueId} | ${prCell} | ${conflictsCell} |`;
-}).join('\n')}
-
----
-
-`
-    : '';
-
-  return `# Flywheel Run ${runNumber} Report — ${reportDate(status)}
-
-Per-run report derived from the last \`FlywheelStatus\` snapshot. Durable cumulative memory across runs lives in \`docs/FLYWHEEL-STATE.md\`.
-
-**Run window:** ${status.startedAt} → ${status.lastTickAt} (${status.orchestrator.harness}, ${status.orchestrator.model}, ${status.orchestrator.effort})
-
-**Headline result:** ${status.headline.bugsFixed} substrate bugs fixed; ${status.headline.swarmItemsMerged}/${status.headline.swarmItemsTotal} SWARM items merged; ${status.headline.prsMerged} PRs merged; ${status.headline.awaitingUat} awaiting UAT.
-
-**Run counters:** ticks ${status.ticks}; last tick ${status.lastTickAt}; orchestrator context ${status.orchestrator.ctxPercent}%.
-
----
-
-${mergeQueueSection}## Suggestions
-
-${status.suggestions.length > 0 ? `| Priority | Action | Issue | Rationale |
-|---|---|---|---|
-${suggestionRows}` : suggestionRows}
-
----
-
-## Active Pipeline
-
-| Issue | Verb | Status | Title | Progress | PR |
-|---|---|---|---|---:|---:|
-${activePipelineRows}
-
----
-
-## Cycling Alerts
-
-${questionLines}
-
----
-
-## Infrastructure Gaps
-
-| Issue | Status | Notes | Commit |
-|---|---|---|---|
-${substrateRows}
-
----
-
-## Pattern Ledger
-
-${patternLines}
-
----
-
-## Skill Gaps
-
-- Keep \`pan flywheel report\` in the closeout path so run summaries stay archived under the run directory.
-`;
-}
-
-async function isFlywheelStateDirty(cwd: string): Promise<boolean> {
-  // Tolerate non-git cwd / missing file: a non-zero git exit means there are
-  // no orchestrator-authored changes worth committing here (PAN-1245). The
-  // gate clear in flywheelReportCommand must not be blocked by this check.
-  try {
-    const { stdout } = await execAsync(
-      'git status --porcelain docs/FLYWHEEL-STATE.md',
-      { cwd, encoding: 'utf8' },
-    );
-    return stdout.trim().length > 0;
-  } catch {
-    return false;
-  }
-}
-
-async function loadReportFlywheelStatus(): Promise<FlywheelStatus | null> {
-  const activeRunId = getFlywheelActiveRunId();
-  if (activeRunId) {
-    const activeDetail = await getFlywheelRunDetail(activeRunId);
-    if (activeDetail?.latest) return activeDetail.latest;
-  }
-  const runs = await listFlywheelRuns();
-  const run = runs.find((candidate) => candidate.status === 'running') ?? runs[0];
-  if (!run) return null;
-  const detail = await getFlywheelRunDetail(run.id);
-  return detail?.latest ?? null;
-}
-
-async function gitOutput(command: string, cwd: string): Promise<string> {
-  const { stdout } = await execAsync(command, { cwd, encoding: 'utf8' });
-  return stdout.trim();
-}
-
-async function commitFlywheelStateChanges(cwd: string, runNumber: number): Promise<void> {
-  const subject = `docs(flywheel): run ${runNumber}`;
-  await execAsync('git add docs/FLYWHEEL-STATE.md', { cwd });
-  const headSubject = await gitOutput('git log -1 --format=%s', cwd).catch(() => '');
-  const command = headSubject === subject
-    ? `git commit --amend -m ${JSON.stringify(subject)}`
-    : `git commit -m ${JSON.stringify(subject)}`;
-  await execAsync(command, { cwd, encoding: 'utf8' });
-}
-
-function readFlywheelGateSnapshot(): FlywheelGateSnapshot {
-  return {
-    paused: isFlywheelGloballyPaused(),
-    activeRunId: getFlywheelActiveRunId(),
-  };
-}
-
-function formatGateSnapshot(snapshot: FlywheelGateSnapshot): string {
-  return `paused=${snapshot.paused ? 'true' : 'false'} active_run_id=${snapshot.activeRunId ?? 'none'}`;
-}
-
-export async function pauseFlywheelRun(): Promise<{ before: FlywheelGateSnapshot; after: FlywheelGateSnapshot; changed: boolean }> {
-  const before = readFlywheelGateSnapshot();
-  if (before.paused) return { before, after: before, changed: false };
-  await pauseFlywheel();
-  return { before, after: readFlywheelGateSnapshot(), changed: true };
 }
 
 export async function flywheelPauseCommand(): Promise<void> {
-  try {
-    const result = await pauseFlywheelRun();
-    if (!result.changed) {
-      console.log(`Flywheel already paused (${formatGateSnapshot(result.before)})`);
-      return;
-    }
-
-    console.log(`Flywheel paused: before ${formatGateSnapshot(result.before)}; after ${formatGateSnapshot(result.after)}`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapshot; after: FlywheelGateSnapshot; changed: boolean }> {
-  const before = readFlywheelGateSnapshot();
-  if (!before.paused && await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID))) {
-    return { before, after: before, changed: false };
-  }
-  if (!before.activeRunId) throw new Error('No active flywheel run to resume');
-  const launch = await readFlywheelLaunchMetadata(before.activeRunId);
-  if (!launch) {
-    throw new Error(`Flywheel run ${before.activeRunId} is missing launch metadata; cannot resume safely`);
-  }
-  const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
-  const roleConfig = await resolveFlywheelRoleConfig();
-  await resumeFlywheel({
-    resumeCause: 'operator',
-    workspace: launch.workspace,
-    briefPath: brief.absolutePath,
-    model: roleConfig.model,
-    harness: roleConfig.harness,
-    effort: roleConfig.effort,
-    minAgents: roleConfig.minAgents,
-    maxAgents: roleConfig.maxAgents,
-    scope: roleConfig.scope,
-    autoPickupBacklog: roleConfig.autoPickupBacklog,
-    requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
+  await runVerb(async () => {
+    await pauseFlywheel();
+    console.log(chalk.green('✓ Flywheel paused. Resume with: pan flywheel resume'));
   });
-  return { before, after: readFlywheelGateSnapshot(), changed: true };
 }
 
 export async function flywheelResumeCommand(): Promise<void> {
-  try {
-    const result = await resumeFlywheelRun();
-    if (!result.changed) {
-      console.log(`Flywheel already running (${formatGateSnapshot(result.before)})`);
-      return;
-    }
-
-    console.log(`Flywheel resumed: before ${formatGateSnapshot(result.before)}; after ${formatGateSnapshot(result.after)}`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-function clearFlywheelRunGate(runId: string): void {
-  if (getFlywheelActiveRunId() === runId) {
-    clearFlywheelGate();
-  }
-}
-
-// Stop the orchestrator, write the report, commit state changes, and clear the gate.
-export async function flywheelStopCommand(options: Pick<ReportOptions, 'cwd'> = {}): Promise<void> {
-  try {
-    const sessionAlive = await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
-    if (sessionAlive) {
-      await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator'));
-    }
-
-    const status = await loadReportFlywheelStatus();
-    if (!status) {
-      console.log('No flywheel run is active and nothing is left to report.');
-      return;
-    }
-
-    // The orchestrator has already been stopped, so force the report path to
-    // bypass its alive-session guard and finalize the run. Thread cwd through
-    // explicitly — the report path commits docs/FLYWHEEL-STATE.md in its cwd,
-    // and an implicit process.cwd() here has committed into the wrong repo
-    // when invoked from tests or another checkout (PAN-2658).
-    await flywheelReportCommand({ force: true, cwd: options.cwd });
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-async function buildFlywheelStateReport(status: FlywheelStatus, cwd: string): Promise<string> {
-  // PAN-1696: Compute the merge queue from the pipeline ready set, not flywheel activePipeline.
-  const candidates = await listEligibleCandidatesByProject(cwd);
-  const mergeQueue = await Effect.runPromise(computeMergeQueueFromCandidates(candidates, cwd).pipe(Effect.provide(nodeServicesLayer)));
-  return formatFlywheelStateReport(status, mergeQueue);
-}
-
-async function persistFlywheelStateReport(status: FlywheelStatus, cwd: string, report: string): Promise<void> {
-  const runNumber = runNumberFromRunId(status.runId);
-  await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), report, 'utf8');
-  await compactFlywheelStateFile(cwd);
-  const stateChanged = await isFlywheelStateDirty(cwd);
-  if (stateChanged) {
-    await commitFlywheelStateChanges(cwd, runNumber);
-    console.log(`Wrote per-run report and committed FLYWHEEL-STATE.md changes for run ${runNumber}.`);
-  } else {
-    console.log(`Wrote per-run report for run ${runNumber}. No FLYWHEEL-STATE.md changes to commit.`);
-  }
-}
-
-export async function flywheelReportCommand(options: ReportOptions = {}): Promise<void> {
-  try {
-    const cwd = options.cwd ?? process.cwd();
-
-    // Writing report.md finalizes the run. Refuse while the orchestrator is alive;
-    // its own end-of-run call passes --force to bypass this guard.
-    if (!options.force && await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID))) {
-      console.error('Refusing to write report — flywheel orchestrator session is still alive.');
-      console.error('This command finalizes the run (writes report.md and clears the active-run gate).');
-      console.error('Run `pan flywheel pause` (or `pan flywheel abort`) first, or pass --force to override.');
-      process.exitCode = 1;
-      return;
-    }
-
-    const status = await loadReportFlywheelStatus();
-    if (!status) {
-      console.error('no flywheel run to report');
-      process.exitCode = 1;
-      return;
-    }
-
-    try {
-      await persistFlywheelStateReport(status, cwd, await buildFlywheelStateReport(status, cwd));
-    } finally {
-      clearFlywheelRunGate(status.runId);
-    }
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-const flywheelCompleteCommand = createFlywheelCompleteCommand({ loadStatus: loadReportFlywheelStatus, buildReport: buildFlywheelStateReport, persistReport: persistFlywheelStateReport, clearGate: clearFlywheelRunGate, start: startFlywheelRun });
-function getPlatformOpenCommand(): string {
-  switch (process.platform) {
-    case 'linux': return 'xdg-open';
-    case 'darwin': return 'open';
-    case 'win32': return 'explorer';
-    default: throw new Error(`Opening files is not supported on ${process.platform}`);
-  }
-}
-
-function openPathDetached(path: string): void {
-  const child = spawn(getPlatformOpenCommand(), [path], {
-    detached: true,
-    stdio: 'ignore',
+  await runVerb(async () => {
+    await resumeFlywheel();
+    console.log(chalk.green(`✓ Flywheel resumed; re-sent ${FLYWHEEL_SKILL_COMMAND}.`));
   });
-  child.unref();
 }
 
-async function resolveReportOpenRunId(runId: string | undefined): Promise<string> {
-  if (runId) return runId;
-  const runs = await listFlywheelRuns();
-  const run = runs.find((candidate) => candidate.status === 'complete') ?? runs[0];
-  if (!run) throw new Error('no flywheel run report to open');
-  return run.id;
-}
-
-export async function openFlywheelRunReport(options: ReportOpenOptions = {}): Promise<{ runId: string; path: string }> {
-  const runId = await resolveReportOpenRunId(options.runId);
-  const detail = await getFlywheelRunDetail(runId);
-  if (!detail) throw new Error(`Flywheel run not found: ${runId}`);
-  if (!detail.paths.report) throw new Error(`No report exists for ${runId}`);
-  await (options.opener ?? openPathDetached)(detail.paths.report);
-  return { runId, path: detail.paths.report };
-}
-
-export async function flywheelReportOpenCommand(options: ReportOpenOptions = {}): Promise<void> {
-  try {
-    const result = await openFlywheelRunReport(options);
-    console.log(`Opened Flywheel report for ${result.runId}: ${result.path}`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-// Discard the current run without writing a report (PAN-1245).
-export async function flywheelAbortCommand(): Promise<void> {
-  try {
-    const candidate = getFlywheelActiveRunId();
-    if (!candidate) {
-      console.log('No active flywheel run to abort.');
+export async function flywheelReportCommand(): Promise<void> {
+  await runVerb(async () => {
+    const { run } = await readFlywheelRun();
+    if (run === 'running') {
+      await requestFlywheelReport();
+      console.log(chalk.green('✓ Asked the loop to write .pan/flywheel/report.md.'));
       return;
     }
-    await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator'));
-    await abortFlywheelRun(candidate);
-    console.log(`Aborted flywheel run ${candidate}.`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+    const { planHome } = await resolveFlywheelProjectRoot();
+    const report = await readFlywheelReportFile(planHome);
+    if (!report.exists || !report.content) {
+      console.log(chalk.dim('No report yet.'));
+      return;
+    }
+    console.log(chalk.dim(`${report.path} · ${report.lastModified ?? ''}`));
+    console.log(report.content);
+  });
+}
+
+function relativeAge(iso: string, nowMs: number): string {
+  const ms = nowMs - Date.parse(iso);
+  if (!Number.isFinite(ms)) return iso;
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 90) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 90) return `${minutes}m ago`;
+  return `${Math.round(minutes / 60)}h ago`;
+}
+
+export function formatFlywheelStatus(status: FlywheelDerivedStatus, nowMs = Date.now()): string {
+  const lines: string[] = [];
+  const conv = status.conversation;
+  const runLabel = status.run === 'running' && status.lastTick ? `running · tick ${status.lastTick.tick}` : status.run;
+  lines.push(`${chalk.bold('Flywheel')}  ${runLabel}${conv ? chalk.dim(`  ${conv.name} (${conv.harness ?? '?'}, ${conv.model ?? '?'})`) : ''}`);
+  lines.push(chalk.dim(`  project ${status.projectRoot}`));
+  if (status.lastTick) {
+    const t = status.lastTick;
+    lines.push(`  last tick  ${t.tick} · ${t.phase} · pick ${t.pick ?? 'none'} · ${relativeAge(t.at, nowMs)} (${status.freshness})`);
+    if (t.needsYou) lines.push(chalk.yellow(`  needs you  ${t.needsYou}`));
+  } else if (status.run === 'running') {
+    lines.push(chalk.dim('  waiting for the first tick'));
   }
+  const p = status.policies;
+  lines.push(`  policies   auto-pickup ${p.auto_pickup_backlog ? 'on' : 'off'} · require UAT ${p.require_uat_before_merge ? 'on' : 'off'} · merge train ${p.merge_train_enabled ? 'on' : 'off'}`);
+  if (status.orderBook) {
+    const b = status.orderBook;
+    lines.push(`  order book ${b.name} (${b.id}) · ${b.landed}/${b.total} landed`);
+  }
+  if (status.inFlight.length) {
+    lines.push(`  in flight  ${status.inFlight.length}`);
+    for (const row of status.inFlight) {
+      const pr = row.pr ? `PR #${row.pr.number} ${row.pr.reviewState}/${row.pr.checks}` : 'no PR';
+      const journal = row.lastJournal ? `${row.lastJournal.type} ${relativeAge(row.lastJournal.at, nowMs)}` : '—';
+      lines.push(`    ${row.issueId.padEnd(10)} ${row.state.padEnd(18)} ${(row.attention ?? '').padEnd(10)} ${pr.padEnd(32)} ${journal}`);
+    }
+  } else {
+    lines.push(chalk.dim('  in flight  none'));
+  }
+  return lines.join('\n');
+}
+
+export async function flywheelStatusCommand(options: FlywheelStatusOptions = {}): Promise<void> {
+  const status = await deriveFlywheelStatus();
+  if (options.json) {
+    console.log(JSON.stringify(status, null, 2));
+    return;
+  }
+  console.log(formatFlywheelStatus(status));
+}
+
+export function formatFlywheelStats(stats: FlywheelStats): string {
+  const c1 = stats.criteria.c1_bugRate;
+  const c2 = stats.criteria.c2_p0Bugs;
+  const since = stats.window.since.slice(0, 10);
+  const c1Value = c1.dataSufficient && c1.value !== null ? c1.value.toFixed(2) : `collecting since ${since}`;
+  const lines = [
+    `${chalk.bold('Substrate stats')}  last ${stats.window.days} days (since ${since})`,
+    `  c1 discovery rate  ${c1Value}  (${c1.count} bugs / ${c1.denominator} merged PRs) · ${c1.status} · ${c1.trend}`,
+    `  c2 P0 bugs         ${c2.value} · ${c2.status} · ${c2.trend}`,
+  ];
+  for (const bug of stats.bugs) {
+    lines.push(`    #${bug.number} ${bug.severity.padEnd(7)} ${bug.closedAt ? 'closed' : 'open  '} ${bug.title}`);
+  }
+  return lines.join('\n');
+}
+
+export async function flywheelStatsCommand(options: FlywheelStatsOptions = {}): Promise<void> {
+  const windowDays = options.window !== undefined ? Number(options.window) : undefined;
+  if (windowDays !== undefined && (!Number.isFinite(windowDays) || windowDays <= 0)) {
+    console.error(chalk.red(`--window must be a positive number of days, got ${options.window}`));
+    process.exitCode = 1;
+    return;
+  }
+  const { projectRoot } = await resolveFlywheelProjectRoot();
+  const stats = await computeSubstrateStats({ projectPath: projectRoot, ...(windowDays !== undefined ? { windowDays } : {}) });
+  console.log(options.json ? JSON.stringify(stats, null, 2) : formatFlywheelStats(stats));
 }
 
 export function registerFlywheelCommands(program: Command): void {
   const flywheel = program
     .command('flywheel')
-    .description('Flywheel orchestrator lifecycle and status helpers');
-  registerFlywheelSurfaceCommands(program);
+    .description('Start, stop, pause, resume, or inspect the flywheel conversation');
 
   flywheel
     .command('start')
-    .description('Start the Flywheel orchestrator')
-    .option('--brief <path>', 'Path to the Flywheel brief', DEFAULT_BRIEF_PATH)
-    .option('--orders <book-id>', 'Bind the run to a validated order book')
+    .description(`Launch a conversation running ${FLYWHEEL_SKILL_COMMAND}`)
+    .option('--model <model>', 'Model for the flywheel conversation')
+    .option('--harness <harness>', 'Harness for the flywheel conversation')
+    .option('--cwd <path>', 'Working directory (default: cwd)')
+    .option('--orders <book-id>', 'Order book the flywheel works from')
+    .option('--fresh', 'Replace a paused flywheel conversation instead of refusing')
     .action(flywheelStartCommand);
 
   flywheel
-    .command('emit-status')
-    .description('Validate and publish a FlywheelStatus JSON snapshot to the local dashboard')
-    .requiredOption('--file <path>', 'Path to FlywheelStatus JSON, or - to read from stdin')
-    .action(emitStatusCommand);
-
-  flywheel
-    .command('config')
-    .description('Get or set Flywheel autonomy configuration')
-    .option('--get [key]', 'Print Flywheel config values')
-    .option('--set <key=value>', 'Set a Flywheel config boolean')
-    .action(flywheelConfigCommand);
-
-  flywheel
-    .command('status')
-    .description('Show the active Flywheel run status')
-    .option('--json', 'Emit the raw FlywheelStatus JSON')
-    .action(flywheelStatusCommand);
-
-  flywheel
-    .command('stats')
-    .description('Show Flywheel v1.0 readiness stats')
-    .option('--window <duration>', 'Stats window duration', DEFAULT_STATS_WINDOW)
-    .option('--json', 'Emit the raw FlywheelStats JSON')
-    .action(flywheelStatsCommand);
-
-  flywheel
-    .command('pause')
-    .description('Pause the active Flywheel orchestrator run')
-    .action(flywheelPauseCommand);
-
-  flywheel
-    .command('resume')
-    .description('Resume the paused Flywheel orchestrator run')
-    .action(flywheelResumeCommand);
-
-  flywheel
-    .command('report')
-    .description('Finalize the active Flywheel run: write report.md, compact over-threshold FLYWHEEL-STATE.md history, commit State changes, and clear the active-run gate. Refuses to run while the orchestrator session is alive (pause or abort first).')
-    .option('--force', 'Bypass the orchestrator-alive guard. Intended for the orchestrator role\'s own end-of-run call.')
-    .action(flywheelReportCommand);
-
-  flywheel.command('complete')
-    .description('Complete a drained order-book run, write its report and retrospective, then continue mechanically')
-    .option('--force', 'Complete even when the order book still has non-terminal items').action(flywheelCompleteCommand);
-
-  flywheel
     .command('stop')
-    .description('Stop the Flywheel orchestrator gracefully: kill any live session, write report.md, commit FLYWHEEL-STATE.md changes, and clear the active-run gate')
+    .description('Ask the loop to write its report, wait for it, then pause')
+    .option('--timeout <ms>', 'How long to wait for the report (default 120000)')
     .action(flywheelStopCommand);
 
   flywheel
     .command('abort')
-    .description('Discard the active Flywheel run without writing a report')
+    .description('Stop the flywheel conversation without a report')
     .action(flywheelAbortCommand);
+
+  flywheel
+    .command('pause')
+    .description('Stop the flywheel session, keeping its conversation and transcript')
+    .action(flywheelPauseCommand);
+
+  flywheel
+    .command('resume')
+    .description(`Respawn a paused flywheel and re-send ${FLYWHEEL_SKILL_COMMAND}`)
+    .action(flywheelResumeCommand);
+
+  flywheel
+    .command('report')
+    .description('Ask a running loop for its report, or print .pan/flywheel/report.md')
+    .action(flywheelReportCommand);
+
+  flywheel
+    .command('status')
+    .description('Show the derived flywheel status: run, last tick, policies, in-flight issues, order book')
+    .option('--json', 'Output as JSON')
+    .action(flywheelStatusCommand);
+
+  flywheel
+    .command('stats')
+    .description('Substrate-bug discovery rate and P0 count, computed from the tracker and forge')
+    .option('--json', 'Output as JSON')
+    .option('--window <days>', 'Window in days (default 30)')
+    .action(flywheelStatsCommand);
 }

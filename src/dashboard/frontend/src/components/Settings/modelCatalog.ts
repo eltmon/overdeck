@@ -36,12 +36,20 @@ interface ProviderDef {
  * selects after the legacy AgentCards UI removal.
  */
 export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
+  meta: {
+    name: 'Meta (Muse)',
+    models: [
+      { id: 'muse-spark-1.3', name: 'Muse Spark 1.3 Standard', icon: Sparkles, costPer1MTokens: 2.75, capabilities: ['code', 'reasoning', 'large-context'], description: 'Standard: $1.25 input / $0.15 cached input / $4.25 output per million tokens.' },
+      { id: 'muse-spark-1.3-contributor', name: 'Muse Spark 1.3 Contributor (training data)', icon: Sparkles, costPer1MTokens: 0.15, capabilities: ['code', 'reasoning', 'large-context', 'cost-efficient'], description: 'Contributor: $0.10 input / $0.002 cached input / $0.20 output per million tokens. Prompts and replies may train Meta models.' },
+    ],
+  },
   anthropic: {
     name: 'Anthropic',
     models: [
       { id: 'claude-fable-5-1' as ModelId, name: 'Claude Fable 5.1 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Current model; see provider documentation for availability and pricing.' },
       { id: 'claude-fable-5' as ModelId, name: 'Claude Fable 5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Mythos-class flagship — long-horizon autonomous work, low→max effort. ~2× Opus pricing ($10 in / $50 out).' },
-      { id: 'claude-opus-5' as ModelId, name: 'Claude Opus 5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Opus (July 2026) — near-Fable-5 capability at half the cost, 1M context, low→max effort' },
+      { id: 'claude-opus-5-5' as ModelId, name: 'Claude Opus 5.5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 12, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Opus (September 2026) — long-running agentic coding, 128K output, always-on thinking, low→max effort' },
+      { id: 'claude-opus-5' as ModelId, name: 'Claude Opus 5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Previous Opus (July 2026) — near-Fable-5 capability at half the cost, 1M context, low→max effort' },
       { id: 'claude-opus-4-8' as ModelId, name: 'Claude Opus 4.8 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6 (200K context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
@@ -156,7 +164,7 @@ export function findModelDef(modelId: string): ModelDef | undefined {
  * Whether image attachments may be sent to a model. Permissive: returns `false`
  * ONLY for models flagged `supportsImages: false` (proven text-only, e.g.
  * mimo-v2.5-pro); every other model — including unflagged ones — is allowed, so
- * the provider stays the final authority. Mirrors `modelSupportsImagesSync` in
+ * the provider stays the final authority. Mirrors `modelSupportsImages` in
  * src/lib/model-capabilities.ts. PAN-1685.
  */
 export function modelSupportsImages(modelId: string): boolean {
@@ -166,9 +174,9 @@ export function modelSupportsImages(modelId: string): boolean {
 export type OpenRouterFavoriteModel = {
   id: string;
   name: string;
-  promptCostPer1M: number;
-  completionCostPer1M: number;
-  contextLength: number;
+  promptCostPer1M: number | null;
+  completionCostPer1M: number | null;
+  contextLength: number | null;
   supportsThinking: boolean;
   category: string;
 };

@@ -354,8 +354,9 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   const handlePaneContextMenu = useCallback(
     (pane: WorkspacePane, e: React.MouseEvent) => {
       e.preventDefault()
-      const top = Math.min(e.clientY, window.innerHeight - 360)
-      const left = Math.min(e.clientX, window.innerWidth - 240)
+      if (e.currentTarget instanceof HTMLElement) e.currentTarget.focus()
+      const top = Math.max(8, Math.min(e.clientY, window.innerHeight - 360))
+      const left = Math.max(8, Math.min(e.clientX, window.innerWidth - 240))
       // Conversation/agent tabs get the rich menu; everything else the generic one.
       if (pane.paneType === 'agent' && pane.conversationId && conversations.some((c) => c.name === pane.conversationId)) {
         setTabMenu({ conversationName: pane.conversationId, paneId: pane.paneId, top, left })

@@ -1,4 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockGetProjectSync = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../src/lib/projects.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/projects.js')>()),
+  getProjectSync: mockGetProjectSync,
+}));
+
 import { __testInternals } from '../../../src/cli/commands/start.js';
 import {
   createPlanningProgress,
@@ -10,6 +18,11 @@ import {
 } from '../../../src/cli/commands/start-prep-progress.js';
 import { UnsafeSyncMainStateError } from '../../../src/lib/cloister/sync-main-git.js';
 
+// PAN-3917: reconcileStartState (the pre-spawn state-worktree migration) is
+// gone with the state layer — start.ts no longer runs it, so __testInternals
+// no longer exposes it. The 'state-reconcile' prep-step budget/timeout tests
+// below still exercise the generic runStateReconcile/runStartPrepStep
+// machinery with ad-hoc callbacks, unrelated to that deleted function.
 const { runStartPrepStep } = __testInternals;
 type PrepProgress = Parameters<typeof runStartPrepStep>[0];
 type PrepStepName = keyof typeof START_PREP_STEP_POLICIES;
@@ -140,7 +153,9 @@ describe('pan start prep step wiring', () => {
     );
   });
 
-  it('fails fast when state reconciliation exceeds its budget', async () => {
+  it('degrades when state reconciliation exceeds its budget (PAN-3848 W24)', async () => {
+    // state-reconcile is best-effort migration at spawn time (FR-19); a slow
+    // reconcile warns and continues instead of failing the start.
     const prep = createTimeoutPrep();
     const spinner = { warn: vi.fn() };
     const resultPromise = runStartPrepStep(
@@ -148,19 +163,18 @@ describe('pan start prep step wiring', () => {
       spinner,
       'state-reconcile',
       () => new Promise<never>(() => undefined),
+      undefined,
     );
-    const rejection = expect(resultPromise).rejects.toMatchObject({
-      name: 'PrepStepTimeoutError',
-      message: "Prep step 'state-reconcile' exceeded its 60s budget",
-    });
 
     await vi.advanceTimersByTimeAsync(60_000);
 
-    await rejection;
-    expect(spinner.warn).not.toHaveBeenCalled();
+    await expect(resultPromise).resolves.toBeUndefined();
+    expect(spinner.warn).toHaveBeenCalledWith(
+      "Prep step 'state-reconcile' exceeded its 60s budget",
+    );
   });
 
-  it('aborts local reconciliation and waits for cleanup before returning its timeout', async () => {
+  it('aborts local reconciliation and waits for cleanup before degrading', async () => {
     const prep = createPrepProgress(
       { text: '' },
       { stream: { isTTY: false, write: vi.fn() } },
@@ -180,10 +194,12 @@ describe('pan start prep step wiring', () => {
     expect(receivedSignal?.aborted).toBe(true);
     expect(settled).toBe(false);
     finishCleanup();
-    await expect(resultPromise).rejects.toMatchObject({
-      name: 'PrepStepTimeoutError',
-      message: "Prep step 'state-reconcile' exceeded its 60s budget",
-    });
+    // PAN-3848 (W24): state-reconcile degrades — the timeout warns and the
+    // start continues instead of rejecting.
+    await expect(resultPromise).resolves.toBeUndefined();
+    expect(spinner.warn).toHaveBeenCalledWith(
+      "Prep step 'state-reconcile' exceeded its 60s budget",
+    );
     expect(vi.getTimerCount()).toBe(0);
   });
 

@@ -17,4 +17,4 @@ This is a one-release compatibility stub. Use `/pan-flywheel` for the canonical 
 
 If this skill is invoked, stop reading this file and invoke `/pan-flywheel` instead so the current `pan flywheel` CLI mapping, guardrails, and docs load.
 
-Do not run the legacy informal all-up workflow from this stub. Its operational content now lives in `skills/pan-flywheel/SKILL.md`, `roles/flywheel.md`, and `docs/FLYWHEEL.md`.
+Do not run the legacy informal all-up workflow from this stub. Its operational content now lives in `skills/pan-flywheel/SKILL.md`.

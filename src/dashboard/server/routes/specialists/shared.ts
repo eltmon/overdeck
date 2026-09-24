@@ -12,7 +12,7 @@ import {
 } from '../../../../lib/agents.js';
 import { createInFlightGuard } from '../../../../lib/cloister/in-flight-guard.js';
 import type { VerifiedMergedRepo } from '../../../../lib/cloister/merge-verification.js';
-import { parseIssueIdSync } from '../../../../lib/issue-id.js';
+import { parseIssueId } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 
 export const execAsync = promisify(exec);
@@ -20,7 +20,7 @@ export const execFileAsync = promisify(execFile);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export type SpecialistAgentName = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
+export type SpecialistAgentName = 'merge-agent' | 'review-agent' | 'test-agent' | 'uat-agent';
 export type ProjectSpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent';
 export type SpecialistEventRole = 'review' | 'test' | 'ship';
 
@@ -141,7 +141,7 @@ export interface FirePostMergeLifecycleOptions {
 }
 
 export function firePostMergeLifecycle(issueId: string, options?: FirePostMergeLifecycleOptions): boolean {
-  const parsedIssueId = parseIssueIdSync(issueId.trim());
+  const parsedIssueId = parseIssueId(issueId.trim());
   if (!parsedIssueId) {
     console.error(`[merge] Refusing post-merge lifecycle for invalid issue ID: ${issueId}`);
     return false;

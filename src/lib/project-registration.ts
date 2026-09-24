@@ -9,7 +9,7 @@ import { join, basename } from 'node:path';
 
 import {
   getProjectSync,
-  registerProjectSync,
+  registerProject,
   type ProjectConfig,
 } from './projects.js';
 import { ensureProjectLayer } from './context-layers/index.js';
@@ -24,9 +24,15 @@ export class DuplicateProjectError extends Error {
   }
 }
 
+export type RegisterProjectExtras = Pick<
+  ProjectConfig,
+  'issue_prefix' | 'github_repo' | 'gitlab_repo' | 'tracker' | 'workspace'
+>;
+
 export interface RegisterProjectOptions {
   path: string;
   name?: string;
+  extras?: RegisterProjectExtras;
 }
 
 export interface RegisterProjectResult {
@@ -61,15 +67,15 @@ export async function registerProjectFromPath(
     throw new DuplicateProjectError(key, existing.path);
   }
 
-  const projectConfig: ProjectConfig = { name, path: fullPath };
-  registerProjectSync(key, projectConfig);
+  const projectConfig: ProjectConfig = { name, path: fullPath, ...(opts.extras ?? {}) };
+  registerProject(key, projectConfig);
 
   const seededContextLayer = ensureProjectLayer(fullPath);
 
   // Pre-trust the project directory in Claude Code (non-fatal — H7).
   try {
-    const { preTrustDirectorySync } = await import('./workspace-manager.js');
-    preTrustDirectorySync(fullPath);
+    const { preTrustDirectory } = await import('./workspace-manager.js');
+    preTrustDirectory(fullPath);
   } catch { /* non-fatal */ }
 
   // Install git hooks where .git exists.

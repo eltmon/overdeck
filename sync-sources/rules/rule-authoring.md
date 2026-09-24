@@ -22,9 +22,9 @@ bundled rule in the overdeck repo:
 3. **`scope: universal` costs context in every session on every machine** —
    keep it as short as the rule allows. `scope: dev` folds in only on a
    overdeck source checkout; mechanics and tooling detail belong there.
-4. Run `pan sync`, then verify the rule landed in the rendered harness context
-   files: `~/.claude/CLAUDE.md` (managed region), `~/.overdeck/context/pi-global.md`,
-   and `~/.overdeck/context/codex-global.md`.
+4. Run `pan sync`, then verify the rule landed in the Overdeck-owned launch
+   artifacts: `~/.overdeck/context/claude-global.md`, `pi-global.md`, and
+   `codex-global.md`.
 5. Commit and push — bundled rules ship with the package, so an uncommitted
    rule exists only on this machine.
 6. If the rule introduces new canonical terminology, update
@@ -34,7 +34,5 @@ bundled rule in the overdeck repo:
 **"project rule"** and **"machine rule"** requests are NOT bundled rules — they
 edit the code-owned project layer (`<root>/.overdeck/context/project.md`) or global layer
 (`~/.overdeck/context/global.md`) directly; no overdeck checkout
-involved. Permanent state is separate: migrated projects use `overdeck-state`
-(on disk at `${OVERDECK_HOME}/state/<project>/`), while unmigrated projects
-temporarily retain their legacy `<projectRoot>/.pan/` state paths. See the
-context-nomenclature rule for the full routing table.
+involved. Permanent planning state is separate: it lives under `.pan/` in the
+project repo. See the context-nomenclature rule for the full routing table.

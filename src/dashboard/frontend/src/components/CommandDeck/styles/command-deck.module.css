@@ -439,13 +439,6 @@
   border-color: color-mix(in srgb, var(--warning) 32%, transparent);
 }
 
-.featureBadge_troubled {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
-  color: var(--warning-foreground, var(--warning));
-  border-color: color-mix(in srgb, var(--warning) 46%, transparent);
-  font-weight: 700;
-}
-
 .featureBadge_stopped {
   background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
   color: var(--muted-foreground);
@@ -2319,6 +2312,46 @@
   color: var(--primary);
 }
 
+/* Pipeline retrospective window menu (PAN-3841) */
+.retroMenuHost {
+  position: relative;
+}
+
+.retroMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  margin-top: 4px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.retroMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+  border: none;
+  background: transparent;
+  padding: 9px 13px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.retroMenuItem:hover {
+  background: var(--secondary);
+}
+
 /* Wrapper around controls + list */
 .conversationListWrapper {
   display: flex;
@@ -3212,101 +3245,6 @@
 .headerMenuWrap {
   position: relative;
   display: inline-flex;
-}
-
-.headerMenuOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-}
-
-.headerMenu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  z-index: 50;
-  min-width: 220px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--popover, var(--card));
-  color: var(--popover-foreground, var(--foreground));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-}
-
-.headerMenuItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  font-size: 12px;
-  text-align: left;
-  background: transparent;
-  border: none;
-  border-radius: 5px;
-  color: var(--foreground);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-
-.headerMenuItem:hover {
-  background: var(--accent);
-}
-
-.headerMenuItem:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.headerMenuItemActive {
-  color: var(--primary);
-}
-
-.headerMenuItemCheck {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  color: var(--primary);
-}
-
-.headerMenuItemDestructive {
-  color: var(--destructive);
-}
-
-.headerMenuItemDestructive:hover {
-  background: var(--destructive);
-  color: var(--destructive-foreground);
-}
-
-.headerMenuDivider {
-  height: 1px;
-  margin: 4px 2px;
-  background: var(--border);
-}
-
-.headerSubmenu {
-  position: absolute;
-  left: 100%;
-  top: 0;
-  margin-left: 4px;
-  z-index: 50;
-  min-width: 180px;
-  max-height: 320px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--popover, var(--card));
-  color: var(--popover-foreground, var(--foreground));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 .headerMenuDeliveryRow {
@@ -4666,6 +4604,7 @@
 
 .pickerBtn {
   display: flex;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
@@ -5326,6 +5265,25 @@
   border-radius: 4px;
   background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
   cursor: help;
+}
+
+.conversationStalledStatus {
+  min-width: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.conversationMetaLine .conversationStalledStatus {
+  order: -1;
+}
+
+.conversationStalledIcon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
 }
 
 /* ─── Branch / worktree chips (PAN-1523) ─────────────────────────────────── */

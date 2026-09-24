@@ -22,13 +22,15 @@ const workspace = {
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useIssueCostsQuery: () => ({ data: { sessions: [] } }),
-  useReviewStatusQuery: () => ({
-    data: {
-      verificationStatus: 'passed',
-      testStatus: 'pending',
-    },
-  }),
   useWorkspaceQuery: () => ({ data: workspace }),
+}))
+
+vi.mock('../../../lib/store', () => ({
+  useDerivedIssueState: () => ({
+    issueId: 'PAN-2842',
+    state: 'in-review',
+    pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'review-requested', checks: 'green', mergeable: true },
+  }),
 }))
 
 vi.mock('../../IssueActionMenu/useIssueActions', () => ({

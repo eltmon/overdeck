@@ -22,55 +22,53 @@ import {
 } from '../../../lib/projects.js';
 import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
-import { readIssueRecordSync, type PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
 import { setProjectVersionSync } from '../../../lib/projects-writer.js';
-import {
-  aggregateGenerationShipStatus,
-  loadShipRecords,
-  publicShipStatus,
-} from '../../../lib/cloister/ship-status.js';
-import { listUatGenerationsSync, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
-import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
+import { listUatGenerations, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { resolveImplicitStaffing } from '../../../lib/agents/staffing.js';
 import { resolveTieredExecutionBlock } from '../../../lib/agents/tier-table.js';
-import { normalizeModelOverrideSync } from '../../../lib/model-validation.js';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
+import {
+  resolveProjectCreateIntent,
+  toPublicProjectIntent,
+  type ProjectCreateInput,
+  type ResolvedProjectIntent,
+} from '../../../lib/projects/create.js';
+import { projectCreateJobRoutesLayer } from './project-create-routes.js';
+import { readProjectJsonBody } from './project-body.js';
 import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
 } from './dashboard-auth.js';
 
-const execAsync = promisify(exec);
-import { extractPrefixSync } from '../../../lib/issue-id.js';
+import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
-import { withConcurrencyLimit } from '../../../lib/concurrency.js';
+import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
 import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodeType } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
+import { getBackendPanesForIssue } from '../services/backend-inventory.js';
+import { getDerivedIssueState } from '../services/derived-issue-state.js';
+import { getShipLog } from '../../../lib/cloister/ship-log.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentRuntimeState, getAgentState } from '../../../lib/agents.js';
 import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
-import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import type { ReviewerRoundMetadata } from './reviewer-tree.js';
 import {
   awaitingInputFromProjection,
   buildSpecialistSessionNodes,
-  readSessionGateFields,
 } from './session-tree-specialists.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { isPlanningComplete } from '../../../lib/xbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
-import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
+import { parseIssueIdFromText } from '../../../lib/resource-utils.js';
 import { isDiscoverableAgentSession } from '../services/resource-discovery.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
@@ -141,11 +139,16 @@ function getSlotWorkSessionPattern(issueLower: string): RegExp {
   return new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`, 'i');
 }
 
+/** PAN-3920: registered workers (`pan worker run`) of this issue. */
+function getWorkerSessionPattern(issueLower: string): RegExp {
+  return new RegExp(`^agent-${escapeRegExp(issueLower)}-worker-(\\d+)$`, 'i');
+}
+
 function issueIdsWithLiveTmuxSessions(sessionNames: ReadonlySet<string>): Set<string> {
   const issueIds = new Set<string>();
   for (const sessionName of sessionNames) {
     if (!isDiscoverableAgentSession(sessionName)) continue;
-    const issueId = parseIssueIdFromTextSync(sessionName);
+    const issueId = parseIssueIdFromText(sessionName);
     if (issueId) issueIds.add(issueId.toLowerCase());
   }
   return issueIds;
@@ -193,7 +196,7 @@ async function collectSessionTreeNodes(
   context: SessionTreeContext,
 ): Promise<SessionNode[]> {
   const issueLower = issueId.toLowerCase();
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
   const agentsDir = join(getOverdeckHome(), 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
@@ -201,6 +204,7 @@ async function collectSessionTreeNodes(
   const strikeAgentId = `strike-${issueLower}`;
   const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
+  const workerSessionPattern = getWorkerSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
@@ -220,7 +224,7 @@ async function collectSessionTreeNodes(
 
   for (const entry of agentEntries) {
     if (!entry.isDirectory()) continue;
-    if (slotWorkSessionPattern.test(entry.name)) {
+    if (slotWorkSessionPattern.test(entry.name) || workerSessionPattern.test(entry.name)) {
       candidateSessionIds.add(entry.name);
     }
   }
@@ -234,7 +238,7 @@ async function collectSessionTreeNodes(
   for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
     // PAN-1908: the agents registry decides whether a session exists — never
     // the ~/.overdeck/agents/<id>/ dir, which janitors remove after sessions end.
-    const state = getAgentStateSync(checkId);
+    const state = getAgentState(checkId);
     if (!state) continue;
 
     try {
@@ -254,9 +258,11 @@ async function collectSessionTreeNodes(
       const awaitingInput = projectedAwaitingInput !== undefined
         ? projectedAwaitingInput
         : context.tmuxSessionNames.has(checkId)
-          ? await Effect.runPromise(detectAwaitingInputForAgent(checkId, { isPlanning }))
+          ? await detectAwaitingInputForAgent(checkId, { isPlanning })
           : null;
-      const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
+      const sessionWorkspacePath = state.role === 'worker' && state.workspace
+        ? state.workspace // a worker runs in its own .swarm worktree or the workspace itself
+        : getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
 
       // Terminal-end signal: endedAt is populated only when the session has
@@ -298,7 +304,6 @@ async function collectSessionTreeNodes(
         harness: state.harness,
         deliveryMethod: state.deliveryMethod,
         planningComplete: isPlanning ? planningFinished : undefined,
-        ...await readSessionGateFields(checkId, state),
       });
     } catch {
       // skip malformed state
@@ -359,7 +364,14 @@ async function collectSessionTreeNodes(
     }
   }
 
-  const centralStatus = getReviewStatusSync(issueId.toUpperCase());
+  // PAN-3917 FR-6: there is no central review-status record. Specialist rows
+  // are the issue's own panes plus the PR's review state; the ship row comes
+  // from the in-memory ship log the merge writes as it runs.
+  const shipLog = getShipLog(issueId.toUpperCase());
+  const [treeDerived, treePanes] = await Promise.all([
+    getDerivedIssueState(issueId),
+    getBackendPanesForIssue(issueId),
+  ]);
 
   // Lint node (PAN-2665): the verification quality-gate run, shown between
   // Work and Review (TYPE_PRIORITY orders it client-side). Unlike agent nodes
@@ -369,7 +381,6 @@ async function collectSessionTreeNodes(
     workspacePath,
     issueLower,
     includeTranscripts: true,
-    centralStatus: centralStatus ?? null,
   });
   if (lintSection) {
     sections.push({
@@ -378,7 +389,6 @@ async function collectSessionTreeNodes(
     });
   }
 
-  const statusHistory = centralStatus?.history ?? [];
   sections.push(...await buildSpecialistSessionNodes({
     issueId,
     fallbackProjectKey: issuePrefix.toLowerCase(),
@@ -386,38 +396,40 @@ async function collectSessionTreeNodes(
     projectPath,
     tmuxSessionNames: context.tmuxSessionNames,
     agentSnapshotsById: context.agentSnapshotsById,
-    centralStatus,
+    derived: treeDerived,
+    panes: treePanes,
   }));
 
-  if (statusHistory.length > 0) {
-    const mergeEntries = statusHistory.filter((entry) => entry.type === 'merge');
-    const latestMerge = mergeEntries[mergeEntries.length - 1];
-    if (latestMerge) {
-      const shipSessionName = `agent-${issueLower}-ship`;
-      const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
-      const shipState = getAgentStateSync(shipSessionName);
-      const shipJsonlPath = shipIsLive || shipState ? await resolveJsonlPath(shipSessionName, workspacePath) : null;
-      if (shipIsLive || shipJsonlPath) {
-        const shipAwaitingInput = awaitingInputFromProjection(shipSessionName, context.agentSnapshotsById);
-        const shipSnapshot = context.agentSnapshotsById?.get(shipSessionName);
-        sections.push({
-          type: 'ship',
-          sessionId: shipSessionName,
-          model: 'specialist',
-          startedAt: latestMerge.timestamp,
-          endedAt: undefined,
-          duration: 0,
-          status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
-          presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
-          awaitingInput: shipAwaitingInput !== undefined ? (shipAwaitingInput !== null) : false,
-          awaitingInputPrompt: shipAwaitingInput?.prompt,
-          awaitingInputReason: shipAwaitingInput?.reason,
-          pendingInputKinds: shipSnapshot?.pendingInputKinds ? [...shipSnapshot.pendingInputKinds] : undefined,
-          hasJsonl: !!shipJsonlPath,
-          tmuxSession: shipIsLive ? shipSessionName : undefined,
-          ...await readSessionGateFields(shipSessionName),
-        });
-      }
+  // PAN-3020: a ship row is a real ship agent — live, or one that ran and left
+  // state behind. Probing the synthetic `agent-<issue>-ship` id unconditionally
+  // grows a phantom conversation row for every API-driven merge.
+  {
+    const shipSessionName = `agent-${issueLower}-ship`;
+    const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
+    const shipState = getAgentState(shipSessionName);
+    const shipJsonlPath = shipIsLive || shipState
+      ? await resolveJsonlPath(shipSessionName, workspacePath)
+      : null;
+    if (shipIsLive || shipJsonlPath) {
+      const shipRunning = shipIsLive && shipLog?.step !== undefined && shipLog.step !== 'merged';
+      const shipAwaitingInput = awaitingInputFromProjection(shipSessionName, context.agentSnapshotsById);
+      const shipSnapshot = context.agentSnapshotsById?.get(shipSessionName);
+      sections.push({
+        type: 'ship',
+        sessionId: shipSessionName,
+        model: 'specialist',
+        startedAt: shipLog?.startedAt ?? shipState?.startedAt ?? new Date().toISOString(),
+        endedAt: undefined,
+        duration: 0,
+        status: normalizeAgentStatus(shipRunning ? 'running' : 'completed'),
+        presence: shipIsLive ? (shipRunning ? 'active' : 'idle') : 'ended',
+        awaitingInput: shipAwaitingInput !== undefined ? (shipAwaitingInput !== null) : false,
+        awaitingInputPrompt: shipAwaitingInput?.prompt,
+        awaitingInputReason: shipAwaitingInput?.reason,
+        pendingInputKinds: shipSnapshot?.pendingInputKinds ? [...shipSnapshot.pendingInputKinds] : undefined,
+        hasJsonl: !!shipJsonlPath,
+        tmuxSession: shipIsLive ? shipSessionName : undefined,
+      });
     }
   }
   // PAN-2053: attach read-only model-origin so the right-click MODEL inspector works
@@ -568,8 +580,8 @@ export async function fetchProjectSessionTree(
       issueId: issueLower.toUpperCase(),
     }));
 
-    const results = await Effect.runPromise(withConcurrencyLimit(
-      featureCandidates.map((c) => Effect.promise(async () => {
+    const results = await withConcurrencyLimitPromise(
+      featureCandidates.map((c) => async () => {
         const agentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}`);
         const planningAgentDir = join(getOverdeckHome(), 'agents', `planning-${c.issueLower}`);
         const planRunAgentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}-plan`);
@@ -597,9 +609,9 @@ export async function fetchProjectSessionTree(
           console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
           return null;
         }
-      })),
+      }),
       15,
-    ));
+    );
 
     features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
   }
@@ -656,11 +668,10 @@ const getAllSessionTreesRoute = HttpRouter.add(
 
 // ─── Compose route into a single Layer ────────────────────────────────────────
 
-export const readProjectJsonBody = Effect.gen(function* () {
-  const request = yield* HttpServerRequest.HttpServerRequest;
-  const text = yield* request.text;
-  try { return text ? JSON.parse(text) : {}; } catch { return {}; }
-});
+// Defined in project-body.ts so project-create-routes.ts can use it without
+// importing this module back (the circular-dependency guard refuses that cycle).
+// Re-exported here because existing consumers import it from this path.
+export { readProjectJsonBody };
 
 // ─── Route: GET /api/projects/:projectKey/release-status ─────────────────────
 // PAN-2555: release/publish pipeline visibility — npm dist-tags, release
@@ -687,22 +698,17 @@ interface ProjectVersionSyncRouteDeps {
   getProject: (key: string) => ProjectConfig | null;
   listProjectKeys: () => string[];
   listPromotedGenerations: (projectRoot: string) => UatGeneration[];
-  readOutcome: (project: ProjectConfig, generation: UatGeneration) => Promise<PanIssueShipRecord | null>;
   writeVersionSync: typeof setProjectVersionSync;
 }
 
 const defaultProjectVersionSyncRouteDeps: ProjectVersionSyncRouteDeps = {
   getProject: key => getProjectSync(key) ?? null,
   listProjectKeys: () => listProjectsSync().map(entry => entry.key),
-  listPromotedGenerations: projectRoot => listUatGenerationsSync({
+  listPromotedGenerations: projectRoot => listUatGenerations({
     projectRoot: resolve(projectRoot),
     statuses: ['promoted'],
     limit: 1,
   }),
-  readOutcome: async (project, generation) => aggregateGenerationShipStatus(
-    generation,
-    await loadShipRecords(project, [generation]),
-  ),
   writeVersionSync: setProjectVersionSync,
 };
 
@@ -713,11 +719,11 @@ export async function getProjectVersionSyncPayload(
   const project = deps.getProject(projectKey);
   if (!project) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
 
+  // PAN-3917 D6: ship records are gone — a shipped version is a git tag plus a
+  // GitHub release. `lastOutcome` stays in the shape (W7 renders it) but is
+  // null until the release engine exposes a tag-derived read.
   const generation = deps.listPromotedGenerations(project.path)[0];
-  const lastOutcome = generation
-    ? publicShipStatus(await deps.readOutcome(project, generation))
-    : null;
-  return { status: 200, body: { config: project.version_sync ?? null, lastOutcome } };
+  return { status: 200, body: { config: project.version_sync ?? null, lastOutcome: null, generation: generation?.name ?? null } };
 }
 
 export async function putProjectVersionSyncPayload(
@@ -828,42 +834,36 @@ const getIssueSwarmPolicyRoute = HttpRouter.add('GET', '/api/issues/:issueId/swa
   const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
   const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
   if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
-  return jsonResponse({ configured: readIssueRecordSync(project, issueId)?.swarm?.policy ?? null, resolved: resolveSwarmPolicy(issueId) });
-})));
-const postIssueSwarmPolicyRoute = HttpRouter.add('POST', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
-  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase(); const body = (yield* readProjectJsonBody) as { value?: SwarmPolicyLayer | null };
-  const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
-  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
-  const record = readIssueRecordSync(project, issueId); if (!record) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
-  yield* Effect.promise(() => updateIssueRecord(project, issueId, (current) => ({ ...current, swarm: { ...current.swarm, policy: body.value ?? undefined } })));
-  return jsonResponse({ configured: body.value ?? null, resolved: resolveSwarmPolicy(issueId) });
+  // PAN-3917: the per-issue swarm policy layer lived on the issue record and
+  // had no other owner, so it is gone. The resolved policy is the project's,
+  // then the global default. POST /api/issues/:issueId/swarm-policy is deleted;
+  // set the layer on the project instead.
+  return jsonResponse({ configured: null, resolved: resolveSwarmPolicy(issueId) });
 })));
 
-function getIssueStaffingPayload(
-  project: NonNullable<ReturnType<typeof getProjectSync>>,
+async function getIssueStaffingPayload(
   issueId: string,
   planMetadata: { [key: string]: unknown } | undefined,
 ) {
-  const record = readIssueRecordSync(project, issueId);
   const config = loadConfigSync().config;
-  const block = resolveTieredExecutionBlock(
-    config.tieredExecution,
-    planMetadata,
-    record?.tieredExecutionOverride ?? null,
-  );
+  // PAN-3917: `tieredExecutionOverride` and `workModel` lived on the issue
+  // record. Neither is derivable and neither had another home, so the per-issue
+  // override is gone: staffing resolves from the plan's own metadata and the
+  // configured defaults. `recordedModel` is now the live pane's `model` token
+  // (FR-5), which is the truth the record was always trying to mirror.
+  const block = resolveTieredExecutionBlock(config.tieredExecution, planMetadata, null);
   const implicit = resolveImplicitStaffing(config, `work:${issueId.toLowerCase()}`);
-  // PAN-2686: recordedModel reflects the most recent work-agent run, so prefer
-  // the live agent state over the permanent record (which can lag a
-  // restart-fresh respawn). The mid-spawn placeholder is not authoritative.
-  const liveModel = getAgentStateSync(`agent-${issueId.toLowerCase()}`)?.model;
+  const panes = await getBackendPanesForIssue(issueId);
+  const workPane = panes.find((pane) => pane.role === 'work') ?? panes[0];
+  const liveModel = workPane && workPane.model !== 'unknown' ? workPane.model : null;
   return {
-    override: { workModel: record?.workModel ?? null },
+    override: { workModel: null },
     tieredExecution: block,
     resolved: {
-      model: record?.workModel ?? implicit.model,
+      model: implicit.model,
       tiered: block.effective,
-      source: record?.workModel ? 'issue' : 'default',
-      recordedModel: (liveModel && liveModel !== 'pending-work-spawn' ? liveModel : undefined) ?? record?.model ?? null,
+      source: 'default',
+      recordedModel: liveModel,
     },
   };
 }
@@ -876,45 +876,17 @@ const getIssueStaffingRoute = HttpRouter.add('GET', '/api/issues/:issueId/staffi
   const spec = yield* findSpecByIssue(project.path, issueId).pipe(
     Effect.catch(() => Effect.succeed(null)),
   );
-  return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
+  return jsonResponse(yield* Effect.promise(() => getIssueStaffingPayload(issueId, spec?.document.plan.metadata)));
 })));
 
-const postIssueStaffingRoute = HttpRouter.add('POST', '/api/issues/:issueId/staffing', httpHandler(Effect.gen(function* () {
-  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
-  const body = (yield* readProjectJsonBody) as { workModel?: unknown };
-  const resolved = resolveProjectFromIssueSync(issueId);
-  const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
-  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
-  if (!readIssueRecordSync(project, issueId)) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
-  let workModel: string | undefined;
-  try {
-    workModel = normalizeModelOverrideSync(body.workModel);
-  } catch (error) {
-    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
-  }
-  yield* Effect.promise(() => updateIssueRecord(project, issueId, (record) => { record.workModel = workModel; }));
-  const spec = yield* findSpecByIssue(project.path, issueId).pipe(
-    Effect.catch(() => Effect.succeed(null)),
-  );
-  return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
-})));
+// ─── Route: POST /api/projects/resolve ──────────────────────────────────────
+// PAN-3836: dry-run resolve intent before POST /api/projects. Uses the
+// resolve-before-create pattern from PAN-3330 (workspaces) — dashboard /projects/new
+// calls this endpoint on every keystroke to show findings without creating anything.
 
-// ─── Home-boundary guard (shared by POST /api/projects and GET /api/fs/list-dirs) ──
-
-async function buildHomeGuard(): Promise<(p: string) => boolean> {
-  const home = homedir();
-  let ch: string;
-  try { ch = await realpath(home); }
-  catch { ch = home; }
-  return (p: string) => p === ch || p.startsWith(ch.endsWith(sep) ? ch : `${ch}${sep}`);
-}
-
-// ─── Route: POST /api/projects ───────────────────────────────────────────────
-// PAN-1970: register a project in mode='existing' or create one in mode='new'.
-
-const postProjectsRoute = HttpRouter.add(
+const postProjectsResolveRoute = HttpRouter.add(
   'POST',
-  '/api/projects',
+  '/api/projects/resolve',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnsafeDashboardMutationRequest(request);
@@ -922,150 +894,41 @@ const postProjectsRoute = HttpRouter.add(
 
     const body = (yield* readProjectJsonBody) as {
       mode?: unknown;
+      url?: unknown;
       path?: unknown;
       parentDir?: unknown;
       name?: unknown;
+      issuePrefix?: unknown;
     };
 
-    function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9-]/g, '-'); }
-
-    // ── mode='existing' ──────────────────────────────────────────────────────
-
-    if (body.mode === 'existing') {
-      const rawPath = body.path;
-      if (typeof rawPath !== 'string' || !rawPath.trim()) {
-        return jsonResponse({ error: 'path is required' }, { status: 400 });
-      }
-      if (!isAbsolute(rawPath)) {
-        return jsonResponse({ error: 'path must be absolute' }, { status: 400 });
-      }
-      const nameOpt = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : undefined;
-      return yield* Effect.promise(async () => {
-        try { await access(rawPath); }
-        catch { return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 }); }
-
-        // Canonicalize and enforce home-directory boundary (rejects symlink escapes).
-        const withinHome = await buildHomeGuard();
-        let canonicalPath: string;
-        try { canonicalPath = await realpath(rawPath); }
-        catch { return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 }); }
-        if (!withinHome(canonicalPath)) {
-          return jsonResponse({ error: 'path is outside home directory' }, { status: 400 });
-        }
-
-        try {
-          const result = await registerProjectFromPath({ path: canonicalPath, name: nameOpt });
-          return jsonResponse({ key: result.key, name: result.config.name, path: result.config.path });
-        } catch (err) {
-          if (err instanceof DuplicateProjectError) {
-            return jsonResponse(
-              { error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath },
-              { status: 409 },
-            );
-          }
-          throw err;
-        }
-      });
+    // Validate mode
+    const mode = body.mode;
+    if (mode !== 'clone' && mode !== 'existing' && mode !== 'new') {
+      return jsonResponse({ error: "mode must be 'clone', 'existing', or 'new'" }, { status: 400 });
     }
 
-    // ── mode='new' ───────────────────────────────────────────────────────────
-
-    if (body.mode === 'new') {
-      const rawName = body.name;
-      if (typeof rawName !== 'string' || !rawName.trim()) {
-        return jsonResponse({ error: 'name is required for mode=new' }, { status: 400 });
-      }
-      const rawParent = body.parentDir;
-      if (typeof rawParent !== 'string' || !rawParent.trim()) {
-        return jsonResponse({ error: 'parentDir is required for mode=new' }, { status: 400 });
-      }
-      if (!isAbsolute(rawParent)) {
-        return jsonResponse({ error: 'parentDir must be absolute' }, { status: 400 });
-      }
-
-      const name = rawName.trim();
-      const key = slugify(name);
-
-      // Reject names whose slug contains no alphanumeric characters (e.g., "!!!").
-      if (!key.replace(/-/g, '')) {
-        return jsonResponse({ error: 'Name must contain at least one alphanumeric character' }, { status: 400 });
-      }
-
-      // Dup-check BEFORE any fs work.
-      if (getProjectSync(key)) {
-        return jsonResponse(
-          { error: `project key '${key}' is already registered` },
-          { status: 409 },
-        );
-      }
-
-      return yield* Effect.promise(async () => {
-        // Canonicalize parentDir and enforce home-directory boundary (rejects symlink escapes).
-        // parentDir need not exist yet — the default ~/Projects home for new projects is
-        // created on demand. Climb to the nearest existing ancestor, canonicalize THAT (so a
-        // symlinked ancestor pointing outside home is still rejected), then re-anchor the
-        // requested parent onto it; mkdir -p below creates the full chain. Because `probe` is
-        // always an ancestor of `rawParentResolved`, the re-anchored suffix can never contain
-        // '..', so the home-boundary check cannot be escaped by a non-existent tail.
-        const withinHome = await buildHomeGuard();
-        const rawParentResolved = resolve(normalize(rawParent));
-        let probe = rawParentResolved;
-        let existingAncestor: string | null = null;
-        for (;;) {
-          try { existingAncestor = await realpath(probe); break; }
-          catch { /* probe doesn't exist — climb toward the filesystem root */ }
-          const up = dirname(probe);
-          if (up === probe) break; // reached the root without finding an existing dir
-          probe = up;
-        }
-        if (!existingAncestor || !withinHome(existingAncestor)) {
-          return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
-        }
-        const suffix = relative(probe, rawParentResolved);
-        const canonicalParent = suffix ? resolve(existingAncestor, suffix) : existingAncestor;
-        if (!withinHome(canonicalParent)) {
-          return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
-        }
-
-        const target = join(canonicalParent, key);
-
-        // If target exists and is non-empty, reject with no fs change.
-        let targetExists = false;
-        try {
-          await access(target);
-          targetExists = true;
-        } catch { /* target doesn't exist yet */ }
-
-        if (targetExists) {
-          const entries = await readdir(target).catch(() => []);
-          if (entries.length > 0) {
-            return jsonResponse(
-              { error: `target directory already exists and is non-empty: ${target}` },
-              { status: 409 },
-            );
-          }
-        }
-
-        // Create directory and git-init.
-        await mkdir(target, { recursive: true });
-        await execAsync('git init', { cwd: target });
-
-        try {
-          const result = await registerProjectFromPath({ path: target, name });
-          return jsonResponse({ key: result.key, name: result.config.name, path: result.config.path });
-        } catch (err) {
-          if (err instanceof DuplicateProjectError) {
-            return jsonResponse(
-              { error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath },
-              { status: 409 },
-            );
-          }
-          throw err;
-        }
-      });
+    // Validate malformed/empty body
+    if (!body || Object.keys(body).length === 0) {
+      return jsonResponse({ error: 'request body is required' }, { status: 400 });
     }
 
-    return jsonResponse({ error: "mode must be 'existing' or 'new'" }, { status: 400 });
+    const input: ProjectCreateInput = {
+      mode,
+      url: typeof body.url === 'string' ? body.url : undefined,
+      path: typeof body.path === 'string' ? body.path : undefined,
+      parentDir: typeof body.parentDir === 'string' ? body.parentDir : undefined,
+      name: typeof body.name === 'string' ? body.name : undefined,
+      issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
+      homeBoundary: true,
+      // No refreshRemote: this route is called once per settled keystroke, so it
+      // must read the 60 s probe memo rather than force a fresh `git ls-remote`
+      // every time. POST /api/projects still refreshes before it writes.
+    };
+
+    const intent = yield* Effect.promise(() => resolveProjectCreateIntent(input));
+    // Never the raw intent: its cloneUrl is the operator's transport URL and can
+    // carry credentials the browser must not get back.
+    return jsonResponse(toPublicProjectIntent(intent));
   })),
 );
 
@@ -1081,10 +944,12 @@ export const projectsRouteLayer = Layer.mergeAll(
   getProjectSwarmPolicyRoute,
   postProjectSwarmPolicyRoute,
   getIssueSwarmPolicyRoute,
-  postIssueSwarmPolicyRoute,
   getIssueStaffingRoute,
-  postIssueStaffingRoute,
-  postProjectsRoute,
+  postProjectsResolveRoute,
+  // The create-job routes live in project-create-routes.ts (file-size ratchet);
+  // they are merged first so their literal path segments win over
+  // /api/projects/:projectKey/*.
+  projectCreateJobRoutesLayer,
 );
 
 export default projectsRouteLayer;

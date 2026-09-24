@@ -943,6 +943,23 @@ A project with extra test roots (e.g. overdeck's `src/dashboard/frontend`) appen
 
 Keep e2e, Playwright, and other heavy browser tests out of the local per-change gate. Put them in CI-only jobs or an explicit `@slow` tier so local agent verification stays fast and targeted.
 
+### Tests on CI (`verification.tests`)
+
+A project with CI does not run its `quality_gates.test` gate on the host at all (PAN-3965): the verification gate runs typecheck, lint, and the project's other non-`test` gates, and the CI test job on the PR head is the test gate. One full-suite run per push, on CI.
+
+```yaml
+verification:
+  tests: ci      # ci | local
+```
+
+| Value | Behavior |
+| --- | --- |
+| `ci` | Skip the local `test` gate. Merge readiness requires the PR checks green; a red CI job named `test` (or `tests`, `test (22)`, …) is journaled as `verification.failed { failedCheck: 'test' }` and sent to the work agent as verification feedback. |
+| `local` | Run `quality_gates.test` on the host during verification, as before. |
+| unset | `ci` when the project has `github_repo` and a GitHub Actions workflow that runs on pull requests and defines a job named `test`/`tests`/`test-*`/`test (…)`, else `local`. The verification artifact's `testsMode` records the mode and the reason. |
+
+Agent feedback for a red CI test job comes from the GitHub webhooks, so a GitLab project that sets `ci` gets the pipeline merge gate but no automatic feedback message. See [PIPELINE-GATES.md](PIPELINE-GATES.md#one-full-suite-run-per-push-on-ci-pan-3965).
+
 ### Cloudflare Tunnels
 
 Automatically creates/deletes Cloudflare tunnel ingress routes so workspaces are accessible via public URLs (e.g., `api-feature-min-123.mindyournow.com`).

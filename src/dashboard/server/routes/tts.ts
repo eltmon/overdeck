@@ -7,9 +7,11 @@ import {
   addVoice as addStoredVoice,
   clearVoices as clearStoredVoices,
   deleteVoice as deleteStoredVoice,
+  getTtsVoicesPath,
   loadVoices as loadStoredVoices,
   type TtsVoice,
 } from '../../../lib/tts-voices.js';
+import { FsError } from '../../../lib/errors.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getTtsDaemonAuthHeaders, getTtsDaemonStatus, startTtsDaemon, type TtsDaemonStartResult, type TtsDaemonStatus } from '../../../lib/tts-daemon.js';
 
@@ -40,7 +42,7 @@ export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promi
   };
 
   if (!options.fetch) {
-    const status = await Effect.runPromise(getTtsDaemonStatus(config));
+    const status = await getTtsDaemonStatus(config);
     return { ...status, ttsEnabled: runtimeConfig.enabled };
   }
 
@@ -162,9 +164,21 @@ export function toPublicVoice(voice: TtsVoice): PublicTtsVoice {
   return publicVoice;
 }
 
+/**
+ * Run a voice-store call and map a rejection to the `FsError` (operation + store
+ * path) that a failed request's 500 body has always shown.
+ */
+async function voiceStore<T>(operation: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (cause) {
+    throw new FsError({ path: getTtsVoicesPath(), operation, cause });
+  }
+}
+
 export async function listTtsVoices(store: TtsVoiceStore = {}): Promise<PublicTtsVoice[]> {
-  const loadVoices = store.loadVoices ?? loadStoredVoices;
-  const voices = await Effect.runPromise(loadVoices());
+  const loadVoices = store.loadVoices ?? (() => voiceStore('loadVoices', loadStoredVoices));
+  const voices = await loadVoices();
   return voices.map(toPublicVoice);
 }
 
@@ -250,24 +264,24 @@ export function parseExtractEmbeddingInput(body: unknown): ExtractEmbeddingInput
 }
 
 export async function createTtsVoice(input: CreateTtsVoiceInput, store: TtsVoiceStore = {}): Promise<TtsVoice> {
-  const addVoice = store.addVoice ?? addStoredVoice;
-  return (await Effect.runPromise(addVoice(input)));
+  const addVoice = store.addVoice ?? ((voice: CreateTtsVoiceInput) => voiceStore('addVoice', () => addStoredVoice(voice)));
+  return (await addVoice(input));
 }
 
 export async function removeTtsVoice(id: string, store: TtsVoiceStore = {}): Promise<boolean> {
-  const deleteVoice = store.deleteVoice ?? deleteStoredVoice;
-  return (await Effect.runPromise(deleteVoice(id)));
+  const deleteVoice = store.deleteVoice ?? ((voiceId: string) => voiceStore('deleteVoice', () => deleteStoredVoice(voiceId)));
+  return (await deleteVoice(id));
 }
 
 export async function clearTtsVoices(store: TtsVoiceStore = {}): Promise<number> {
-  const clearVoices = store.clearVoices ?? clearStoredVoices;
-  return (await Effect.runPromise(clearVoices()));
+  const clearVoices = store.clearVoices ?? (() => voiceStore('clearVoices', clearStoredVoices));
+  return (await clearVoices());
 }
 
 export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps = {}): Promise<SpeakTtsResponse> {
   const result = deps.resolveAndSpeak
     ? await deps.resolveAndSpeak(input)
-    : await Effect.runPromise(resolveAndSpeak(input, { config: getTtsRuntimeConfig() }));
+    : await resolveAndSpeak(input, { config: getTtsRuntimeConfig() });
   if (result === 'daemon-unavailable') {
     return {
       status: 503,
@@ -282,7 +296,7 @@ export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps
 }
 
 export async function startTtsDaemonFromDashboard(): Promise<TtsDaemonStartResult> {
-  return (await Effect.runPromise(startTtsDaemon({ config: getTtsRuntimeConfig(), detach: true, timeoutMs: 120_000 })));
+  return (await startTtsDaemon({ config: getTtsRuntimeConfig(), detach: true, timeoutMs: 120_000 }));
 }
 
 export async function extractTtsEmbedding(
@@ -303,7 +317,7 @@ export async function extractTtsEmbedding(
   try {
     const response = await (deps.fetch ?? fetch)(`http://${host}:${port}/extract-embedding`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...await Effect.runPromise(getTtsDaemonAuthHeaders()) },
+      headers: { 'Content-Type': 'application/json', ...await getTtsDaemonAuthHeaders() },
       body: JSON.stringify(input),
       signal: controller.signal,
     });

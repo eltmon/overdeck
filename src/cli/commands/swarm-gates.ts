@@ -8,8 +8,9 @@ import { createWorkspace } from '../../lib/workspace-manager.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { analyzeSwarmReadiness } from '../../lib/xbrief/swarm-readiness.js';
-import { applyStatusOverrides } from '../../lib/xbrief/io.js';
-import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
+import { applyItemStatuses } from '../../lib/xbrief/io.js';
+import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
+import { readItemStatusesAsync } from '../../lib/xbrief/continue-state.js';
 import { readSwarmHold } from '../../lib/cloister/deacon-swarm-record.js';
 import {
   classifyInFlightSlots,
@@ -19,7 +20,7 @@ import {
   mergeReadySlots,
   type ClassifiedSwarmSlot,
 } from '../../lib/cloister/deacon-swarm.js';
-import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
+import { reconcileSlotState } from '../../lib/cloister/swarm-slot-reconcile.js';
 
 type ConsoleLike = Pick<typeof console, 'log' | 'error'>;
 
@@ -112,9 +113,9 @@ export async function swarmDispatchCommand(
     return { ok: false, actions: [], workspacePath };
   }
 
-  const overrides = readIssueRecordForWorkspaceSync(workspacePath, issue)?.statusOverrides;
-  const doc = overrides && Object.keys(overrides).length > 0
-    ? applyStatusOverrides(loaded.doc, overrides)
+  const itemStatuses = await readItemStatusesAsync(resolvePlanHome(workspacePath), issue);
+  const doc = Object.keys(itemStatuses).length > 0
+    ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;
   const readiness = deps.analyzeSwarmReadiness(doc);
   const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc);
@@ -160,11 +161,11 @@ export async function swarmMergeCommand(
     return { ok: false, actions: [], workspacePath };
   }
 
-  const overrides = readIssueRecordForWorkspaceSync(workspacePath, issue)?.statusOverrides;
-  const doc = overrides && Object.keys(overrides).length > 0
-    ? applyStatusOverrides(loaded.doc, overrides)
+  const itemStatuses = await readItemStatusesAsync(resolvePlanHome(workspacePath), issue);
+  const doc = Object.keys(itemStatuses).length > 0
+    ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;
-  const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc, { statusOverrides: overrides });
+  const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc, { itemStatuses });
   const slot = reconciled.inFlight.find(candidate => candidate.slotIndex === slotIndex);
   if (!slot) {
     deps.console.error(chalk.red(`No in-flight swarm slot ${slotIndex} exists for ${issue}.`));
@@ -193,11 +194,11 @@ async function ensureFeatureWorkspace(issueId: string, project: ResolvedProjectL
   const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
   if (existsSync(workspacePath)) return workspacePath;
   const projectConfig: ProjectConfig = { name: project.projectName, path: project.projectPath };
-  const result = await Effect.runPromise(createWorkspace({
+  const result = await createWorkspace({
     projectConfig,
     featureName: issueId.toLowerCase(),
     startDocker: false,
-  }));
+  });
   if (!result.success) {
     throw new Error(`Failed to create workspace for ${issueId}: ${result.errors.join('; ') || 'unknown error'}`);
   }

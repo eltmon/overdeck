@@ -70,21 +70,21 @@ const initialLayersResponse: ContextLayersResponse = {
     {
       harness: 'claude-code',
       layerKind: 'global',
-      label: 'Claude Code · global',
-      path: '/home/user/.claude/CLAUDE.md',
+      label: 'Claude · managed launch',
+      path: '/home/user/.overdeck/context/claude-global.md',
       exists: true,
-      hasManagedRegion: true,
-      hasUserContent: true,
+      deliveryChannel: 'claude-append-system-prompt',
+      byteCount: 42,
+      sha256: 'abc123',
     },
     {
       harness: 'claude-code',
-      layerKind: 'project',
-      projectKey: 'overdeck',
-      label: 'Claude Code · overdeck',
-      path: '/repo/overdeck/CLAUDE.md',
+      layerKind: 'global',
+      label: 'Codex · managed launch',
+      path: '/home/user/.overdeck/context/codex-global.md',
       exists: true,
-      hasManagedRegion: true,
-      hasUserContent: false,
+      deliveryChannel: 'codex-developer-instructions',
+      byteCount: 38,
     },
   ],
 };
@@ -125,6 +125,11 @@ function installFetchHandler() {
         previews: {
           'claude-code': content.includes('claude-only') ? 'shared claude-only' : `Claude preview: ${content}`,
           ohmypi: content.includes('pi-only') ? 'shared pi-only' : `oh-my-pi preview: ${content}`,
+          codex: `Codex preview: ${content}`,
+          acp: `ACP preview: ${content}`,
+          muse: `Muse preview: ${content}`,
+          opencode: `OpenCode preview: ${content}`,
+          'kimi-code': `Kimi preview: ${content}`,
           fullPrompt: `Full injected prompt\n\n${content}\n\nMemory/status/briefing placeholders`,
         },
         diagnostics: content.includes('broken-harness')
@@ -215,12 +220,42 @@ describe('ContextPage', () => {
     vi.useRealTimers();
 
     await waitFor(() => expect(screen.getByText(/shared claude-only/)).toBeTruthy());
-    fireEvent.click(screen.getByText('oh-my-pi output'));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview for agent' }));
+    fireEvent.change(screen.getByLabelText('Preview for'), { target: { value: 'ohmypi' } });
     expect(screen.getByText(/shared pi-only/)).toBeTruthy();
-    fireEvent.click(screen.getByText('Full injected prompt'));
+    fireEvent.change(screen.getByLabelText('Preview for'), { target: { value: 'fullPrompt' } });
     expect(screen.getByText(/Memory\/status\/briefing placeholders/)).toBeTruthy();
     expect(fetchPaths('PUT')).toEqual([]);
     expect(fetchPaths('POST').filter((path) => path === '/api/context/sync')).toEqual([]);
+  });
+
+  it('offers every harness and preserves source drafts when switching views', async () => {
+    renderWithQuery(<ContextPage />);
+    const editor = await screen.findByLabelText('Context markdown editor');
+    vi.useFakeTimers();
+    fireEvent.change(editor, { target: { value: 'draft instructions' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(350); });
+    vi.useRealTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Preview for agent' }));
+    const select = screen.getByLabelText('Preview for');
+    for (const [value, text] of [['codex', 'Codex'], ['acp', 'ACP'], ['kimi-code', 'Kimi'], ['muse', 'Muse'], ['opencode', 'OpenCode']]) {
+      fireEvent.change(select, { target: { value } });
+      expect(screen.getByText(`${text} preview: draft instructions`)).toBeVisible();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Edit source' }));
+    expect(screen.getByDisplayValue('draft instructions')).toBeVisible();
+    expect(fetchPaths('PUT')).toEqual([]);
+  });
+
+  it('describes machine scope and refreshes outputs without requiring an edit', async () => {
+    renderWithQuery(<ContextPage />);
+    await screen.findByLabelText('Context markdown editor');
+    expect(screen.getByRole('radio', { name: 'Machine context' })).toBeChecked();
+    expect(screen.getAllByText('Every project on this machine').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText('Generated output files'));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh outputs' }));
+    await waitFor(() => expect(syncCount).toBe(1));
+    expect(fetchPaths('PUT')).toEqual([]);
   });
 
   it('shows validation diagnostics returned by preview', async () => {
@@ -265,7 +300,7 @@ describe('ContextPage', () => {
     const editor = await screen.findByLabelText('Context markdown editor');
 
     fireEvent.change(editor, { target: { value: 'updated global context' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save & Sync' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save & refresh outputs' }));
 
     await waitFor(() => expect(syncCount).toBe(1));
     const writePaths = fetchMock.mock.calls
@@ -279,7 +314,7 @@ describe('ContextPage', () => {
     const editor = await screen.findByLabelText('Context markdown editor');
 
     fireEvent.change(editor, { target: { value: 'fail-sync' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save & Sync' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save & refresh outputs' }));
 
     expect(await screen.findByText('Sync failed')).toBeTruthy();
     expect(screen.getByDisplayValue('fail-sync')).toBeTruthy();

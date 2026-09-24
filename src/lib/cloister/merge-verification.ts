@@ -1,13 +1,11 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
-import { getMergeSetSync } from '../merge-set.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { getMergeSet } from '../merge-set.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { assessMergeCompleteness, hasPositiveMergedEvidence } from './merge-completeness.js';
-import type { VerificationRunnerOutcome } from './verification-types.js';
 
 const execAsync = promisify(exec);
 
@@ -27,9 +25,7 @@ export interface VerifiedMergedRepo {
 }
 
 export interface PostMergeLifecycleOptions {
-  skipDeploy?: boolean;
   allowVerifiedNoPrMerge?: boolean;
-  markReviewPassed?: boolean;
   verifiedMergedRef?: string;
   /**
    * Per-repo merge evidence for a batch promotion that spans several repos.
@@ -39,54 +35,6 @@ export interface PostMergeLifecycleOptions {
    * target branches other than main.
    */
   verifiedMergedRepos?: readonly VerifiedMergedRepo[];
-}
-
-type MergeStatus = 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-
-type MergeStateBeforeAttempt = {
-  mergeStatus?: MergeStatus;
-  mergeStep?: string;
-  mergeNotes?: string;
-} | null | undefined;
-
-type PostRebaseVerificationDeferralDeps = {
-  appendShipLog: (issueId: string, message: string, phase: 'verifying') => void;
-  setReviewStatus: (issueId: string, update: {
-    mergeStatus?: MergeStatus;
-    mergeStep?: string;
-    mergeNotes?: string;
-  }) => unknown;
-  completePendingOperation: (issueId: string, error: string) => void;
-};
-
-export function handlePostRebaseVerificationDeferral(
-  issueId: string,
-  outcome: VerificationRunnerOutcome,
-  _previous: MergeStateBeforeAttempt,
-  deps: PostRebaseVerificationDeferralDeps,
-): {
-  success: false;
-  statusCode: 409;
-  error: string;
-  deferred: true;
-  mergeStatus: 'queued';
-} | null {
-  if (outcome.outcome !== 'deferred') return null;
-  const message = `Post-rebase verification deferred: ${outcome.reason} — merge retries after the deploy.`;
-  deps.appendShipLog(issueId, message, 'verifying');
-  deps.setReviewStatus(issueId, {
-    mergeStatus: 'queued',
-    mergeStep: 'queued',
-    mergeNotes: message,
-  });
-  deps.completePendingOperation(issueId, message);
-  return {
-    success: false,
-    statusCode: 409,
-    error: message,
-    deferred: true,
-    mergeStatus: 'queued',
-  };
 }
 
 function shellQuote(value: string): string {
@@ -153,7 +101,7 @@ async function requireCompletePolyrepoMerge(
   mergedResult: { merged: true; reason: string },
 ): Promise<{ merged: boolean; reason: string }> {
   try {
-    const mergeSet = getMergeSetSync(issueId);
+    const mergeSet = getMergeSet(issueId);
     if (!mergeSet || mergeSet.repos.length <= 1) return mergedResult;
 
     const completeness = await assessMergeCompleteness(issueId);
@@ -207,7 +155,7 @@ export async function verifyMergedBeforeLifecycle(
     return { merged: false, reason: `batch promotion unverified: ${unproven.join('; ')}` };
   }
 
-  const ghResolved = resolveGitHubIssueSync(issueId);
+  const ghResolved = resolveGitHubIssue(issueId);
   if (!ghResolved.isGitHub) {
     try {
       const completeness = await assessMergeCompleteness(issueId);
@@ -228,7 +176,7 @@ export async function verifyMergedBeforeLifecycle(
   const { owner, repo } = ghResolved;
   try {
     if (isGitHubAppConfigured()) {
-      const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
+      const prs = await listPullRequestsForHead(owner, repo, branchName, 'all');
       const mergedPr = prs.find((pr) => pr.merged === true || pr.mergedAt != null);
       if (mergedPr) {
         return requireCompletePolyrepoMerge(issueId, {

@@ -1,20 +1,14 @@
-import { Effect } from 'effect';
 import { randomUUID } from 'node:crypto';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { setCloisterEventStoreProvider, getCloisterService } from '../../lib/cloister/service.js';
 import {
-  resetPatrolHeartbeatForStartup,
-  runPatrol,
+  runDeaconLite,
   setAgentStoppedNotifier,
   setAgentStatusChangedNotifier,
-  setMergeReadyNotifier,
-} from '../../lib/cloister/deacon.js';
+} from '../../lib/cloister/deacon-lite.js';
 import { createDeaconEventClient } from '../../lib/cloister/deacon-event-client.js';
-import { getReviewStatusSync } from '../../lib/review-status.js';
-import { ensureInternalTokenSync } from '../../lib/internal-token.js';
-import { emitReviewStatusChanged } from './review-status-emit.js';
-import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
+import { ensureInternalToken } from '../../lib/internal-token.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 function internalDashboardUrl(): string {
@@ -54,7 +48,7 @@ function buildAgentStatusChangedPayload(
 
 const eventClient = createDeaconEventClient({
   dashboardUrl: internalDashboardUrl(),
-  token: ensureInternalTokenSync(),
+  token: ensureInternalToken(),
 });
 
 function append(event: Omit<DomainEvent, 'sequence'>): void {
@@ -75,7 +69,7 @@ setCloisterEventStoreProvider(() => eventClient);
 setAgentStoppedNotifier((agentId) => {
   void (async () => {
     try {
-      const state = await Effect.runPromise(getAgentState(agentId));
+      const state = getAgentState(agentId);
       if (state) {
         append(domainEvent('agent.heartbeat_dead', { agentId, issueId: state.issueId, sessionId: state.sessionId }));
         // PAN-2633: heartbeat_dead means the deacon has determined the tmux
@@ -94,24 +88,10 @@ setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
   append(domainEvent('agent.status_changed', buildAgentStatusChangedPayload(state, previousStatus, hasLiveTmuxSession)));
 });
 
-setMergeReadyNotifier((issueId) => {
-  const status = getReviewStatusSync(issueId);
-  if (!status) return;
-  try {
-    emitReviewStatusChanged(
-      (event) => append(event as Omit<DomainEvent, 'sequence'>),
-      issueId,
-      status,
-    );
-  } catch (err) {
-    console.error('[deacon-child] Failed to append merge-ready event:', err);
-  }
-});
-
 process.on('message', (message) => {
   if (!message || typeof message !== 'object') return;
   if ((message as { type?: unknown }).type === 'patrol') {
-    void runPatrol().catch((err) => {
+    void runDeaconLite().catch((err) => {
       console.error('[deacon-child] patrol request failed:', err);
     });
     return;
@@ -144,9 +124,6 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   } catch (err) {
     console.error('[deacon-child] gate process reap failed:', err);
   }
-  await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => {
-    console.error('[deacon-child] auto-commit shutdown flush failed:', err);
-  });
   await eventClient.flushNow().catch(() => undefined);
   process.exit(0);
 }
@@ -155,7 +132,6 @@ process.once('SIGTERM', () => void shutdown('SIGTERM'));
 process.once('SIGINT', () => void shutdown('SIGINT'));
 process.once('disconnect', () => void shutdown('SIGTERM'));
 
-resetPatrolHeartbeatForStartup();
 getCloisterService().start().catch((err) => {
   console.error('[deacon-child] Cloister start failed:', err);
   append(domainEvent('activity.entry', {

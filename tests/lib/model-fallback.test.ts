@@ -1,18 +1,44 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  ModelProvider,
-  getModelProviderSync,
-  requiresExternalKeySync,
-  getModelsByProviderSync,
-  isProviderEnabled,
-  applyFallbackSync,
-  getFallbackModelSync,
-  detectEnabledProvidersSync,
-  filterAvailableModelsSync,
-  getAvailableModelsSync,
-} from '../../src/lib/model-fallback.js';
+import { ModelProvider, getModelProvider, getModelsByProvider, isProviderEnabled, applyFallback, getFallbackModel, getAvailableModels  } from '../../src/lib/model-fallback.js';
 import { ModelId } from '../../src/lib/settings.js';
-import { hasModelCapabilitySync, getModelCapabilitySync, getModelEffortLevelsSync, modelSupportsEffortSync, MODEL_CAPABILITIES, modelSupportsImagesSync } from '../../src/lib/model-capabilities.js';
+import { hasModelCapability, getModelCapability, getModelEffortLevels, MODEL_CAPABILITIES, modelSupportsImages } from '../../src/lib/model-capabilities.js';
+import type { EffortLevel } from '../../src/lib/model-capability-types.js';
+
+// Moved here from src/lib/model-fallback.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Filter a list of models to only those available with enabled providers
+ *
+ * @param models List of models to filter
+ * @param enabledProviders Set of enabled provider names
+ * @returns Filtered list of models
+ */
+function filterAvailableModelsSync(
+  models: ModelId[],
+  enabledProviders: Set<ModelProvider>
+): ModelId[] {
+  return models.filter((modelId) => {
+    const provider = getModelProvider(modelId);
+    return isProviderEnabled(provider, enabledProviders);
+  });
+}
+
+// Moved here from src/lib/model-fallback.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Check if a model requires an external API key
+ */
+function requiresExternalKeySync(modelId: ModelId | string): boolean {
+  return getModelProvider(modelId) !== 'anthropic';
+}
+
+// Moved here from src/lib/model-capabilities.ts, which no production code called (PAN-3958 CH-8).
+/**
+ * Whether a model accepts the given effort level. Returns true when the model
+ * has no enumerated effort levels (permissive fallback — see {@link getModelEffortLevels}).
+ */
+function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
+  const levels = getModelEffortLevels(model);
+  return levels === undefined || levels.length === 0 || levels.includes(effort);
+}
 
 describe('model-fallback', () => {
   // Spy on console.warn to test warning logs
@@ -28,25 +54,25 @@ describe('model-fallback', () => {
 
   describe('getModelProvider', () => {
     it('should return anthropic for Claude models', () => {
-      expect(getModelProviderSync('claude-opus-4-6')).toBe('anthropic');
-      expect(getModelProviderSync('claude-sonnet-4-5')).toBe('anthropic');
-      expect(getModelProviderSync('claude-haiku-4-5')).toBe('anthropic');
+      expect(getModelProvider('claude-opus-4-6')).toBe('anthropic');
+      expect(getModelProvider('claude-sonnet-4-5')).toBe('anthropic');
+      expect(getModelProvider('claude-haiku-4-5')).toBe('anthropic');
     });
 
     it('should return openai for OpenAI models', () => {
-      expect(getModelProviderSync('gpt-5.3-codex')).toBe('openai');
-      expect(getModelProviderSync('o3-deep-research')).toBe('openai');
-      expect(getModelProviderSync('gpt-4o')).toBe('openai');
-      expect(getModelProviderSync('gpt-4o-mini')).toBe('openai');
+      expect(getModelProvider('gpt-5.3-codex')).toBe('openai');
+      expect(getModelProvider('o3-deep-research')).toBe('openai');
+      expect(getModelProvider('gpt-4o')).toBe('openai');
+      expect(getModelProvider('gpt-4o-mini')).toBe('openai');
     });
 
     it('should return google for Gemini models', () => {
-      expect(getModelProviderSync('gemini-3-pro-preview')).toBe('google');
-      expect(getModelProviderSync('gemini-3-flash-preview')).toBe('google');
+      expect(getModelProvider('gemini-3-pro-preview')).toBe('google');
+      expect(getModelProvider('gemini-3-flash-preview')).toBe('google');
     });
 
     it('should return nous for Nous Portal models', () => {
-      expect(getModelProviderSync('qwen/qwen3.6-plus')).toBe('nous');
+      expect(getModelProvider('qwen/qwen3.6-plus')).toBe('nous');
     });
   });
 
@@ -74,8 +100,9 @@ describe('model-fallback', () => {
 
   describe('getModelsByProvider', () => {
     it('should return all Anthropic models', () => {
-      const models = getModelsByProviderSync('anthropic');
+      const models = getModelsByProvider('anthropic');
       expect(models).toContain('claude-fable-5');
+      expect(models).toContain('claude-opus-5-5');
       expect(models).toContain('claude-opus-5');
       expect(models).toContain('claude-opus-4-8');
       expect(models).toContain('claude-opus-4-7');
@@ -84,11 +111,11 @@ describe('model-fallback', () => {
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(10);
+      expect(models).toHaveLength(11);
     });
 
     it('should return all OpenAI models', () => {
-      const models = getModelsByProviderSync('openai');
+      const models = getModelsByProvider('openai');
       expect(models).toContain('gpt-5.6-sol');
       expect(models).toContain('gpt-5.6-terra');
       expect(models).toContain('gpt-5.6-luna');
@@ -110,7 +137,7 @@ describe('model-fallback', () => {
     });
 
     it('should return all Google models', () => {
-      const models = getModelsByProviderSync('google');
+      const models = getModelsByProvider('google');
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
@@ -121,7 +148,7 @@ describe('model-fallback', () => {
     });
 
     it('should return all Nous Portal models', () => {
-      const models = getModelsByProviderSync('nous');
+      const models = getModelsByProvider('nous');
       expect(models).toEqual(['qwen/qwen3.6-plus']);
     });
   });
@@ -159,9 +186,9 @@ describe('model-fallback', () => {
 
     it('getAvailableModels excludes Claude models when Anthropic is disabled', () => {
       const noAnthropic = new Set<ModelProvider>(['openai']);
-      const available = getAvailableModelsSync(noAnthropic);
+      const available = getAvailableModels(noAnthropic);
       for (const model of available) {
-        expect(getModelProviderSync(model)).not.toBe('anthropic');
+        expect(getModelProvider(model)).not.toBe('anthropic');
       }
     });
 
@@ -170,60 +197,60 @@ describe('model-fallback', () => {
       // silently rewrite to claude-sonnet-5. The original model is returned with a warning.
       const minimaxOnly = new Set<ModelProvider>(['minimax']);
       // minimax-m2.7 is enabled — should pass through unchanged
-      expect(applyFallbackSync('minimax-m2.7' as ModelId, minimaxOnly)).toBe('minimax-m2.7');
+      expect(applyFallback('minimax-m2.7' as ModelId, minimaxOnly)).toBe('minimax-m2.7');
       // gpt-5.4 is disabled (openai not in set) AND Anthropic is also disabled —
       // must NOT return claude-sonnet-5
-      const result = applyFallbackSync('gpt-5.4' as ModelId, minimaxOnly);
-      expect(getModelProviderSync(result)).not.toBe('anthropic');
+      const result = applyFallback('gpt-5.4' as ModelId, minimaxOnly);
+      expect(getModelProvider(result)).not.toBe('anthropic');
     });
 
     it('applyFallback falls back to Anthropic when Anthropic IS enabled and provider is disabled', () => {
       // Standard path: openai disabled, anthropic enabled → Anthropic fallback applied
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('gpt-5.4' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallback('gpt-5.4' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
     });
   });
 
   describe('applyFallback', () => {
     it('should return original model if provider is enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
-      expect(applyFallbackSync('gpt-5.3-codex', enabled)).toBe('gpt-5.3-codex');
-      expect(applyFallbackSync('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
+      expect(applyFallback('gpt-5.3-codex', enabled)).toBe('gpt-5.3-codex');
+      expect(applyFallback('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
     });
 
     it('should fallback GPT-5.2 Codex to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('gpt-5.3-codex', enabled)).toBe('claude-sonnet-5');
+      expect(applyFallback('gpt-5.3-codex', enabled)).toBe('claude-sonnet-5');
     });
 
     it('should fallback O3 Deep Research to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('o3-deep-research', enabled)).toBe('claude-sonnet-5');
+      expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-5');
     });
 
     it('should fallback GPT-4o to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('gpt-4o', enabled)).toBe('claude-sonnet-5');
+      expect(applyFallback('gpt-4o', enabled)).toBe('claude-sonnet-5');
     });
 
     it('should fallback GPT-4o-mini to Haiku', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('gpt-4o-mini', enabled)).toBe('claude-haiku-4-5');
+      expect(applyFallback('gpt-4o-mini', enabled)).toBe('claude-haiku-4-5');
     });
 
     it('should fallback Gemini Pro to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-5');
+      expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-5');
     });
 
     it('should fallback Gemini Flash to Haiku', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('gemini-3-flash-preview', enabled)).toBe('claude-haiku-4-5');
+      expect(applyFallback('gemini-3-flash-preview', enabled)).toBe('claude-haiku-4-5');
     });
 
     it('should log warning when applying fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      applyFallbackSync('gpt-5.3-codex', enabled);
+      applyFallback('gpt-5.3-codex', enabled);
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Model gpt-5.3-codex requires openai API key')
@@ -235,98 +262,43 @@ describe('model-fallback', () => {
 
     it('should not log warning when provider is enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
-      applyFallbackSync('gpt-5.3-codex', enabled);
+      applyFallback('gpt-5.3-codex', enabled);
 
       expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it('should always return Anthropic models unchanged', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
-      expect(applyFallbackSync('claude-sonnet-4-5', enabled)).toBe('claude-sonnet-4-5');
-      expect(applyFallbackSync('claude-haiku-4-5', enabled)).toBe('claude-haiku-4-5');
+      expect(applyFallback('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
+      expect(applyFallback('claude-sonnet-4-5', enabled)).toBe('claude-sonnet-4-5');
+      expect(applyFallback('claude-haiku-4-5', enabled)).toBe('claude-haiku-4-5');
     });
   });
 
   describe('getFallbackModel', () => {
     it('should return Anthropic models unchanged', () => {
-      expect(getFallbackModelSync('claude-opus-4-6')).toBe('claude-opus-4-6');
-      expect(getFallbackModelSync('claude-sonnet-4-5')).toBe('claude-sonnet-4-5');
-      expect(getFallbackModelSync('claude-haiku-4-5')).toBe('claude-haiku-4-5');
+      expect(getFallbackModel('claude-opus-4-6')).toBe('claude-opus-4-6');
+      expect(getFallbackModel('claude-sonnet-4-5')).toBe('claude-sonnet-4-5');
+      expect(getFallbackModel('claude-haiku-4-5')).toBe('claude-haiku-4-5');
     });
 
     it('should return fallback for OpenAI models', () => {
-      expect(getFallbackModelSync('gpt-5.3-codex')).toBe('claude-sonnet-5');
-      expect(getFallbackModelSync('o3-deep-research')).toBe('claude-sonnet-5');
-      expect(getFallbackModelSync('gpt-4o')).toBe('claude-sonnet-5');
-      expect(getFallbackModelSync('gpt-4o-mini')).toBe('claude-haiku-4-5');
+      expect(getFallbackModel('gpt-5.3-codex')).toBe('claude-sonnet-5');
+      expect(getFallbackModel('o3-deep-research')).toBe('claude-sonnet-5');
+      expect(getFallbackModel('gpt-4o')).toBe('claude-sonnet-5');
+      expect(getFallbackModel('gpt-4o-mini')).toBe('claude-haiku-4-5');
     });
 
     it('should return fallback for Google models', () => {
-      expect(getFallbackModelSync('gemini-3-pro-preview')).toBe('claude-sonnet-5');
-      expect(getFallbackModelSync('gemini-3-flash-preview')).toBe('claude-haiku-4-5');
+      expect(getFallbackModel('gemini-3-pro-preview')).toBe('claude-sonnet-5');
+      expect(getFallbackModel('gemini-3-flash-preview')).toBe('claude-haiku-4-5');
     });
 
     it('should return fallback for Nous Portal models', () => {
-      expect(getFallbackModelSync('qwen/qwen3.6-plus')).toBe('claude-sonnet-5');
+      expect(getFallbackModel('qwen/qwen3.6-plus')).toBe('claude-sonnet-5');
     });
   });
 
-  describe('detectEnabledProviders', () => {
-    it('should always include Anthropic', () => {
-      const enabled = detectEnabledProvidersSync({});
-      expect(enabled.has('anthropic')).toBe(true);
-    });
-
-    it('should detect OpenAI when key present', () => {
-      const enabled = detectEnabledProvidersSync({ openai: 'sk-test' });
-      expect(enabled.has('openai')).toBe(true);
-    });
-
-    it('should detect Google when key present', () => {
-      const enabled = detectEnabledProvidersSync({ google: 'test-key' });
-      expect(enabled.has('google')).toBe(true);
-    });
-
-    it('should detect Nous Portal when key present', () => {
-      const enabled = detectEnabledProvidersSync({ nous: 'nous-key' });
-      expect(enabled.has('nous')).toBe(true);
-    });
-
-    it('should detect multiple providers', () => {
-      const enabled = detectEnabledProvidersSync({
-        openai: 'sk-test',
-        google: 'test-key',
-      });
-
-      expect(enabled.size).toBe(3); // anthropic + 2 others
-      expect(enabled.has('anthropic')).toBe(true);
-      expect(enabled.has('openai')).toBe(true);
-      expect(enabled.has('google')).toBe(true);
-    });
-
-    it('should ignore empty strings', () => {
-      const enabled = detectEnabledProvidersSync({
-        openai: '',
-        google: '  ',
-      });
-
-      expect(enabled.size).toBe(1); // Only anthropic
-      expect(enabled.has('anthropic')).toBe(true);
-      expect(enabled.has('openai')).toBe(false);
-      expect(enabled.has('google')).toBe(false);
-    });
-
-    it('should handle undefined values', () => {
-      const enabled = detectEnabledProvidersSync({
-        openai: undefined,
-        google: undefined,
-      });
-
-      expect(enabled.size).toBe(1); // Only anthropic
-      expect(enabled.has('anthropic')).toBe(true);
-    });
-  });
 
   describe('filterAvailableModels', () => {
     it('should include Anthropic models when only Anthropic enabled', () => {
@@ -373,9 +345,10 @@ describe('model-fallback', () => {
   describe('getAvailableModels', () => {
     it('should return only Anthropic models when only Anthropic enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      const models = getAvailableModelsSync(enabled);
+      const models = getAvailableModels(enabled);
 
       expect(models).toContain('claude-fable-5');
+      expect(models).toContain('claude-opus-5-5');
       expect(models).toContain('claude-opus-5');
       expect(models).toContain('claude-opus-4-8');
       expect(models).toContain('claude-opus-4-7');
@@ -384,19 +357,19 @@ describe('model-fallback', () => {
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).not.toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(9);
+      expect(models).toHaveLength(10);
     });
 
     it('should return all models when all providers enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
-      const models = getAvailableModelsSync(enabled);
+      const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(28); // 9 Anthropic + 17 OpenAI + 6 Google + 7 Kimi
+      expect(models.length).toBe(29); // 10 Anthropic + 7 OpenAI + 5 Google + 7 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
-      const models = getAvailableModelsSync(enabled);
+      const models = getAvailableModels(enabled);
 
       expect(models).toContain('gpt-6-astra');
       expect(models).toContain('gpt-5.6-sol');
@@ -407,34 +380,34 @@ describe('model-fallback', () => {
       expect(models).not.toContain('o3');
       expect(models).not.toContain('gpt-5.3-codex');
       expect(models).not.toContain('gpt-4o');
-      expect(models.length).toBe(16); // 9 Anthropic + 17 OpenAI
+      expect(models.length).toBe(17); // 10 Anthropic + 7 current OpenAI
     });
 
     it('should include Google models when Google enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'google']);
-      const models = getAvailableModelsSync(enabled);
+      const models = getAvailableModels(enabled);
 
       expect(models).toContain('gemini-3.1-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-3.1-flash-lite-preview');
       expect(models).not.toContain('gemini-2.5-pro');
       expect(models).not.toContain('gemini-2.5-flash');
-      expect(models.length).toBe(14); // 9 Anthropic + 6 Google
+      expect(models.length).toBe(15); // 10 Anthropic + 5 current Google
     });
   });
 
   describe('fallback strategy validation', () => {
     it('should map premium models to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('gpt-5.3-codex', enabled)).toBe('claude-sonnet-5');
-      expect(applyFallbackSync('o3-deep-research', enabled)).toBe('claude-sonnet-5');
-      expect(applyFallbackSync('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-5');
+      expect(applyFallback('gpt-5.3-codex', enabled)).toBe('claude-sonnet-5');
+      expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-5');
+      expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-5');
     });
 
     it('should map economy models to Haiku', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('gpt-4o-mini', enabled)).toBe('claude-haiku-4-5');
-      expect(applyFallbackSync('gemini-3-flash-preview', enabled)).toBe('claude-haiku-4-5');
+      expect(applyFallback('gpt-4o-mini', enabled)).toBe('claude-haiku-4-5');
+      expect(applyFallback('gemini-3-flash-preview', enabled)).toBe('claude-haiku-4-5');
     });
 
     it('should never fallback to Opus by default', () => {
@@ -449,7 +422,7 @@ describe('model-fallback', () => {
       ];
 
       allModels.forEach((model) => {
-        const fallback = applyFallbackSync(model, enabled);
+        const fallback = applyFallback(model, enabled);
         expect(fallback).not.toBe('claude-opus-4-6');
       });
     });
@@ -457,8 +430,8 @@ describe('model-fallback', () => {
 
   describe('newly introduced model catalog regression (PAN-540)', () => {
     it('glm-4.7 is recognized as zai provider', () => {
-      expect(getModelProviderSync('glm-4.7' as ModelId)).toBe('zai');
-      expect(getModelProviderSync('glm-4.7-flash' as ModelId)).toBe('zai');
+      expect(getModelProvider('glm-4.7' as ModelId)).toBe('zai');
+      expect(getModelProvider('glm-4.7-flash' as ModelId)).toBe('zai');
     });
 
     it('glm-4.7 requires external key', () => {
@@ -467,7 +440,7 @@ describe('model-fallback', () => {
     });
 
     it('glm-4.7 appears in getModelsByProvider for zai', () => {
-      const zaiModels = getModelsByProviderSync('zai');
+      const zaiModels = getModelsByProvider('zai');
       expect(zaiModels).toContain('glm-5.2');
       expect(zaiModels).toContain('glm-4.7');
       expect(zaiModels).toContain('glm-4.7-flash');
@@ -479,72 +452,72 @@ describe('model-fallback', () => {
       // Explicit FALLBACK_MAP entries ensure tier-correct results regardless of the
       // MODEL_DEPRECATIONS chain (which previously mapped both through glm-5.1 → Sonnet).
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('glm-4.7' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
-      expect(applyFallbackSync('glm-4.7-flash' as ModelId, anthropicOnly)).toBe('claude-haiku-4-5');
+      expect(applyFallback('glm-4.7' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallback('glm-4.7-flash' as ModelId, anthropicOnly)).toBe('claude-haiku-4-5');
     });
 
     it('glm-4.7 stays when zai is enabled', () => {
       const zaiEnabled = new Set<ModelProvider>(['zai']);
-      expect(applyFallbackSync('glm-4.7' as ModelId, zaiEnabled)).toBe('glm-4.7');
+      expect(applyFallback('glm-4.7' as ModelId, zaiEnabled)).toBe('glm-4.7');
     });
 
     it('kimi-k2 is recognized as kimi provider', () => {
-      expect(getModelProviderSync('kimi-k2' as ModelId)).toBe('kimi');
+      expect(getModelProvider('kimi-k2' as ModelId)).toBe('kimi');
     });
 
     it('kimi-k2 falls back to Sonnet when kimi is disabled', () => {
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('kimi-k2' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallback('kimi-k2' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
     });
 
     it('kimi-k2.7-code is recognized as kimi provider', () => {
-      expect(getModelProviderSync('kimi-k2.7-code' as ModelId)).toBe('kimi');
+      expect(getModelProvider('kimi-k2.7-code' as ModelId)).toBe('kimi');
     });
 
     it('kimi-k2.7-code falls back to Sonnet when kimi is disabled', () => {
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('kimi-k2.7-code' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallback('kimi-k2.7-code' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
     });
 
     it('K3 model ids are recognized as kimi provider models', () => {
-      expect(getModelProviderSync('k3' as ModelId)).toBe('kimi');
-      expect(getModelProviderSync('k3[1m]' as ModelId)).toBe('kimi');
+      expect(getModelProvider('k3' as ModelId)).toBe('kimi');
+      expect(getModelProvider('k3[1m]' as ModelId)).toBe('kimi');
     });
 
     it('K3 model ids fall back to Sonnet when kimi is disabled', () => {
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('k3' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
-      expect(applyFallbackSync('k3[1m]' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallback('k3' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallback('k3[1m]' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
     });
 
     it('K3 capabilities pin the standard and 1M context windows', () => {
-      expect(hasModelCapabilitySync('k3')).toBe(true);
-      expect(hasModelCapabilitySync('k3[1m]')).toBe(true);
-      expect(getModelCapabilitySync('k3').contextWindow).toBe(262144);
-      expect(getModelCapabilitySync('k3[1m]').contextWindow).toBe(1048576);
+      expect(hasModelCapability('k3')).toBe(true);
+      expect(hasModelCapability('k3[1m]')).toBe(true);
+      expect(getModelCapability('k3').contextWindow).toBe(262144);
+      expect(getModelCapability('k3[1m]').contextWindow).toBe(1048576);
     });
 
     it('glm-5.2 is recognized as zai provider', () => {
-      expect(getModelProviderSync('glm-5.2' as ModelId)).toBe('zai');
+      expect(getModelProvider('glm-5.2' as ModelId)).toBe('zai');
       expect(requiresExternalKeySync('glm-5.2' as ModelId)).toBe(true);
     });
 
     it('glm-5.2 falls back to Sonnet when zai is disabled', () => {
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('glm-5.2' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallback('glm-5.2' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
     });
 
     it('glm-5.2 stays when zai is enabled', () => {
       const zaiEnabled = new Set<ModelProvider>(['zai']);
-      expect(applyFallbackSync('glm-5.2' as ModelId, zaiEnabled)).toBe('glm-5.2');
+      expect(applyFallback('glm-5.2' as ModelId, zaiEnabled)).toBe('glm-5.2');
     });
 
     it('glm-5.2 is a known model capability', () => {
-      expect(hasModelCapabilitySync('glm-5.2')).toBe(true);
+      expect(hasModelCapability('glm-5.2')).toBe(true);
     });
 
     it('glm-5.2 exposes only high and max effort levels', () => {
-      expect(getModelEffortLevelsSync('glm-5.2')).toEqual(['high', 'max']);
+      expect(getModelEffortLevels('glm-5.2')).toEqual(['high', 'max']);
       expect(modelSupportsEffortSync('glm-5.2', 'high')).toBe(true);
       expect(modelSupportsEffortSync('glm-5.2', 'max')).toBe(true);
       expect(modelSupportsEffortSync('glm-5.2', 'low')).toBe(false);
@@ -563,7 +536,7 @@ describe('model-fallback', () => {
     // (Input Modalities: Text); vision is a separate model line (GLM-5V-Turbo).
     it('glm-5.2 is text-only (supportsImages false)', () => {
       expect(MODEL_CAPABILITIES['glm-5.2'].supportsImages).toBe(false);
-      expect(modelSupportsImagesSync('glm-5.2')).toBe(false);
+      expect(modelSupportsImages('glm-5.2')).toBe(false);
     });
 
     // PAN-1956 (GLM-5.1, same bug pattern as GLM-5.2): contextWindow must reflect
@@ -577,7 +550,7 @@ describe('model-fallback', () => {
     // own research artifact (docs/research/glm-5.1-work-type-fit.md).
     it('glm-5.1 is text-only (supportsImages false)', () => {
       expect(MODEL_CAPABILITIES['glm-5.1'].supportsImages).toBe(false);
-      expect(modelSupportsImagesSync('glm-5.1')).toBe(false);
+      expect(modelSupportsImages('glm-5.1')).toBe(false);
     });
 
     // PAN-1956: costPer1MTokens is the documented avg of input/output
@@ -593,13 +566,13 @@ describe('model-fallback', () => {
     });
 
     it('claude-opus-4-7 is recognized as anthropic provider', () => {
-      expect(getModelProviderSync('claude-opus-4-7')).toBe('anthropic');
+      expect(getModelProvider('claude-opus-4-7')).toBe('anthropic');
       expect(requiresExternalKeySync('claude-opus-4-7')).toBe(false);
     });
 
     it('retired GLM models stay out of available selections when zai is enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'zai']);
-      const models = getAvailableModelsSync(enabled);
+      const models = getAvailableModels(enabled);
       expect(models).toContain('glm-5.2');
       expect(models).not.toContain('glm-4.7');
       expect(models).not.toContain('glm-4.7-flash');
@@ -607,48 +580,44 @@ describe('model-fallback', () => {
     });
 
     it('grok-build-0.1 is recognized as xai provider', () => {
-      expect(getModelProviderSync('grok-build-0.1' as ModelId)).toBe('xai');
+      expect(getModelProvider('grok-build-0.1' as ModelId)).toBe('xai');
     });
 
     it('grok-build-0.1 falls back to Sonnet when xai is disabled', () => {
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallbackSync('grok-build-0.1' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallback('grok-build-0.1' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
     });
 
     it('grok-build-0.1 is a known model capability', () => {
-      expect(hasModelCapabilitySync('grok-build-0.1')).toBe(true);
+      expect(hasModelCapability('grok-build-0.1')).toBe(true);
     });
   });
 
   describe('QuantumLlama (PAN-3252)', () => {
     it('resolves ql-* models to the quantumllama provider', () => {
-      expect(getModelProviderSync('ql-reason-70b')).toBe('quantumllama');
-      expect(getModelProviderSync('ql-swift-8b')).toBe('quantumllama');
-      expect(getModelProviderSync('ql-nano-1b')).toBe('quantumllama');
+      expect(getModelProvider('ql-reason-70b')).toBe('quantumllama');
+      expect(getModelProvider('ql-swift-8b')).toBe('quantumllama');
+      expect(getModelProvider('ql-nano-1b')).toBe('quantumllama');
     });
 
     it('resolves unlisted ql-* ids via the prefix heuristic', () => {
-      expect(getModelProviderSync('ql-future-model')).toBe('quantumllama');
+      expect(getModelProvider('ql-future-model')).toBe('quantumllama');
     });
 
-    it('detectEnabledProviders enables quantumllama from its API key', () => {
-      const enabled = detectEnabledProvidersSync({ quantumllama: 'test-key' });
-      expect(enabled.has('quantumllama')).toBe(true);
-    });
 
     it('getAvailableModels includes ql-* models only when quantumllama is enabled', () => {
-      const withQl = getAvailableModelsSync(new Set<ModelProvider>(['anthropic', 'quantumllama']));
+      const withQl = getAvailableModels(new Set<ModelProvider>(['anthropic', 'quantumllama']));
       expect(withQl).toEqual(expect.arrayContaining(['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']));
 
-      const withoutQl = getAvailableModelsSync(new Set<ModelProvider>(['anthropic']));
+      const withoutQl = getAvailableModels(new Set<ModelProvider>(['anthropic']));
       expect(withoutQl).not.toContain('ql-reason-70b');
       expect(withoutQl).not.toContain('ql-swift-8b');
       expect(withoutQl).not.toContain('ql-nano-1b');
     });
 
     it('falls back to Sonnet for ql-reason-70b and Haiku for ql-nano-1b', () => {
-      expect(getFallbackModelSync('ql-reason-70b' as ModelId)).toBe('claude-sonnet-5');
-      expect(getFallbackModelSync('ql-nano-1b' as ModelId)).toBe('claude-haiku-4-5');
+      expect(getFallbackModel('ql-reason-70b' as ModelId)).toBe('claude-sonnet-5');
+      expect(getFallbackModel('ql-nano-1b' as ModelId)).toBe('claude-haiku-4-5');
     });
   });
 });

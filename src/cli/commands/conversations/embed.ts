@@ -2,11 +2,12 @@
  * pan conversations embed — generate embeddings for enriched sessions (PAN-457)
  */
 
+import { Effect } from 'effect';
 import chalk from 'chalk';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbeddingProviderName } from '../../../lib/conversations/embeddings/index.js';
 import { getDiscoveredStats } from '../../../lib/overdeck/discovered-sessions.js';
-import { getConversationsConfigSync } from '../../../lib/config-yaml.js';
+import { getConversationsConfig } from '../../../lib/config-yaml.js';
 
 export async function embedAction(
   positionalIds: string[],
@@ -15,7 +16,7 @@ export async function embedAction(
   // --status: show coverage and exit
   if (opts['status']) {
     const stats = getDiscoveredStats();
-    const config = getConversationsConfigSync();
+    const config = await Effect.runPromise(getConversationsConfig());
     console.log(chalk.bold('Embedding coverage'));
     console.log(`  Provider:         ${config.embeddingProvider}`);
     console.log(`  Config model:     ${config.embeddingModel}`);

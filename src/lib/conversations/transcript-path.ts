@@ -1,8 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { sessionFilePath } from '../paths.js';
+import { claudeProjectsRoot, sessionFilePath } from '../runtimes/storage/claude-code.js';
 
 export type ConversationTranscriptStatus = 'ok' | 'expired' | 'unknown';
 
@@ -27,7 +26,7 @@ export function resolveConversationTranscript(
 }
 
 function findClaudeProjectSessionFile(sessionId: string): string | null {
-  const projectsDir = join(homedir(), '.claude', 'projects');
+  const projectsDir = claudeProjectsRoot();
   if (!existsSync(projectsDir)) return null;
 
   for (const projectDir of readdirSync(projectsDir, { withFileTypes: true })

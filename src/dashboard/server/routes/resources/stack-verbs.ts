@@ -9,7 +9,7 @@ import { EventStoreService } from '../../services/domain-services.js';
 import { httpHandler } from '../http-handler.js';
 import { dockerActionErrorPayload } from './containers.js';
 import { getCurrentDockerStats } from './shared.js';
-import { getResourceStacks, type ResourceStack } from './stacks.js';
+import { buildResourceStacks, type ResourceStack } from './stacks.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -132,7 +132,9 @@ function isDockerIdentifier(value: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/.test(value);
 }
 
+// Grouping only: a docker verb acts on a stack's containers and never needs
+// the issue's derived state, so this stays off the forge.
 function findStack(issueId: string): ResourceStack | undefined {
-  return getResourceStacks(getCurrentDockerStats() as Parameters<typeof getResourceStacks>[0])
+  return buildResourceStacks(getCurrentDockerStats() as Parameters<typeof buildResourceStacks>[0])
     .find((stack) => stack.issueId?.toUpperCase() === issueId);
 }

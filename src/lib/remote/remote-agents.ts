@@ -24,10 +24,8 @@ import {
   runSsh,
   shellQuote,
 } from './remote-tmux.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
-import { resolveProjectForIssue } from '../pan-dir/record.js';
-import { isStateMigrated } from '../state-home.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { getClaudePermissionFlags, getClaudePermissionFlagsString } from '../claude-permissions.js';
 import {
   withAutoSpawnConsentClaim,
   type AcceptAutoSpawnConsent,
@@ -496,14 +494,6 @@ export interface SpawnRemoteAgentOptions {
   tier?: 'ephemeral' | 'durable';
 }
 
-export function assertFlyRemoteStateSupported(issueId: string, migrated: boolean): void {
-  if (migrated) {
-    throw new Error(
-      `Fly remote spawn blocked for ${issueId.toUpperCase()}: PAN-2541 D14 forbids remote work on migrated projects until PAN-2549 implements overdeck-state synchronization.`,
-    );
-  }
-}
-
 /**
  * Write a file on the VM via base64 chunks. The Machines exec API rejects
  * payloads somewhere above 4KB (PayloadTooLarge), so large content — agent
@@ -567,8 +557,6 @@ async function spawnRemoteAgentWithoutConsentClaim(
   acceptConsent?: AcceptAutoSpawnConsent,
 ): Promise<RemoteAgentState> {
   const { issueId, workspace, startedBy, model = 'claude-sonnet-4-6', prompt } = options;
-  const project = resolveProjectForIssue(issueId);
-  if (project) assertFlyRemoteStateSupported(issueId, await isStateMigrated(project));
   const tier = options.tier ?? 'ephemeral';
 
   const agentId = `agent-${issueId.toLowerCase()}`;
@@ -619,7 +607,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
     // Create launcher script
     const launcherScript = `/workspace/.pan/prompts/${agentId}-launcher.sh`;
-    const launcherContent = generateLauncherScriptSync({
+    const launcherContent = generateLauncherScript({
       role: 'work',
       spawnMode: 'remote',
       workingDir: '/workspace',
@@ -627,7 +615,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
       setRemotePath: true,
       promptFile,
       baseCommand: 'claude',
-      permissionFlags: getClaudePermissionFlagsSync(),
+      permissionFlags: getClaudePermissionFlags(),
       extraEnvExports: [`export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
       model,
     });
@@ -639,7 +627,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsStringSync()} --model ${model}`;
+    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsString()} --model ${model}`;
   }
 
   console.log(`[claude-invoke] purpose=remote-agent | model=${model} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);
@@ -700,23 +688,42 @@ export async function getRemoteAgentOutput(
 export async function sendToRemoteAgent(
   agentId: string,
   vmName: string,
-  message: string
-): Promise<void> {
-  const fly = createFlyProvider();
+  message: string,
+  deps: { createFlyProvider?: typeof createFlyProvider } = {},
+): Promise<{ ok: boolean; failure?: string }> {
+  const fly = (deps.createFlyProvider ?? createFlyProvider)();
   await ensureRemoteTmuxContext(fly, vmName);
 
   const promptFile = `${REMOTE_PAN_DIR}/prompts/${agentId}-message.txt`;
   const messageBase64 = Buffer.from(message).toString('base64');
-  await runSsh(
-    fly,
-    vmName,
-    `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
-  );
-  await runSsh(fly, vmName, buildRemoteTmuxCommand(['load-buffer', '-b', agentId, promptFile]));
-  await runSsh(fly, vmName, buildRemoteTmuxCommand(['paste-buffer', '-b', agentId, '-t', agentId, '-d']));
+  // Every delivery step runs over SSH and can fail at the remote tmux layer
+  // with a nonzero exit code even when the SSH transport itself succeeds.
+  // Check each one — a failed write/load/paste/send must not report success.
+  const steps: Array<{ label: string; command: string }> = [
+    {
+      label: 'prompt-file write',
+      command: `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
+    },
+    { label: 'load-buffer', command: buildRemoteTmuxCommand(['load-buffer', '-b', agentId, promptFile]) },
+    { label: 'paste-buffer', command: buildRemoteTmuxCommand(['paste-buffer', '-b', agentId, '-t', agentId, '-d']) },
+  ];
+  for (const step of steps) {
+    const result = await runSsh(fly, vmName, step.command);
+    if (result.exitCode !== 0) {
+      const detail = result.stderr.trim() || result.stdout.trim() || 'no output';
+      return { ok: false, failure: `remote ${step.label} failed for ${agentId} on ${vmName} (exit ${result.exitCode}): ${detail}` };
+    }
+  }
   await new Promise(resolve => setTimeout(resolve, 300));
-  await runSsh(fly, vmName, buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
+  const sendResult = await runSsh(fly, vmName, buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
+  if (sendResult.exitCode !== 0) {
+    const detail = sendResult.stderr.trim() || sendResult.stdout.trim() || 'no output';
+    return { ok: false, failure: `remote send-keys failed for ${agentId} on ${vmName} (exit ${sendResult.exitCode}): ${detail}` };
+  }
+  // Cleanup is best-effort: a leftover prompt file never makes a delivered
+  // message undelivered.
   await runSsh(fly, vmName, `rm -f ${shellQuote(promptFile)}`);
+  return { ok: true };
 }
 
 

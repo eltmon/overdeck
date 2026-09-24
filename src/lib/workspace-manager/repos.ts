@@ -3,7 +3,7 @@ import { existsSync, readdirSync, realpathSync, symlinkSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
 import { installGitHooksInDir } from '../git-hooks.js';
-import { registerProjectSync } from '../projects.js';
+import { registerProject } from '../projects.js';
 import type { RepoConfig } from '../workspace-config.js';
 import type {
   AddNewRepoToWorkspaceOptions,
@@ -18,7 +18,7 @@ type RunGit = (args: string[], cwd: string) => Promise<{ stdout: string }>;
 
 interface AddNewRepoDeps {
   runGit?: RunGit;
-  persistProject?: typeof registerProjectSync;
+  persistProject?: typeof registerProject;
 }
 
 const defaultRunGit: RunGit = async (args, cwd) => {
@@ -67,7 +67,8 @@ async function verifyRepoOrigin(
   return null;
 }
 
-export async function addNewRepoToWorkspacePromise(
+/** Register a newly-created repository and add its feature worktree to a workspace. */
+export async function addNewRepoToWorkspace(
   options: AddNewRepoToWorkspaceOptions,
   deps: AddNewRepoDeps = {},
 ): Promise<AddReposToWorkspaceResult> {
@@ -162,7 +163,7 @@ export async function addNewRepoToWorkspacePromise(
       };
     }
   } else {
-    const addResult = await addReposToWorkspacePromise({
+    const addResult = await addReposToWorkspace({
       projectConfig: updatedProjectConfig,
       featureName,
       repoNames: [repoName],
@@ -174,7 +175,7 @@ export async function addNewRepoToWorkspacePromise(
   }
 
   try {
-    (deps.persistProject ?? registerProjectSync)(projectKey, updatedProjectConfig);
+    (deps.persistProject ?? registerProject)(projectKey, updatedProjectConfig);
     result.steps.push(`Registered ${repoName} in project ${projectKey}`);
   } catch (error) {
     return {
@@ -187,7 +188,8 @@ export async function addNewRepoToWorkspacePromise(
   return result;
 }
 
-export async function addReposToWorkspacePromise(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
+/** Add additional configured repos (worktrees / symlinks) to an existing workspace. */
+export async function addReposToWorkspace(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
   const { projectConfig, featureName, repoNames, dryRun } = options;
   const result: AddReposToWorkspaceResult = {
     success: true,

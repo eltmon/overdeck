@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
-import { registerProjectSync, unregisterProjectSync } from '../../../src/lib/projects.js';
+import { registerProject, unregisterProject } from '../../../src/lib/projects.js';
 import { getWorkspaceForIssue } from '../../../src/lib/workspaces/resolver.js';
 import { listWorkspaces } from '../../../src/lib/workspaces/resolver.js';
 import { workspaceNewCommand } from '../../../src/cli/commands/workspace-scratch.js';
@@ -35,11 +35,11 @@ beforeEach(() => {
   odb = setupOverdeckTestDb();
   projectRoot = mkdtempSync(join(tmpdir(), 'pan-1990-workspace-scratch-'));
   initRepoWithCheckedOutBranch(projectRoot);
-  registerProjectSync(PROJECT_KEY, { name: 'Isolated test project', path: projectRoot });
+  registerProject(PROJECT_KEY, { name: 'Isolated test project', path: projectRoot });
 });
 
 afterEach(() => {
-  unregisterProjectSync(PROJECT_KEY);
+  unregisterProject(PROJECT_KEY);
   teardownOverdeckTestDb(odb);
   rmSync(projectRoot, { recursive: true, force: true });
   vi.restoreAllMocks();

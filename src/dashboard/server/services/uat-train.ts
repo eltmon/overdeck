@@ -6,10 +6,10 @@
  * The reconciler interval is the heartbeat of "always one batch ready": every
  * 60s it walks every tracked project whose effective merge-train flag is on,
  * comparing that project's ready set against its generation chain and
- * assembling/invalidating as needed. PAN-1696 removed the active-flywheel-run
- * requirement — the ready set comes from review-status records, so batches
- * assemble with no run at all. Assemblies run minutes; the reconciler is
- * single-flight per project, so ticks never pile up.
+ * assembling/invalidating as needed. PAN-3917: the ready set is the forge's —
+ * approvals, green checks, and mergeability (FR-9) — so batches assemble with
+ * no flywheel run and no review-status record at all. Assemblies run minutes;
+ * the reconciler is single-flight per project, so ticks never pile up.
  */
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -45,38 +45,27 @@ import {
   type PromoteResult,
   type UatPromoteDeps,
 } from '../../../lib/cloister/uat-promote.js';
-import { notifyFlywheelOfUatPromote } from '../../../lib/cloister/uat-promote-notify.js';
 import {
-  getUatGenerationSync,
-  hasUncleanedTerminalUatGenerationSync,
+  getUatGeneration,
+  hasUncleanedTerminalUatGeneration,
   isMergeTrainEnabled,
-  listUatGenerationsSync,
-  markUatGenerationRepoPromotedSync,
+  listUatGenerations,
+  markUatGenerationRepoPromoted,
   type UatGeneration,
   type UatGenerationRepo,
 } from '../../../lib/overdeck/merge-sync.js';
-import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-order.js';
+import { getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
-import { findProjectByPathSync, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import type { PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
+import { findProjectByPath, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import {
-  executeVersionShipForGeneration,
-  persistPendingShipRecords,
-  persistShipRecords,
-  withGenerationShipLock,
-} from '../../../lib/cloister/ship-record.js';
-import {
-  aggregateGenerationShipStatus,
-  loadShipRecords,
-  publicShipStatus,
-} from '../../../lib/cloister/ship-status.js';
-import {
-  resolveConfiguredReposSync,
-  resolveProjectReposFromResolvedIssueSync,
+  resolveConfiguredRepos,
+  resolveProjectReposFromResolvedIssue,
   type ResolvedProjectRepo,
 } from '../../../lib/project-repos.js';
 import { getDashboardIdentity } from '../identity.js';
+import { issueHoldsForUat } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-settings.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -104,7 +93,7 @@ interface AcceptanceCriteriaCacheEntry {
 const acceptanceCriteriaByIssue = new Map<string, AcceptanceCriteriaCacheEntry>();
 
 export function resolveUatProjectRoot(cwdPath = process.cwd()): string {
-  const registeredProject = findProjectByPathSync(cwdPath);
+  const registeredProject = findProjectByPath(cwdPath);
   if (registeredProject) return resolve(registeredProject.path);
 
   const normalized = resolve(cwdPath);
@@ -118,6 +107,8 @@ function projectRoot(): string {
 
 export function canStartUatTrainReconciler(): boolean {
   const identity = getDashboardIdentity();
+  // identity.mode is isPeerDashboardProcess(); keeping the check here means one
+  // answer to "is this a peer" for every spawn-capable starter (fix10).
   return identity.mode === 'primary' && resolve(identity.repoRoot) === projectRoot();
 }
 
@@ -133,7 +124,7 @@ function makeCleanupForProject(projectPath: string): () => Promise<void> {
   return async () => {
     // A polyrepo generation's artifacts live in N repos plus a wrapper folder,
     // none of them reachable from the wrapper path the monorepo cleanup uses.
-    const projectConfig = findProjectByPathSync(projectPath);
+    const projectConfig = findProjectByPath(projectPath);
     const cleanupGit = projectConfig?.workspace?.type === 'polyrepo'
       ? buildPolyrepoCleanupGit(await resolveProjectRepos(projectPath), projectPath)
       : buildUatGenerationCleanupGit(projectPath);
@@ -157,7 +148,7 @@ async function runUatTrainReconcileForProject(
   options: { force?: boolean } = {},
 ): Promise<ReconcileResult> {
   const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
-  const projectConfig = findProjectByPathSync(projectPath);
+  const projectConfig = findProjectByPath(projectPath);
 
   // Fail closed: if project cannot be resolved, don't proceed
   if (!projectConfig) {
@@ -171,8 +162,8 @@ async function runUatTrainReconcileForProject(
   }
 
   // Early exit if no candidates and no live generations — skip git operations
-  const candidates = await listEligibleCandidatesByProject(projectPath);
-  const liveGenerations = listUatGenerationsSync({
+  const candidates = await listReadyIssuesForProject(projectPath);
+  const liveGenerations = listUatGenerations({
     projectRoot: projectPath,
     statuses: ['assembling', 'ready', 'superseded'],
     limit: 1,
@@ -186,7 +177,7 @@ async function runUatTrainReconcileForProject(
     // An existence check, not a load: generation rows are retained as an audit
     // trail, so hydrating every terminal row and its four child tables to answer
     // a yes/no question would make the idle minute cost grow with history.
-    if (hasUncleanedTerminalUatGenerationSync(projectPath)) {
+    if (hasUncleanedTerminalUatGeneration(projectPath)) {
       await makeCleanupForProject(projectPath)().catch((err) => {
         console.log(`[uat-train] terminal cleanup failed for ${projectPath}: ${err instanceof Error ? err.message : String(err)}`);
       });
@@ -223,6 +214,7 @@ async function runUatTrainReconcileForProject(
       assemble: (features) => assemblePolyrepoFromReadySetForProject(projectPath, features),
       teardownStack: (gen) => teardownUatStack(gen),
       cleanup: makeCleanupForProject(projectPath),
+      holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
       log: (msg) => console.log(msg),
     }, options);
   }
@@ -239,6 +231,7 @@ async function runUatTrainReconcileForProject(
     assemble: (features) => assembleFromReadySetForProject(projectPath, features),
     teardownStack: (gen) => teardownUatStack(gen),
     cleanup: makeCleanupForProject(projectPath),
+    holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
     log: (msg) => console.log(msg),
   }, options);
 }
@@ -247,9 +240,9 @@ async function runUatTrainReconcileForProject(
  * Get ready set for a specific project path.
  */
 async function getReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
-  const { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
+  const { computeMergeQueueFromCandidates, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
 
-  const candidates = await listEligibleCandidatesByProject(projectPath);
+  const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return [];
 
   const queue = await Effect.runPromise(
@@ -278,7 +271,7 @@ async function getReadySetForProject(projectPath: string): Promise<ReadyFeature[
 function resolveReposForIssue(issueId: string): ResolvedProjectRepo[] {
   const resolvedProject = resolveProjectFromIssueSync(issueId);
   if (!resolvedProject) return [];
-  return resolveProjectReposFromResolvedIssueSync(issueId, resolvedProject) ?? [];
+  return resolveProjectReposFromResolvedIssue(issueId, resolvedProject) ?? [];
 }
 
 /**
@@ -288,26 +281,26 @@ function resolveReposForIssue(issueId: string): ResolvedProjectRepo[] {
  * from each feature's own contributions rather than these.
  */
 async function resolveProjectRepos(projectPath: string, preferredIssueId?: string): Promise<ResolvedProjectRepo[]> {
-  const issueId = preferredIssueId ?? (await listEligibleCandidatesByProject(projectPath))[0]?.issueId;
+  const issueId = preferredIssueId ?? (await listReadyIssuesForProject(projectPath))[0]?.issueId;
   if (issueId) return resolveReposForIssue(issueId);
 
   // No candidate to resolve through — the exact state cleanup runs in after the
   // last batch is promoted. Resolve the configured repo set straight from
   // project config instead; the per-issue branch names it derives are unused
   // here, only the repo paths and targets matter.
-  const resolved = findProjectByPathSync(projectPath);
+  const resolved = findProjectByPath(projectPath);
   if (!resolved) return [];
   const entry = listProjectsSync().find(({ config }) => resolve(config.path) === resolve(projectPath));
   if (!entry) return [];
-  return resolveConfiguredReposSync(entry.key, projectPath, entry.config, `${entry.key}-cleanup`);
+  return resolveConfiguredRepos(entry.key, projectPath, entry.config, `${entry.key}-cleanup`);
 }
 
 /** Polyrepo ready set: per-candidate contributions across member repos. */
 async function getPolyrepoReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
-  const { computePolyrepoMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } =
+  const { computePolyrepoMergeQueueFromCandidates, resolveMergeQueuePrUrl } =
     await import('../../../lib/flywheel-merge-order.js');
 
-  const candidates = await listEligibleCandidatesByProject(projectPath);
+  const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return [];
 
   const reposByIssue = new Map(candidates.map((c) => [c.issueId, resolveReposForIssue(c.issueId)]));
@@ -550,7 +543,12 @@ export interface UatGenerationPayload {
   resolutions: UatGeneration['resolutions'];
   versionSyncConfigured: boolean;
   /** Public aggregate omits operational error/reason detail. */
-  shipStatus: Omit<PanIssueShipRecord, 'error' | 'reason'> | null;
+  /**
+   * PAN-3917 D6: ship records are gone. A batch's ship state is its git tag
+   * and GitHub release, which `pan release` owns — the payload reports only
+   * whether version sync is configured for the project.
+   */
+  shipStatus: null;
   /**
    * Per-repo generation detail, additive (PAN-3093). Always present and
    * non-empty: a monorepo generation projects the single synthesized entry, so
@@ -649,16 +647,13 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
   // projectRootOverride lets the aggregate /api/merge-train/generations route read
   // each tracked project's chain instead of only the dashboard's own repo.
   const root = projectRootOverride ? resolve(projectRootOverride) : projectRoot();
-  const project = findProjectByPathSync(root);
+  const project = findProjectByPath(root);
   const versionSyncConfigured = Boolean(project?.version_sync);
-  const chain = listUatGenerationsSync({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
+  const chain = listUatGenerations({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
   // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo.
-  const [acCache, shipRecords] = await Promise.all([
-    loadAcceptanceCriteriaCache(memberIssueIds, root),
-    project && versionSyncConfigured ? loadShipRecords(project, chain) : Promise.resolve(new Map()),
-  ]);
+  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds, root);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);
@@ -686,9 +681,7 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       heldOut: gen.heldOut,
       resolutions: gen.resolutions,
       versionSyncConfigured,
-      shipStatus: publicShipStatus(
-        versionSyncConfigured ? aggregateGenerationShipStatus(gen, shipRecords) : null,
-      ),
+      shipStatus: null,
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,
@@ -718,7 +711,7 @@ export interface UatCandidatePayload {
 
 /** The authoritative active UAT candidate, if one is ready to test/ship. */
 export async function getUatCandidatePayload(): Promise<UatCandidatePayload | null> {
-  const [candidate] = listUatGenerationsSync({
+  const [candidate] = listUatGenerations({
     projectRoot: projectRoot(),
     statuses: ['ready'],
     limit: 1,
@@ -734,7 +727,7 @@ export async function getUatCandidatePayload(): Promise<UatCandidatePayload | nu
 export async function postUatGenerationStackPayload(name: string): Promise<
   { ok: true; frontendUrl: string; evicted: string[] } | { ok: false; error: string; status: number }
 > {
-  const gen = getUatGenerationSync(name);
+  const gen = getUatGeneration(name);
   if (!gen) return { ok: false, error: `No UAT generation named ${name}`, status: 404 };
   if (gen.status !== 'ready' && gen.status !== 'superseded') {
     return { ok: false, error: `${name} is ${gen.status} — only live batches can serve a stack`, status: 409 };
@@ -755,20 +748,35 @@ export async function postUatGenerationPromotePayload(
   // PAN-1696: promote into the generation's OWN project repo. Generation rows carry
   // project_root, so a MIN generation must not be merged against the Overdeck repo.
   // For a generation belonging to this repo this resolves to the same path as before.
-  const root = resolve(getUatGenerationSync(name)?.projectRoot ?? projectRoot());
-  const [
-    { reviewRecordEligibility },
-    { recordUatPromotionVerdicts },
-  ] = await Promise.all([
-    import('../../../lib/flywheel-merge-order.js'),
-    import('../../../lib/cloister/uat-promote-verification.js'),
-  ]);
+  const root = resolve(getUatGeneration(name)?.projectRoot ?? projectRoot());
+  // PAN-3917: promotion used to stamp a verification verdict onto every
+  // member's record. The merge itself is the evidence — the generation's own
+  // rows carry the merge sha, and readiness is re-derived from each PR.
+
+  // PAN-3917 FR-9: a member may land only if its own PR is still ready —
+  // approved, green, mergeable. `uat-promote`'s gate is synchronous, so the
+  // states are derived up front and the closure reads the loaded answers.
+  const memberStates = new Map<string, { eligible: boolean; reason?: string }>();
+  await Promise.all((getUatGeneration(name)?.members ?? []).map(async (member) => {
+    const issueId = member.issueId.toUpperCase();
+    try {
+      const derived = await getDerivedIssueState(issueId);
+      memberStates.set(issueId, derived.state === 'ready'
+        ? { eligible: true }
+        : { eligible: false, reason: `is ${derived.state}, not ready to merge` });
+    } catch (error) {
+      memberStates.set(issueId, {
+        eligible: false,
+        reason: `state could not be read (${error instanceof Error ? error.message : String(error)})`,
+      });
+    }
+  }));
   // A polyrepo generation merges into each member repo's own target branch, so
   // it needs per-repo promote git. Supplying it is what selects the two-phase
   // (trial-merge everything, then publish) path.
-  const projectConfig = findProjectByPathSync(root);
+  const projectConfig = findProjectByPath(root);
   const polyrepo = projectConfig?.workspace?.type === 'polyrepo';
-  const storedRepos = polyrepo ? (getUatGenerationSync(name)?.repos ?? []) : [];
+  const storedRepos = polyrepo ? (getUatGeneration(name)?.repos ?? []) : [];
 
   // Re-check writability against CURRENT config, not the config that was live
   // at assembly: a repo can be flipped to readonly between assembly and merge,
@@ -787,8 +795,7 @@ export async function postUatGenerationPromotePayload(
         `${name} includes repo(s) that are no longer writable in project config: ${detail}. ` +
         `Nothing was published. Restore write access or let the reconciler rebuild the batch without them.`,
     };
-    await notifyFlywheelOfUatPromote(result).catch(() => {});
-    return result;
+      return result;
   }
   const generationRepos = storedRepos;
 
@@ -801,40 +808,18 @@ export async function postUatGenerationPromotePayload(
           // there rather than silently defaulting to main.
           polyrepoGit: buildPolyrepoUatPromoteGitDeps(generationRepos),
           markRepoPromoted: (genName, repoKey, at, mergeSha) =>
-            markUatGenerationRepoPromotedSync(genName, repoKey, at, mergeSha),
+            markUatGenerationRepoPromoted(genName, repoKey, at, mergeSha),
         }
       : {}),
-    store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },
+    store: { ...buildUatGenerationStore(), get: (n) => getUatGeneration(n) },
     teardownStack: (gen) => teardownUatStack(gen),
     firePostMerge,
-    memberEligibility: reviewRecordEligibility,
-    recordVerification: (generation, mergeSha) => recordUatPromotionVerdicts(generation, mergeSha),
-    ...(projectConfig?.version_sync
-      ? {
-          runShip: (generation: UatGeneration, requestedVersion: string | undefined) => withGenerationShipLock(
-            generation.name,
-            async () => {
-              // Establish durable batch membership before any command, worktree, or
-              // Git operation can fail. Deferred recovery and the DoD gate then
-              // remain blocking even when propagation never starts.
-              await persistPendingShipRecords(
-                generation,
-                requestedVersion ? 'version ship in progress' : 'no version supplied at promote time',
-              );
-              if (!requestedVersion) return;
-
-              const report = await executeVersionShipForGeneration({
-                generation,
-                project: projectConfig,
-                version: requestedVersion,
-              });
-              await persistShipRecords(generation, report);
-            },
-          ),
-        }
-      : {}),
+    memberEligibility: (issueId: string) =>
+      memberStates.get(issueId.toUpperCase()) ?? { eligible: false, reason: 'state could not be read' },
+    // PAN-3917 D6: version ship no longer writes ship records. Tags and GitHub
+    // releases are the record, and `pan release` owns writing them — promote
+    // publishes the batch and stops there.
     log: (msg) => console.log(msg),
   }, { shipVersion });
-  await notifyFlywheelOfUatPromote(result).catch(() => {});
   return result;
 }

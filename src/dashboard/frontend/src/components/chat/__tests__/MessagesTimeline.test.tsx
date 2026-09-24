@@ -72,6 +72,42 @@ describe('MessagesTimeline — search', () => {
     expect(screen.queryByText('Sending…')).not.toBeInTheDocument();
   });
 
+  it('preserves prompt and command recovery actions while distinguishing unknown delivery', () => {
+    const retry = vi.fn();
+    const discard = vi.fn();
+    render(<MessagesTimeline messages={[]} workLog={[]} streaming={false}
+      failedMessages={[
+        { id: 'unknown', text: 'Unknown prompt', kind: 'prompt', createdAt: '', deliveryUnknown: true, retryable: false, error: 'Receipt expired' },
+        { id: 'failed', text: 'Rejected prompt', kind: 'prompt', createdAt: '', retryable: true },
+        { id: 'command', text: '/pan status', kind: 'command', createdAt: '', retryable: true },
+      ]} onRetryFailed={retry} onDiscardFailed={discard} />);
+    expect(screen.getByText('Delivery not confirmed')).toBeInTheDocument();
+    expect(screen.getByText('Failed to send')).toBeInTheDocument();
+    expect(screen.getByText('Command request failed')).toBeInTheDocument();
+    expect(screen.getByText('Receipt expired')).toBeInTheDocument();
+    expect(screen.getByText('Unknown prompt')).toBeInTheDocument();
+    const retries = screen.getAllByRole('button', { name: 'Retry' });
+    expect(retries).toHaveLength(2);
+    fireEvent.click(retries[0]);
+    expect(retry).toHaveBeenCalledWith('failed', 'Rejected prompt');
+    const discards = screen.getAllByRole('button', { name: 'Discard' });
+    expect(discards).toHaveLength(3);
+    fireEvent.click(discards[0]);
+    expect(discard).toHaveBeenCalledWith('unknown');
+  });
+
+  it.each([
+    ['pending', false, 'Sending…'],
+    ['accepted', true, 'Sent · waiting for transcript'],
+    ['unknown', false, 'Delivery not confirmed'],
+  ] as const)('renders the %s delivery state without losing the message text', (deliveryState, acknowledged, label) => {
+    render(<MessagesTimeline messages={[{
+      ...makeMessage('optimistic-id', 'user', 0, 'Preserved prompt'), deliveryState, acknowledged,
+    }]} workLog={[]} streaming={false} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.getByText('Preserved prompt')).toBeInTheDocument();
+  });
+
   it('handles target-message scroll requests once per target key', async () => {
     const messages: ChatMessage[] = [
       makeMessage('u1', 'user', 0, 'hello'),

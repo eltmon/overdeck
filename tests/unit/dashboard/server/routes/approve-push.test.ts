@@ -7,10 +7,13 @@
  * past the local ancestor, gitPush throws MainDivergedError; the handler must:
  *
  *   1. Return HTTP 409 (not 400 or 500)
- *   2. Mark the workspace stuck via markWorkspaceStuck()
- *   3. Include the diverged SHAs in the error message
- *   4. NOT reset local main automatically — the operator must preserve and
+ *   2. Include the diverged SHAs in the error message
+ *   3. NOT reset local main automatically — the operator must preserve and
  *      reconcile local commits before retrying.
+ *
+ * PAN-3917: the `markWorkspaceStuck` record flag is gone. The 409 and its
+ * recovery instructions ARE the signal — the next attempt re-reads git, so
+ * nothing has to remember that this happened.
  *
  * The approve route deliberately refuses to auto-reset because a reset on the
  * project repo would destroy work in the projectPath. The orphaned merge commit
@@ -23,12 +26,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Effect } from 'effect';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 const mockGitPush = vi.fn();
-const mockMarkWorkspaceStuck = vi.fn();
 const mockExec = vi.fn();
 
 // vi.hoisted so class definition is available before vi.mock() resolution
@@ -45,6 +46,19 @@ const { MainDivergedErrorClass } = vi.hoisted(() => {
   }
   return { MainDivergedErrorClass };
 });
+
+// PAN-3917: the record plane (`pan-dir/record*`, `records`, `agents`,
+// `auto-commit`) is being deleted by W3, and `auto-commit` already imports the
+// removed `state-read-home`, so merge-ops' module graph cannot load. Stub the
+// deleted modules and the boundaries that still reach them.
+vi.mock('../../../../../src/lib/agents/spawn.js', () => ({
+  spawnAgent: vi.fn(), spawnRun: vi.fn(), postAgentsRoute: vi.fn(),
+}));
+vi.mock('../../../../../src/lib/agents/tier-table.js', () => ({
+  DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
+}));
+vi.mock('../../../../../src/lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
+vi.mock('../../../../../src/dashboard/server/routes/specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -69,23 +83,12 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 vi.mock('../../../../../src/lib/git/operations.js', () => ({
-  gitPush: (...args: unknown[]) => Effect.tryPromise({
-    try: () => Promise.resolve(mockGitPush(...args)),
-    catch: (cause) => cause as any,
-  }),
+  gitPush: async (...args: unknown[]) => mockGitPush(...args),
   MainDivergedError: MainDivergedErrorClass,
   gitFetch: vi.fn(),
   gitForcePush: vi.fn(),
   gitMerge: vi.fn(),
 }));
-
-vi.mock('../../../../../src/lib/review-status.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../../src/lib/review-status.js')>();
-  return {
-    ...actual,
-    markWorkspaceStuck: (...args: unknown[]) => mockMarkWorkspaceStuck(...args),
-  };
-});
 
 // Stub out modules that merge-ops.ts imports at module scope
 vi.mock('../../../../../src/lib/projects.js', () => ({ resolveProjectFromIssue: vi.fn() }));
@@ -94,7 +97,6 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn().mockReturnValue([]),
   listRunningAgentsSync: vi.fn().mockReturnValue([]),
   getAgentState: vi.fn(),
-  getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
@@ -102,10 +104,6 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn(),
   getAgentRuntimeStateSync: vi.fn(),
   transitionIssueToInReview: vi.fn(),
-}));
-vi.mock('../../../../../src/lib/database/index.js', () => ({
-  getDatabase: vi.fn(() => ({ prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn(), all: vi.fn() })) })),
-  resetDatabase: vi.fn(),
 }));
 
 // ─── Import under test (after mocks) ─────────────────────────────────────────
@@ -131,10 +129,9 @@ describe('pushApproveMain — approve route divergence guard', () => {
     const result = await pushApproveMain(ISSUE_ID, PROJECT_PATH);
 
     expect(result.pushed).toBe(true);
-    expect(mockMarkWorkspaceStuck).not.toHaveBeenCalled();
   });
 
-  it('returns httpStatus=409 and calls markWorkspaceStuck when MainDivergedError is thrown', async () => {
+  it('returns httpStatus=409 naming both SHAs when MainDivergedError is thrown', async () => {
     const localSha = 'abc1234abcd';
     const remoteSha = 'xyz9876xyz9';
     mockGitPush.mockRejectedValue(
@@ -150,15 +147,8 @@ describe('pushApproveMain — approve route divergence guard', () => {
       // Error message includes both abbreviated SHAs
       expect(result.error).toContain(remoteSha.slice(0, 7));
       expect(result.error).toContain(localSha.slice(0, 7));
-      expect(result.error).toContain('stuck');
+      expect(result.error).toContain('recover');
     }
-
-    // markWorkspaceStuck must be called with the diverged SHAs
-    expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith(
-      ISSUE_ID,
-      'main_diverged',
-      expect.objectContaining({ localSha, remoteSha }),
-    );
   });
 
   it('returns httpStatus=400 (not 409) for non-divergence push failures', async () => {
@@ -171,9 +161,6 @@ describe('pushApproveMain — approve route divergence guard', () => {
       expect(result.httpStatus).toBe(400);
       expect(result.error).toContain('push failed');
     }
-
-    // Must not mark workspace stuck for a plain push failure
-    expect(mockMarkWorkspaceStuck).not.toHaveBeenCalled();
   });
 
   it('passes issueId and projectPath correctly to gitPush', async () => {
@@ -192,7 +179,7 @@ describe('pushApproveMain — approve route divergence guard', () => {
   // Regression: approve → divergence → workspace marked stuck, NO implicit hard-reset.
   // Recovery instructions are surfaced in the error message without prescribing
   // destructive reset.
-  it('marks workspace stuck on divergence without resetting local main', async () => {
+  it('reports divergence without resetting local main', async () => {
     const localSha = 'aaa1111aaaa';
     const remoteSha = 'bbb2222bbbb';
     mockGitPush.mockRejectedValue(
@@ -206,11 +193,6 @@ describe('pushApproveMain — approve route divergence guard', () => {
     expect(mockExec).not.toHaveBeenCalledWith(
       'git reset --hard origin/main',
       expect.anything(),
-    );
-    expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith(
-      ISSUE_ID,
-      'main_diverged',
-      expect.objectContaining({ localSha, remoteSha }),
     );
     // Error message must include recovery instructions so the user knows what to do
     if (!result.pushed) {

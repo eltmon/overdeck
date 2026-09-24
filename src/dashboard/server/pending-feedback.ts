@@ -1,19 +1,23 @@
 /**
  * Pending feedback recovery for dashboard restarts (PAN-585).
  *
- * Feedback files and review-status rows are persistent, but tmux delivery is not.
- * When the dashboard dies after writing feedback and before messageAgent() completes,
- * startup replays the queued delivery so the work agent is notified.
+ * Feedback files are persistent, but tmux delivery is not. When the dashboard
+ * dies after writing feedback and before messageAgent() completes, startup
+ * replays the queued delivery so the work agent is notified.
+ *
+ * PAN-3917 FR-6: whether a queued delivery is still worth replaying is derived
+ * from the issue's live state — a review complaint matters while the PR still
+ * asks for changes, a test complaint while its checks are still red.
  */
 
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { Effect } from 'effect';
-import { messageAgent, getAgentState as getAgentStateProgram, type AgentState } from '../../lib/agents.js';
-import { getReviewStatusSync, loadReviewStatuses, type ReviewStatus } from '../../lib/review-status.js';
+import { messageAgent, getAgentState as getAgentStateImpl, type AgentState } from '../../lib/agents.js';
+import type { DerivedIssueState } from '@overdeck/contracts';
+import { getDerivedIssueState } from './services/derived-issue-state.js';
 import { getOverdeckHome } from '../../lib/paths.js';
-import { emitActivityEntrySync } from '../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../lib/activity-logger.js';
 
 const PENDING_FEEDBACK_FILE = join(getOverdeckHome(), 'pending-feedback-deliveries.json');
 const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -53,14 +57,16 @@ async function writeStore(filePath: string, store: PendingFeedbackStore): Promis
   await writeFile(filePath, JSON.stringify(store, null, 2), 'utf-8');
 }
 
-function isDeliveryStillRelevant(delivery: PendingFeedbackDelivery, status: ReviewStatus | null | undefined): boolean {
+function isDeliveryStillRelevant(
+  delivery: PendingFeedbackDelivery,
+  derived: DerivedIssueState | null | undefined,
+): boolean {
   switch (delivery.kind) {
     case 'review-blocked':
-      return status?.reviewStatus === 'blocked';
     case 'review-failed':
-      return status?.reviewStatus === 'failed';
+      return derived?.state === 'changes-requested';
     case 'test-failed':
-      return status?.testStatus === 'failed';
+      return derived?.pr?.checks === 'red';
     default:
       return false;
   }
@@ -108,16 +114,15 @@ export async function processPendingFeedbackDeliveries(options?: {
   now?: number;
   _deliver?: (agentId: string, message: string) => Promise<void>;
   _getAgentState?: (agentId: string) => Promise<AgentState | null>;
-  _loadStatuses?: typeof loadReviewStatuses;
-  _getStatus?: typeof getReviewStatusSync;
+  _getState?: (issueId: string) => Promise<DerivedIssueState | null>;
 }): Promise<void> {
   const filePath = options?.filePath ?? PENDING_FEEDBACK_FILE;
   const staleThresholdMs = options?.staleThresholdMs ?? STALE_THRESHOLD_MS;
   const now = options?.now ?? Date.now();
   const deliver = options?._deliver ?? messageAgent;
-  const getAgentState = options?._getAgentState ?? ((agentId: string) => Effect.runPromise(getAgentStateProgram(agentId)));
-  const loadStatuses = options?._loadStatuses ?? loadReviewStatuses;
-  const getStatus = options?._getStatus ?? getReviewStatusSync;
+  const getAgentState = options?._getAgentState ?? (async (agentId: string) => getAgentStateImpl(agentId));
+  const getState = options?._getState
+    ?? ((issueId: string) => getDerivedIssueState(issueId).catch(() => null));
 
   if (!existsSync(filePath)) return;
 
@@ -127,7 +132,6 @@ export async function processPendingFeedbackDeliveries(options?: {
     return;
   }
 
-  const statuses = loadStatuses();
   const remaining: PendingFeedbackDelivery[] = [];
 
   for (const delivery of store.deliveries) {
@@ -136,8 +140,14 @@ export async function processPendingFeedbackDeliveries(options?: {
       continue;
     }
 
-    const status = statuses[delivery.issueId] ?? getStatus(delivery.issueId);
-    if (!isDeliveryStillRelevant(delivery, status)) {
+    // A forge blip is not an answer: an unreadable state keeps the delivery
+    // queued, the same way an agent that is not up yet does.
+    const derived = await getState(delivery.issueId);
+    if (derived === null) {
+      remaining.push(delivery);
+      continue;
+    }
+    if (!isDeliveryStillRelevant(delivery, derived)) {
       continue;
     }
 
@@ -149,7 +159,7 @@ export async function processPendingFeedbackDeliveries(options?: {
 
     try {
       await deliver(delivery.agentId, delivery.message);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'dashboard',
         level: 'warn',
         message: `${delivery.issueId} — replayed missed ${delivery.kind} feedback after restart`,

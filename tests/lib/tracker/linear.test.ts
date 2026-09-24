@@ -403,6 +403,12 @@ describe('LinearTracker', () => {
         { type: 'started', expected: 'in_progress' },
         { type: 'completed', expected: 'closed' },
         { type: 'canceled', expected: 'closed' },
+        // Live workspaces can add terminal custom state types outside
+        // Linear's documented triage/backlog/unstarted/started/completed/
+        // canceled set (confirmed on the mind-your-now MIN team's "Duplicate"
+        // state, PAN-3917 w1-plan-home) — an unmapped one silently fell back
+        // to 'open' and inflated every open-issue count.
+        { type: 'duplicate', expected: 'closed' },
       ];
 
       for (const test of stateTests) {

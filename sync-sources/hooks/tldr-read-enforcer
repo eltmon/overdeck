@@ -106,7 +106,7 @@ case "$EXT_LOWER" in
     ;;
 esac
 
-# Metrics helper (PAN-3534): bypasses.log feeds getTldrMetricsSync(); these
+# Metrics helper (PAN-3534): bypasses.log feeds getTldrMetrics(); these
 # writes were dropped in a refactor and the metrics were dead from Feb 2026.
 # Format matches the reader: "timestamp reason rel_path".
 log_bypass() {
@@ -345,7 +345,7 @@ SUMMARY="${SUMMARY}
 ---
 To read the full file, use Read with offset/limit parameters for the specific section you need to edit."
 
-# Metrics (PAN-3534): interceptions.log feeds getTldrMetricsSync().
+# Metrics (PAN-3534): interceptions.log feeds getTldrMetrics().
 # Format matches the reader: "timestamp file_size rel_path".
 mkdir -p "$PROJECT_DIR/.tldr" 2>/dev/null
 printf '%s %s %s\n' "$(date +%s)" "$FILE_SIZE" "$REL_PATH" >> "$PROJECT_DIR/.tldr/interceptions.log" 2>/dev/null

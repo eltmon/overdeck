@@ -3,22 +3,32 @@ import { Effect } from 'effect';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
+// PAN-3917 W6: W3 deletes the record plane; config-yaml still reaches it
+// transitively (config-yaml/defaults → agents/tier-table → pan-dir/record).
+// Stub the chain entry so the module under test loads.
+
 const homeDir = homedir();
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn((id: string) => Effect.succeed(mockRuntimeStates.get(id) ?? null)),
-  getAgentStateSync: vi.fn((id: string) => mockAgentStates.get(id) ?? null),
+  getAgentState: vi.fn((id: string) => mockAgentStates.get(id) ?? null),
   listRunningAgents: vi.fn(() => []),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
+  listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   listSessionNames: vi.fn(() => Effect.succeed([])),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
 }));
 
 vi.mock('../../../../../src/lib/agent-input-detection.js', () => ({
-  detectAwaitingInputFromPaneSync: vi.fn(() => null),
-  detectAwaitingInputForAgent: vi.fn(() => Effect.succeed(null)),
+  detectAwaitingInputFromPane: vi.fn(() => null),
+  detectAwaitingInputForAgent: vi.fn(async () => null),
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/session-presence.js', () => ({
@@ -31,10 +41,6 @@ vi.mock('../../../../../src/dashboard/server/services/session-presence.js', () =
   }),
 }));
 
-vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
-  getReviewStatusSync: vi.fn(() => null),
-}));
-
 vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
   resolveJsonlPath: vi.fn(async () => null),
 }));
@@ -43,12 +49,17 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectPath: '/tmp/overdeck' })),
   listProjectsSync: vi.fn(() => []),
   resolveProjectFromIssue: vi.fn(),
+  // PAN-3917 (W6): the derived issue state resolves the owning project from a
+  // path before it asks the forge; unregistered here, so it never asks.
+  findProjectByPath: vi.fn(() => null),
 }));
 
 const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
 vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
   readWorkspacePlan: vi.fn(),
+  // The FR-6 spec lookup reads the specs directory through this resolver.
+  findSpecByIssue: vi.fn(() => null),
 }));
 
 vi.mock('node:fs/promises', async () => {
@@ -76,7 +87,6 @@ vi.mock('node:fs/promises', async () => {
 });
 
 import { extractReviewerRole, fetchActivityDataWithContext } from '../../../../../src/dashboard/server/routes/command-deck.ts';
-import { getReviewStatusSync } from '../../../../../src/dashboard/server/review-status.js';
 import { resolveJsonlPath } from '../../../../../src/dashboard/server/routes/jsonl-resolver.js';
 
 const mockAgentStates = vi.hoisted(() => new Map<string, any>());
@@ -140,7 +150,6 @@ describe('fetchActivityDataWithContext', () => {
     mockAgentStates.clear();
     mockRuntimeStates.clear();
     mockIsPlanningComplete.mockReturnValue(Effect.succeed(false));
-    vi.mocked(getReviewStatusSync).mockReturnValue(null);
     vi.mocked(resolveJsonlPath).mockResolvedValue(null);
   });
 
@@ -276,9 +285,6 @@ describe('fetchActivityDataWithContext', () => {
   it('uses merge-door history without probing a synthetic ship conversation', async () => {
     const issueId = 'PAN-3020';
     const shipId = 'agent-pan-3020-ship';
-    vi.mocked(getReviewStatusSync).mockReturnValue({
-      history: [{ type: 'merge', status: 'merging', timestamp: '2026-07-24T12:00:00Z' }],
-    } as ReturnType<typeof getReviewStatusSync>);
 
     const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set() });
     const sections = (result as { sections: Array<{ sessionId: string; type: string }> }).sections;
@@ -298,9 +304,6 @@ describe('fetchActivityDataWithContext', () => {
       status: 'stopped',
       startedAt: '2026-07-24T12:00:00Z',
     });
-    vi.mocked(getReviewStatusSync).mockReturnValue({
-      history: [{ type: 'merge', status: 'passed', timestamp: '2026-07-24T12:00:00Z' }],
-    } as ReturnType<typeof getReviewStatusSync>);
     vi.mocked(resolveJsonlPath).mockImplementation(async (agentId) => (
       agentId === shipId ? '/tmp/ship.jsonl' : null
     ));

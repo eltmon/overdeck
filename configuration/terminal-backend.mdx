@@ -1,0 +1,134 @@
+---
+title: Terminal backend
+description: Herdr is the default terminal backend; how it is installed, verified, and opted out of
+---
+
+# Terminal backend
+
+Every agent Overdeck runs lives in a **terminal-backend pane**. The default
+backend is [Herdr](https://herdr.dev), a terminal workspace manager with a
+headless server per session. tmux is still supported, but only when you ask
+for it.
+
+Herdr is **strict**: if it is selected and its binary or this home's session
+server is missing, agent launches fail with an error that names `pan install`.
+Overdeck never falls back to tmux silently.
+
+## Selection
+
+Overdeck picks the backend from these sources, in order:
+
+1. The `OVERDECK_TERMINAL_BACKEND` environment variable (`herdr` or `tmux`).
+2. `terminal.backend` in `~/.overdeck/config.yaml`:
+
+   ```yaml
+   terminal:
+     backend: herdr   # or tmux
+   ```
+
+3. Otherwise `herdr`.
+
+Selection is a policy, not a probe: a missing `herdr` binary does not change
+it. Availability is checked separately, every time an agent launches — the
+`herdr` binary on `PATH` or in `~/.local/bin`, and the session socket for this
+Overdeck home (`~/.config/herdr/sessions/<session>/herdr.sock`, where
+`<session>` is `overdeck` for the default `~/.overdeck` home).
+
+The dashboard logs the result once at boot:
+
+```text
+[terminal] backend=herdr source=default session=overdeck socket=/home/you/.config/herdr/sessions/overdeck/herdr.sock binary=/home/you/.local/bin/herdr
+```
+
+When Herdr is selected but unavailable, that line is an error that starts with
+`UNAVAILABLE:` and says what is missing.
+
+## What `pan install` and `pan sync` do
+
+Both commands run the same Herdr setup:
+
+- **Binary.** If `herdr` is missing, it is installed with the vendor installer
+  (`curl -fsSL https://herdr.dev/install.sh | sh`) into `~/.local/bin`. An
+  installer-managed binary is kept on the `stable` channel; a binary installed
+  by Homebrew, mise or Nix is verified but never changed.
+- **Config.** `~/.config/herdr/config.toml` gets:
+
+  ```toml
+  [session]
+  resume_agents_on_restore = false
+  ```
+
+  Herdr's default is `true`, which relaunches every agent pane with its native
+  resume after a Herdr server restart. That would bypass Overdeck's own resume
+  gates, so agents you paused, stopped, or that a pipeline gate is holding
+  would come back on their own. The file is edited line by line: your comments
+  and other settings stay exactly as they were. The result is checked with
+  `herdr config check`, and a running server reloads it with
+  `herdr server reload-config`.
+- **Session server.** One headless `herdr --session <session> server` per
+  Overdeck home. On a systemd host it runs as the user unit
+  `<session>-herdr.service` — `overdeck-herdr.service` for the default home.
+  Elsewhere it is started detached, logging to
+  `~/.overdeck/logs/herdr-<session>.log`. `pan up` also makes sure this server
+  is running.
+- **Integrations.** Herdr integrations report an agent's lifecycle to Herdr
+  directly instead of Herdr reading the screen. Overdeck installs the pilot set
+  — `pi`, `omp`, `kimi` (Kimi Code 0.14.0 or later) and `opencode` — for each
+  harness whose binary is installed. `claude`, `codex` and `hermes` only report
+  session identity, which Overdeck does not use yet, so Overdeck neither
+  installs nor removes them.
+
+The Herdr step is skipped under `CI`, under Vitest, when the backend is
+explicitly tmux, and with `pan install --skip-herdr`. Re-running either command
+is safe: with everything in place it installs nothing and writes nothing.
+
+## Updates
+
+Overdeck compares the installed version with `https://herdr.dev/latest.json`
+(an unreachable manifest skips the check; it is never an error).
+
+- `pan install` runs `herdr update` when a newer stable release exists.
+- `pan sync` runs `herdr update` only when no session server is running for
+  this home. When one is running, it prints the manual steps instead.
+- `pan up` never updates.
+
+**Nothing ever restarts the session server automatically.** A restart closes
+every agent pane, so it is always your call: run
+`systemctl --user restart overdeck-herdr.service` at a quiet moment.
+`pan doctor` warns when the running server is older than the installed binary.
+
+## `pan doctor` rows
+
+| Row | ok | warn | error |
+| --- | --- | --- | --- |
+| `Terminal backend` | Herdr selected and available, or tmux selected explicitly | — | Herdr selected but unavailable (fix: `pan install`) |
+| `Herdr binary` | Version, path and channel | Channel is not stable; `~/.local/bin` is not on `PATH` | Not found |
+| `Herdr server` | Running, endpoint compatible, unit active | Needs a restart; running outside its unit on a systemd host | Not running; not endpoint compatible |
+| `Herdr config` | `resume_agents_on_restore = false` | — | Missing, unset, or `true` (fix: `pan sync`) |
+| `Herdr integration: <target>` | Pilot installed; pilot harness not installed; `claude`/`codex`/`hermes` not installed | Pilot outdated; unrecognized status; `claude` installed but Overdeck's `SessionStart` hook missing | Pilot harness installed but its integration is not (fix: `pan sync`) |
+
+Under an explicit tmux backend, only the `Terminal backend` row is shown.
+
+## Opting into tmux
+
+Set the backend in `~/.overdeck/config.yaml`:
+
+```yaml
+terminal:
+  backend: tmux
+```
+
+or export `OVERDECK_TERMINAL_BACKEND=tmux`. With `terminal.backend: tmux`,
+Overdeck skips all Herdr setup and runs agents on the `tmux -L overdeck`
+socket.
+
+## Claude Code hooks
+
+If you install Herdr's `claude` integration yourself, it adds a
+`SessionStart` hook to `~/.claude/settings.json`. Overdeck registers its own
+`SessionStart` hook in the same list. Claude Code runs all matching hooks for
+an event **in parallel**, and the two are independent: Herdr's reports the
+session to Herdr; Overdeck's injects context and starts the heartbeat. `pan sync`
+never removes Herdr's entry, and Herdr's installer does not remove Overdeck's.
+`pan doctor` warns if Herdr's `claude` integration is installed while
+Overdeck's `SessionStart` hook is missing.

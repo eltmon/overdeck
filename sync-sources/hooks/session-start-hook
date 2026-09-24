@@ -22,10 +22,12 @@ INPUT=$(cat 2>/dev/null || echo '{}')
 CLAUDE_SESSION_ID=""
 MODEL=""
 SOURCE=""
+TRANSCRIPT_PATH=""
 if command -v jq >/dev/null 2>&1; then
   CLAUDE_SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null)
   MODEL=$(echo "$INPUT" | jq -r '.model // .model_name // ""' 2>/dev/null)
   SOURCE=$(echo "$INPUT" | jq -r '.source // ""' 2>/dev/null)
+  TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // ""' 2>/dev/null)
 fi
 [ -z "$MODEL" ] && MODEL="${ANTHROPIC_MODEL:-}"
 
@@ -42,6 +44,9 @@ pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"hookN
 # its presence means "this session reached the prompt".
 READY_DIR="${OVERDECK_HOME:-$HOME/.overdeck}/agents/$AGENT_ID"
 mkdir -p "$READY_DIR" 2>/dev/null
+if [ -n "$CLAUDE_SESSION_ID" ] && command -v jq >/dev/null 2>&1; then
+  pan_append_session_index "$READY_DIR" "$CLAUDE_SESSION_ID" "$TS" "session-start-hook" "claude-code" "$MODEL" "$TRANSCRIPT_PATH" || true
+fi
 if command -v jq >/dev/null 2>&1; then
   jq -n --arg agentId "$AGENT_ID" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \
     '{ready: true, agentId: $agentId, sessionId: (if $sid == "" then null else $sid end), reason: "session-start", timestamp: $ts}' \
@@ -53,9 +58,10 @@ fi
 
 if [ -n "$MODEL" ]; then
   if command -v jq >/dev/null 2>&1; then
-    BODY=$(jq -n --arg model "$MODEL" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \
-      'if $sid == "" then {kind: "model_set", model: $model, timestamp: $ts}
-       else {kind: "model_set", model: $model, claudeSessionId: $sid, timestamp: $ts} end')
+    BODY=$(jq -n --arg model "$MODEL" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" --arg tp "$TRANSCRIPT_PATH" \
+      '{kind: "model_set", model: $model, timestamp: $ts}
+       + (if $sid == "" then {} else {claudeSessionId: $sid} end)
+       + (if $tp == "" then {} else {transcriptPath: $tp} end)')
   elif [ -n "$CLAUDE_SESSION_ID" ]; then
     BODY="{\"kind\":\"model_set\",\"model\":\"$MODEL\",\"claudeSessionId\":\"$CLAUDE_SESSION_ID\",\"timestamp\":\"$TS\"}"
   else

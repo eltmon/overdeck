@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
+import { generateLauncherScript, type LauncherConfig  } from '../launcher-generator.js';
 
 // Pin OVERDECK_HOME to an empty temp dir so the COLORFGBG export (derived
 // from ~/.overdeck/ui-theme.json) deterministically uses the dark default
@@ -42,7 +42,7 @@ function materializeGitGuard(): { script: string; wrapperPath: string; worktree:
   writeFileSync(realGitPath, '#!/bin/sh\nexit 23\n');
   chmodSync(realGitPath, 0o755);
 
-  const script = generateLauncherScriptSync({
+  const script = generateLauncherScript({
     ...DEFAULT_CONFIG,
     workingDir: worktree,
     changeDir: false,
@@ -69,24 +69,24 @@ function materializeGitGuard(): { script: string; wrapperPath: string; worktree:
 
 describe('generateLauncherScript', () => {
   it('exports the spawning process home for non-remote launchers', () => {
-    const script = generateLauncherScriptSync(DEFAULT_CONFIG);
+    const script = generateLauncherScript(DEFAULT_CONFIG);
     expect(script).toContain(`export OVERDECK_HOME='${tempHome}'`);
   });
 
   it('omits the spawning process home from remote launchers', () => {
-    const script = generateLauncherScriptSync({ ...DEFAULT_CONFIG, spawnMode: 'remote' });
+    const script = generateLauncherScript({ ...DEFAULT_CONFIG, spawnMode: 'remote' });
     expect(script).not.toContain('export OVERDECK_HOME=');
   });
 
   it('reflects a changed process home in non-remote launchers', () => {
     const alternateHome = join(tempHome, 'alternate home');
     process.env.OVERDECK_HOME = alternateHome;
-    const script = generateLauncherScriptSync(DEFAULT_CONFIG);
+    const script = generateLauncherScript(DEFAULT_CONFIG);
     expect(script).toContain(`export OVERDECK_HOME='${alternateHome}'`);
   });
 
   it('work agent spawn (basic)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
@@ -105,7 +105,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work agent with provider and caveman exports', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"\nexport ANTHROPIC_AUTH_TOKEN="tok"',
@@ -129,7 +129,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work agent resume (PAN-982: permissions via --agent frontmatter)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
@@ -159,7 +159,7 @@ describe('generateLauncherScript', () => {
     expect(script).toContain('export PATH="');
     expect(script).toContain('git-guard:$PATH"');
 
-    const conversationScript = generateLauncherScriptSync({
+    const conversationScript = generateLauncherScript({
       ...DEFAULT_CONFIG,
       spawnMode: 'conversation',
       overdeckEnv: { agentId: 'conv-123', issueId: 'PAN-806' },
@@ -219,7 +219,7 @@ describe('generateLauncherScript', () => {
     const worktree = join(tempHome, 'workspace');
     mkdirSync(worktree, { recursive: true });
     const launcherPath = join(tempHome, 'inherited-guard-launcher.sh');
-    writeFileSync(launcherPath, generateLauncherScriptSync({
+    writeFileSync(launcherPath, generateLauncherScript({
       ...DEFAULT_CONFIG,
       workingDir: worktree,
       changeDir: false,
@@ -253,7 +253,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('planning agent spawn', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'plan',
       workingDir: '/workspace/project',
@@ -440,7 +440,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('review role script supports specialist-style prompt launch', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'review',
       workingDir: '/workspace/project',
@@ -626,7 +626,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('supports prompt files on stdin for headless launchers', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'review',
       promptFile: '/tmp/prompt.md',
@@ -640,7 +640,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('review sub-role launcher owns the synthesis signal (PAN-977)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'review',
       promptFile: '/agents/agent-pan-1-review-security/initial-prompt.md',
@@ -649,6 +649,7 @@ describe('generateLauncherScript', () => {
       baseCommand: 'claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5',
       sessionId: 'sess-rev',
       reviewSignal: {
+        agentId: 'agent-pan-1-review-security',
         synthesisAgentId: 'agent-pan-1-review',
         subRole: 'security',
         outputPath: '/agents/agent-pan-1-review-security/review-security.md',
@@ -673,12 +674,23 @@ describe('generateLauncherScript', () => {
     expect(script).toContain('elif [ -s \'/agents/agent-pan-1-review-security/review-security.md\' ]; then');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_READY security /agents/agent-pan-1-review-security/review-security.md" || true');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED security reviewer exited (code $CLAUDE_EXIT) without writing report" || true');
+    // PAN-3848 (W26, FR-21): the launcher writes the reviewer's stopped state on
+    // exit — after the signal `fi`, before the signal-marker touch. PAN-3848
+    // (F5): the write is retried, never swallowed with `|| true`.
+    const fiIndex = script.indexOf('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED');
+    const exitLineIndex = script.indexOf('pan admin agents exited \'agent-pan-1-review-security\' --code "$CLAUDE_EXIT"');
+    const touchIndex = script.indexOf("touch '/agents/agent-pan-1-review-security/reviewer-signaled'");
+    expect(exitLineIndex).toBeGreaterThan(-1);
+    expect(exitLineIndex).toBeGreaterThan(fiIndex);
+    expect(exitLineIndex).toBeLessThan(touchIndex);
+    expect(script).toContain('for PAN_EXIT_ATTEMPT in 1 2 3; do');
+    expect(script).not.toContain('pan admin agents exited \'agent-pan-1-review-security\' --code "$CLAUDE_EXIT" || true');
     expect(script).toContain("touch '/agents/agent-pan-1-review-security/reviewer-signaled'");
     expect(script).toContain("rm -f '/agents/agent-pan-1-review-security/reviewer-launcher.pid'");
   });
 
   it('work role identity prompt launch', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       workingDir: '/workspace/project',
@@ -715,7 +727,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('review agent', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'review',
       workingDir: '/workspace/project',
@@ -741,7 +753,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('conversation panel (new session)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'conversation',
@@ -780,7 +792,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('conversation panel (resume)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'conversation',
@@ -814,7 +826,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('remote agent', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'remote',
@@ -838,7 +850,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('runtime adapter', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       workingDir: '/workspace/project',
@@ -860,7 +872,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('planning continuation', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       workingDir: '/workspace/project',
@@ -881,7 +893,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('escapeForBase64 escapes $ characters', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'remote',
@@ -901,7 +913,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work agent without changeDir', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       changeDir: false,
@@ -924,7 +936,7 @@ describe('generateLauncherScript', () => {
   // the generator must pass it through verbatim into the exec line.
 
   it('appends workspace and briefing system prompt files without adding model flags', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --agent pan-work-agent',
@@ -934,12 +946,13 @@ describe('generateLauncherScript', () => {
       ],
     });
 
-    expect(script).toContain("--append-system-prompt-file '/workspace/project/.pan/context/workspace.md' --append-system-prompt-file '/home/u/.overdeck/session-context.md'");
+    expect(script.match(/--append-system-prompt-file/g)).toHaveLength(1);
+    expect(script).toContain("'/workspace/project/.pan/context/workspace.md' '/home/u/.overdeck/session-context.md'");
     expect(script).not.toMatch(/--model/);
   });
 
   it('work agent with --agent flag (Anthropic model — no --model, no permission flags)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --agent pan-work-agent',
@@ -951,7 +964,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('work agent with --agent flag and --model override (non-Anthropic)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
@@ -963,7 +976,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('planning agent with --agent flag', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'plan',
       promptFile: '/tmp/init-prompt.txt',
@@ -975,7 +988,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('resume agent preserves --agent across --resume', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
@@ -989,7 +1002,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('review role with --agent flag', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'review',
       promptFile: '/tmp/prompt.md',
@@ -1002,7 +1015,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('--agent with --name produces both flags', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --agent pan-work-agent --name agent-pan-982',
@@ -1012,7 +1025,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('wraps work agent claude command in the PTY supervisor', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --agent pan-work-agent',
@@ -1028,7 +1041,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('wraps conversation claude command while preserving post-exit behavior', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'conversation',
@@ -1055,8 +1068,8 @@ describe('generateLauncherScript', () => {
       baseCommand: 'claude --agent pan-work-agent',
       sessionId: 'sess-work',
     };
-    expect(generateLauncherScriptSync({ ...workConfig, useSupervisor: false })).toBe(
-      generateLauncherScriptSync(workConfig),
+    expect(generateLauncherScript({ ...workConfig, useSupervisor: false })).toBe(
+      generateLauncherScript(workConfig),
     );
 
     const conversationConfig: LauncherConfig = {
@@ -1067,14 +1080,14 @@ describe('generateLauncherScript', () => {
       resumeSessionId: 'sess-conv',
       keepAlive: true,
     };
-    expect(generateLauncherScriptSync({ ...conversationConfig, useSupervisor: false })).toBe(
-      generateLauncherScriptSync(conversationConfig),
+    expect(generateLauncherScript({ ...conversationConfig, useSupervisor: false })).toBe(
+      generateLauncherScript(conversationConfig),
     );
   });
 
   it('requires supervisorScriptPath when supervisor wrapping is enabled', () => {
     expect(() =>
-      generateLauncherScriptSync({
+      generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         baseCommand: 'claude',
@@ -1084,7 +1097,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('quotes supervisorScriptPath in the emitted exec line', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude',
@@ -1095,7 +1108,7 @@ describe('generateLauncherScript', () => {
   });
 
   it('ignores supervisor wrapping for ohmypi launchers and review sub-role launchers', () => {
-    const piScript = generateLauncherScriptSync({
+    const piScript = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'ohmypi',
@@ -1111,7 +1124,7 @@ describe('generateLauncherScript', () => {
     expect(piScript).not.toContain('exec omp');
     expect(piScript).not.toContain('pty-supervisor.js');
 
-    const reviewScript = generateLauncherScriptSync({
+    const reviewScript = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'review',
       promptFile: '/tmp/prompt.md',
@@ -1121,6 +1134,7 @@ describe('generateLauncherScript', () => {
       useSupervisor: true,
       supervisorScriptPath: '/opt/pty-supervisor.js',
       reviewSignal: {
+        agentId: 'agent-pan-1-review-security',
         synthesisAgentId: 'agent-pan-1-review',
         subRole: 'security',
         outputPath: '/tmp/review.md',
@@ -1132,51 +1146,111 @@ describe('generateLauncherScript', () => {
     expect(reviewScript).toContain('timeout 1800 claude --print');
     expect(reviewScript).not.toContain('pty-supervisor.js');
   });
+
+  it('PAN-3848 (W26, FR-21): a reviewer exit makes the launcher report `pan admin agents exited` — no patrol needed', () => {
+    // Fixture: a stub `pan` on PATH records its argv, and the reviewer command
+    // exits 7. Running the generated launcher must emit the exit report —
+    // the transition writes its own state. The verb's state write itself is
+    // covered by tests/unit/cli/admin-agents-exited.test.ts.
+    const binDir = join(tempHome, 'bin');
+    mkdirSync(binDir, { recursive: true });
+    const panLog = join(tempHome, 'pan-calls.log');
+    writeFileSync(join(binDir, 'pan'), `#!/bin/sh\necho "$@" >> '${panLog}'\nexit 0\n`);
+    chmodSync(join(binDir, 'pan'), 0o755);
+    writeFileSync(join(binDir, 'fake-claude'), '#!/bin/sh\nexit 7\n');
+    chmodSync(join(binDir, 'fake-claude'), 0o755);
+
+    const launcherPath = join(tempHome, 'reviewer-launcher.sh');
+    const markerPath = join(tempHome, 'reviewer-signaled');
+    writeFileSync(launcherPath, generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'review',
+      workingDir: tempHome,
+      changeDir: false,
+      trapHup: true,
+      baseCommand: 'fake-claude',
+      reviewSignal: {
+        agentId: 'agent-pan-1-review-security',
+        synthesisAgentId: 'agent-pan-1-review',
+        subRole: 'security',
+        outputPath: join(tempHome, 'review-security.md'),
+        signalMarkerPath: markerPath,
+        launcherPidPath: join(tempHome, 'reviewer-launcher.pid'),
+        timeoutSeconds: 60,
+      },
+    }));
+
+    const result = spawnSync('bash', [launcherPath], {
+      encoding: 'utf-8',
+      env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ''}` },
+    });
+
+    expect(result.status).toBe(0);
+    const calls = readFileSync(panLog, 'utf8');
+    // No report file → REVIEWER_FAILED branch, then the exit report with the
+    // reviewer's own agent id and the real exit code.
+    expect(calls).toContain('admin agents exited agent-pan-1-review-security --code 7');
+    expect(existsSync(markerPath)).toBe(true);
+  });
+
+  it('PAN-3848 (F5): the launcher retries a failed reviewer-exit write before giving up', () => {
+    // Fixture: the stub `pan` fails the first `admin agents exited` call
+    // (transient state-store failure), then succeeds. The launcher must
+    // retry the exit transition — not swallow the first failure — and still
+    // touch the signal marker.
+    const binDir = join(tempHome, 'bin-retry');
+    mkdirSync(binDir, { recursive: true });
+    const panLog = join(tempHome, 'pan-calls-retry.log');
+    const attemptCounter = join(tempHome, 'exited-attempts');
+    writeFileSync(join(binDir, 'pan'),
+      `#!/bin/sh\n`
+      + `echo "$@" >> '${panLog}'\n`
+      + `case "$*" in\n`
+      + `  *"admin agents exited"*) n=$(cat '${attemptCounter}' 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > '${attemptCounter}'; [ "$n" -lt 2 ] && exit 1;;\n`
+      + `esac\n`
+      + `exit 0\n`);
+    chmodSync(join(binDir, 'pan'), 0o755);
+    writeFileSync(join(binDir, 'fake-claude'), '#!/bin/sh\nexit 7\n');
+    chmodSync(join(binDir, 'fake-claude'), 0o755);
+
+    const launcherPath = join(tempHome, 'reviewer-launcher-retry.sh');
+    const markerPath = join(tempHome, 'reviewer-signaled-retry');
+    writeFileSync(launcherPath, generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'review',
+      workingDir: tempHome,
+      changeDir: false,
+      trapHup: true,
+      baseCommand: 'fake-claude',
+      reviewSignal: {
+        agentId: 'agent-pan-1-review-security',
+        synthesisAgentId: 'agent-pan-1-review',
+        subRole: 'security',
+        outputPath: join(tempHome, 'review-security.md'),
+        signalMarkerPath: markerPath,
+        launcherPidPath: join(tempHome, 'reviewer-launcher.pid'),
+        timeoutSeconds: 60,
+      },
+    }));
+
+    const result = spawnSync('bash', [launcherPath], {
+      encoding: 'utf-8',
+      env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ''}` },
+    });
+
+    expect(result.status).toBe(0);
+    // Two attempts: the first failure retried, the second succeeded.
+    expect(readFileSync(attemptCounter, 'utf8').trim()).toBe('2');
+    expect(readFileSync(panLog, 'utf8').split('\n')
+      .filter((line) => line.includes('admin agents exited'))).toHaveLength(2);
+    expect(existsSync(markerPath)).toBe(true);
+  });
 });
 
 describe('generateLauncherWrapper', () => {
-  it('returns null when not using script wrapper', () => {
-    const wrapper = generateLauncherWrapperSync({
-      ...DEFAULT_CONFIG,
-      useScriptWrapper: false,
-    });
-    expect(wrapper).toBeNull();
-  });
 
-  it('returns null when scriptLogFile is missing', () => {
-    const wrapper = generateLauncherWrapperSync({
-      ...DEFAULT_CONFIG,
-      useScriptWrapper: true,
-    });
-    expect(wrapper).toBeNull();
-  });
 
-  it('generates script wrapper with innerScriptPath', () => {
-    const wrapper = generateLauncherWrapperSync({
-      ...DEFAULT_CONFIG,
-      useScriptWrapper: true,
-      scriptLogFile: '/tmp/log.txt',
-      innerScriptPath: '/tmp/run-claude.sh',
-    });
-    expect(wrapper).toMatchInlineSnapshot(`
-      "#!/bin/bash
-      exec script -qfaec "bash '/tmp/run-claude.sh'" '/tmp/log.txt'
-      "
-    `);
-  });
 
-  it('falls back to workingDir-based inner script path', () => {
-    const wrapper = generateLauncherWrapperSync({
-      ...DEFAULT_CONFIG,
-      useScriptWrapper: true,
-      scriptLogFile: '/tmp/log.txt',
-    });
-    expect(wrapper).toMatchInlineSnapshot(`
-      "#!/bin/bash
-      exec script -qfaec "bash '/workspace/project/run-claude.sh'" '/tmp/log.txt'
-      "
-    `);
-  });
 
   describe('channels bridge args', () => {
     const FIXTURE_CONFIG: LauncherConfig = {
@@ -1188,7 +1262,7 @@ describe('generateLauncherWrapper', () => {
     };
 
     it('flag-off: omits channels bridge arguments', () => {
-      const script = generateLauncherScriptSync(FIXTURE_CONFIG);
+      const script = generateLauncherScript(FIXTURE_CONFIG);
       expect(script).toBe(
         [
           '#!/bin/bash',
@@ -1205,7 +1279,7 @@ describe('generateLauncherWrapper', () => {
     });
 
     it('flag-on: appends --mcp-config and --dangerously-load-development-channels before --session-id', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...FIXTURE_CONFIG,
         channelsBridgeMcpConfig: '/tmp/agent-x/.mcp.json',
       });
@@ -1217,7 +1291,7 @@ describe('generateLauncherWrapper', () => {
     });
 
     it('flag-on with custom server name: uses the override', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...FIXTURE_CONFIG,
         channelsBridgeMcpConfig: '/tmp/x/.mcp.json',
         channelsBridgeServerName: 'custom-bridge',
@@ -1227,7 +1301,7 @@ describe('generateLauncherWrapper', () => {
     });
 
     it('flag-on for review role: same flags applied before session/model', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'review',
         baseCommand: 'claude',
@@ -1247,7 +1321,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   // ─── ohmypi harness tests ──────────────────────────────────────────────────
 
   it('ohmypi: emits omp --mode rpc with --extension, no --no-context-files, and stdin from fifo (AC1)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'ohmypi',
@@ -1278,7 +1352,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('ohmypi: uses --resume (not --session) for resumeSessionId (AC1, contract)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
@@ -1294,7 +1368,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('ohmypi: wrapWithSupervisor skips supervisor wrapping for ohmypi harness (AC3)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'ohmypi',
@@ -1310,7 +1384,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('ohmypi: tui mode omits --mode rpc and FIFO redirect (AC2)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       agentType: 'conversation',
       harness: 'ohmypi',
@@ -1330,7 +1404,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   // ─── Codex harness tests (PAN-1574) ───────────────────────────────────────────
 
   it('codex exec mode emits approval_policy=never and workspace sandbox', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1345,7 +1419,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('codex work-tui mode emits interactive codex with only -m (approval/sandbox from config.toml)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1361,7 +1435,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('codex work-tui mode RESUMES the thread when resumeSessionId is set (PAN-1988)', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1375,7 +1449,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('codex work-tui mode can be wrapped by the PTY supervisor', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1389,7 +1463,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('codex app-server mode launches the host without the PTY supervisor', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1405,7 +1479,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('codex app-server mode resumes by thread id', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1415,8 +1489,28 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     expect(script).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --effort 'high' --resume '019ee5e7-thread-abc'$/m);
   });
 
+  it('codex app-server conversations expose the native endpoint only when asked (PAN-3835)', () => {
+    const conversation = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+      codexNativeEndpoint: true,
+      resumeSessionId: '019ee5e7-thread-abc',
+    });
+    expect(conversation).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --effort 'high' --resume '019ee5e7-thread-abc' --native-endpoint$/m);
+
+    const workAgent = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+    });
+    expect(workAgent).not.toMatch(/--native-endpoint/);
+  });
+
   it('acp mode launches the authenticated host in an isolated provider environment', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'acp',
@@ -1447,7 +1541,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('acp mode refuses to launch without the preflight-resolved binary path', () => {
-    expect(() => generateLauncherScriptSync({
+    expect(() => generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'acp',
@@ -1459,7 +1553,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('codex tui escape hatch preserves the previous conversation command byte-for-byte', () => {
-    const legacy = generateLauncherScriptSync({
+    const legacy = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1468,7 +1562,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    const escapeHatch = generateLauncherScriptSync({
+    const escapeHatch = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1478,11 +1572,11 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
     expect(escapeHatch).toBe(legacy);
-    expect(escapeHatch).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+    expect(escapeHatch).toMatch(/^node '\/dist\/pty-supervisor\.js' codex$/m);
   });
 
   it('codex plan launchers do not receive Claude-only append-system-prompt flags', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'plan',
       harness: 'codex',
@@ -1490,24 +1584,25 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       codexMode: 'work-tui',
       appendSystemPromptFiles: ['/workspace/project/.pan/context.md'],
     });
-    expect(script).toMatch(/^codex -m 'gpt-5\.5'$/m);
+    expect(script).toContain('developer_instructions=');
+    expect(script).toContain("'/workspace/project/.pan/context.md'");
     expect(script).not.toMatch(/--append-system-prompt-file/);
   });
 
-  it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
-    const script = generateLauncherScriptSync({
+  it('codex conversation (tui) mode preserves native project AGENTS.md discovery', () => {
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
       codexMode: 'tui',
       spawnMode: 'conversation',
     });
-    expect(script).toMatch(/^codex -c project_doc_max_bytes=0$/m);
+    expect(script).toMatch(/^codex$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
   it('codex conversation (tui) mode can be wrapped by the PTY supervisor', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1516,12 +1611,12 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
   it('codex conversation (tui) resume uses interactive codex resume', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1531,12 +1626,12 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex resume -c project_doc_max_bytes=0 '019eaaec-4dfa-7ab1-90ba-9104d16534d1'$/m);
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex resume '019eaaec-4dfa-7ab1-90ba-9104d16534d1'$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
   it('codex exec mode stays off the PTY supervisor', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1549,7 +1644,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('codex exports CODEX_HOME env var when codexHome is set', () => {
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
@@ -1560,12 +1655,12 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
   });
 
   it('claude-code (default) output is bit-for-bit unchanged when harness is unset (AC3)', () => {
-    const a = generateLauncherScriptSync({
+    const a = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
-    const b = generateLauncherScriptSync({
+    const b = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'claude-code',
@@ -1576,7 +1671,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
 
   describe('kimi-code harness (PAN-1837)', () => {
     it('launches the native kimi TUI wrapped in the PTY supervisor with an isolated provider environment', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1596,7 +1691,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
 
     it('never emits --session (long form), --work-dir, or -p/--print (D2/erratum E1)', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1611,7 +1706,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
 
     it('resumes a captured session id via -S (PAN-1837)', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1623,7 +1718,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
 
     it('omits -S when no resumeSessionId is set (fresh launch)', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1634,7 +1729,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
 
     it('appends --add-dir once per configured directory', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1646,7 +1741,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
 
     it('omits --yolo when kimiCodeYolo is not set', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1657,7 +1752,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
 
     it('refuses to launch without a configured model', () => {
-      expect(() => generateLauncherScriptSync({
+      expect(() => generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1665,7 +1760,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
 
     it('conversation panel mode wraps the same command under the PTY supervisor', () => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1690,7 +1785,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       ['kimi-code/k3', "kimi-code/k3"],
       ['kimi-code/kimi-for-coding-highspeed', "kimi-code/kimi-for-coding-highspeed"],
     ])('translates the Overdeck model id %s to the CLI catalog id %s', (given, expected) => {
-      const script = generateLauncherScriptSync({
+      const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
@@ -1700,7 +1795,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
 
     it('refuses to launch a retired id the CLI catalog never carried', () => {
-      expect(() => generateLauncherScriptSync({
+      expect(() => generateLauncherScript({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',

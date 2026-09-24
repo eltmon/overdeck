@@ -1,11 +1,12 @@
 import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { listSessionNamesSync } from '../tmux.js';
+import { Effect } from 'effect';
+import { listSessionNames } from '../tmux.js';
 import { buildWorkAgentPrompt } from './work-agent-prompt.js';
 
 export interface EnsureSwarmForemanDeps {
-  listSessionNamesSync: () => string[];
+  listSessionNames: () => Promise<readonly string[]>;
   messageAgent: typeof messageAgent;
   buildWorkAgentPrompt: typeof buildWorkAgentPrompt;
   spawnRun: typeof spawnRun;
@@ -15,7 +16,7 @@ export interface EnsureSwarmForemanDeps {
 const defaultDeps: EnsureSwarmForemanDeps = {
   // Keep the binding lazy so importing Deacon does not force unrelated tests
   // with focused tmux mocks to provide this foreman-only dependency.
-  listSessionNamesSync: () => listSessionNamesSync(),
+  listSessionNames: () => Effect.runPromise(listSessionNames()),
   messageAgent,
   buildWorkAgentPrompt,
   spawnRun,
@@ -30,7 +31,7 @@ export async function ensureSwarmForeman(
 ): Promise<string[]> {
   const issue = issueId.toUpperCase();
   const agentId = `agent-${issue.toLowerCase()}`;
-  if (deps.listSessionNamesSync().includes(agentId)) {
+  if ((await deps.listSessionNames()).includes(agentId)) {
     await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, 'pan-swarm');
     return [`[swarm] attached to live foreman ${agentId} for ${issue}`];
   }

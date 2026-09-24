@@ -1,7 +1,7 @@
 /**
  * PAN-2500: the cached MemoryVerdict, split out from memory-governor.ts into
- * its own zero-dependency module. concurrency.ts (canDispatchAdvancing /
- * tryReserveAdvancingSlot) needs to read this synchronously without importing
+ * its own zero-dependency module so concurrency.ts could read it synchronously
+ * (its readers there were removed in PAN-3958 CH-8) without importing
  * memory-governor.ts directly — memory-governor.ts pulls in
  * dashboard/server/routes/resources/stacks.ts, which transitively reaches
  * concurrency.ts itself (stacks.ts -> review-status.ts -> agents.ts ->
@@ -35,6 +35,7 @@ export interface MemoryVerdict {
   swapFreeBytes?: number;
   psiSomeAvg10?: number | null;
   psiFullAvg10?: number | null;
+  loadPerCore?: number | null;
   trigger?: GovernorTrigger | null;
 }
 
@@ -49,10 +50,5 @@ export function getCachedMemoryVerdict(): MemoryVerdict | null {
 }
 
 export function setCachedMemoryVerdict(verdict: MemoryVerdict | null): void {
-  cachedVerdict = verdict;
-}
-
-/** Test-only. */
-export function setCachedMemoryVerdictForTests(verdict: MemoryVerdict | null): void {
   cachedVerdict = verdict;
 }

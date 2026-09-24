@@ -188,7 +188,11 @@ export async function recordSessionBriefingSize(input: {
   await writeFile(path, `${JSON.stringify(marker)}\n`, 'utf8');
 }
 
-/** Read a marker back, or null when this session has never been briefed. */
+/**
+ * Read a marker back, or null when this session has never been briefed.
+ *
+ * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
+ */
 export async function readSessionBriefingMarker(input: {
   identity: MemoryIdentity;
   sessionId: string;

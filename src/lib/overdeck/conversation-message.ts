@@ -8,8 +8,9 @@ import { Option } from 'effect';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { compactConversationNative, shouldInterceptManualCompact } from '../../dashboard/server/services/conversation-compaction.js';
 import { watchForEatenConversationMessage } from '../../dashboard/server/services/conversation-eaten-message-watcher.js';
-import { modelSupportsImagesSync } from '../model-capabilities.js';
+import { modelSupportsImages } from '../model-capabilities.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { waitForManagedKimiSessionId } from '../runtimes/kimi-context-envelope.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
@@ -496,7 +497,7 @@ export async function handleConversationMessage(
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
   const behavior = getHarnessBehavior(harness);
-  const supportsImages = modelSupportsImagesSync(conv.model ?? '');
+  const supportsImages = modelSupportsImages(conv.model ?? '');
   const partition = partitionAttachmentsForModel(message, managedAttachmentPaths, supportsImages);
   const outboundMessage = partition.outboundMessage;
   const effectiveAttachmentPaths = partition.effectiveAttachmentPaths;
@@ -531,12 +532,30 @@ export async function handleConversationMessage(
     }
 
     try {
-      await deliverAgentMessage(
-        conv.tmuxSession,
-        deliveredMessage,
-        'conversation-message',
-        resolveConversationDeliveryMethod(conv),
-      );
+      const method = resolveConversationDeliveryMethod(conv);
+      if (harness === 'kimi-code') {
+        // The composer enables the moment the tmux session exists, but the
+        // spawn path may still be diffing Kimi's session bucket to capture the
+        // session id (up to 60s). Wait for the pointer file — bounded under the
+        // frontend's 20s request timeout — instead of failing the first
+        // message with "captured kimi-session-id is missing".
+        const kimiSessionId = await waitForManagedKimiSessionId(conv.tmuxSession);
+        if (!kimiSessionId) {
+          return jsonResponse(
+            { error: 'Kimi session is still starting (no captured kimi-session-id yet). Wait a moment and send again.' },
+            { status: 503 },
+          );
+        }
+        await deliverAgentMessage(
+          conv.tmuxSession,
+          deliveredMessage,
+          'conversation-message',
+          method,
+          { kimiContext: { workspace: conv.cwd, sessionId: kimiSessionId } },
+        );
+      } else {
+        await deliverAgentMessage(conv.tmuxSession, deliveredMessage, 'conversation-message', method);
+      }
     } catch (deliveryErr: unknown) {
       const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
       if (errMsg.includes('MessageDeliveryFailed')) {

@@ -3,6 +3,17 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
+// The queue's own logic is the subject; the delivery door and the state door
+// are both injected per call, so neither real module needs to load.
+vi.mock('../../../lib/agents.js', () => ({
+  messageAgent: vi.fn(async () => {}),
+  getAgentState: vi.fn(() => null),
+}));
+
+vi.mock('../services/derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async () => null),
+}));
+
 import {
   enqueuePendingFeedbackDelivery,
   markPendingFeedbackDelivered,
@@ -36,24 +47,14 @@ describe('pending feedback recovery (PAN-585)', () => {
 
     const deliver = vi.fn(async () => {});
     const getAgentState = vi.fn(async () => ({ id: 'agent-pan-585' } as any));
-    const loadStatuses = vi.fn(() => ({
-      'PAN-585': {
-        issueId: 'PAN-585',
-        reviewStatus: 'blocked',
-        testStatus: 'pending',
-        readyForMerge: false,
-        updatedAt: '2026-04-27T06:00:00Z',
-      },
-    }));
-    const getStatus = vi.fn();
+    const getState = vi.fn(async () => ({ issueId: 'PAN-585', state: 'changes-requested' } as any));
 
     await processPendingFeedbackDeliveries({
       filePath: queueFile,
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: deliver,
       _getAgentState: getAgentState,
-      _loadStatuses: loadStatuses as any,
-      _getStatus: getStatus as any,
+      _getState: getState,
     });
 
     expect(deliver).toHaveBeenCalledWith(
@@ -80,16 +81,11 @@ describe('pending feedback recovery (PAN-585)', () => {
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: vi.fn(async () => { throw new Error('tmux unavailable'); }),
       _getAgentState: vi.fn(async () => ({ id: 'agent-pan-585' } as any)),
-      _loadStatuses: vi.fn(() => ({
-        'PAN-585': {
-          issueId: 'PAN-585',
-          reviewStatus: 'passed',
-          testStatus: 'failed',
-          readyForMerge: false,
-          updatedAt: '2026-04-27T06:00:00Z',
-        },
-      })) as any,
-      _getStatus: vi.fn() as any,
+      _getState: vi.fn(async () => ({
+        issueId: 'PAN-585',
+        state: 'in-review',
+        pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'none', checks: 'red', mergeable: null },
+      } as any)),
     });
 
     const stored = JSON.parse(await readFile(queueFile, 'utf-8'));
@@ -97,7 +93,7 @@ describe('pending feedback recovery (PAN-585)', () => {
     expect(stored.deliveries[0].kind).toBe('test-failed');
   });
 
-  it('drops obsolete feedback once the issue status no longer needs redelivery', async () => {
+  it('drops obsolete feedback once the derived state no longer needs redelivery', async () => {
     queueFile = await setupQueueFile();
 
     await enqueuePendingFeedbackDelivery({
@@ -116,20 +112,40 @@ describe('pending feedback recovery (PAN-585)', () => {
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: deliver,
       _getAgentState: vi.fn(async () => ({ id: 'agent-pan-585' } as any)),
-      _loadStatuses: vi.fn(() => ({
-        'PAN-585': {
-          issueId: 'PAN-585',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          readyForMerge: true,
-          updatedAt: '2026-04-27T06:04:00Z',
-        },
-      })) as any,
-      _getStatus: vi.fn() as any,
+      _getState: vi.fn(async () => ({ issueId: 'PAN-585', state: 'ready' } as any)),
     });
 
     expect(deliver).not.toHaveBeenCalled();
     await expect(readFile(queueFile, 'utf-8')).rejects.toThrow();
+  });
+
+  it('keeps queued feedback when the derived state cannot be read', async () => {
+    queueFile = await setupQueueFile();
+
+    await enqueuePendingFeedbackDelivery({
+      issueId: 'PAN-585',
+      agentId: 'agent-pan-585',
+      kind: 'review-blocked',
+      filePath: '/tmp/workspaces/feature-pan-585/.pan/feedback/004-review-agent-changes-requested.md',
+      message: 'SPECIALIST FEEDBACK: review-agent reported BLOCKED for PAN-585',
+      createdAt: '2026-04-27T06:00:00Z',
+    }, { filePath: queueFile });
+
+    const deliver = vi.fn(async () => {});
+
+    await processPendingFeedbackDeliveries({
+      filePath: queueFile,
+      now: Date.parse('2026-04-27T06:05:00Z'),
+      _deliver: deliver,
+      _getAgentState: vi.fn(async () => ({ id: 'agent-pan-585' } as any)),
+      // The forge was unreachable: an unreadable state is not "no longer
+      // relevant", so the delivery survives to the next startup.
+      _getState: vi.fn(async () => null),
+    });
+
+    expect(deliver).not.toHaveBeenCalled();
+    const stored = JSON.parse(await readFile(queueFile, 'utf-8'));
+    expect(stored.deliveries).toHaveLength(1);
   });
 
   it('removes a specific queue entry after successful immediate delivery', async () => {

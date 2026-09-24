@@ -2,15 +2,18 @@
  * Tests for seedUatFixturesLocal (PAN-3362, WI-2).
  *
  * seedUatFixturesLocal touches stores that resolve OVERDECK_HOME two
- * different ways: overdeck.db (agents/events/review_status, all via
- * getOverdeckDatabaseSync() — a path-keyed cache that self-heals when the
- * path changes) and cache.db (CacheService — its db path is a top-level
- * module constant computed once at import time, plus the event-store
- * singleton, also fixed at import time). The only mechanism that reliably
- * isolates the latter two per test is vi.resetModules() + dynamic import of
- * every path-sensitive module AFTER the env vars for that test are stubbed
- * — see tests/dashboard/cache-service-init-home.test.ts for the established
+ * different ways: each ~/.overdeck/agents/<id>/state.json (agent rows, plain fs) and
+ * cache.db (CacheService — its db path is a top-level module constant
+ * computed once at import time, plus the event-store singleton, also fixed
+ * at import time). The only mechanism that reliably isolates the latter two
+ * per test is vi.resetModules() + dynamic import of every path-sensitive
+ * module AFTER the env vars for that test are stubbed — see
+ * tests/dashboard/cache-service-init-home.test.ts for the established
  * per-test pattern this file follows.
+ *
+ * PAN-3917: review status is no longer a stored record (the review_status
+ * table and its event-emit path are gone), so this file no longer asserts
+ * anything about it.
  */
 
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -29,36 +32,29 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  const { closeOverdeckDatabaseSync } = await import('../../../../src/lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
+  closeOverdeckDatabase();
   vi.unstubAllEnvs();
   rmSync(tempHome, { recursive: true, force: true });
 });
 
 async function importSeedModules() {
   const seed = await import('../../../../src/lib/uat-fixtures/seed.js');
-  const agentStateSync = await import('../../../../src/lib/overdeck/agent-state-sync.js');
-  const reviewStatusSync = await import('../../../../src/lib/overdeck/review-status-sync.js');
+  const agentState = await import('../../../../src/lib/agents/agent-state.js');
   const cacheServiceModule = await import('../../../../src/dashboard/server/services/cache-service.js');
-  return { seed, agentStateSync, reviewStatusSync, cacheServiceModule };
+  return { seed, agentState, cacheServiceModule };
 }
 
 describe('seedUatFixturesLocal', () => {
-  it('populates 5 agent rows, 1 review_status row with PR fields, and readable activity events (AC-1)', async () => {
-    const { seed, agentStateSync, reviewStatusSync, cacheServiceModule } = await importSeedModules();
+  it('populates 5 agent rows and readable activity events (AC-1)', async () => {
+    const { seed, agentState, cacheServiceModule } = await importSeedModules();
 
     const report = await seed.seedUatFixturesLocal({ detectContainer: () => true });
     expect(report.agentsWritten).toBe(5);
     expect(report.activityEntriesWritten).toBe(4);
 
-    const agents = agentStateSync.listOverdeckAgentStatesSync().filter((a) => a.issueId === 'FIX-1');
+    const agents = agentState.listAgentStatesSync().filter((a) => a.issueId === 'FIX-1');
     expect(agents).toHaveLength(5);
-
-    const status = reviewStatusSync.getReviewStatusFromDbSync('FIX-1');
-    expect(status).not.toBeNull();
-    expect(status?.prUrl).toBeTruthy();
-    expect(status?.prNumber).toBeTruthy();
-    expect(status?.prHeadSha).toBeTruthy();
 
     const cache = new cacheServiceModule.CacheService();
     try {
@@ -90,17 +86,14 @@ describe('seedUatFixturesLocal', () => {
     );
   });
 
-  it('is idempotent: a second run leaves identical row counts in agents, review_status, the issue cache, and activity history (AC-3)', async () => {
-    const { seed, agentStateSync, reviewStatusSync, cacheServiceModule } = await importSeedModules();
+  it('is idempotent: a second run leaves identical row counts in agents, the issue cache, and activity history (AC-3)', async () => {
+    const { seed, agentState, cacheServiceModule } = await importSeedModules();
 
     await seed.seedUatFixturesLocal({ detectContainer: () => true });
     await seed.seedUatFixturesLocal({ detectContainer: () => true });
 
-    const agents = agentStateSync.listOverdeckAgentStatesSync().filter((a) => a.issueId === 'FIX-1');
+    const agents = agentState.listAgentStatesSync().filter((a) => a.issueId === 'FIX-1');
     expect(agents).toHaveLength(5);
-
-    const statuses = Object.keys(reviewStatusSync.getAllReviewStatusesFromDb());
-    expect(statuses.filter((id) => id === 'FIX-1')).toHaveLength(1);
 
     const cache = new cacheServiceModule.CacheService();
     try {
@@ -129,37 +122,24 @@ describe('seedUatFixturesLocal', () => {
     expect(doc.plan.items).toHaveLength(3);
   });
 
-  it('writes a CLAUDE.md marker at the workspace root so GET /api/workspaces/FIX-1 does not report corrupted (AC-5)', async () => {
+  it('uses Overdeck-owned workspace state as the validity marker without creating CLAUDE.md (AC-5)', async () => {
     const { seed } = await importSeedModules();
     const { fixtureWorkspacePath } = await import('../../../../src/lib/uat-fixtures/fixture-data.js');
 
     await seed.seedUatFixturesLocal({ detectContainer: () => true });
 
-    const claudeMdPath = join(fixtureWorkspacePath(), 'CLAUDE.md');
-    expect(existsSync(claudeMdPath)).toBe(true);
-    expect(readFileSync(claudeMdPath, 'utf-8').length).toBeGreaterThan(0);
+    expect(existsSync(join(fixtureWorkspacePath(), 'CLAUDE.md'))).toBe(false);
+    expect(existsSync(join(fixtureWorkspacePath(), '.overdeck', 'spec.vbrief.json'))).toBe(true);
   });
 
-  it('appends a review.status_changed event with prUrl, and every agent row carries a branch (AC-6, review finding UAT cycle 2)', async () => {
-    const { seed, agentStateSync } = await importSeedModules();
+  it('every agent row carries a branch (AC-6, review finding UAT cycle 2)', async () => {
+    const { seed, agentState } = await importSeedModules();
 
     await seed.seedUatFixturesLocal({ detectContainer: () => true });
 
-    // The event is what the server's in-memory read model (and from there the
-    // frontend Issue store's reviewStatus, which the drawer's PR-link action
-    // reads) actually learns from — a raw DB upsert alone never reaches it.
-    const { getEventStore } = await import('../../../../src/dashboard/server/event-store.js');
-    const events = getEventStore()
-      .queryByType('review.status_changed', 1000)
-      .filter((event) => (event.payload as { issueId?: string }).issueId === 'FIX-1');
-    expect(events.length).toBeGreaterThan(0);
-    const latest = events[events.length - 1]?.payload as { status?: { prUrl?: string } };
-    expect(latest.status?.prUrl).toBeTruthy();
-
-    // The work agent's seeded branch must survive the write door round-trip
-    // (AGENT_COLUMNS_FOR_DB previously dropped `branch` for every agent).
-    const workAgent = agentStateSync
-      .listOverdeckAgentStatesSync()
+    // The work agent's seeded branch must survive the write door round-trip.
+    const workAgent = agentState
+      .listAgentStatesSync()
       .find((a) => a.issueId === 'FIX-1' && a.role === 'work');
     expect(workAgent?.branch).toBe('feature/fix-1');
   });

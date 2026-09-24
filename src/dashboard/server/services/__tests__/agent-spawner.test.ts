@@ -23,7 +23,6 @@ const mockMessageAgent = vi.fn();
 
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
-  getAgentStateSync: mockGetAgentState,
   getAgentStateProgram: mockGetAgentState,
   spawnAgent: mockSpawnAgent,
   stopAgent: mockStopAgent,
@@ -57,7 +56,7 @@ vi.mock('../../../../lib/xbrief/io.js', () => ({
 
 const mockResolveProjectFromIssue = vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' });
 vi.mock('../../../../lib/projects.js', () => ({
-  findProjectByPathSync: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
+  findProjectByPath: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
   listProjectsSync: vi.fn(() => [{ key: 'myapp', config: { path: '/projects/myapp', name: 'myapp' } }]),
   resolveProjectFromIssue: mockResolveProjectFromIssue,
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
@@ -87,7 +86,7 @@ describe('AgentSpawner Effect service', () => {
     vi.clearAllMocks();
     // Default: workspace exists and no agent is running.
     mockExistsSync.mockReturnValue(true);
-    mockGetAgentState.mockReturnValue(Effect.succeed(null));
+    mockGetAgentState.mockReturnValue(null);
     mockReadWorkspacePlanSync.mockReturnValue({ plan: { items: [{ id: 'wi-1' }] } });
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
     mockStopAgent.mockReturnValue(undefined);
@@ -138,7 +137,7 @@ describe('AgentSpawner Effect service', () => {
       expect((err as any)._tag).toBe('PlanEmpty');
     });
     it('fails with AgentAlreadyRunning when agent status is running', async () => {
-      mockGetAgentState.mockReturnValue(Effect.succeed({ status: 'running', issueId: 'PAN-1' }));
+      mockGetAgentState.mockReturnValue({ status: 'running', issueId: 'PAN-1' });
 
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 

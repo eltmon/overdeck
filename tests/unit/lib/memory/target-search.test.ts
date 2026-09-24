@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 import { searchMemory } from '../../../../src/lib/memory/cli.js';
 import { writeObservation } from '../../../../src/lib/memory/observations.js';
-import { closeDatabase } from '../../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases } from '../../../../src/lib/memory/fts-db.js';
 import { archiveWorkspace, createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 import { listWorkspacesForPath } from '../../../../src/lib/workspaces/resolver.js';
@@ -56,7 +55,6 @@ beforeEach(() => {
 
 afterEach(() => {
   closeMemoryFtsDatabases();
-  closeDatabase();
   teardownOverdeckTestDb(odb);
   rmSync(targetDir, { recursive: true, force: true });
   vi.restoreAllMocks();

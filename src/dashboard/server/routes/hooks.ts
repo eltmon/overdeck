@@ -20,7 +20,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getEventStore } from '../event-store.js';
 import { getAgentRuntimeState, getAgentState, listRunningAgents, type AgentState } from '../../../lib/agents.js';
-import { sessionFilePath } from '../../../lib/paths.js';
+import { sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
 import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { ReadModelService } from '../read-model.js';
@@ -750,7 +750,7 @@ async function resolveAgentState(
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
 ): Promise<AgentState | null> {
   const agentId = stringField(body.agentId) ?? stringField(body.agent_id);
-  return agentId ? await Effect.runPromise(getAgentState(agentId)) : await findAgentStateBySessionId(sessionId, resolveAgentIdBySessionId);
+  return agentId ? getAgentState(agentId) : await findAgentStateBySessionId(sessionId, resolveAgentIdBySessionId);
 }
 
 async function findAgentStateBySessionId(
@@ -759,7 +759,7 @@ async function findAgentStateBySessionId(
 ): Promise<AgentState | null> {
   if (resolveAgentIdBySessionId) {
     const agentId = await resolveAgentIdBySessionId(sessionId);
-    return agentId ? await Effect.runPromise(getAgentState(agentId)) : null;
+    return agentId ? getAgentState(agentId) : null;
   }
 
   const agents = await Effect.runPromise(listRunningAgents());

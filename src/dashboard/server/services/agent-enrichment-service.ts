@@ -14,14 +14,14 @@
 
 import { Effect } from 'effect'
 import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
-import { computeAgentEnrichment, getAgentJsonlMtime, isInteractiveRoleAgent, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
-import { getReviewStatusSync } from '../../../lib/review-status.js'
-import { withConcurrencyLimit } from '../../../lib/concurrency.js'
+import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
+import { getBackendPanes } from './backend-inventory.js'
+import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js'
 import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
 import { getEventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js'
-import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@overdeck/contracts'
+import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js'
+import type { AgentEnrichmentChangedEvent, AgentCreatedEvent } from '@overdeck/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,8 +41,6 @@ interface EnrichmentServiceState {
   lastScan: Map<string, { mtime: number; scan: PendingInputsScan }>
   /** Agent IDs for which we've already emitted agent.created this server lifetime */
   seenAgentIds: Set<string>
-  /** Agent IDs for which we've already emitted a status reconciliation event */
-  reconciledAgentIds: Set<string>
 }
 
 // ─── Diff helpers ─────────────────────────────────────────────────────────────
@@ -103,26 +101,11 @@ export function buildAwaitingInputActivityMessage(
     : `${agentId} is waiting for ${kindList}`
 }
 
-// PAN-3055 — no census evidence means no liveness claims: the listRunningAgents
-// fail-open would mark every stopped agent tmuxActive at boot and resurrect dead questions with TTS.
+// PAN-3055 — no census evidence means no liveness claims: without it the
+// backend inventory's tmux fallback cannot tell a live pane from a dead one,
+// and the poller would resurrect dead questions with TTS.
 export function shouldSkipEnrichmentCycle(census: Pick<RuntimeCensus, 'tmuxAvailable'>): boolean {
   return !census.tmuxAvailable
-}
-
-/**
- * PAN-3338 — should the poller rewrite this stopped agent to 'running' on tmux
- * liveness alone? For interactive roles the durable stopped status is the
- * deliberate post-completion state, so it must stand; other roles keep the
- * PAN-1419 crash-recovery reconcile.
- */
-export function shouldResurrectStoppedAgent(
-  agentId: string,
-  role: string | undefined,
-  status: string,
-  tmuxActive: boolean,
-): boolean {
-  if (!tmuxActive || status !== 'stopped') return false
-  return !isInteractiveRoleAgent(agentId, role)
 }
 
 export function hasReapablePendingInput(enrichment: AgentEnrichment): boolean {
@@ -184,12 +167,26 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
   const eventStore = getEventStore()
 
-  // Only enrich agents that actually have a live tmux session.
-  // Stopped agents have no changing state — their enrichment is static.
-  const activeAgents = runningAgents.filter(a => a.tmuxActive)
+  // PAN-3917 (FR-12): the terminal backend answers liveness, not a persisted
+  // mirror. `listRunningAgents` still supplies the permanent facts (workspace,
+  // role, model, branch) the enrichment event payload carries.
+  const panes = await getBackendPanes()
+  const livePaneIds = new Set(
+    panes.filter((pane) => pane.state !== 'exited').map((pane) => pane.terminalId ?? pane.id),
+  )
+  const specialistIssues = new Set(
+    panes
+      .filter((pane) => pane.state !== 'exited' && (pane.role === 'review' || pane.role === 'test' || pane.role === 'uat'))
+      .map((pane) => pane.issue)
+      .filter((issue): issue is string => Boolean(issue)),
+  )
 
-  await Effect.runPromise(withConcurrencyLimit(
-    activeAgents.map((agent) => Effect.promise(async () => {
+  // Only enrich agents the backend reports as live. A pane that exited has no
+  // changing state — its enrichment is static.
+  const activeAgents = runningAgents.filter(a => livePaneIds.has(a.id))
+
+  await withConcurrencyLimitPromise(
+    activeAgents.map((agent) => async () => {
       const { id: agentId, issueId, startedAt } = agent
 
       // If this agent hasn't been seen since server start, emit agent.created so the
@@ -209,14 +206,14 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 workspace: agent.workspace || undefined,
                 runtime: undefined,
                 model: agent.model || undefined,
-                status: toAgentStatus(shouldResurrectStoppedAgent(agentId, agent.role, agent.status, agent.tmuxActive) ? 'running' : agent.status),
+                status: toAgentStatus('running'),
                 startedAt: agent.startedAt || undefined,
                 lastActivity: agent.lastActivity || undefined,
                 branch: agent.branch || undefined,
                 costSoFar: agent.costSoFar,
                 sessionId: agent.sessionId || undefined,
                 role: toRole(agent.role) ?? 'work',
-                hasLiveTmuxSession: agent.tmuxActive,
+                hasLiveTmuxSession: true,
                 hasPendingQuestion: undefined,
                 pendingQuestionCount: undefined,
                 pendingQuestionPrompt: undefined,
@@ -226,55 +223,19 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
               },
             },
           }
-          // PAN-1908: write-through projection — agents-row upsert + lifecycle
-          // event append in one SQLite transaction.
           saveAgentStateAndEmitEvent(agent, createdEvent)
         } catch {
           // Non-fatal — event store may not be ready at startup
         }
       }
 
-      // Reconcile stale status: if tmux is active but state.json says stopped,
-      // emit a status_changed event so the read model corrects to 'running'.
-      // Interactive roles (plan, conv-*) are exempt — for them, stopped-but-
-      // session-alive is the deliberate post-completion steady state (skipKill
-      // finalize, idle conversations), not staleness (PAN-3338).
-      if (shouldResurrectStoppedAgent(agentId, agent.role, agent.status, agent.tmuxActive) && !state.reconciledAgentIds.has(agentId)) {
-        state.reconciledAgentIds.add(agentId)
-        try {
-          const statusEvent: Omit<AgentStatusChangedEvent, 'sequence'> = {
-            type: 'agent.status_changed',
-            timestamp: new Date().toISOString(),
-            payload: {
-              agentId,
-              status: 'running',
-              previousStatus: 'stopped',
-              hasLiveTmuxSession: true,
-            },
-          }
-          // PAN-1908: write-through projection — agents-row upsert + lifecycle
-          // event append in one SQLite transaction.
-          saveAgentStateAndEmitEvent(agent, statusEvent)
-        } catch {
-          // Non-fatal
-        }
-      }
-
-      // Determine if the agent's issue has an active specialist
-      let hasActiveSpecialist = false
-      if (issueId) {
-        const reviewStatus = getReviewStatusSync(issueId)
-        hasActiveSpecialist =
-          reviewStatus?.reviewStatus === 'reviewing' ||
-          reviewStatus?.testStatus === 'testing' ||
-          reviewStatus?.mergeStatus === 'merging'
-      }
+      // An active specialist is a live review, test, or uat pane in this
+      // issue's workspace — the backend's answer, not a stored status row.
+      const hasActiveSpecialist = issueId ? specialistIssues.has(issueId) : false
 
       // Replay the previous JSONL scan while the file's mtime is unchanged
       // (avoids I/O on static sessions).
-      // getAgentJsonlMtime returns an Effect — it MUST be run, not awaited directly
-      // (awaiting a non-thenable Effect yields the Effect object, never the value).
-      const currentMtime = await Effect.runPromise(getAgentJsonlMtime(agentId))
+      const currentMtime = await getAgentJsonlMtime(agentId)
       const previousEnrichment = state.lastEnrichment.get(agentId)
       const previousScan = state.lastScan.get(agentId)
       const cachedScan =
@@ -282,11 +243,11 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       let enrichment: AgentEnrichment
       try {
-        // computeAgentEnrichment returns an Effect — it MUST be run, not awaited
-        // directly (awaiting a non-thenable Effect yields the Effect object, so
-        // every enrichment field came back undefined → hasPendingQuestion/
-        // pendingAskUserQuestion silently dropped for every agent). PAN-1395.
-        enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, cachedScan))
+        // computeAgentEnrichment is a plain async function (PAN-3958 CH-3). It
+        // used to return an Effect, and awaiting that non-thenable value yielded
+        // the Effect object, so every enrichment field came back undefined
+        // (PAN-1395).
+        enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, cachedScan)
       } catch {
         return
       }
@@ -302,8 +263,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       if (isAwaitingInputRisingEdge(previousEnrichment, enrichment)) {
         const message = buildAwaitingInputActivityMessage(agentId, issueId, enrichment.pendingInputKinds)
         const source = toRole(agent.role) ?? 'work'
-        emitActivityEntrySync({ source, level: 'warn', message, issueId })
-        emitActivityTtsSync({ utterance: message, priority: 1, issueId, source, eventType: 'awaiting_input' })
+        emitActivityEntry({ source, level: 'warn', message, issueId })
+        emitActivityTts({ utterance: message, priority: 1, issueId, source, eventType: 'awaiting_input' })
       }
 
       // PAN-2633 — a stop-shaped status_changed event may have wiped the read
@@ -343,9 +304,9 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       } catch {
         // Non-fatal — event store may not be initialized yet at startup
       }
-    })),
+    }),
     4,
-  ))
+  )
 
   // Clean up stale entries for agents that have stopped
   const activeIds = new Set(activeAgents.map(a => a.id))
@@ -361,7 +322,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         }
 
         const issueId = reapIssueId
-        emitActivityEntrySync({
+        emitActivityEntry({
           source: toRole(agentRecord?.role) ?? 'work',
           level: 'info',
           message: buildExpiredQuestionActivityMessage(id, issueId),
@@ -387,7 +348,6 @@ const serviceState: EnrichmentServiceState = {
   lastEnrichment: new Map(),
   lastScan: new Map(),
   seenAgentIds: new Set(),
-  reconciledAgentIds: new Set(),
 }
 
 export function startAgentEnrichmentService(): void {

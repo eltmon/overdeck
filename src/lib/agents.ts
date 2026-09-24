@@ -2,7 +2,7 @@ export {
   clearReadySignal,
   isQualifiedAgentId,
   normalizeAgentId,
-  resolveAgentTargetSync,
+  resolveAgentTarget,
   waitForAgentIdle,
   waitForReadySignal,
 } from './agents/identity.js';
@@ -51,13 +51,10 @@ export {
   SESSION_EXITED_BEFORE_KICKOFF,
   __testInternals,
   clearAgentPaused,
-  clearAgentPausedSync,
   clearAgentTroubled,
-  clearAgentTroubledSync,
   getAgentDir,
-  getAgentState,
   getAgentStateFilePath,
-  getAgentStateSync,
+  getAgentState,
   isAgentPaused,
   isAgentTroubled,
   isRole,
@@ -65,22 +62,20 @@ export {
   markAgentStoppedState,
   markAgentTroubled,
   recordAgentFailure,
-  recordAgentFailureSync,
   resetAgentFailureCount,
   saveAgentState,
   saveAgentStateSync,
   setAgentPaused,
-  setAgentPausedSync,
-  setAgentYieldedSync,
-  clearYieldForResumeSync,
+  setAgentYielded,
+  clearYieldForResume,
   wipeAgentStateDirs,
-  writeAgentStateJsonSync,
+  writeAgentStateJson,
   type AgentState,
   type AgentStopCause,
   type Role,
 } from './agents/agent-state.js';
 export { stopAgentSync, stopAgent } from './agents/termination.js';
-export { type ActivityEntry, appendActivity, getActivity, saveSessionId, getSessionId, getLatestSessionIdSync, getLatestSessionId } from './agents/activity.js';
+export { type ActivityEntry, appendActivity, getActivity, saveSessionId, getSessionId, getLatestSessionId } from './agents/activity.js';
 export { type AgentResolution, type AgentRuntimeState, getAgentRuntimeStateSync, getAgentRuntimeState, saveAgentRuntimeState } from './agents/runtime-state.js';
 export { deliverAgentMessage, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, deliverAgentPermissionDecision, setAgentDeliveryMethod, type DeliveryResult } from './agents/delivery.js';
 export { messageAgent } from './agents/messaging.js';
@@ -88,19 +83,7 @@ export { messageAgent } from './agents/messaging.js';
 export { buildCompactRecoverySeed, resumeAgent } from './agents/resume.js';
 
 export { autoRecoverAgents, detectCrashedAgents, recoverAgent, restartAgent, type RestartAgentOptions } from './agents/recovery.js';
-export {
-  compactAtTierRunBoundary,
-  contextWindowForModel,
-  replayCrashedStandingAgent,
-  replayStandingAgent,
-  shouldReplayCompactAtTierRunBoundary,
-  type ReplayCommit,
-  type ReplayDelivery,
-  type ReplayResult,
-  type ReplayStandingTierTarget,
-  type ReplaySupervisorTarget,
-  type ReplayTarget,
-  type TierReplayDeps,
-  type TierRunCompactionInput,
-  type TierRunCompactionOptions,
-} from './agents/tier-replay.js';
+// PAN-3917: tier-replay.ts (standing-tier swarm replay) deleted — it depended
+// on agents/slot-reconcile.ts and agents/standing-tiers.ts (Appendix A.5,
+// permanently gone) and had no surviving caller outside this barrel and its
+// own smoke test. Swarm standing-tiers are dormant in the new architecture.

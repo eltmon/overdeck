@@ -12,7 +12,7 @@ const agentMocks = vi.hoisted(() => ({
   recoverAgent: vi.fn(),
   autoRecoverAgents: vi.fn(),
   normalizeAgentId: vi.fn((id: string) => `agent-${id.toLowerCase()}`),
-  resolveAgentTargetSync: vi.fn(),
+  resolveAgentTarget: vi.fn(),
   resumeAgent: vi.fn(),
 }));
 const exitMocks = vi.hoisted(() => ({
@@ -31,7 +31,7 @@ describe('recoverCommand agent-target resolution', () => {
   });
 
   it('recovers the strike agent registered for an issue rather than a nonexistent agent-<id>', async () => {
-    agentMocks.resolveAgentTargetSync.mockReturnValue('strike-pan-3150');
+    agentMocks.resolveAgentTarget.mockReturnValue('strike-pan-3150');
     agentMocks.recoverAgent.mockResolvedValue({
       action: 'respawned',
       state: {
@@ -49,7 +49,7 @@ describe('recoverCommand agent-target resolution', () => {
   });
 
   it('exits non-zero when a live harness has not been recovered', async () => {
-    agentMocks.resolveAgentTargetSync.mockReturnValue('strike-pan-3604');
+    agentMocks.resolveAgentTarget.mockReturnValue('strike-pan-3604');
     agentMocks.recoverAgent.mockResolvedValue({
       action: 'already-running',
       state: {
@@ -66,7 +66,7 @@ describe('recoverCommand agent-target resolution', () => {
   });
 
   it('still prefers the canonical work agent when the resolver finds one', async () => {
-    agentMocks.resolveAgentTargetSync.mockReturnValue('agent-pan-3116');
+    agentMocks.resolveAgentTarget.mockReturnValue('agent-pan-3116');
     agentMocks.recoverAgent.mockResolvedValue({
       action: 'respawned',
       state: {
@@ -83,7 +83,7 @@ describe('recoverCommand agent-target resolution', () => {
   });
 
   it('falls back to the canonical work-agent id when nothing resolves', async () => {
-    agentMocks.resolveAgentTargetSync.mockReturnValue(null);
+    agentMocks.resolveAgentTarget.mockReturnValue(null);
     agentMocks.recoverAgent.mockResolvedValue({
       action: 'respawned',
       state: {

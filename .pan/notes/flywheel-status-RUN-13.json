@@ -1,0 +1,64 @@
+{
+  "runId": "RUN-13",
+  "startedAt": "2026-06-25T02:00:04Z",
+  "elapsedMs": 6476000,
+  "orchestrator": {
+    "harness": "ohmypi",
+    "model": "glm-5.2",
+    "effort": "high",
+    "ctxPercent": 64
+  },
+  "headline": {
+    "bugsFixed": 3,
+    "swarmItemsMerged": 0,
+    "swarmItemsTotal": 0,
+    "prsMerged": 0,
+    "awaitingUat": 2
+  },
+  "activePipeline": [
+    { "issueId": "PAN-2057", "title": "P0 RED MAIN — stale test import; fix verified (d8b0702cb) but strike DEADLOCKED (PAN-2022). NEEDS OPERATOR: pan kill strike-pan-2057 && pan strike PAN-2057", "verb": "blocked", "status": "blocked", "agentId": "strike-pan-2057" },
+    { "issueId": "PAN-1919", "title": "PR #1950 merge_conflict + inherited red-main", "verb": "blocked", "status": "blocked", "pr": 1950 },
+    { "issueId": "PAN-1901", "title": "PR #2042 failing test (inherited stale-red)", "verb": "blocked", "status": "blocked", "pr": 2042 },
+    { "issueId": "PAN-2044", "title": "PR #2048 merge_conflict", "verb": "blocked", "status": "blocked", "pr": 2048 },
+    { "issueId": "MIN-831", "title": "review+test passed — readyForMerge", "verb": "merging", "status": "passed" },
+    { "issueId": "MIN-846", "title": "review+test passed — readyForMerge", "verb": "merging", "status": "passed" }
+  ],
+  "substrateBugs": [
+    { "issueId": "PAN-2057", "title": "P0 red main stale-test import", "status": "filed", "url": "https://github.com/eltmon/overdeck/issues/2057" },
+    { "issueId": "PAN-2050", "title": "plan/start --auto worktree race — LANDED 2ec6164c4 + CLOSED", "status": "fixed", "commitSha": "2ec6164c4", "url": "https://github.com/eltmon/overdeck/issues/2050" },
+    { "issueId": "PAN-2022", "title": "stuck strike blocks re-strike — DIRECTLY HIT this run, blocks P0 landing", "status": "filed", "url": "https://github.com/eltmon/overdeck/issues/2022" },
+    { "issueId": "PAN-2017", "title": "strike spawns agent but never delivers task prompt", "status": "filed", "url": "https://github.com/eltmon/overdeck/issues/2017" }
+  ],
+  "agents": [
+    { "id": "strike-pan-2057", "label": "strike PAN-2057 (DEADLOCKED)", "status": "idle", "issueId": "PAN-2057", "role": "strike", "model": "gpt-5.5", "currentAction": "fix verified (28 tests) but cannot land — branch not FF + state stuck 'running' (PAN-2022); idle at prompt" },
+    { "id": "agent-pan-1919", "label": "work PAN-1919", "status": "running", "issueId": "PAN-1919", "role": "work", "model": "claude-sonnet-4-6", "currentAction": "live but PR #1950 blocked at merge gate (conflict + inherited red-main)" },
+    { "id": "sequencer-runner", "label": "sequencer (operator/system)", "status": "running", "role": "sequencer", "model": "glm-5.2" }
+  ],
+  "parked": [
+    { "issueId": "PAN-1762", "title": "Swarm v2", "reason": "OPERATOR-HELD at proposed — operator wants to review the plan before work starts (RUN-22 directive).", "parkedAt": "2026-06-11" }
+  ],
+  "suggestions": [
+    { "action": "unblock", "issueId": "PAN-2057", "priority": "urgent", "rationale": "P0 RED MAIN. Verified one-line test fix (d8b0702cb, 28 tests pass) stranded because strike-pan-2057 is stuck 'running' (PAN-2022) and branch isn't FF. Operator-only (pan kill is flywheel-forbidden): `pan kill strike-pan-2057 && pan strike PAN-2057`." },
+    { "action": "investigate", "priority": "high", "rationale": "Deploy landed PAN-2050 fix: `npm run build && pan reload`. Fix is in source (2ec6164c4) but NOT in running dist. pan reload is outside flywheel allowed-actions." },
+    { "action": "merge", "issueId": "MIN-831", "priority": "high", "rationale": "GitLab MR 68 review+test PASSED, readyForMerge. require_uat_before_merge=true — operator UAT + merge." },
+    { "action": "merge", "issueId": "MIN-846", "priority": "high", "rationale": "review+test PASSED, readyForMerge. Awaiting human UAT + merge." },
+    { "action": "unblock", "issueId": "PAN-1919", "priority": "medium", "rationale": "PR #1950 passed but merge_conflict + inherited red-main. Needs rebase after main greens; deacon is no-resume (OVERDECK_NO_RESUME=1) so will NOT auto-rebase — operator rebase or `pan restart --resume`." }
+  ],
+  "openQuestions": [
+    "P0 RED MAIN: strike-pan-2057 deadlocked (PAN-2022). Operator must `pan kill strike-pan-2057 && pan strike PAN-2057` to land the verified test fix. Flywheel-blocked by design (pan kill is operator-only).",
+    "Deacon is OVERDECK_NO_RESUME=1 (since RUN-3). Stopped agents won't revive; conflicting PRs (PAN-1919/2044) won't auto-rebase even after main greens. `pan restart --resume` (operator) unfreezes the review/rebase queue.",
+    "PAN-2050 fix is in source but not in dist — pan plan --auto reliability unconfirmed until `npm run build && pan reload`.",
+    "require_uat_before_merge=true: MIN-831 + MIN-846 at the human merge gate; PAN-1919/1901/2044 join once main greens."
+  ],
+  "system": {
+    "mainHead": "2ec6164c4",
+    "ramUsedMb": 11782,
+    "ramTotalMb": 64126,
+    "swapUsedMb": 0,
+    "swapTotalMb": 8191,
+    "agentsActive": 1,
+    "agentsCap": 20
+  },
+  "ticks": 3,
+  "lastTickAt": "2026-06-25T03:48:00Z"
+}

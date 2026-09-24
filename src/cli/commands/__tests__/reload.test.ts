@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  reportComposerReloadProgress: vi.fn(async () => undefined),
   acquireRestartLock: vi.fn(),
   readRestartLockHolder: vi.fn(),
   readPlatformConfig: vi.fn(),
@@ -25,7 +25,6 @@ const mocks = vi.hoisted(() => ({
   fsSymlink: vi.fn(),
   readDevSupervisorMarker: vi.fn(),
   devSupervisorRefusalLines: vi.fn(),
-  agentRestartBlockReason: vi.fn(),
   readActiveDashboardBundle: vi.fn(),
   writeActiveDashboardBundle: vi.fn(),
   fsMkdir: vi.fn(),
@@ -33,6 +32,8 @@ const mocks = vi.hoisted(() => ({
   dashboardServerBootFailure: vi.fn(),
   waitForRestartApproval: vi.fn(),
 }));
+
+vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloadProgress: mocks.reportComposerReloadProgress }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
 // Without mocking this, the test outcome depends on whether the host happens to
@@ -48,10 +49,6 @@ vi.mock('../../../lib/restart-lock.js', () => ({
   readRestartLockHolder: mocks.readRestartLockHolder,
 }));
 
-vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
-  agentRestartBlockReason: mocks.agentRestartBlockReason,
-}));
-
 vi.mock('../../../lib/channels/pty-supervisor-locate.js', () => ({
   supervisorDeploymentFailure: mocks.supervisorDeploymentFailure,
 }));
@@ -61,13 +58,12 @@ vi.mock('../../../lib/deploy/dashboard-bundle-integrity.js', () => ({
 }));
 
 vi.mock('../../../lib/deploy/active-dashboard-bundle.js', () => ({
-  readActiveDashboardBundleSync: mocks.readActiveDashboardBundle,
+  readActiveDashboardBundle: mocks.readActiveDashboardBundle,
   writeActiveDashboardBundle: mocks.writeActiveDashboardBundle,
 }));
 
 vi.mock('../../../lib/platform-lifecycle.js', () => ({
   readPlatformConfig: mocks.readPlatformConfig,
-  readPlatformConfigSync: mocks.readPlatformConfig,
   restartDashboard: mocks.restartDashboard,
   stopDashboard: mocks.stopDashboard,
   parseHealthTimeoutMs: (value: string | undefined, defaultMs: number) => {
@@ -170,6 +166,7 @@ const DEFAULT_ORIGIN_MAIN_SHA = '1111111111111111111111111111111111111111';
 
 const originalAgentId = process.env.OVERDECK_AGENT_ID;
 const originalRestartInitiator = process.env.OVERDECK_RESTART_INITIATOR;
+const originalIssueId = process.env.OVERDECK_ISSUE_ID;
 const originalHome = process.env.HOME;
 const originalPath = process.env.PATH;
 const originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -179,6 +176,8 @@ function restoreEnv(): void {
   else process.env.OVERDECK_AGENT_ID = originalAgentId;
   if (originalRestartInitiator === undefined) delete process.env.OVERDECK_RESTART_INITIATOR;
   else process.env.OVERDECK_RESTART_INITIATOR = originalRestartInitiator;
+  if (originalIssueId === undefined) delete process.env.OVERDECK_ISSUE_ID;
+  else process.env.OVERDECK_ISSUE_ID = originalIssueId;
   if (originalHome === undefined) delete process.env.HOME;
   else process.env.HOME = originalHome;
   if (originalPath === undefined) delete process.env.PATH;
@@ -193,6 +192,7 @@ describe('reloadCommand', () => {
     process.exitCode = undefined;
     delete process.env.OVERDECK_AGENT_ID;
     delete process.env.OVERDECK_RESTART_INITIATOR;
+    delete process.env.OVERDECK_ISSUE_ID;
     process.env.HOME = '/home/test';
     process.env.PATH = '/usr/bin:/bin';
     process.env.OVERDECK_HOME = TEST_OVERDECK_HOME;
@@ -200,11 +200,11 @@ describe('reloadCommand', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    mocks.acquireRestartLock.mockReturnValue(Effect.succeed({
+    mocks.acquireRestartLock.mockResolvedValue({
       refresh: vi.fn(() => Promise.resolve()),
       release: vi.fn(() => Promise.resolve()),
-    }));
-    mocks.readRestartLockHolder.mockReturnValue(Effect.succeed(null));
+    });
+    mocks.readRestartLockHolder.mockResolvedValue(null);
     mocks.readPlatformConfig.mockReturnValue({
       dashboardPort: 3010,
       dashboardApiPort: 3011,
@@ -212,14 +212,13 @@ describe('reloadCommand', () => {
       traefikDomain: 'overdeck.localhost',
       traefikDir: '/tmp/traefik',
     });
-    mocks.restartDashboard.mockReturnValue(Effect.succeed({ ownershipVerified: true, spawnedPid: 1234 }));
-    mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
+    mocks.restartDashboard.mockResolvedValue({ ownershipVerified: true, spawnedPid: 1234 });
+    mocks.writeRestartStatus.mockResolvedValue(undefined);
     mocks.refuseNonPrimaryDashboardCwd.mockReturnValue(false);
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
     mocks.resolvePrimaryDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
     mocks.readDevSupervisorMarker.mockReturnValue(null);
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
-    mocks.agentRestartBlockReason.mockResolvedValue(null);
     mocks.readActiveDashboardBundle.mockReturnValue(null);
     mocks.writeActiveDashboardBundle.mockResolvedValue(undefined);
     mocks.supervisorDeploymentFailure.mockReturnValue(null);
@@ -281,10 +280,8 @@ describe('reloadCommand', () => {
       apiPort: 3011,
       startedAt: '2026-06-07T00:00:00.000Z',
     });
-    mocks.acquireRestartLock.mockReturnValue(Effect.succeed(null));
-    mocks.readRestartLockHolder.mockReturnValue(
-      Effect.succeed({ pid: 777777, caller: 'pan reload', ts: Date.now() }),
-    );
+    mocks.acquireRestartLock.mockResolvedValue(null);
+    mocks.readRestartLockHolder.mockResolvedValue({ pid: 777777, caller: 'pan reload', ts: Date.now() });
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
 
     await reloadCommand({});
@@ -301,10 +298,8 @@ describe('reloadCommand', () => {
   });
 
   it('refuses the detached path when the restart lock is already held', async () => {
-    mocks.acquireRestartLock.mockReturnValue(Effect.succeed(null));
-    mocks.readRestartLockHolder.mockReturnValue(
-      Effect.succeed({ pid: 777777, caller: 'pan reload', ts: Date.now() }),
-    );
+    mocks.acquireRestartLock.mockResolvedValue(null);
+    mocks.readRestartLockHolder.mockResolvedValue({ pid: 777777, caller: 'pan reload', ts: Date.now() });
 
     await reloadCommand({});
 
@@ -316,40 +311,11 @@ describe('reloadCommand', () => {
     expect(process.exitCode).toBe(2);
   });
 
-  it('refuses a blocked agent reload before acquiring the restart lock or building', async () => {
-    process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
-    mocks.agentRestartBlockReason.mockResolvedValue('Restart refused by active deployment gate.');
-
-    await reloadCommand({});
-
-    expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
-      initiator: 'agent-pan-2772',
-      force: false,
-    });
-    expect(console.error).toHaveBeenCalledWith('Restart refused by active deployment gate.');
-    expect(process.exitCode).toBe(1);
-    expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
-    expect(mocks.spawn).not.toHaveBeenCalled();
-    expect(mocks.restartDashboard).not.toHaveBeenCalled();
-  });
-
-  it('allows --force to proceed through the agent reload gate', async () => {
+  it('reloads for an agent initiator without consulting a deploy gate', async () => {
     process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
 
-    await reloadCommand({ force: true, skipBuild: true });
-
-    expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
-      initiator: 'agent-pan-2772',
-      force: true,
-    });
-    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
-    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
-  });
-
-  it('skips the agent reload gate when no initiator is present', async () => {
     await reloadCommand({ skipBuild: true });
 
-    expect(mocks.agentRestartBlockReason).not.toHaveBeenCalled();
     expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
   });
@@ -407,7 +373,7 @@ describe('reloadCommand', () => {
   });
 
   it('qualifies reload success when spawned dashboard ownership was not verified', async () => {
-    mocks.restartDashboard.mockReturnValue(Effect.succeed({ ownershipVerified: false, spawnedPid: null }));
+    mocks.restartDashboard.mockResolvedValue({ ownershipVerified: false, spawnedPid: null });
 
     await reloadCommand({ skipBuild: true });
 
@@ -514,7 +480,7 @@ describe('reloadCommand', () => {
       }
       return { stdout: '', stderr: '' };
     });
-    mocks.restartDashboard.mockReturnValue(Effect.fail(new Error('health failed')));
+    mocks.restartDashboard.mockRejectedValue(new Error('health failed'));
     mockSpawnExits();
 
     await reloadCommand({});
@@ -540,13 +506,13 @@ describe('reloadCommand', () => {
 
   it('preserves a deployment when the lifecycle leaves its dashboard running after health timeout', async () => {
     mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
-    mocks.restartDashboard.mockReturnValue(Effect.fail(Object.assign(new Error('health timed out'), {
+    mocks.restartDashboard.mockRejectedValue(Object.assign(new Error('health timed out'), {
       failure: {
         stage: 'dashboard',
         reason: 'health timed out; dashboard left running',
         recovery: 'dashboard-left-running',
       },
-    })));
+    }));
     mockSpawnExits();
 
     await reloadCommand({});
@@ -787,6 +753,8 @@ describe('reloadCommand', () => {
 
   describe('restart-approval gate (PAN-3729)', () => {
     it('builds first, then waits for approval before restarting', async () => {
+      vi.stubEnv('OVERDECK_COMPOSER_RELOAD_ACTIVITY', 'reload-42');
+      vi.stubEnv('OVERDECK_COMPOSER_RELOAD_LOG', '/tmp/reload-42.log');
       mocks.statSync
         .mockReturnValueOnce({ mtimeMs: 1000 })
         .mockReturnValueOnce({ mtimeMs: 2000 });
@@ -798,11 +766,33 @@ describe('reloadCommand', () => {
         kind: 'reload',
         requesterId: 'reload:1234',
       }));
+      expect(mocks.reportComposerReloadProgress.mock.calls.map(([phase]) => phase))
+        .toEqual(['building', 'awaiting-approval', 'restarting', 'completed']);
+      expect(mocks.reportComposerReloadProgress).toHaveBeenLastCalledWith('completed', 'reload-42', '/tmp/reload-42.log');
+      expect(process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY).toBeUndefined();
+      expect(process.env.OVERDECK_COMPOSER_RELOAD_LOG).toBeUndefined();
+      vi.unstubAllEnvs();
       // The build is ungated; only the restart waits.
       expect(mocks.spawn.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.waitForRestartApproval.mock.invocationCallOrder[0]);
       expect(mocks.waitForRestartApproval.mock.invocationCallOrder[0])
         .toBeLessThan(mocks.restartDashboard.mock.invocationCallOrder[0]);
+    });
+
+    it('preserves the post-merge deploy identity when the script delegates to reload', async () => {
+      process.env.OVERDECK_RESTART_INITIATOR = 'merge-step0';
+      process.env.OVERDECK_ISSUE_ID = 'PAN-3329';
+      mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+      mockSpawnExits();
+
+      await reloadCommand({});
+
+      expect(mocks.waitForRestartApproval).toHaveBeenCalledWith({
+        requesterId: 'deploy:1234',
+        kind: 'deploy',
+        reason: 'post-merge deploy for PAN-3329',
+        builtSha: DEFAULT_ORIGIN_MAIN_SHA,
+      });
     });
 
     it('keeps the freshly built deployment but restarts nothing when another approved restart already ran', async () => {

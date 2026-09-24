@@ -1,0 +1,208 @@
+<title>Open Threads Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#F6F7F4; --panel:#FFFFFF; --ink:#1A211E; --muted:#5F6A64; --line:#D8DED9; --line-soft:#E8ECE8;
+  --accent:#0F6B66; --accent-soft:#DCEFEC;
+  --owe:#8A5A0B; --owe-soft:#F7ECD3;
+  --risk:#A3372B; --risk-soft:#F8E1DC;
+  --ask:#4A4F9C; --ask-soft:#E4E5F6;
+  --done:#7C877F;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#141917; --panel:#1B221F; --ink:#E7ECE8; --muted:#9AA69F; --line:#2C3531; --line-soft:#232B27;
+    --accent:#5CC0B8; --accent-soft:#173532;
+    --owe:#E0B25B; --owe-soft:#3A2E13;
+    --risk:#F08A7C; --risk-soft:#3E1E19;
+    --ask:#A9ADEB; --ask-soft:#25284A;
+    --done:#6E7A72;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#141917; --panel:#1B221F; --ink:#E7ECE8; --muted:#9AA69F; --line:#2C3531; --line-soft:#232B27;
+  --accent:#5CC0B8; --accent-soft:#173532;
+  --owe:#E0B25B; --owe-soft:#3A2E13;
+  --risk:#F08A7C; --risk-soft:#3E1E19;
+  --ask:#A9ADEB; --ask-soft:#25284A;
+  --done:#6E7A72;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:currentColor}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px}
+@media (max-width:860px){.wrap{grid-template-columns:1fr;gap:24px}}
+header.top{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:20px}
+h1{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-weight:600;font-size:34px;line-height:1.1;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.stamp{color:var(--muted);font-size:13px;margin-top:6px}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-width:92px;background:var(--panel)}
+.stat b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat span{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.stat.owe b{color:var(--owe)} .stat.risk b{color:var(--risk)} .stat.ask b{color:var(--ask)}
+nav.rail{position:sticky;top:20px;align-self:start;font-size:14px}
+@media (max-width:860px){nav.rail{position:static}}
+nav.rail h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:600}
+nav.rail ul{list-style:none;margin:0 0 20px;padding:0}
+nav.rail li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line-soft)}
+nav.rail li a{color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+nav.rail li em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+.controls{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.controls label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+.legend{display:grid;gap:6px;margin-top:16px;font-size:12px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:8px}
+main{min-width:0}
+section.group{margin-bottom:44px}
+section.group > h2{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-weight:600;font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+section.group > p.lede{margin:0 0 18px;color:var(--muted);max-width:68ch}
+article.conv{border-top:2px solid var(--ink);padding:14px 0 6px;margin-bottom:22px}
+article.conv.all-done{border-top-color:var(--line)}
+.conv-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;margin-bottom:4px}
+.conv-head h3{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-weight:600;font-size:19px;margin:0;line-height:1.25;text-wrap:balance}
+.conv-head h3 a{color:var(--ink)}
+.chip{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:12px;padding:1px 7px;border:1px solid var(--line);border-radius:4px;color:var(--muted);background:var(--panel);white-space:nowrap}
+.chip.conv{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.stopped{color:var(--muted);font-size:14px;margin:0 0 10px;max-width:74ch}
+ul.items{list-style:none;margin:0;padding:0}
+ul.items li{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line-soft);align-items:start}
+ul.items li:first-child{border-top:0}
+ul.items input{margin:4px 0 0;width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.item-body{min-width:0}
+.item-body p{margin:0;max-width:78ch}
+.item-body p a{border-bottom:1px solid var(--line)}
+.tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:3px;margin-right:8px;vertical-align:1px}
+.tag.owe{color:var(--owe);background:var(--owe-soft)}
+.tag.risk{color:var(--risk);background:var(--risk-soft)}
+.tag.ask{color:var(--ask);background:var(--ask-soft)}
+.tag.open{color:var(--muted);background:var(--line-soft)}
+.tag.close{color:var(--accent);background:var(--accent-soft)}
+li.done .item-body{color:var(--done)} li.done .item-body p a{color:var(--done)} li.done .tag{opacity:.55}
+li.done .item-body p{text-decoration:line-through;text-decoration-color:var(--line)}
+body.hide-done li.done{display:none}
+body.hide-done article.conv.all-done{display:none}
+.closeable{border:1px dashed var(--line);border-radius:6px;padding:12px 16px;color:var(--muted);font-size:14px;margin-top:8px}
+.closeable b{color:var(--ink);font-weight:500}
+.savebar{position:fixed;right:16px;bottom:16px;font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;opacity:0;transition:opacity .2s}
+.savebar.show{opacity:1}
+@media (prefers-reduced-motion: reduce){.savebar{transition:none}}
+</style>
+
+<script type="application/json" id="ledger-state">{"done":[],"hideDone":false}</script>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Open Threads Ledger</h1>
+      <div class="stamp">Every unfinished thread across your open Overdeck conversations, as of DATE UTC. Tick a line when it is handled; ticks are saved for everyone who opens this page.</div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <nav class="rail" id="rail"></nav>
+
+  <main id="main"></main>
+</div>
+<div class="savebar" id="savebar">Saved</div>
+
+<script>
+// ---- Data. Tags: owe = something only you can do; risk = data or money at stake; ask = an agent asked you and never got an answer; open = pending work nobody is driving.
+const GROUPS = [
+{ id:"close", title:"Safe to close", lede:"Finished, empty, or handed off to a successor. Tick each one as you close it in the dashboard.", convs:[
+  { key:"close-1235", id:"1235", title:"Finished conversation", meta:"Harness · model", stopped:"Why it is finished.", items:[ {t:"close", h:"Close it."} ]}
+]},
+{ id:"example", title:"Project name", lede:"One sentence on the state of this project's conversations. Keep open: 1234.", convs:[
+  { id:"1234", title:"Conversation title", meta:"Harness · model", stopped:"One sentence on where the conversation stopped and whether it is settled or mid-task.", items:[
+    {t:"owe", h:"Something only the operator can do, with the exact click or command."},
+    {t:"risk", h:"Data or money exposed: unpushed commits, a secret on disk, a key reset."},
+    {t:"ask", h:"A question an agent asked the operator that never got an answer."},
+    {t:"open", h:"Pending work nobody is driving, with the <a href='https://github.com/eltmon/overdeck/issues/1'>issue link</a>."}
+  ]}
+]}
+];
+// A conversation may appear in both the close group and a project group; give the close-group row a distinct key so item ids never collide.
+
+const CLOSEABLE = "";
+
+// ---- State
+const stateEl = document.getElementById('ledger-state');
+let state = {done:[], hideDone:false};
+try { state = Object.assign(state, JSON.parse(stateEl.textContent)); } catch (e) {}
+try { const ls = localStorage.getItem('ledger-local'); if (ls) { const l = JSON.parse(ls); if (!state.done.length && l.done) state.done = l.done; if (l.hideDone !== undefined) state.hideDone = l.hideDone; } } catch (e) {}
+const doneSet = new Set(state.done);
+
+const TAG_LABEL = {owe:"You", risk:"At risk", ask:"Unanswered", open:"Open", close:"Close"};
+
+function render(){
+  const main = document.getElementById('main');
+  const rail = document.getElementById('rail');
+  main.innerHTML = '';
+  let counts = {total:0, done:0, owe:0, risk:0, ask:0};
+  let railHtml = '<h2>Conversations</h2>';
+  for (const g of GROUPS){
+    const sec = document.createElement('section'); sec.className='group'; sec.id='g-'+g.id;
+    sec.innerHTML = `<h2>${g.title}</h2><p class="lede">${g.lede}</p>`;
+    railHtml += `<ul><li style="border:0;padding-bottom:2px"><a href="#g-${g.id}"><b>${g.title}</b></a></li>`;
+    for (const c of g.convs){
+      const key = c.key || c.id;
+      const art = document.createElement('article'); art.className='conv'; art.id='c-'+key;
+      let openHere = 0;
+      let lis = '';
+      c.items.forEach((it, i) => {
+        const id = key+'-'+i; const isDone = doneSet.has(id);
+        counts.total++; if (isDone) counts.done++; else { openHere++; if (counts[it.t] !== undefined) counts[it.t]++; }
+        lis += `<li class="${isDone?'done':''}"><input type="checkbox" id="cb-${id}" data-id="${id}" ${isDone?'checked':''} aria-label="Mark handled"><div class="item-body"><p><label for="cb-${id}"><span class="tag ${it.t}">${TAG_LABEL[it.t]}</span></label>${it.h}</p></div></li>`;
+      });
+      if (openHere === 0) art.classList.add('all-done');
+      art.innerHTML = `<div class="conv-head"><a class="chip conv" href="https://overdeck.localhost/conv/${c.id}">conv ${c.id}</a><h3><a href="https://overdeck.localhost/conv/${c.id}">${c.title}</a></h3><span class="chip">${c.meta}</span></div><p class="stopped">${c.stopped}</p><ul class="items">${lis}</ul>`;
+      sec.appendChild(art);
+      railHtml += `<li><a href="#c-${key}">${c.id} · ${c.title}</a><em>${openHere}</em></li>`;
+    }
+    railHtml += '</ul>';
+    main.appendChild(sec);
+  }
+  railHtml += `<div class="controls"><label><input type="checkbox" id="hide-done" ${state.hideDone?'checked':''}> Hide handled items</label></div>
+  <div class="legend"><span><i class="tag owe">You</i> only you can do it</span><span><i class="tag risk">At risk</i> data or money exposed</span><span><i class="tag ask">Unanswered</i> an agent asked, no reply</span><span><i class="tag open">Open</i> nobody is driving it</span></div>`;
+  rail.innerHTML = railHtml;
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><b>${counts.total-counts.done}</b><span>open</span></div>
+     <div class="stat owe"><b>${counts.owe}</b><span>yours</span></div>
+     <div class="stat risk"><b>${counts.risk}</b><span>at risk</span></div>
+     <div class="stat ask"><b>${counts.ask}</b><span>unanswered</span></div>
+     <div class="stat"><b>${counts.done}</b><span>handled</span></div>`;
+  document.body.classList.toggle('hide-done', !!state.hideDone);
+}
+
+// ---- Persistence: the page republishes itself with the ticks embedded (artifact capability); localStorage is the per-viewer fallback.
+let artifactApi = null, publishTimer = null;
+(async () => { try { artifactApi = await claude.use('artifact'); } catch (e) { artifactApi = null; } })();
+
+function persist(){
+  state.done = Array.from(doneSet);
+  try { localStorage.setItem('ledger-local', JSON.stringify(state)); } catch (e) {}
+  stateEl.textContent = JSON.stringify(state);
+  if (!artifactApi) { flash('Saved on this device'); return; }
+  clearTimeout(publishTimer);
+  publishTimer = setTimeout(async () => {
+    try {
+      const html = '<!doctype html>\n' + document.documentElement.outerHTML;
+      await artifactApi.publish(html);
+      flash('Saved');
+    } catch (e) { flash(e && e.code === 'conflict' ? 'Someone else saved first; reloading' : 'Saved on this device only'); }
+  }, 1500);
+}
+function flash(msg){ const b=document.getElementById('savebar'); b.textContent=msg; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'), 1800); }
+
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 'hide-done') { state.hideDone = t.checked; render(); persist(); return; }
+  if (t.dataset && t.dataset.id) { if (t.checked) doneSet.add(t.dataset.id); else doneSet.delete(t.dataset.id); render(); persist(); }
+});
+render();
+</script>

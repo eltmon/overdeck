@@ -245,7 +245,7 @@ export async function prepareOpenKnowledgeSnapshot(
   return destination;
 }
 
-export async function readOnlyOpenKnowledgeSnapshotPath(
+async function readOnlyOpenKnowledgeSnapshotPath(
   bundlePath: string,
   snapshotRoot = join(getOverdeckHome(), 'cache', 'knowledge-viewer'),
 ): Promise<string> {

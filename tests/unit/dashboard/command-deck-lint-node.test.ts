@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildLintSessionNode } from '../../../src/dashboard/server/routes/command-deck-lint-node.js';
 import type { VerificationArtifact } from '../../../src/lib/cloister/verification-artifact.js';
-import type { ReviewStatus } from '../../../src/lib/review-status.js';
 
 const RAN_AT = '2026-07-17T12:00:00.000Z';
 
@@ -20,19 +19,6 @@ afterEach(() => {
   rmSync(workspacePath, { recursive: true, force: true });
 });
 
-function centralStatus(
-  verificationStatus: NonNullable<ReviewStatus['verificationStatus']>,
-): ReviewStatus {
-  return {
-    issueId: 'PAN-2665',
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    verificationStatus,
-    updatedAt: RAN_AT,
-    readyForMerge: false,
-  };
-}
-
 function writeArtifact(artifact: VerificationArtifact): void {
   const artifactDir = join(workspacePath, '.overdeck');
   mkdirSync(artifactDir, { recursive: true });
@@ -42,24 +28,20 @@ function writeArtifact(artifact: VerificationArtifact): void {
   );
 }
 
-function build(options: {
-  includeTranscripts?: boolean;
-  centralStatus?: ReviewStatus | null;
-} = {}) {
+function build(options: { includeTranscripts?: boolean } = {}) {
   return buildLintSessionNode({
     workspacePath,
     issueLower: 'pan-2665',
     includeTranscripts: options.includeTranscripts ?? true,
-    centralStatus: options.centralStatus ?? null,
   });
 }
 
 describe('buildLintSessionNode', () => {
-  it.each([
-    ['no central status', null],
-    ['skipped verification', centralStatus('skipped')],
-  ])('returns null without an artifact for %s', (_label, status) => {
-    expect(build({ centralStatus: status })).toBeNull();
+  // PAN-3917 FR-8: the workspace artifact is the whole input. With no
+  // verification-latest.json there is no Lint row — there is no status field
+  // left that could stand in for one.
+  it('returns null without an artifact', () => {
+    expect(build()).toBeNull();
   });
 
   it('returns a failed ended node with gate output from a failed artifact', () => {
@@ -111,16 +93,6 @@ describe('buildLintSessionNode', () => {
     });
     expect(node).not.toHaveProperty('endedAt');
     expect(node?.transcript).toContain('▶ test running…');
-  });
-
-  it('returns a completed node with fallback details for passed legacy verification', () => {
-    const node = build({ centralStatus: centralStatus('passed') });
-
-    expect(node).toMatchObject({
-      status: 'completed',
-      presence: 'ended',
-    });
-    expect(node?.transcript).toContain('No gate details recorded for the last run.');
   });
 
   it('omits the transcript when transcripts are not requested', () => {

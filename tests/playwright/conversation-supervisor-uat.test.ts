@@ -165,7 +165,7 @@ async function tmuxSessionExists(session: string): Promise<boolean> {
 
 async function captureTmuxTranscript(session: string): Promise<string> {
   if (!actualTmux) throw new Error('tmux module not initialized');
-  return Effect.runPromise(actualTmux.capturePane(session, 200));
+  return actualTmux.capturePane(session, 200);
 }
 
 async function enterTmuxCopyMode(session: string): Promise<void> {
@@ -296,7 +296,7 @@ function launcherFor(session: string): string {
 }
 
 async function writeConversationSessionFile(conv: { cwd: string; claudeSessionId: string }): Promise<void> {
-  const { sessionFilePath } = await import('../../src/lib/paths.js');
+  const { sessionFilePath } = await import('../../src/lib/runtimes/storage/claude-code.js');
   const sessionFile = sessionFilePath(conv.cwd, conv.claudeSessionId);
   mkdirSync(dirname(sessionFile), { recursive: true });
   writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'parent context' } })}\n`);
@@ -433,8 +433,6 @@ beforeEach(async () => {
     }),
   }));
 
-  const { resetDatabase } = await import('../../src/lib/database/index.js');
-  resetDatabase();
   await startRealConversationRoutes();
   browser = await chromium.launch();
   context = await browser.newContext();
@@ -455,8 +453,6 @@ afterEach(async () => {
     )));
   }
   tmuxSessions.clear();
-  const { resetDatabase } = await import('../../src/lib/database/index.js');
-  resetDatabase();
   if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalOverdeckHome;
   if (originalHome === undefined) delete process.env.HOME;

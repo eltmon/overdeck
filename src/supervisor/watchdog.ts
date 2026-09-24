@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { readFileSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -353,7 +352,7 @@ export class SupervisorWatchdog {
         this.state.restartBlockedUntil = null;
         await this.persistState();
         await this.log(error);
-        await Effect.runPromise(writeRestartStatus({
+        await writeRestartStatus({
           ts: new Date(startedAt).toISOString(),
           trigger: 'watchdog',
           success: false,
@@ -363,7 +362,7 @@ export class SupervisorWatchdog {
           gaveUp: true,
           reason: restartReason ?? 'foreign dashboard eviction failed',
           pid: process.pid,
-        }));
+        });
         return;
       }
       await this.log(`watchdog evicted foreign dashboard PID(s) ${eviction.pids.join(', ')} from port ${this.config.dashboardApiPort} with SIGTERM`);
@@ -398,7 +397,7 @@ export class SupervisorWatchdog {
       this.state.restartBlockedUntil = null;
       await this.persistState();
       await this.log(error);
-      await Effect.runPromise(writeRestartStatus({
+      await writeRestartStatus({
         ts: new Date(startedAt).toISOString(),
         trigger: 'watchdog',
         success: false,
@@ -408,11 +407,11 @@ export class SupervisorWatchdog {
         gaveUp: true,
         reason: restartReason ?? restartLogReason ?? 'dashboard health check failed',
         pid: process.pid,
-      }));
+      });
       return;
     }
 
-    const lock = await Effect.runPromise(acquireRestartLock('supervisor watchdog'));
+    const lock = await acquireRestartLock('supervisor watchdog');
     if (!lock) {
       if (foreignDashboard) {
         const error = 'NEEDS YOU: watchdog evicted a foreign dashboard but could not restart the primary because the restart lock is held';
@@ -422,7 +421,7 @@ export class SupervisorWatchdog {
         this.state.restartBlockedUntil = null;
         await this.persistState();
         await this.log(error);
-        await Effect.runPromise(writeRestartStatus({
+        await writeRestartStatus({
           ts: new Date(startedAt).toISOString(),
           trigger: 'watchdog',
           success: false,
@@ -432,10 +431,10 @@ export class SupervisorWatchdog {
           gaveUp: true,
           reason: restartReason ?? 'foreign dashboard restart lock held',
           pid: process.pid,
-        }));
+        });
         return;
       }
-      const holder = await Effect.runPromise(readRestartLockHolder());
+      const holder = await readRestartLockHolder();
       const heldBy = holder ? `PID ${holder.pid} (${holder.caller})` : 'another process';
       this.state.restartBlockedReason = `restart lock held by ${heldBy}`;
       this.state.restartBlockedUntil = null;
@@ -483,7 +482,7 @@ export class SupervisorWatchdog {
       this.state.bootGraceStartedAt = this.now();
     }
 
-    await Effect.runPromise(writeRestartStatus({
+    await writeRestartStatus({
       ts: new Date(startedAt).toISOString(),
       trigger: 'watchdog',
       success: restartError === null,
@@ -492,7 +491,7 @@ export class SupervisorWatchdog {
       attempts: this.state.restartAttempts.length,
       reason: restartReason ?? 'dashboard health check failed',
       pid: process.pid,
-    }));
+    });
     if (restartError) {
       this.state.restartBlockedReason = `previous restart failed: ${restartError}`;
       await this.log(`watchdog restart failed: ${restartError}`);
@@ -548,17 +547,22 @@ export class SupervisorWatchdog {
       ? config.patrolIntervalMs
       : 60_000;
     const staleAfterMs = interval * 3;
-    const lastPatrol = typeof state.lastPatrol === 'string' ? state.lastPatrol : null;
+    // PAN-3917: deacon-lite keeps no heartbeat file and the dashboard process
+    // only reports a run timestamp when the deacon child has relayed one. A
+    // missing timestamp is therefore not evidence of a dead deacon (the
+    // pre-cut "heartbeat missing" verdict restart-looped the dashboard every
+    // three minutes after the cut). Only a reported-but-stale or invalid
+    // timestamp is a failure; liveness of the child is `isRunning` above.
+    const deaconLite = record.deaconLite && typeof record.deaconLite === 'object'
+      ? record.deaconLite as Record<string, unknown>
+      : {};
+    const lastPatrol = typeof state.lastPatrol === 'string'
+      ? state.lastPatrol
+      : typeof deaconLite.lastRunAt === 'string' ? deaconLite.lastRunAt : null;
 
     if (!lastPatrol) {
-      this.state.patrolUnhealthySince ??= nowMs;
-      const unhealthyForMs = nowMs - this.state.patrolUnhealthySince;
-      return {
-        message: `deacon patrol heartbeat missing for ${Math.floor(unhealthyForMs / 1000)}s`,
-        restartReady: unhealthyForMs > staleAfterMs,
-        reason: `deacon patrol heartbeat missing for >${Math.ceil(staleAfterMs / 1000)}s`,
-        logReason: 'deacon patrol heartbeat missing',
-      };
+      this.state.patrolUnhealthySince = null;
+      return null;
     }
 
     const lastPatrolMs = Date.parse(lastPatrol);

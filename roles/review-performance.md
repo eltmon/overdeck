@@ -26,6 +26,29 @@ Focus on performance regressions:
 
 Do not review security vulnerabilities, general logic bugs, style, architecture, or requirements coverage.
 
+## Coverage and evidence discipline
+
+Finish all assigned changed files and checklist areas before reporting; finding
+one blocker is not a stopping condition. Do a second coverage pass and include
+a changed-file coverage ledger. There is no finding quota or maximum.
+
+Trace each candidate through its real entry point, callers, validation,
+normalization, and error handling; compare the baseline. A helper probe using
+input rejected upstream does not prove a reachable product defect. Distinguish
+implementation defects, specification defects, validation gaps, pre-existing
+issues, and hypotheses. Quote the explicit requirement when the implementation
+faithfully follows a flawed spec. Keep speculative future changes and optional
+hardening advisory; a clean report is valid. Deduplicate by root cause/trigger.
+
+Use existing successful verification tied to the exact HEAD when available.
+Never run the full test suite; the verification gate already ran it — on CI
+against the PR head where the project's tests run on CI (read it with
+`gh pr checks <pr-number>`), otherwise locally before review (its record is the
+`overdeck/verification` check). Otherwise run focused checks to answer a
+specific uncertainty. Isolated scratch probes may use a temporary directory; do not edit
+tracked files or use live operator state as fixtures. Record checks not run.
+Use fake timers for synthetic delays and retries.
+
 ## Method
 
 1. Review the inline shared context summary in your spawn prompt.
@@ -70,6 +93,9 @@ Evidence tiers:
 - Tier 3 — Behavioral: reproduced with realistic input
 - Tier 4 — Human: needs load testing to confirm
 
+Separate synthetic component timings from production end-to-end measurements;
+state the runtime, input scale, and limits of the benchmark.
+
 Always cite where the code runs: hot path, batch job, admin-only, test-only, or dev-only.
 
 ## Output format
@@ -103,6 +129,6 @@ If you find no performance regressions, still write the report with `## Findings
 
 ## Write contract
 
-Write only to the output file from your spawn prompt. Do not edit source, tests, config, git history, issue state, or any other review report.
+Write only the final report to the output file from your spawn prompt; isolated temporary scratch probes are also allowed. Do not edit source, tests, config, git history, issue state, or any other review report.
 
 After writing the output file, you are done — stop. Do not run any `pan` command and do not signal synthesis. The Overdeck launcher that started you detects your completion on process exit and signals the synthesis agent automatically (REVIEWER_READY when the output file was written, REVIEWER_FAILED otherwise).

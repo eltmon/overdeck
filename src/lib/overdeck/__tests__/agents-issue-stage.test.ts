@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  getIssueStageSync,
+  getIssueStage,
   isTerminalIssueStage,
 } from '../agents.js';
 import {
-  closeOverdeckDatabaseSync,
-  getOverdeckDatabaseSync,
+  closeOverdeckDatabase,
+  getOverdeckDatabase,
 } from '../infra.js';
 
 describe('agent issue stage helpers', () => {
@@ -20,11 +20,11 @@ describe('agent issue stage helpers', () => {
   beforeEach(() => {
     testHome = mkdtempSync(join(tmpdir(), 'agents-issue-stage-'));
     process.env.OVERDECK_HOME = testHome;
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
   });
 
   afterEach(() => {
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
     if (originalOverdeckHome === undefined) {
       delete process.env.OVERDECK_HOME;
     } else {
@@ -34,14 +34,14 @@ describe('agent issue stage helpers', () => {
   });
 
   it('returns the stored issue stage or null when the issue is absent', () => {
-    const db = getOverdeckDatabaseSync();
+    const db = getOverdeckDatabase();
     db.prepare(`
       INSERT INTO issues (id, stage, updated_at)
       VALUES (?, ?, ?)
     `).run('PAN-2338', 'working', Date.now());
 
-    expect(getIssueStageSync('PAN-2338')).toBe('working');
-    expect(getIssueStageSync('PAN-404')).toBeNull();
+    expect(getIssueStage('PAN-2338')).toBe('working');
+    expect(getIssueStage('PAN-404')).toBeNull();
   });
 
   it('identifies terminal issue stages', () => {

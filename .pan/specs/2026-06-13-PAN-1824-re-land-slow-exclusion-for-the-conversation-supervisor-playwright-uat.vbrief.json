@@ -1,0 +1,224 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T16:47:25.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1824: Re-land the @slow exclusion for the conversation-supervisor Playwright UAT (root cause already fixed by fd7b0cbe1; fake-timer conversion forbidden)",
+    "updated": "2026-06-13T16:51:41.949Z"
+  },
+  "plan": {
+    "id": "pan-1824",
+    "title": "Re-land @slow exclusion for the conversation-supervisor Playwright UAT",
+    "status": "proposed",
+    "uid": "e7e034e1-efb8-4a50-82d4-363de78acc2b",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T16:47:25.000Z",
+    "updated": "2026-06-13T16:51:41.949Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1824",
+        "label": "PAN-1824",
+        "type": "issue"
+      },
+      {
+        "uri": "https://vitest.dev/guide/test-tags",
+        "label": "vitest Test Tags",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "ci",
+      "tests",
+      "flaky",
+      "vitest",
+      "test-infra"
+    ],
+    "narratives": {
+      "Problem": "The conversation-supervisor Playwright UAT (tests/playwright/conversation-supervisor-uat.test.ts) is a wall-clock real-browser (chromium.launch) integration test that runs in the default `vitest run` / CI `npm test`. It was one of the ~5s-timeout victims on loaded CI runners. The actual root cause (PAN-1798's managed tmux-server founding burning 5s synchronously inside every createSession under tests) was already fixed on main by fd7b0cbe1, and the whole family now passes fast (verified in CI run 27472211377: the UAT itself ✓2936ms). An earlier strike (d9807686d) ALSO tagged this UAT @slow to keep wall-clock browser tests out of the gating default run — but that commit bundled fake-timer conversions of the tmux/IO suites which hung both main CI jobs for the full 30-min budget, so the whole commit was reverted (53ac34014). The revert took the harmless, correct @slow tagging down with the harmful conversion, so the wall-clock UAT is back in the default suite where a loaded-runner timeout on it would redden main and mask real regressions.",
+      "Proposal": "Re-land ONLY the @slow exclusion, replaying exactly the two known-good hunks of d9807686d. (1) Declare a @slow tag in vitest.config.ts test config and set tagsFilter to ['!@slow'] so the default run excludes @slow-tagged tests. (2) Tag the single UAT describe with { tags: ['@slow'] } and prove the default `vitest run` collects zero tests from that file. (3) Add a `test:slow` npm script (`vitest run --tagsFilter @slow`) so the excluded set stays runnable on demand. Do NOT redo any fake-timer conversion — the root cause is already fixed and that approach hangs CI. Because @slow exclusion is pure deterministic config-level tag filtering (identical local and CI, independent of whether tmux/IO ops succeed), local verification that the default run skips the UAT is a faithful CI proxy.",
+      "NonGoals": "- Do NOT convert codex.test.ts, conversations.test.ts, reviewer-tree.test.ts, or any fork/heartbeat/kill/conversation-routes test to fake timers — that approach (d9807686d) hung CI for 30 min and was reverted (53ac34014).\n- Do NOT modify src/lib/tmux.ts or the fd7b0cbe1 founding guard — the root cause is already fixed there.\n- Do NOT modify .github/workflows/ci.yml (e.g. removing the now-unused root chromium install, or adding a dedicated @slow CI job) — follow-up only.\n- Do NOT introduce any vitest tag other than @slow; strictTags defaults to true and an undeclared tag errors the whole suite.\n- Do NOT add new wall-clock/real-timer tests; any genuinely wall-clock test must be @slow-tagged.\n- Do NOT add a config-assertion regression-guard test for the @slow filter — possible follow-up, out of scope here."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Do NOT redo any fake-timer conversion.",
+        "rationale": "The issue body asks for it, but the operator's later comments authoritatively re-scope: the root cause is already fixed by fd7b0cbe1 and the conversion hung both main CI jobs and was reverted. Later operator comments supersede the stale body; chronological re-scope, not an unresolvable contradiction."
+      },
+      {
+        "summary": "Re-land @slow by replaying exactly the two known-good hunks of d9807686d, nothing else.",
+        "rationale": "The @slow mechanism was API-correct vitest 4.x; only the bundled conversion was harmful. Verbatim replay minimizes risk."
+      },
+      {
+        "summary": "Add a `test:slow` npm script so the excluded @slow set stays runnable on demand.",
+        "rationale": "An excluded-from-default set with no runner is write-only / silent coverage loss; the project rule is 'no silent caps'. Kept as its own droppable bead."
+      },
+      {
+        "summary": "Do NOT touch the CI workflow or add a config-guard test.",
+        "rationale": "Out of the operator's explicit 'ONLY' scope; recorded as NonGoal follow-ups. Karpathy simplicity-first."
+      }
+    ],
+    "items": [
+      {
+        "id": "vitest-slow-tag-config",
+        "title": "Declare the @slow tag and exclude it from the default vitest run",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T16:47:25.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1824",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In vitest.config.ts, inside the `test: { ... }` block (after the existing testTimeout/hookTimeout lines, ~line 50), add the @slow tag declaration and filter, replaying the known-good hunk from `git show d9807686d -- vitest.config.ts`:\n\n    // Wall-clock integration tests are tagged `@slow` and excluded from the\n    // default run so a red CI always means a real regression, not a loaded-runner\n    // timeout on a browser/tmux integration test.\n    tags: [{ name: '@slow', description: 'Wall-clock integration tests' }],\n    tagsFilter: ['!@slow'],\n\nThis is the foundation for tagging the UAT: vitest 4.1.6's strictTags defaults to true, so any describe/test that uses @slow must have @slow declared in `test.tags` first or vitest throws. Land this before the UAT-tag bead. Touch ONLY vitest.config.ts; do not convert any test to fake timers."
+        },
+        "items": [
+          {
+            "id": "vitest-slow-tag-config.ac1",
+            "title": "Given vitest.config.ts, the `test` config declares a @slow tag via `tags: [{ name: '@slow', description: 'Wall-clock integration tests' }]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vitest-slow-tag-config.ac2",
+            "title": "Given `tagsFilter: ['!@slow']` in the `test` config, a default `vitest run` excludes (does not execute) @slow-tagged tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vitest-slow-tag-config.ac3",
+            "title": "When no test is yet tagged, `npx vitest run` still passes the existing suite — the declared-but-unused @slow tag is accepted under strictTags (does not error)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tag-uat-slow",
+        "title": "Tag the conversation-supervisor Playwright UAT @slow and prove the default run excludes it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T16:47:25.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1824",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/playwright/conversation-supervisor-uat.test.ts, add the @slow tag to the single describe at line 401, replaying the known-good hunk from `git show d9807686d -- tests/playwright/conversation-supervisor-uat.test.ts`:\n\n    -describe('conversation supervisor Playwright UAT', () => {\n    +describe('conversation supervisor Playwright UAT', { tags: ['@slow'] }, () => {\n\nThen prove exclusion: run the default `npx vitest run tests/playwright/conversation-supervisor-uat.test.ts` and confirm zero tests execute (filtered by tagsFilter `!@slow`), and that a default `npm test` no longer runs 'delivers through real conversation routes…'. Local verification is a faithful CI proxy here because tag filtering is deterministic config behavior, independent of whether tmux/IO ops succeed (unlike the reverted fake-timer conversion). Touch ONLY this test file; do NOT convert it (or its neighbors) to fake timers."
+        },
+        "items": [
+          {
+            "id": "tag-uat-slow.ac1",
+            "title": "The single `describe('conversation supervisor Playwright UAT', ...)` is given `{ tags: ['@slow'] }` as its second argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tag-uat-slow.ac2",
+            "title": "When `npx vitest run tests/playwright/conversation-supervisor-uat.test.ts` runs with the default config, it executes zero tests (the file's test is filtered out by tagsFilter `!@slow`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tag-uat-slow.ac3",
+            "title": "`npm run typecheck` exits 0 and passes — the 3-arg `describe(name, { tags }, fn)` signature compiles under vitest 4.1.6",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tag-uat-slow.ac4",
+            "title": "When a default `npm test` runs, it does not execute the UAT test 'delivers through real conversation routes and keeps plain forks off Channels MCP' — the test name is absent from the default-run output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-slow-script",
+        "title": "Add a test:slow npm script so the excluded @slow set stays runnable on demand",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-13T16:47:25.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1824",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a `test:slow` script to package.json `scripts` defined as `vitest run --tagsFilter @slow` (the inverse of the default `!@slow` exclusion; --tagsFilter is the verified vitest 4.1.6 CLI flag). This keeps the @slow set runnable on demand rather than silently orphaned. Note the @slow UAT uses real chromium.launch(), so a green run requires chromium installed (`npx playwright install chromium`); the bead's AC only requires that the script SELECTS the @slow test for execution, not that the browser test passes in every environment. Place the script next to the existing `test` / `test:unit` entries."
+        },
+        "items": [
+          {
+            "id": "test-slow-script.ac1",
+            "title": "package.json `scripts` contains `test:slow` defined as `vitest run --tagsFilter @slow`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-slow-script.ac2",
+            "title": "When `npm run test:slow` runs, vitest selects the @slow-tagged UAT test for execution rather than reporting zero matched tests (the inverse of the default exclusion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-slow-script.ac3",
+            "title": "`npm run lint` passes with the new script present (no JSON or skills-lint drift)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vitest-slow-tag-config",
+        "to": "tag-uat-slow",
+        "type": "blocks"
+      },
+      {
+        "from": "vitest-slow-tag-config",
+        "to": "test-slow-script",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1824-re-land-slow-exclusion-for-the-conversation-supervisor-playwright-uat.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -1,36 +1,44 @@
+/**
+ * Sync twins (PAN-3958): `readOrderBook` (async: `readOrderBookAsync`) exists because this caller runs
+ * in a synchronous context and cannot await: src/lib/orders/resolver.ts:153 (`listBooks`, the sync
+ * order-book read door). Do not add new synchronous callers; server-reachable code uses the async variant.
+ */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { OrderBookIndexEntry as OrderBookIndexEntrySchema } from '@overdeck/contracts';
 import type { OrderBook, OrderBookIndexEntry, OrderBookItem } from '@overdeck/contracts';
-import { Effect, Schema } from 'effect';
-import { flushAutoCommits, queueAutoCommit } from '../pan-dir/auto-commit.js';
+import { Schema } from 'effect';
 import { parseOrderBookJson } from './types.js';
 
 const BOOK_ID_PATTERN = /^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const decodeIndex = Schema.decodeUnknownSync(Schema.Array(OrderBookIndexEntrySchema));
 
-export function ordersDirectory(stateRoot: string): string {
-  return join(stateRoot, 'orders');
+/**
+ * Order books, the index, and the backlog sequence live under the project's
+ * plan directory: pass `getProjectPanPaths(projectRoot).panDir` (PAN-3917).
+ */
+function ordersDirectory(panDir: string): string {
+  return join(panDir, 'orders');
 }
 
-export function orderBookPath(stateRoot: string, bookId: string): string {
+export function orderBookPath(panDir: string, bookId: string): string {
   if (!BOOK_ID_PATTERN.test(bookId)) {
     throw new Error(`Invalid order book id: ${bookId}`);
   }
-  return join(ordersDirectory(stateRoot), `${bookId}.json`);
+  return join(ordersDirectory(panDir), `${bookId}.json`);
 }
 
-export function orderBookIndexPath(stateRoot: string): string {
-  return join(ordersDirectory(stateRoot), 'index.json');
+export function orderBookIndexPath(panDir: string): string {
+  return join(ordersDirectory(panDir), 'index.json');
 }
 
-export function backlogSequencePath(stateRoot: string): string {
-  return join(stateRoot, 'backlog', 'sequence.md');
+export function backlogSequencePath(panDir: string): string {
+  return join(panDir, 'backlog', 'sequence.md');
 }
 
-export async function readOrderBookAsync(stateRoot: string, bookId: string): Promise<OrderBook | null> {
-  const path = orderBookPath(stateRoot, bookId);
+export async function readOrderBookAsync(panDir: string, bookId: string): Promise<OrderBook | null> {
+  const path = orderBookPath(panDir, bookId);
   let value: unknown;
   try {
     value = JSON.parse(await readFile(path, 'utf8'));
@@ -44,8 +52,8 @@ export async function readOrderBookAsync(stateRoot: string, bookId: string): Pro
   return parsed.book;
 }
 
-export function readOrderBook(stateRoot: string, bookId: string): OrderBook | null {
-  const path = orderBookPath(stateRoot, bookId);
+export function readOrderBook(panDir: string, bookId: string): OrderBook | null {
+  const path = orderBookPath(panDir, bookId);
   if (!existsSync(path)) return null;
 
   let value: unknown;
@@ -65,8 +73,8 @@ export function readOrderBook(stateRoot: string, bookId: string): OrderBook | nu
   return parsed.book;
 }
 
-export function readOrderBookIndex(stateRoot: string): readonly OrderBookIndexEntry[] {
-  const path = orderBookIndexPath(stateRoot);
+export function readOrderBookIndex(panDir: string): readonly OrderBookIndexEntry[] {
+  const path = orderBookIndexPath(panDir);
   if (!existsSync(path)) return [];
 
   try {
@@ -78,11 +86,11 @@ export function readOrderBookIndex(stateRoot: string): readonly OrderBookIndexEn
   }
 }
 
-export function listOrderBookIds(stateRoot: string): string[] {
-  const indexed = readOrderBookIndex(stateRoot).map((entry) => entry.id);
-  if (indexed.length > 0 || !existsSync(ordersDirectory(stateRoot))) return [...indexed];
+export function listOrderBookIds(panDir: string): string[] {
+  const indexed = readOrderBookIndex(panDir).map((entry) => entry.id);
+  if (indexed.length > 0 || !existsSync(ordersDirectory(panDir))) return [...indexed];
 
-  return readdirSync(ordersDirectory(stateRoot))
+  return readdirSync(ordersDirectory(panDir))
     .filter((name) => name !== 'index.json' && name.endsWith('.json'))
     .map((name) => name.slice(0, -'.json'.length))
     .filter((id) => BOOK_ID_PATTERN.test(id))
@@ -124,15 +132,15 @@ function indexEntry(book: OrderBook): OrderBookIndexEntry {
  * must mutate order books through writer.ts so the book and queue stay aligned.
  */
 export async function writeOrderBookState(
-  stateRoot: string,
+  panDir: string,
   nextBook: OrderBook,
   queueOrder?: readonly string[],
 ): Promise<OrderBook> {
-  const prior = readOrderBook(stateRoot, nextBook.id);
+  const prior = await readOrderBookAsync(panDir, nextBook.id);
   const book = preserveOperatorOwnedState(prior, nextBook);
-  const bookPath = orderBookPath(stateRoot, book.id);
-  const indexPath = orderBookIndexPath(stateRoot);
-  const existingIndex = [...readOrderBookIndex(stateRoot)];
+  const bookPath = orderBookPath(panDir, book.id);
+  const indexPath = orderBookIndexPath(panDir);
+  const existingIndex = [...readOrderBookIndex(panDir)];
   const byId = new Map(existingIndex.map((entry) => [entry.id, entry]));
   byId.set(book.id, indexEntry(book));
 
@@ -148,15 +156,7 @@ export async function writeOrderBookState(
   writeFileSync(bookPath, `${JSON.stringify(book, null, 2)}\n`, 'utf8');
   writeFileSync(indexPath, `${JSON.stringify(index, null, 2)}\n`, 'utf8');
 
-  queueAutoCommit({
-    projectRoot: stateRoot,
-    repoRoot: stateRoot,
-    paths: [bookPath, indexPath],
-    subject: `chore(state): update order book ${book.id}`,
-  });
-  const flushed = await Effect.runPromise(flushAutoCommits(stateRoot));
-  if (flushed.errored || flushed.pushed === false) {
-    throw new Error(`Failed to persist order book ${book.id}: ${flushed.reason ?? 'state commit failed'}`);
-  }
+  // PAN-3917: order books are tracked files in the plan home; the agent or
+  // operator that changed them commits them.
   return book;
 }

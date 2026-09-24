@@ -3,7 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { chunkConversationJsonlFile, splitTextIntoWindows } from '../chunker.js';
+import { splitTextIntoWindows, chunkConversationJsonl } from '../chunker.js';
+import type { ChunkConversationJsonlOptions, ConversationChunkRecord } from '../chunker.js';
+
+// Moved here from src/lib/conversation-search/chunker.ts, which no production code called (PAN-3958 CH-8).
+async function chunkConversationJsonlFile(
+  options: ChunkConversationJsonlOptions,
+): Promise<ConversationChunkRecord[]> {
+  const records: ConversationChunkRecord[] = [];
+  for await (const record of chunkConversationJsonl(options)) records.push(record);
+  return records;
+}
 
 let tmpDir: string | undefined;
 

@@ -1,0 +1,198 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { getHarnessBehavior, KNOWN_HARNESSES } from '@overdeck/contracts';
+import { getProviderForModel } from '../providers.js';
+import { parseMuseSessionMetadata } from '../conversations/harness-metadata.js';
+import { applyFallback } from '../model-fallback.js';
+import { getAgentCommand } from '../settings.js';
+import { getPricing } from '../cost.js';
+import { canUseHarness } from '../harness-policy.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { getAvailableModelsApi } from '../settings-api.js';
+import { mergeConfigs } from '../config-yaml/merge.js';
+import { parseMuseRecords, summarizeMuseRecords } from '../cost-parsers/muse-parser.js';
+import { museDataHome, resolveMuseSessionPath } from '../runtimes/storage/muse.js';
+import { renderForHarness } from '../context-layers/harness.js';
+import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
+import { readSessionIndex } from '../session-history.js';
+import { MuseRuntimeSync } from '../runtimes/muse.js';
+
+vi.mock('../harness-binary.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../harness-binary.js')>();
+  return { ...actual, prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/usr/bin/muse', pathExport: '' })) };
+});
+vi.mock('../runtimes/tmux-cli.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtimes/tmux-cli.js')>();
+  return {
+    ...actual,
+    tmuxCreateSession: vi.fn(async () => undefined),
+    tmuxSessionExists: vi.fn(async () => false),
+    tmuxKillSession: vi.fn(async () => undefined),
+  };
+});
+vi.mock('../agents/runtime-command.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../agents/runtime-command.js')>();
+  return { ...actual, waitForPromptReady: vi.fn(async () => true) };
+});
+vi.mock('../runtimes/muse-context.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtimes/muse-context.js')>();
+  return { ...actual, materializeMuseContext: vi.fn(async () => '/tmp/fake-muse-context.md') };
+});
+
+const models = ['muse-spark-1.3', 'muse-spark-1.3-contributor'] as const;
+const temporary: string[] = [];
+afterEach(async () => { await Promise.all(temporary.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
+
+describe('Muse model and harness support', () => {
+  it('registers both tiers without changing their exact identity', () => {
+    expect(KNOWN_HARNESSES.has('muse')).toBe(true);
+    expect(getHarnessBehavior('muse').executableName).toBe('muse');
+    expect(getAvailableModelsApi().meta.map(model => model.id)).toEqual(models);
+    for (const model of models) {
+      expect(getProviderForModel(model)).toMatchObject({ name: 'meta', defaultHarness: 'muse' });
+      expect(canUseHarness('muse', model, undefined).allowed).toBe(true);
+      expect(canUseHarness('claude-code', model, undefined).allowed).toBe(false);
+    }
+    expect(canUseHarness('muse', 'claude-sonnet-5', undefined).allowed).toBe(false);
+    expect(applyFallback(models[0], new Set(['meta']))).toBe(models[0]);
+    expect(() => applyFallback(models[0], new Set(['anthropic']))).toThrow('Meta (Muse) is disabled');
+    expect(getAvailableModelsApi().meta[1].name).toContain('training data');
+  });
+
+  it('preserves opt-in provider settings and Muse-specific context', () => {
+    const { config } = mergeConfigs({ models: { providers: { meta: { enabled: true, harness: 'muse' } } } });
+    expect(config.enabledProviders.has('meta')).toBe(true);
+    expect(config.providerHarnesses.meta).toBe('muse');
+    expect(renderForHarness('shared {{#harness:muse}}native{{/harness:muse}}{{#harness:claude}}claude{{/harness:claude}}', 'muse')).toBe('shared native');
+  });
+
+  it('honors a higher-precedence provider disable after Meta was enabled', () => {
+    const { config, explicitlyDisabled } = mergeConfigs(
+      { models: { providers: { meta: false } } },
+      { models: { providers: { meta: true } } },
+    );
+    expect(config.enabledProviders.has('meta')).toBe(false);
+    expect(explicitlyDisabled.has('meta')).toBe(true);
+    expect(() => applyFallback(models[0], config.enabledProviders)).toThrow('Meta (Muse) is disabled');
+  });
+
+  it.each(models)('routes the command helper for %s to native Muse', model => {
+    expect(getAgentCommand(model)).toEqual({ command: 'muse', args: ['--model', model] });
+  });
+
+  it('clears the completed-turn marker when a resumed turn starts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'muse-active-turn-')); temporary.push(root);
+    const file = join(root, 'session.jsonl');
+    const raw = await readFile(resolve('tests/fixtures/muse/echo-session.jsonl'), 'utf8');
+    await writeFile(file, raw + '\n' + JSON.stringify({ id: 'new-turn', payload_type: 'runtime.session',
+      payload: { kind: 'run', event: { kind: 'started', prompt: 'Continue' } } }));
+    const result = await parseMuseConversationMessages(file);
+    expect(result.streaming).toBe(true);
+    expect(result.lastTurnCompletedAt).toBeUndefined();
+  });
+
+  it('deduplicates root record IDs consistently while preserving anonymous records', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'muse-duplicate-turn-')); temporary.push(root);
+    const file = join(root, 'session.jsonl');
+    const raw = await readFile(resolve('tests/fixtures/muse/echo-session.jsonl'), 'utf8');
+    await writeFile(file, raw + '\n' + raw);
+    expect((await parseMuseSessionMetadata(file)).messageCount).toBe(4);
+    expect((await parseMuseConversationMessages(file)).messages).toHaveLength(4);
+    const anonymous = JSON.stringify({ id: '', payload_type: 'runtime.session', payload: {} });
+    expect(parseMuseRecords(anonymous + '\n' + anonymous)).toHaveLength(2);
+  });
+
+  it.each(models)('launches %s interactively and resumes only a native UUID', model => {
+    const script = generateLauncherScript({ role: 'work', workingDir: '/tmp/muse workspace', harness: 'muse',
+      museModel: model, overdeckEnv: { agentId: 'conv-muse-test' },
+      resumeSessionId: 'stale-claude-id', museResumeSessionId: 'native-muse-id',
+      museContextFile: '/tmp/context with spaces.md', spawnMode: 'conversation' });
+    expect(script).toContain(`muse --model '${model}' --reasoning-effort 'high'`);
+    expect(script).toContain("resume 'native-muse-id'");
+    expect(script).toContain('XDG_DATA_HOME=');
+    expect(script).toContain("TBH_EVAL_APPEND_DEVELOPER_PROMPT_FILE='/tmp/context with spaces.md'");
+    expect(script).not.toContain('stale-claude-id');
+    expect(script).not.toContain('muse exec');
+    expect(script).not.toContain('--yolo');
+  });
+
+  it('requires an explicit model instead of using Muse settings as a fallback', () => {
+    expect(() => generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
+      overdeckEnv: { agentId: 'agent-muse-test' } })).toThrow('explicit supported Muse');
+  });
+
+  it('selects only the newest root session in the requested agent directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'muse-sessions-')); temporary.push(root);
+    const dir = join(museDataHome('conv-one', root), 'muse', 'sessions', '2026', '09', '08');
+    for (const path of [join(dir, '01-older', 'session.jsonl'), join(dir, '02-newer', 'session.jsonl'),
+      join(dir, '02-newer', 'subagent', '99-child', 'session.jsonl')]) {
+      await mkdir(resolve(path, '..'), { recursive: true }); await writeFile(path, '{}\n');
+    }
+    expect(await resolveMuseSessionPath('conv-one', root)).toBe(join(dir, '02-newer', 'session.jsonl'));
+    expect(await resolveMuseSessionPath('conv-two', root)).toBeNull();
+    expect(() => museDataHome('../escape', root)).toThrow('identity');
+  });
+
+  it.each(models)('prices %s with cached input counted once', model => {
+    const metadata = { id: 'metadata', payload_type: 'runtime.session.metadata', payload: { record: { model_id: model } } };
+    const completion = { id: 'completion', payload_type: 'runtime.session', payload: { kind: 'run', event: {
+      kind: 'model_completed', usage: { input_tokens: 1000000, output_tokens: 1000000, cached_tokens: 500000 },
+    } } };
+    const records = parseMuseRecords([metadata, completion, completion].map(record => JSON.stringify(record)).join('\n') + '\n{"partial":');
+    const result = summarizeMuseRecords(records, '/sessions/root/session.jsonl');
+    const price = getPricing('custom', model)!;
+    expect(result?.usage).toEqual({ inputTokens: 500000, outputTokens: 1000000, cacheReadTokens: 500000 });
+    expect(result?.cost).toBeCloseTo(500 * price.inputPer1k + 1000 * price.outputPer1k + 500 * price.cacheReadPer1k!);
+    expect(result?.cost).toBeCloseTo(model.endsWith('contributor') ? 0.251 : 4.95);
+  });
+
+  it('reads real Muse 1.0.2 echo turns without rendering private reasoning or duplicating user intents', async () => {
+    const result = await parseMuseConversationMessages(resolve('tests/fixtures/muse/echo-session.jsonl'));
+    expect(result.messages.map(message => message.text)).toEqual([
+      'Muse integration echo fixture', 'echo: Muse integration echo fixture',
+      'Second isolated message', 'echo: Second isolated message',
+    ]);
+    const metadata = await parseMuseSessionMetadata(resolve('tests/fixtures/muse/echo-session.jsonl'));
+    expect(metadata.messageCount).toBe(4);
+    expect(metadata.cwdFromFirstMessage).toBeTruthy();
+    expect(result.streaming).toBe(false);
+    expect(result.lastTurnCompletedAt).toBeTruthy();
+  });
+
+  it('records the real session log path in the session index after a native spawn (PAN-3959)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'muse-spawn-')); temporary.push(root);
+    const originalOverdeckHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = root;
+    try {
+      const agentId = 'agent-muse-spawn-test';
+      const sessionDir = join(museDataHome(agentId, join(root, 'agents')), 'muse', 'sessions', '2026', '09', '20', '01-fresh');
+      await mkdir(sessionDir, { recursive: true });
+      const sessionLogPath = join(sessionDir, 'session.jsonl');
+      await writeFile(sessionLogPath, '{}\n');
+
+      const runtime = new MuseRuntimeSync();
+      const agent = await runtime.spawnAgent({
+        agentId,
+        workspace: '/tmp/muse-workspace',
+        runtime: 'muse',
+        model: 'muse-spark-1.3',
+      });
+
+      expect(agent.sessionId).toBe('01-fresh');
+      expect(readSessionIndex(agentId)).toEqual([
+        expect.objectContaining({
+          sessionId: '01-fresh',
+          source: 'launcher',
+          harness: 'muse',
+          model: 'muse-spark-1.3',
+          path: sessionLogPath,
+        }),
+      ]);
+    } finally {
+      if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = originalOverdeckHome;
+    }
+  });
+});

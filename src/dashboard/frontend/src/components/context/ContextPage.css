@@ -1,0 +1,30 @@
+.context-page {
+  container: context / inline-size;
+}
+.context-layout {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  min-height: calc(100% - 8rem);
+}
+.context-sources {
+  border-right-width: 1px;
+}
+.context-editor {
+  min-height: 26rem;
+}
+.context-page :is(button, input, select, summary):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+@container context (max-width: 680px) {
+  .context-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .context-sources {
+    border-right-width: 0;
+    border-bottom-width: 1px;
+  }
+  .context-editor {
+    height: 26rem;
+  }
+}

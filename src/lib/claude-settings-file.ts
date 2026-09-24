@@ -27,7 +27,7 @@ export const SETTINGS_BACKUP_KEEP = 5;
  * Backups go alongside the file (not in tmpdir) so users can find them
  * easily and so we don't pay EXDEV on the copy.
  */
-export function backupSettingsSync(path: string): string | null {
+export function backupSettings(path: string): string | null {
   if (!existsSync(path)) return null;
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupPath = `${path}.pan-backup-${timestamp}`;
@@ -42,7 +42,7 @@ export function backupSettingsSync(path: string): string | null {
  *
  * Silent on per-file delete failure; the next prune cycle will retry.
  */
-export function pruneBackupsSync(settingsPath: string, keep: number = SETTINGS_BACKUP_KEEP): void {
+export function pruneBackups(settingsPath: string, keep: number = SETTINGS_BACKUP_KEEP): void {
   const dir = dirname(settingsPath);
   const prefix = `${basename(settingsPath)}.pan-backup-`;
   let entries: string[];
@@ -61,7 +61,7 @@ export function pruneBackupsSync(settingsPath: string, keep: number = SETTINGS_B
   }
 }
 
-export function findNewestBackupSync(settingsPath: string): string | undefined {
+export function findNewestBackup(settingsPath: string): string | undefined {
   const dir = dirname(settingsPath);
   const prefix = `${basename(settingsPath)}.pan-backup-`;
   let entries: string[];
@@ -82,7 +82,7 @@ export function findNewestBackupSync(settingsPath: string): string | undefined {
  * tmpfile lives in the same directory (not tmpdir) so the rename is a
  * single-filesystem op — POSIX guarantees that's atomic.
  */
-export function atomicWriteJsonSync(path: string, value: unknown): void {
+export function atomicWriteJson(path: string, value: unknown): void {
   const dir = dirname(path);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });

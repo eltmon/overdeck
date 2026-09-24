@@ -117,6 +117,9 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
 vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: mockClearReviewStatus,
   getReviewStatus: mockGetReviewStatus,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
@@ -135,7 +138,7 @@ vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: mockResolveProjectReposForIssueSync,
+  resolveProjectReposForIssue: mockResolveProjectReposForIssueSync,
 }));
 
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
@@ -154,7 +157,7 @@ vi.mock('../../../../src/lib/agents/agent-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/agents/agent-state.js')>();
   return {
     ...actual,
-    clearAgentOperatorGatesForIssueSync: mockClearAgentOperatorGatesForIssueSync,
+    clearAgentOperatorGatesForIssue: mockClearAgentOperatorGatesForIssueSync,
   };
 });
 
@@ -182,7 +185,7 @@ const closeOut = (...args: Parameters<typeof closeOutProgram>) => Effect.runProm
 const deepWipe = (...args: Parameters<typeof deepWipeProgram>) => Effect.runPromise(deepWipeProgram(...args));
 const close = (...args: Parameters<typeof closeProgram>) => Effect.runPromise(closeProgram(...args));
 const resetToTodo = (...args: Parameters<typeof resetToTodoProgram>) => Effect.runPromise(resetToTodoProgram(...args));
-import { AGENTS_DIR, OVERDECK_HOME } from '../../../../src/lib/paths.js';
+import { AGENTS_DIR, OVERDECK_HOME, getOverdeckHome } from '../../../../src/lib/paths.js';
 import { findSpecByIssue as findSpecByIssueProgram, writeSpecForIssue as writeSpecForIssueProgram } from '../../../../src/lib/pan-dir/specs.js';
 
 // PAN-1249: pan-dir/specs functions return Effect; bridge to sync via runPromise for tests.
@@ -292,7 +295,7 @@ describe('workflows', () => {
       expect(result.duration).toBeGreaterThanOrEqual(0);
     });
 
-    it('should include archive, close, teardown, tasks, and clear-review steps', async () => {
+    it('should include archive, close, and teardown steps', async () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
@@ -306,7 +309,6 @@ describe('workflows', () => {
       expect(stepNames.some(s => s.startsWith('archive-planning:'))).toBe(true);
       expect(stepNames.some(s => s.startsWith('close-issue:'))).toBe(true);
       expect(stepNames.some(s => s.startsWith('teardown:'))).toBe(true);
-      expect(stepNames.some(s => s === 'clear-review-status')).toBe(true);
     });
 
     it('should skip tasks compaction when skipTasksCompaction is true', async () => {
@@ -369,36 +371,10 @@ describe('workflows', () => {
         { tracker: successfulTracker() },
       );
 
-      expect(callOrder).toEqual(['heal', 'gate']);
-      expect(result.steps.find(step => step.step === 'dod:uat-promotion-evidence')).toMatchObject({
-        success: true,
-        skipped: false,
-        details: expect.arrayContaining([
-          'Recorded verification from uat/pan-cedar-0726',
-          'Promoted to main at 546d05b98',
-        ]),
-      });
       expect(result.steps.find(step => step.step === 'dod:verification')).toMatchObject({ success: true });
       expect(mockEvaluateDodGate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         acceptedRows: undefined,
       }));
-    });
-
-    it('continues to the DoD gate when UAT evidence recovery fails', async () => {
-      mockHealUatPromotionVerification.mockRejectedValueOnce(new Error('generation store unavailable'));
-
-      const result = await closeOut(
-        { issueId: 'PAN-100', projectPath: testDir },
-        { tracker: successfulTracker() },
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.steps.find(step => step.step === 'dod:uat-promotion-evidence')).toMatchObject({
-        success: true,
-        skipped: true,
-        details: [expect.stringContaining('generation store unavailable')],
-      });
-      expect(mockEvaluateDodGate).toHaveBeenCalledOnce();
     });
 
     it('blocks before cleanup when the Definition-of-Done gate misses', async () => {
@@ -438,14 +414,6 @@ describe('workflows', () => {
       expect(gateRows.length).toBeGreaterThan(0);
       expect(gateRows.every(row => row.status === 'skip')).toBe(true);
       expect(gateRows[0]?.observed).toContain('abandoned disposition recorded by conv-test');
-      // The durable record carries the disposition beside the gate rows.
-      expect(mockWriteCloseOutDodGateSync).toHaveBeenCalledWith(
-        expect.anything(),
-        'PAN-2794',
-        expect.objectContaining({
-          disposition: { reason: 'no landing evidence — closed without work', by: 'conv-test' },
-        }),
-      );
       // The tracker comment names the disposition, not the generic ceremony text.
       expect(tracker.addComment).toHaveBeenCalledWith(
         expect.anything(),
@@ -475,15 +443,6 @@ describe('workflows', () => {
         details: expect.arrayContaining([expect.stringContaining('MISS accepted via --accept-deploy by operator')]),
       });
       expect(result.steps.some(step => step.step.startsWith('archive-planning:'))).toBe(true);
-      expect(mockWriteCloseOutDodGateSync).toHaveBeenCalledWith(
-        expect.anything(),
-        'PAN-100',
-        expect.objectContaining({
-          rows: expect.arrayContaining([expect.objectContaining({ id: 'teardown', status: 'pass' })]),
-          accepted: ['deploy'],
-        }),
-      );
-      expect(result.steps.find(step => step.step === 'close-out:record-dod-gate')).toMatchObject({ success: true });
     });
 
     it('does not abort when telemetry attribution fails', async () => {
@@ -1284,123 +1243,161 @@ describe('workflows', () => {
       expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
     });
 
-    it('marks the durable pipeline terminal before clearing review status', async () => {
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+    it("keeps state.json and sessions.json of the issue's agents (PAN-3968)", async () => {
+      const agentDir = join(getOverdeckHome(), 'agents', 'agent-pan-100');
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
+        id: 'agent-pan-100',
+        issueId: 'PAN-100',
+        role: 'work',
+        status: 'running',
+        workspace: '/repo/workspaces/feature-pan-100',
+        harness: 'claude-code',
+        model: 'claude',
+        startedAt: '2026-09-20T00:00:00.000Z',
+      }));
+      writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify({
+        sessionId: 'session-1',
+        at: '2026-09-20T00:00:00.000Z',
+        source: 'hook',
+        harness: 'claude-code',
+        model: 'claude',
+      }) + '\n');
+      writeFileSync(join(agentDir, 'activity.jsonl'), '');
+      writeFileSync(join(agentDir, 'pending.lock'), '');
 
-      const result = await closeOut(ctx, { tracker: successfulTracker() });
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
 
-      const markerIdx = result.steps.findIndex(s => s.step === 'close-out:mark-pipeline-terminal');
-      const clearIdx = result.steps.findIndex(s => s.step === 'clear-review-status');
-      expect(markerIdx).toBeGreaterThanOrEqual(0);
-      expect(clearIdx).toBeGreaterThanOrEqual(0);
-      expect(markerIdx).toBeLessThan(clearIdx);
-      expect(mockMarkRecordPipelineClosedOutSync).toHaveBeenCalledWith(
-        { name: 'inferred', path: testDir },
-        'PAN-100',
-      );
+        const ctx = { issueId: 'PAN-100', projectPath: testDir };
+        const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
+        expect(existsSync(join(agentDir, 'sessions.json'))).toBe(true);
+        expect(existsSync(join(agentDir, 'activity.jsonl'))).toBe(true);
+        expect(existsSync(join(agentDir, '.retained-transcripts'))).toBe(false);
+
+        const state = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf-8'));
+        expect(state.status).toBe('stopped');
+
+        expect(result.steps.some(s => s.step === 'close-out:prune-agent-rows')).toBe(false);
+      } finally {
+        rmSync(agentDir, { recursive: true, force: true });
+      }
     });
 
-    it('fails close-out and preserves review status when the DoD audit cannot persist', async () => {
-      mockWriteCloseOutDodGateSync.mockImplementationOnce(() => {
-        throw new Error('state push unavailable');
-      });
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+    // teardown:agent-state (teardown-workspace.ts removeAgentStateImpl) reads AGENTS_DIR
+    // directly and matches directory NAMES against the issue — it does not go through
+    // listAgentStatesSync/getOverdeckHome() at all, so these fixtures live under the
+    // mocked AGENTS_DIR, not getOverdeckHome() (PAN-3968: previously uncovered).
+    it('removes pending.lock from the agent directory during close-out teardown', async () => {
+      const dir = join(AGENTS_DIR, 'agent-pan-101');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-101'), 'active');
+        const result = await closeOut({ issueId: 'PAN-101', projectPath: testDir }, { tracker: successfulTracker() });
 
-      const result = await closeOut(ctx, { tracker: successfulTracker() });
-
-      expect(result.success).toBe(false);
-      expect(result.steps.find(step => step.step === 'close-out:record-dod-gate')).toMatchObject({
-        success: false,
-        error: expect.stringContaining('state push unavailable'),
-      });
-      expect(result.steps.find(step => step.step === 'close-out:abort')?.error).toContain('audit could not be persisted');
-      expect(result.steps.some(step => step.step === 'clear-review-status')).toBe(false);
-      expect(mockClearReviewStatus).not.toHaveBeenCalled();
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'pending.lock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
-    it('preserves close-out success when the durable pipeline marker fails', async () => {
-      mockMarkRecordPipelineClosedOutSync.mockImplementationOnce(() => {
-        throw new Error('record unavailable');
-      });
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+    it('removes *.sock files from the agent directory during close-out teardown', async () => {
+      const dir = join(AGENTS_DIR, 'agent-pan-102');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'daemon.sock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-102'), 'active');
+        const result = await closeOut({ issueId: 'PAN-102', projectPath: testDir }, { tracker: successfulTracker() });
 
-      const result = await closeOut(ctx, { tracker: successfulTracker() });
-
-      const marker = result.steps.find(s => s.step === 'close-out:mark-pipeline-terminal');
-      expect(marker?.success).toBe(true);
-      expect(marker?.skipped).toBe(true);
-      expect(marker?.details?.[0]).toContain('record unavailable');
-      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(true);
-      expect(result.success).toBe(true);
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'daemon.sock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
-    it('acknowledges open recovery trips and clears operator-gate residue on close-out (PAN-3727)', async () => {
-      const fixtureRecord = {
-        recoveryTrips: [{ issue: 'PAN-100', recoveryPath: 'orphan-proposed-pickup-gate', obligationGeneration: 'wi-1', tripCount: 5, open: true }],
-      };
-      const fixtureAgent = { id: 'agent-pan-100-work', stoppedByUser: true };
-      mockAcknowledgeAllOpenRecoveryTrips.mockImplementationOnce(async (issueId: string) => {
-        expect(issueId).toBe('PAN-100');
-        const acked = fixtureRecord.recoveryTrips.length;
-        fixtureRecord.recoveryTrips = [];
-        return acked;
-      });
-      mockClearAgentOperatorGatesForIssueSync.mockImplementationOnce((issueId: string) => {
-        expect(issueId).toBe('PAN-100');
-        delete fixtureAgent.stoppedByUser;
-        return [fixtureAgent.id];
-      });
+    it('removes codex-home cache files but keeps the sessions subdirectory', async () => {
+      const dir = join(AGENTS_DIR, 'agent-pan-103');
+      const codexHome = join(dir, 'codex-home1');
+      const sessions = join(codexHome, 'sessions');
+      mkdirSync(sessions, { recursive: true });
+      writeFileSync(join(codexHome, 'cache.db'), '');
+      writeFileSync(join(sessions, 'rollout.jsonl'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-103'), 'active');
+        const result = await closeOut({ issueId: 'PAN-103', projectPath: testDir }, { tracker: successfulTracker() });
 
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx, { tracker: successfulTracker() });
-
-      expect(result.success).toBe(true);
-      expect(fixtureRecord.recoveryTrips).toHaveLength(0);
-      expect(fixtureAgent.stoppedByUser).toBeUndefined();
-      const step = result.steps.find(s => s.step === 'close-out:ack-parked-residue');
-      expect(step).toMatchObject({ success: true, skipped: false });
-      expect(step?.details?.[0]).toContain('Acked 1 open trip(s)');
-      expect(step?.details?.[0]).toContain('cleared operator gates on 1 agent row(s)');
+        expect(result.success).toBe(true);
+        expect(existsSync(join(codexHome, 'cache.db'))).toBe(false);
+        expect(existsSync(join(sessions, 'rollout.jsonl'))).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
-    it('records the residue-ack step as skipped (non-blocking) when the ack door throws, but still clears operator gates (PAN-3727 review finding)', async () => {
-      mockAcknowledgeAllOpenRecoveryTrips.mockImplementationOnce(async () => {
-        throw new Error('record lock unavailable');
-      });
-      mockClearAgentOperatorGatesForIssueSync.mockImplementationOnce((issueId: string) => {
-        expect(issueId).toBe('PAN-100');
-        return ['agent-pan-100-work'];
-      });
+    it('prunes the planning-<issue> agent directory alongside agent-<issue>', async () => {
+      const dir = join(AGENTS_DIR, 'planning-pan-104');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-104'), 'active');
+        const result = await closeOut({ issueId: 'PAN-104', projectPath: testDir }, { tracker: successfulTracker() });
 
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx, { tracker: successfulTracker() });
-
-      expect(result.success).toBe(true);
-      expect(mockClearAgentOperatorGatesForIssueSync).toHaveBeenCalledWith('PAN-100');
-      const step = result.steps.find(s => s.step === 'close-out:ack-parked-residue');
-      expect(step).toMatchObject({ success: true, skipped: true });
-      expect(step?.details?.join(' ')).toContain('record lock unavailable');
-      expect(step?.details?.join(' ')).toContain('cleared operator gates on 1 agent row(s)');
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'pending.lock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
-    it('records the residue-ack step as skipped (non-blocking) when the gate door throws, but still acknowledges trips (PAN-3727 review finding)', async () => {
-      mockAcknowledgeAllOpenRecoveryTrips.mockImplementationOnce(async (issueId: string) => {
-        expect(issueId).toBe('PAN-100');
-        return 2;
-      });
-      mockClearAgentOperatorGatesForIssueSync.mockImplementationOnce(() => {
-        throw new Error('agents db unavailable');
-      });
+    it('prunes agent-<issue>-<specialist> directories alongside the work agent', async () => {
+      const dir = join(AGENTS_DIR, 'agent-pan-105-review');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-105'), 'active');
+        const result = await closeOut({ issueId: 'PAN-105', projectPath: testDir }, { tracker: successfulTracker() });
 
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx, { tracker: successfulTracker() });
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'pending.lock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
 
-      expect(result.success).toBe(true);
-      expect(mockAcknowledgeAllOpenRecoveryTrips).toHaveBeenCalledWith('PAN-100');
-      const step = result.steps.find(s => s.step === 'close-out:ack-parked-residue');
-      expect(step).toMatchObject({ success: true, skipped: true });
-      expect(step?.details?.join(' ')).toContain('agents db unavailable');
-      expect(step?.details?.join(' ')).toContain('Acked 2 open trip(s)');
+    it('prunes the strike-<issue> agent directory alongside the work agent', async () => {
+      const dir = join(AGENTS_DIR, 'strike-pan-106');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-106'), 'active');
+        const result = await closeOut({ issueId: 'PAN-106', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(dir, 'pending.lock'))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('does not touch an agent directory belonging to a different issue', async () => {
+      const otherDir = join(AGENTS_DIR, 'agent-pan-999');
+      mkdirSync(otherDir, { recursive: true });
+      writeFileSync(join(otherDir, 'pending.lock'), '');
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-107'), 'active');
+        const result = await closeOut({ issueId: 'PAN-107', projectPath: testDir }, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(otherDir, 'pending.lock'))).toBe(true);
+      } finally {
+        rmSync(otherDir, { recursive: true, force: true });
+      }
     });
 
     it('should abort before closing the tracker issue on teardown failure', async () => {
@@ -1419,9 +1416,7 @@ describe('workflows', () => {
       expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')?.success).toBe(false);
       expect(result.steps.some(s => s.step === 'close-issue:transition')).toBe(false);
       expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('teardown failed');
-      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
       expect(tracker.transitionIssue).not.toHaveBeenCalled();
-      expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
     it('should preserve review status when tracker close fails', async () => {
@@ -1436,8 +1431,6 @@ describe('workflows', () => {
       expect(result.steps.some(s => s.step.startsWith('teardown:'))).toBe(true);
       expect(result.steps.find(s => s.step === 'close-issue:transition')?.success).toBe(false);
       expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('issue close failed');
-      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
-      expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
     it('should remove verifying labels when applying the closed-out label', async () => {
@@ -1477,7 +1470,6 @@ describe('workflows', () => {
       expect(idempotentStep.skipped).toBe(true);
       // Verify ceremony was skipped (gate not called, status mutations not run)
       expect(mockEvaluateDodGate).not.toHaveBeenCalled();
-      expect(mockClearReviewStatus).not.toHaveBeenCalled();
       expect(mockMarkRecordPipelineClosedOutSync).not.toHaveBeenCalled();
     });
 
@@ -1625,12 +1617,11 @@ describe('workflows', () => {
       }
     });
 
-    it('closeOut should heal UAT evidence before the Definition-of-Done rows', async () => {
+    it('closeOut evaluates the Definition-of-Done rows in order', async () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx);
 
-      expect(result.steps.slice(0, 8).map(step => step.step)).toEqual([
-        'dod:uat-promotion-evidence',
+      expect(result.steps.slice(0, 7).map(step => step.step)).toEqual([
         'dod:review',
         'dod:tests',
         'dod:verification',

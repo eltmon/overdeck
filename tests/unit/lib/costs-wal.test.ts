@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * Tests for WAL writer (wal.ts) and WAL importer (sync-wal.ts)
  */
@@ -39,7 +38,6 @@ function makeCostEvent(overrides: Partial<CostEvent> = {}): CostEvent {
 // ============== wal.ts: resolveWalDir ==============
 
 vi.mock('../../../src/lib/projects.js', () => ({
-  listProjects: hoistedMockListProjects,
   listProjectsSync: hoistedMockListProjects,
 }));
 
@@ -121,9 +119,9 @@ describe('appendToWal', () => {
     listProjects.mockReturnValue([
       { key: 'PAN', config: { path: tmpDir, name: 'Overdeck' } },
     ]);
-    const { appendToWalSync } = await import('../../../src/lib/costs/wal.js');
+    const { appendToWal } = await import('../../../src/lib/costs/wal.js');
     const event = makeCostEvent();
-    const result = appendToWalSync(event);
+    const result = appendToWal(event);
 
     expect(result).toBe(true);
     const walFile = join(tmpDir, '.pan/events/PAN-335.jsonl');
@@ -137,8 +135,8 @@ describe('appendToWal', () => {
 
   it('returns false when no project matches', async () => {
     listProjects.mockReturnValue([]);
-    const { appendToWalSync } = await import('../../../src/lib/costs/wal.js');
-    const result = appendToWalSync(makeCostEvent());
+    const { appendToWal } = await import('../../../src/lib/costs/wal.js');
+    const result = appendToWal(makeCostEvent());
     expect(result).toBe(false);
   });
 
@@ -146,9 +144,9 @@ describe('appendToWal', () => {
     listProjects.mockReturnValue([
       { key: 'PAN', config: { path: tmpDir, name: 'Overdeck' } },
     ]);
-    const { appendToWalSync } = await import('../../../src/lib/costs/wal.js');
-    appendToWalSync(makeCostEvent({ requestId: 'req-1' }));
-    appendToWalSync(makeCostEvent({ requestId: 'req-2' }));
+    const { appendToWal } = await import('../../../src/lib/costs/wal.js');
+    appendToWal(makeCostEvent({ requestId: 'req-1' }));
+    appendToWal(makeCostEvent({ requestId: 'req-2' }));
 
     const walFile = join(tmpDir, '.pan/events/PAN-335.jsonl');
     const lines = readFileSync(walFile, 'utf-8').trim().split('\n').filter(Boolean);
@@ -159,106 +157,6 @@ describe('appendToWal', () => {
 });
 
 // ============== sync-wal.ts: syncWalFromDir ==============
-
-describe('syncWalFromDir', () => {
-  // sync-wal now writes through the overdeck CostWriter door (not database/cost-events-db).
-  // Use the real overdeck fixture to let the full Effect path run and verify via stats.
-  // vi.resetModules() ensures overdeck/infra DbLive captures the new OVERDECK_HOME.
-  let tmpDir: string;
-  let odb: OverdeckTestDb;
-
-  beforeEach(() => {
-    tmpDir = join(tmpdir(), `pan-sync-test-${Date.now()}`);
-    mkdirSync(tmpDir, { recursive: true });
-    vi.resetModules();
-    odb = setupOverdeckTestDb();
-  });
-
-  afterEach(() => {
-    teardownOverdeckTestDb(odb);
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it('returns empty stats for non-existent directory', async () => {
-    const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = await Effect.runPromise(syncWalFromDir(join(tmpDir, 'no-such-dir')));
-    expect(stats.imported).toBe(0);
-    expect(stats.duplicates).toBe(0);
-    expect(stats.files).toBe(0);
-    expect(stats.errors).toHaveLength(0);
-  });
-
-  it('imports valid events from JSONL files', async () => {
-    const event = makeCostEvent();
-    writeFileSync(join(tmpDir, 'PAN-335.jsonl'), JSON.stringify(event) + '\n');
-
-    const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
-
-    expect(stats.imported).toBe(1);
-    expect(stats.duplicates).toBe(0);
-    expect(stats.files).toBe(1);
-    expect(stats.errors).toHaveLength(0);
-  });
-
-  it('records the source file path in overdeck cost_events', async () => {
-    const event = makeCostEvent();
-    const walFile = join(tmpDir, 'PAN-335.jsonl');
-    writeFileSync(walFile, JSON.stringify(event) + '\n');
-
-    const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    await Effect.runPromise(syncWalFromDir(tmpDir));
-
-    // Verify source_file was persisted in overdeck
-    const rows = odb.raw().prepare('SELECT source_file FROM cost_events WHERE request_id = ?').all(event.requestId) as Array<{ source_file: string }>;
-    expect(rows).toHaveLength(1);
-    expect(rows[0].source_file).toBe(walFile);
-  });
-
-  it('counts duplicates correctly (same requestId re-imported)', async () => {
-    const event = makeCostEvent();
-    writeFileSync(join(tmpDir, 'PAN-335.jsonl'), JSON.stringify(event) + '\n');
-
-    const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    // First import — inserted
-    await Effect.runPromise(syncWalFromDir(tmpDir));
-    // Second import of same file — duplicate
-    const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
-
-    expect(stats.imported).toBe(0);
-    expect(stats.duplicates).toBe(1);
-  });
-
-  it('skips malformed lines without failing', async () => {
-    const event = makeCostEvent();
-    writeFileSync(
-      join(tmpDir, 'PAN-335.jsonl'),
-      'not-valid-json\n' + JSON.stringify(event) + '\n',
-    );
-
-    const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
-
-    expect(stats.imported).toBe(1);
-    expect(stats.errors).toHaveLength(0);
-  });
-
-  it('skips lines missing required fields', async () => {
-    writeFileSync(join(tmpDir, 'PAN-335.jsonl'), '{"ts":"2026-01-01"}\n');
-    const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
-
-    expect(stats.imported).toBe(0);
-  });
-
-  it('ignores non-jsonl files', async () => {
-    writeFileSync(join(tmpDir, 'README.txt'), 'not events');
-    const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
-
-    expect(stats.files).toBe(0);
-  });
-});
 
 // ============== sync-wal.ts: syncWalFromAllProjects ==============
 
@@ -286,7 +184,7 @@ describe('syncWalFromAllProjects', () => {
   it('returns empty result when no projects are registered', async () => {
     listProjects.mockReturnValue([]);
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.imported).toBe(0);
     expect(result.duplicates).toBe(0);
@@ -299,7 +197,7 @@ describe('syncWalFromAllProjects', () => {
       { key: 'PAN', config: { path: join(tmpDir, 'no-such-repo') } },
     ]);
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.filesScanned).toBe(0);
   });
@@ -321,7 +219,7 @@ describe('syncWalFromAllProjects', () => {
       { key: 'MIN', config: { path: repo2 } },
     ]);
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.filesScanned).toBe(2);
     expect(result.imported).toBe(2);
@@ -346,9 +244,90 @@ describe('syncWalFromAllProjects', () => {
     odb.raw().prepare('DROP TABLE cost_events').run();
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.errors[0]).toContain('import failed');
+  });
+
+  // WAL file parsing (parseWalFile, the .jsonl filter, duplicate counting and
+  // source_file recording) through the live sweep. These cases were tested via
+  // syncWalFromDir until PAN-3958 (#4007) deleted that dead entry point.
+  function singleProjectEventsDir(): string {
+    const repo = join(tmpDir, 'repo');
+    const eventsDir = join(repo, '.pan/events');
+    mkdirSync(eventsDir, { recursive: true });
+    listProjects.mockReturnValue([{ key: 'PAN', config: { path: repo } }]);
+    return eventsDir;
+  }
+
+  it('imports valid events from JSONL files', async () => {
+    const eventsDir = singleProjectEventsDir();
+    writeFileSync(join(eventsDir, 'PAN-335.jsonl'), JSON.stringify(makeCostEvent()) + '\n');
+
+    const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
+    const result = await syncWalFromAllProjects();
+
+    expect(result.imported).toBe(1);
+    expect(result.duplicates).toBe(0);
+    expect(result.filesScanned).toBe(1);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('records the source file path in overdeck cost_events', async () => {
+    const eventsDir = singleProjectEventsDir();
+    const event = makeCostEvent();
+    const walFile = join(eventsDir, 'PAN-335.jsonl');
+    writeFileSync(walFile, JSON.stringify(event) + '\n');
+
+    const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
+    await syncWalFromAllProjects();
+
+    const rows = odb.raw().prepare('SELECT source_file FROM cost_events WHERE request_id = ?').all(event.requestId) as Array<{ source_file: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].source_file).toBe(walFile);
+  });
+
+  it('counts duplicates correctly (same requestId re-imported)', async () => {
+    const eventsDir = singleProjectEventsDir();
+    writeFileSync(join(eventsDir, 'PAN-335.jsonl'), JSON.stringify(makeCostEvent()) + '\n');
+
+    const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
+    await syncWalFromAllProjects();
+    const result = await syncWalFromAllProjects();
+
+    expect(result.imported).toBe(0);
+    expect(result.duplicates).toBe(1);
+  });
+
+  it('skips malformed lines without failing', async () => {
+    const eventsDir = singleProjectEventsDir();
+    writeFileSync(join(eventsDir, 'PAN-335.jsonl'), 'not-valid-json\n' + JSON.stringify(makeCostEvent()) + '\n');
+
+    const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
+    const result = await syncWalFromAllProjects();
+
+    expect(result.imported).toBe(1);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('skips lines missing required fields', async () => {
+    const eventsDir = singleProjectEventsDir();
+    writeFileSync(join(eventsDir, 'PAN-335.jsonl'), '{"ts":"2026-01-01"}\n');
+
+    const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
+    const result = await syncWalFromAllProjects();
+
+    expect(result.imported).toBe(0);
+  });
+
+  it('ignores non-jsonl files', async () => {
+    const eventsDir = singleProjectEventsDir();
+    writeFileSync(join(eventsDir, 'README.txt'), 'not events');
+
+    const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
+    const result = await syncWalFromAllProjects();
+
+    expect(result.filesScanned).toBe(0);
   });
 });

@@ -11,7 +11,6 @@ import ora from 'ora';
 import { loadConfigSync } from '../../lib/config.js';
 import type { Issue, IssueTracker, TrackerType } from '../../lib/tracker/index.js';
 import { createTracker, TrackerConfig } from '../../lib/tracker/index.js';
-import { isShadowed, getPendingSyncCount } from '../../lib/shadow-state.js';
 import { loadProjectsConfigSync } from '../../lib/projects.js';
 
 interface ListOptions {
@@ -20,7 +19,6 @@ interface ListOptions {
   json?: boolean;
   tracker?: string;
   allTrackers?: boolean;
-  shadowOnly?: boolean;
 }
 
 const PRIORITY_LABELS: Record<number, string> = {
@@ -117,12 +115,6 @@ async function displayIssues(issues: Issue[], trackerName: string): Promise<void
     return;
   }
 
-  // Pre-compute shadowed refs in one batch so the render loop stays sync.
-  const shadowedRefs = new Set<string>();
-  const shadowChecks = await Promise.all(
-    issues.map(async i => [i.ref, await Effect.runPromise(isShadowed(i.ref))] as const),
-  );
-  for (const [ref, shadowed] of shadowChecks) if (shadowed) shadowedRefs.add(ref);
 
   // Group by state
   const byState: Record<string, Issue[]> = {};
@@ -146,9 +138,8 @@ async function displayIssues(issues: Issue[], trackerName: string): Promise<void
       const priorityLabel = issue.priority ? PRIORITY_LABELS[issue.priority] || '' : '';
       const assigneeStr = issue.assignee ? chalk.dim(` @${issue.assignee.split(' ')[0]}`) : '';
       const priorityStr = issue.priority && issue.priority < 3 ? ` ${priorityLabel}` : '';
-      const shadowIndicator = shadowedRefs.has(issue.ref) ? chalk.cyan('👻 ') : '';
 
-      console.log(`    ${shadowIndicator}${chalk.cyan(issue.ref)} ${issue.title}${assigneeStr}${priorityStr}`);
+      console.log(`    ${chalk.cyan(issue.ref)} ${issue.title}${assigneeStr}${priorityStr}`);
     }
     console.log('');
   }
@@ -228,31 +219,9 @@ export async function listCommand(options: ListOptions): Promise<void> {
       return;
     }
 
-    if (options.shadowOnly) {
-      // Render only the shadow-only subset — the full list is suppressed.
-      const filteredIssues = await Promise.all(
-        allIssues.map(async ({ tracker, issues }) => {
-          const shadowChecks = await Promise.all(
-            issues.map(i => Effect.runPromise(isShadowed(i.ref))),
-          );
-          return { tracker, issues: issues.filter((_, idx) => shadowChecks[idx]) };
-        })
-      );
-      const nonEmpty = filteredIssues.filter(({ issues }) => issues.length > 0);
-
-      if (nonEmpty.length === 0) {
-        console.log(chalk.dim('\nNo shadowed issues found.'));
-      } else {
-        for (const { tracker, issues } of nonEmpty) {
-          console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} shadowed issues)\n`));
-          await displayIssues(issues, tracker);
-        }
-      }
-    } else {
-      for (const { tracker, issues } of allIssues) {
-        console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} issues)\n`));
-        await displayIssues(issues, tracker);
-      }
+    for (const { tracker, issues } of allIssues) {
+      console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} issues)\n`));
+      await displayIssues(issues, tracker);
     }
 
     // Footer
@@ -263,12 +232,6 @@ export async function listCommand(options: ListOptions): Promise<void> {
     }
     if (!options.allTrackers && trackersToQuery.length === 1) {
       console.log(chalk.dim('Use --all-trackers to query all configured trackers.'));
-    }
-
-    // Show shadow mode info
-    const pendingSync = await Effect.runPromise(getPendingSyncCount());
-    if (pendingSync > 0) {
-      console.log(chalk.cyan(`👻 ${pendingSync} shadowed issue(s) pending sync`));
     }
 
   } catch (error: any) {

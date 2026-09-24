@@ -69,14 +69,48 @@ function runGuard(root: string, args: string[] = [], tscExit = 0): GuardResult {
 }
 
 describe('lint-effect-diagnostics.sh', () => {
-  it('labels an unbaselined Effect finding as NEW', () => {
+  it('names the file whose finding count rose (PAN-3847 per-file attribution)', () => {
     const root = makeTempGuard([]);
     writeTscOutput(root, EFFECT_FINDING);
 
     const result = runGuard(root);
 
     expect(result.ok).toBe(false);
-    expect(result.output).toContain('NEW: src/x.ts: error TS3: Effect must be yielded.    effect(floatingEffect)');
+    // The fake tsc serves the same output for all four lanes.
+    expect(result.output).toContain('NEW: src/x.ts (4, baseline 0)');
+  });
+
+  it('attributes a regression to the file whose count rose, and not to an unchanged file (PAN-3847)', () => {
+    const finding = (file: string, n: number) =>
+      `${file}(${n},1): error TS3: Effect must be yielded.    effect(floatingEffect)`;
+    const baseline = [
+      ...Array.from({ length: 10 }, (_, i) => finding('src/lib/settings.ts', i + 1)),
+      ...Array.from({ length: 6 }, (_, i) => finding('src/lib/projects.ts', i + 1)),
+    ];
+    const root = makeTempGuard(baseline);
+    const current = [
+      ...Array.from({ length: 10 }, (_, i) => finding('src/lib/settings.ts', i + 1)),
+      ...Array.from({ length: 8 }, (_, i) => finding('src/lib/projects.ts', i + 1)),
+    ].join('\n');
+    // The fixture hook skips the tsc lanes so counts stay exact (no ×4 lanes).
+    writeTscOutput(root, current);
+
+    let result: GuardResult;
+    try {
+      const output = execFileSync('bash', [join(root, 'scripts', 'lint-effect-diagnostics.sh')], {
+        cwd: root,
+        encoding: 'utf-8',
+        env: { ...process.env, EFFECT_DIAG_FIXTURE_OUTPUT: join(root, 'tsc-output.txt') },
+      });
+      result = { ok: true, output };
+    } catch (error: unknown) {
+      const e = error as { stdout?: string; stderr?: string };
+      result = { ok: false, output: [e.stdout ?? '', e.stderr ?? ''].join('\n') };
+    }
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain('NEW: src/lib/projects.ts (8, baseline 6)');
+    expect(result.output).not.toContain('settings.ts (');
   });
 
   it('ignores a plain TypeScript error with no Effect marker', () => {

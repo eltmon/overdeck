@@ -4,13 +4,13 @@
  * Resolves specialist session state, token usage, and startup status.
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { basename, join } from 'path';
+import { existsSync } from 'fs';
+import { basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { AGENTS_DIR } from '../paths.js';
-import { getAllSessionFilesSync, parseClaudeSessionSync } from '../cost-parsers/jsonl-parser.js';
+import { readLatestIndexedSessionId } from '../session-history.js';
+import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { listPaneValues, sessionExists } from '../tmux.js';
 import {
   getAllSpecialists,
@@ -23,14 +23,7 @@ import {
 const execAsync = promisify(exec);
 
 function readRecordedClaudeSessionId(tmuxSession: string): string | null {
-  const sessionFile = join(AGENTS_DIR, tmuxSession, 'session.id');
-  if (!existsSync(sessionFile)) return null;
-  try {
-    const sessionId = readFileSync(sessionFile, 'utf-8').trim();
-    return sessionId || null;
-  } catch {
-    return null;
-  }
+  return readLatestIndexedSessionId(tmuxSession);
 }
 
 /**
@@ -68,7 +61,7 @@ export function getSpecialistState(
  */
 export function findSessionFile(sessionId: string): string | null {
   try {
-    const allFiles = getAllSessionFilesSync();
+    const allFiles = getAllSessionFiles();
 
     for (const file of allFiles) {
       const fileSessionId = basename(file, '.jsonl');
@@ -105,7 +98,7 @@ export function countContextTokens(name: SpecialistAgentName): number | null {
     return null;
   }
 
-  const sessionUsage = parseClaudeSessionSync(sessionFile);
+  const sessionUsage = parseClaudeSession(sessionFile);
 
   if (!sessionUsage) {
     return null;
@@ -136,7 +129,7 @@ export async function isRunning(name: SpecialistAgentName, projectKey?: string):
     // Session exists — but check if the pane actually has a running process.
     // When Claude Code crashes, the pane's process exits but the tmux session persists,
     // making has-session return success even though nothing is running.
-    const panePid = (await Effect.runPromise(listPaneValues(tmuxSession, '#{pane_pid}')))[0]?.trim() ?? '';
+    const panePid = (await listPaneValues(tmuxSession, '#{pane_pid}'))[0]?.trim() ?? '';
     if (!panePid) return false;
     // Check if the pane's process has any child processes (Claude Code / bash)
     const { stdout: children } = await execAsync(

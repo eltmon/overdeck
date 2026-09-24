@@ -6,14 +6,14 @@ import { join } from 'node:path';
 import type { XBriefItem } from '../../xbrief/types.js';
 
 const repoRootsMock = vi.hoisted(() => ({
-  resolveWorkspaceRepoRootsSync: vi.fn(),
+  resolveWorkspaceRepoRoots: vi.fn(),
 }));
 
 vi.mock('../../project-repos.js', async () => {
   const actual = await vi.importActual<typeof import('../../project-repos.js')>('../../project-repos.js');
   return {
     ...actual,
-    resolveWorkspaceRepoRootsSync: repoRootsMock.resolveWorkspaceRepoRootsSync,
+    resolveWorkspaceRepoRoots: repoRootsMock.resolveWorkspaceRepoRoots,
   };
 });
 
@@ -40,7 +40,7 @@ function createRepo(workspace: string, repoKey: string, filename: string): { dir
 }
 
 afterEach(() => {
-  repoRootsMock.resolveWorkspaceRepoRootsSync.mockReset();
+  repoRootsMock.resolveWorkspaceRepoRoots.mockReset();
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -50,7 +50,7 @@ describe('deliverCommitForReview polyrepo diff', () => {
     tempDirs.push(workspace);
     const fe = createRepo(workspace, 'fe', 'frontend.txt');
     const api = createRepo(workspace, 'api', 'backend.txt');
-    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([
+    repoRootsMock.resolveWorkspaceRepoRoots.mockReturnValue([
       {
         repoKey: 'fe',
         dir: fe.dir,

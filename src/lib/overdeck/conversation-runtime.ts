@@ -1,3 +1,5 @@
+import { materializeMuseContext } from '../runtimes/muse-context.js';
+import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { randomUUID } from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
@@ -9,7 +11,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
-import { getClaudePermissionFlagsStringSync, ensureClaudePermissionFlagSync } from '../claude-permissions.js';
+import { getClaudePermissionFlagsString, ensureClaudePermissionFlag } from '../claude-permissions.js';
 import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getDefaultCwd } from '../default-cwd.js';
 import {
@@ -31,7 +33,6 @@ import {
 } from './conversations.js';
 import {
   capturePane,
-  capturePaneText,
   sessionExists,
   isHarnessProcessAlive,
   killSession,
@@ -39,7 +40,7 @@ import {
   setOption,
   exactPaneTarget,
   listSessionNames,
-  findManagedServerPidSync,
+  findManagedServerPid,
 } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
 import {
@@ -47,31 +48,41 @@ import {
   getProviderExportsForModel,
   getProviderAuthMode,
 } from '../agents.js';
-import { writeBridgeTokenSync } from '../bridge-token.js';
+import { writeBridgeToken } from '../bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../config-yaml.js';
 import { writePtyToken } from '../pty-token.js';
-import { canUseHarnessSync } from '../harness-policy.js';
+import { canUseHarness } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
-import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../providers.js';
+import { getProviderForModel, piProviderForModel, UnknownModelError } from '../providers.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
-import { workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { claudeSystemPromptFiles, getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
+import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
-import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
+import { getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
+import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { buildResumeContract } from '../resume-contract.js';
+import { readLatestIndexedSessionId } from '../session-history.js';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { markRespawnPending } from '../../dashboard/server/services/pending-respawn.js';
 import { cleanupConversationAttachments, cleanupUnreferencedConversationAttachments } from '../../dashboard/server/services/conversation-attachments.js';
-import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
+import { resolveCodexRolloutPath } from '../agents/transcript-resolver.js';
+import { closeCompanionTerminalForOwner } from './companion-terminal/index.js';
 import { sendConversationControlCommand, isPiControlChannelHarness, resolveConversationDeliveryMethod } from './conversation-delivery.js';
-import { deliverResumeContractUnlessGated } from './resume-contract-delivery.js';
+import {
+  assertKimiResumeContractResult,
+  deliverMandatoryKimiResumeContext,
+  deliverResumeContractUnlessGated,
+} from './resume-contract-delivery.js';
+import { kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/storage/kimi-code.js';
+import { codexSessionsRoot, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
+import { piSessionsRoot } from '../runtimes/storage/pi.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -149,7 +160,7 @@ export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTab
   const launcherScript = join(getOverdeckHome(), 'conversations', conv.tmuxSession, 'launcher.sh');
   const sessionId = conv.claudeSessionId?.trim();
   const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
-  const serverPid = findManagedServerPidSync();
+  const serverPid = findManagedServerPid();
   return rows
     .filter((row) => {
       if (row.pid === process.pid) return false;
@@ -166,9 +177,8 @@ async function killConversationRuntimeProcesses(conv: Conversation): Promise<voi
   await terminatePids(pids);
 }
 export async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
-  if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-    return;
-  }
+  if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) return;
+  await closeCompanionTerminalForOwner(conv.tmuxSession); // PAN-3974: the companion goes with its runtime
   await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
   try {
     await killConversationRuntimeProcesses(conv);
@@ -196,7 +206,7 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
 export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code'
+    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse'
       ? requested
       : undefined;
   return resolveHarness({ model, explicit });
@@ -226,7 +236,7 @@ async function validateCwdContainment(cwd: string): Promise<boolean> {
 async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const output = await Effect.runPromise(capturePane(tmuxSession, 200));
+    const output = await capturePane(tmuxSession, 200);
     if (output.includes('❯')) {
       console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
       return;
@@ -243,9 +253,7 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000)
   const deadline = Date.now() + timeoutMs;
   let stableV17FooterPolls = 0;
   while (Date.now() < deadline) {
-    const snapshot = await Effect.runPromise(
-      capturePane(tmuxSession, 40).pipe(Effect.catch(() => Effect.succeed(''))),
-    );
+    const snapshot = await capturePane(tmuxSession, 40).catch(() => '');
     const mcpConnecting = /Connecting to MCP servers/i.test(snapshot) && !/MCP finished/i.test(snapshot);
     // omp v17 paints its footer before MCP startup and redraws again afterward.
     stableV17FooterPolls = /⬢[^\n]*[◕◉]/.test(snapshot) && !mcpConnecting ? stableV17FooterPolls + 1 : 0;
@@ -264,7 +272,6 @@ export function shouldReportUnresolvedLiveSession(
   if (!conv || conv.status !== 'active') return false;
   return getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl';
 }
-
 export function conversationSessionAliveFromState(
   conv: Pick<Conversation, 'status' | 'forkStatus'>,
   tmuxSessionAlive: boolean,
@@ -307,8 +314,12 @@ export function shouldUseSupervisorForConversation(
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
 }
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
-  if (harness === 'acp') {
-    await waitForAcpHostReady(tmuxSession);
+  if (harness === 'muse') {
+    if (!await waitForPromptReady(tmuxSession, harness, 60)) throw new Error('Muse Code did not become interactive within 60 seconds');
+    return;
+  }
+  if (harness === 'acp' || harness === 'opencode') {
+    await waitForAcpHostReady(tmuxSession, 30, { sessionExists: tmuxSessionExists }); // conversations are tmux on every host until PAN-3921
     return;
   }
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;
@@ -348,11 +359,11 @@ export async function handleConversationSwitchModel(
   const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
   const requestedHarness = body['harness'];
   let harness: RuntimeName = currentHarness;
-  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code') {
+  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode' || requestedHarness === 'muse') {
     const requestedRuntime: RuntimeName = requestedHarness === 'pi' ? 'ohmypi' : requestedHarness;
     if (requestedRuntime !== currentHarness) {
       const policyModel = model ?? conv.model ?? '';
-      const decision = canUseHarnessSync(
+      const decision = canUseHarness(
         requestedRuntime,
         policyModel,
         await getProviderAuthMode(policyModel),
@@ -431,7 +442,7 @@ export async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PT
     }
     await new Promise(r => setTimeout(r, 250));
   }
-  const failure = extractSupervisorFailure(await capturePaneText(agentId, 40));
+  const failure = extractSupervisorFailure(await capturePane(agentId, 40));
   const detail = failure ? `supervisor output: ${failure}` : 'the supervisor pane shows no error output (a healthy harness statusline); the supervisor may have bound its socket under a different OVERDECK_HOME';
   throw new Error(`Timed out waiting for PTY supervisor socket ${socketPath} — ${detail}`);
 }
@@ -512,16 +523,10 @@ export function startConversationModelBackfill(resolveSessionFile: (conv: Conver
   });
 }
 async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[]> {
-  const files: string[] = [];
-  const contextFile = workspaceContextFile(cwd);
-  try {
-    await stat(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-  return files;
+  return claudeSystemPromptFiles(cwd, 'claude-code');
+}
+async function codexConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+  return claudeSystemPromptFiles(cwd, 'codex');
 }
 async function ensurePiConversationSourceContractFile(): Promise<string> {
   const contextDir = join(getOverdeckHome(), 'context');
@@ -531,23 +536,8 @@ async function ensurePiConversationSourceContractFile(): Promise<string> {
   return path;
 }
 export async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
-  const files: string[] = [];
-  const globalFile = piGlobalContextFile();
-  try {
-    await stat(globalFile);
-    files.push(globalFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
+  const files = await claudeSystemPromptFiles(cwd, 'ohmypi');
   files.push(await ensurePiConversationSourceContractFile());
-  const contextFile = workspaceContextFile(cwd);
-  try {
-    await stat(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
   return files;
 }
 function isNotFound(error: unknown): boolean {
@@ -570,7 +560,7 @@ export async function spawnConversationSession(
   await mkdir(stateDir, { recursive: true });
   clearReadySignal(tmuxSession);
   const launcherScript = join(stateDir, 'launcher.sh');
-  const permissionFlags = getClaudePermissionFlagsStringSync();
+  const permissionFlags = getClaudePermissionFlagsString();
   let runtimeCommand = `claude ${permissionFlags}`;
   let providerExportsStr = '';
   let piFields: {
@@ -587,10 +577,19 @@ export async function spawnConversationSession(
     codexHome: string;
     codexSessionDir: string;
     codexEffort?: string;
+    codexNativeEndpoint?: boolean;
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
-  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; kimiCodeEffort?: string; resumeSessionId?: string } | undefined;
+  const museSavedSession = harness === 'muse' && resume ? await resolveMuseSessionPath(tmuxSession) : null;
+  const museFields = harness === 'muse' ? {
+    harness: 'muse' as const,
+    museModel: model,
+    museEffort: effort,
+    museContextFile: await materializeMuseContext(tmuxSession, cwd),
+    museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
+  } : undefined;
+  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; kimiContextDelivery: 'initial-message'; kimiCodeEffort?: string; resumeSessionId?: string } | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
   if (behavior.launchCommandKind === 'acp-host') {
     if (!model) throw new Error('ACP conversation requires a model');
@@ -611,10 +610,10 @@ export async function spawnConversationSession(
     }
     runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
     // Map permissions through the canonical helper; Claude rejects the literal `auto` flag.
-    runtimeCommand = ensureClaudePermissionFlagSync(runtimeCommand);
+    runtimeCommand = ensureClaudePermissionFlag(runtimeCommand);
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
-      if (getProviderForModelSync(model).name === 'openai') {
+      if (getProviderForModel(model).name === 'openai') {
         const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
         if (auth.status === 'missing' || auth.status === 'expired') {
           throw new Error(
@@ -624,11 +623,11 @@ export async function spawnConversationSession(
         }
       }
       const paths = piFifoPaths(tmuxSession);
-      const piSessionDir = join(paths.agentDir, 'sessions');
+      const piSessionDir = piSessionsRoot(paths.agentDir);
       await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
       await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
       const storedPiSessionId = resume
-        ? (await readFile(join(paths.agentDir, 'session.id'), 'utf-8').then((s) => s.trim()).catch(() => undefined))
+        ? readLatestIndexedSessionId(tmuxSession) ?? undefined
         : undefined;
       piFields = {
         harness: 'ohmypi',
@@ -639,7 +638,7 @@ export async function spawnConversationSession(
         resumeSessionId: storedPiSessionId || undefined,
       };
     } else if (behavior.usesCodexHome) {
-      const codexHome = join(getOverdeckHome(), 'agents', tmuxSession, 'codex-home');
+      const codexHome = join(getOverdeckHome(), 'agents', tmuxSession, 'codex-home-v2');
       const codexConfig = loadConfigSync().config.codex;
       const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
       codexTransport = codexConfig?.transport ?? 'app-server';
@@ -649,7 +648,7 @@ export async function spawnConversationSession(
         : codexPermMode === 'read-only' ? 'read-only'
         : 'workspace-write';
       const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
-      const { initCodexHome, extractThreadIdFromRollout } = await import('../runtimes/codex.js');
+      const { initCodexHome } = await import('../runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
         model,
@@ -667,7 +666,8 @@ export async function spawnConversationSession(
         codexMode: codexTransport,
         codexEffort: effort ?? 'high',
         codexHome,
-        codexSessionDir: join(codexHome, 'sessions'),
+        codexSessionDir: codexSessionsRoot(codexHome),
+        ...(codexTransport === 'app-server' ? { codexNativeEndpoint: true } : {}),
         resumeSessionId,
       };
     } else if (behavior.launchCommandKind === 'kimi-code-tui') {
@@ -681,9 +681,7 @@ export async function spawnConversationSession(
         const kimiSessionIdPath = join(getOverdeckHome(), 'agents', tmuxSession, 'kimi-session-id');
         const pinnedId = await readFile(kimiSessionIdPath, 'utf-8').then((value) => value.trim() || undefined).catch(() => undefined);
         if (pinnedId) {
-          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-          const candidateWire = join(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd), pinnedId, 'agents', 'main', 'wire.jsonl');
-          const wireExists = await stat(candidateWire).then(() => true, () => false);
+          const wireExists = await stat(kimiWirePath(kimiHomeDefault(), cwd, pinnedId)).then(() => true, () => false);
           if (wireExists) kimiResumeSessionId = pinnedId;
         }
       }
@@ -691,6 +689,7 @@ export async function spawnConversationSession(
         harness: 'kimi-code',
         kimiCodeModel: model,
         kimiCodeYolo: true,
+        kimiContextDelivery: 'initial-message',
         kimiCodeEffort: effort ?? 'high',
         ...(kimiResumeSessionId ? { resumeSessionId: kimiResumeSessionId } : {}),
       };
@@ -701,7 +700,7 @@ export async function spawnConversationSession(
     const piProvider = piProviderForModel(model);
     if (piProvider) launcherModel = `${piProvider}/${model}`;
   }
-  if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
+  if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) {
     throw new Error('Invalid effort level');
   }
   const useSupervisor = shouldUseSupervisorForConversation(harness, { codexTransport });
@@ -716,9 +715,10 @@ export async function spawnConversationSession(
     !codexFields &&
     !acpFields &&
     !kimiCodeFields &&
+    !museFields &&
     !plainFork &&
     isClaudeCodeChannelsEnabled() &&
-    (!model || getProviderForModelSync(model).name === 'anthropic') &&
+    (!model || getProviderForModel(model).name === 'anthropic') &&
     process.env.CLAUDE_CODE_USE_BEDROCK !== '1' &&
     process.env.CLAUDE_CODE_USE_VERTEX !== '1' &&
     process.env.CLAUDE_CODE_USE_FOUNDRY !== '1' &&
@@ -726,7 +726,7 @@ export async function spawnConversationSession(
     process.env.PAN_DOCKER !== '1'
   ) {
     channelsBridgeMcpConfig = join(stateDir, 'agent-mcp.json');
-    writeBridgeTokenSync(tmuxSession);
+    writeBridgeToken(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
   // PAN-1837 review fix: the tmux-create + session-capture sequence below is
@@ -747,8 +747,7 @@ export async function spawnConversationSession(
     let kimiExistingSessionsBefore: Set<string> | undefined;
     if (kimiCodeFields && !kimiCodeFields.resumeSessionId) {
       try {
-        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-        kimiExistingSessionsBefore = new Set(await readdir(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd)));
+        kimiExistingSessionsBefore = new Set(await readdir(kimiSessionsRoot(kimiHomeDefault(), cwd)));
       } catch {
         kimiExistingSessionsBefore = new Set();
       }
@@ -757,31 +756,38 @@ export async function spawnConversationSession(
     const launcherTmp = `${launcherScript}.${randomUUID()}.tmp`;
     await writeFile(
       launcherTmp,
-      generateLauncherScriptSync({
+      generateLauncherScript({
         role: 'work',
         spawnMode: 'conversation',
         workingDir: cwd,
         setTerminalEnv: true,
         unsetProviderEnv: true,
+        managedStateKey: tmuxSession,
         overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [
           harnessLaunch.pathExport,
           `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
+          // PAN-3920: every harness knows its conversation, so `pan worker run` can name its parent.
+          `export OVERDECK_CONVERSATION=${JSON.stringify(tmuxSession)}`,
         ],
         providerExports: providerExportsStr || undefined,
         trapHup: true,
         baseCommand: runtimeCommand,
         appendSystemPromptFiles: piFields
           ? await piConversationSystemPromptFiles(cwd)
-          : codexFields || acpFields || kimiCodeFields
-            ? []
-            : await claudeConversationSystemPromptFiles(cwd),
+          : codexFields
+            ? await codexConversationSystemPromptFiles(cwd)
+            : acpFields || museFields
+              ? []
+              : kimiCodeFields
+                ? await claudeSystemPromptFiles(cwd, 'kimi-code')
+              : await claudeConversationSystemPromptFiles(cwd),
         model: launcherModel,
-        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? {
+        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? museFields ?? {
           resumeSessionId: resume ? claudeSessionId : undefined,
           sessionId: resume ? undefined : claudeSessionId,
         }),
-        extraArgs: !piFields && !acpFields && !kimiCodeFields && effort ? `--effort "${effort}"` : undefined,
+        extraArgs: !piFields && !acpFields && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
         keepAlive: true,
         fileMode: 0o700,
         channelsBridgeMcpConfig,
@@ -791,15 +797,9 @@ export async function spawnConversationSession(
       { mode: 0o700 },
     );
     await rename(launcherTmp, launcherScript);
-    try {
-      await Effect.runPromise(killSession(tmuxSession));
-    } catch {
-    }
+    await closeCompanionTerminalForOwner(tmuxSession); // PAN-3974: a respawned owner gets a new generation
+    await Effect.runPromise(killSession(tmuxSession)).catch(() => undefined);
     console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
-    try {
-      const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-      preTrustDirectory(cwd);
-    } catch { /* non-fatal */ }
     try {
       await Effect.runPromise(createSession(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
         env: {
@@ -822,12 +822,11 @@ export async function spawnConversationSession(
       const codexHomeDir = codexFields.codexHome;
       void (async () => {
         try {
-          const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
-            await import('../runtimes/codex.js');
+          const { waitForCodexRollout, recordCodexRolloutSession } = await import('../runtimes/codex.js');
           const rollout = await waitForCodexRollout(codexHomeDir, 120_000);
           if (rollout) {
             const threadId = extractThreadIdFromRollout(rollout);
-            if (threadId) writeThreadId(tmuxSession, threadId);
+            if (threadId) recordCodexRolloutSession(tmuxSession, threadId, rollout);
           }
         } catch {
         }
@@ -846,20 +845,20 @@ export async function spawnConversationSession(
       // can render a DIFFERENT conversation's or agent's prompts/transcript
       // under this identity. Require a real captured id or fail the launch,
       // same fail-closed contract as spawnAgent/restartAgent/recoverAgent.
-      const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-      const sessionId = await waitForNewKimiSessionAsync(join(homedir(), '.kimi-code'), cwd, kimiExistingSessionsBefore);
+      const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
+      const sessionId = await waitForNewKimiSessionAsync(kimiHomeDefault(), cwd, kimiExistingSessionsBefore);
       if (!sessionId) {
         throw new Error(
           `kimi-code session capture timed out for ${tmuxSession} — no new session directory appeared under the workspace bucket`,
         );
       }
-      writeKimiSessionId(tmuxSession, sessionId);
+      recordKimiSessionCapture(tmuxSession, sessionId, cwd);
     }
   };
 
   if (kimiCodeFields) {
     const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
-    await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), cwd, launchTmuxAndCaptureSession);
+    await withKimiSessionCaptureLock(kimiHomeDefault(), cwd, launchTmuxAndCaptureSession);
   } else {
     await launchTmuxAndCaptureSession();
   }
@@ -924,7 +923,7 @@ export async function handleConversationCreate(
     const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
     if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
     if (model && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-    if (effort && !SAFE_EFFORT_PATTERN.test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
+    if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
     let cwd = getDefaultCwd();
     let canonicalProjectKey: string | undefined;
     if (projectKey) {
@@ -950,10 +949,19 @@ export async function handleConversationCreate(
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
         await waitForConversationRuntimeReady(tmuxSession, harness, 'spawn');
-        if (message) {
-          const delivery = await deliverAgentMessage(tmuxSession, message, 'conversation-message', resolveConversationDeliveryMethod(conv));
-          if (harness === 'acp' && !delivery.ok) {
-            throw new Error(`ACP initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
+        if (message || harness === 'kimi-code') {
+          const method = resolveConversationDeliveryMethod(conv);
+          const delivery = harness === 'kimi-code'
+            ? await deliverAgentMessage(
+                tmuxSession,
+                message,
+                'conversation-message',
+                method,
+                { kimiContext: { workspace: cwd } },
+              )
+            : await deliverAgentMessage(tmuxSession, message, 'conversation-message', method);
+          if ((harness === 'acp' || harness === 'opencode' || harness === 'kimi-code') && !delivery.ok) {
+            throw new Error(`${getHarnessBehavior(harness).displayName} initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
           }
         }
       } catch (spawnErr: unknown) {
@@ -962,7 +970,7 @@ export async function handleConversationCreate(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with
         // no owned native identity presented as a healthy conversation.
-        if (harness === 'acp' || harness === 'kimi-code') await stopConversationRuntime(conv, name);
+        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
         updateSpawnError(name, msg);
         getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
       }
@@ -1047,22 +1055,27 @@ export async function handleConversationResume(
       await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
       await waitForTmuxSession(conv.tmuxSession);
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
+      const method = resolveConversationDeliveryMethod(conv);
+      if (harness === 'kimi-code') {
+        await deliverMandatoryKimiResumeContext(conv.tmuxSession, conv.cwd, method);
+      }
       // The harness may open its own blocking gate on resume. The operator owns
       // that answer, so the contract delivery seam skips rather than races it.
-      await deliverResumeContractUnlessGated(
+      const resumeContractResult = await deliverResumeContractUnlessGated(
         conv.tmuxSession,
         `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
         'conversation-resume',
-        resolveConversationDeliveryMethod(conv),
+        method,
         sendResumeContract,
       );
+      if (harness === 'kimi-code') assertKimiResumeContractResult(resumeContractResult);
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
     } catch (error) {
       // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
       // acp — a failed capture must not leave a running tmux session with no
       // owned native identity presented as a healthy conversation.
-      if (harness === 'acp' || harness === 'kimi-code') await stopConversationRuntime(conv, name);
+      if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
       throw error;
     } finally {
       respawn.done();
@@ -1112,8 +1125,13 @@ export async function handleConversationRestartAll(
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
-        if (harness === 'acp') {
+        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
+        }
+        if (harness === 'kimi-code') {
+          await deliverMandatoryKimiResumeContext(
+            conv.tmuxSession, conv.cwd, resolveConversationDeliveryMethod(conv),
+          );
         }
         setConversationHarness(conv.name, harness);
         markConversationActive(conv.name);
@@ -1124,7 +1142,7 @@ export async function handleConversationRestartAll(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with no
         // owned native identity presented as a healthy conversation.
-        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code') await stopConversationRuntime(conv, conv.name);
+        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode' || attemptedHarness === 'muse') await stopConversationRuntime(conv, conv.name);
         results.push({ name: conv.name, model: conv.model, status: 'failed' });
       } finally {
         respawn.done();

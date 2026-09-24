@@ -20,84 +20,11 @@ import {
   type SqliteRow,
   type SqliteScalar,
 } from '../database/driver.js';
-import {
-  getIssueRecordPath,
-  readIssueRecordSync,
-  type PanIssueRecord,
-} from '../pan-dir/record.js';
-import { updateIssueRecord } from '../pan-dir/record-update.js';
+import { isPeerDashboardProcess } from '../boot-gates.js';
 import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
 import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
-import {
-  auditOverdeckSchemaSync,
-  type SchemaTopUpExpectations,
-} from './schema-audit.js';
-
-export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
-  columns: [
-    { table: 'discovered_sessions', column: 'harness' },
-    { table: 'flywheel_substrate_bugs', column: 'affected_criteria' },
-    { table: 'review_status', column: 'release_status' },
-    { table: 'review_status', column: 'release_notes' },
-    { table: 'review_status', column: 'uat_status' },
-    { table: 'review_status', column: 'uat_notes' },
-    { table: 'review_status', column: 'retired_at' },
-    { table: 'review_status', column: 'inspect_owner_session' },
-    { table: 'review_status', column: 'strike_ready_head' },
-    { table: 'review_status', column: 'strike_ready_at' },
-    { table: 'review_status', column: 'strike_landing_state' },
-    { table: 'review_status', column: 'strike_recovery_count' },
-    { table: 'review_status', column: 'strike_transport_retry_count' },
-    { table: 'review_status', column: 'strike_next_attempt_at' },
-    { table: 'review_status', column: 'strike_landing_attempts' },
-    { table: 'review_status', column: 'conflicts_since' },
-    { table: 'agents', column: 'yielded_by_scheduler' },
-    { table: 'agents', column: 'review_context_manifest_path' },
-    { table: 'agents', column: 'yielded_at' },
-    { table: 'agents', column: 'last_yield_resume_at' },
-    { table: 'agents', column: 'started_by' },
-    { table: 'agents', column: 'branch' },
-    { table: 'uat_generation_repos', column: 'target_branch' },
-    { table: 'uat_generation_repos', column: 'merge_sha' },
-    { table: 'uat_generation_resolutions', column: 'kind' },
-    { table: 'uat_generation_resolutions', column: 'note' },
-    // PAN-3092: listed explicitly so the drift audit reports the table's
-    // absence if the runtime top-up ever fails on an existing database.
-    { table: 'event_idempotency', column: 'key' },
-    // PAN-1990: sentinels for the four brand-new tables (SchemaTopUpExpectations
-    // has no dedicated "tables" list).
-    { table: 'projects', column: 'id' },
-    { table: 'workspaces', column: 'id' },
-    { table: 'project_targets', column: 'project_id' },
-    { table: 'pinned_docs', column: 'id' },
-    { table: 'conversations', column: 'workspace_id' },
-    { table: 'agents', column: 'workspace_id' },
-    // PAN-1577: explicit project assignment override for moving a conversation
-    // between projects without relying on cwd-derived grouping.
-    { table: 'conversations', column: 'project_key' },
-    // PAN-3331: the quick-action band's per-workspace run command.
-    { table: 'workspaces', column: 'run_command' },
-  ],
-  indexes: [
-    'cost_session_id_idx',
-    'idx_cost_agent_id',
-    'idx_cost_issue_upper',
-    'release_sets_project_idx',
-    'release_set_components_issue_component_idx',
-    'release_set_components_issue_order_idx',
-    'uat_generation_repos_uat_order_idx',
-    'uat_generation_member_repos_uat_idx',
-    'uat_generations_uncleaned_terminal_idx',
-    'projects_primary_path_idx',
-    'idx_workspace_project',
-    'idx_workspace_kind',
-    'idx_workspace_last_accessed',
-    'idx_project_targets_one_primary',
-    'idx_pinned_docs_scope',
-  ],
-};
 
 export const overdeckEvents = sqliteTable('events', {
   sequence: integer('sequence').primaryKey({ autoIncrement: true }),
@@ -123,8 +50,12 @@ let overdeckDbSync: { path: string; db: SqliteDatabase } | null = null;
 let overdeckReadOnlyDbSync: { path: string; db: SqliteDatabase } | null = null;
 
 function runOverdeckMigrationSync(db: SqliteDatabase): void {
+  // PAN-3917: the sentinel used to be the `agents` table, but the pipeline-state
+  // mirror tables (agents, review_status, ...) are dropped by
+  // dropPipelineStateMirrorTablesSync below. `events` is drizzle-owned and never
+  // dropped, so it stays a valid fresh-vs-existing signal.
   const row = db
-    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agents'`)
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'`)
     .get();
   if (row) return;
 
@@ -159,22 +90,6 @@ export function runSchemaTopUp(db: SqliteDatabase, statement: string): void {
 function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text');
   runSchemaTopUp(db, "UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_status` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_notes` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_status` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_notes` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `retired_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_transport_retry_count` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_next_attempt_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `review_cycle_history` text');
-  // PAN-3154: main-head SHA/paths that first made this branch conflict.
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `conflicts_since` text');
   ensureReleaseSetTablesSync(db);
   ensureUatGenerationRepoTablesSync(db);
   // PAN-1491: existing overdeck.db files created before substrate-bug weights need
@@ -188,22 +103,218 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `cost_reconcile_file_state` (`path` text PRIMARY KEY NOT NULL, `mtime_ms` integer NOT NULL, `size` integer NOT NULL, `verdict` text NOT NULL)');
-  // PAN-2507: preemptive-scheduler yield attribution on agents. The init
-  // migration only runs on a fresh DB, so existing overdeck.db files need these
-  // columns added idempotently here.
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer');
-  // Existing databases need the run context manifest for missing-reviewer recovery.
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `started_by` text');
-  // PAN-3362: the init migration's `agents` table never carried `branch`, so it
-  // was silently dropped on every DB round-trip (fixture and real agents alike).
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `branch` text');
   ensureWorkspaceTablesSync(db);
   // PAN-1577: explicit project assignment override for moving a conversation
   // between projects without relying on cwd-derived grouping.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `project_key` text');
+}
+
+/** `app_settings` key recording that the pipeline-mirror drop already ran. */
+export const PIPELINE_MIRROR_DROPPED_SETTING = 'schema.pipelineMirrorDropped';
+
+/** Child tables first so FK-enforced DROP TABLE succeeds. */
+const PIPELINE_STATE_MIRROR_TABLES = [
+  'review_run_agents',
+  'review_runs',
+  'agents',
+  'issue_policy',
+  'status_history',
+  'review_status',
+] as const;
+
+export interface DropPipelineStateMirrorResult {
+  /** True when this call performed the drop (and wrote the marker). */
+  readonly dropped: boolean;
+  /** Why it did not, when it did not. */
+  readonly skipped?: 'peer' | 'already-dropped';
+}
+
+/**
+ * PAN-3917 (W3): drop the overdeck.db tables that mirrored pipeline state an
+ * owner elsewhere already holds — agent status/liveness (now the terminal
+ * backend), review/test/merge/release status (now PR reviews, check runs, and
+ * forge mergeability), and their run-scoped children. Costs, conversation
+ * search, health history, caches, and the events table are untouched.
+ *
+ * fix10: this used to run from `ensureRuntimeIndexesSync`, i.e. on EVERY open
+ * of the database by ANY process. A throwaway peer boot of the new build
+ * against the real `~/.overdeck` therefore dropped `agents` out from under the
+ * running 0.51.0 dashboard, which crash-looped on "no such table: agents".
+ *
+ * Two gates make that impossible:
+ *   1. **Primary only.** A peer dashboard shares someone else's database and
+ *      must never run a migration that drops or alters tables.
+ *   2. **Exactly once.** A marker in `app_settings` records the drop, so a
+ *      second primary boot is a no-op instead of a live DDL statement.
+ *
+ * It is an explicit boot step (see `src/dashboard/server/main.ts`), not a
+ * side effect of opening the database, so a `pan` CLI invocation — "not peer"
+ * by env, yet sharing the live database — cannot trigger it either.
+ *
+ * Drops and marker commit in one transaction: a partial drop must not leave a
+ * marker that stops the next boot from finishing the job.
+ */
+export function dropPipelineStateMirrorTables(
+  db: SqliteDatabase = getOverdeckDatabase(),
+  env: NodeJS.ProcessEnv = process.env,
+): DropPipelineStateMirrorResult {
+  if (isPeerDashboardProcess(env)) return { dropped: false, skipped: 'peer' };
+  if (readPipelineMirrorMarker(db) !== null) return { dropped: false, skipped: 'already-dropped' };
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(
+      'CREATE TABLE IF NOT EXISTS `app_settings` '
+      + '(`key` text PRIMARY KEY NOT NULL, `value` text, `updated_at` integer)',
+    );
+    for (const table of PIPELINE_STATE_MIRROR_TABLES) {
+      db.exec(`DROP TABLE IF EXISTS \`${table}\``);
+    }
+    db.prepare(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    ).run(PIPELINE_MIRROR_DROPPED_SETTING, new Date().toISOString(), Date.now());
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+  return { dropped: true };
+}
+
+/** The marker value, or null when the drop has not run against this database. */
+export function readPipelineMirrorMarker(db: SqliteDatabase): string | null {
+  try {
+    const row = db
+      .prepare('SELECT value FROM app_settings WHERE key = ?')
+      .get(PIPELINE_MIRROR_DROPPED_SETTING) as { value: string | null } | undefined;
+    return row?.value ?? null;
+  } catch {
+    // No app_settings table yet (a database older than the settings migration).
+    return null;
+  }
+}
+
+/** `app_settings` key recording that the dead `issues` FK rebuild already ran. */
+const DEAD_ISSUES_FK_DROPPED_SETTING = 'schema.deadIssuesFkDropped';
+
+/**
+ * Live tables whose `issue_id → issues(id)` foreign key still gates post-cut
+ * writers. Nothing inserts `issues` rows since the Cut (PAN-3917), so each of
+ * these FKs rejects every new issue id (PAN-3963: batch assembly died on
+ * `uat_generation_members` for exactly this reason). The dropped
+ * pipeline-mirror tables are not listed — they are gone.
+ */
+const DEAD_ISSUES_FK_TABLES = [
+  'merge_queue',
+  'merge_sets',
+  'release_sets',
+  'pending_auto_merges',
+  'uat_generation_members',
+  'uat_generation_member_repos',
+] as const;
+
+const ISSUES_FK_PRESENT_RE = /FOREIGN KEY\s*\(\s*`issue_id`\s*\)\s*REFERENCES\s*`issues`\s*\(\s*`id`\s*\)/i;
+/** The FK clause, with its leading comma — the last clause in every listed table. */
+const ISSUES_FK_CLAUSE_RE = /,\s*FOREIGN KEY\s*\(`issue_id`\)\s*REFERENCES\s*`issues`\s*\(`id`\)[^,)]*/i;
+
+export interface DropDeadIssuesFkResult {
+  /** True when this call ran the rebuild (and wrote the marker). */
+  readonly dropped: boolean;
+  /** Tables actually rebuilt (absent or already-clean tables are skipped). */
+  readonly tables: readonly string[];
+  readonly skipped?: 'peer' | 'already-dropped';
+}
+
+/**
+ * PAN-3963: rebuild the live tables whose `issue_id → issues(id)` FK can bite
+ * post-cut writers, dropping that one constraint and preserving every row,
+ * index, and the table's remaining FKs. SQLite has no DROP CONSTRAINT, so each
+ * table is rebuilt: copy into a new table under the edited CREATE statement,
+ * drop the old one, rename, recreate its indexes.
+ *
+ * The new definition is derived from the table's own sqlite_master SQL with
+ * the issues-FK clause excised — never hand-copied — so drift between the init
+ * migration, the top-ups, and a live database cannot produce a wrong schema
+ * here. A table whose SQL does not carry the clause (fresh database, or one
+ * already rebuilt) is skipped; a table where the excision does not match
+ * cleanly aborts the whole run loudly and the marker is never written, so the
+ * next primary boot retries.
+ *
+ * Same two gates as the pipeline-mirror drop above (fix10): PRIMARY ONLY, and
+ * EXACTLY ONCE via an app_settings marker. It runs from the dashboard boot
+ * step in main.ts, never on database open.
+ */
+export function dropDeadIssuesForeignKeys(
+  db: SqliteDatabase = getOverdeckDatabase(),
+  env: NodeJS.ProcessEnv = process.env,
+): DropDeadIssuesFkResult {
+  if (isPeerDashboardProcess(env)) return { dropped: false, tables: [], skipped: 'peer' };
+  let marker: string | null = null;
+  try {
+    const row = db
+      .prepare('SELECT value FROM app_settings WHERE key = ?')
+      .get(DEAD_ISSUES_FK_DROPPED_SETTING) as { value: string | null } | undefined;
+    marker = row?.value ?? null;
+  } catch {
+    marker = null; // no app_settings table yet
+  }
+  if (marker !== null) return { dropped: false, tables: [], skipped: 'already-dropped' };
+
+  const rebuilt: string[] = [];
+  // FK enforcement must be off for the drop/rename step, and the pragma is a
+  // no-op inside a transaction — so it wraps the transaction, not vice versa.
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(
+        'CREATE TABLE IF NOT EXISTS `app_settings` '
+        + '(`key` text PRIMARY KEY NOT NULL, `value` text, `updated_at` integer)',
+      );
+      for (const table of DEAD_ISSUES_FK_TABLES) {
+        const row = db
+          .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`)
+          .get(table) as { sql: string | null } | undefined;
+        if (!row?.sql || !ISSUES_FK_PRESENT_RE.test(row.sql)) continue;
+
+        const newSql = row.sql.replace(ISSUES_FK_CLAUSE_RE, '');
+        if (ISSUES_FK_PRESENT_RE.test(newSql) || newSql.length >= row.sql.length) {
+          throw new Error(`[schema] could not excise the issues FK from ${table} — leaving it untouched`);
+        }
+        const tmp = `__pan3963_${table}`;
+        const tmpSql = newSql.replace(
+          new RegExp(`(CREATE\\s+TABLE\\s+)\`?${table}\`?`, 'i'),
+          `$1\`${tmp}\``,
+        );
+        if (!new RegExp(`CREATE\\s+TABLE\\s+\`${tmp}\``, 'i').test(tmpSql)) {
+          throw new Error(`[schema] could not rename ${table} in its CREATE statement — leaving it untouched`);
+        }
+
+        const indexes = db
+          .prepare(`SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL`)
+          .all(table) as Array<{ sql: string }>;
+
+        db.exec(tmpSql);
+        db.exec(`INSERT INTO \`${tmp}\` SELECT * FROM \`${table}\``);
+        db.exec(`DROP TABLE \`${table}\``);
+        db.exec(`ALTER TABLE \`${tmp}\` RENAME TO \`${table}\``);
+        for (const index of indexes) db.exec(index.sql);
+        rebuilt.push(table);
+      }
+      db.prepare(
+        `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      ).run(DEAD_ISSUES_FK_DROPPED_SETTING, new Date().toISOString(), Date.now());
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  return { dropped: true, tables: rebuilt };
 }
 
 /**
@@ -278,7 +389,6 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
   db.exec('CREATE INDEX IF NOT EXISTS `idx_pinned_docs_scope` ON `pinned_docs` (`scope`, `scope_id`)');
 
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `workspace_id` text');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `workspace_id` text');
   // PAN-3331: the quick-action band's per-workspace run command. Its own column
   // rather than a key inside layout_config, which react-resizable-panels owns
   // and rewrites wholesale on every panel drag.
@@ -291,6 +401,9 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
  * requiring a full migration reset.
  */
 function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
+  // PAN-3963: no FK into `issues` — that table is a pre-cut cache nothing
+  // writes any more, so the constraint rejects every post-cut issue id.
+  // Existing databases get the FK dropped by dropDeadIssuesForeignKeysSync.
   db.exec(`
     CREATE TABLE IF NOT EXISTS \`release_sets\` (
       \`issue_id\` text PRIMARY KEY NOT NULL,
@@ -299,8 +412,7 @@ function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
       \`workspace_type\` text NOT NULL,
       \`status\` text DEFAULT 'pending' NOT NULL,
       \`created_at\` integer NOT NULL,
-      \`updated_at\` integer NOT NULL,
-      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+      \`updated_at\` integer NOT NULL
     )
   `);
   db.exec('CREATE INDEX IF NOT EXISTS \`release_sets_project_idx\` ON \`release_sets\` (\`project_key\`,\`updated_at\`)');
@@ -360,8 +472,7 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
       \`head_sha\` text NOT NULL,
       \`merge_order_in_repo\` integer DEFAULT 0 NOT NULL,
       PRIMARY KEY(\`uat_name\`, \`issue_id\`, \`repo_key\`),
-      FOREIGN KEY (\`uat_name\`) REFERENCES \`uat_generations\`(\`name\`) ON UPDATE no action ON DELETE no action,
-      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+      FOREIGN KEY (\`uat_name\`) REFERENCES \`uat_generations\`(\`name\`) ON UPDATE no action ON DELETE no action
     )
   `);
   db.exec('CREATE INDEX IF NOT EXISTS \`uat_generation_member_repos_uat_idx\` ON \`uat_generation_member_repos\` (\`uat_name\`,\`issue_id\`)');
@@ -381,25 +492,7 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `uat_generation_resolutions` ADD COLUMN `note` text');
 }
 
-function warnSchemaDriftSync(db: SqliteDatabase): void {
-  try {
-    const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
-    for (const table of report.missingTables) {
-      console.warn(`[schema-audit] missing table: ${table}`);
-    }
-    for (const index of report.missingIndexes) {
-      console.warn(`[schema-audit] missing index: ${index}`);
-    }
-    for (const { table, column } of report.missingColumns) {
-      console.warn(`[schema-audit] missing column: ${table}.${column}`);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[schema-audit] audit failed: ${message}`);
-  }
-}
-
-export function getOverdeckDatabaseSync(
+export function getOverdeckDatabase(
   dbPath = getOverdeckDatabasePath(),
   options: { readOnly?: boolean } = {},
 ): SqliteDatabase {
@@ -433,7 +526,6 @@ export function getOverdeckDatabaseSync(
   db.pragma('synchronous = NORMAL');
   runOverdeckMigrationSync(db);
   ensureRuntimeIndexesSync(db);
-  warnSchemaDriftSync(db);
   overdeckDbSync = { path: dbPath, db };
   return db;
 }
@@ -444,21 +536,12 @@ function getOverdeckDatabaseReadOnlySync(dbPath: string): SqliteDatabase {
   overdeckReadOnlyDbSync?.db.close();
   const db = openDatabase(dbPath, { readOnly: true });
   db.pragma('foreign_keys = ON');
-  const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
-  const missing = [
-    ...report.missingTables.map((table) => `table ${table}`),
-    ...report.missingIndexes.map((index) => `index ${index}`),
-    ...report.missingColumns.map(({ table, column }) => `column ${table}.${column}`),
-  ];
-  if (missing.length > 0) {
-    db.close();
-    throw new Error(`overdeck.db schema is incompatible; writable dashboard startup must update: ${missing.join(', ')}`);
-  }
   overdeckReadOnlyDbSync = { path: dbPath, db };
   return db;
 }
 
-export function closeOverdeckDatabaseSync(): void {
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
+export function closeOverdeckDatabase(): void {
   overdeckDbSync?.db.close();
   overdeckDbSync = null;
   overdeckReadOnlyDbSync?.db.close();
@@ -619,9 +702,8 @@ export const EventBusLive = Layer.effect(
   }),
 );
 
+/** PAN-3917: reads plan artifacts. There is no per-issue record to write. */
 export interface RecordsServiceShape {
-  readonly writeIssue: (project: ProjectConfig, issueId: string, record: PanIssueRecord) => Effect.Effect<string>;
-  readonly readIssue: (project: ProjectConfig, issueId: string) => Effect.Effect<PanIssueRecord | null>;
   readonly readSpec: (planRef: string) => Effect.Effect<unknown>;
   readonly writeAgentIdentity: (issueId: string, opts: { harness: string; model: string }) => Effect.Effect<void>;
 }
@@ -631,11 +713,6 @@ export class Records extends Context.Service<Records, RecordsServiceShape>()('ov
 export const RecordsLive = Layer.succeed(
   Records,
   Records.of({
-    writeIssue: (project, issueId, record) => Effect.promise(async () => {
-      await updateIssueRecord(project, issueId, () => record);
-      return getIssueRecordPath(project, issueId);
-    }),
-    readIssue: (project, issueId) => Effect.sync(() => readIssueRecordSync(project, issueId)),
     readSpec: (planRef) =>
       Effect.sync(() => {
         const path = isAbsolute(planRef) ? planRef : join(packageRoot, planRef);

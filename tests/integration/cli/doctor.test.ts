@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -60,7 +59,7 @@ let odb: OverdeckTestDb | null = null;
 
 function makeAgentsDir(): string {
   // Overdeck (PAN-1938): the doctor test seeds agent state into overdeck.db
-  // via saveOverdeckAgentStateSync, and getAgentStateSync reads overdeck first.
+  // via saveOverdeckAgentStateSync, and getAgentState reads overdeck first.
   // The agentsDir parameter still must point at a real directory under
   // OVERDECK_HOME so readDoctorAgentStates' readdirSync can enumerate it.
   const dir = odb ? join(odb.home, 'agents') : mkdtempSync(join(tmpdir(), 'pan-doctor-agents-'));
@@ -73,7 +72,7 @@ function writeAgentState(agentsDir: string, agentId: string, state: object): voi
   const agentDir = join(agentsDir, agentId);
   mkdirSync(agentDir, { recursive: true });
   // Mirror the on-disk state.json (read by the rollback layer fallback) AND
-  // persist the same record into overdeck.db so getAgentStateSync resolves
+  // persist the same record into overdeck.db so getAgentState resolves
   // the agent on the first lookup (the overdeck door is the source of truth
   // post-PAN-1938).
   writeFileSync(join(agentDir, 'state.json'), JSON.stringify(state), 'utf8');
@@ -103,12 +102,12 @@ describe('doctor command', () => {
       return true;
     });
     odb = setupOverdeckTestDb();
-    mocks.cleanupClosedIssueAgentDirectories.mockReturnValue(Effect.succeed({
+    mocks.cleanupClosedIssueAgentDirectories.mockResolvedValue({
       removed: [],
       protected: [],
       wouldRemove: [],
       totalCandidates: 0,
-    }));
+    });
     mocks.getAgentSessionsSync.mockReturnValue([]);
     mocks.listSessionNamesSync.mockReturnValue([]);
   }, 20_000);
@@ -232,12 +231,12 @@ describe('doctor command', () => {
 
   describe('closed issue agent directory checks', () => {
     it('reports stale closed-issue agent directories', async () => {
-      mocks.cleanupClosedIssueAgentDirectories.mockReturnValueOnce(Effect.succeed({
+      mocks.cleanupClosedIssueAgentDirectories.mockResolvedValueOnce({
         removed: [],
         protected: [],
         wouldRemove: ['agent-pan-1052-ship'],
         totalCandidates: 1,
-      }));
+      });
 
       const { checkClosedIssueOrphanAgentDirs } = await import('../../../src/cli/commands/doctor.js');
       const result = await checkClosedIssueOrphanAgentDirs([], '/tmp/agents');

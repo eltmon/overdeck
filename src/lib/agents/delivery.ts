@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { request as httpRequest } from 'node:http';
 import { join, dirname } from 'path';
@@ -5,7 +6,9 @@ import { homedir } from 'os';
 import { Effect } from 'effect';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { markKimiContextDelivered, prepareKimiMessage, type PreparedKimiMessage } from '../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agents.js';
+import type { PromptResult, PromptSender } from '../terminal-backends/types.js';
 import {
   normalizeAgentId,
   getAgentState,
@@ -14,10 +17,12 @@ import {
   waitForPromptReady,
   SESSION_EXITED_BEFORE_KICKOFF,
 } from '../agents.js';
-import { getAgentRuntimeState } from './runtime-state.js';
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
+import { checkPrompt, senderFromEnv, tokensFromLaunchMetadata } from '../terminal-backends/prompt-guard.js';
+import { selectTerminalBackend } from '../terminal-backends/select.js';
+import { isPromptDropped, isPromptRefused, isUnsupported } from '../terminal-backends/types.js';
 import { completeKeyedSubmit, sendKeysDedup } from '../tmux-dedup.js';
-import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
+import { BRIDGE_TOKEN_HEADER, readBridgeToken } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 import {
   SUPERVISOR_CLIENT_MARGIN_MS,
@@ -29,9 +34,60 @@ import {
   type TranscriptUserRecordSnapshot,
 } from '../transcript-landing.js';
 
+/**
+ * `terminal.backend` from config.yaml, for the D10 selection. Read lazily: the
+ * delivery door must not pull the config loader into its module graph.
+ */
+async function loadTerminalBackendConfig(): Promise<{ terminal?: { backend?: 'herdr' | 'tmux' } }> {
+  try {
+    const { loadConfigSync } = await import('../config-yaml.js');
+    return loadConfigSync().config as { terminal?: { backend?: 'herdr' | 'tmux' } };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Does this agent run behind a host process with its own delivery socket?
+ * codex app-server (the default codex transport) and ACP/opencode do; codex in
+ * `transport: tui` mode does not.
+ */
+async function isHostBackedTarget(state: AgentState | null): Promise<boolean> {
+  if (!state) return false;
+  if (state.harness === 'acp' || state.harness === 'opencode') return true;
+  if (state.harness !== 'codex') return false;
+  try {
+    const { loadConfigSync } = await import('../config-yaml.js');
+    const loaded = loadConfigSync() as { config?: { codex?: { transport?: string } } };
+    return loaded.config?.codex?.transport !== 'tui';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Which backend this host delivers through. Resolved once per process: the
+ * answer is the host's policy (env, `terminal.backend`, default herdr —
+ * PAN-3956), not a property of the message.
+ */
+let backendSelection: Promise<'herdr' | 'tmux'> | null = null;
+
+function deliveryBackendName(): Promise<'herdr' | 'tmux'> {
+  backendSelection ??= loadTerminalBackendConfig()
+    .then((config) => selectTerminalBackend(config))
+    .then((selection) => selection.backend)
+    .catch(() => 'herdr' as const);
+  return backendSelection;
+}
+
+/** Tests reset the memoized host selection. */
+export function resetDeliveryBackendSelection(): void {
+  backendSelection = null;
+}
+
 export type DeliveryResult = {
   ok: boolean;
-  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex' | 'herdr';
   failure?: string;
   /** True when the delivery was suppressed by the keyed dedup record — the
    * side effect already happened on an earlier call with the same key. */
@@ -39,6 +95,10 @@ export type DeliveryResult = {
 };
 
 export interface DeliverAgentMessageOptions {
+  /** Conversation sessions have no AgentState; identify their Kimi context explicitly. */
+  kimiContext?: { workspace: string; sessionId?: string };
+  /** Runtime-owned precomposition seam; prevents the shared Kimi guard from nesting envelopes. */
+  preparedKimiContext?: PreparedKimiMessage;
   /**
    * Idempotency key (PAN-2997). Keyed deliveries are deduplicated by the
    * crash-independent delivery component, not by dashboard-side state: the
@@ -56,6 +116,19 @@ export interface DeliverAgentMessageOptions {
    * caller's acknowledgment would otherwise replay the wake.
    */
   dedupKey?: string;
+  /**
+   * Idempotency key for the prompt guard (PAN-3917 FR-17). A repeat of the
+   * same id for the same target inside the guard's window is dropped and the
+   * reason is reported. Callers that do not pass one get a fresh id per call,
+   * so nothing is dropped by accident — a retry of a FAILED delivery must use
+   * a new id, because the guard records an id when it admits it.
+   */
+  messageId?: string;
+  /**
+   * Who is sending. Defaults to this process's `OVERDECK_AGENT_ID` (an
+   * operator shell with none is treated as an operator conversation).
+   */
+  sender?: PromptSender;
 }
 
 /**
@@ -286,35 +359,112 @@ export async function deliverAgentMessage(
   const normalizedId = normalizeAgentId(agentId);
   const dedupKey = opts.dedupKey;
 
+
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
   let state: AgentState | null = null;
   try {
-    state = await Effect.runPromise(getAgentState(normalizedId));
+    state = getAgentState(normalizedId);
     channelsEnabled = Boolean(state?.channelsEnabled);
-    resolvedMethod ??= state?.deliveryMethod ?? 'auto';
+    // A persisted deliveryMethod is a launch-time hint, not a per-call
+    // transport opt-in: state can project 'supervisor' for an agent with no
+    // live PTY supervisor (codex app-server launches stamped
+    // supervisorEnabled=true while the launcher never wrapped; a crash-resume
+    // can lose the socket, PAN-3257). Route a state-derived 'supervisor'
+    // through the resilient cascade so delivery falls through to the
+    // app-server/channels/tmux tiers instead of throwing socket-missing with
+    // no fallback — the failure mode that stalled the PAN-3743 review loop
+    // when the inspect verdict could not reach the work agent. Only an
+    // explicit caller argument keeps the strict PAN-1769 supervisor contract.
+    resolvedMethod ??= resilientDeliveryMethod(state?.deliveryMethod) ?? 'auto';
   } catch {
     resolvedMethod ??= 'auto';
   }
 
-  const isAcpTarget = state?.harness === 'acp';
+  // PAN-3917 FR-17: every prompt is role-checked and idempotent, on both
+  // backends. On Herdr the whole delivery is `backend.prompt`; on tmux only the
+  // guard is new — the PTY supervisor cascade below is unchanged. The target's
+  // tokens come from the agent state already read above, and the Herdr adapter
+  // is imported only on a Herdr host (it must not be a module-load dependency
+  // of the delivery door).
+  const messageId = opts.messageId ?? randomUUID();
+  const targetTokens = tokensFromLaunchMetadata(state);
+  // The SENDER's own tokens, looked up from ITS agent id — never the target's.
+  const sender = opts.sender
+    ?? senderFromEnv(process.env, (senderId) => tokensFromLaunchMetadata(getAgentState(senderId)));
+  // A harness reached through its own host process (codex app-server, ACP /
+  // opencode) is never prompted through Herdr. Herdr detects the codex process
+  // UNDER the app-server host, and `agent.prompt` then types the message into
+  // the pane, where the host's stdin reader treats every line as its own
+  // message — the PAN-3705 kickoff arrived as 97 one-line threads that way.
+  // Their socket tiers below are the only correct door.
+  const herdrAgent = !(await isHostBackedTarget(state)) && (await deliveryBackendName()) === 'herdr'
+    ? await (await import('../terminal-backends/herdr.js')).findHerdrAgent(normalizedId)
+    : null;
+  if (herdrAgent) {
+    const { herdrBackend } = await import('../terminal-backends/herdr.js');
+    // A Herdr THROW is a delivery failure; a returned `unsupported` is not — a
+    // pane-bound agent has no Herdr agent record to prompt (PAN-3917 W12), so it
+    // falls through to the harness's own transport below, guard included.
+    let result: PromptResult;
+    try {
+      result = await Effect.runPromise(
+        herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
+      );
+    } catch (err: unknown) {
+      return { ok: false, path: 'herdr', failure: err instanceof Error ? err.message : String(err) };
+    }
+    if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
+    if (isPromptDropped(result)) {
+      return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
+    }
+    if (!isUnsupported(result)) return { ok: true, path: 'herdr' };
+  }
+  // Not a Herdr agent, one Herdr cannot prompt, or a tmux host: same cascade, same guard.
+  const guard = checkPrompt({ targetId: normalizedId, targetTokens, sender, messageId });
+  if ('refused' in guard) return { ok: false, path: 'tmux', failure: `refused: ${guard.reason}` };
+  if ('dropped' in guard) {
+    return { ok: true, path: 'tmux', deduplicated: true, failure: `dropped: ${guard.reason}` };
+  }
+
+  const isAcpTarget = state?.harness === 'acp' || state?.harness === 'opencode';
   if (isAcpTarget && resolvedMethod !== 'auto') {
     throw new Error(
       `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ACP requires authenticated host RPC delivery`,
     );
   }
 
+  let preparedKimiMessage = opts.preparedKimiContext;
+  if (preparedKimiMessage && preparedKimiMessage.message !== message) {
+    throw new Error(`Managed Kimi message blocked for ${normalizedId}: prepared envelope does not match the delivered message.`);
+  }
+  const kimiContext = state?.harness === 'kimi-code' && state.workspace
+    ? { workspace: state.workspace }
+    : opts.kimiContext;
+  if (kimiContext && !preparedKimiMessage) {
+    preparedKimiMessage = await prepareKimiMessage(normalizedId, kimiContext.workspace, message, {
+      sessionId: kimiContext.sessionId,
+    });
+    message = preparedKimiMessage.message;
+  }
+  const completeDelivery = (result: DeliveryResult): DeliveryResult => {
+    if (result.ok && !result.deduplicated && preparedKimiMessage) {
+      markKimiContextDelivered(normalizedId, preparedKimiMessage);
+    }
+    return result;
+  };
+
   // Keyed deliveries take a dedicated, narrower cascade: only the tiers whose
   // crash-independent component enforces the key across the complete side
   // effect. Everything below this branch is the unkeyed cascade.
   if (dedupKey !== undefined) {
-    return deliverKeyedAgentMessage(normalizedId, message, caller, resolvedMethod ?? 'auto', isAcpTarget, dedupKey);
+    return completeDelivery(await deliverKeyedAgentMessage(normalizedId, message, caller, resolvedMethod ?? 'auto', isAcpTarget, dedupKey));
   }
 
   if (resolvedMethod === 'tmux') {
     await assertTmuxTargetCanReceive(normalizedId, caller);
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return { ok: true, path: 'tmux' };
+    return completeDelivery({ ok: true, path: 'tmux' });
   }
 
   let appServerFailure: string | undefined;
@@ -335,7 +485,7 @@ export async function deliverAgentMessage(
             appServerToken,
           );
           await appendChannelDeliveryLog(normalizedId, { path: 'app-server', caller });
-          return { ok: true, path: 'app-server' };
+          return completeDelivery({ ok: true, path: 'app-server' });
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           appServerFailure = `socket-post-failed: ${reason}`;
@@ -366,7 +516,7 @@ export async function deliverAgentMessage(
             acpToken,
           );
           await appendChannelDeliveryLog(normalizedId, { path: 'acp', caller });
-          return { ok: true, path: 'acp' };
+          return completeDelivery({ ok: true, path: 'acp' });
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           acpFailure = `socket-post-failed: ${reason}`;
@@ -409,7 +559,7 @@ export async function deliverAgentMessage(
           PTY_TOKEN_HEADER,
         );
         await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
-        return { ok: true, path: 'supervisor' };
+        return completeDelivery({ ok: true, path: 'supervisor' });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         supervisorFailure = `socket-post-failed: ${reason}`;
@@ -429,7 +579,7 @@ export async function deliverAgentMessage(
     } else if (!existsSync(socketPath)) {
       channelFailure = 'socket-missing';
     } else {
-      const bridgeToken = readBridgeTokenSync(normalizedId);
+      const bridgeToken = readBridgeToken(normalizedId);
       if (!bridgeToken) {
         channelFailure = 'bridge-token-missing';
       } else {
@@ -445,7 +595,7 @@ export async function deliverAgentMessage(
             caller,
             ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
           });
-          return { ok: true, path: 'channels' };
+          return completeDelivery({ ok: true, path: 'channels' });
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           channelFailure = `socket-post-failed: ${reason}`;
@@ -468,12 +618,12 @@ export async function deliverAgentMessage(
     });
     await assertTmuxTargetCanReceive(normalizedId, caller);
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return { ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure };
+    return completeDelivery({ ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure });
   }
 
   await assertTmuxTargetCanReceive(normalizedId, caller);
   await Effect.runPromise(sendKeys(normalizedId, message));
-  return { ok: true, path: 'tmux' };
+  return completeDelivery({ ok: true, path: 'tmux' });
 }
 
 /**
@@ -637,7 +787,7 @@ async function waitForTranscriptMessageLanding(
   return result.matchedUserRecord || (result.realAssistantTurnCount ?? 0) > 0;
 }
 
-export async function deliverResumeMessageWithTranscriptConfirmation(args: {
+export async function deliverMessageWithTranscriptConfirmation(args: {
   agentId: string;
   workspace: string;
   sessionId: string;
@@ -670,12 +820,15 @@ export async function deliverResumeMessageWithTranscriptConfirmation(args: {
       return { delivered: true, attempts: attempt, lastDelivery };
     }
     if (attempt < 2) {
-      console.warn(`[resumeAgent] Auto-continue prompt did not land in ${args.sessionId}; redelivering once.`);
+      console.warn(`[${args.caller}] message did not land in ${args.sessionId}; redelivering once.`);
     }
   }
 
   return { delivered: false, attempts: 2, ...(lastDelivery ? { lastDelivery } : {}) };
 }
+
+/** Alias kept for one release; use `deliverMessageWithTranscriptConfirmation`. */
+export { deliverMessageWithTranscriptConfirmation as deliverResumeMessageWithTranscriptConfirmation };
 
 export async function deliverInitialPromptWithRetry(
   agentId: string,
@@ -700,15 +853,23 @@ export async function deliverInitialPromptWithRetry(
   const probe = options.probe ?? probeTranscriptSince;
   const getState = options.getState ?? (async (id: string) => {
     try {
-      return await Effect.runPromise(getAgentState(normalizeAgentId(id)));
+      return getAgentState(normalizeAgentId(id));
     } catch {
       return null;
     }
   });
   const waitForReady = options.waitForReady ?? waitForPromptReady;
-  const sessionExistsForAgent = options.sessionExists ?? (async (id: string) => (
-    Effect.runPromise(sessionExists(normalizeAgentId(id)))
-  ));
+  // "Is the agent's terminal still there?" is a backend question: a live tmux
+  // session, or a live Herdr agent of that name. Without the Herdr half, a
+  // kickoff on a Herdr host reports SESSION_EXITED_BEFORE_KICKOFF and the
+  // spawn path kills a perfectly healthy pane (PAN-3917).
+  const sessionExistsForAgent = options.sessionExists ?? (async (id: string) => {
+    const normalized = normalizeAgentId(id);
+    if (await Effect.runPromise(sessionExists(normalized)).catch(() => false)) return true;
+    if ((await deliveryBackendName()) !== 'herdr') return false;
+    const { findHerdrAgent } = await import('../terminal-backends/herdr.js');
+    return (await findHerdrAgent(normalized)) !== null;
+  });
 
   function promptReadyTimeoutSeconds(): number {
     const raw = process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;
@@ -724,14 +885,8 @@ export async function deliverInitialPromptWithRetry(
       return null;
     }
 
-    let sessionId = state.sessionId;
-    if (!sessionId) {
-      try {
-        sessionId = (await Effect.runPromise(getAgentRuntimeState(normalizedId)))?.claudeSessionId;
-      } catch {
-        sessionId = undefined;
-      }
-    }
+    const { getLatestSessionId } = await import('./activity.js');
+    const sessionId = getLatestSessionId(normalizedId, { getAgentState: () => state }) ?? undefined;
     if (!sessionId) return null;
 
     return {
@@ -844,7 +999,7 @@ export async function deliverAgentPermissionDecision(
 
   let state: AgentState | null = null;
   try {
-    state = await Effect.runPromise(getAgentState(normalizedId));
+    state = getAgentState(normalizedId);
   } catch {
     state = null;
   }
@@ -858,7 +1013,7 @@ export async function deliverAgentPermissionDecision(
     throw new Error(`bridge socket missing for ${normalizedId}`);
   }
 
-  const bridgeToken = readBridgeTokenSync(normalizedId);
+  const bridgeToken = readBridgeToken(normalizedId);
   if (!bridgeToken) {
     throw new Error(`bridge token missing for ${normalizedId}`);
   }
@@ -885,7 +1040,7 @@ export async function setAgentDeliveryMethod(
   agentId: string,
   deliveryMethod: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<void> {
-  const state = await Effect.runPromise(getAgentState(agentId));
+  const state = getAgentState(agentId);
   if (!state) return;
   state.deliveryMethod = deliveryMethod;
   await Effect.runPromise(saveAgentState(state));

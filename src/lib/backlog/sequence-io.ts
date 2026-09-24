@@ -2,8 +2,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseSequenceJson } from './types.js';
 import type { SequenceDoc, SequenceEdge, SequenceNode, SequenceParseError } from './types.js';
-import { queueAutoCommit } from '../pan-dir/auto-commit.js';
-import { getReviewStatusSync } from '../review-status.js';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
 
 const MACHINE_MARKER = '<!-- machine-readable; do not hand-edit below this line -->';
@@ -92,13 +90,13 @@ export function writeSequenceMd(projectRoot: string, doc: SequenceDoc, opts?: Wr
     }
   }
 
-  // Detect in-pipeline (pinned) issues: live workspace dir OR non-pending review status
+  // Detect in-pipeline (pinned) issues: an issue with a live workspace is
+  // already being worked and must keep its rank. PAN-3917 removed the second
+  // signal (a stored non-pending review status); the workspace directory is
+  // git's own evidence that work started.
   const workspacesDir = join(projectRoot, 'workspaces');
-  const isPinned = (issueId: string): boolean => {
-    const rs = getReviewStatusSync(issueId.toUpperCase());
-    if (rs && rs.reviewStatus !== 'pending') return true;
-    return existsSync(join(workspacesDir, `feature-${issueId.toLowerCase()}`));
-  };
+  const isPinned = (issueId: string): boolean =>
+    existsSync(join(workspacesDir, `feature-${issueId.toLowerCase()}`));
 
   // Merge operator-owned fields into each node
   const mergedNodes: SequenceNode[] = doc.nodes.map((node) => {
@@ -144,10 +142,4 @@ export function writeSequenceMd(projectRoot: string, doc: SequenceDoc, opts?: Wr
   const content = parts.join('\n\n');
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, content, 'utf-8');
-
-  queueAutoCommit({
-    projectRoot,
-    paths: [outPath],
-    subject: `chore(state): update backlog sequence (${doc.project})`,
-  });
 }

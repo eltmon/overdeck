@@ -4,9 +4,9 @@
  * Provides API-compatible interface for settings management.
  * Converts between YAML config format and frontend API format.
  */
+export { getAvailableModelsApi } from './settings-model-catalog.js';
 import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
-import { Data, Effect } from 'effect';
 import {
   DEFAULT_CONFIG,
   DEFAULT_ROLES,
@@ -37,7 +37,7 @@ import { validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
-import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
+import { MODEL_CAPABILITIES, hasModelCapability, MODEL_DEPRECATIONS, resolveModelId, getModelEffortLevels } from './model-capabilities.js';
 import { resolveTelemetryEnabled, telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { getOrCreateInstallId } from './telemetry/install-id.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
@@ -136,6 +136,9 @@ export interface ApiSettingsConfig {
       openrouter: boolean;
       nous: boolean;
       dashscope: boolean;
+      opencode?: boolean;
+      "opencode-go"?: boolean;
+      meta?: boolean;
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
@@ -150,6 +153,8 @@ export interface ApiSettingsConfig {
     manual_compact_mode?: 'claude-code' | 'overdeck-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
+    /** Model used to author external handoff docs (`pan handoff`) when no per-call model is given (PAN-3869/3884). */
+    handoff_author_model?: ModelId;
     watch_dirs?: string[];
     scan_max_parallel?: number | null;
     embeddings?: boolean;
@@ -287,33 +292,15 @@ export interface ApiSettingsConfig {
 export function getDefaultConversationModelApi(): ModelId | undefined {
   const { config } = loadConfigSync();
 
-  if (config.defaultConversationModel) return resolveModelIdSync(config.defaultConversationModel);
+  if (config.defaultConversationModel) return resolveModelId(config.defaultConversationModel);
   // Unset is legal (fresh install) — Settings must still render so the operator can set it (PAN-2589).
   return undefined;
 }
 
-const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];
-type AvailableModel = {
-  id: ModelId;
-  name: string;
-  costPer1MTokens: number;
-  contextWindow: number;
-  /**
-   * Kimi-only: which harness family this id launches under. `claude-code` ids
-   * are the Anthropic-compatible route; `kimi-code/*` ids belong to the native
-   * CLI's catalog (also used by the ACP transport). Conversation pickers use
-   * this to render harness-labeled rows and to send the row's harness at
-   * spawn; config panels can ignore it.
-   */
-  harness?: RuntimeName;
-  /** Effort levels the row's harness actually offers (Kimi rows only today). */
-  effortLevels?: readonly string[];
-  /** Display name without any harness suffix — pickers compose row labels from it. */
-  baseName?: string;
-};
-type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope', AvailableModel[]>;
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge', 'worker'];
+
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
-const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
+const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'meta', 'opencode', 'opencode-go'] as const;
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
 type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName | ''>>;
 type BuiltInProviderHarnessesConfig = Record<ApiModelProvider, RuntimeName>;
@@ -381,6 +368,29 @@ function pruneUndefined<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Merge-preserving block write (PAN-3884).
+ *
+ * The settings API only models a whitelist of keys per block, so a wholesale
+ * `doc.setIn([block], payload)` silently drops any key it doesn't know about —
+ * `conversations.handoff_author_model` before it joined the model, or any
+ * hand-added future key. Write per-key instead: known fields still win,
+ * unknown keys (and their comments) survive untouched. Shallow on purpose —
+ * nested entries (e.g. a single provider's object) are replaced wholesale so
+ * a cleared override actually clears. Matches the existing per-key precedent
+ * for `tts` and `agents.rtk`/`agents.tldr` below.
+ */
+function setBlockMergePreserving(doc: ReturnType<typeof parseDocument>, path: string[], value: Record<string, unknown>): void {
+  const existing = doc.getIn(path);
+  if (existing !== undefined && !isRecord(existing)) {
+    doc.setIn(path, value);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    doc.setIn([...path, key], entry);
+  }
 }
 
 function isWorkhorseRef(ref: string): boolean {
@@ -501,16 +511,16 @@ function validateModelRef(
     return;
   }
 
-  const resolved = resolveModelIdSync(ref);
-  if (!hasModelCapabilitySync(resolved)) {
+  const resolved = resolveModelId(ref);
+  if (!/^opencode(?:-go)?\/[^\s/]+$/.test(resolved) && !hasModelCapability(resolved)) {
     errors.push(`Invalid model reference "${ref}" at ${fieldPath}`);
   }
 }
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -541,9 +551,9 @@ function resolveModelRefToId(ref: unknown, workhorses: WorkhorsesConfig): ModelI
   if (isWorkhorseRef(ref)) {
     const resolved = workhorses[workhorseSlotFromRef(ref) as WorkhorseSlot];
     if (!resolved || isWorkhorseRef(resolved)) return undefined;
-    return resolveModelIdSync(resolved);
+    return resolveModelId(resolved);
   }
-  return resolveModelIdSync(ref);
+  return resolveModelId(ref);
 }
 
 function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[], warnings: string[]): void {
@@ -591,7 +601,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
             for (const entry of modelRef as WeightedModelRef[]) {
               const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
               if (resolvedModel) {
-                const supported = getModelEffortLevelsSync(resolvedModel);
+                const supported = getModelEffortLevels(resolvedModel);
                 if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                   errors.push(
                     `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
@@ -602,7 +612,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
           } else {
             const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
             if (resolvedModel) {
-              const supported = getModelEffortLevelsSync(resolvedModel);
+              const supported = getModelEffortLevels(resolvedModel);
               if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                 errors.push(
                   `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
@@ -672,6 +682,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     manual_compact_mode: config.conversations?.manualCompactMode,
     rich_compaction: config.conversations?.richCompaction,
     title_model: config.conversations?.titleModel,
+    handoff_author_model: config.conversations?.handoffAuthorModel,
     watch_dirs: config.conversations?.watchDirs,
     scan_max_parallel: config.conversations?.scanMaxParallel,
     embeddings: config.conversations?.embeddings,
@@ -710,6 +721,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
         openrouter: config.enabledProviders.has('openrouter'),
         nous: config.enabledProviders.has('nous'),
         dashscope: config.enabledProviders.has('dashscope'),
+        opencode: config.enabledProviders.has('opencode'),
+        'opencode-go': config.enabledProviders.has('opencode-go'),
+        meta: config.enabledProviders.has('meta'),
       },
       provider_harnesses: config.providerHarnesses,
       provider_default_harnesses: builtInProviderHarnesses(),
@@ -807,10 +821,18 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     doc.contents = parseDocument('{}\n').contents;
   }
   const config = pruneUndefined(yamlConfig);
-  doc.setIn(['swarm'], config.swarm ?? { mode: 'off', maxSlots: 3, autoAdvance: true });
+  if (config.swarm !== undefined) {
+    setBlockMergePreserving(doc, ['swarm'], config.swarm as Record<string, unknown>);
+  } else {
+    setBlockMergePreserving(doc, ['swarm'], { mode: 'off', maxSlots: 3, autoAdvance: true });
+  }
   doc.setIn(['workhorses'], config.workhorses ?? {});
   doc.setIn(['roles'], config.roles ?? {});
-  doc.setIn(['models', 'providers'], config.models?.providers ?? {});
+  if (isRecord(config.models?.providers)) {
+    setBlockMergePreserving(doc, ['models', 'providers'], config.models.providers as Record<string, unknown>);
+  } else {
+    doc.setIn(['models', 'providers'], config.models?.providers ?? {});
+  }
   doc.deleteIn(['models', 'overrides']);
 
   if (config.models?.gemini_thinking_level !== undefined) {
@@ -845,6 +867,8 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   for (const [key, value] of topLevelSections) {
     if (value === undefined) {
       doc.deleteIn([key]);
+    } else if (isRecord(value)) {
+      setBlockMergePreserving(doc, [key], value as Record<string, unknown>);
     } else {
       doc.setIn([key], value);
     }
@@ -865,7 +889,11 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   }
 
   if (config.remote !== undefined) {
-    doc.setIn(['remote'], config.remote);
+    if (isRecord(config.remote)) {
+      setBlockMergePreserving(doc, ['remote'], config.remote as Record<string, unknown>);
+    } else {
+      doc.setIn(['remote'], config.remote);
+    }
   } else {
     doc.deleteIn(['remote']);
   }
@@ -896,7 +924,7 @@ function providerConfigForSave(
  * theme changes) could still interleave their own read-modify-write, since
  * both read the pre-write config before either finished writing it. Callers
  * must do their OWN `loadConfigSync()`/`loadSettingsApi()` read *inside* the
- * queued callback (see `saveDesignLanguagePromise` below) — reading before
+ * queued callback (see `saveDesignLanguage` below) — reading before
  * enqueueing bakes in the same staleness a queue further down cannot undo.
  */
 let settingsWriteQueue: Promise<unknown> = Promise.resolve();
@@ -912,13 +940,14 @@ function runSettingsWriteSerialized<T>(fn: () => Promise<T>): Promise<T> {
   return turn;
 }
 
-async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
+/** Persist API settings through the serialized settings write queue. */
+export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void> {
   return runSettingsWriteSerialized(() => saveSettingsApiPromiseUnlocked(settings));
 }
 
 /**
  * `honorThemeFromSettings` gates whether `settings.ui?.theme` is allowed to
- * reach disk (PAN-3410 review finding, cycle 8). Only `saveDesignLanguagePromise`
+ * reach disk (PAN-3410 review finding, cycle 8). Only `saveDesignLanguage`
  * passes `true`, immediately after its own fresh `loadSettingsApi()` read
  * inside the write queue. Every other caller — chiefly the general
  * `PUT /api/settings` route, whose `settings` argument is a whole-document
@@ -950,6 +979,9 @@ async function saveSettingsApiPromiseUnlocked(
         openrouter: providerConfigForSave('openrouter', settings.models.providers.openrouter, settings, currentConfig),
         nous: providerConfigForSave('nous', settings.models.providers.nous, settings, currentConfig),
         dashscope: providerConfigForSave('dashscope', settings.models.providers.dashscope, settings, currentConfig),
+        opencode: providerConfigForSave('opencode', settings.models.providers.opencode ?? false, settings, currentConfig),
+        'opencode-go': providerConfigForSave('opencode-go', settings.models.providers['opencode-go'] ?? false, settings, currentConfig),
+        meta: providerConfigForSave('meta', settings.models.providers.meta ?? false, settings, currentConfig),
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -987,7 +1019,7 @@ async function saveSettingsApiPromiseUnlocked(
     // blank a non-default theme the operator set outside this save. Beyond
     // omission, `honorThemeFromSettings` (see the doc comment above) governs
     // whether an EXPLICITLY-present `settings.ui.theme` is trusted at all —
-    // only saveDesignLanguagePromise's fresh-inside-the-queue read may set it.
+    // only saveDesignLanguage's fresh-inside-the-queue read may set it.
     ui: ((honorThemeFromSettings && settings.ui?.theme !== undefined)
       || currentConfig.ui.theme !== DEFAULT_CONFIG.ui.theme
       || currentConfig.ui.openInEditorCommand !== null)
@@ -1051,7 +1083,8 @@ async function saveSettingsApiPromiseUnlocked(
   await synchronizeAnalyticsServices();
 }
 
-async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
+/** Merge `updates` into the current API settings and persist them. */
+async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
   const current = loadSettingsApi();
 
   // Merge updates
@@ -1157,27 +1190,20 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
   };
 
   // Save and return
-  await Effect.runPromise(saveSettingsApi(merged));
+  await saveSettingsApi(merged);
   return merged;
 }
 
-export function getRoleConfig(role: Role): RoleConfig | undefined {
-  return loadSettingsApi().roles?.[role];
-}
-
-async function setRoleConfigPromise(role: Role, roleConfig: RoleConfig): Promise<ApiSettingsConfig> {
-  return Effect.runPromise(updateSettingsApi({ roles: { [role]: roleConfig } }));
-}
-
-async function updateProviderApiKeyPromise(
+/** Set (or clear) one provider's API key in the API settings. */
+export async function updateProviderApiKey(
   provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
-  return Effect.runPromise(updateSettingsApi({
+  return updateSettingsApi({
     api_keys: {
       [provider]: apiKey,
     },
-  }));
+  });
 }
 
 /**
@@ -1218,8 +1244,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or empty string`);
         }
       }
     }
@@ -1377,113 +1403,6 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
 }
 
 /**
- * Get available models by provider (for model selection UI)
- */
-/**
- * Annotate Kimi entries with the harness their id space belongs to and the
- * effort levels that route actually offers (ground truth:
- * MODEL_CAPABILITIES.effortLevels — the native `kimi` binary's /effort offers
- * low/high/max for kimi-code/* ids; claude-code's /effort offers all five for
- * the bare Anthropic-route ids). `kimi-code/*` ids only launch via the native
- * CLI (kimi-code harness or ACP transport), so the picker-facing `name`
- * carries the "— Kimi Code CLI" marker wherever the row is shown without
- * harness context; bare ids are the claude-code route. Keeps flat config
- * panels honest (two "Kimi K3 (1M)" rows with different validity would be a
- * trap) while conversation pickers compose their own per-row labels from
- * baseName.
- */
-function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effortLevels: readonly string[] | undefined): AvailableModel {
-  if (modelId.startsWith('kimi-code/')) {
-    return {
-      ...entry,
-      name: `${entry.name} — Kimi Code CLI`,
-      baseName: entry.name,
-      harness: 'kimi-code',
-      effortLevels,
-    };
-  }
-  return {
-    ...entry,
-    baseName: entry.name,
-    harness: 'claude-code',
-    effortLevels,
-  };
-}
-
-export function getAvailableModelsApi(): AvailableModelsApi {
-  const result: AvailableModelsApi = {
-    anthropic: [],
-    openai: [],
-    google: [],
-    minimax: [],
-    zai: [],
-    kimi: [],
-    mimo: [],
-    openrouter: [],
-    nous: [],
-    dashscope: [],
-  };
-
-  for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    // Retain historical capabilities, but expose only active selections.
-    if (capability.displayName.includes('(deprecated)')) continue;
-    if (modelId in MODEL_DEPRECATIONS) continue;
-    const contextWindow = capability.contextWindow;
-    const name = capability.displayName.replace(/\s*\(?[\d.]+[KM]\)?$/, '');
-    const contextLabel = contextWindow === 1_048_576 ? '1M' : contextWindow === 262_144 ? '256K' : contextWindow >= 1_000_000 ? `${Number((contextWindow / 1_000_000).toFixed(3))}M` : `${Number((contextWindow / 1000).toFixed(3))}K`;
-    const entry = { id: modelId as ModelId, name: `${name} (${contextLabel} context)`, contextWindow, effortLevels: capability.effortLevels, costPer1MTokens: capability.costPer1MTokens };
-    const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
-    switch (capability.provider) {
-      case 'anthropic':
-        result.anthropic.push(annotated);
-        break;
-      case 'openai':
-        result.openai.push(annotated);
-        break;
-      case 'google':
-        result.google.push(annotated);
-        break;
-      case 'kimi':
-        result.kimi.push(annotated);
-        break;
-      case 'minimax':
-        result.minimax.push(annotated);
-        break;
-      case 'zai':
-        result.zai.push(annotated);
-        break;
-      case 'mimo':
-        result.mimo.push(annotated);
-        break;
-      case 'openrouter':
-        result.openrouter.push(annotated);
-        break;
-      case 'nous':
-        result.nous.push(annotated);
-        break;
-      case 'dashscope':
-        result.dashscope.push(annotated);
-        break;
-    }
-  }
-
-  // Order OpenAI models with latest family first: gpt-6-astra → 5.6-sol (current default) → 5.6-terra → 5.6-luna → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
-  const openaiOrder: Record<string, number> = {
-    'gpt-6-astra': 0,
-    'gpt-5.6-sol': 1, 'gpt-5.6-terra': 2, 'gpt-5.6-luna': 3,
-    'gpt-5.5': 10, 'gpt-5.5-pro': 11,
-    'gpt-5.4': 20, 'gpt-5.4-pro': 21, 'gpt-5.4-mini': 22,
-    'gpt-5.3-codex': 30,
-    'gpt-5.2': 40,
-    'o3': 50, 'o4-mini': 51,
-    'gpt-4o': 60, 'gpt-4o-mini': 61,
-  };
-  result.openai.sort((a, b) => (openaiOrder[a.id] ?? 99) - (openaiOrder[b.id] ?? 99));
-
-  return result;
-}
-
-/**
  * Get optimal default settings (for "Restore optimal defaults" feature)
  */
 export function getOptimalDefaultsApi(): ApiSettingsConfig {
@@ -1502,6 +1421,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         openrouter: false,
         nous: false,
         dashscope: false,
+        meta: false,
       },
       gemini_thinking_level: 3,
     },
@@ -1533,6 +1453,7 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         openrouter: false,
         nous: false,
         dashscope: false,
+        meta: false,
       },
       gemini_thinking_level: 3,
     },
@@ -1541,12 +1462,13 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
   };
 }
 
-async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void> {
+/** Persist the OpenRouter favourite model ids in the API settings. */
+export async function saveOpenRouterFavorites(favorites: string[]): Promise<void> {
   const current = loadSettingsApi();
-  await Effect.runPromise(saveSettingsApi({
+  await saveSettingsApi({
     ...current,
     openrouter: { ...current.openrouter, favorites },
-  }));
+  });
 }
 
 /**
@@ -1567,7 +1489,7 @@ async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void
  * defaults to `false` and can never write a client-materialized theme snapshot,
  * however fresh it looked when constructed (cycle 8).
  */
-async function saveDesignLanguagePromise(theme: DesignLanguage): Promise<void> {
+export async function saveDesignLanguage(theme: DesignLanguage): Promise<void> {
   await runSettingsWriteSerialized(async () => {
     const current = loadSettingsApi();
     await saveSettingsApiPromiseUnlocked({
@@ -1584,102 +1506,3 @@ export function getOpenRouterFavorites(): string[] {
   const settings = loadSettingsApi();
   return settings.openrouter?.favorites ?? [];
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel variants for the genuinely-async settings-api
-// surfaces. Sync helpers (`loadSettingsApi`, `getRoleConfig`, validation,
-// defaults) remain unwrapped — they're pure reads of an in-memory parsed
-// config. Only the disk-writing helpers receive Effect variants.
-
-/** Tagged error for settings-api Effect variants. */
-export class SettingsApiError extends Data.TaggedError('SettingsApiError')<{
-  readonly operation: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `saveSettingsApi`. */
-export const saveSettingsApi = (
-  settings: ApiSettingsConfig,
-): Effect.Effect<void, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => saveSettingsApiPromise(settings),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'saveSettingsApi',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `updateSettingsApi`. */
-export const updateSettingsApi = (
-  updates: Partial<ApiSettingsConfig>,
-): Effect.Effect<ApiSettingsConfig, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => updateSettingsApiPromise(updates),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'updateSettingsApi',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `setRoleConfig`. */
-export const setRoleConfig = (
-  role: Role,
-  roleConfig: RoleConfig,
-): Effect.Effect<ApiSettingsConfig, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => setRoleConfigPromise(role, roleConfig),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'setRoleConfig',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `updateProviderApiKey`. */
-export const updateProviderApiKey = (
-  ...args: Parameters<typeof updateProviderApiKeyPromise>
-): Effect.Effect<Awaited<ReturnType<typeof updateProviderApiKeyPromise>>, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => updateProviderApiKeyPromise(...args),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'updateProviderApiKey',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `saveOpenRouterFavorites`. */
-export const saveOpenRouterFavorites = (
-  favorites: string[],
-): Effect.Effect<void, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => saveOpenRouterFavoritesPromise(favorites),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'saveOpenRouterFavorites',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `saveDesignLanguage` — single-field `ui.theme` write. */
-export const saveDesignLanguage = (
-  theme: DesignLanguage,
-): Effect.Effect<void, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => saveDesignLanguagePromise(theme),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'saveDesignLanguage',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

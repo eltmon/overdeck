@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import {
-  createServer,
+  createServer as createHttpServer,
   type IncomingMessage,
   type Server,
   type ServerResponse,
 } from "node:http";
+import { createServer as createNetServer } from "node:net";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { Writable } from "node:stream";
@@ -30,14 +31,18 @@ import {
   selectAutoPermissionOutcome,
 } from "./permissions.js";
 import { resolveAcpModelId, resolveAcpProviderSupport } from "./providers.js";
+import { appendSessionIdToHistory } from "../session-history.js";
 import {
   AcpSessionRuntime,
   type AcpSessionRuntimeEvent,
   type AcpSessionRuntimeStartResult,
 } from "./session-runtime.js";
 import { AcpTranscriptWriter, readOwedAcpPrompts } from "./transcript.js";
+import { ACP_TRANSCRIPT_FILE } from "../runtimes/storage/acp.js";
 
 const FILE_MODE = 0o600;
+const OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS = 60_000;
+export const OPENCODE_PERMISSION_WATCHDOG_STALE_MS = 180_000;
 type JsonRecord = Record<string, unknown>;
 
 export type AcpHostRuntime = Pick<
@@ -50,6 +55,7 @@ export type AcpHostRuntime = Pick<
   | "prompt"
   | "cancel"
   | "setModel"
+  | "getConfigOptions"
   | "setConfigOption"
 >;
 
@@ -65,6 +71,8 @@ export interface AcpHostOptions {
   readonly runtime: AcpHostRuntime;
   readonly stdout?: Writable;
   readonly disposeRuntime?: () => Promise<void>;
+  readonly openCodePort?: number;
+  readonly fetch?: typeof fetch;
 }
 
 interface HostOpResult {
@@ -83,6 +91,9 @@ export class AcpHost {
   private state: "starting" | "ready" | "closed" = "starting";
   private observedSessionUpdates = 0;
   private contextPending: string | undefined;
+  private lastRuntimeEventAt = 0;
+  private permissionWatchdogRunning = false;
+  private permissionWatchdog: ReturnType<typeof setInterval> | undefined;
 
   constructor(private readonly options: AcpHostOptions) {
     this.overdeckHome =
@@ -97,10 +108,15 @@ export class AcpHost {
     await rm(this.sessionIdPath(), { force: true });
     await rm(this.errorPath(), { force: true });
     await rm(this.socketPath(), { force: true });
+    await rm(this.openCodePortPath(), { force: true });
 
     this.token = randomUUID();
     await writeFile(this.tokenPath(), `${this.token}\n`, { mode: FILE_MODE });
     await chmod(this.tokenPath(), FILE_MODE);
+    if (this.options.openCodePort !== undefined) {
+      await writeFile(this.openCodePortPath(), `${this.options.openCodePort}\n`, { mode: FILE_MODE });
+      await chmod(this.openCodePortPath(), FILE_MODE);
+    }
 
     try {
       await Effect.runPromise(
@@ -133,6 +149,15 @@ export class AcpHost {
           ),
         );
       }
+      if (this.options.provider === "opencode" || this.options.provider === "opencode-go") {
+        const configOptions = await Effect.runPromise(this.options.runtime.getConfigOptions);
+        const effortOption = configOptions.find((option) => option.id === "effort");
+        if (effortOption) {
+          await Effect.runPromise(this.options.runtime.setConfigOption("effort", this.options.effort ?? "high"));
+        } else if (this.options.effort && this.options.effort !== "high") {
+          throw new Error(`The selected OpenCode model does not expose an effort setting (${this.options.effort} requested).`);
+        }
+      }
       if (this.options.provider === "kimi" && this.options.model) {
         const effort = resolveKimiNativeEffort(this.options.model, this.options.effort);
         if (effort) {
@@ -148,6 +173,11 @@ export class AcpHost {
       this.state = "ready";
       await writeFile(this.sessionIdPath(), `${started.sessionId}\n`, { mode: FILE_MODE });
       await chmod(this.sessionIdPath(), FILE_MODE);
+      appendSessionIdToHistory(this.options.agentId, started.sessionId, "acp-host", {
+        harness: "acp",
+        model: this.options.model,
+        path: this.transcriptPath(),
+      });
     } catch (error) {
       const launchError = this.options.provider === "kimi" && isAuthenticationFailure(error)
         ? "Kimi authentication is required. Run `kimi`, then /login, and retry."
@@ -164,6 +194,10 @@ export class AcpHost {
   async stop(): Promise<void> {
     if (this.state === "closed") return;
     this.state = "closed";
+    if (this.permissionWatchdog) {
+      clearInterval(this.permissionWatchdog);
+      this.permissionWatchdog = undefined;
+    }
     await Effect.runPromise(this.options.runtime.cancel).catch(() => undefined);
     if (this.eventFiber) {
       await Effect.runPromise(Fiber.interrupt(this.eventFiber));
@@ -241,6 +275,8 @@ export class AcpHost {
         const promptContent = context
           ? `<overdeck-context>\n${context}\n</overdeck-context>\n\n${content}`
           : content;
+        this.lastRuntimeEventAt = Date.now();
+        this.permissionWatchdog = this.startPermissionWatchdog();
         const promptResult = await Effect.runPromise(
           this.options.runtime.prompt({ prompt: [{ type: "text", text: promptContent }] }),
         );
@@ -267,6 +303,11 @@ export class AcpHost {
           event: "prompt_failed",
         });
         throw error;
+      } finally {
+        if (this.permissionWatchdog) {
+          clearInterval(this.permissionWatchdog);
+          this.permissionWatchdog = undefined;
+        }
       }
     });
     this.promptQueue = promptOperation.then(
@@ -284,11 +325,16 @@ export class AcpHost {
     if (this.state !== "ready") {
       return { status: 409, body: { error: "ACP session is not ready" } };
     }
-    if (this.options.provider !== "kimi" || !this.options.model) {
-      return { status: 400, body: { error: "This ACP model does not support adjustable effort" } };
-    }
     if (typeof op.effort !== "string" || !op.effort.trim()) {
       return { status: 400, body: { error: "effort is required" } };
+    }
+    if (this.options.provider === "opencode" || this.options.provider === "opencode-go") {
+      const effort = op.effort.trim();
+      await Effect.runPromise(this.options.runtime.setConfigOption("effort", effort));
+      return { status: 200, body: { ok: true, effort } };
+    }
+    if (this.options.provider !== "kimi" || !this.options.model) {
+      return { status: 400, body: { error: "This ACP model does not support adjustable effort" } };
     }
     let effort: ReturnType<typeof resolveKimiNativeEffort>;
     try {
@@ -372,6 +418,7 @@ export class AcpHost {
   }
 
   private async handleRuntimeEvent(event: AcpSessionRuntimeEvent): Promise<void> {
+    this.lastRuntimeEventAt = Date.now();
     if (event._tag === "EventStreamBarrier") {
       await Effect.runPromise(Deferred.succeed(event.acknowledge, undefined));
       return;
@@ -409,12 +456,69 @@ export class AcpHost {
     }
   }
 
+  private startPermissionWatchdog(): ReturnType<typeof setInterval> | undefined {
+    if (
+      (this.options.provider !== "opencode" && this.options.provider !== "opencode-go")
+      || this.options.openCodePort === undefined
+    ) {
+      return undefined;
+    }
+    return setInterval(() => {
+      if (Date.now() - this.lastRuntimeEventAt < OPENCODE_PERMISSION_WATCHDOG_STALE_MS) return;
+      void this.resolvePendingOpenCodePermissions().catch((error) => {
+        this.writePaneLine(`[warning] OpenCode permission watchdog failed: ${errorMessage(error)}`);
+      });
+    }, OPENCODE_PERMISSION_WATCHDOG_INTERVAL_MS);
+  }
+
+  private async resolvePendingOpenCodePermissions(): Promise<void> {
+    if (this.permissionWatchdogRunning || this.options.openCodePort === undefined) return;
+    this.permissionWatchdogRunning = true;
+    const fetchImpl = this.options.fetch ?? globalThis.fetch;
+    const baseUrl = `http://127.0.0.1:${this.options.openCodePort}`;
+    try {
+      const response = await fetchImpl(`${baseUrl}/permission`);
+      if (!response.ok) throw new Error(`GET /permission returned HTTP ${response.status}`);
+      const payload: unknown = await response.json();
+      if (!Array.isArray(payload)) throw new Error("GET /permission returned a non-array response");
+      for (const rawEntry of payload) {
+        const entry = asRecord(rawEntry);
+        if (typeof entry.id !== "string") continue;
+        const reply = await fetchImpl(
+          `${baseUrl}/permission/${encodeURIComponent(entry.id)}/reply`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ reply: "always" }),
+          },
+        );
+        if (reply.status === 404) continue;
+        if (!reply.ok) {
+          throw new Error(`POST /permission/${entry.id}/reply returned HTTP ${reply.status}`);
+        }
+        await this.transcript.append({
+          role: "system",
+          content: JSON.stringify({
+            type: "permission_outcome",
+            outcome: "selected",
+            chosenOptionId: "always",
+            watchdog: true,
+          }),
+          sessionId: typeof entry.sessionID === "string" ? entry.sessionID : this.sessionId,
+          source: "watchdog",
+        });
+      }
+    } finally {
+      this.permissionWatchdogRunning = false;
+    }
+  }
+
   private writePaneLine(line: string): void {
     this.options.stdout?.write(`${stripAcpPaneControl(line)}\n`);
   }
 
   private async listen(): Promise<void> {
-    this.server = createServer((request, response) => {
+    this.server = createHttpServer((request, response) => {
       void this.handleRequest(request, response).catch((error) => {
         if (!response.headersSent) sendJson(response, 500, { error: errorMessage(error) });
         else response.end();
@@ -488,8 +592,12 @@ export class AcpHost {
     return join(this.agentDir(), "acp-launch-error");
   }
 
+  private openCodePortPath(): string {
+    return join(this.agentDir(), "opencode-port");
+  }
+
   private transcriptPath(): string {
-    return join(this.agentDir(), "acp-session.jsonl");
+    return join(this.agentDir(), ACP_TRANSCRIPT_FILE);
   }
 }
 
@@ -590,9 +698,32 @@ export function parseAcpHostArgs(argv: ReadonlyArray<string>): AcpHostArgs {
   };
 }
 
+export async function reserveOpenCodePort(): Promise<number> {
+  const server = createNetServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error("Could not reserve a TCP port for OpenCode");
+  }
+  const port = address.port;
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+  });
+  return port;
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseAcpHostArgs(argv);
   const support = resolveAcpProviderSupport(args.provider);
+  const isOpenCode = args.provider === "opencode" || args.provider === "opencode-go";
+  const openCodePort = isOpenCode ? await reserveOpenCodePort() : undefined;
   const scope = await Effect.runPromise(Scope.make());
   let scopeClosed = false;
   const closeScope = async () => {
@@ -609,11 +740,13 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           cwd: args.workspace,
           resumeSessionId: args.resumeSessionId,
           kimiSettings: { binaryPath: args.binaryPath },
+          binaryPath: args.binaryPath,
           clientInfo: {
             name: "overdeck",
             version: process.env.npm_package_version ?? "development",
           },
           environment: process.env,
+          ...(openCodePort === undefined ? {} : { port: openCodePort }),
         });
       }).pipe(
         Effect.provideService(Scope.Scope, scope),
@@ -634,6 +767,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       runtime,
       stdout: process.stdout,
       disposeRuntime: closeScope,
+      openCodePort,
     });
     await host.start();
     const stop = () => {
@@ -646,18 +780,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     process.once("SIGINT", stop);
   } catch (error) {
     await closeScope();
-    throw error;
-  }
-}
-
-export async function readPersistedAcpSessionId(
-  overdeckHome: string,
-  agentId: string,
-): Promise<string | undefined> {
-  try {
-    return (await readFile(join(overdeckHome, "agents", agentId, "acp-session-id"), "utf-8")).trim() || undefined;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;
   }
 }

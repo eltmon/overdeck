@@ -44,7 +44,7 @@ function roleConfig(): Pick<NormalizedConfig, 'workhorses' | 'roles'> {
 
 describe('role model configuration', () => {
   it('exports default model refs for every role', () => {
-    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'knowledge', 'plan', 'review', 'sequencer', 'ship', 'strike', 'test', 'work']);
+    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'knowledge', 'plan', 'review', 'sequencer', 'ship', 'strike', 'test', 'work', 'worker']);
   });
 
   it('dereferences workhorse refs and passes literal model ids through', () => {
@@ -409,9 +409,9 @@ describe('tts daemon configuration', () => {
         daemonPort: 8788,
         daemonHost: 'localhost',
         daemon: { autoStart: true },
-        voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+        voiceMap: { 'mergeOutcome.merged': 'voice-merge' },
         mutedSources: ['merge-agent'],
-        utteranceTemplates: { readyForMerge: '{issueId} can merge' },
+        utteranceTemplates: { mergeReady: '{issueId} can merge' },
         mutedIssues: ['PAN-123'],
       },
     });
@@ -428,9 +428,9 @@ describe('tts daemon configuration', () => {
       daemonPort: 8788,
       daemonHost: 'localhost',
       daemonAutoStart: true,
-      voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+      voiceMap: { 'mergeOutcome.merged': 'voice-merge' },
       mutedSources: ['merge-agent'],
-      utteranceTemplates: { readyForMerge: '{issueId} can merge' },
+      utteranceTemplates: { mergeReady: '{issueId} can merge' },
       mutedIssues: ['PAN-123'],
     });
   });

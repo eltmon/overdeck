@@ -18,13 +18,15 @@ import { TAB_PATHS } from '../../../src/dashboard/frontend/src/App/routes.js';
 
 // Route-table check: every tab that existed on origin/main before PAN-1990
 // keeps its exact path. PAN-1990 only adds `workspace`.
+// PAN-3917 W7 deleted `/flywheel`; PAN-3964 restored it as a derived view, so it
+// is back on the pre-PAN-1990 list with its original path.
 const PRE_PAN_1990_TAB_PATHS: Record<string, string> = {
   home: '/',
+  flywheel: '/flywheel',
   pipeline: '/pipeline',
   kanban: '/board',
   'command-deck': '/command-deck',
   agents: '/agents',
-  flywheel: '/flywheel',
   orders: '/orders',
   backlog: '/backlog',
   resources: '/resources',
@@ -51,9 +53,10 @@ describe('no-loss audit (PAN-1990 ac1, ac2)', () => {
   });
 
   it('PAN-1990 and PAN-3411 add workspace routes without removing any tab', () => {
-    expect(Object.keys(TAB_PATHS).length).toBe(Object.keys(PRE_PAN_1990_TAB_PATHS).length + 2);
+    expect(Object.keys(TAB_PATHS).length).toBe(Object.keys(PRE_PAN_1990_TAB_PATHS).length + 3);
     expect(TAB_PATHS.workspace).toBe('/workspace');
     expect(TAB_PATHS['workspace-new']).toBe('/workspaces/new');
+    expect(TAB_PATHS['project-new']).toBe('/projects/new'); // PAN-3836
   });
 
   it('Sidebar nav item affordance resolves (component + workspace-registry rail)', async () => {

@@ -96,7 +96,8 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       const state = {
         issuesRaw: [mockIssue],
         agentsById: {},
-        reviewStatusByIssueId: {},
+        derivedIssueStateByIssueId: {},
+        backendPanesById: {},
       };
       return selector(state as any);
     });
@@ -255,7 +256,8 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
         const state = {
           issuesRaw: [mockIssue],
           agentsById: { 'agent-test-1': mockAgent },
-          reviewStatusByIssueId: {},
+          derivedIssueStateByIssueId: {},
+        backendPanesById: {},
         };
         return selector(state as any);
       });
@@ -329,7 +331,8 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
         const state = {
           issuesRaw: [mockIssue],
           agentsById: {},
-          reviewStatusByIssueId: {},
+          derivedIssueStateByIssueId: {},
+        backendPanesById: {},
         };
         return selector(state as any);
       });
@@ -431,7 +434,8 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
         const state = {
           issuesRaw: [mockIssue],
           agentsById: { 'agent-test-1': mockAgent },
-          reviewStatusByIssueId: {},
+          derivedIssueStateByIssueId: {},
+        backendPanesById: {},
         };
         return selector(state as any);
       });

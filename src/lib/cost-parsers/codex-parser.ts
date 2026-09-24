@@ -20,7 +20,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import type { SessionUsage } from './jsonl-parser.js';
-import { getPricingSync } from '../cost.js';
+import { getPricing } from '../cost.js';
 import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 
 interface CodexTokenUsageFields {
@@ -50,7 +50,7 @@ function pickUsage(...candidates: (number | undefined)[]): number | undefined {
  * Parse a Codex rollout JSONL file into the shared SessionUsage shape.
  * Returns null if the file cannot be read or contains no valid token_count records.
  */
-export function parseCodexSessionSync(sessionFile: string): SessionUsage | null {
+export function parseCodexSession(sessionFile: string): SessionUsage | null {
   if (!existsSync(sessionFile)) return null;
   let raw: string;
   try {
@@ -59,6 +59,13 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
     return null;
   }
 
+  const parser = createCodexSessionParser(sessionFile);
+  for (const line of raw.split('\n')) parser.push(line);
+  return parser.result();
+}
+
+/** Stateful canonical usage reducer shared by full reads and the live transcript tail. */
+export function createCodexSessionParser(sessionFile: string) {
   let model = '';
   let threadId = '';
   let startTime = '';
@@ -70,15 +77,17 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
   let messageCount = 0;
   let hasUsage = false;
 
-  for (const line of raw.split('\n')) {
+  const push = (line: string): void => {
     const trimmed = line.trim();
-    if (!trimmed) continue;
+    if (!trimmed) return;
     let entry: Record<string, unknown>;
     try {
       entry = JSON.parse(trimmed) as Record<string, unknown>;
     } catch {
-      continue;
+      return;
     }
+
+    if (!entry || typeof entry !== 'object') return;
 
     // Normalize the two rollout schemas. cli >= 0.137.0 nests the record kind
     // under `payload.type` inside event_msg/turn_context/session_meta wrappers;
@@ -128,44 +137,47 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
         if (ts) endTime = ts;
       }
     }
-  }
+  };
+  const result = (): SessionUsage | null => {
 
-  if (!hasUsage && messageCount === 0) return null;
-  if (!model) model = 'unknown';
+    if (!hasUsage && messageCount === 0) return null;
+    if (!model) model = 'unknown';
 
-  const pricing = getPricingSync('openai', model);
-  // total_token_usage.input_tokens includes the cached portion, so charge only
-  // the non-cached remainder at the full input rate.
-  const nonCachedInput = Math.max(0, totalInput - totalCachedInput);
-  const inputCost = (nonCachedInput / 1000) * (pricing?.inputPer1k ?? 0);
-  const cachedCost = (totalCachedInput / 1000) * (pricing?.cacheReadPer1k ?? 0);
-  const outputCost = (totalOutput / 1000) * (pricing?.outputPer1k ?? 0);
-  const totalCost = inputCost + cachedCost + outputCost;
+    const pricing = getPricing('openai', model);
+    // total_token_usage.input_tokens includes the cached portion, so charge only
+    // the non-cached remainder at the full input rate.
+    const nonCachedInput = Math.max(0, totalInput - totalCachedInput);
+    const inputCost = (nonCachedInput / 1000) * (pricing?.inputPer1k ?? 0);
+    const cachedCost = (totalCachedInput / 1000) * (pricing?.cacheReadPer1k ?? 0);
+    const outputCost = (totalOutput / 1000) * (pricing?.outputPer1k ?? 0);
+    const totalCost = inputCost + cachedCost + outputCost;
 
-  return {
-    sessionId: threadId || sessionFile,
-    sessionFile,
-    startTime: startTime || new Date().toISOString(),
-    endTime: endTime || startTime || new Date().toISOString(),
-    model,
-    usage: {
-      inputTokens: totalInput,
-      outputTokens: totalOutput,
-      cacheReadTokens: totalCachedInput,
-    },
-    cost: totalCost,
-    cost_v2: totalCost,
-    cwd,
-    messageCount,
-    modelBreakdown: {
-      [model]: {
-        cost: totalCost,
+    return {
+      sessionId: threadId || sessionFile,
+      sessionFile,
+      startTime: startTime || new Date().toISOString(),
+      endTime: endTime || startTime || new Date().toISOString(),
+      model,
+      usage: {
         inputTokens: totalInput,
         outputTokens: totalOutput,
-        messageCount,
+        cacheReadTokens: totalCachedInput,
       },
-    },
+      cost: totalCost,
+      cost_v2: totalCost,
+      cwd,
+      messageCount,
+      modelBreakdown: {
+        [model]: {
+          cost: totalCost,
+          inputTokens: totalInput,
+          outputTokens: totalOutput,
+          messageCount,
+        },
+      },
+    };
   };
+  return { push, result };
 }
 
 /** Per-turn cost event for Codex rollouts. Mirrors OhmypiCostEventUsage. */
@@ -210,7 +222,7 @@ function normalizeUsageFields(usage: CodexTokenUsageFields | undefined): Normali
 }
 
 function computeCodexEventCost(input: number, cacheRead: number, output: number, model: string): number {
-  const pricing = getPricingSync('openai', model);
+  const pricing = getPricing('openai', model);
   const nonCachedInput = Math.max(0, input - cacheRead);
   const inputCost = (nonCachedInput / 1000) * (pricing?.inputPer1k ?? 0);
   const cachedCost = (cacheRead / 1000) * (pricing?.cacheReadPer1k ?? 0);
@@ -229,7 +241,7 @@ function computeCodexEventCost(input: number, cacheRead: number, output: number,
  * sum to the final total_token_usage, and falls back to last_token_usage only
  * for files where the values do sum (such as the committed test fixture).
  */
-export function parseCodexSessionCostEventsSync(sessionFile: string): CodexCostEventUsage[] {
+export function parseCodexSessionCostEvents(sessionFile: string): CodexCostEventUsage[] {
   if (!existsSync(sessionFile)) return [];
   let raw: string;
   try {

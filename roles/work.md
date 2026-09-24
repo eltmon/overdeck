@@ -52,16 +52,6 @@ Work is one undifferentiated mode. Do not switch models or behavior by internal 
 
 Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Development and verification target only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.overdeck.localhost`).
 
-## Message inbox (Claude Code sessions)
-
-Before claiming your first task, start your message inbox as a background task and leave it running for the whole session:
-
-```bash
-pan monitor
-```
-
-Run it in the background (`run_in_background`), never in the foreground — it blocks forever by design. Messages from the operator and the pipeline then arrive as `[overdeck:agent-message]` blocks in background output instead of being typed into your prompt. Long messages are truncated; run `pan inbox` to read the full body. Do not kill the monitor to "clean up" — it is your delivery channel.
-
 If a Linear MCP tool call fails with an authentication error: call `mcp__linear__authenticate` ONCE, state the returned authorization URL in one sentence, then stop and wait — Overdeck is notified automatically and will wake you when authentication is restored. Do not retry the tool in a loop and do not improvise other auth commands. When you receive a "Linear MCP authentication has been restored" message, re-check with one lightweight Linear read and resume your canonical task.
 
 ## Per-Task Workflow
@@ -70,7 +60,7 @@ For every item:
 
 1. `pan task next <ISSUE-ID>` — find the next unblocked item scoped to this issue.
 2. `pan task claim <ISSUE-ID> <item-id>` — claim it.
-3. Implement only that item.
+3. Implement only that item. Run only the tests it touched, with the project's test runner scoped to those files (`npx vitest run <files>` in a vitest project). Never run the full suite yourself — the verification gate runs it after `pan done`.
 4. `git add` specific files and `git commit` — one item = one commit.
 5. Immediately push that commit with `git push -u origin "$(git branch --show-current)"`. Every completed item must exist on origin before its status is closed; generic project Git profiles do not override this managed-work invariant.
 6. `pan task done <ISSUE-ID> <item-id> --reason="…"`. (The canonical writer records item status automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
@@ -117,10 +107,12 @@ Summaries lead with anomalies and deviations — never bury them after the wins.
 When all tasks are closed and the tree is clean:
 
 ```bash
-npm test
+<test runner> <test files you changed or whose subjects you changed>
 git push -u origin "$(git branch --show-current)"
 pan done <ISSUE-ID> -c "<terse summary>"
 ```
+
+`pan done` runs the verification gate. Where the project's tests run on CI (`verification.tests: ci`), it runs typecheck and lint locally and the full suite runs once, on CI, against the PR head; otherwise it runs the full suite locally. Either way a test failure returns to you as verification feedback (`Failed check: test`).
 
 The final push is a verification pass; every item commit was already pushed before its
 item was closed. Work agents push only their feature branch. Never push to `origin/main` or merge into

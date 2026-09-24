@@ -13,8 +13,12 @@ vi.mock('../../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   listSessions: () => Effect.succeed(mockListSessions()),
-  listPaneValues: () => Effect.succeed([]),
+  listPaneValues: async () => [],
 }));
 
 vi.mock('../../../../src/lib/runtime-census.js', () => ({

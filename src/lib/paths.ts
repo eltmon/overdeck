@@ -36,7 +36,6 @@ export const COSTS_DIR = join(OVERDECK_HOME, 'costs');
 export const HEARTBEATS_DIR = join(OVERDECK_HOME, 'heartbeats');
 export const ARCHIVES_DIR = join(OVERDECK_HOME, 'archives');
 export const LOGS_DIR = join(OVERDECK_HOME, 'logs');
-export const HANDOFFS_DIR = join(OVERDECK_HOME, 'handoffs');
 
 export function getHandoffsDir(): string {
   return join(getOverdeckHome(), 'handoffs');
@@ -58,14 +57,6 @@ export const SETTINGS_FILE = join(CONFIG_DIR, 'settings.json');
 // Codex, Pi, and Oh My Pi discover the Agent Skills standard directory.
 export const CLAUDE_DIR = join(homedir(), '.claude');
 export const AGENT_SKILLS_DIR = join(homedir(), '.agents', 'skills');
-
-// Legacy runtime directories (kept for symlink cleanup migration)
-export const LEGACY_RUNTIME_DIRS = {
-  codex: join(homedir(), '.codex'),
-  cursor: join(homedir(), '.cursor'),
-  gemini: join(homedir(), '.gemini'),
-  opencode: join(homedir(), '.opencode'),
-} as const;
 
 // Sync target (Claude Code only)
 export const SYNC_TARGET = {
@@ -120,14 +111,6 @@ export function ohmypiExtensionCandidates(): string[] {
   ];
 }
 
-/** Candidate locations for the legacy pi extension bundle (same scheme). */
-export function piExtensionCandidates(): string[] {
-  return [
-    join(packageRoot, 'dist', 'extensions', 'pi.js'),
-    join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js'),
-  ];
-}
-
 /**
  * Resolve the ohmypi (omp) extension bundle to the first existing candidate,
  * or `null` when no build is present. Callers that require the bundle (agent
@@ -135,14 +118,6 @@ export function piExtensionCandidates(): string[] {
  */
 export function resolveOhmypiExtensionPath(): string | null {
   for (const candidate of ohmypiExtensionCandidates()) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
-}
-
-/** Resolve the legacy pi extension bundle to the first existing candidate. */
-export function resolvePiExtensionPath(): string | null {
-  for (const candidate of piExtensionCandidates()) {
     if (existsSync(candidate)) return candidate;
   }
   return null;
@@ -251,7 +226,6 @@ export const SYNC_SOURCES = {
 } as const;
 
 // Cache directories (where Overdeck keeps its copy of distributed content)
-export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.overdeck/skills/
 export const CACHE_AGENTS_DIR = join(OVERDECK_HOME, 'agent-definitions');  // separate from agent state
 export const CACHE_RULES_DIR = join(OVERDECK_HOME, 'rules');
 export const CACHE_MANIFEST = join(OVERDECK_HOME, '.manifest.json');
@@ -261,10 +235,6 @@ export const DOCS_DIR = join(OVERDECK_HOME, 'docs');
 export const PRDS_DIR = join(DOCS_DIR, 'prds');
 export const PRD_DRAFTS_DIR = join(PRDS_DIR, 'drafts');
 export const PRD_PUBLISHED_DIR = join(PRDS_DIR, 'published');
-export const DOCS_INDEX_FILE = join(DOCS_DIR, 'index.sqlite');
-export const DOCS_BUDGET_STATE_FILE = join(DOCS_DIR, 'budget-state.json');
-export const DOCS_DISABLE_STATE_FILE = join(DOCS_DIR, 'disable-state.json');
-export const DOCS_TELEMETRY_FILE = join(DOCS_DIR, 'telemetry.jsonl');
 
 export interface DocsPathOverrides {
   overdeckHome?: string;
@@ -292,10 +262,6 @@ export function getDocsPaths(overrides: DocsPathOverrides = {}): DocsPaths {
     disableStatePath: overrides.disableStatePath ?? join(docsDir, 'disable-state.json'),
     telemetryPath: overrides.telemetryPath ?? join(docsDir, 'telemetry.jsonl'),
   };
-}
-
-export function getDocsDir(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir'> = {}): string {
-  return getDocsPaths(overrides).docsDir;
 }
 
 export function getDocsIndexPath(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir' | 'indexPath'> = {}): string {
@@ -334,50 +300,6 @@ export const PROJECT_PRDS_COMPLETED_SUBDIR = 'completed';
  */
 export function isDevMode(): boolean {
   return existsSync(join(packageRoot, 'src'));
-}
-
-/**
- * Encode a filesystem path to match Claude Code's project directory naming.
- *
- * Claude Code replaces ALL non-alphanumeric characters (except hyphens) with
- * hyphens when encoding the CWD into the project directory name under
- * ~/.claude/projects/. For example:
- *
- *   /Users/edward.becker/Projects → -Users-edward-becker-Projects
- *   /home/eltmon/Projects         → -home-eltmon-Projects
- *   /tmp/test_under.dot+plus@at   → -tmp-test-under-dot-plus-at
- *
- * This is critical for session file lookup — a mismatch means JSONL files
- * are never found and conversation messages appear permanently empty.
- */
-export function encodeClaudeProjectDir(cwdPath: string): string {
-  return cwdPath.replace(/[^a-zA-Z0-9-]/g, '-');
-}
-
-/**
- * Compute the deterministic JSONL session file path from cwd + session UUID.
- *
- * Claude Code stores session files at:
- *   ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
- */
-export function sessionFilePath(cwd: string, sessionId: string): string {
-  const encodedCwd = encodeClaudeProjectDir(cwd);
-  return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
-}
-
-/**
- * Single existence check every Claude resume probe must use. Mirrors the
- * JSONL resolver's `jsonl-missing` detection so stale session IDs are never
- * treated as resumable (PAN-3194).
- */
-export function claudeSessionTranscriptExists(cwd: string, sessionId: string): boolean {
-  return existsSync(sessionFilePath(cwd, sessionId));
-}
-
-/** Extract the session UUID from a full JSONL file path. */
-export function sessionIdFromFile(sessionFile: string | null | undefined): string | undefined {
-  if (!sessionFile) return undefined;
-  return sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined;
 }
 
 // All directories to create on init

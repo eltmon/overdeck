@@ -63,7 +63,7 @@ beforeEach(() => {
     agentsById: {},
     agentRuntimeById: {},
     issuesRaw: [],
-    reviewStatusByIssueId: {},
+    derivedIssueStateByIssueId: {},
     recentActivity: [],
   });
 });
@@ -105,9 +105,9 @@ describe('useConfluenceOrbs', () => {
         { id: 'PAN-3', identifier: 'PAN-3', title: 'Wreck', labels: [] },
         { id: 'PAN-4', identifier: 'PAN-4', title: 'Testing', labels: [] },
       ],
-      reviewStatusByIssueId: {
-        'PAN-3': { issueId: 'PAN-3', mergeStatus: 'failed' },
-        'PAN-4': { issueId: 'PAN-4', testStatus: 'testing' },
+      derivedIssueStateByIssueId: {
+        'PAN-3': { issueId: 'PAN-3', state: 'working', attention: 'stuck' },
+        'PAN-4': { issueId: 'PAN-4', state: 'in-review' },
       },
     });
 
@@ -144,7 +144,7 @@ describe('useConfluenceOrbs', () => {
     expect(result.current.find((orb) => orb.id === 'PAN-4')).toBe(original);
   });
 
-  it('maps queued work into MERGE and exposes the primary agent harness', () => {
+  it('maps a merge-ready issue into MERGE and exposes the primary agent harness', () => {
     useDashboardStore.setState({
       agentsById: {
         'agent-pan-5': agent({
@@ -154,9 +154,9 @@ describe('useConfluenceOrbs', () => {
           runtime: 'claude-code',
         }),
       },
-      issuesRaw: [{ id: 'PAN-5', identifier: 'PAN-5', title: 'Queued', labels: [] }],
-      reviewStatusByIssueId: {
-        'PAN-5': { issueId: 'PAN-5', mergeStatus: 'queued' },
+      issuesRaw: [{ id: 'PAN-5', identifier: 'PAN-5', title: 'Ready', labels: [] }],
+      derivedIssueStateByIssueId: {
+        'PAN-5': { issueId: 'PAN-5', state: 'ready' },
       },
     });
 
@@ -167,8 +167,66 @@ describe('useConfluenceOrbs', () => {
     expect(result.current[0]).toMatchObject({
       stage: 'MERGE',
       role: 'ship',
-      mergeStatus: 'queued',
+      issueState: 'ready',
       harness: 'claude-code',
+    });
+  });
+
+  it('lets a live agent outvote its own stopped-and-paused specialists', () => {
+    // PAN-3841's real shape: eight review specialists stopped and paused by an
+    // operator, one work agent still running. Nothing clears `paused` on a dead
+    // row, so the issue rendered "yielded" on the shelf while that agent worked.
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-6': agent({ id: 'agent-pan-6', issueId: 'PAN-6', role: 'work' }),
+        'agent-pan-6-review-security': agent({
+          id: 'agent-pan-6-review-security',
+          issueId: 'PAN-6',
+          role: 'review',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'Operator requested stop of these agents for independent code review',
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-6', identifier: 'PAN-6', title: 'Working', labels: [] }],
+      derivedIssueStateByIssueId: {},
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-6']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-6')).toMatchObject({
+      state: 'active',
+      yieldReason: null,
+      yieldedByScheduler: false,
+    });
+  });
+
+  it('keeps a wholly stopped, paused issue on the shelf', () => {
+    // The other half of the same rule: with no live agent, the stopped rows are
+    // the only evidence there is, and an operator-parked issue belongs shelved.
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-7': agent({
+          id: 'agent-pan-7',
+          issueId: 'PAN-7',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'Operator paused the slot',
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-7', identifier: 'PAN-7', title: 'Parked', labels: [] }],
+      derivedIssueStateByIssueId: {},
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-7']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-7')).toMatchObject({
+      state: 'shelf',
+      yieldReason: 'Operator paused the slot',
     });
   });
 

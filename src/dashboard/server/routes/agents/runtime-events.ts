@@ -185,16 +185,16 @@ export const postAgentPlanChecklistRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const { getAgentState } = yield* Effect.promise(() => import('../../../../lib/agents.js'));
-    const state = yield* getAgentState(id);
+    const state = getAgentState(id);
     if (!state?.workspace || !state.issueId) {
       return jsonResponse({ success: false, error: 'agent has no resolvable workspace or issue id' }, { status: 422 });
     }
 
-    const { checkIncompletePlanItemsPromise } = yield* Effect.promise(
+    const { checkIncompletePlanItems } = yield* Effect.promise(
       () => import('../../../../lib/work/done-preflight.js'),
     );
     const incomplete = yield* Effect.promise(
-      () => checkIncompletePlanItemsPromise(state.workspace, state.issueId),
+      () => checkIncompletePlanItems(state.workspace, state.issueId),
     );
     return jsonResponse({ success: true, complete: incomplete.length === 0, incomplete });
   })),

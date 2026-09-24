@@ -87,7 +87,7 @@ function stack(id: string, options: { status: 'running' | 'stopped'; memoryBytes
       memoryBytes: options.memoryBytes ?? 512 * 1024 ** 2,
       diskBytes: 0,
     },
-    phase: 'work',
+    state: 'working',
   };
 }
 

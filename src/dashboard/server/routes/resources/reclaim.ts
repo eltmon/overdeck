@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
-import { getReviewStatusSync } from '../../../../lib/review-status.js';
+import { getDerivedIssueState } from '../../services/derived-issue-state.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import type { ResourceStack } from './stacks.js';
@@ -48,14 +48,23 @@ let cachedVenvCandidates: ReclaimVenvCandidate[] = [];
 let venvDelete: (path: string) => Promise<void> = async (path) => {
   await rm(path, { recursive: true, force: true });
 };
-let issueClosedReader: (issueId: string) => boolean = (issueId) => isClosedReviewStatus(issueId);
+let issueClosedReader: (issueId: string) => Promise<boolean> = (issueId) => isIssueFinished(issueId);
 let projectRootReader: () => string = () => resolve(process.cwd(), '..', '..');
 
 export function buildReclaimPayload(
   stacks: ResourceStack[],
   agents: ReclaimAgentLike[],
-  options: { venvs?: ReclaimVenvCandidate[] } = {},
+  options: {
+    venvs?: ReclaimVenvCandidate[];
+    /**
+     * Issues whose work is over (derived state `merged` or `closed`). The
+     * caller loads these — this function stays pure so the grouping and
+     * threshold logic is testable without a forge.
+     */
+    closedIssueIds?: ReadonlySet<string>;
+  } = {},
 ): ReclaimPayload {
+  const closedIssueIds = options.closedIssueIds ?? new Set<string>();
   const liveIssueIds = new Set(
     agents
       .filter((agent) => agent.hasLiveTmuxSession === true)
@@ -76,7 +85,7 @@ export function buildReclaimPayload(
         issueId: stack.issueId ?? undefined,
       })),
     ...(options.venvs ?? cachedVenvCandidates)
-      .filter((venv) => venv.diskBytes >= VENV_THRESHOLD_BYTES && issueClosedReader(venv.issueId))
+      .filter((venv) => venv.diskBytes >= VENV_THRESHOLD_BYTES && closedIssueIds.has(venv.issueId.toUpperCase()))
       .map((venv): ReclaimCandidate => ({
         kind: 'venv',
         label: `${venv.issueId} virtualenv`,
@@ -102,7 +111,7 @@ export function setReclaimVenvCandidatesForTests(candidates: ReclaimVenvCandidat
   cachedVenvCandidates = candidates.map((candidate) => ({ ...candidate }));
 }
 
-export function setReclaimIssueClosedReaderForTests(reader: (issueId: string) => boolean): void {
+export function setReclaimIssueClosedReaderForTests(reader: (issueId: string) => Promise<boolean>): void {
   issueClosedReader = reader;
 }
 
@@ -119,7 +128,7 @@ export function resetReclaimForTests(): void {
   venvDelete = async (path) => {
     await rm(path, { recursive: true, force: true });
   };
-  issueClosedReader = (issueId) => isClosedReviewStatus(issueId);
+  issueClosedReader = (issueId) => isIssueFinished(issueId);
   projectRootReader = () => resolve(process.cwd(), '..', '..');
 }
 
@@ -135,7 +144,8 @@ export const deleteResourceVenvRoute = HttpRouter.add(
 export function deleteResourceVenvEffect(issue: string): Effect.Effect<ReturnType<typeof jsonResponse>, never, never> {
   return Effect.gen(function* () {
     const issueId = issue.toUpperCase();
-    if (!issueClosedReader(issueId)) {
+    const finished = yield* Effect.promise(() => issueClosedReader(issueId));
+    if (!finished) {
       return jsonResponse({ ok: false, error: `${issueId} is not closed; refusing to delete workspace venv.` }, { status: 409 });
     }
     const venvPath = join(projectRootReader(), 'workspaces', `feature-${issueId.toLowerCase()}`, '.venv');
@@ -149,11 +159,29 @@ export function deleteResourceVenvEffect(issue: string): Effect.Effect<ReturnTyp
   });
 }
 
-function isClosedStack(stack: ResourceStack): boolean {
-  return stack.phase === 'merged';
+/** A stack whose issue is finished: the PR merged, or the issue closed. */
+export function isClosedStack(stack: ResourceStack): boolean {
+  return stack.state === 'merged' || stack.state === 'closed';
 }
 
-function isClosedReviewStatus(issueId: string): boolean {
-  const status = getReviewStatusSync(issueId);
-  return status?.mergeStatus === 'merged';
+/** Derived (FR-6): the work is over when the PR merged or the issue closed. */
+async function isIssueFinished(issueId: string): Promise<boolean> {
+  const derived = await getDerivedIssueState(issueId);
+  return derived.state === 'merged' || derived.state === 'closed';
+}
+
+/** Issue ids of the cached venv candidates — what `loadClosedIssueIds` needs. */
+export function listReclaimVenvIssueIds(venvs?: ReclaimVenvCandidate[]): string[] {
+  return (venvs ?? cachedVenvCandidates).map((venv) => venv.issueId.toUpperCase());
+}
+
+/** The subset of these issues whose work is over, for `buildReclaimPayload`. */
+export async function loadClosedIssueIds(issueIds: Iterable<string>): Promise<ReadonlySet<string>> {
+  const closed = new Set<string>();
+  const ids = [...new Set([...issueIds].map((id) => id.toUpperCase()))];
+  const results = await Promise.allSettled(ids.map(async (id) => [id, await issueClosedReader(id)] as const));
+  for (const outcome of results) {
+    if (outcome.status === 'fulfilled' && outcome.value[1]) closed.add(outcome.value[0]);
+  }
+  return closed;
 }

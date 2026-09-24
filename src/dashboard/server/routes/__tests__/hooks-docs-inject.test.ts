@@ -8,7 +8,6 @@ import { getDefaultDocsConfig, type NormalizedDocsConfig } from '../../../../lib
 import type { DocsPathOverrides } from '../../../../lib/paths.js';
 import {
   buildDocsIndex,
-  deterministicDocsTestEmbedding,
 } from '../../../../lib/docs/index-builder.js';
 import { queryDocsIndex } from '../../../../lib/docs/query.js';
 import { readDocsBudgetState } from '../../../../lib/docs/state.js';
@@ -16,6 +15,7 @@ import {
   handleMemoryInjectBody,
   handleMemoryInjectFastPathBody,
 } from '../hooks.js';
+import { deterministicDocsTestEmbedding } from '../../../../../tests/helpers/docs-test-embedding.js';
 
 let rootDir: string;
 let paths: DocsPathOverrides;

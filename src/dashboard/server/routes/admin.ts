@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
+import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import {
   derivePromptTitle,
@@ -53,7 +53,7 @@ const getAdminTldrRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-      const service = getTldrDaemonServiceSync(workspacePath, venvPath);
+      const service = getTldrDaemonService(workspacePath, venvPath);
       const status = await service.getStatus();
       return jsonResponse({
         available: true,

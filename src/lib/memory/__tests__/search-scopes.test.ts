@@ -11,7 +11,6 @@ import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from
 import { searchMemory } from '../cli.js';
 import { writeObservation } from '../observations.js';
 import { closeMemoryFtsDatabases } from '../fts-db.js';
-import { closeDatabase } from '../../database/index.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../workspaces/writer.js';
 
 let odb: OverdeckTestDb;
@@ -22,7 +21,6 @@ beforeEach(() => {
 
 afterEach(() => {
   closeMemoryFtsDatabases();
-  closeDatabase();
   teardownOverdeckTestDb(odb);
 });
 

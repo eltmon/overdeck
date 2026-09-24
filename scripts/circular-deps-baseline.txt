@@ -14,36 +14,46 @@ src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspac
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/stash-clean.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/uat-stack-actions.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/workspace-data.ts
-src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/workspace-data.ts > src/dashboard/server/routes/workspaces/merge-ops.ts
 src/dashboard/server/services/codex-conversation-parser.ts > src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts
 src/dashboard/server/services/conversation-compaction.ts > src/lib/agents.ts > src/lib/agents/resume.ts
 src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/smart-compaction.ts > src/lib/agents.ts > src/lib/agents/resume.ts
+src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/smart-compaction.ts > src/lib/background-ai/cost.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts > src/lib/agents.ts > src/lib/agents/resume.ts
 src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/summary-fork.ts > src/lib/agents.ts > src/lib/agents/resume.ts
 src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts > src/dashboard/server/services/ohmypi-conversation-parser.ts
 src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts > src/dashboard/server/services/pi-conversation-parser.ts
-src/lib/agents.ts > src/lib/agents/activity.ts
+src/lib/agent-enrichment.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts > src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/agents/pending-decision-gate.ts
 src/lib/agents.ts > src/lib/agents/activity.ts > src/lib/runtimes/ohmypi.ts > src/lib/launcher-generator.ts
-src/lib/agents.ts > src/lib/agents/agent-state.ts > src/lib/agents/identity.ts > src/lib/agents/runtime-state.ts
-src/lib/agents.ts > src/lib/agents/agent-state.ts > src/lib/agents/identity.ts > src/lib/overdeck/agent-rollback-state.ts
-src/lib/agents.ts > src/lib/agents/agent-state.ts > src/lib/agents/identity.ts > src/lib/overdeck/agent-state-sync.ts
-src/lib/agents.ts > src/lib/agents/agent-state.ts > src/lib/overdeck/agent-state-sync.ts
 src/lib/agents.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/delivery.ts
 src/lib/agents.ts > src/lib/agents/messaging.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/liveness.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/monitor-transport.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/provider-env.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/provider-env.ts > src/lib/caveman/workspace.ts > src/lib/memory/settings.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/runtime-command.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/runtime-command.ts > src/lib/memory/injection.ts > src/lib/memory/query-expansion.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/messaging.ts > src/lib/agents/supervisor-channels.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
 src/lib/agents.ts > src/lib/agents/queries.ts
-src/lib/agents.ts > src/lib/agents/queries.ts > src/lib/overdeck/agent-state-sync.ts
+src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/agents/spawn-prep.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
 src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/agents/termination.ts
 src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/harness-resolve.ts
+src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/runtimes/kimi-code.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/runtimes/kimi-code.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/agents/session-pointers.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
+src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/agents/delivery.ts
 src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/concurrency.ts
-src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/concurrency.ts > src/lib/overdeck/agents.ts
-src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts
-src/lib/cloister/auto-resume-config.ts > src/lib/projects.ts
+src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/concurrency.ts > src/lib/cloister/swarm-slot-lifecycle.ts > src/lib/agents/agent-state.ts > src/lib/registry/feature-registry-population.ts > src/lib/memory/providers/index.ts > src/lib/memory/providers/policy.ts > src/lib/memory/providers/registry.ts > src/lib/memory/providers/anthropic.ts > src/lib/memory/providers/types.ts > src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts > src/lib/agents/tier-metrics.ts > src/lib/agents/delivery.ts
 src/lib/cloister/deacon-swarm-completion.ts > src/lib/cloister/deacon-swarm.ts
-src/lib/cloister/feedback-target.ts > src/lib/review-status.ts
 src/lib/conversations/smart-compaction.ts
 src/lib/costs/events.ts > src/lib/costs/wal.ts
 src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts
-src/lib/database/agent-backfill.ts > src/lib/database/agent-mappers.ts > src/lib/database/agents-db.ts > src/lib/database/index.ts > src/lib/database/schema.ts
-src/lib/database/agent-backfill.ts > src/lib/database/index.ts > src/lib/database/schema.ts
 src/lib/issue-id.ts > src/lib/projects.ts
 src/lib/memory/pending.ts > src/lib/memory/rollup.ts
 src/lib/merge-set.ts > src/lib/overdeck/merge-sync.ts
@@ -52,4 +62,3 @@ src/lib/overdeck/conversation-forks.ts
 src/lib/overdeck/issue-transitions.ts > src/lib/overdeck/workspace-hygiene.ts
 src/lib/pan-dir/specs.ts > src/lib/xbrief/io.ts
 src/lib/pan-dir/specs.ts > src/lib/xbrief/xbrief-index.ts > src/lib/xbrief/io.ts
-src/dashboard/server/routes/jsonl-resolver.ts > src/lib/agents.ts > src/lib/agents/resume.ts > src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/summary-fork.ts > src/lib/conversations/transcript-adapter.ts

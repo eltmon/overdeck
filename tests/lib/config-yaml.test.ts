@@ -8,7 +8,6 @@ import {
   getGlobalConfigPath,
   getProjectConfigPath,
   mergeConfigs,
-  mergeRtkConfigs,
 } from '../../src/lib/config-yaml.js';
 
 describe('config-yaml', () => {
@@ -192,7 +191,7 @@ api_keys:
             openai: { enabled: true, harness: 'bad' as never },
           },
         },
-      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, codex, acp, or kimi-code');
+      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse');
     });
 
     it('normalizes legacy DashScope API keys without re-enabling an explicitly disabled provider', () => {
@@ -205,26 +204,6 @@ api_keys:
       expect(config.enabledProviders.has('dashscope')).toBe(false);
     });
 
-    it('normalizes RTK agent config with default-off precedence', () => {
-      expect(mergeRtkConfigs().enabled).toBe(false);
-
-      const { config } = mergeConfigs({
-        agents: {
-          rtk: { enabled: true },
-        },
-      });
-
-      expect(config.rtk.enabled).toBe(true);
-      expect(
-        mergeRtkConfigs({ agents: { rtk: { enabled: true } } }).enabled,
-      ).toBe(true);
-      expect(
-        mergeRtkConfigs(
-          { agents: { rtk: { enabled: true } } },
-          { agents: { rtk: { enabled: false } } },
-        ).enabled,
-      ).toBe(false);
-    });
 
     it('defaults memory governor swap runway and PSI thresholds', () => {
       expect(mergeConfigs().config.resources).toMatchObject({
@@ -233,7 +212,18 @@ api_keys:
         governorPsiFullShedAvg10: 1,
         governorPsiCalmReadmitAvg10: 0.05,
         governorPsiCalmWindowMs: 600_000,
+        governorCpuSoftLoadPerCore: 1.5,
+        governorCpuRecoveryLoadPerCore: 1,
       });
+    });
+
+    it('rejects CPU governor recovery at or above the soft threshold', () => {
+      expect(() => mergeConfigs({
+        resources: {
+          governor_cpu_soft_load_per_core: 1.5,
+          governor_cpu_recovery_load_per_core: 1.5,
+        },
+      })).toThrow('recovery_load_per_core must be lower than');
     });
 
     it('normalizes memory governor swap runway config', () => {

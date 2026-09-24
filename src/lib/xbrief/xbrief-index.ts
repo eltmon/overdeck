@@ -2,9 +2,9 @@
  * xBRIEF Index — async, cached issue→xBRIEF lookups for server hot paths.
  *
  * The canonical spec store is the `specs/` directory resolved by
- * `getProjectPanPaths()` — `overdeck-state` for a migrated project, legacy
- * `<projectRoot>/.pan/specs` otherwise. Legacy `vbrief/<lifecycle>/`
- * directories remain as fallback reads when no spec entry exists for an issue.
+ * `getProjectPanPaths()` — `<planHome>/.pan/specs`. Legacy
+ * `vbrief/<lifecycle>/` directories remain as fallback reads when no spec
+ * entry exists for an issue.
  */
 import { readdir, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -43,10 +43,10 @@ interface ProjectIndex {
 const projectIndexCache = new Map<string, ProjectIndex>();
 
 async function scanPanSpecs(projectRoot: string): Promise<IndexEntry[]> {
-  // PAN-3165: resolve through the shared path authority. Hardcoding
-  // `<projectRoot>/.pan/specs` here read the pre-PAN-2541 in-repo location, so
-  // every spec written to `overdeck-state` since the cutover resolved to null —
-  // and the UAT panel rendered that lookup miss as "No UAT steps in plan".
+  // PAN-3165: resolve through the shared path authority so a polyrepo plan
+  // home (`pan_records.repo`) is honoured — hardcoding `<projectRoot>/.pan`
+  // here made every such lookup miss, and the UAT panel rendered that as
+  // "No UAT steps in plan".
   const { specsDir } = getProjectPanPaths(projectRoot);
   if (!existsSync(specsDir)) return [];
 
@@ -140,6 +140,7 @@ export function invalidateXBriefIndex(projectRoot: string): void {
   projectIndexCache.delete(projectRoot);
 }
 
+/** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function resetXBriefIndex(): void {
   projectIndexCache.clear();
 }

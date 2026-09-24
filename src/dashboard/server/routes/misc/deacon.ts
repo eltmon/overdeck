@@ -1,12 +1,9 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { applyBootReconciliationDecision } from '../../../../lib/cloister/deacon.js';
 import {
-  getBootReconciliationState,
-  isDeaconGloballyPausedSync as isDeaconGloballyPaused,
-  setBootReconciliationDecision,
-  setDeaconGloballyPausedSync as setDeaconGloballyPaused,
+  isDeaconGloballyPaused,
+  setDeaconGloballyPaused,
 } from '../../../../lib/overdeck/control-settings.js';
 import {
   readDurableDeaconLogs,
@@ -17,43 +14,9 @@ import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { readJsonBody } from './shared.js';
 
-const getNoResumeModeRoute = HttpRouter.add(
-  'GET',
-  '/api/no-resume-mode',
-  Effect.sync(() => {
-    const state = getBootReconciliationState();
-    const active = state.decision === 'pending' || state.decision === 'hold_all';
-    return jsonResponse({ active, since: active ? state.decidedAt ?? state.graceDeadline : null });
-  }),
-);
-
-const postResumeAllRoute = HttpRouter.add(
-  'POST',
-  '/api/resume-all',
-  Effect.promise(async () => {
-    try {
-      setBootReconciliationDecision('resume_all');
-      const result = await applyBootReconciliationDecision();
-      const resumed = result.resumed;
-      console.log(`[resume-all] Boot reconciliation decision set to resume_all; resumed ${resumed.length} work agent(s)${resumed.length ? `: ${resumed.join(', ')}` : ''}`);
-      return jsonResponse({
-        ok: true,
-        resumed,
-        outcomes: result.outcomes,
-        skipped: result.skipped,
-        deferred: result.deferred,
-        count: resumed.length,
-      });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error resuming all agents:', error);
-      return jsonResponse(
-        { ok: false, error: 'Failed to resume agents: ' + msg },
-        { status: 500 },
-      );
-    }
-  }),
-);
+// PAN-3917: `GET /api/no-resume-mode` and `POST /api/resume-all` are gone with
+// boot reconciliation (D7, A.1). There is no stored resume decision to hold or
+// apply: a pane's liveness is the terminal backend's answer, read live.
 
 // ─── Route: GET /api/deacon/status ───────────────────────────────────────────
 
@@ -163,8 +126,6 @@ const postDeaconPauseRoute = HttpRouter.add(
 );
 
 export const deaconRouteLayer = Layer.mergeAll(
-  getNoResumeModeRoute,
-  postResumeAllRoute,
   getDeaconStatusRoute,
   getDeaconLogsRoute,
   postDeaconPatrolRoute,

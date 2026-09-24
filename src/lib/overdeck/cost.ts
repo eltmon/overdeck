@@ -4,15 +4,14 @@ import { join } from 'node:path';
 import { Context, Effect, Layer, Schema } from 'effect';
 import { and, desc, eq, gte, like, sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { CostArchive, CostArchiveLive, Db, DbLive, EventBus, EventBusLive } from './infra.js';
 import { IssueId, type IssueId as IssueIdType } from './issues.js';
 import {
-  getAllBudgetsSync,
-  checkBudgetSync,
-  createBudgetSync,
-  deleteBudgetSync,
+  getAllBudgets,
+  checkBudget as checkBudgetImpl,
+  createBudget as createBudgetImpl,
+  deleteBudget as deleteBudgetImpl,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
@@ -123,7 +122,7 @@ export type Rollup = typeof Rollup.Type;
 export const Window = Schema.Literals(['day', 'week', 'month']);
 export type Window = typeof Window.Type;
 
-export const WindowSummary = Schema.Struct({
+const WindowSummary = Schema.Struct({
   project:     Schema.NullOr(Schema.String),
   window:      Window,
   totalCost:   Schema.Number,
@@ -142,7 +141,7 @@ export const IssueCost = Schema.Struct({
 });
 export type IssueCost = typeof IssueCost.Type;
 
-export const BudgetSpec = Schema.Struct({
+const BudgetSpec = Schema.Struct({
   name:           Schema.String,
   type:           Schema.Literals(['daily', 'monthly', 'project', 'issue', 'feature']),
   limit:          Schema.Number,
@@ -159,7 +158,7 @@ export const Budget = Schema.Struct({
 });
 export type Budget = typeof Budget.Type;
 
-export const BudgetStatus = Schema.Struct({
+const BudgetStatus = Schema.Struct({
   budget:      Budget,
   percentUsed: Schema.Number,
   remaining:   Schema.Number,
@@ -188,12 +187,12 @@ export type CostReconcileExtraRoot =
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 
-export class CostIngestError extends Schema.TaggedErrorClass<CostIngestError>()(
+class CostIngestError extends Schema.TaggedErrorClass<CostIngestError>()(
   'CostIngestError',
   { reason: Schema.String },
 ) {}
 
-export class BudgetNotFound extends Schema.TaggedErrorClass<BudgetNotFound>()(
+class BudgetNotFound extends Schema.TaggedErrorClass<BudgetNotFound>()(
   'BudgetNotFound',
   { id: Schema.String },
 ) {}
@@ -480,11 +479,11 @@ export const CostResolverLive = Layer.effect(
       });
 
     const listBudgets = () =>
-      Effect.sync(() => getAllBudgetsSync().map(mapBudget));
+      Effect.sync(() => getAllBudgets().map(mapBudget));
 
     const checkBudget = (id: string) =>
       Effect.gen(function* () {
-        const result = yield* Effect.sync(() => checkBudgetSync(id));
+        const result = yield* Effect.sync(() => checkBudgetImpl(id));
         if (!result.budget) return yield* Effect.fail(new BudgetNotFound({ id }));
         return {
           budget:      mapBudget(result.budget),
@@ -819,14 +818,14 @@ export const CostWriterLive = Layer.effect(
     const createBudget = (spec: BudgetSpec) =>
       Effect.gen(function* () {
         const created = yield* Effect.sync(() =>
-          createBudgetSync({ ...spec, enabled: true }),
+          createBudgetImpl({ ...spec, enabled: true }),
         );
         return mapBudget(created);
       });
 
     const deleteBudget = (id: string) =>
       Effect.gen(function* () {
-        const deleted = yield* Effect.sync(() => deleteBudgetSync(id));
+        const deleted = yield* Effect.sync(() => deleteBudgetImpl(id));
         if (!deleted) return yield* Effect.fail(new BudgetNotFound({ id }));
       });
 
@@ -837,117 +836,3 @@ export const CostWriterLive = Layer.effect(
 export const CostDoorLive = CostWriterLive.pipe(
   Layer.provide(Layer.mergeAll(DbLive, EventBusLive.pipe(Layer.provide(DbLive)), CostArchiveLive)),
 );
-
-// ── CostApi — the controller (HttpApiGroup, no handler wiring) ────────────────
-// Handler wiring (CostApiLive) is deferred to workspace-m9n4j (server bootstrap).
-
-export const CostApi = HttpApiGroup.make('costs')
-  // ── reads ──
-  .add(
-    HttpApiEndpoint.get('summary', '/costs/summary', {
-      query: {
-        window:  Schema.optional(Window),
-        project: Schema.optional(Schema.String),
-      },
-      success: WindowSummary,
-    }),
-  )
-  .add(HttpApiEndpoint.get('byIssue', '/costs/by-issue', { success: Schema.Array(Rollup) }))
-  .add(
-    HttpApiEndpoint.get('issueDetail', '/costs/issue/:id', {
-      params:  { id: IssueId },
-      success: IssueCost,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.get('byDay', '/costs/trends', {
-      query: {
-        days:    Schema.optional(Schema.NumberFromString),
-        issueId: Schema.optional(IssueId),
-      },
-      success: Schema.Array(Rollup),
-    }),
-  )
-  .add(
-    HttpApiEndpoint.get('byModel', '/costs/by-model', {
-      query:   { issueId: Schema.optional(IssueId) },
-      success: Schema.Array(Rollup),
-    }),
-  )
-  .add(
-    HttpApiEndpoint.get('byAgent', '/costs/by-agent', {
-      query:   { issueId: Schema.optional(IssueId) },
-      success: Schema.Array(Rollup),
-    }),
-  )
-  .add(
-    HttpApiEndpoint.get('byBackgroundSource', '/costs/background', {
-      query:   { hours: Schema.optional(Schema.NumberFromString) },
-      success: Schema.Array(Rollup),
-    }),
-  )
-  .add(HttpApiEndpoint.get('byProject', '/costs/by-project', { success: Schema.Array(Rollup) }))
-  .add(
-    HttpApiEndpoint.get('recent', '/costs/stream', {
-      query: {
-        limit: Schema.optional(Schema.NumberFromString),
-        since: Schema.optional(Schema.String),
-      },
-      success: Schema.Array(CostEvent),
-    }),
-  )
-  .add(HttpApiEndpoint.get('listBudgets', '/costs/budget', { success: Schema.Array(Budget) }))
-  .add(
-    HttpApiEndpoint.get('checkBudget', '/costs/budget/:id', {
-      params:  { id: Schema.String },
-      success: BudgetStatus,
-      error:   BudgetNotFound,
-    }),
-  )
-  // ── writes ──
-  .add(
-    HttpApiEndpoint.post('reconcile', '/costs/reconcile', {
-      payload: Schema.Struct({
-        source: Schema.optional(Schema.Literals(['claude', 'ohmypi', 'codex', 'acp', 'wal'])),
-        dryRun: Schema.optional(Schema.Boolean),
-        extraRoots: Schema.optional(Schema.Array(Schema.String)),
-      }),
-      success: Schema.Struct({
-        imported:          Schema.Number,
-        skipped:           Schema.Array(Schema.Struct({ file: Schema.String, reason: Schema.String })),
-        sessionsScanned:   Schema.Number,
-        eventsImported:    Schema.Number,
-        duplicatesSkipped: Schema.Number,
-        errors:            Schema.Array(Schema.String),
-        earliestEventTs:   Schema.NullOr(Schema.String),
-        latestEventTs:     Schema.NullOr(Schema.String),
-        warnings:          Schema.Array(Schema.Struct({
-          file:     Schema.String,
-          reason:   Schema.String,
-          provider: Schema.NullOr(Schema.String),
-          model:    Schema.String,
-        })),
-      }),
-      error:   CostIngestError,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post('rebuild', '/costs/rebuild', {
-      success: Schema.Struct({ events: Schema.Number }),
-      error:   CostIngestError,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post('createBudget', '/costs/budget', {
-      payload: BudgetSpec,
-      success: Budget,
-      error:   CostIngestError,
-    }),
-  )
-  // HttpApiEndpoint exports 'del' as 'delete' (reserved word alias)
-  .add(
-    HttpApiEndpoint['delete']('deleteBudget', '/costs/budget/:id', {
-      params: { id: Schema.String },
-      error:  BudgetNotFound,
-    }),
-  );

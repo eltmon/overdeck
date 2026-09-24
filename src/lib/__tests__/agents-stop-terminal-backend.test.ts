@@ -1,0 +1,324 @@
+/**
+ * PAN-3947: stopping an agent terminates it through the host's terminal
+ * backend. On a Herdr host `pan kill` / dashboard Stop / the post-merge
+ * lifecycle used to rewrite state.json only — the pane and the idle harness in
+ * it stayed alive, liveness readers kept reporting the agent, and the next
+ * start was refused as "already running".
+ *
+ * Every terminal here is fake: the Herdr socket client and the tmux primitives
+ * are mocked, so no real pane or session on this host is touched.
+ */
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Effect } from 'effect';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+interface HerdrCall { method: string; params: Record<string, unknown> }
+
+const herdr = vi.hoisted(() => ({
+  calls: [] as { method: string; params: Record<string, unknown> }[],
+  handler: (_method: string, _params: Record<string, unknown>): unknown => ({}),
+}));
+
+const tmux = vi.hoisted(() => ({
+  live: new Set<string>(),
+  killed: [] as string[],
+}));
+
+const backendSelection = vi.hoisted(() => ({ name: 'herdr' as 'herdr' | 'tmux' }));
+
+vi.mock('../paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../paths.js')>();
+  return {
+    ...actual,
+    get AGENTS_DIR() {
+      return join(process.env.TEST_STOP_BACKEND_HOME!, 'agents');
+    },
+  };
+});
+
+vi.mock('../terminal-backends/select.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../terminal-backends/select.js')>();
+  return {
+    ...actual,
+    hostTerminalBackendName: vi.fn(async () => backendSelection.name),
+    // PAN-3956: a herdr host in these tests has a live session server.
+    probeHerdrAvailability: vi.fn(async () => ({
+      binary: '/usr/bin/herdr', session: 'overdeck', socket: '/tmp/herdr.sock', socketExists: true, available: true,
+    })),
+  };
+});
+
+// The Herdr adapter singleton captures its client at import time, so the fake
+// has to be in place before herdr.js loads.
+vi.mock('../terminal-backends/herdr-api.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../terminal-backends/herdr-api.js')>();
+  const fake = {
+    call: async (method: string, params: Record<string, unknown>) => {
+      herdr.calls.push({ method, params });
+      const result = herdr.handler(method, params);
+      if (result instanceof Error) throw result;
+      return result ?? {};
+    },
+  };
+  return { ...actual, getHerdrApiClient: () => fake };
+});
+
+vi.mock('../tmux.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../tmux.js')>();
+  const { Effect: E } = await import('effect');
+  return {
+    ...actual,
+    sessionExists: vi.fn((name: string) => E.succeed(tmux.live.has(name))),
+    capturePane: vi.fn(async () => ''),
+    killSession: vi.fn((name: string) => E.sync(() => {
+      tmux.killed.push(name);
+      tmux.live.delete(name);
+    })),
+    sessionExistsSync: vi.fn((name: string) => tmux.live.has(name)),
+    capturePaneSync: vi.fn(() => ''),
+    killSessionSync: vi.fn(),
+  };
+});
+
+// No launcher process to sweep: pgrep "finds nothing".
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    exec: vi.fn((_cmd: string, ...rest: unknown[]) => {
+      const cb = rest.find((arg) => typeof arg === 'function') as ((err: Error | null, out?: unknown) => void) | undefined;
+      cb?.(Object.assign(new Error('no match'), { code: 1 }));
+    }),
+  };
+});
+
+vi.mock('../overdeck/agent-state-sync.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../overdeck/agent-state-sync.js')>();
+  return { ...actual, getOverdeckAgentStateSync: vi.fn(() => null) };
+});
+
+vi.mock('../overdeck/agent-rollback-state.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../overdeck/agent-rollback-state.js')>();
+  return { ...actual, readRollbackAgentStateSync: vi.fn(() => null) };
+});
+
+vi.mock('../agent-runtime.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../agent-runtime.js')>();
+  const { Effect: E } = await import('effect');
+  return { ...actual, emitAgentEvent: vi.fn(() => E.void) };
+});
+
+import { stopAgent } from '../agents.js';
+import { closeAgentPane, closeIssuePanes } from '../terminal-backends/launch.js';
+import { findHerdrAgentPane, HerdrBackend } from '../terminal-backends/herdr.js';
+import { tmuxBackend } from '../terminal-backends/tmux.js';
+
+const AGENT = 'agent-pan-3947';
+
+function herdrPaneCloses(): string[] {
+  return herdr.calls
+    .filter((call) => call.method === 'pane.close')
+    .map((call) => String(call.params['pane_id']));
+}
+
+/** A Herdr session holding one detected agent named `AGENT` in pane `wG:p2`. */
+function herdrWithDetectedAgent(): void {
+  herdr.handler = (method, params) => {
+    if (method === 'agent.get' && params['target'] === AGENT) {
+      return { agent: { pane_id: 'wG:p2', terminal_id: 't2', workspace_id: 'wG', agent_status: 'idle' } };
+    }
+    if (method === 'agent.get') return new Error('no such agent');
+    if (method === 'session.snapshot') return { snapshot: { panes: [] } };
+    return {};
+  };
+}
+
+let testHome: string;
+
+beforeAll(() => {
+  testHome = mkdtempSync(join(tmpdir(), 'pan-3947-stop-backend-'));
+  process.env.TEST_STOP_BACKEND_HOME = testHome;
+});
+
+afterAll(() => {
+  rmSync(testHome, { recursive: true, force: true });
+  delete process.env.TEST_STOP_BACKEND_HOME;
+});
+
+beforeEach(() => {
+  rmSync(join(testHome, 'agents'), { recursive: true, force: true });
+  mkdirSync(join(testHome, 'agents'), { recursive: true });
+  herdr.calls.length = 0;
+  herdr.handler = () => ({});
+  tmux.live.clear();
+  tmux.killed.length = 0;
+  vi.spyOn(console, 'log').mockImplementation(() => undefined);
+});
+
+describe('stopAgent terminates through the terminal backend (PAN-3947)', () => {
+  it('closes the Herdr pane on a Herdr host', async () => {
+    backendSelection.name = 'herdr';
+    herdrWithDetectedAgent();
+
+    await Effect.runPromise(stopAgent(AGENT, 'operator'));
+
+    expect(herdrPaneCloses()).toEqual(['wG:p2']);
+    expect(tmux.killed).toEqual([]);
+  });
+
+  it('kills the tmux session on a tmux host', async () => {
+    backendSelection.name = 'tmux';
+    tmux.live.add(AGENT);
+
+    await Effect.runPromise(stopAgent(AGENT, 'operator'));
+
+    expect(tmux.killed).toEqual([AGENT]);
+    expect(herdr.calls).toEqual([]);
+  });
+
+  it('still completes the stop when the Herdr socket is down', async () => {
+    backendSelection.name = 'herdr';
+    herdr.handler = () => new Error('socket_error');
+
+    await expect(Effect.runPromise(stopAgent(AGENT, 'operator'))).resolves.toBeUndefined();
+    expect(herdrPaneCloses()).toEqual([]);
+  });
+});
+
+describe('closeAgentPane', () => {
+  it('closes a Herdr residue pane whose shell is back at its prompt', async () => {
+    // Pane-bound agent: no Herdr agent record, only the agentId-stamped pane.
+    // Its harness exited, so findHerdrAgent (a liveness read) drops it — a stop
+    // must still close it.
+    const log: HerdrCall[] = [];
+    const api = {
+      call: async (method: string, params: Record<string, unknown>) => {
+        log.push({ method, params });
+        if (method === 'agent.get') throw new Error('no such agent');
+        if (method === 'session.snapshot') {
+          return {
+            snapshot: {
+              panes: [{ pane_id: 'wG:pA', terminal_id: 'tA', workspace_id: 'wG', tokens: { agentId: `${AGENT}-review` } }],
+            },
+          };
+        }
+        return {};
+      },
+    };
+    const backend = new HerdrBackend(api as never);
+    herdr.handler = (method, params) => api.call(method, params);
+
+    const closed = await closeAgentPane(`${AGENT}-review`, backend);
+
+    expect(closed).toBe(true);
+    expect(log.filter((call) => call.method === 'pane.close').map((call) => call.params['pane_id'])).toEqual(['wG:pA']);
+    expect(log.some((call) => call.method === 'pane.process_info')).toBe(false);
+  });
+
+  it('returns false and closes nothing when Herdr has no pane for the agent', async () => {
+    herdr.handler = (method) => {
+      if (method === 'agent.get') return new Error('no such agent');
+      if (method === 'session.snapshot') return { snapshot: { panes: [] } };
+      return {};
+    };
+    const closed = await closeAgentPane(AGENT, new HerdrBackend({ call: vi.fn() } as never));
+    expect(closed).toBe(false);
+  });
+
+  it('kills a pre-Herdr tmux session of the same name on a Herdr host', async () => {
+    herdrWithDetectedAgent();
+    tmux.live.add(AGENT);
+    const backendApi = { call: vi.fn(async () => ({})) };
+
+    const closed = await closeAgentPane(AGENT, new HerdrBackend(backendApi as never));
+
+    expect(closed).toBe(true);
+    expect(backendApi.call).toHaveBeenCalledWith('pane.close', { pane_id: 'wG:p2' });
+    expect(tmux.killed).toEqual([AGENT]);
+  });
+
+  it('kills the tmux session through the tmux adapter', async () => {
+    tmux.live.add(AGENT);
+    expect(await closeAgentPane(AGENT, tmuxBackend)).toBe(true);
+    expect(tmux.killed).toEqual([AGENT]);
+  });
+
+  it('is a no-op on tmux when the session is already gone', async () => {
+    expect(await closeAgentPane(AGENT, tmuxBackend)).toBe(false);
+    expect(tmux.killed).toEqual([]);
+  });
+});
+
+describe('findHerdrAgentPane', () => {
+  it('prefers the detected agent record', async () => {
+    herdrWithDetectedAgent();
+    await expect(findHerdrAgentPane(AGENT)).resolves.toEqual({ paneId: 'wG:p2', terminalId: 't2', workspaceId: 'wG' });
+  });
+
+  it('returns null when the socket does not answer', async () => {
+    herdr.handler = () => new Error('socket_error');
+    await expect(findHerdrAgentPane(AGENT)).resolves.toBeNull();
+  });
+});
+
+describe('closeIssuePanes', () => {
+  const panes = [
+    { pane_id: 'wG:p2', terminal_id: 't2', workspace_id: 'wG', tokens: { issue: 'PAN-3947', role: 'work', agentId: AGENT } },
+    { pane_id: 'wG:pA', terminal_id: 'tA', workspace_id: 'wG', tokens: { issue: 'PAN-3947', role: 'review', agentId: `${AGENT}-review` } },
+    { pane_id: 'wG:p8', terminal_id: 't8', workspace_id: 'wG', tokens: { issue: 'PAN-3947', role: 'test', agentId: `${AGENT}-test` } },
+    { pane_id: 'wH:p1', terminal_id: 'u1', workspace_id: 'wH', tokens: { issue: 'PAN-9999', role: 'review', agentId: 'agent-pan-9999-review' } },
+    { pane_id: 'wC:p1', terminal_id: 'c1', workspace_id: 'wC', tokens: { role: 'work', agentId: 'conv-1' } },
+  ];
+
+  function inventoryApi(log: HerdrCall[]) {
+    return {
+      call: async (method: string, params: Record<string, unknown>) => {
+        log.push({ method, params });
+        if (method === 'agent.list') return { agents: [] };
+        if (method === 'session.snapshot') return { snapshot: { panes } };
+        return {};
+      },
+    };
+  }
+
+  it('closes only the issue panes with the requested roles', async () => {
+    const log: HerdrCall[] = [];
+    const closed = await closeIssuePanes('pan-3947', { roles: ['review', 'test', 'uat'] }, new HerdrBackend(inventoryApi(log) as never));
+
+    expect(closed).toEqual([`${AGENT}-review`, `${AGENT}-test`]);
+    expect(log.filter((call) => call.method === 'pane.close').map((call) => call.params['pane_id'])).toEqual(['wG:pA', 'wG:p8']);
+  });
+
+  it('closes every pane of the issue when no role filter is given', async () => {
+    const log: HerdrCall[] = [];
+    const closed = await closeIssuePanes('PAN-3947', {}, new HerdrBackend(inventoryApi(log) as never));
+    expect(closed).toEqual([AGENT, `${AGENT}-review`, `${AGENT}-test`]);
+  });
+
+  it('never closes an operator conversation pane, even one stamped with the issue', async () => {
+    const log: HerdrCall[] = [];
+    const api = {
+      call: async (method: string, params: Record<string, unknown>) => {
+        log.push({ method, params });
+        if (method === 'agent.list') return { agents: [] };
+        if (method === 'session.snapshot') {
+          return {
+            snapshot: {
+              panes: [{ pane_id: 'wC:p9', terminal_id: 'c9', workspace_id: 'wC', tokens: { issue: 'PAN-3947', role: 'work', agentId: 'conv-42' } }],
+            },
+          };
+        }
+        return {};
+      },
+    };
+    expect(await closeIssuePanes('PAN-3947', {}, new HerdrBackend(api as never))).toEqual([]);
+    expect(log.some((call) => call.method === 'pane.close')).toBe(false);
+  });
+
+  it('is a no-op on tmux, whose callers scan session names themselves', async () => {
+    expect(await closeIssuePanes('PAN-3947', {}, tmuxBackend)).toEqual([]);
+    expect(tmux.killed).toEqual([]);
+  });
+});

@@ -6,8 +6,8 @@ import {
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
-import type { ReconciledSlotItem } from '../../../../src/lib/agents/slot-reconcile.js';
-import type { PanIssueSwarmSlotCompletion } from '../../../../src/lib/pan-dir/record.js';
+import type { ReconciledSlotItem } from '../../../../src/lib/cloister/swarm-slot-reconcile.js';
+import type { SwarmSlotCompletion } from '../../../../src/lib/cloister/swarm-slot-store.js';
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 
@@ -26,7 +26,7 @@ function deps(options: {
   dead?: Record<string, boolean>;
   exitStatus?: Record<string, number | null>;
   runtime?: Record<string, Pick<AgentRuntimeSnapshot, 'resolution'>>;
-  slotCompletions?: Record<number, PanIssueSwarmSlotCompletion>;
+  slotCompletions?: Record<number, SwarmSlotCompletion>;
   outputDigest?: string;
   commitTime?: number | null;
   aheadCount?: number;

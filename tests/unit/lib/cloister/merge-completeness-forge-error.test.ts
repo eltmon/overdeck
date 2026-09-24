@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -38,29 +37,25 @@ vi.mock('child_process', () => {
 vi.mock('../../../../src/lib/github-app.js', () => ({
   getPullRequestState: vi.fn(),
   isGitHubAppConfigured: isGitHubAppConfiguredMock,
-  listPullRequestsForHead: vi.fn(() => Effect.succeed([])),
+  listPullRequestsForHead: vi.fn(async () => []),
   mergePullRequestWithApp: vi.fn(),
   parsePullRequestRef: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
-  getMergeSetSync: getMergeSetMock,
-  patchMergeSetRepoSync: patchMergeSetRepoMock,
-  patchMergeSetReposSync: patchMergeSetReposMock,
-  upsertMergeSetSync: upsertMergeSetMock,
-  withRepoArtifactUrlSync: vi.fn(),
-  withRepoStateSync: withRepoStateMock,
+  ensureMergeSetForIssue: ensureMergeSetForIssueMock,
+  getMergeSet: getMergeSetMock,
+  upsertMergeSet: upsertMergeSetMock,
+  withRepoArtifactUrl: vi.fn(),
+  withRepoState: withRepoStateMock,
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
-  resolveProjectReposForIssueSync: vi.fn().mockReturnValue(null),
+  resolveProjectReposForIssue: vi.fn().mockReturnValue(null),
 }));
 
 import {
   assessMergeCompleteness,
-  observeForgeMergeState,
-  reconcileStrandedRepos,
 } from '../../../../src/lib/cloister/merge-completeness.js';
 
 describe('merge completeness forge error propagation', () => {
@@ -74,7 +69,6 @@ describe('merge completeness forge error propagation', () => {
         forge: 'github',
         sourceBranch: 'feature/min-857',
         targetBranch: 'main',
-        mergeStatus: 'pending',
         required: true,
       }],
     });
@@ -107,51 +101,4 @@ describe('merge completeness forge error propagation', () => {
     );
   });
 
-  it('does not write merge-set state when forge observation is unverifiable', async () => {
-    const result = await observeForgeMergeState('MIN-857');
-
-    expect(result.complete).toBe(false);
-    expect(result.hasPositiveMergedEvidence).toBe(false);
-    expect(result.repos).toEqual([
-      expect.objectContaining({
-        repoKey: 'api',
-        state: 'unverifiable',
-        reason: expect.stringContaining('gh authentication failed'),
-      }),
-    ]);
-    expect(patchMergeSetRepoMock).not.toHaveBeenCalled();
-    expect(patchMergeSetReposMock).not.toHaveBeenCalled();
-    expect(withRepoStateMock).not.toHaveBeenCalled();
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
-
-  it('returns an unverifiable blocker and writes nothing when stranded merge lookup fails', async () => {
-    const initial = {
-      repos: [{
-        repoKey: 'api',
-        repoPath: '/projects/myn/api',
-        forge: 'github',
-        sourceBranch: 'feature/min-857',
-        targetBranch: 'main',
-        artifactUrl: 'https://github.com/org/api/pull/56',
-        mergeStatus: 'failed',
-        required: true,
-      }],
-    };
-
-    const result = await reconcileStrandedRepos(initial as any);
-
-    expect(result.mergeSet).toBe(initial);
-    expect(result.blockers).toEqual([
-      expect.objectContaining({
-        repoKey: 'api',
-        state: 'unverifiable',
-        reason: expect.stringContaining('gh authentication failed'),
-      }),
-    ]);
-    expect(patchMergeSetRepoMock).not.toHaveBeenCalled();
-    expect(patchMergeSetReposMock).not.toHaveBeenCalled();
-    expect(withRepoStateMock).not.toHaveBeenCalled();
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
 });

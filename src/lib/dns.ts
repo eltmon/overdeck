@@ -55,7 +55,7 @@ function isDnsmasqInstalled(): boolean {
 
 // ---- wsl2hosts method ----
 
-export function addWsl2HostEntry(hostname: string): boolean {
+function addWsl2HostEntry(hostname: string): boolean {
   const wsl2hostsPath = join(homedir(), '.wsl2hosts');
 
   try {
@@ -73,7 +73,7 @@ export function addWsl2HostEntry(hostname: string): boolean {
   }
 }
 
-export function removeWsl2HostEntry(hostname: string): boolean {
+function removeWsl2HostEntry(hostname: string): boolean {
   const wsl2hostsPath = join(homedir(), '.wsl2hosts');
 
   try {
@@ -109,7 +109,7 @@ const HOSTS_FILE = '/etc/hosts';
 const MARKER_START = '# BEGIN overdeck managed entries';
 const MARKER_END = '# END overdeck managed entries';
 
-export function addHostsFileEntry(hostname: string, ip: string = '127.0.0.1'): boolean {
+function addHostsFileEntry(hostname: string, ip: string = '127.0.0.1'): boolean {
   try {
     let content = existsSync(HOSTS_FILE) ? readFileSync(HOSTS_FILE, 'utf-8') : '';
     const entry = `${ip}\t${hostname}`;
@@ -137,7 +137,7 @@ export function addHostsFileEntry(hostname: string, ip: string = '127.0.0.1'): b
   }
 }
 
-export function removeHostsFileEntry(hostname: string): boolean {
+function removeHostsFileEntry(hostname: string): boolean {
   try {
     if (!existsSync(HOSTS_FILE)) return true;
 
@@ -167,7 +167,7 @@ function getDnsmasqConfigDir(): string {
 
 const OVERDECK_DNSMASQ_CONF = 'overdeck.conf';
 
-export function addDnsmasqEntry(hostname: string, ip: string = '127.0.0.1'): boolean {
+function addDnsmasqEntry(hostname: string, ip: string = '127.0.0.1'): boolean {
   try {
     const configDir = getDnsmasqConfigDir();
     mkdirSync(configDir, { recursive: true });
@@ -189,7 +189,7 @@ export function addDnsmasqEntry(hostname: string, ip: string = '127.0.0.1'): boo
   }
 }
 
-export function removeDnsmasqEntry(hostname: string): boolean {
+function removeDnsmasqEntry(hostname: string): boolean {
   try {
     const configDir = getDnsmasqConfigDir();
     const confPath = join(configDir, OVERDECK_DNSMASQ_CONF);
@@ -198,20 +198,6 @@ export function removeDnsmasqEntry(hostname: string): boolean {
     const content = readFileSync(confPath, 'utf-8');
     const lines = content.split('\n').filter(line => !line.includes(`/${hostname}/`));
     writeFileSync(confPath, lines.join('\n'));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function restartDnsmasq(): Promise<boolean> {
-  const plat = await Effect.runPromise(detectPlatform());
-  try {
-    if (plat === 'darwin') {
-      await execAsync('brew services restart dnsmasq');
-    } else {
-      await execAsync('sudo systemctl restart dnsmasq');
-    }
     return true;
   } catch {
     return false;

@@ -14,7 +14,6 @@ import { memoryStatusCommand, memorySummaryCommand } from '../../../src/cli/comm
 import { MEMORY_STATUS_HISTORY_LIMIT } from '../../../src/lib/memory/cli.js';
 import { commitStatusRollup } from '../../../src/lib/memory/rollup.js';
 import { writeObservation } from '../../../src/lib/memory/observations.js';
-import { closeDatabase } from '../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases } from '../../../src/lib/memory/fts-db.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
@@ -112,7 +111,6 @@ beforeEach(() => {
 afterEach(() => {
   process.chdir(originalCwd);
   closeMemoryFtsDatabases();
-  closeDatabase();
   teardownOverdeckTestDb(odb);
   rmSync(workspaceDir, { recursive: true, force: true });
   rmSync(unregisteredDir, { recursive: true, force: true });

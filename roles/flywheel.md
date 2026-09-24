@@ -175,7 +175,7 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    each such item against current state and adopt it or close it out — never assume the last
    run finished what it started.
 3. `packages/contracts/src/flywheel.ts` — the `FlywheelStatus` schema you emit every tick.
-4. The run brief (default `docs/flywheel-brief.md`) — this run's scope and config
+4. The run brief (default `sync-sources/skills/pan-flywheel/SKILL.md`) — this run's scope and config
    (`scope`, `roles.flywheel.minAgents`/`maxAgents`, `auto_pickup_backlog`,
    `require_uat_before_merge`). Operate only inside `scope`; never exceed `maxAgents`.
 
@@ -269,10 +269,10 @@ It sets how aggressively you START backlog work:
 - **Start:** `pan start <id>` / `pan plan <id> --auto --auto-start` for auto-pickable items,
   in-pipeline recovery (startup-triage restart, merge-conflict re-plan), and trivial issues.
 - **Strike:** `pan strike <id>` for `blocks-main` emergencies — bypasses the pipeline. The
-  Deacon lands a ready `strike/<id>` through its server merge door, which records landing state
-  and runs the post-merge handoff. Observe `strikeLandingState` after readiness and intervene
-  only when it reaches `needs_you`; never merge the branch locally, push it to `origin/main`, or
-  run `pan done <id> --strike`.
+  strike agent pushes `strike/<id>` and opens a PR against `main`; the operator merges that PR.
+  Nothing lands a pushed strike branch on its own, so a strike that stops without a PR URL is
+  stalled: park it for the operator. Never merge the branch locally, push it to `origin/main`,
+  or run `pan done <id> --strike`.
 
 **Vet before every launch (PAN-2059).** Before you plan/start/strike *any* item, vet it
 against current `main` **and the resolved-tenets registry (`docs/DECISIONS.md`)**: already

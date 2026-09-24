@@ -41,6 +41,10 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   tmux: {
     configMode: 'managed',
   },
+  // PAN-3917 D10: unset means auto-select — herdr when its binary and the
+  // 'overdeck' session socket are present, else tmux with a diagnostic
+  // (src/lib/terminal-backends/select.ts).
+  terminal: {},
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   // Seeded conversation-model default for brand-new installs (operator
   // decision, 2026-07-12): the new-conversation picker must never be empty.
@@ -63,6 +67,12 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     manualCompactMode: 'claude-code',
     richCompaction: true,
     titleModel: 'claude-haiku-4-5',
+    // PAN-3860: deliberately no default here (unlike compactionModel/
+    // titleModel above) — the previous default lived as a private literal in
+    // summary-fork.ts, which is exactly the hardcoded-fallback pattern the
+    // repo bans. Leaving this unset means an operator who hasn't configured
+    // `conversations.handoff_author_model` gets a loud failure from
+    // `pan handoff`, not a silently-chosen model.
     watchDirs: ['~/Projects'],
     scanMaxParallel: null,
     embeddings: false,
@@ -218,6 +228,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorPsiFullShedAvg10: 1,
     governorPsiCalmReadmitAvg10: 0.05,
     governorPsiCalmWindowMs: 600_000,
+    governorCpuSoftLoadPerCore: 1.5,
+    governorCpuRecoveryLoadPerCore: 1,
   },
   issues: {
     closedWindowDays: 14,

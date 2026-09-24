@@ -12,8 +12,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  const { closeOverdeckDatabaseSync } = await import('../../../../src/lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
+  closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });

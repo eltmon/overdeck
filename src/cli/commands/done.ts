@@ -1,149 +1,83 @@
-import { exitCli } from '../exit.js';
-import chalk from 'chalk';
-import ora from 'ora';
-import { saveAgentRuntimeState } from '../../lib/agents.js';
-import type { AgentState } from '../../lib/agents.js';
-import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-const execAsync = promisify(exec);
-import { join } from 'path';
+/**
+ * `pan done` — the work agent's one submit step (PAN-3917 FR-10).
+ *
+ * It opens or updates the pull request for the issue's branches, marks it
+ * ready for review, moves the tracker to In Review, asks the dashboard to
+ * start verification and the review convoy (the same request `pan review
+ * request` makes), and writes nothing else. There is no pipeline record and no
+ * review-request row: "this issue is in review" is derived from the PR — open,
+ * not a draft — and "this item is done" lives in `.pan/continues/`, written by
+ * `pan task`. A dashboard that cannot be reached prints a hint and exits 0;
+ * the GitHub webhook starts the same pipeline when it sees the PR.
+ *
+ * The pre-flight checks that survive are the ones git and the plan can answer:
+ * a clean working tree, a branch that is pushed and ahead of its target, and
+ * an xBRIEF whose checklist is complete (item status comes from the continue
+ * file through `readWorkspacePlan`).
+ */
+
+import { exec, execFile } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
-import { AGENTS_DIR } from '../../lib/paths.js';
-import { runPreflightChecks } from '../../lib/work/done-preflight.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
-import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
-import { updateShadowState } from '../../lib/shadow-state.js';
-import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
-import { Effect, Layer } from 'effect';
-import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
-import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
-import * as NodePath from '@effect/platform-node/NodePath';
-import { getLinearApiKey } from '../../lib/shadow-utils.js';
-import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
-import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
-import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { resolveStateReadHomeSync, shouldCommitLegacyWorkspaceArtifacts } from '../../lib/state-read-home.js';
+import { join } from 'path';
+import { promisify } from 'util';
+
+import chalk from 'chalk';
+import { Effect } from 'effect';
+import ora from 'ora';
+
+import { exitCli } from '../exit.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
+import { cleanupWorkflowLabels } from '../../core/state-mapping.js';
+import { getForgeAdapter } from '../../lib/forge.js';
+import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
-import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
-import {
-  appendSessionEntrySync,
-  getProjectConfigFromWorkspacePath,
-  readIssueRecordSync,
-  readRecordContinueViewSync,
-  resolveProjectForIssue,
-  writeRecordDecisionsSync,
-  writeRecordScopeDriftSync,
-} from '../../lib/pan-dir/record.js';
-import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
-import type { MergeSet } from '../../lib/merge-set.js';
-import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
-import { compileGlob } from '../../lib/xbrief/dag.js';
-import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
-import type { XBriefDocument } from '../../lib/xbrief/types.js';
-import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
-import { postDoneDashboardJson } from './done-dashboard-client.js';
-import { persistDoneReviewIntent } from './done-review-intent.js';
-import { recordStrikeBypassVerdicts, verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
-const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
-  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
-);
+import { buildMergeSetForIssue } from '../../lib/merge-set.js';
+import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
+import { computeWorkspaceRepoRoots, resolveProjectReposForIssue } from '../../lib/project-repos.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { getLinearApiKey } from '../../lib/shadow-utils.js';
+import { runPreflightChecks } from '../../lib/work/done-preflight.js';
+import { updateContinueState } from '../../lib/xbrief/continue-state.js';
+import { commitPlanArtifacts, planArtifactCommitMessage } from '../../lib/overdeck/plan-artifact-commit.js';
+
+const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface DoneOptions {
   comment?: string;
   force?: boolean;
   testWaived?: string;
   /**
-   * Strike-agent shape (PAN strike role). When true, `pan done` short-circuits
-   * the review-pipeline dispatch: the strike has already merged to main and
-   * verified there, so there is no PR to open, no review specialists to spawn,
-   * and no tracker `in_review` transition. We only emit a completion activity
-   * entry and exit cleanly.
+   * Strike shape: the strike already merged to main, so there is no PR to open
+   * and no review to request. `pan done --strike` only proves the strike branch
+   * is contained in `origin/main`.
    */
   strike?: boolean;
 }
 
-interface SlotCompletionContext {
-  agentId: string;
-  agentState: AgentState | null;
-  slotIndex: number;
-  slotItemId?: string;
-  workspacePath: string | null;
-}
-
-export function parseSlotAgentId(input: string): { issueId: string; agentId: string; slotIndex: number } | null {
-  const match = /^(?:agent-)?([a-z]+-\d+)-slot-(\d+)$/i.exec(input.trim());
-  if (!match) return null;
-  const slotIndex = Number(match[2]);
-  if (!Number.isInteger(slotIndex) || slotIndex < 1) return null;
-  return {
-    issueId: match[1].toUpperCase(),
-    agentId: `agent-${match[1].toLowerCase()}-slot-${slotIndex}`,
-    slotIndex,
-  };
-}
-
-function parseSlotIndexFromAgentId(agentId: string): number | null {
-  const match = /^agent-[a-z]+-\d+-slot-(\d+)$/i.exec(agentId);
-  if (!match) return null;
-  const slotIndex = Number(match[1]);
-  return Number.isInteger(slotIndex) && slotIndex >= 1 ? slotIndex : null;
-}
-
-function parseSlotWorkspacePath(issueId: string, workspacePath: string): { slotIndex: number } | null {
-  const escapedIssue = issueId.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = new RegExp(`(?:^|/)feature-${escapedIssue}-slot-(\\d+)/?$`).exec(workspacePath);
-  if (!match) return null;
-  const slotIndex = Number(match[1]);
-  return Number.isInteger(slotIndex) && slotIndex >= 1 ? { slotIndex } : null;
-}
-
-function isSlotAgentState(agentState: AgentState | null): agentState is AgentState {
-  return !!agentState && (
-    typeof agentState.slotIndex === 'number' ||
-    /^agent-[a-z]+-\d+-slot-\d+$/i.test(agentState.id) ||
-    /-slot-\d+\/?$/.test(agentState.workspace)
-  );
-}
+// ─── Tracker ─────────────────────────────────────────────────────────────────
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {
   try {
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
-
-    // Deterministic lookup by identifier — no team iteration needed
-    // searchIssues returns IssueSearchResult which lacks .update(); re-fetch full Issue object
     const searchResults = await client.searchIssues(issueIdentifier, { first: 1 });
     const searchHit = searchResults.nodes.find(
-      (i) => i.identifier.toUpperCase() === issueIdentifier.toUpperCase()
+      (i) => i.identifier.toUpperCase() === issueIdentifier.toUpperCase(),
     );
-
     if (!searchHit) return false;
-    const issue = await client.issue(searchHit.id);
 
-    // Get the team from the issue itself, then find the target state
+    const issue = await client.issue(searchHit.id);
+    const { findLinearStateByName, getLinearStateName } = await import('../../core/state-mapping.js');
     const team = await issue.team;
     if (!team) return false;
-
     const states = await team.states();
-    const targetStateName = getLinearStateName('in_review');
-    const targetState = findLinearStateByName(states.nodes, targetStateName);
+    const target = findLinearStateByName(states.nodes, getLinearStateName('in_review'));
+    if (!target) return false;
 
-    if (!targetState) {
-      console.error(`Linear state "${targetStateName}" not found in team`);
-      return false;
-    }
-
-    await issue.update({ stateId: targetState.id });
-
-    // Add completion comment if provided
-    if (comment) {
-      await client.createComment({
-        issueId: issue.id,
-        body: `🤖 **Agent completed work:**\n\n${comment}`,
-      });
-    }
-
+    await issue.update({ stateId: target.id });
+    if (comment) await client.createComment({ issueId: issue.id, body: `🤖 **Agent completed work:**\n\n${comment}` });
     return true;
   } catch (error) {
     console.error('Linear API error:', error);
@@ -157,63 +91,49 @@ function getGitHubConfig(): { token: string; repos: { owner: string; repo: strin
   const content = readFileSync(envFile, 'utf-8');
   const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);
   if (!tokenMatch) return null;
-  const token = tokenMatch[1].trim();
   const reposMatch = content.match(/GITHUB_REPOS=(.+)/);
   if (!reposMatch) return null;
-  const repos = reposMatch[1].trim().split(',').map(r => {
+  const repos = reposMatch[1].trim().split(',').map((r) => {
     const [repoPath, prefix] = r.trim().split(':');
     const [owner, repo] = repoPath.split('/');
     return { owner, repo, prefix };
-  }).filter(r => r.owner && r.repo);
+  }).filter((r) => r.owner && r.repo);
   if (repos.length === 0) return null;
-  return { token, repos };
+  return { token: tokenMatch[1].trim(), repos };
 }
 
 async function updateGitHubToInReview(issueId: string, comment?: string): Promise<boolean> {
   try {
     const ghConfig = getGitHubConfig();
     if (!ghConfig) return false;
-
-    const number = extractNumberSync(issueId);
+    const number = extractNumber(issueId);
     if (number === null) return false;
-    const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
-    const { owner, repo } = repoConfig;
-    const token = ghConfig.token;
+    const { owner, repo } = ghConfig.repos.find((r) => r.prefix === 'PAN') ?? ghConfig.repos[0];
     const headers = {
-      'Authorization': `token ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
+      Authorization: `token ${ghConfig.token}`,
+      Accept: 'application/vnd.github.v3+json',
       'Content-Type': 'application/json',
     };
 
-    // Get current labels
     const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
       headers, signal: AbortSignal.timeout(15_000),
     });
-    const currentLabels = labelsRes.ok ? (await labelsRes.json() as any[]).map((l: any) => l.name) : [];
-
-    // Defense-in-depth: refuse to re-submit an already-closed-out issue
-    if (currentLabels.some(l => l.toLowerCase() === 'closed-out')) {
+    const currentLabels = labelsRes.ok ? (await labelsRes.json() as { name: string }[]).map((l) => l.name) : [];
+    if (currentLabels.some((l) => l.toLowerCase() === 'closed-out')) {
       console.error(chalk.red(`\n✖ ${issueId} has already been closed out. Cannot mark work as done.\n`));
       return false;
     }
 
-    // Clean up workflow labels and get target labels for in_review state
-    const targetLabels = cleanupWorkflowLabels(currentLabels, 'in_review');
-
-    // Update labels (set all at once to replace)
     await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
       method: 'PUT', headers, signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify({ labels: targetLabels }),
+      body: JSON.stringify({ labels: cleanupWorkflowLabels(currentLabels, 'in_review') }),
     });
-
-    // Add completion comment
     if (comment) {
       await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments`, {
         method: 'POST', headers, signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({ body: `🤖 **Agent completed work:**\n\n${comment}` }),
       });
     }
-
     return true;
   } catch (error) {
     console.error('GitHub API error:', error);
@@ -221,795 +141,338 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
   }
 }
 
-export async function recordTestWaiver(workspacePath: string, reason: string): Promise<void> {
-  try {
-    const issueId = workspacePath.match(/feature-([a-z]+-\d+)$/i)?.[1]?.toUpperCase();
-    if (!issueId) return;
-    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-    const existing = readRecordContinueViewSync(project, issueId);
-    const now = new Date().toISOString();
-    writeRecordDecisionsSync(project, issueId, [
-      ...(existing?.decisions ?? []),
-      { id: 'D-test-waived', summary: `Test gate waived: ${reason}`, recordedAt: now },
-    ]);
-  } catch (err: any) {
-    console.warn(`[pan done] Failed to record test waiver in record (non-fatal): ${err?.message ?? err}`);
+/** Refuse a done on an issue the tracker already closed. */
+async function refuseIfIssueClosed(issueId: string): Promise<string | null> {
+  const { resolveGitHubIssue } = await import('../../lib/tracker-utils.js');
+  const ghInfo = resolveGitHubIssue(issueId);
+  if (ghInfo.isGitHub) {
+    try {
+      const { stdout } = await execAsync(
+        `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state,labels --jq '[.state, (.labels | map(.name) | join(","))] | @tsv'`,
+        { encoding: 'utf-8' },
+      );
+      const [state, labelsStr] = stdout.trim().split('\t');
+      if ((state || '').toLowerCase() === 'closed') return `${issueId} is already closed.`;
+      if ((labelsStr || '').split(',').some((l) => l.toLowerCase() === 'closed-out')) {
+        return `${issueId} has already been closed out.`;
+      }
+      return null;
+    } catch (error) {
+      return `Could not verify issue state for ${issueId} (${(error as Error).message}). Use --force to override.`;
+    }
   }
+
+  const apiKey = await Effect.runPromise(getLinearApiKey());
+  if (!apiKey) return null;
+  try {
+    const { LinearClient } = await import('@linear/sdk');
+    const client = new LinearClient({ apiKey });
+    const { extractPrefix } = await import('../../lib/issue-id.js');
+    const issueNum = extractNumber(issueId);
+    const teamKey = extractPrefix(issueId);
+    if (issueNum === null || teamKey === null) return null;
+    const results = await client.issues({ filter: { number: { eq: issueNum }, team: { key: { eq: teamKey } } }, first: 1 });
+    const state = results.nodes.length > 0 ? await results.nodes[0].state : null;
+    return state?.type === 'completed' || state?.type === 'canceled' ? `${issueId} is already closed.` : null;
+  } catch (error) {
+    return `Could not verify Linear issue state for ${issueId} (${(error as Error).message}). Use --force to override.`;
+  }
+}
+
+// ─── The PR ──────────────────────────────────────────────────────────────────
+
+/** Acceptance criteria from the plan, so the PR body carries the checklist. */
+async function buildPrBody(issueId: string, workspacePath: string): Promise<string> {
+  const lines = [`**Issue:** #${extractNumber(issueId) ?? issueId}`, ''];
+  try {
+    const { readWorkspacePlanSync } = await import('../../lib/xbrief/io.js');
+    const items = readWorkspacePlanSync(workspacePath)?.plan.items ?? [];
+    if (items.length > 0) {
+      lines.push('## Acceptance Criteria', '');
+      for (const item of items) lines.push(`- [${item.status === 'completed' ? 'x' : ' '}] ${item.title}`);
+      lines.push('');
+    }
+  } catch { /* body enrichment only */ }
+  return lines.join('\n').trim() || `Automated review artifact for ${issueId}`;
+}
+
+export interface OpenedPr {
+  repoKey: string;
+  url?: string;
+  id?: string;
+  created: boolean;
+}
+
+/** True when the repo checkout has commits the target branch does not. */
+async function repoHasChanges(dir: string, targetBranch: string): Promise<boolean> {
+  if (!existsSync(join(dir, '.git'))) return false;
+  await execFileAsync('git', ['fetch', 'origin', targetBranch], { cwd: dir, timeout: 30_000 }).catch(() => {});
+  try {
+    await execFileAsync('git', ['diff', '--quiet', `origin/${targetBranch}...HEAD`], { cwd: dir, timeout: 15_000 });
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Open the PR for every repo with changes, or return the one already open.
+ * The forge adapter is the GitHub (`gh`) and GitLab (`glab`) door; nothing
+ * about the result is stored.
+ */
+export async function openOrUpdatePullRequests(issueId: string, workspacePath: string): Promise<OpenedPr[]> {
+  const repos = resolveProjectReposForIssue(issueId);
+  const roots = computeWorkspaceRepoRoots(repos, issueId, workspacePath);
+  const forgeByKey = new Map((repos ?? []).map((repo) => [repo.repoKey, repo.forge]));
+  const body = await buildPrBody(issueId, workspacePath);
+  const opened: OpenedPr[] = [];
+
+  for (const root of roots) {
+    if (!(await repoHasChanges(root.dir, root.targetBranch))) continue;
+    const adapter = getForgeAdapter(forgeByKey.get(root.repoKey) ?? 'github');
+    const artifact = await adapter.createReviewArtifact({
+      title: issueId,
+      body,
+      sourceBranch: root.sourceBranch,
+      targetBranch: root.targetBranch,
+      cwd: root.dir,
+    });
+    opened.push({ repoKey: root.repoKey, url: artifact.url, id: artifact.id, created: artifact.created });
+
+    // "Review requested" is derived from the PR being open and not a draft —
+    // there is no reviewer row to write. `gh pr ready` is a no-op on a PR that
+    // is already ready.
+    if (adapter.forge === 'github' && artifact.url) {
+      await execFileAsync('gh', ['pr', 'ready', artifact.url], { cwd: root.dir }).catch(() => {});
+    }
+  }
+  return opened;
+}
+
+/** The test-gate waiver is a decision on the issue's continue file, not a record. */
+export async function recordTestWaiver(workspacePath: string, reason: string): Promise<void> {
+  const issueId = workspacePath.match(/feature-([a-z]+-\d+)$/i)?.[1]?.toUpperCase();
+  if (!issueId) return;
+  const planHome = resolvePlanHome(workspacePath);
+  updateContinueState(planHome, issueId, (state) => ({
+    ...state,
+    decisions: [
+      ...state.decisions,
+      { id: 'D-test-waived', summary: `Test gate waived: ${reason}`, recordedAt: new Date().toISOString() },
+    ],
+  }));
+  await commitPlanArtifacts({
+    cwd: planHome,
+    paths: [join('.pan', 'continues')],
+    message: planArtifactCommitMessage(issueId),
+  });
+}
+
+/**
+ * Ask the dashboard to start verification → review for the issue (PAN-3917
+ * W12). Reuses the `pan review request` door; the result is advisory, so the
+ * caller prints the line and carries on.
+ */
+export async function startReviewPipeline(
+  issueId: string,
+  message?: string,
+): Promise<{ started: boolean; line: string }> {
+  const { requestReviewViaDashboard } = await import('./request-review.js');
+  const response = await requestReviewViaDashboard(issueId, message, undefined, 'pan-done');
+
+  if (response.kind === 'unreachable') {
+    return {
+      started: false,
+      line: chalk.yellow(`  ⚠ Review not started (dashboard unreachable): run pan review request ${issueId}`),
+    };
+  }
+  if (response.kind === 'rejected') {
+    const reason = response.result.error || `HTTP ${response.status}`;
+    return {
+      started: false,
+      line: chalk.yellow(`  ⚠ Review not started (${reason}): run pan review request ${issueId}`),
+    };
+  }
+  return {
+    started: true,
+    line: chalk.green(`  ✓ ${response.result.message ?? `Review pipeline started for ${issueId}`}`),
+  };
 }
 
 export function augmentCommentWithWaiver(comment: string | undefined, waiverReason: string): string {
   const waiverText = `Test gate waived: ${waiverReason}`;
-  if (!comment) return waiverText;
-  return `${comment}\n\n${waiverText}`;
+  return comment ? `${comment}\n\n${waiverText}` : waiverText;
 }
 
-function pathMatchesDeclaredScope(filePath: string, declaredScope: string[]): boolean {
-  return declaredScope.some((pattern) => {
-    const compiled = compileGlob(pattern);
-    return compiled.regex.test(filePath) || compiled.exactDirectory === filePath;
-  });
-}
-
-function declaredScopeMatchesChangedFile(pattern: string, actualChangedFiles: string[]): boolean {
-  const compiled = compileGlob(pattern);
-  return actualChangedFiles.some((filePath) => compiled.regex.test(filePath) || compiled.exactDirectory === filePath);
-}
-
-export function declaredScopeUnion(doc: XBriefDocument): string[] {
-  return Array.from(
-    new Set(
-      doc.plan.items.flatMap((item) => item.metadata?.files_scope ?? []),
-    ),
-  ).sort();
-}
-
-export function computeScopeDrift(
-  doc: XBriefDocument,
-  actualChangedFiles: Iterable<string>,
-  recordedAt: string,
-): ScopeDriftRecord | null {
-  const declaredScope = declaredScopeUnion(doc);
-  if (declaredScope.length === 0) return null;
-
-  const actual = Array.from(new Set(actualChangedFiles)).sort();
-  return {
-    outsideDeclaredScope: actual.filter((filePath) => !pathMatchesDeclaredScope(filePath, declaredScope)),
-    declaredScopeUntouched: declaredScope.filter((pattern) => !declaredScopeMatchesChangedFile(pattern, actual)),
-    declaredScope,
-    actualChangedFiles: actual,
-    recordedAt,
-  };
-}
-
-async function recordScopeDriftForDone(
-  issueId: string,
-  workspacePath: string,
-): Promise<ScopeDriftRecord | undefined> {
-  try {
-    const plan = readWorkspacePlanSync(workspacePath);
-    if (!plan) return undefined;
-    const actualChangedFiles = await Effect.runPromise(
-      changedFilesVsMain('HEAD', workspacePath, 'origin/main').pipe(Effect.provide(childProcessLayer)),
-    );
-    const drift = computeScopeDrift(plan, actualChangedFiles, new Date().toISOString());
-    if (!drift) return undefined;
-    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-    writeRecordScopeDriftSync(project, issueId, drift);
-    return drift;
-  } catch (err: any) {
-    console.warn(`[pan done] Failed to record scope drift for ${issueId} (non-fatal): ${err?.message ?? err}`);
-    return undefined;
-  }
-}
-
-async function isMergeSetMergedIntoTargets(
-  workspacePath: string,
-  mergeSet: MergeSet | null | undefined,
-): Promise<boolean> {
-  if (!mergeSet || mergeSet.repos.length === 0) return false;
-
-  for (const repo of mergeSet.repos) {
-    const repoPath = mergeSet.workspaceType === 'polyrepo'
-      ? join(workspacePath, repo.repoKey)
-      : workspacePath;
-
-    if (!existsSync(join(repoPath, '.git'))) return false;
-
-    await execAsync(`git fetch origin ${repo.targetBranch}`, {
-      cwd: repoPath,
-      encoding: 'utf-8',
-      timeout: 60000,
-    });
-
-    try {
-      await execAsync(`git merge-base --is-ancestor HEAD origin/${repo.targetBranch}`, {
-        cwd: repoPath,
-        encoding: 'utf-8',
-        timeout: 10000,
-      });
-    } catch {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-async function resolveDoneWorkspace(
-  issueId: string,
-  agentId: string,
-): Promise<{ agentState: AgentState | null; workspacePath: string | null }> {
-  const { getAgentStateSync } = await import('../../lib/agents.js');
-  const agentState = getAgentStateSync(agentId) ?? null;
-  const agentWorkspace = agentState?.workspace;
-  if (agentWorkspace && existsSync(agentWorkspace)) {
-    return { agentState, workspacePath: agentWorkspace };
-  }
-
-  const cwdSlot = parseSlotWorkspacePath(issueId, process.cwd());
-  if (cwdSlot) {
-    const slotAgentId = `agent-${issueId.toLowerCase()}-slot-${cwdSlot.slotIndex}`;
-    const slotAgentState = getAgentStateSync(slotAgentId) ?? null;
-    return { agentState: slotAgentState, workspacePath: process.cwd() };
-  }
-
-  const resolved = resolveProjectFromIssueSync(issueId);
-  const workspacePath = resolved
-    ? findWorkspacePath(resolved.projectPath, issueId.toLowerCase())
-    : null;
-
-  return { agentState, workspacePath };
-}
-
-async function resolveSlotCompletionContext(
-  issueId: string,
-  agentId: string,
-  slotInput: { agentId: string; slotIndex: number } | null,
-): Promise<SlotCompletionContext | null> {
-  const { getAgentStateSync } = await import('../../lib/agents.js');
-
-  if (slotInput) {
-    const agentState = getAgentStateSync(slotInput.agentId) ?? null;
-    return {
-      agentId: slotInput.agentId,
-      agentState,
-      slotIndex: slotInput.slotIndex,
-      slotItemId: agentState?.slotItemId,
-      workspacePath: agentState?.workspace ?? null,
-    };
-  }
-
-  const agentState = getAgentStateSync(agentId) ?? null;
-  if (isSlotAgentState(agentState)) {
-    const slotIndex =
-      agentState.slotIndex ??
-      parseSlotIndexFromAgentId(agentState.id) ??
-      parseSlotWorkspacePath(issueId, agentState.workspace)?.slotIndex;
-    if (!slotIndex) return null;
-    return {
-      agentId: agentState.id,
-      agentState,
-      slotIndex,
-      slotItemId: agentState.slotItemId,
-      workspacePath: agentState.workspace,
-    };
-  }
-
-  const cwdSlot = parseSlotWorkspacePath(issueId, process.cwd());
-  if (!cwdSlot) return null;
-
-  const slotAgentId = `agent-${issueId.toLowerCase()}-slot-${cwdSlot.slotIndex}`;
-  const slotAgentState = getAgentStateSync(slotAgentId) ?? null;
-  return {
-    agentId: slotAgentId,
-    agentState: slotAgentState,
-    slotIndex: cwdSlot.slotIndex,
-    slotItemId: slotAgentState?.slotItemId,
-    workspacePath: slotAgentState?.workspace ?? process.cwd(),
-  };
-}
-
-export async function completeSlotWork(issueId: string, slot: SlotCompletionContext, comment?: string): Promise<void> {
-  const now = new Date().toISOString();
-  const { saveAgentStateSync } = await import('../../lib/agents.js');
-
-  // PAN-2372 WI-3 / FR-4, FR-5: durably record this slot's completion and verify
-  // it persisted BEFORE any runtime-state write — see persistAndVerifySwarmSlotCompletion.
-  // statusOverrides are intentionally NOT written here; the coordinator (WI-4)
-  // derives item completion from this marker.
-  const { persistAndVerifySwarmSlotCompletion } = await import('../../lib/cloister/deacon-swarm-record.js');
-  const workspacePath = slot.workspacePath ?? process.cwd();
-  const persisted = await persistAndVerifySwarmSlotCompletion(workspacePath, issueId, {
-    slotIndex: slot.slotIndex,
-    itemId: slot.slotItemId,
-    agentId: slot.agentId,
-    completedAt: now,
-  });
-  if (!persisted) {
-    console.error(chalk.red(
-      `✗ Slot ${slot.slotIndex} completion did NOT persist to ${issueId}'s record — ` +
-      `refusing to mark the slot done. Re-run \`pan done ${slot.agentId}\` so the ` +
-      `swarm coordinator can observe this slot as completed.`,
-    ));
-    return exitCli(1);
-  }
-
-  if (slot.agentState) {
-    slot.agentState.status = 'stopped';
-    slot.agentState.stoppedByUser = true;
-    slot.agentState.lastActivity = now;
-    saveAgentStateSync(slot.agentState);
-  }
-
-  saveAgentRuntimeState(slot.agentId, {
-    state: 'idle',
-    resolution: 'completed',
-    resolutionCount: 1,
-    resolutionUpdatedAt: now,
-    lastActivity: now,
-  });
-
-  emitActivityEntrySync({
-    source: 'work-agent',
-    level: 'info',
-    issueId,
-    message: `${slot.agentId} slot work complete — awaiting swarm verification and merge`,
-  });
-
-  console.log(chalk.green(`✓ Slot ${slot.slotIndex} work complete for ${issueId}`));
-  if (slot.slotItemId) {
-    console.log(chalk.dim(`  Item: ${slot.slotItemId}`));
-  }
-  if (comment) {
-    console.log(chalk.dim(`  Comment: ${comment}`));
-  }
-  console.log(chalk.dim('  Swarm coordination will verify and merge this slot before issue-level review.'));
-}
+// ─── The verb ────────────────────────────────────────────────────────────────
 
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
-  // Support both "pan done MIN-123" and "pan done agent-min-123"
-  const slotInput = parseSlotAgentId(id);
-  const issueId = slotInput?.issueId ?? resolveIssueIdSync(id);
-  const agentId = slotInput?.agentId ?? `agent-${issueId.toLowerCase()}`;
+  const issueId = resolveIssueId(id);
 
-  // Strike-agent shape: the strike already merged to main and verified there,
-  // so there is no review pipeline to dispatch. Run the same post-merge
-  // lifecycle handoff the PR merge path uses, after verifying the strike branch
-  // is actually contained in origin/main.
   if (options.strike) {
     const resolved = resolveProjectFromIssueSync(issueId);
     if (!resolved?.projectPath) {
-      console.error(chalk.red(`Could not resolve project for ${issueId}; cannot run strike post-merge handoff.`));
+      console.error(chalk.red(`Could not resolve project for ${issueId}.`));
       return exitCli(1);
     }
-
-    const branchName = `strike/${issueId.toLowerCase()}`;
+    const { verifyStrikeBranchMergedIntoMain } = await import('./strike-merge-verification.js');
     try {
       const reason = await verifyStrikeBranchMergedIntoMain(issueId, resolved.projectPath);
       console.log(chalk.green(`✓ Verified strike merge: ${reason}`));
-
-      // PAN-3067: record the strike's by-design test/verification bypass as 'skipped' so DoD close-out can pass.
-      recordStrikeBypassVerdicts(issueId);
-
-      const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
-      await postMergeLifecycle(issueId, resolved.projectPath, branchName, {
-        skipDeploy: true,
-        allowVerifiedNoPrMerge: true,
-        markReviewPassed: true,
-      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(chalk.red(`Strike post-merge handoff refused for ${issueId}: ${message}`));
+      console.error(chalk.red(`Strike ${issueId} is not contained in origin/main: ${(error as Error).message}`));
       return exitCli(1);
     }
-
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'strike',
       level: 'info',
       issueId,
-      message: `Strike ${issueId} post-merge handoff completed${options.comment ? `: ${options.comment}` : ''}`,
+      message: `Strike ${issueId} merged to main${options.comment ? `: ${options.comment}` : ''}`,
     });
-    console.log(chalk.green(`✓ Strike ${issueId} handed off to verifying-on-main (review pipeline skipped)`));
     return;
   }
 
-  const slotCompletion = await resolveSlotCompletionContext(issueId, agentId, slotInput);
-  if (slotCompletion) {
-    await completeSlotWork(issueId, slotCompletion, options.comment);
-    return;
-  }
-
-  // Guard: reject completion for already-closed issues
   if (!options.force) {
-    const { resolveGitHubIssueSync } = await import('../../lib/tracker-utils.js');
-    const ghInfo = resolveGitHubIssueSync(issueId);
-    if (ghInfo.isGitHub) {
-      try {
-        const { stdout } = await execAsync(
-          `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state,labels --jq '[.state, (.labels | map(.name) | join(","))] | @tsv'`,
-          { encoding: 'utf-8' }
-        );
-        const [state, labelsStr] = stdout.trim().split('\t');
-        const stateLower = (state || '').toLowerCase();
-        const labels = (labelsStr || '').split(',').filter(Boolean);
-        if (stateLower === 'closed') {
-          console.error(chalk.red(`\n✖ ${issueId} is already closed. Cannot mark work as done on a closed issue.\n`));
-          return exitCli(1);
-        }
-        // Defense-in-depth: refuse to re-submit an issue that has already been closed out
-        if (labels.some(l => l.toLowerCase() === 'closed-out')) {
-          console.error(chalk.red(`\n✖ ${issueId} has already been closed out. Cannot mark work as done on a closed-out issue.\n`));
-          return exitCli(1);
-        }
-      } catch (guardErr) {
-        console.error(chalk.yellow(`\n⚠ Could not verify issue state for ${issueId} (${(guardErr as Error).message}). Aborting for safety — use --force to override.\n`));
-        return exitCli(1);
-      }
-    } else {
-      const linearApiKey = await Effect.runPromise(getLinearApiKey());
-      if (linearApiKey) {
-        try {
-          const { LinearClient } = await import('@linear/sdk');
-          const client = new LinearClient({ apiKey: linearApiKey });
-          const { extractNumberSync, extractPrefixSync } = await import('../../lib/issue-id.js');
-          const issueNum = extractNumberSync(issueId);
-          const teamKey = extractPrefixSync(issueId);
-          if (issueNum !== null && teamKey !== null) {
-            const results = await client.issues({
-              filter: { number: { eq: issueNum }, team: { key: { eq: teamKey } } },
-              first: 1,
-            });
-            if (results.nodes.length > 0) {
-              const state = await results.nodes[0].state;
-              if (state?.type === 'completed' || state?.type === 'canceled') {
-                console.error(chalk.red(`\n✖ ${issueId} is already closed. Cannot mark work as done on a closed issue.\n`));
-                return exitCli(1);
-              }
-            }
-          }
-        } catch (guardErr) {
-          console.error(chalk.yellow(`\n⚠ Could not verify Linear issue state for ${issueId} (${(guardErr as Error).message}). Aborting for safety — use --force to override.\n`));
-          return exitCli(1);
-        }
-      }
+    const refusal = await refuseIfIssueClosed(issueId);
+    if (refusal) {
+      console.error(chalk.red(`\n✖ ${refusal}\n`));
+      return exitCli(1);
     }
   }
 
-  // PAN-2207: clear stale deacon recovery tombstone before pre-flight.
-  try {
-    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
-    await updateIssueRecord(project, issueId, (record) => {
-      if (!record.pipeline.panDoneRecoveredAt) return;
-      const { panDoneRecoveredAt: _, ...pipeline } = record.pipeline;
-      return { ...record, pipeline };
-    });
-  } catch (e: any) {
-    console.warn(`[pan done] Failed to clear recovery tombstone (non-fatal): ${e?.message ?? e}`);
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const workspacePath = resolved ? findWorkspacePath(resolved.projectPath, issueId.toLowerCase()) : null;
+  if (!workspacePath || !existsSync(workspacePath)) {
+    console.error(chalk.red(`Workspace not found for ${issueId}; there is nothing to open a pull request from.`));
+    return exitCli(1);
   }
 
-  // Pre-flight completion checks (unless --force)
   if (!options.force) {
-    const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
-    if (workspacePath && existsSync(workspacePath)) {
-      const doneProject = (() => { try { return resolveProjectForIssue(issueId); } catch { return null; } })();
-      const migratedState = resolveStateReadHomeSync(doneProject ?? getProjectConfigFromWorkspacePath(workspacePath)).migrated;
-      // Commit stale orchestration artifacts so preflight does not reject them.
-      if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
-        const { stdout: preDirty } = await execAsync(
-          'git status --porcelain .pan/',
-          { cwd: workspacePath, encoding: 'utf-8' }
-        );
-        if (preDirty.trim()) {
-          await execAsync('git add .pan/', { cwd: workspacePath });
-          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
-        }
-      } catch { /* non-fatal */ }
+    const failures = await runPreflightChecks(workspacePath, issueId, options.testWaived);
+    if (failures.length > 0) {
+      console.error(chalk.red(`\n✖ Work completion checks failed for ${issueId}:\n`));
+      for (const line of failures) console.error(line);
+      console.error('');
+      console.error(chalk.dim('  Resolve uncommitted changes by picking ONE:'));
+      console.error(chalk.dim('    1. Commit:  git add -A && git commit -m "<message>" (in the repo that owns the file)'));
+      console.error(chalk.dim('    2. Discard: git restore --staged --worktree . (tracked files only; destructive)'));
+      console.error(chalk.dim(`    3. Surface: pan tell ${issueId} "Uncommitted changes need operator decision"`));
+      console.error('');
+      console.error(chalk.dim(`  After resolving, run 'pan done ${issueId}' again.`));
+      console.error(chalk.dim('  Use --force to skip checks (NOT recommended — leaves uncommitted work behind).'));
+      console.error('');
+      return exitCli(1);
+    }
 
-      const failures = await Effect.runPromise(runPreflightChecks(workspacePath, issueId, options.testWaived));
-
-      if (failures.length > 0) {
-        console.error(chalk.red(`\n✖ Work completion checks failed for ${issueId}:\n`));
-        for (const line of failures) {
-          console.error(line);
-        }
-        console.error('');
-        // Agents never use git stash. Dirty work must be committed, explicitly
-        // discarded, or surfaced to the operator.
-        console.error(chalk.dim('  Resolve uncommitted changes by picking ONE:'));
-        console.error(chalk.dim('    1. Commit:  git add -A && git commit -m "<message>" (in the repo that owns the file)'));
-        console.error(chalk.dim('    2. Discard: git restore --staged --worktree . (tracked files only; destructive)'));
-        console.error(chalk.dim('    3. Surface: pan tell ' + issueId + ' "Uncommitted changes need operator decision"'));
-        console.error('');
-        console.error(chalk.dim('  Generated harness files (.devcontainer/, dev symlink, .pan/, .overdeck/) are'));
-        console.error(chalk.dim('  already excluded from this check. If any listed file looks like workspace'));
-        console.error(chalk.dim('  infrastructure, treat it as a bug: surface it (option 3). NEVER delete'));
-        console.error(chalk.dim('  workspace infrastructure to pass this check.'));
-        console.error('');
-        console.error(chalk.dim(`  After resolving, run 'pan done ${issueId}' again.`));
-        console.error(chalk.dim('  Use --force to skip checks (NOT recommended — leaves uncommitted work behind).'));
-        console.error('');
-        return exitCli(1);
-        return;
-      }
-
-      if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
-        const { stdout: postDirty } = await execAsync(
-          'git status --porcelain .pan/',
-          { cwd: workspacePath, encoding: 'utf-8' }
-        );
-        if (postDirty.trim()) {
-          await execAsync('git add .pan/', { cwd: workspacePath });
-          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
-        }
-      } catch { /* non-fatal */ }
-
-      // PAN-1501: persist --test-waived reason to continue.json and append it to
-      // the tracker comment so human reviewers see the waiver without reading
-      // continue.json.
-      if (options.testWaived) {
-        await recordTestWaiver(workspacePath, options.testWaived);
-        options.comment = augmentCommentWithWaiver(options.comment, options.testWaived);
-      }
+    if (options.testWaived) {
+      await recordTestWaiver(workspacePath, options.testWaived);
+      options.comment = augmentCommentWithWaiver(options.comment, options.testWaived);
     }
   }
 
   const spinner = ora('Marking work as done...').start();
 
   try {
-    // Step 0: Rebase onto target branch + push.
-    //
-    // Absorbing the rebase into `pan done` eliminates the multi-step
-    // orchestration burden that was causing agents to stop partway through
-    // the submit flow. An agent now has exactly one command to run; this
-    // step handles the fetch/rebase/push that agents previously had to
-    // perform manually before calling `pan done`.
-    //
-    // Planning-artifact conflicts (`.planning/*`) are auto-resolved with
-    // `--ours`. Any other conflicts abort the rebase and surface a clear
-    // error; the agent must resolve them and re-run `pan done`.
-    {
-      const { workspacePath: rebaseWorkspacePath } = await resolveDoneWorkspace(issueId, agentId);
-
-      if (rebaseWorkspacePath && existsSync(rebaseWorkspacePath)) {
-        const { ensureMergeSetForIssueSync } = await import('../../lib/merge-set.js');
-        const { rebaseAndPushRepos } = await import('../../lib/rebase-helper.js');
-        const preMergeSet = ensureMergeSetForIssueSync(issueId);
-
-        if (preMergeSet && preMergeSet.repos.length > 0) {
-          spinner.text = 'Rebasing onto target branch and pushing...';
-          const rebaseResult = await Effect.runPromise(rebaseAndPushRepos(rebaseWorkspacePath, preMergeSet));
-
-          if (!rebaseResult.success) {
-            const failure = rebaseResult.firstFailure!;
-            spinner.fail(`Rebase failed in ${failure.repoKey}`);
-            console.error('');
-            if (failure.conflictFiles?.length) {
-              console.error(chalk.red(`Rebase conflicts in non-planning files:`));
-              for (const file of failure.conflictFiles) {
-                console.error(chalk.red(`  - ${file}`));
-              }
-              console.error('');
-              console.error(chalk.dim('Resolve the conflicts manually, commit, then re-run:'));
-              console.error(chalk.dim(`  pan done ${issueId}`));
-            } else {
-              console.error(chalk.red(failure.message || 'Unknown rebase error'));
-            }
-            console.error('');
-            return exitCli(1);
-          }
-
-          const rebased = rebaseResult.results.filter(r => r.outcome === 'rebased');
-          if (rebased.length > 0) {
-            console.log(chalk.green(`  ✓ Rebased and pushed ${rebased.length} repo(s)`));
-          } else {
-            console.log(chalk.dim('  Branch already current with target — pushed any local commits'));
-          }
-        }
-      }
-    }
-
-    let trackerUpdated = false;
-    let shadowModeActive = false;
-    const isGitHubIssue = issueId.startsWith('PAN-');
-
-    // Step 1: Create review artifacts immediately and persist merge-set state.
-    const { saveAgentStateSync } = await import('../../lib/agents.js');
-    const { agentState: existingState, workspacePath } = await resolveDoneWorkspace(issueId, agentId);
-
-    if (!workspacePath || !existsSync(workspacePath)) {
-      throw new Error(`Workspace not found for ${issueId}; cannot create review artifact set`);
-    }
-
-    const scopeDrift = await recordScopeDriftForDone(issueId, workspacePath);
-
-    spinner.text = 'Creating review artifacts...';
-    const { createReviewArtifactsForIssue } = await import('../../lib/review-artifacts.js');
-    const { setReviewStatusSync } = await import('../../lib/review-status.js');
-    let artifactResult;
-    try {
-      artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
-    } catch (artifactErr: any) {
-      // PAN-2207: GraphQL/App rate limit → REST-only PR lookup fallback.
-      // PAN-2465: the fallback runs `gh pr list` in the workspace ROOT, but a
-      // polyrepo workspace root has no git remotes (the real repos are the
-      // subdirectories, often not even on GitHub) — the gh call then crashes
-      // with "no git remotes found", masking the original artifact error and
-      // making agents loop `pan done` against a red herring. Guard the
-      // fallback: any failure rethrows the ORIGINAL artifact error.
-      let existingPrUrl = '';
-      try {
-        const { stdout } = await execAsync(
-          `gh pr list --head feature/${issueId.toLowerCase()} --state open --json url --jq '.[0].url'`,
-          { cwd: workspacePath, encoding: 'utf-8' }
-        );
-        existingPrUrl = stdout.trim();
-      } catch (fallbackErr: any) {
-        console.log(chalk.dim(`  (REST PR-lookup fallback unavailable here: ${String(fallbackErr?.message ?? fallbackErr).split('\n')[0]})`));
-        throw artifactErr;
-      }
-      if (!existingPrUrl) throw artifactErr;
-      console.log(chalk.yellow(`  ⚠ Review artifact creation failed, but found existing PR via REST fallback: ${existingPrUrl}`));
-      artifactResult = { mergeSet: null, artifacts: [{ repoKey: 'primary', created: false, skipped: false, url: existingPrUrl }] };
-    }
-    const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
-    const reviewArtifactUrl = primaryArtifact?.artifactUrl
-      ?? artifactResult.artifacts.find(artifact => !artifact.skipped && artifact.url)?.url;
-
-    const createdArtifacts = artifactResult.artifacts.filter(artifact => !artifact.skipped && artifact.url);
-    if (createdArtifacts.length > 0) {
-      console.log(chalk.green(`  ✓ Created review artifact set (${createdArtifacts.length} repo${createdArtifacts.length === 1 ? '' : 's'})`));
-    } else {
-      console.log(chalk.yellow('  ⚠ No changed repos detected for review artifact creation'));
-    }
-
-    // Step 2: Guard against actually-merged issues (e.g. merge completed in
-    // background while agent was finishing up). Review status is cached state and
-    // can be stale after re-submission, so verify git ancestry before skipping.
-    const { getReviewStatusSync } = await import('../../lib/review-status.js');
-    const currentStatus = getReviewStatusSync(issueId);
-    if (currentStatus?.mergeStatus === 'merged') {
-      const actuallyMerged = await isMergeSetMergedIntoTargets(workspacePath, artifactResult.mergeSet);
-      if (actuallyMerged) {
-        spinner.succeed(`Work complete: ${issueId} (already merged — skipping review pipeline)`);
-        console.log(chalk.green(`  ✓ Issue was already merged — no review pipeline triggered`));
-        console.log('');
-        return;
-      }
-
-      console.log(chalk.yellow(`  ⚠ Stored merge status for ${issueId} was stale; re-running review pipeline.`));
-    }
-
-    // Step 2b: Guard against no-op re-submission. If review already passed and
-    // HEAD hasn't changed since the review snapshot, skip re-review entirely.
-    // This prevents agents from accidentally cycling the pipeline after approval.
-    if (currentStatus?.reviewStatus === 'passed' && currentStatus?.reviewedAtCommit) {
-      const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
-      try {
-        const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
-        if (HEAD === currentStatus.reviewedAtCommit) {
-          spinner.succeed(`Work complete: ${issueId} (review already passed at ${HEAD.slice(0, 8)} — no new commits, skipping re-review)`);
-          console.log(chalk.green(`  ✓ Review already passed and no new commits detected. Pipeline continues normally.`));
-          console.log('');
-          return;
-        }
-        if (await hasOnlyPipelineStateChangesSinceCommit(workspacePath, currentStatus.reviewedAtCommit, HEAD)) {
-          spinner.succeed(`Work complete: ${issueId} (review still valid — only pipeline state changed since ${currentStatus.reviewedAtCommit.slice(0, 8)})`);
-          console.log(chalk.green(`  ✓ Review/test verdicts remain valid because post-verdict commits only touched pipeline state.`));
-          console.log('');
-          return;
-        }
-        console.log(chalk.yellow(`  ⚠ New commits since review passed (${currentStatus.reviewedAtCommit.slice(0, 8)} → ${HEAD.slice(0, 8)}). Re-running review pipeline.`));
-      } catch {
-        // Git info unavailable — proceed with normal flow rather than blocking
-      }
-    }
-
-    // Step 3: Persist the concrete review-request intent before any tracker,
-    // runtime, marker, cache, notification, or HTTP progression. If the state
-    // branch push loses a remote-ref race, updateIssueRecord reconciles it; if
-    // durability still fails, the command exits before all later pipeline progression.
-    const reviewRequestedAt = new Date().toISOString();
-    await persistDoneReviewIntent(issueId, workspacePath, {
-      reviewRequestedAt,
-      scopeDrift,
-      prUrl: reviewArtifactUrl,
-    });
-
-    // Step 4: Update status (either tracker or shadow) only after the canonical
-    // request is durable.
-    const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId));
-
-    if (skipTrackerUpdate) {
-      shadowModeActive = true;
-      spinner.text = 'Updating shadow state...';
-      await Effect.runPromise(updateShadowState(issueId, 'in_review', 'pan done'));
-      console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
-    } else if (isGitHubIssue) {
-      spinner.text = 'Updating GitHub labels...';
-      trackerUpdated = await updateGitHubToInReview(issueId, options.comment);
-      if (trackerUpdated) {
-        console.log(chalk.green(`  ✓ Updated ${issueId} to In Review (GitHub)`));
-      } else {
-        console.log(chalk.yellow(`  ⚠ Failed to update GitHub labels`));
-      }
-    } else {
-      const apiKey = await Effect.runPromise(getLinearApiKey());
-      if (apiKey) {
-        spinner.text = 'Updating Linear to In Review...';
-        trackerUpdated = await updateLinearToInReview(apiKey, issueId, options.comment);
-        if (trackerUpdated) {
-          console.log(chalk.green(`  ✓ Updated ${issueId} to In Review`));
+    // Step 1: rebase onto the target branch and push. `pan done` is one command
+    // for the agent; the fetch/rebase/push it used to do by hand lives here.
+    const mergeSet = buildMergeSetForIssue(issueId);
+    if (mergeSet && mergeSet.repos.length > 0) {
+      const { rebaseAndPushRepos } = await import('../../lib/rebase-helper.js');
+      spinner.text = 'Rebasing onto target branch and pushing...';
+      const rebaseResult = await rebaseAndPushRepos(workspacePath, mergeSet);
+      if (!rebaseResult.success) {
+        const failure = rebaseResult.firstFailure!;
+        spinner.fail(`Rebase failed in ${failure.repoKey}`);
+        console.error('');
+        if (failure.conflictFiles?.length) {
+          console.error(chalk.red('Rebase conflicts in non-planning files:'));
+          for (const file of failure.conflictFiles) console.error(chalk.red(`  - ${file}`));
+          console.error('');
+          console.error(chalk.dim(`Resolve the conflicts manually, commit, then re-run: pan done ${issueId}`));
         } else {
-          console.log(chalk.yellow(`  ⚠ Failed to update Linear status`));
+          console.error(chalk.red(failure.message || 'Unknown rebase error'));
         }
-      } else {
-        console.log(chalk.dim('  LINEAR_API_KEY not set - skipping status update'));
+        console.error('');
+        return exitCli(1);
       }
+      const rebased = rebaseResult.results.filter((r) => r.outcome === 'rebased');
+      console.log(rebased.length > 0
+        ? chalk.green(`  ✓ Rebased and pushed ${rebased.length} repo(s)`)
+        : chalk.dim('  Branch already current with target — pushed any local commits'));
     }
 
-    // Publish the already-durable intent to the rebuildable cache and pipeline
-    // event stream. The setter's redundant journal write is safe because its
-    // newer-wins merge cannot erase the request persisted above.
-    setReviewStatusSync(issueId, {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      readyForMerge: false,
-      verificationStatus: 'pending',
-      verificationCycleCount: 0,
-      autoRequeueCount: 0,
-      reviewRequestedAt,
-      scopeDrift,
-      prUrl: reviewArtifactUrl,
-    });
-
-    // Step 5: Update agent state and completion markers after durability.
-    if (existingState) {
-      existingState.status = 'stopped';
-      existingState.stoppedByUser = true;
-      existingState.lastActivity = new Date().toISOString();
-      saveAgentStateSync(existingState);
+    // Step 2: open or update the PR, and mark it ready for review.
+    spinner.text = 'Opening the pull request...';
+    const opened = await openOrUpdatePullRequests(issueId, workspacePath);
+    if (opened.length === 0) {
+      spinner.fail(`No repo under ${issueId}'s workspace has commits the target branch does not.`);
+      console.error(chalk.dim('  Commit and push the work, then run pan done again.'));
+      return exitCli(1);
     }
-    saveAgentRuntimeState(agentId, {
-      state: 'idle',
-      lastActivity: new Date().toISOString(),
-    });
-
-    mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
-    const completedFile = join(AGENTS_DIR, agentId, 'completed');
-    const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
-    if (existsSync(processedMarker)) {
-      try { unlinkSync(processedMarker); } catch {}
+    for (const pr of opened) {
+      console.log(chalk.green(`  ✓ ${pr.created ? 'Opened' : 'Updated'} ${pr.repoKey}: ${pr.url ?? '(no url)'}`));
     }
-    writeFileSync(completedFile, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      trackerUpdated,
-      comment: options.comment,
+
+    // Step 3: move the tracker to In Review.
+    spinner.text = 'Updating the tracker...';
+    const trackerUpdated = issueId.startsWith('PAN-')
+      ? await updateGitHubToInReview(issueId, options.comment)
+      : await (async () => {
+        const apiKey = await Effect.runPromise(getLinearApiKey());
+        return apiKey ? updateLinearToInReview(apiKey, issueId, options.comment) : false;
+      })();
+    console.log(trackerUpdated
+      ? chalk.green(`  ✓ Updated ${issueId} to In Review`)
+      : chalk.yellow('  ⚠ Tracker not updated'));
+
+    // Step 4: ask the dashboard to start verification and the review convoy —
+    // the same request `pan review request` makes. Without it `pan done` left
+    // an open PR that nothing was watching. The PR and the tracker are already
+    // updated, so a dashboard that cannot be reached is a hint, never a
+    // failure: the agent must not re-run `pan done` over it.
+    spinner.text = 'Starting the review pipeline...';
+    const reviewStarted = await startReviewPipeline(issueId, options.comment).catch((error) => ({
+      started: false,
+      line: chalk.yellow(
+        `  ⚠ Review not started (${(error as Error).message}): run pan review request ${issueId}`,
+      ),
     }));
-
-    try {
-      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-      appendSessionEntrySync(project, issueId, {
-        timestamp: new Date().toISOString(),
-        reason: 'end',
-        note: options.comment || 'Agent signaled work complete',
-      });
-    } catch (continueErr: any) {
-      console.warn(`[pan done] Failed to append end entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
-    }
+    console.log(reviewStarted.line);
 
     spinner.succeed(`Work complete: ${issueId}`);
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'work-agent',
       level: 'info',
-      message: `${issueId} work complete — entering review pipeline`,
+      message: `${issueId} work complete — pull request open for review`,
       issueId,
     });
-    emitActivityTtsSync({
+    emitActivityTts({
       utterance: `Work agent finished ${issueId}, entering review`,
       priority: 2,
       issueId,
       source: 'work-agent',
       eventType: 'workAgent.finished',
     });
-    console.log('');
 
-    // Summary
+    console.log('');
     console.log(chalk.bold('Summary:'));
     console.log(`  Issue:   ${chalk.cyan(issueId)}`);
-    if (shadowModeActive) {
-      console.log(`  Status:  ${chalk.cyan('👻 Shadow mode - pending sync to tracker')}`);
-    } else {
-      console.log(`  Tracker: ${trackerUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
-    }
+    console.log(`  PR:      ${chalk.cyan(opened.map((pr) => pr.url).filter(Boolean).join(', ') || 'unknown')}`);
+    console.log(`  Tracker: ${trackerUpdated ? chalk.green('In Review') : chalk.dim('Not updated')}`);
+    console.log(`  Review:  ${reviewStarted.started
+      ? chalk.green('verification started')
+      : chalk.yellow(`not started — run pan review request ${issueId}`)}`);
     if (options.comment) {
       console.log(`  Comment: ${chalk.dim(options.comment.slice(0, 50))}${options.comment.length > 50 ? '...' : ''}`);
     }
     console.log('');
-
-    console.log(chalk.dim('Ready for review. When review passes, click MERGE in the dashboard.'));
-    console.log('');
-
-    // Auto-trigger review & test (respecting circuit breaker)
-    try {
-      const { getDashboardApiUrlSync } = await import('../../lib/config.js');
-      const dashboardUrl = getDashboardApiUrlSync();
-
-      // Check if dashboard is running. Use fetch() so https:// URLs work
-      // (e.g. when DASHBOARD_URL points at https://overdeck.localhost via Traefik).
-      const checkDashboard = async (): Promise<boolean> => {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 2000);
-          const res = await fetch(`${dashboardUrl}/api/health`, { method: 'GET', signal: controller.signal });
-          clearTimeout(timer);
-          return res.status === 200;
-        } catch {
-          return false;
-        }
-      };
-
-      // PAN-1988: aggressively retry reaching the dashboard — a mid-reload restart is the most
-      // common reason this trigger is dropped, which strands the issue. Up to 10 attempts with
-      // exponential backoff (0.5s → capped 8s, ~47s total). The durable `reviewRequestedAt` intent
-      // recorded above means even total failure here is recovered by the host's reconcile-on-read;
-      // this retry just makes the fast path resilient to a transient restart.
-      const MAX_ATTEMPTS = 10;
-      let triggered = false;
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        if (await checkDashboard()) {
-          console.log(chalk.dim(`Auto-triggering review & test${attempt > 1 ? ` (attempt ${attempt}/${MAX_ATTEMPTS})` : ''}...`));
-          let result = await postDoneDashboardJson(dashboardUrl, `/api/review/${issueId}/trigger`);
-
-          // Self-healing: if issue was previously reviewed (blocked/failed) or merged, auto-reset and retry.
-          // This is the normal flow when a work agent fixes review issues and re-signals done.
-          if (!result.success && (result.alreadyMerged || result.alreadyReviewed)) {
-            const reason = result.alreadyMerged ? 'previously merged' : 'prior review blocked/failed';
-            console.log(chalk.yellow(`  ⚠ Issue was ${reason}. Resetting specialist states for re-review...`));
-            const resetResult = await postDoneDashboardJson(dashboardUrl, `/api/review/${issueId}/reset`);
-            if (resetResult.success) {
-              console.log(chalk.green(`  ✓ Specialist states reset`));
-              result = await postDoneDashboardJson(dashboardUrl, `/api/review/${issueId}/trigger`);
-            } else {
-              console.log(chalk.red(`  ✗ Failed to reset: ${resetResult.error || resetResult.message || 'Unknown error'}`));
-            }
-          }
-
-          // The dashboard responded (success OR a real verdict like alreadyReviewed) — this is not a
-          // transient outage, so stop retrying regardless of the verdict.
-          triggered = true;
-          if (result.success) {
-            console.log(chalk.green(`  ✓ Review & test ${result.queued ? 'queued' : 'started'} automatically`));
-          } else if (!result.alreadyMerged) {
-            console.log(chalk.yellow(`  ⚠ Auto-review not triggered: ${result.error || result.message || 'Unknown error'}`));
-            if (result.alreadyReviewed) {
-              console.log(chalk.dim(`    Manual review needed - click "Review and Test" in dashboard`));
-            }
-          }
-          break;
-        }
-
-        // Dashboard unreachable (likely mid-reload) — back off and retry.
-        if (attempt < MAX_ATTEMPTS) {
-          const delayMs = Math.min(8_000, 500 * 2 ** (attempt - 1));
-          console.log(chalk.dim(`  Dashboard not reachable (attempt ${attempt}/${MAX_ATTEMPTS}) — retrying in ${Math.round(delayMs / 1000) || 1}s...`));
-          await new Promise((r) => setTimeout(r, delayMs));
-        }
-      }
-
-      if (!triggered) {
-        console.log(chalk.yellow(`  ⚠ Dashboard unreachable after ${MAX_ATTEMPTS} attempts.`));
-        console.log(chalk.dim(`    Review intent is recorded durably — it will auto-dispatch when the dashboard next reads ${issueId}'s status. No action needed.`));
-      }
-    } catch (error: any) {
-      // Don't fail the done command if auto-review fails
-      console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
+    console.log(chalk.dim('Ready for review. Review state is read from the PR.'));
+    if (!reviewStarted.started) {
+      console.log(chalk.dim(`Start the review convoy with: pan review request ${issueId}`));
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  } catch (error: any) {
-    spinner.fail(error.message);
+    console.log('');
+  } catch (error) {
+    spinner.fail((error as Error).message);
     return exitCli(1);
   }
 }

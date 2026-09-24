@@ -1,21 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  emitActivityEntrySync: vi.fn(),
-  resolveCanonicalReviewStatus: vi.fn(),
-  teardownWorkspaceDockerByNamePromise: vi.fn(),
+  emitActivityEntry: vi.fn(),
+  getPrFacts: vi.fn(),
+  teardownWorkspaceDockerByName: vi.fn(),
 }));
 
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: mocks.emitActivityEntrySync,
+  emitActivityEntry: mocks.emitActivityEntry,
 }));
 
-vi.mock('../review-status-source.js', () => ({
-  resolveCanonicalReviewStatus: mocks.resolveCanonicalReviewStatus,
+vi.mock('../pr-facts.js', () => ({
+  getPrFacts: mocks.getPrFacts,
 }));
 
 vi.mock('../../workspace-manager/docker.js', () => ({
-  teardownWorkspaceDockerByNamePromise: mocks.teardownWorkspaceDockerByNamePromise,
+  teardownWorkspaceDockerByName: mocks.teardownWorkspaceDockerByName,
 }));
 
 import {
@@ -32,10 +32,7 @@ describe('merged Docker cleanup worker', () => {
     vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'));
     await resetMergedDockerCleanupWorkerForTests();
     vi.clearAllMocks();
-    mocks.resolveCanonicalReviewStatus.mockReturnValue({
-      available: true,
-      status: { mergeStatus: 'merged' },
-    });
+    mocks.getPrFacts.mockResolvedValue({ merged: true });
   });
 
   afterEach(async () => {
@@ -46,7 +43,7 @@ describe('merged Docker cleanup worker', () => {
   it('deduplicates issues and drains Docker teardown serially', async () => {
     let active = 0;
     let maxActive = 0;
-    mocks.teardownWorkspaceDockerByNamePromise.mockImplementation(async () => {
+    mocks.teardownWorkspaceDockerByName.mockImplementation(async () => {
       active += 1;
       maxActive = Math.max(maxActive, active);
       await Promise.resolve();
@@ -59,7 +56,7 @@ describe('merged Docker cleanup worker', () => {
     expect(enqueueMergedDockerCleanup('PAN-5560')).toBe('Queued merged-issue Docker cleanup for PAN-5560');
     await waitForMergedDockerCleanupIdleForTests();
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise.mock.calls).toEqual([
+    expect(mocks.teardownWorkspaceDockerByName.mock.calls).toEqual([
       ['pan-5559'],
       ['pan-5560'],
     ]);
@@ -69,7 +66,7 @@ describe('merged Docker cleanup worker', () => {
   });
 
   it('backs off failed cleanup and retries on a later patrol', async () => {
-    mocks.teardownWorkspaceDockerByNamePromise
+    mocks.teardownWorkspaceDockerByName
       .mockResolvedValueOnce({ networkRemoved: false, steps: ['Network still present'] })
       .mockResolvedValueOnce({ networkRemoved: true, steps: ['Removed network'] });
 
@@ -82,35 +79,32 @@ describe('merged Docker cleanup worker', () => {
       running: false,
     });
     expect(enqueueMergedDockerCleanup('PAN-5559')).toBeNull();
-    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledTimes(1);
+    expect(mocks.teardownWorkspaceDockerByName).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(60_000);
     expect(enqueueMergedDockerCleanup('PAN-5559')).toBeNull();
     await waitForMergedDockerCleanupIdleForTests();
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledTimes(2);
+    expect(mocks.teardownWorkspaceDockerByName).toHaveBeenCalledTimes(2);
     expect(getMergedDockerCleanupStateForTests('PAN-5559')).toBeNull();
   });
 
-  it('fails closed when canonical merge status is unavailable', async () => {
-    mocks.resolveCanonicalReviewStatus.mockReturnValue({ available: false, status: null });
+  it('fails closed when the forge cannot answer whether the PR merged', async () => {
+    mocks.getPrFacts.mockResolvedValue({ merged: false, error: 'gh pr view failed' });
 
     enqueueMergedDockerCleanup('PAN-5559');
     await waitForMergedDockerCleanupIdleForTests();
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise).not.toHaveBeenCalled();
+    expect(mocks.teardownWorkspaceDockerByName).not.toHaveBeenCalled();
     expect(getMergedDockerCleanupStateForTests('PAN-5559')).toMatchObject({
       attempts: 1,
       running: false,
     });
   });
 
-  it('uses fresh merge verification when canonical persistence has not caught up', async () => {
-    mocks.resolveCanonicalReviewStatus.mockReturnValue({
-      available: true,
-      status: { mergeStatus: 'failed' },
-    });
-    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+  it('uses the merge-agent\'s fresh verification when the forge has not caught up', async () => {
+    mocks.getPrFacts.mockResolvedValue({ merged: false });
+    mocks.teardownWorkspaceDockerByName.mockResolvedValue({
       networkRemoved: true,
       steps: ['Removed network'],
     });
@@ -118,12 +112,12 @@ describe('merged Docker cleanup worker', () => {
     enqueueMergedDockerCleanup('PAN-5559', { mergeVerified: true });
     await waitForMergedDockerCleanupIdleForTests();
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-5559');
+    expect(mocks.teardownWorkspaceDockerByName).toHaveBeenCalledWith('pan-5559');
     expect(getMergedDockerCleanupStateForTests('PAN-5559')).toBeNull();
   });
 
   it('prunes failed entries that disappear from the patrol eligible set', async () => {
-    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+    mocks.teardownWorkspaceDockerByName.mockResolvedValue({
       networkRemoved: false,
       steps: ['Network still present'],
     });
@@ -137,22 +131,21 @@ describe('merged Docker cleanup worker', () => {
   });
 
   it('cancels a reopened issue before a later worker wake-up', async () => {
-    mocks.teardownWorkspaceDockerByNamePromise
+    mocks.teardownWorkspaceDockerByName
       .mockResolvedValueOnce({ networkRemoved: false, steps: ['Network still present'] })
       .mockResolvedValueOnce({ networkRemoved: true, steps: ['Removed network'] });
 
     enqueueMergedDockerCleanup('PAN-5559');
     await waitForMergedDockerCleanupIdleForTests();
     await vi.advanceTimersByTimeAsync(60_000);
-    mocks.resolveCanonicalReviewStatus.mockImplementation((issueId: string) => ({
-      available: true,
-      status: { mergeStatus: issueId === 'PAN-5559' ? 'failed' : 'merged' },
+    mocks.getPrFacts.mockImplementation(async (issueId: string) => ({
+      merged: issueId !== 'PAN-5559',
     }));
 
     enqueueMergedDockerCleanup('PAN-5560');
     await waitForMergedDockerCleanupIdleForTests();
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise.mock.calls).toEqual([
+    expect(mocks.teardownWorkspaceDockerByName.mock.calls).toEqual([
       ['pan-5559'],
       ['pan-5560'],
     ]);

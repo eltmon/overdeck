@@ -48,9 +48,9 @@ const readJsonBody = Effect.gen(function* () {
 const getCloisterStatusRoute = HttpRouter.add(
   'GET',
   '/api/cloister/status',
-  httpHandler(Effect.try({
-    try: () => {
-      return jsonResponse(readDurableCloisterStatus());
+  httpHandler(Effect.tryPromise({
+    try: async () => {
+      return jsonResponse(await readDurableCloisterStatus());
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
@@ -101,7 +101,7 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction. Cloister already stopped the agents,
       // so re-upsert the latest row to make the event atomic.
-      const state = yield* getAgentState(agentId);
+      const state = getAgentState(agentId);
       if (state) {
         yield* saveAgentStateAndEmitEventProgram(state, {
           type: 'agent.stopped',
@@ -132,7 +132,7 @@ const postCloisterBrakeRoute = HttpRouter.add(
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction. emergencyBrake already stopped the
       // agents, so re-upsert the latest row to make the event atomic.
-      const state = yield* getAgentState(agentId);
+      const state = getAgentState(agentId);
       if (state) {
         yield* saveAgentStateAndEmitEventProgram(state, {
           type: 'agent.stopped',
@@ -209,9 +209,9 @@ const putCloisterConfigRoute = HttpRouter.add(
 const getCloisterAgentsHealthRoute = HttpRouter.add(
   'GET',
   '/api/cloister/agents/health',
-  httpHandler(Effect.try({
-    try: () => {
-      const agentHealths = getCloisterService().getAllAgentHealth();
+  httpHandler(Effect.tryPromise({
+    try: async () => {
+      const agentHealths = await getCloisterService().getAllAgentHealth();
       return jsonResponse({ agents: agentHealths });
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),

@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { getDefaultDocsConfig, mergeConfigs, mergeDocsConfigs } from '../config-yaml.js';
+import { getDefaultDocsConfig, mergeConfigs} from '../config-yaml.js';
+import type { NormalizedDocsConfig, YamlConfig } from '../config-yaml/schema.js';
+import { mergeDocsConfig } from '../config-yaml/domain-mergers.js';
+
+// Moved here from src/lib/config-yaml/domain-mergers.ts, which no production code called (PAN-3958 CH-8).
+function mergeDocsConfigs(...configs: (YamlConfig | null)[]): NormalizedDocsConfig {
+  const result = getDefaultDocsConfig();
+  for (const config of configs) {
+    mergeDocsConfig(result, config);
+  }
+  return result;
+}
 
 describe('docs RAG configuration', () => {
   it('seeds normalized defaults for enablement, trigger, corpus, budget, embedding, and classifier', () => {

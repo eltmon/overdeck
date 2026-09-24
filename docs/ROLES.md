@@ -12,17 +12,26 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 
 | Role | File | Purpose |
 |------|------|---------|
-| `plan` | `roles/plan.md` | Read issue, research codebase, write xBRIEF, create xBRIEF tasks |
-| `work` | `roles/work.md` | Claim xBRIEF tasks, write code, commit per bead, self-inspect (Jidoka) |
-| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and signals the spawner to review and land it. Bypasses the plan/work/review/test pipeline and server-side shipping. |
-| `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes |
+| `plan` | `roles/plan.md` | Read issue, research codebase, write xBRIEF, create xBRIEF tasks. Instruction source: `roles/plan.md` (system prompt) plus `src/lib/cloister/prompts/planning.md` (issue inputs and plan formats); no other file instructs the planner. |
+| `work` | `roles/work.md` | The foreman for the issue. Claims xBRIEF items, writes code, commits one item at a time with an `Item: <item-id>` trailer. When the plan has parallel waves, dispatches same-family workers as in-harness subagents and cross-family workers as terminal-backend panes via `pan spawn` — see the `pan-foreman` skill and [FOREMAN.md](./FOREMAN.md). |
+| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and opens a PR against `main` that the operator merges. Bypasses the plan/work/review/test pipeline and server-side shipping. |
+| `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes as a PR review |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
+| `worker` | `roles/worker.md` | A registered worker (`pan worker run`, PAN-3920): one agent or conversation, its parent, gives it one bounded brief for an issue. It does only the brief, never runs `pan done`, `pan review` or `pan task done`, and ends by writing a report with `pan worker report`. It stays warm after reporting. See [reference/workers.mdx](../reference/workers.mdx). |
+
+### Conversation kickoff templates (not roles)
+
+`roles/handoff.md`, `roles/handoff-external.md`, `roles/handoff-external-pi.md`,
+and `roles/retrospective.md` live alongside the role files but are **not**
+roles: the server reads them at request time and renders them into a
+conversation's first message. They are never spawned as agents. Changing any
+of them requires a `Prompt-Change:` commit trailer.
 
 There is no spawned `ship` role file. Shipping is server-side: the dashboard runs
-`rebaseFeatureBranch()`, PAN-1650's review-status gate derives `readyForMerge`,
-and the human Merge button performs the final GitHub squash. The `ship` token
-survives only as the merge-specialist identity for model routing, historical
-activity attribution, and old session records.
+`rebaseFeatureBranch()`, computes merge readiness live from PR approvals, green
+checks, and forge mergeability, and the human Merge button performs the final
+GitHub squash. The `ship` token survives only as the merge-specialist identity
+for model routing and historical activity attribution.
 
 A **Run** is a process playing a role: `(role, model, harness)`. A run's *work* is scoped — it does one role's worth of work and records its verdict — but its *session* is not disposable. See the session-lifecycle policy below.
 
@@ -31,13 +40,14 @@ A **Run** is a process playing a role: `(role, model, harness)`. A run's *work* 
 Role sessions are **warm by default**: they persist after recording their verdict, until issue close-out. A session for an issue's role should be absent only for two reasons:
 
 1. **Reboot** — the machine or dashboard restarted and the session did not survive.
-2. **Resource relief** — the memory governor (PAN-2500) or preemptive scheduler (PAN-2507) evicted or yielded it to free capacity for a blocked part of the pipeline. See [RESOURCE-GOVERNOR.md](./RESOURCE-GOVERNOR.md).
+2. **Resource relief** — the memory governor evicted or yielded it to free capacity for a blocked part of the pipeline. See "Agent Auto-Resume Gates" in [PIPELINE-GATES.md](./PIPELINE-GATES.md).
 
 Consequences:
 
 - **Dispatch resumes before it spawns.** Every dispatch path (review request, re-review, test run, rework handoff) first looks for a live warm session for that role + issue and messages/resumes it; cold-spawning is the fallback for the absent case.
-- **Review agents (and convoy sub-reviewers) stay warm after a verdict** so a re-review after a BLOCKED → fix cycle resumes reviewers that already hold context from the previous pass, cutting re-review latency (PAN-1862 is the convoy-warm-reuse design).
-- **BLOCKED feedback goes agent-to-agent.** The review agent's `pan admin specialists done review --status blocked` delivers feedback directly to the live work agent (`deliverReviewVerdictFeedback` → `messageAgent`); the deacon is a recovery backstop, not the primary path.
+- **Review agents (and convoy sub-reviewers) stay warm after a verdict** so a re-review after a request-changes → fix cycle resumes reviewers that already hold context from the previous pass, cutting re-review latency.
+- **Reviewer exit is reported by the supervisor, never inferred.** For supervisor-launched agents the PTY supervisor posts an `exited` lifecycle event, and the agent-liveness projection writes `stopped` from that observed fact — see `src/lib/agents/liveness.ts`, the single oracle for liveness everywhere.
+- **Feedback goes agent-to-agent.** A reviewer's PR review comments reach the live work agent via `pan tell`; deacon-lite is a recovery backstop for a stuck agent, not the primary delivery path.
 - **Idle-warm sessions are free capacity**, not load: they must not count against the advancing-role concurrency ceiling, and they are the first thing the governor sheds under memory pressure.
 
 Health reporting follows the same lifecycle semantics. `warm` describes a reusable session lifecycle,
@@ -50,32 +60,32 @@ leak.
 
 ---
 
-## `verifying_on_main` phase
+## After merge
 
-A merged issue is not done. After the human Merge button lands the prepared branch, Overdeck moves the issue into canonical state `verifying_on_main` and applies the GitHub label `verifying-on-main`. This phase keeps the issue open and visible while operators run post-merge UAT against `main`.
+A merged issue is not done. After the human Merge button lands the prepared branch, the issue's derived state becomes `merged` (from the PR, not a stored field) and the tracker issue stays open while operators run post-merge UAT against `main`.
 
 Role responsibilities during this phase:
 
 | Role | Behavior |
 |------|----------|
-| server-side shipping | `rebaseFeatureBranch()` prepares the branch and PAN-1650's review-status gate derives `readyForMerge` for the human Merge button. No agent is spawned. |
-| merge handoff | `postMergeLifecycle()` marks `mergeStatus: "merged"`, applies `verifying-on-main`, frees runtime resources, and preserves workspace/state/xBRIEF/branches. |
+| server-side shipping | `rebaseFeatureBranch()` prepares the branch; merge readiness for the human Merge button is computed live from approvals, checks, and mergeability. No agent is spawned. |
 | `work` / `plan` | Remain paused so the operator can unpause for regression follow-up if verification fails. |
 | `review` / `test` | Their sessions may be killed after merge; the merged code is now evaluated on `main`, not by reusing pre-merge role sessions. |
-| close-out | `pan close <id>` or the dashboard Close Out action performs the final xBRIEF completion, archival, optional teardown/branch deletion, tracker close, and review-status clearing. |
+| close-out | `pan close <id>` or the dashboard Close Out action performs the final xBRIEF completion, archival, optional teardown/branch deletion, and tracker close. |
 
-If `close_out.auto=true`, Deacon may run close-out automatically after `close_out.auto_delay_minutes`; otherwise close-out is an explicit operator ceremony.
+`close_out.auto=true` lets deacon-lite's closed-issue reaper run close-out automatically after `close_out.auto_delay_minutes`; otherwise close-out is an explicit operator ceremony.
 
 ---
 
 ## Sub-roles
 
-A sub-role is a configuration slot under a role, not a separate pipeline stage. Today's sub-roles:
+A sub-role is a configuration slot under a role, not a separate pipeline stage. Today's sub-role:
 
 | Role | Sub-roles | Shape |
 |------|-----------|-------|
-| `work` | `inspect`, `inspect-deep` | Harness-agnostic prompt templates. The orchestrator's `pan inspect` CLI spawns a separate run with the prompt inlined; nothing lives in `.claude/agents/`. |
 | `review` | `security`, `correctness`, `performance`, `requirements` | Harness-agnostic prompt templates the orchestrator inlines into each convoy spawn message. See `roles/review-<subRole>.md`. |
+
+The operator's "worker sub-role" is realized as its own `Role` literal, `worker`, not as a sub-role of `work`: pipeline patrols that filter `role === 'work'` (deacon, auto-resume, stall sweeper) must never act on a worker, and a separate literal keeps them out without touching each one (PAN-3920 Q1).
 
 All sub-roles share the same delivery shape: **workflow-injected prompts orchestrated by Overdeck**, never ambient subagents auto-discovered by Claude Code. The prompts live in Overdeck's own files and are inlined at spawn time. This is a deliberate choice — see "Why no ambient subagents" below.
 

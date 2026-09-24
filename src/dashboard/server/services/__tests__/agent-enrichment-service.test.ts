@@ -6,7 +6,6 @@ import {
   hasReapablePendingInput,
   isAwaitingInputRisingEdge,
   shouldForceReemitPendingInput,
-  shouldResurrectStoppedAgent,
   shouldSkipEnrichmentCycle,
 } from '../agent-enrichment-service.js'
 import { isInteractiveRoleAgent } from '../../../../lib/agent-enrichment.js'
@@ -40,28 +39,6 @@ describe('isInteractiveRoleAgent', () => {
 
   it('returns false for a work-role agent', () => {
     expect(isInteractiveRoleAgent('agent-pan-3330', 'work')).toBe(false)
-  })
-})
-
-describe('shouldResurrectStoppedAgent', () => {
-  it('returns false for a stopped, tmux-live plan agent', () => {
-    expect(shouldResurrectStoppedAgent('planning-pan-3330', 'plan', 'stopped', true)).toBe(false)
-  })
-
-  it('returns false for a stopped, tmux-live conv- agent', () => {
-    expect(shouldResurrectStoppedAgent('conv-371', undefined, 'stopped', true)).toBe(false)
-  })
-
-  it('returns true for a stopped, tmux-live work-role agent (PAN-1419 reconcile preserved)', () => {
-    expect(shouldResurrectStoppedAgent('agent-pan-3330', 'work', 'stopped', true)).toBe(true)
-  })
-
-  it('returns false when the agent is not actually stopped', () => {
-    expect(shouldResurrectStoppedAgent('agent-pan-3330', 'work', 'running', true)).toBe(false)
-  })
-
-  it('returns false when tmux is not active', () => {
-    expect(shouldResurrectStoppedAgent('agent-pan-3330', 'work', 'stopped', false)).toBe(false)
   })
 })
 

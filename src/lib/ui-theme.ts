@@ -9,6 +9,14 @@
  * explicitly, so stamping new sessions with the dashboard's background lets
  * Claude detect the right theme with no viewer attached (conv 2547).
  */
+
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `getUiThemeSync` (async: `getUiTheme`): src/lib/launcher-generator.ts:327.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { readFileSync } from 'fs';
 import { join } from 'path';

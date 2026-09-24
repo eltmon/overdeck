@@ -70,7 +70,7 @@ function writeTranscript(path: string): void {
 
 describe('jsonlAction', () => {
   it('prints the derived JSONL path and exits 0 when the transcript exists', async () => {
-    const { sessionFilePath } = await import('../../../../lib/paths.js');
+    const { sessionFilePath } = await import('../../../../lib/runtimes/storage/claude-code.js');
     const cwd = '/tmp/jsonl-ok-workspace';
     const sessionId = 'jsonl-ok-session';
     const expectedPath = sessionFilePath(cwd, sessionId);
@@ -115,7 +115,7 @@ describe('jsonlAction', () => {
   });
 
   it('prints JSON and exits 0 for ok, expired, and unknown statuses', async () => {
-    const { sessionFilePath } = await import('../../../../lib/paths.js');
+    const { sessionFilePath } = await import('../../../../lib/runtimes/storage/claude-code.js');
     const ok = await seedConversation({ cwd: '/tmp/jsonl-json-ok', claudeSessionId: 'jsonl-json-ok-session' });
     writeTranscript(sessionFilePath(ok.cwd, ok.claudeSessionId!));
     const expired = await seedConversation({ cwd: '/tmp/jsonl-json-expired', claudeSessionId: 'jsonl-json-expired-session' });

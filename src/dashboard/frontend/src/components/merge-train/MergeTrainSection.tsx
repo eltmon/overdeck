@@ -1,5 +1,5 @@
 import { MergeTrainView } from './MergeTrainView';
-import { useFlywheelConfig, useFlywheelConfigMutation } from '../../pages/FlywheelPage';
+import { useMergeTrainConfig, useMergeTrainConfigMutation } from './config';
 
 /**
  * PAN-1696 fe-awaiting-merge: the merge train hosted on the merge gate.
@@ -7,16 +7,15 @@ import { useFlywheelConfig, useFlywheelConfigMutation } from '../../pages/Flywhe
  * The merge train assembles the features that already passed review and tests
  * into one batch per project, so an operator can test that exact tree once and
  * merge it in a single click instead of merging features one at a time. It runs
- * per project and needs no flywheel run — this section is the multi-project
- * home for it, and the Flywheel page is a second viewer of the same view.
+ * per project — this section is the multi-project home for it.
  *
- * The toggle here is the GLOBAL default. `merge_train_enabled` is the retained
- * payload key on /api/flywheel/config; the server writes merge_train.enabled.
+ * The toggle here is the GLOBAL default. `merge_train_enabled` is the payload
+ * key on /api/merge-train/config; the server writes merge_train.enabled.
  * A project can override the global default in its cockpit settings.
  */
 export function MergeTrainSection() {
-  const { data: config } = useFlywheelConfig();
-  const configMutation = useFlywheelConfigMutation();
+  const { data: config } = useMergeTrainConfig();
+  const configMutation = useMergeTrainConfigMutation();
   const enabled = config?.merge_train_enabled ?? false;
 
   return (

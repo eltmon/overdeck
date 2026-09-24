@@ -986,6 +986,27 @@ Item:
   Selected: bg-accent text-accent-foreground
 ```
 
+### Context Menus and Popovers
+
+`src/dashboard/frontend/src/components/shared/ContextMenu.tsx` is the canonical
+implementation for dashboard context menus and floating control popovers. Use
+its Radix exports for right-click menus, `MenuSurface` + `MenuItemButton` for
+controlled or cursor-positioned action menus, and `PopoverSurface` for floating
+forms or confirmations. All three presentations share `bg-popover`,
+`border-border`, `rounded-md`, `p-1`, and `shadow-floating`; route-local CSS must
+only position or size the shared frame.
+
+Shared menu behavior includes Arrow Up/Down, Home/End, Escape dismissal, visible
+focus, disabled-item skipping, and focus return when a trigger ref is supplied.
+Popover callers must provide an accessible name, constrain portaled placement to
+the viewport, and return focus to the trigger after dismissal.
+
+The scoped God View neon theme and terminal presentation remain intentional
+visual exceptions. Kanban and IssueCard status stripes may retain stable
+task-state color encoding, but their menus and popovers still use the shared
+primitive. These exceptions do not permit palette literals in ordinary
+dashboard menus, badges, or operational alerts.
+
 ### Alerts
 
 ```

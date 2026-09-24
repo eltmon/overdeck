@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { isTerminalSwarmSlotAgent } from '../../../../src/lib/cloister/swarm-slot-lifecycle.js';
-import type { PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';
+import type { SwarmSlotAssignment } from '../../../../src/lib/cloister/swarm-slot-store.js';
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
 const agent = {
@@ -26,49 +26,54 @@ const plan = {
   },
 } as XBriefDocument;
 
-describe('terminal swarm slot lifecycle', () => {
-  it('retires stale stopped ownership when the canonical item is completed', () => {
-    const record = {
-      statusOverrides: { 'sync-schema-foundation': 'completed' },
-      swarm: {
-        slotAssignments: [{
-          slotIndex: 1,
-          itemId: 'sync-schema-foundation',
-          agentId: agent.id,
-          branch: 'feature/min-888-slot-1',
-        }],
-      },
-    } as PanIssueRecord;
+const assignments: SwarmSlotAssignment[] = [{
+  slotIndex: 1,
+  itemId: 'sync-schema-foundation',
+  agentId: agent.id,
+  branch: 'feature/min-888-slot-1',
+}];
 
-    expect(isTerminalSwarmSlotAgent(agent, () => plan, () => record)).toBe(true);
-  });
-
-  it('retires the live state shape by resolving the slot and item from durable ownership', () => {
-    const record = {
-      statusOverrides: { 'sync-schema-foundation': 'completed' },
-      swarm: {
-        slotAssignments: [{
-          slotIndex: 1,
-          itemId: 'sync-schema-foundation',
-          agentId: liveAgentWithoutEmbeddedSlotMetadata.id,
-          branch: 'feature/min-888-slot-1',
-        }],
-      },
-    } as PanIssueRecord;
-
+describe('terminal swarm slot lifecycle (PAN-3917: continue file + slot ledger)', () => {
+  it('retires stale stopped ownership when the continue file says the item completed', () => {
     expect(isTerminalSwarmSlotAgent(
-      liveAgentWithoutEmbeddedSlotMetadata,
+      agent,
       () => plan,
-      () => record,
+      () => assignments,
+      () => ({ 'sync-schema-foundation': 'completed' }),
     )).toBe(true);
   });
 
-  it('does not retire ownership while the canonical item remains in flight', () => {
-    const record = {
-      statusOverrides: { 'sync-schema-foundation': 'running' },
-      swarm: { slotAssignments: [{ slotIndex: 1, itemId: 'sync-schema-foundation' }] },
-    } as PanIssueRecord;
+  it('resolves the slot and item from the ledger when the agent row carries no slot metadata', () => {
+    expect(isTerminalSwarmSlotAgent(
+      liveAgentWithoutEmbeddedSlotMetadata,
+      () => plan,
+      () => assignments,
+      () => ({ 'sync-schema-foundation': 'completed' }),
+    )).toBe(true);
+  });
 
-    expect(isTerminalSwarmSlotAgent(agent, () => plan, () => record)).toBe(false);
+  it('does not retire ownership while the item remains in flight', () => {
+    expect(isTerminalSwarmSlotAgent(
+      agent,
+      () => plan,
+      () => assignments,
+      () => ({ 'sync-schema-foundation': 'running' }),
+    )).toBe(false);
+  });
+
+  it('falls back to the workspace plan when the continue file has no status for the item', () => {
+    const completedPlan = {
+      plan: { items: [{ id: 'sync-schema-foundation', status: 'completed' }] },
+    } as XBriefDocument;
+    expect(isTerminalSwarmSlotAgent(agent, () => completedPlan, () => assignments, () => ({}))).toBe(true);
+  });
+
+  it('ignores an agent with no resolvable item', () => {
+    expect(isTerminalSwarmSlotAgent(
+      liveAgentWithoutEmbeddedSlotMetadata,
+      () => plan,
+      () => [],
+      () => ({}),
+    )).toBe(false);
   });
 });

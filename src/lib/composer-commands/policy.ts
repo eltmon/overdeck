@@ -7,6 +7,7 @@ import {
 export const COMPOSER_COMMAND_POLICIES: Readonly<Record<string, ComposerCommandPolicy>> = {
   start: { mode: 'detached', safety: 'safe' },
   plan: { mode: 'detached', safety: 'safe' },
+  reload: { mode: 'detached', safety: 'safe' },
   show: { mode: 'captured', safety: 'safe' },
   status: { mode: 'captured', safety: 'safe' },
   tell: { mode: 'captured', safety: 'safe' },

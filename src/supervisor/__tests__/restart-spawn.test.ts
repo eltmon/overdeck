@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
-import { Effect } from 'effect';
 import {
   buildSupervisorRestartArgs,
   createSupervisorRestartSpawner,
@@ -86,8 +85,8 @@ describe('supervisor restart spawner', () => {
       panBinary: 'pan',
       log: vi.fn(),
       spawnFn: spawnFn as never,
-      acquireRestartLockFn: (() => Effect.succeed(null)) as never,
-      readRestartLockHolderFn: (() => Effect.succeed({ pid: 123, ts: Date.now(), caller: 'pan reload' })) as never,
+      acquireRestartLockFn: (async () => null) as never,
+      readRestartLockHolderFn: (async () => ({ pid: 123, ts: Date.now(), caller: 'pan reload' })) as never,
     });
 
     await expect(spawnRestart()).resolves.toEqual({

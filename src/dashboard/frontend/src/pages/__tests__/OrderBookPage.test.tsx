@@ -16,12 +16,10 @@ function render(ui: Parameters<typeof rtlRender>[0]) {
 
 const mocks = vi.hoisted(() => ({
   mutationHeaders: vi.fn(async () => ({ 'content-type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
-  subscribe: vi.fn(() => vi.fn()),
 }));
 
 vi.mock('../../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: mocks.mutationHeaders,
-  subscribeFlywheelStatus: mocks.subscribe,
 }));
 
 interface BookFixture extends OrderBook {
@@ -156,7 +154,6 @@ describe('OrderBookPage', () => {
 
   it('toggles from setup controls to the live progress checklist', async () => {
     stubFetch(async (input) => {
-      if (String(input) === '/api/flywheel/current') return Response.json(null);
       if (String(input) === '/api/orders/2026-07-18-active') return Response.json(running);
       return ordersResponse([running]);
     });

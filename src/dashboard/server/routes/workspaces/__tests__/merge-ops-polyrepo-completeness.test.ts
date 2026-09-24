@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -8,9 +9,21 @@ const mocks = vi.hoisted(() => ({
   mergeReviewArtifact: vi.fn(),
   mergeSet: null as any,
   postMergeLifecycle: vi.fn(),
-  reviewStatus: {} as Record<string, unknown>,
-  setReviewStatus: vi.fn(),
+  setMergeRun: vi.fn(),
   upsertMergeSet: vi.fn(),
+}));
+
+// PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
+// reaches the record plane W3 is deleting. Stub the one constant it needs.
+// lib/agents pulls agents/spawn, which imports the removed `state-home`.
+vi.mock('../../../../../lib/agents.js', () => ({
+  getAgentState: vi.fn(),
+  messageAgent: vi.fn(),
+  spawnAgent: vi.fn(),
+}));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
+vi.mock('../../../../../lib/agents/tier-table.js', () => ({
+  DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
 
 vi.mock('node:child_process', () => {
@@ -48,7 +61,7 @@ vi.mock('../../../../../lib/overdeck/merge.js', () => ({
 }));
 
 vi.mock('../../../../../lib/projects.js', () => ({
-  findProjectByTeamSync: vi.fn(() => ({
+  findProjectByTeam: vi.fn(() => ({
     workspace: {
       type: 'polyrepo',
       repos: [
@@ -58,20 +71,27 @@ vi.mock('../../../../../lib/projects.js', () => ({
     },
     quality_gates: {},
   })),
+  findProjectByPath: vi.fn(() => null),
+  listProjectsSync: vi.fn(() => []),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/project' })),
 }));
 
-vi.mock('../../../../../lib/review-status.js', () => ({
-  getReviewStatusSync: vi.fn(() => ({
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    mergeStatus: 'pending',
-    readyForMerge: true,
+// PAN-3917: merge readiness is the forge's answer, not a review-status record.
+vi.mock('../../../services/derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async (issueId: string) => ({
+    issueId,
+    state: 'ready',
+    pr: { url: 'https://github.com/eltmon/overdeck/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
   })),
-  markWorkspaceStuck: vi.fn(),
-  setReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
+  listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   sessionExists: vi.fn(),
 }));
 
@@ -82,17 +102,13 @@ vi.mock('../../workspaces.js', () => ({
   getWorkspaceInfoForIssue: vi.fn(() => ({ isRemote: false, localPath: '/workspace' })),
   readJsonBody: vi.fn(),
   setPendingOperation: vi.fn(),
-  setReviewStatus: (issueId: string, patch: Record<string, unknown>) => {
-    mocks.reviewStatus = { ...mocks.reviewStatus, ...patch };
-    mocks.setReviewStatus(issueId, patch);
-  },
 }));
 
 vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
-  advanceMergeQueue: vi.fn(),
+  advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: vi.fn(),
-  mergeCompletionStatus: vi.fn(() => ({})),
+  forgeMergeGateRefusal: vi.fn(async () => null),
   mergeVerificationOptions: vi.fn(() => ({})),
   normalMergeEligibility: vi.fn(() => null),
   validateStrikeMergeRequest: vi.fn(() => null),
@@ -104,56 +120,25 @@ vi.mock('../../specialists.js', () => ({
 
 vi.mock('../../../services/merge-queue-service.js', () => ({
   setMergeQueueAdvanceHandler: vi.fn(),
+  setMergeRun: (issueId: string, patch: Record<string, unknown>) => mocks.setMergeRun(issueId, patch),
+  getMergeRun: () => null,
+  clearMergeRun: vi.fn(),
 }));
 
 vi.mock('../../../../../lib/merge-set.js', () => ({
-  ensureMergeSetForIssueSync: vi.fn(() => mocks.mergeSet),
-  getMergeSetSync: vi.fn(() => mocks.mergeSet),
-  patchMergeSetRepoSync: vi.fn((_issueId: string, repoKey: string, expected: any, patch: any) => {
-    const current = mocks.mergeSet?.repos.find((repo: any) => repo.repoKey === repoKey);
-    if (!current
-      || current.sourceBranch !== expected.sourceBranch
-      || current.targetBranch !== expected.targetBranch
-      || current.artifactUrl !== expected.artifactUrl
-      || current.artifactId !== expected.artifactId) return false;
-    mocks.mergeSet = {
-      ...mocks.mergeSet,
-      repos: mocks.mergeSet.repos.map((repo: any) => (
-        repo.repoKey === repoKey ? { ...repo, ...patch } : repo
-      )),
-    };
-    return true;
-  }),
-  patchMergeSetReposSync: vi.fn((_issueId: string, patches: any[]) => {
-    const matches = patches.every(({ repoKey, expected }) => {
-      const current = mocks.mergeSet?.repos.find((repo: any) => repo.repoKey === repoKey);
-      return current
-        && current.sourceBranch === expected.sourceBranch
-        && current.targetBranch === expected.targetBranch
-        && current.artifactUrl === expected.artifactUrl
-        && current.artifactId === expected.artifactId;
-    });
-    if (!matches) return false;
-    mocks.mergeSet = {
-      ...mocks.mergeSet,
-      repos: mocks.mergeSet.repos.map((repo: any) => {
-        const planned = patches.find(({ repoKey }) => repoKey === repo.repoKey);
-        return planned ? { ...repo, ...planned.patch } : repo;
-      }),
-    };
-    return true;
-  }),
-  upsertMergeSetSync: (mergeSet: any) => {
+  ensureMergeSetForIssue: vi.fn(() => mocks.mergeSet),
+  getMergeSet: vi.fn(() => mocks.mergeSet),
+  upsertMergeSet: (mergeSet: any) => {
     mocks.mergeSet = mergeSet;
     mocks.upsertMergeSet(mergeSet);
   },
-  withRepoArtifactUrlSync: vi.fn((mergeSet: any, repoKey: string, artifactUrl: string, artifactId?: string) => ({
+  withRepoArtifactUrl: vi.fn((mergeSet: any, repoKey: string, artifactUrl: string, artifactId?: string) => ({
     ...mergeSet,
     repos: mergeSet.repos.map((repo: any) => (
       repo.repoKey === repoKey ? { ...repo, artifactUrl, artifactId } : repo
     )),
   })),
-  withRepoStateSync: vi.fn((mergeSet: any, repoKey: string, patch: Record<string, unknown>) => ({
+  withRepoState: vi.fn((mergeSet: any, repoKey: string, patch: Record<string, unknown>) => ({
     ...mergeSet,
     repos: mergeSet.repos.map((repo: any) => (
       repo.repoKey === repoKey ? { ...repo, ...patch } : repo
@@ -180,11 +165,11 @@ function repo(repoKey: string, patch: Record<string, unknown> = {}) {
     targetBranch: 'main',
     artifactUrl: undefined,
     artifactId: undefined,
-    reviewStatus: 'passed',
-    testStatus: 'passed',
+    repoReview: 'passed',
+    repoTests: 'passed',
     rebaseStatus: 'passed',
-    verificationStatus: 'passed',
-    mergeStatus: 'pending',
+    repoVerification: 'passed',
+    repoMerge: 'pending',
     mergeOrder: repoKey === 'repo-a' ? 0 : 1,
     required: true,
     ...patch,
@@ -207,7 +192,6 @@ function mergeSet(repos: ReturnType<typeof repo>[]) {
 describe('coordinated polyrepo merge completeness gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.reviewStatus = {};
     mocks.discoverArtifact.mockResolvedValue(null);
     mocks.findMergedArtifact.mockResolvedValue(null);
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
@@ -238,13 +222,11 @@ describe('coordinated polyrepo merge completeness gate', () => {
       statusCode: 409,
       error: expect.stringContaining('repo-b has 2 commits'),
     }));
-    expect(mocks.reviewStatus).toEqual(expect.objectContaining({
-      mergeStatus: 'failed',
-      readyForMerge: false,
-      blockerReasons: [expect.objectContaining({
-        type: 'unmerged_sibling_repo',
-        summary: expect.stringContaining('repo-b'),
-      })],
+    // PAN-3917: the blocker is reported on the merge run and in the response,
+    // not written to a record as `blockerReasons`.
+    expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-2467', expect.objectContaining({
+      phase: 'failed',
+      notes: expect.stringContaining('repo-b'),
     }));
     expect(mocks.mergeSet.status).toBe('failed');
     expect(mocks.postMergeLifecycle).not.toHaveBeenCalled();
@@ -252,7 +234,7 @@ describe('coordinated polyrepo merge completeness gate', () => {
 
   it('completes when the remaining required repo has no changes', async () => {
     mocks.mergeSet = mergeSet([
-      repo('repo-a', { mergeStatus: 'skipped' }),
+      repo('repo-a', { repoMerge: 'skipped' }),
       repo('repo-b'),
     ]);
     mocks.exec.mockImplementation(async (command) => ({
@@ -265,10 +247,9 @@ describe('coordinated polyrepo merge completeness gate', () => {
     expect(result).toEqual(expect.objectContaining({
       success: true,
       statusCode: 200,
-      mergeStatus: 'merged',
+      outcome: 'merged',
     }));
     expect(mocks.mergeSet.status).toBe('merged');
-    expect(mocks.reviewStatus).toEqual(expect.objectContaining({ mergeStatus: 'merged' }));
     expect(mocks.postMergeLifecycle).toHaveBeenCalledTimes(1);
   });
 
@@ -276,11 +257,11 @@ describe('coordinated polyrepo merge completeness gate', () => {
     mocks.mergeSet = mergeSet([
       repo('repo-a', {
         artifactUrl: 'https://github.com/org/repo-a/pull/1',
-        mergeStatus: 'failed',
+        repoMerge: 'failed',
       }),
       repo('repo-b', {
         artifactUrl: 'https://github.com/org/repo-b/pull/2',
-        mergeStatus: 'pending',
+        repoMerge: 'pending',
       }),
     ]);
     mocks.findMergedArtifact.mockImplementation(async ({ cwd }: { cwd: string }) => ({
@@ -298,15 +279,14 @@ describe('coordinated polyrepo merge completeness gate', () => {
       success: true,
       statusCode: 200,
       message: 'No changed repos remain for PAN-2467',
-      mergeStatus: 'merged',
+      outcome: 'merged',
       repos: [],
     }));
     expect(mocks.mergeSet.repos).toEqual([
-      expect.objectContaining({ repoKey: 'repo-a', mergeStatus: 'merged' }),
-      expect.objectContaining({ repoKey: 'repo-b', mergeStatus: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-a', repoMerge: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-b', repoMerge: 'merged' }),
     ]);
     expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
-    expect(mocks.reviewStatus).toEqual(expect.objectContaining({ mergeStatus: 'merged' }));
     expect(mocks.postMergeLifecycle).toHaveBeenCalledTimes(1);
   });
 
@@ -314,11 +294,11 @@ describe('coordinated polyrepo merge completeness gate', () => {
     mocks.mergeSet = mergeSet([
       repo('repo-a', {
         artifactUrl: 'https://github.com/org/repo-a/pull/1',
-        mergeStatus: 'failed',
+        repoMerge: 'failed',
       }),
       repo('repo-b', {
         artifactUrl: 'https://github.com/org/repo-b/pull/2',
-        mergeStatus: 'pending',
+        repoMerge: 'pending',
       }),
     ]);
     mocks.findMergedArtifact.mockImplementation(async ({ cwd }: { cwd: string }) => (
@@ -336,7 +316,7 @@ describe('coordinated polyrepo merge completeness gate', () => {
 
     expect(result).toEqual(expect.objectContaining({
       success: true,
-      mergeStatus: 'merged',
+      outcome: 'merged',
       repos: [{ repo: 'repo-b', success: true, message: 'Merged via github' }],
     }));
     expect(mocks.mergeReviewArtifact).toHaveBeenCalledTimes(1);
@@ -347,8 +327,8 @@ describe('coordinated polyrepo merge completeness gate', () => {
       url: 'https://github.com/org/repo-a/pull/1',
     }));
     expect(mocks.mergeSet.repos).toEqual([
-      expect.objectContaining({ repoKey: 'repo-a', verificationStatus: 'passed', mergeStatus: 'merged' }),
-      expect.objectContaining({ repoKey: 'repo-b', verificationStatus: 'skipped', mergeStatus: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-a', repoVerification: 'passed', repoMerge: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-b', repoVerification: 'skipped', repoMerge: 'merged' }),
     ]);
   });
 });

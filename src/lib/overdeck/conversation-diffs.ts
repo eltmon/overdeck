@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { ChatMessage } from '@overdeck/contracts';
-import { Effect } from 'effect';
 
 import {
   findCommitAtTime,
@@ -134,9 +133,9 @@ async function diffPatchForFiles(
   createdAt: string,
   filePaths: string[],
 ): Promise<string> {
-  const baseCommit = await Effect.runPromise(findCommitAtTime(repoRoot, createdAt));
+  const baseCommit = await findCommitAtTime(repoRoot, createdAt);
   if (!baseCommit) {
-    return Effect.runPromise(diffPatchFilesAgainstHead(repoRoot, filePaths));
+    return diffPatchFilesAgainstHead(repoRoot, filePaths);
   }
 
   const quotedPaths = filePaths.map(p => JSON.stringify(p)).join(' ');
@@ -189,12 +188,12 @@ export async function getConversationDiffs(
       for (const [repoRoot, filePaths] of filesByRepo) {
         try {
           if (!baseCommitCache.has(repoRoot)) {
-            baseCommitCache.set(repoRoot, await Effect.runPromise(findCommitAtTime(repoRoot, conv.createdAt)));
+            baseCommitCache.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
           }
           const baseCommit = baseCommitCache.get(repoRoot) ?? null;
           const diffs = baseCommit
             ? await diffFilesSinceBase(repoRoot, baseCommit, filePaths)
-            : await Effect.runPromise(diffFilesAgainstHead(repoRoot, filePaths));
+            : await diffFilesAgainstHead(repoRoot, filePaths);
           allFiles.push(...diffs);
         } catch {
           // git diff failed — skip this repo
@@ -233,9 +232,9 @@ export async function getConversationDiffFull(
     const patches: string[] = [];
 
     if (cwdRepoRoot) {
-      const baseCommit = await Effect.runPromise(findCommitAtTime(cwdRepoRoot, conv.createdAt));
+      const baseCommit = await findCommitAtTime(cwdRepoRoot, conv.createdAt);
       if (baseCommit) {
-        const patch = await Effect.runPromise(diffPatchSinceCommit(cwdRepoRoot, baseCommit));
+        const patch = await diffPatchSinceCommit(cwdRepoRoot, baseCommit);
         if (patch) patches.push(patch);
       }
     }
@@ -286,9 +285,9 @@ export async function getConversationDiffTurn(
     const patches: string[] = [];
 
     if (cwdRepoRoot) {
-      const baseCommit = await Effect.runPromise(findCommitAtTime(cwdRepoRoot, conv.createdAt));
+      const baseCommit = await findCommitAtTime(cwdRepoRoot, conv.createdAt);
       if (baseCommit) {
-        const patch = await Effect.runPromise(diffPatchSinceCommit(cwdRepoRoot, baseCommit, fileFilter));
+        const patch = await diffPatchSinceCommit(cwdRepoRoot, baseCommit, fileFilter);
         if (patch) patches.push(patch);
       }
     }

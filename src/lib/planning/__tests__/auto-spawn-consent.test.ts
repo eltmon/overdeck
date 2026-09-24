@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import {
   autoSpawnOnFinalizeFlagPath,
-  readAutoSpawnOnFinalizeFlag,
+  readAutoSpawnOnFinalizeFlagAsync,
   withAutoSpawnConsentClaim,
   writeAutoSpawnOnFinalizeFlag,
 } from '../auto-spawn-consent.js';
@@ -34,7 +34,7 @@ describe('auto-spawn consent claims', () => {
     await expect(withAutoSpawnConsentClaim(issueId, operation)).resolves.toBe('running');
 
     expect(operation).toHaveBeenCalledOnce();
-    expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(issueId)).resolves.toBe(false);
   });
 
   it('releases the claim when launch fails', async () => {
@@ -44,7 +44,7 @@ describe('auto-spawn consent claims', () => {
       throw new Error('tmux start failed');
     })).rejects.toThrow('tmux start failed');
 
-    expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(issueId)).resolves.toBe(true);
   });
 
   it('allows only one launch to own a granted consent generation', async () => {
@@ -70,7 +70,7 @@ describe('auto-spawn consent claims', () => {
     failFirst();
     await expect(firstLaunch).rejects.toThrow('pre-session setup failed');
     expect(firstOperation).toHaveBeenCalledOnce();
-    expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(issueId)).resolves.toBe(true);
   });
 
   it('keeps consent spent when setup fails after session acceptance', async () => {
@@ -81,7 +81,7 @@ describe('auto-spawn consent claims', () => {
       throw new Error('runtime state persistence failed');
     })).rejects.toThrow('runtime state persistence failed');
 
-    expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(false);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(issueId)).resolves.toBe(false);
   });
 
   it('does not let an old completion consume a newer planning generation', async () => {
@@ -102,7 +102,7 @@ describe('auto-spawn consent claims', () => {
     finishLaunch();
     await expect(launch).resolves.toBe('running');
 
-    expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(true);
+    await expect(readAutoSpawnOnFinalizeFlagAsync(issueId)).resolves.toBe(true);
   });
 
   it('aborts before launch when existing consent state is unreadable', async () => {

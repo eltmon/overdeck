@@ -1,6 +1,8 @@
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
 
 export interface ParseResult {
+  /** Worker-local accumulator generation; changes when a transcript is rebuilt. */
+  transcriptGeneration?: number;
   messages: ChatMessage[];
   workLog: WorkLogEntry[];
   /** Byte offset after the last parsed line — pass back for incremental reads. */
@@ -79,6 +81,8 @@ export interface ConversationActivitySummary {
   isWorking: boolean;
   /** Tool name of the most recently pending tool call, if any (e.g. "Bash", "Read"). */
   currentTool: string | null;
+  /** Transcript mtime when an ACP turn has remained open without activity past the stall threshold. */
+  stalledSince?: string;
 }
 
 /** Maximum bytes to read in a single incremental chunk (10 MB). */

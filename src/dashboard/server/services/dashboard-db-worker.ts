@@ -1,3 +1,7 @@
+import { getCostsByIssueSnapshot } from './dashboard-cost-snapshot.js';
+import { getAgentCostStats } from '../../../lib/overdeck/cost-sync.js';
+import { getConversationSearchStats } from '../../../lib/overdeck/conversations-search.js';
+import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { parentPort } from 'node:worker_threads';
 import {
   aggregateDiscoveredSessionCost,
@@ -7,7 +11,7 @@ import {
   getDiscoveredSessionById,
   getDiscoveredStats,
 } from '../../../lib/overdeck/discovered-sessions.js';
-import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import { getConversationByName, getConversationLedgerCosts } from '../../../lib/overdeck/conversations.js';
 import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.js';
 import type { ConversationFilter } from '../../../lib/overdeck/discovered-sessions.js';
 import { getSessionsFeedFacets, listSessionsFeed } from '../../../lib/overdeck/sessions-feed.js';
@@ -20,7 +24,6 @@ import { enrichSessions, CostThresholdError } from '../../../lib/conversations/e
 import type { EnrichOptions } from '../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
-import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
 import { collectPiCostEvents } from '../../../lib/costs/reconciler.js';
 import { parseAcpConversationMessages } from './acp-conversation-parser.js';
@@ -32,6 +35,10 @@ import { parseEntireConversation } from './conversation-service.js';
 import type { ParseResult } from './conversation-service.js';
 
 type DashboardDbOperation =
+  | 'getAgentCostStats'
+  | 'getCostsByIssueSnapshot'
+  | 'getConversationSearchStats'
+  | 'getConversationLedgerCosts'
   | 'getDiscoveredStats'
   | 'listDiscoveredSessions'
   | 'listSessionsFeed'
@@ -47,14 +54,13 @@ type DashboardDbOperation =
   | 'getConversationByName'
   | 'getSetting'
   | 'setSetting'
-  | 'listSubstrateBugWeights'
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug'
   | 'parseTranscriptSnapshot'
   | 'costReconcileSweep';
 
-type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'claude-initial';
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
 
 const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
@@ -63,6 +69,7 @@ const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
   codex: parseCodexConversationMessages,
   acp: parseAcpConversationMessages,
   kimi: parseKimiConversationMessages,
+  muse: parseMuseConversationMessages,
   'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
 };
 
@@ -102,6 +109,14 @@ async function runJob(
   };
 
   switch (operation) {
+    case 'getAgentCostStats':
+      return getAgentCostStats(payload as { agentIds: string[]; nowMs: number });
+    case 'getCostsByIssueSnapshot':
+      return getCostsByIssueSnapshot();
+    case 'getConversationSearchStats':
+      return getConversationSearchStats(payload as { dbPath: string; model: string });
+    case 'getConversationLedgerCosts':
+      return [...getConversationLedgerCosts()];
     case 'getDiscoveredStats':
       return getDiscoveredStats();
     case 'listDiscoveredSessions': {
@@ -144,10 +159,6 @@ async function runJob(
       const input = payload as { key: string; value: string };
       setSetting(input.key, input.value);
       return null;
-    }
-    case 'listSubstrateBugWeights': {
-      const input = payload as { window: string; limit: number; offset: number };
-      return listSubstrateBugWeights(input.window, { limit: input.limit, offset: input.offset });
     }
     case 'getArtifactBySlug': {
       const { getArtifactBySlugJob } = await import('./artifact-index-jobs.js');

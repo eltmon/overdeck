@@ -1,14 +1,9 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
-import { getReviewStatusSync, loadReviewStatuses, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
-import { resolveGitHubIssueSync } from './tracker-utils.js';
-import type { SequenceNode } from './backlog/types.js';
-import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
+import { resolveGitHubIssue } from './tracker-utils.js';
 import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
-import { computeIssueFootprint } from './xbrief/swarm-readiness.js';
-import type { XBriefDocument } from './xbrief/types.js';
-import { findProjectByPathSync, getProjectSwarmHotspots, resolveProjectFromIssueSync } from './projects.js';
+import { findProjectByPath, getProjectSwarmHotspots } from './projects.js';
 import type { ResolvedProjectRepo } from './project-repos.js';
 
 export interface MergeQueueItem {
@@ -73,25 +68,6 @@ export interface MergeTrainPlan {
   serialize: string[];
   /** Full ordered list (batch, then serialize). */
   order: string[];
-}
-
-/**
- * PAN-1691 merge-train plan. Partitions the conflict-aware order into the run of
- * disjoint candidates — which can all merge in a single verification pass — and
- * the conflicting remainder, which must serialize broadest-footprint first.
- * Pure; the executor consumes this once the merge-train flag is enabled.
- */
-export function planMergeTrain<T extends MergeCandidateMeta>(candidates: ReadonlyArray<T>): MergeTrainPlan {
-  const ordered = orderMergeCandidates(candidates);
-  return {
-    batch: ordered.filter((c) => c.conflictCount === 0).map((c) => c.issueId),
-    serialize: ordered.filter((c) => c.conflictCount > 0).map((c) => c.issueId),
-    order: ordered.map((c) => c.issueId),
-  };
-}
-
-export function declaredIssueFootprint(issueId: string, doc: XBriefDocument): IssueFileFootprint {
-  return { issueId, files: computeIssueFootprint(doc), source: 'declared' };
 }
 
 function pathMatchesAnyCompiled(filePath: string, patterns: CompiledGlob[]): boolean {
@@ -164,21 +140,6 @@ export interface UatCandidatePlan {
   bundled: string[];
 }
 
-/**
- * PAN-1691 on-demand UAT candidate. In auto-merge-OFF mode the disjoint "batch"
- * (everything that can merge together in one verification pass) is bundled onto
- * a single throwaway branch the human UATs in one sitting. Pure — `dateIso` is
- * injected, and it reads the already-computed `batchGroup` off the merge queue.
- */
-export function planUatCandidate(
-  queue: ReadonlyArray<MergeQueueItem>,
-  opts: { dateIso: string; label?: string },
-): UatCandidatePlan {
-  const bundled = queue.filter((i) => i.batchGroup === 'batch').map((i) => i.issueId);
-  const day = opts.dateIso.slice(0, 10);
-  return { branchName: `uat/${opts.label ?? 'candidate'}-${day}`, bundled };
-}
-
 const branchExists = (branch: string, cwd: string) =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -199,75 +160,26 @@ export const changedFilesVsMain = (branch: string, cwd: string, base = 'main') =
     );
   });
 
-export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
+const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 
 export interface ComputeMergeQueueOptions {
   getPrUrl?: (item: { issueId: string; pr?: number }) => string | undefined;
   gitConcurrency?: number;
-  /**
-   * Authoritative merge eligibility per issue (PAN-1759). Defaults to the
-   * review-status DB predicate; injectable for tests. The verb filter alone is
-   * the orchestrator's INTENT — an LLM emission that has tagged mid-review
-   * issues as merge-bound. Only verb ∩ eligibility enters the queue.
-   */
-  eligibility?: (issueId: string) => MergeGateEligibility;
   /** Called for each verb-tagged item the eligibility gate rejects. */
   onIneligible?: (issueId: string, reason: string) => void;
   /** Files treated as common hotspots and excluded from predicted-conflict math. */
   hotspots?: string[];
 }
 
-/** Default eligibility: the issue's review-status record, read synchronously. */
-export function reviewRecordEligibility(issueId: string): MergeGateEligibility {
-  return mergeGateEligibility(getReviewStatusSync(issueId.toUpperCase()));
-}
-
 /**
- * Server-side PR URL resolution for merge-queue items: prefer the review
- * status record, fall back to the GitHub repo + PR number — the browser never
- * guesses repo slugs.
+ * Server-side PR URL resolution for merge-queue items: the GitHub repo plus
+ * the candidate's PR number — the browser never guesses repo slugs.
  */
 export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): string | undefined {
-  const issueId = item.issueId.toUpperCase();
-  const reviewStatus = getReviewStatusSync(issueId);
-  if (reviewStatus?.prUrl) return reviewStatus.prUrl;
-
-  const prNumber = reviewStatus?.prNumber ?? item.pr;
-  if (prNumber === undefined) return undefined;
-
-  const githubIssue = resolveGitHubIssueSync(issueId);
+  if (item.pr === undefined) return undefined;
+  const githubIssue = resolveGitHubIssue(item.issueId.toUpperCase());
   if (!githubIssue.isGitHub) return undefined;
-  return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${prNumber}`;
-}
-
-/**
- * PAN-1696 ready-set-source: List all merge-eligible candidates from review-status DB for a given project.
- * No flywheel run required — sources directly from persistent pipeline state.
- * Returns an array of candidate items compatible with computeMergeQueueFromCandidates.
- */
-export async function listEligibleCandidatesByProject(projectRoot: string): Promise<Array<{ issueId: string; title: string; pr?: number }>> {
-  const project = findProjectByPathSync(projectRoot);
-  if (!project) return [];
-
-  const allStatuses = loadReviewStatuses();
-  const readyStatuses = Object.entries(allStatuses).filter(([issueId, rs]) => {
-    const issueProject = resolveProjectFromIssueSync(issueId);
-    return issueProject?.projectPath === project.path &&
-      rs.deaconIgnored !== true && rs.readyForMerge === true && mergeGateEligibility(rs).eligible;
-  });
-  const { gatherMergeEligibility, isMergeEligible } = await import('./cloister/merge-eligibility.js');
-  const memberships = await gatherMergeEligibility(readyStatuses.map(([issueId]) => issueId));
-  const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
-
-  for (const [issueId, rs] of readyStatuses) {
-    const membership = memberships.get(issueId.toUpperCase());
-    if (!membership || !isMergeEligible(membership)) continue;
-
-    // AC 10: title resolved downstream by computeMergeQueueFromCandidates; here use issue ID
-    candidates.push({ issueId, title: issueId, pr: rs.prNumber });
-  }
-
-  return candidates;
+  return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${item.pr}`;
 }
 
 /**
@@ -301,7 +213,7 @@ export const computeMergeQueueFromCandidates = (
       existing.map(({ branch }) => changedFilesVsMain(branch, projectRoot)),
       { concurrency: gitConcurrency },
     );
-    const hotspots = options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot));
+    const hotspots = options.hotspots ?? getProjectSwarmHotspots(findProjectByPath(projectRoot));
     const conflictSignals = computePredictedConflictSignals(
       existing.map((e, i) => ({ issueId: e.item.issueId, source: 'actual' as const, files: fileSets[i]! })),
       { hotspots },
@@ -566,7 +478,7 @@ export const computePolyrepoMergeQueueFromCandidates = (
 
     if (contributing.length === 0) return [] as PolyrepoMergeQueueItem[];
 
-    const hotspots = (options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot))).map(compileGlob);
+    const hotspots = (options.hotspots ?? getProjectSwarmHotspots(findProjectByPath(projectRoot))).map(compileGlob);
 
     // Flattened to ONE concurrency-governed collection: nesting Effect.all
     // inside Effect.all applies the limit at both levels, so the real ceiling
@@ -637,103 +549,3 @@ export interface SequencePickResult {
   predictedConflictsWith?: string[];
 }
 
-
-/**
- * PAN-1866: Pick the highest-ranked eligible issue from a sequence node list.
- *
- * Eligibility rules:
- * - gate must not be 'blocked' (the `vetoed` pickup state)
- * - no `vetoed` label — an absolute operator hard-stop (PAN-2006)
- * - not in-pipeline (active review/work/test)
- * - no parked labels (`parked`; legacy `needs-design`/`needs-discussion`)
- * - not in the optional exclusion set (e.g. already running agents)
- * - FR-14: must have an xBRIEF spec (ready) or a PRD draft (hasPrd)
- *
- * Returns null when no eligible issue is found.
- */
-export function pickFromSequence(
-  nodes: ReadonlyArray<SequenceNode>,
-  opts?: {
-    excludeIssueIds?: ReadonlySet<string>;
-    issueLabels?: (issueId: string) => ReadonlyArray<string>;
-    /** Flywheel author/assignee safety gate. Return false to skip an issue. When
-     *  absent every issue passes (backward-compatible default). */
-    isAuthorizedIssue?: (issueId: string) => boolean;
-    /** FR-14 eligibility gate. Return true if the issue has an xBRIEF spec (ready)
-     *  or a PRD draft (hasPrd). When absent every issue passes (backward-compatible
-     *  default). */
-    isReadyOrHasPrd?: (issueId: string) => boolean;
-    /** Supplement the built-in review-status inPipeline check with live workspace/agent
-     *  state. Return true to treat an issue as in-pipeline and skip it. When absent only
-     *  review_status is checked (backward-compatible default). */
-    isInPipeline?: (issueId: string) => boolean;
-    /** PAN-2006 Definition of Ready: when true, only issues carrying the `ready`
-     *  label are eligible (the hard entry gate). The live Flywheel passes true;
-     *  legacy callers omit it and keep their pre-DoR behavior. */
-    requireReady?: boolean;
-    /** PAN-2059 + vision.mdx blanket release: when auto-pickup is ON the toggle
-     *  satisfies the per-issue `released` gate for the whole backlog. The live Flywheel
-     *  passes its auto_pickup_backlog setting; legacy callers omit it (default OFF). */
-    autoPickupBacklog?: boolean;
-    /** Operator-released scope supplied by the active order book. */
-    activeBookMembership?: ReadonlySet<string>;
-    /**
-     * Advisory pre-branch conflict signal. When present, lower predicted-conflict
-     * counts sort first among otherwise pickable issues; no issue is filtered out.
-     */
-    predictedConflictSignals?: ReadonlyArray<PredictedConflictSignal>;
-  },
-): SequencePickResult | null {
-  // Single source of truth: the same classifier the Forecast UI uses (PAN-2006).
-  // `isReadyOrHasPrd` maps to the module's `planned` gate; review_status + the
-  // optional callback feed the `inPipeline` gate; vetoed / parked / gate-blocked are
-  // derived from labels + the node's gate inside classifyIssue.
-  const lookups: ClassifyLookups = {
-    labels: opts?.issueLabels ?? (() => []),
-    isPlanned: opts?.isReadyOrHasPrd ?? (() => true),
-    isInPipeline: (issueId) => {
-      const reviewStatus = getReviewStatusSync(issueId.toUpperCase());
-      return (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
-        (opts?.isInPipeline?.(issueId) ?? false);
-    },
-  };
-
-  const signalByIssue = new Map((opts?.predictedConflictSignals ?? []).map(signal => [signal.issueId.toUpperCase(), signal]));
-  const eligible = [...nodes]
-    .sort((a, b) => a.rank - b.rank)
-    .filter((node) => {
-      const state = classifyIssue(node, lookups);
-      // DoR is conditional: when not required, treat readiness as satisfied so the
-      // remaining gates (planned / parked / vetoed / in-pipeline) still apply.
-      const activeBookMember = opts?.activeBookMembership?.has(node.issue.toUpperCase()) ?? false;
-      if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true }, opts?.autoPickupBacklog ?? false, activeBookMember)) return false;
-      if (opts?.excludeIssueIds?.has(node.issue)) return false;
-      if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) return false;
-      return true;
-    });
-
-  if (signalByIssue.size > 0) {
-    eligible.sort((a, b) => {
-      const aSignal = signalByIssue.get(a.issue.toUpperCase());
-      const bSignal = signalByIssue.get(b.issue.toUpperCase());
-      const aConflicts = aSignal?.conflictCount ?? 0;
-      const bConflicts = bSignal?.conflictCount ?? 0;
-      if (aConflicts !== bConflicts) return aConflicts - bConflicts;
-      return a.rank - b.rank;
-    });
-  }
-
-  for (const node of eligible) {
-    const state = classifyIssue(node, lookups);
-    const signal = signalByIssue.get(node.issue.toUpperCase());
-    return {
-      issueId: node.issue,
-      rank: node.rank,
-      gate: node.gate,
-      planning: node.planning,
-      predictedConflictCount: signal?.conflictCount,
-      predictedConflictsWith: signal?.conflictsWith,
-    };
-  }
-  return null;
-}

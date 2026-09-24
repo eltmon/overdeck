@@ -8,10 +8,6 @@ import type {
   SystemHealthSnapshot,
 } from '@overdeck/contracts';
 
-import {
-  classifyAdvancingSessionLifecycle,
-  type WarmIdleStatusShape,
-} from '../../../lib/cloister/review-status-source.js';
 import type { AgentHealthRuntimeState } from '../../../lib/agents/health.js';
 import type {
   HostMetricSample,
@@ -58,19 +54,10 @@ export function runtimeHealthState(
   }
 }
 
-export function agentLifecycle(
-  role: string | undefined,
-  issueId: string,
-  tmuxActive: boolean,
-  statuses: ReadonlyMap<string, WarmIdleStatusShape>,
-): SpecialistLifecycle {
-  if (role !== 'review' && role !== 'test' && role !== 'ship') return 'unknown';
-  return classifyAdvancingSessionLifecycle(
-    role,
-    statuses.get(issueId.toUpperCase()),
-    tmuxActive,
-  );
-}
+// PAN-3917: `agentLifecycle` classified a specialist session warm-vs-orphaned
+// from its verdict on the review-status row. That row is gone; the derivation
+// now lives in system-health-service.ts's `specialistLifecycles`, which asks
+// whether the issue's DERIVED state says the work is over (FR-11).
 
 export function stateToLegacySeverity(
   state: HealthState,

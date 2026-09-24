@@ -13,7 +13,6 @@ import {
   PAN_SESSIONS_FILENAME,
   PAN_SPEC_FILENAME,
   PAN_SPECS_DIRNAME,
-  appendSession,
   asPanSpecDocument,
   clearFeedback,
   ensurePanDirs,
@@ -24,7 +23,6 @@ import {
   getWorkspacePanPaths,
   listSpecs,
   readFeedback,
-  readSessions,
   readSpec,
   readWorkspaceContext,
   updateSpecStatus,
@@ -264,27 +262,6 @@ describe('spec helpers', () => {
 
       const found = yield* findSpecByIssue(TEST_DIR, 'pan-3')
       expect(found?.filename).toBe('2026-05-01-PAN-3-older.xbrief.json')
-    }),
-  )
-})
-
-describe('sessions helpers', () => {
-  it.effect('appends and reads JSONL session entries', () =>
-    Effect.gen(function* () {
-      yield* appendSession(TEST_DIR, {
-        timestamp: '2026-05-04T00:00:00Z',
-        reason: 'planning',
-        note: 'started',
-      })
-      yield* appendSession(TEST_DIR, {
-        timestamp: '2026-05-04T01:00:00Z',
-        reason: 'resume',
-      })
-
-      const sessions = yield* readSessions(TEST_DIR)
-      expect(sessions).toHaveLength(2)
-      expect(sessions[0].reason).toBe('planning')
-      expect(sessions[1].reason).toBe('resume')
     }),
   )
 })

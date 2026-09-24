@@ -24,24 +24,24 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
+import { parseIssueId, extractPrefix } from '../../../../lib/issue-id.js';
 import {
   resolveProjectFromIssueSync,
   getProjectSync,
-  findProjectByTeamSync,
+  findProjectByTeam,
 } from '../../../../lib/projects.js';
-import { loadWorkspaceMetadataSync } from '../../../../lib/remote/workspace-metadata.js';
+import { loadWorkspaceMetadata } from '../../../../lib/remote/workspace-metadata.js';
 import {
   collectDockerContainerLifecycleSnapshot,
   getWorkspaceStackHealth,
 } from '../../../../lib/workspace/stack-health.js';
 import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
-import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
-import { getReviewStatusSync } from '../../../../lib/review-status.js';
+import { getActiveSessionModel } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
-import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
-import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
+import { VcsError } from '../../../../lib/errors.js';
+import { findPlan, isPlanningComplete, mergeContinueItemStatuses, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
+import { getCostsForIssue } from '../../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../../services/running-agents-cache.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
@@ -52,7 +52,7 @@ import { XBRIEF_INSPECTION_POLICIES } from '../../../../lib/xbrief/types.js';
 import type { XBriefDocument, XBriefInspectionPolicy } from '../../../../lib/xbrief/types.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
-import { getTldrDaemonServiceSync } from '../../../../lib/tldr-daemon.js';
+import { getTldrDaemonService } from '../../../../lib/tldr-daemon.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -64,14 +64,13 @@ import {
   spawnPanCommand,
   requireTrustedMutationOrigin,
 } from '../workspaces.js';
-import { reconcileGitHubMergeStatus } from './merge-ops.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
   try {
-    const meta = loadWorkspaceMetadataSync(issueId);
+    const meta = loadWorkspaceMetadata(issueId);
     if (meta?.location) return meta.location as 'local' | 'remote';
   } catch { /* non-fatal */ }
   return undefined;
@@ -126,14 +125,17 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
     const url = stdout.trim();
     if (url) return url;
   } catch {
-    // fall through to the DB fallback below
+    // fall through to the derived read below
   }
-  // `gh pr view` needs a real GitHub-backed remote and workspace checkout —
-  // neither exists for the obviously-fake FIX-1 UAT fixture (PAN-3362), whose
-  // review_status row carries a real prUrl written directly through the
-  // canonical write door. Fall back to it whenever the shell lookup finds
-  // nothing, rather than reporting no PR when a persisted one exists.
-  return getReviewStatusSync(issueId)?.prUrl ?? null;
+  // `gh pr view` needs a real GitHub-backed remote and a workspace checkout to
+  // shell in. When there is neither, ask the derived read door, which resolves
+  // the project itself and caches one `gh pr list` per repo (PAN-3917 FR-6).
+  try {
+    const { getDerivedIssueState } = await import('../../services/derived-issue-state.js');
+    return (await getDerivedIssueState(issueId)).pr?.url ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -228,7 +230,7 @@ async function getIndexStats(workspacePath: string): Promise<{
 function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: XBriefDocument } | null, unknown> {
   return Effect.gen(function* () {
     // PAN-2401: every doc this route returns gets the per-issue record's
-    // statusOverrides applied — merged tasks must read 'completed', not the
+    // continue-file item statuses applied — merged tasks must read 'completed', not the
     // spec's immutable 'pending'.
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -239,7 +241,7 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
       return {
         path: found.path,
         lifecycleDir: found.lifecycleDir,
-        doc: mergeRecordStatusOverrides(doc, workspacePath),
+        doc: mergeContinueItemStatuses(doc, workspacePath),
       };
     }
 
@@ -249,7 +251,7 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
     return {
       path: planPath,
       lifecycleDir: 'workspace',
-      doc: mergeRecordStatusOverrides(doc, workspacePath),
+      doc: mergeContinueItemStatuses(doc, workspacePath),
     };
   });
 }
@@ -408,7 +410,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       .filter(Boolean)))
       .slice(0, 100);
 
-    const parsedIds = issueIds.map((issueId) => ({ issueId, parsed: parseIssueIdSync(issueId) }));
+    const parsedIds = issueIds.map((issueId) => ({ issueId, parsed: parseIssueId(issueId) }));
     const invalid = parsedIds.find(({ parsed }) => !parsed);
     if (invalid) {
       return jsonResponse({ error: `Invalid issue ID: ${invalid.issueId}` }, { status: 400 });
@@ -418,7 +420,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       const normalizedIssueId = parsed!.raw.toUpperCase();
       const workspaceMetadata = (() => {
         try {
-          return loadWorkspaceMetadataSync(normalizedIssueId);
+          return loadWorkspaceMetadata(normalizedIssueId);
         } catch {
           return null;
         }
@@ -510,10 +512,10 @@ const getWorkspaceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -545,7 +547,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const feGit = join(workspacePath, 'fe', '.git');
         const srcGit = join(workspacePath, 'src', '.git');
         const devcontainer = join(workspacePath, '.devcontainer');
-        const claudeMd = join(workspacePath, 'CLAUDE.md');
+        const overdeckState = join(workspacePath, '.overdeck');
 
         const hasValidStructure =
           existsSync(gitFile) ||
@@ -553,7 +555,7 @@ const getWorkspaceRoute = HttpRouter.add(
           existsSync(feGit) ||
           existsSync(srcGit) ||
           existsSync(devcontainer) ||
-          existsSync(claudeMd);
+          existsSync(overdeckState);
 
         if (!hasValidStructure) {
           const location = getWorkspaceLocation(issueId);
@@ -567,7 +569,7 @@ const getWorkspaceRoute = HttpRouter.add(
           });
         }
 
-        const projectConfig = findProjectByTeamSync(issuePrefix);
+        const projectConfig = findProjectByTeam(issuePrefix);
         const dnsDomain = projectConfig?.workspace?.dns?.domain || 'localhost';
         const featureFolder = `feature-${issueLower}`;
 
@@ -657,7 +659,7 @@ const getWorkspaceRoute = HttpRouter.add(
         // unconditionally inside the Promise.all above, on every request).
         const git = shellGit ?? (yield* Effect.promise(() => getPersistedBranchFallbackAsync(issueId)));
         const sessionNames = yield* listSessionNames();
-        const paneOutput = yield* capturePane(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
+        const paneOutput = yield* Effect.promise(() => capturePane(agentSession, 50).catch(() => ''));
 
         let hasAgent = false;
         let agentSessionId: string | null = null;
@@ -675,23 +677,25 @@ const getWorkspaceRoute = HttpRouter.add(
           ) || paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
           agentModel = modelMatch ? modelMatch[1] : undefined;
 
-          const fullModel = getActiveSessionModelSync(workspacePath);
+          const fullModel = getActiveSessionModel(workspacePath);
           if (fullModel) agentModelFull = fullModel;
         }
 
         const pendingOperation = getPendingOperation(issueId);
         const location = getWorkspaceLocation(issueId);
-        const reviewStatus = getReviewStatusSync(issueId);
+        // PAN-3917: a failed merge used to trigger a GitHub reconcile that
+        // repaired the stored merge status. There is no stored merge status —
+        // `services/derived-issue-state.ts` reads the PR every time, so a
+        // merge that actually landed shows as `merged` on the next read.
 
-        if (
-          pendingOperation?.type === 'merge' &&
-          pendingOperation.status === 'failed' &&
-          reviewStatus?.mergeStatus !== 'merged'
-        ) {
-          yield* Effect.promise(() => reconcileGitHubMergeStatus(issueId, reviewStatus));
-        }
-
-        const stashes = yield* listStashes(workspacePath);
+        const stashes = yield* Effect.tryPromise({
+          try: () => listStashes(workspacePath),
+          catch: (cause) => new VcsError({
+            operation: 'git stash list',
+            message: cause instanceof Error ? cause.message : String(cause),
+            cause,
+          }),
+        });
         const salvageableStashes = stashes
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());
@@ -701,7 +705,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const planningComplete = hasPlan ? yield* isPlanningComplete(workspacePath) : false;
         const hasTasks = planningComplete;
 
-        const issueData = getCostsForIssueSync(issueId);
+        const issueData = getCostsForIssue(issueId);
         const agents = yield* Effect.promise(() => getCachedRunningAgents());
         const resolvedCost = resolveIssueHeadlineCost({
           issueId: issueId,
@@ -803,7 +807,7 @@ const postWorkspacesRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
     const activityId = spawnPanCommand(
       ['workspace', 'create', issueId],
@@ -824,10 +828,10 @@ const getWorkspacePlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const location = yield* resolvePlanLocation(projectPath, issueId);
@@ -848,12 +852,12 @@ const getWorkspaceUatContextRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const parsed = parseIssueIdSync(issueId);
+    const parsed = parseIssueId(issueId);
     if (!parsed) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const issuePrefix = parsed.prefix ?? extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = parsed.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
@@ -887,7 +891,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -897,7 +901,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid inspection policy' }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
@@ -934,7 +938,7 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -954,7 +958,7 @@ const getWorkspaceTldrRoute = HttpRouter.add(
           });
         }
 
-        const service = getTldrDaemonServiceSync(workspacePath, venvPath);
+        const service = getTldrDaemonService(workspacePath, venvPath);
         const status = await service.getStatus();
         const { fileCount, indexAge, edgeCount } = await getIndexStats(workspacePath);
 
@@ -972,84 +976,11 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: PATCH /api/workspaces/:issueId/tiered-execution ──────────────────
-
-const patchWorkspaceTieredExecutionRoute = HttpRouter.add(
-  'PATCH',
-  '/api/workspaces/:issueId/tiered-execution',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedMutationOrigin(request);
-    if (originError) return originError;
-
-    const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
-    }
-
-    const body = yield* readJsonBody;
-    const override = (body as { override?: unknown }).override;
-    if (override !== 'on' && override !== 'off' && override !== null && override !== undefined) {
-      return jsonResponse({ error: 'Invalid tiered-execution override' }, { status: 400 });
-    }
-
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-    const project = getProjectSync(issuePrefix);
-    if (!project) {
-      return jsonResponse({ error: 'Project not found' }, { status: 404 });
-    }
-
-    // Persist via the record write door
-    yield* Effect.promise(() =>
-      import('../../../../lib/pan-dir/record.js').then(m =>
-        m.writeRecordTieredExecutionOverride(project, issueId, override as 'on' | 'off' | null)
-      )
-    );
-
-    // Return the updated computed tieredExecution block (same shape as read door)
-    const projectPath = project.path;
-    const location = yield* resolvePlanLocation(projectPath, issueId);
-    if (!location) {
-      return jsonResponse(
-        { error: 'No xBRIEF plan found for this workspace' },
-        { status: 404 }
-      );
-    }
-
-    // Compute tieredExecution block using the same logic as the read door
-    const config = loadConfigSync().config;
-    const tieredExecutionConfig = config.tieredExecution;
-    const globalEnabled = tieredExecutionConfig?.enabled ?? false;
-    const planMetadata = location.doc.plan?.metadata;
-
-    // Determine source and effective state with record override precedence
-    let source: 'issue-override' | 'plan-metadata' | 'global';
-    let effective: boolean;
-
-    if (override !== null && override !== undefined) {
-      source = 'issue-override';
-      effective = override === 'on';
-    } else if (planMetadata?.tiered_execution === 'on') {
-      source = 'plan-metadata';
-      effective = true;
-    } else if (planMetadata?.tiered_execution === 'off') {
-      source = 'plan-metadata';
-      effective = false;
-    } else {
-      source = 'global';
-      effective = globalEnabled;
-    }
-
-    const tieredExecution = {
-      effective,
-      source,
-      override: (override as 'on' | 'off' | null) ?? null,
-    };
-
-    return jsonResponse({ ...location.doc, tieredExecution, lifecycleDir: location.lifecycleDir });
-  }))
-);
+// PAN-3917: `PATCH /api/workspaces/:issueId/tiered-execution` is deleted. The
+// per-issue override was a record field (`writeRecordTieredExecutionOverride`)
+// and the record plane is gone. Tiered execution resolves from the plan's
+// `metadata.tiered_execution` and the global config (D11 keeps the swarm
+// machinery in the tree but off the default work path).
 
 export const workspaceDataRouteLayer = Layer.mergeAll(
   getWorkspaceStackHealthBatchRoute,
@@ -1058,7 +989,6 @@ export const workspaceDataRouteLayer = Layer.mergeAll(
   getWorkspacePlanRoute,
   getWorkspaceUatContextRoute,
   patchWorkspacePlanInspectionPolicyRoute,
-  patchWorkspaceTieredExecutionRoute,
   getWorkspaceTldrRoute,
 );
 

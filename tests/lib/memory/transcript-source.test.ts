@@ -33,7 +33,7 @@ describe('ClaudeCodeTranscriptSource', () => {
   it('resolves active Claude Code transcripts from agent session metadata', async () => {
     const source = new ClaudeCodeTranscriptSource({
       listAgents: async () => [agent()],
-      getRuntimeState: async () => ({ claudeSessionId: 'runtime-session' }),
+      resolveSessionId: (candidate) => candidate.sessionId ?? null,
       resolveTranscriptPath: (workspace, sessionId) => `${workspace}/.claude/${sessionId}.jsonl`,
       statTranscript: async () => ({ size: 123, mtimeMs: 456 }),
     });
@@ -57,15 +57,15 @@ describe('ClaudeCodeTranscriptSource', () => {
     }]);
   });
 
-  it('falls back to runtime claudeSessionId when state has no sessionId', async () => {
+  it('uses the shared authoritative session resolver', async () => {
     const source = new ClaudeCodeTranscriptSource({
       listAgents: async () => [agent({ sessionId: undefined })],
-      getRuntimeState: async () => ({ claudeSessionId: 'runtime-session' }),
+      resolveSessionId: () => 'indexed-session',
       resolveTranscriptPath: (workspace, sessionId) => `${workspace}/${sessionId}.jsonl`,
       statTranscript: async () => ({ size: 10, mtimeMs: 20 }),
     });
 
-    expect((await source.getActiveTranscripts())[0]?.sessionId).toBe('runtime-session');
+    expect((await source.getActiveTranscripts())[0]?.sessionId).toBe('indexed-session');
   });
 
   it('ignores inactive, missing, non-Claude, and subagent sessions', async () => {
@@ -78,7 +78,7 @@ describe('ClaudeCodeTranscriptSource', () => {
         agent({ id: 'agent-missing', sessionId: undefined }),
         agent({ id: 'agent-subagent', sessionId: 'subagent-session' }),
       ],
-      getRuntimeState: async () => null,
+      resolveSessionId: (candidate) => candidate.sessionId ?? null,
       resolveTranscriptPath: (workspace, sessionId) => `${workspace}/${sessionId}.jsonl`,
       statTranscript: async () => ({ size: 10, mtimeMs: 20 }),
       isSubagentSession: (sessionId) => sessionId === 'subagent-session',
@@ -90,6 +90,7 @@ describe('ClaudeCodeTranscriptSource', () => {
   it('excludes Claude Code Explore subagent transcripts from the production poller source', async () => {
     const source = new ClaudeCodeTranscriptSource({
       listAgents: async () => [agent({ id: 'agent-explore', sessionId: 'explore-agent' })],
+      resolveSessionId: (candidate) => candidate.sessionId ?? null,
       resolveTranscriptPath: (workspace, sessionId) => `${workspace}/.claude/session-main/subagents/${sessionId}.jsonl`,
       statTranscript: async () => {
         throw new Error('subagent transcript should be filtered before stat');
@@ -118,6 +119,7 @@ describe('PiTranscriptSource', () => {
         agent({ id: 'agent-pi', harness: 'ohmypi', sessionId: 'pi-session' }),
         agent({ id: 'agent-claude', harness: 'claude-code', sessionId: 'claude-session' }),
       ],
+      readSessionId: async (candidate) => candidate.sessionId ?? null,
       resolveTranscriptPath: async (_agent, sessionId) => `/tmp/${sessionId}.jsonl`,
       statTranscript: async () => ({ size: 123, mtimeMs: 456 }),
     });

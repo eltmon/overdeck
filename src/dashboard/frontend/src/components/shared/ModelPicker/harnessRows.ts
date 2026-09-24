@@ -27,6 +27,7 @@ export const KIMI_NATIVE_EFFORT_LEVELS = ['low', 'high', 'max'] as const;
 const HARNESS_ROW_LABELS = {
   'claude-code': 'Claude Code',
   'kimi-code': 'Kimi Code CLI',
+  muse: 'Muse Code',
   acp: 'ACP (Kimi Code)',
 } as const;
 

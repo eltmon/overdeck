@@ -18,6 +18,10 @@ vi.mock('../../../../../src/lib/agents.js', async (importOriginal) => {
 
 import { postAgentPlanChecklistRoute } from '../../../../../src/dashboard/server/routes/agents/runtime-events.js';
 
+// PAN-3917 W6: W3 deletes the record plane; config-yaml still reaches it
+// transitively (config-yaml/defaults → agents/tier-table → pan-dir/record).
+// Stub the chain entry so the module under test loads.
+
 let projectPath: string;
 let workspace: string;
 
@@ -77,7 +81,7 @@ beforeEach(async () => {
   await mkdir(workspace, { recursive: true });
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
   routeMocks.getAgentState.mockReset();
-  routeMocks.getAgentState.mockReturnValue(Effect.succeed({
+  routeMocks.getAgentState.mockReturnValue({
     id: 'agent-pan-3451',
     issueId: 'PAN-3451',
     workspace,
@@ -85,7 +89,7 @@ beforeEach(async () => {
     model: 'test-model',
     status: 'running',
     startedAt: '2026-08-01T00:00:00.000Z',
-  }));
+  });
 });
 
 afterEach(async () => {
@@ -129,7 +133,7 @@ describe('POST /api/agents/:id/plan-checklist', () => {
   });
 
   it('returns 422 when the agent has no resolvable workspace', async () => {
-    routeMocks.getAgentState.mockReturnValue(Effect.succeed(null));
+    routeMocks.getAgentState.mockReturnValue(null);
 
     const result = await postPlanChecklist({ token: 'test-token', agentId: 'missing-agent' });
 

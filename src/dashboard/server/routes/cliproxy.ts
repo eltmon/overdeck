@@ -10,7 +10,19 @@ import {
   stopCliproxy,
   startCliproxy,
   readPidFile,
+  CliproxyError,
 } from '../../../lib/cliproxy.js';
+
+/** Run one cliproxy lifecycle step in a route, keeping its message in a 500 body. */
+const cliproxyStep = (operation: string, run: () => Promise<void>) =>
+  Effect.tryPromise({
+    try: run,
+    catch: (cause) => new CliproxyError({
+      operation,
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    }),
+  });
 
 // ─── In-memory status cache (dashboard-server singleton) ──────────────────────
 
@@ -27,7 +39,7 @@ export function getCachedCliproxyStatus(): CliproxyStatus | null {
 }
 
 async function refreshStatus(): Promise<void> {
-  const running = await Effect.runPromise(isCliproxyRunning());
+  const running = await isCliproxyRunning();
   const pid = readPidFile();
   lastStatus = { running, pid, checkedAt: new Date().toISOString() };
 }
@@ -55,7 +67,7 @@ export function startCliproxyWatchdog(): void {
         }
         if (!isCliproxyInstalled()) lastInstallAttemptAt = now;
         console.log('[cliproxy-watchdog] CLIProxy is down, attempting auto-restart...');
-        await Effect.runPromise(restartCliproxy());
+        await restartCliproxy();
         await refreshStatus();
         if (lastStatus?.running) {
           console.log('[cliproxy-watchdog] CLIProxy auto-restarted successfully');
@@ -119,11 +131,11 @@ const postCliproxyRestartRoute = HttpRouter.add(
         // Force-reinstall: stop, redownload binary at the pinned version, restart.
         // Required when bumping CLIPROXY_RELEASE_VERSION — otherwise install* skips
         // because the old binary is still on disk.
-        yield* stopCliproxy();
-        yield* installCliproxy(true);
-        yield* startCliproxy();
+        yield* cliproxyStep('stopCliproxy', () => stopCliproxy());
+        yield* cliproxyStep('installCliproxy', () => installCliproxy(true));
+        yield* cliproxyStep('startCliproxy', () => startCliproxy());
       } else {
-        yield* restartCliproxy();
+        yield* cliproxyStep('restartCliproxy', () => restartCliproxy());
       }
 
       yield* Effect.promise(() => refreshStatus());

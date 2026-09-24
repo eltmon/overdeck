@@ -5,7 +5,7 @@
  * non-overlap, membership refresh, and resource publication belong to
  * project-resource-refresh-queue.ts.
  */
-import { getAgentStateSync } from '../../../lib/agents.js';
+import { getBackendPanes } from './backend-inventory.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig } from '../../../lib/projects.js';
 import { getEventStore, type Unsubscribe } from '../event-store.js';
 import { enqueueProjectsResourceRefresh } from './project-resource-refresh-queue.js';
@@ -28,14 +28,14 @@ export interface ResourceRefreshTriggerDeps {
   subscribe(fn: (event: ResourceRefreshEvent) => void): Unsubscribe;
   projectForIssue(issueId: string): ProjectConfig | null;
   projectForKey(projectKey: string): ProjectConfig | null;
-  issueForAgent(agentId: string): string | null;
+  issueForAgent(agentId: string): Promise<string | null>;
   enqueueProjects(projects: ProjectConfig[], reason: string): void;
   warn?: (message: string) => void;
 }
 
 export function createResourceRefreshTriggers(deps: ResourceRefreshTriggerDeps): Unsubscribe {
   const warn = deps.warn ?? ((message: string) => console.warn(message));
-  return deps.subscribe((event) => {
+  return deps.subscribe((event) => { void (async () => {
     if (!TRIGGER_EVENT_TYPES.has(event.type)) return;
     const payload = event.payload as {
       projectKey?: unknown;
@@ -52,7 +52,7 @@ export function createResourceRefreshTriggers(deps: ResourceRefreshTriggerDeps):
       project = deps.projectForIssue(payload.issueId);
     }
     if (!project && typeof payload?.agentId === 'string') {
-      const issueId = deps.issueForAgent(payload.agentId);
+      const issueId = await deps.issueForAgent(payload.agentId);
       if (issueId) project = deps.projectForIssue(issueId);
     }
 
@@ -66,7 +66,7 @@ export function createResourceRefreshTriggers(deps: ResourceRefreshTriggerDeps):
       ? 'issue.statusChanged:closed-out'
       : event.type;
     deps.enqueueProjects([project], reason);
-  });
+  })(); });
 }
 
 export function startResourceRefreshTriggers(): Unsubscribe {
@@ -80,9 +80,11 @@ export function startResourceRefreshTriggers(): Unsubscribe {
     },
     projectForKey: (projectKey) =>
       entries().find((entry) => entry.key === projectKey)?.config ?? null,
-    issueForAgent: (agentId) => {
+    // PAN-3917 FR-12: an agent's issue is its pane's `issue` token, read live
+    // from the backend inventory rather than from a persisted agent mirror.
+    issueForAgent: async (agentId) => {
       try {
-        return getAgentStateSync(agentId)?.issueId ?? null;
+        return (await getBackendPanes()).find((pane) => pane.id === agentId)?.issue ?? null;
       } catch {
         return null;
       }

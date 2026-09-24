@@ -9,20 +9,36 @@ import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import type * as EffectAcpSchema from "effect-acp/schema";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BRIDGE_TOKEN_HEADER } from "../../bridge-token.js";
 import { INPUT_PURGE_MAX_CHARS } from "../../channels/injection-budget.js";
 import {
   AcpHost,
+  OPENCODE_PERMISSION_WATCHDOG_STALE_MS,
   type AcpHostRuntime,
   parseAcpHostArgs,
-  readPersistedAcpSessionId,
-} from "../host.js";
+  reserveOpenCodePort} from "../host.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
+import { readSessionIndex } from "../../session-history.js";
+
+// Moved here from src/lib/acp/host.ts, which no production code called (PAN-3958 CH-8).
+async function readPersistedAcpSessionId(
+  overdeckHome: string,
+  agentId: string,
+): Promise<string | undefined> {
+  try {
+    return (await readFile(join(overdeckHome, "agents", agentId, "acp-session-id"), "utf-8")).trim() || undefined;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
 
 interface StubRuntimeOptions {
   readonly sessionId?: string;
+  readonly configOptions?: EffectAcpSchema.SessionConfigOption[];
+  readonly configError?: Error;
   readonly assistantResponse?: string;
   readonly updateDuringStart?: string;
   readonly startError?: Error;
@@ -130,10 +146,12 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
         return { stopReason: "end_turn" as const };
       }),
     cancel: Effect.void,
-    setConfigOption: (configId, value) => Effect.sync(() => {
-      order.push(`set-${configId}`);
-      setThinking.push(String(value));
-      return { configOptions: [] };
+    getConfigOptions: Effect.succeed(options.configOptions ?? []),
+    setConfigOption: (id, value) => Effect.gen(function* () {
+      order.push(id === "thinking" ? "set-thinking" : `config:${id}:${value}`);
+      if (id === "thinking") setThinking.push(String(value));
+      if (options.configError) return yield* Effect.fail(options.configError);
+      return { configOptions: options.configOptions ?? [] };
     }),
     setModel: (model) =>
       Effect.gen(function* () {
@@ -220,6 +238,7 @@ function makeOutput(): { readonly writable: Writable; readonly text: () => strin
 
 const hosts: AcpHost[] = [];
 const tempHomes: string[] = [];
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 async function makeHome(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), "overdeck-acp-host-"));
@@ -230,16 +249,27 @@ async function makeHome(): Promise<string> {
 afterEach(async () => {
   await Promise.all(hosts.splice(0).map((host) => host.stop()));
   await Promise.all(tempHomes.splice(0).map((home) => rm(home, { recursive: true, force: true })));
+  if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalOverdeckHome;
+  vi.useRealTimers();
 });
 
 describe("AcpHost", () => {
+  it("reserves a loopback TCP port for OpenCode launches", async () => {
+    const port = await reserveOpenCodePort();
+    expect(port).toBeGreaterThan(0);
+    expect(port).toBeLessThanOrEqual(65_535);
+  });
+
   it("binds its socket and writes mode-0600 token and session files", async () => {
     const overdeckHome = await makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
     const stub = await makeStubRuntime();
     const host = new AcpHost({
       agentId: "agent-pan-2858",
       provider: "kimi",
       workspace: process.cwd(),
+      model: "kimi-k2.6",
       overdeckHome,
       runtime: stub.runtime,
     });
@@ -255,6 +285,15 @@ describe("AcpHost", () => {
     expect(await readPersistedAcpSessionId(overdeckHome, "agent-pan-2858")).toBe(
       "acp-session-1",
     );
+    expect(readSessionIndex("agent-pan-2858")).toEqual([
+      expect.objectContaining({
+        sessionId: "acp-session-1",
+        source: "acp-host",
+        harness: "acp",
+        model: "kimi-k2.6",
+        path: join(agentDir, "acp-session.jsonl"),
+      }),
+    ]);
   });
 
   it("publishes readiness only after replacing stale state and binding the current socket", async () => {
@@ -444,6 +483,33 @@ describe("AcpHost", () => {
       status: 500, body: { error: "Kimi rejected thinking change" },
     });
     expect(stub.setThinking).toEqual(["high"]);
+  });
+
+  it.each(["opencode", "opencode-go"])("sets %s effort after the chosen model", async (provider) => {
+    const stub = await makeStubRuntime({ configOptions: [{
+      id: "effort", name: "Thinking effort", type: "select", currentValue: "medium",
+      options: [{ value: "high", name: "High" }, { value: "medium", name: "Medium" }],
+    }] });
+    const host = new AcpHost({ agentId: "agent-opencode-effort", provider,
+      workspace: process.cwd(), model: `${provider}/kimi-k3`,
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    expect(stub.setModels).toEqual([`${provider}/kimi-k3`]);
+    expect(stub.order.slice(-2)).toEqual(["set-model", "config:effort:high"]);
+    await expect(host.handleOp({ op: "set-effort", effort: "medium" })).resolves.toEqual({
+      status: 200, body: { ok: true, effort: "medium" },
+    });
+    expect(stub.order.at(-1)).toBe("config:effort:medium");
+  });
+
+  it("rejects an explicit effort when the OpenCode model has no effort option", async () => {
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({ agentId: "agent-opencode-effort", provider: "opencode",
+      workspace: process.cwd(), model: "opencode/big-pickle", effort: "low",
+      overdeckHome: await makeHome(), runtime: stub.runtime });
+    hosts.push(host);
+    await expect(host.start()).rejects.toThrow("does not expose an effort setting");
   });
 
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {
@@ -641,6 +707,128 @@ describe("AcpHost", () => {
 
     await Effect.runPromise(Deferred.succeed(promptGate, undefined));
     await host.waitForIdle();
+  });
+
+  it("answers a stuck OpenCode subagent permission after the watchdog threshold", async () => {
+    const overdeckHome = await makeHome();
+    const promptStarted = await Effect.runPromise(Deferred.make<void>());
+    const promptGate = await Effect.runPromise(Deferred.make<void>());
+    const stub = await makeStubRuntime({ promptStarted, promptGate });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{
+        id: "per-stuck",
+        sessionID: "subagent-session",
+        permission: "external_directory",
+      }]), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response("", { status: 200 }));
+    const host = new AcpHost({
+      agentId: "agent-opencode-watchdog",
+      provider: "opencode",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+      openCodePort: 43123,
+      fetch: fetchMock,
+    });
+    hosts.push(host);
+    await host.start();
+    await expect(readFile(
+      join(overdeckHome, "agents", "agent-opencode-watchdog", "opencode-port"),
+      "utf-8",
+    )).resolves.toBe("43123\n");
+    vi.useFakeTimers();
+
+    await host.handleOp({ op: "message", content: "run a task subagent" });
+    await Effect.runPromise(Deferred.await(promptStarted));
+    await vi.advanceTimersByTimeAsync(OPENCODE_PERMISSION_WATCHDOG_STALE_MS - 1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    vi.useRealTimers();
+    await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+    await host.waitForIdle();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "http://127.0.0.1:43123/permission");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:43123/permission/per-stuck/reply",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ reply: "always" }) }),
+    );
+    const transcript = await readFile(
+      join(overdeckHome, "agents", "agent-opencode-watchdog", "acp-session.jsonl"),
+      "utf-8",
+    );
+    expect(transcript).toContain('"source":"watchdog"');
+    expect(transcript).toContain('"sessionId":"subagent-session"');
+    const watchdog = transcript.trim().split("\n")
+      .map((line) => JSON.parse(line))
+      .find((entry) => entry.source === "watchdog");
+    expect(JSON.parse(watchdog.content)).toMatchObject({
+      type: "permission_outcome",
+      outcome: "selected",
+      chosenOptionId: "always",
+      watchdog: true,
+    });
+  });
+
+  it("does not run the OpenCode permission watchdog while idle or for Kimi", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn();
+    for (const provider of ["opencode", "kimi"] as const) {
+      const host = new AcpHost({
+        agentId: `agent-watchdog-idle-${provider}`,
+        provider,
+        workspace: process.cwd(),
+        overdeckHome: await makeHome(),
+        runtime: (await makeStubRuntime()).runtime,
+        openCodePort: 43123,
+        fetch: fetchMock,
+      });
+      hosts.push(host);
+      await host.start();
+    }
+    await vi.advanceTimersByTimeAsync(OPENCODE_PERMISSION_WATCHDOG_STALE_MS * 2);
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("treats a raced OpenCode permission reply 404 as benign", async () => {
+    const overdeckHome = await makeHome();
+    const promptStarted = await Effect.runPromise(Deferred.make<void>());
+    const promptGate = await Effect.runPromise(Deferred.make<void>());
+    const stub = await makeStubRuntime({ promptStarted, promptGate });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{
+        id: "per-raced",
+        sessionID: "subagent-session",
+      }]), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response("", { status: 404 }));
+    const host = new AcpHost({
+      agentId: "agent-opencode-watchdog-race",
+      provider: "opencode-go",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+      openCodePort: 43124,
+      fetch: fetchMock,
+    });
+    hosts.push(host);
+    await host.start();
+    vi.useFakeTimers();
+
+    await host.handleOp({ op: "message", content: "run a task subagent" });
+    await Effect.runPromise(Deferred.await(promptStarted));
+    await vi.advanceTimersByTimeAsync(OPENCODE_PERMISSION_WATCHDOG_STALE_MS);
+    vi.useRealTimers();
+    await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+    await host.waitForIdle();
+
+    const transcript = await readFile(
+      join(overdeckHome, "agents", "agent-opencode-watchdog-race", "acp-session.jsonl"),
+      "utf-8",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(transcript).not.toContain('"source":"watchdog"');
+    expect(transcript).not.toContain("watchdog failed");
   });
 
   it("writes one ordered completion boundary for each successful prompt", async () => {

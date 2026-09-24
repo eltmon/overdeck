@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -25,6 +24,12 @@ vi.mock('util', async () => {
 });
 
 let mockHomedir = '';
+
+/** Matches both exec shell strings and execFile argv vectors for `git worktree add`. */
+const isWorktreeAddCall = (command: unknown, args?: unknown): boolean =>
+  (typeof command === 'string' && command.includes('git worktree add'))
+  || (command === 'git' && Array.isArray(args) && args[0] === 'worktree' && args[1] === 'add');
+
 vi.mock('os', async () => {
   const actual = await vi.importActual<typeof import('os')>('os');
   return {
@@ -59,7 +64,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should remove hooks whose absolute path does not exist', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -70,7 +75,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.copied).toContain(join(workspaceDir, '.claude', 'settings.json'));
     expect(result.errors.some((e) => e.includes('Removed broken hook'))).toBe(true);
@@ -80,7 +85,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should preserve hooks whose absolute path exists', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const hookPath = join(homeDir, '.claude', 'hooks', 'valid-hook.py');
     mkdirSync(join(homeDir, '.claude', 'hooks'), { recursive: true });
@@ -95,7 +100,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -105,7 +110,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should not validate relative hook paths', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -116,7 +121,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -126,7 +131,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should not validate shell commands with pipes', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -137,7 +142,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -147,7 +152,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should handle mixed valid and invalid hooks', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const validHookPath = join(homeDir, '.claude', 'hooks', 'valid-hook.py');
     mkdirSync(join(homeDir, '.claude', 'hooks'), { recursive: true });
@@ -164,7 +169,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Removed broken hook');
@@ -176,7 +181,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should remove empty hook categories after filtering', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -186,7 +191,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(2);
 
@@ -195,7 +200,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should detect broken script path inside wrapper command', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -206,7 +211,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Removed broken hook');
@@ -236,8 +241,8 @@ describe('createWorkspace', () => {
     mkdirSync(join(workspacePath, '.pan', 'records'), { recursive: true });
     writeFileSync(recordPath, '{"issueId":"PAN-2050"}\n', 'utf8');
 
-    mockExecAsync.mockImplementation(async (command: string) => {
-      if (command.includes('git worktree add')) {
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+      if (isWorktreeAddCall(command, args)) {
         expect(existsSync(workspacePath)).toBe(false);
         mkdirSync(workspacePath, { recursive: true });
       }
@@ -247,29 +252,32 @@ describe('createWorkspace', () => {
     // PAN-1990 FR-6/AC-4: create.ts now guarantees the workspace row exists
     // before the worktree — it must resolve this project's projects.yaml
     // entry to seed the row rather than skipping silently when unseeded.
-    const { registerProjectSync, unregisterProjectSync } = await import('../../src/lib/projects.js');
-    registerProjectSync('workspace-manager-test-project', { name: 'Test', path: tempDir });
+    const { registerProject, unregisterProject } = await import('../../src/lib/projects.js');
+    registerProject('workspace-manager-test-project', { name: 'Test', path: tempDir });
 
     try {
       const { createWorkspace } = await import('../../src/lib/workspace-manager.js');
-      const result = await Effect.runPromise(createWorkspace({
+      const result = await createWorkspace({
         projectConfig: {
           name: 'Test',
           path: tempDir,
           package_manager: 'npm',
         },
         featureName: 'pan-2050',
-      }));
+      });
 
       expect(result.success).toBe(true);
       expect(result.steps).toContain('Staged pre-worktree .pan metadata');
+      // execFile argv form (CWE-78 fix, PR #3872 finding 8): the branch is
+      // cut from origin/main after a fetch, never interpolated into a shell.
       expect(mockExecAsync).toHaveBeenCalledWith(
-        expect.stringContaining(`git worktree add -b "feature/pan-2050" "${workspacePath}"`),
+        'git',
+        ['worktree', 'add', '-b', 'feature/pan-2050', workspacePath, 'origin/main'],
         expect.objectContaining({ cwd: tempDir }),
       );
       expect(readFileSync(recordPath, 'utf8')).toBe('{"issueId":"PAN-2050"}\n');
     } finally {
-      unregisterProjectSync('workspace-manager-test-project');
+      unregisterProject('workspace-manager-test-project');
     }
   });
 });
@@ -300,7 +308,7 @@ describe('stopWorkspaceDocker', () => {
     );
 
     const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
-    await Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'));
+    await stopWorkspaceDocker(workspaceDir, 'pan-1140');
 
     // PAN-3049 security fix: the compose project name is now passed via
     // execFile's argv array (cmd='docker', args=[...]), never interpolated
@@ -324,7 +332,7 @@ describe('stopWorkspaceDocker', () => {
     // PAN-3049: the message now comes from the canonical resolver
     // (composeProjectNameForWorkspace), which reports "a name ending in
     // <feature folder>" rather than one exact expected literal.
-    await expect(Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'))).rejects.toThrow(
+    await expect(stopWorkspaceDocker(workspaceDir, 'pan-1140')).rejects.toThrow(
       'declares COMPOSE_PROJECT_NAME=victim-project, expected a name ending in feature-pan-1140',
     );
     // The resolver throws before any Docker command is issued at all.

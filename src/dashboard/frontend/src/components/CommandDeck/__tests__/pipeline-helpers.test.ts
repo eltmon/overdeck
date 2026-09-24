@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
+import type { DerivedIssueState } from '../../../types';
 import {
   groupPipelineEntries,
   isNeedsYouFeature,
@@ -40,8 +41,12 @@ function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
   };
 }
 
-function makeBucket(feature: ProjectFeature) {
-  return { feature, reviewStatus: undefined, phase: 'work' as const };
+function makeBucket(feature: ProjectFeature, derived?: DerivedIssueState) {
+  return { feature, derived, phase: 'work' as const };
+}
+
+function derivedState(state: DerivedIssueState['state'], extra: Partial<DerivedIssueState> = {}): DerivedIssueState {
+  return { issueId: 'PAN-1', state, ...extra };
 }
 
 describe('needs-you classification', () => {
@@ -221,10 +226,9 @@ describe('groupPipelineEntries stalled bucket', () => {
 
   it('prefers needs-you over stalled when both apply', () => {
     const feature = makeFeature({
-      readyForMerge: true,
       taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
     });
-    const groups = groupPipelineEntries([makeBucket(feature)]);
+    const groups = groupPipelineEntries([makeBucket(feature, derivedState('ready'))]);
 
     expect(groups.map(g => g.key)).toEqual(['needs-you']);
     expect(groups.some(g => g.key === 'stalled')).toBe(false);
@@ -241,27 +245,41 @@ describe('groupPipelineEntries stalled bucket', () => {
   });
 });
 
-describe('pipelineChipFor verification vs test labels', () => {
-  it('labels a running verification gate as running checks, not testing', () => {
+describe('pipelineChipFor reads the derived state', () => {
+  it('labels an issue whose reviewer asked for changes', () => {
     const chip = pipelineChipFor({
       feature: makeFeature(),
-      reviewStatus: { verificationStatus: 'running' } as any,
+      derived: derivedState('changes-requested'),
       phase: 'review',
     });
 
-    expect(chip.key).toBe('verification');
-    expect(chip.label).toBe('running checks');
+    expect(chip.key).toBe('review');
+    expect(chip.label).toBe('changes requested');
+    expect(chip.animate).toBe(false);
+  });
+
+  it('animates a live review', () => {
+    const chip = pipelineChipFor({
+      feature: makeFeature(),
+      derived: derivedState('in-review'),
+      phase: 'review',
+    });
+
+    expect(chip.key).toBe('review');
+    expect(chip.label).toBe('in review');
     expect(chip.animate).toBe(true);
   });
 
-  it('keeps the testing label for a live test specialist', () => {
+  it('flags a pull request the forge cannot merge as blocked', () => {
     const chip = pipelineChipFor({
       feature: makeFeature(),
-      reviewStatus: { testStatus: 'testing' } as any,
+      derived: derivedState('in-review', {
+        pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'red', mergeable: true },
+      }),
       phase: 'review',
     });
 
-    expect(chip.key).toBe('testing');
-    expect(chip.label).toBe('testing');
+    expect(chip.key).toBe('blocked');
+    expect(chip.label).toBe('blocked');
   });
 });

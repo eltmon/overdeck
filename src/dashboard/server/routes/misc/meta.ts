@@ -9,9 +9,8 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getGitHubConfig as getGitHubConfigShared } from '../../services/tracker-config.js';
 import type { IssueDataService } from '../../services/issue-data-service.js';
-import { extractPrefixSync } from '../../../../lib/issue-id.js';
+import { extractPrefix } from '../../../../lib/issue-id.js';
 import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
 import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import { sendKeys } from '../../../../lib/tmux.js';
@@ -68,8 +67,8 @@ const getVersionRoute = HttpRouter.add(
     // is healthy, then use it as a fallback when the dashboard is dead.
     let supervisorUrl: string | null = null;
     try {
-      const { getSupervisorUrlSync } = await import('../../../../lib/supervisor.js');
-      supervisorUrl = getSupervisorUrlSync();
+      const { getSupervisorUrl } = await import('../../../../lib/supervisor.js');
+      supervisorUrl = getSupervisorUrl();
     } catch {
       // supervisor module not available in this build — benign
     }
@@ -105,8 +104,8 @@ const getSyncStatusRoute = HttpRouter.add(
   'GET',
   '/api/sync-status',
   Effect.sync(() => {
-    const { isStartupSyncNeededSync } = require('../../../../lib/sync-startup-gate.js');
-    return jsonResponse(isStartupSyncNeededSync());
+    const { isStartupSyncNeeded } = require('../../../../lib/sync-startup-gate.js');
+    return jsonResponse(isStartupSyncNeeded());
   }),
 );
 
@@ -116,7 +115,9 @@ const postRunSyncRoute = HttpRouter.add(
   Effect.promise(async () => {
     try {
       const invocation = panCliInvocation(['sync']);
-      const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, { encoding: 'utf-8', timeout: 180_000 });
+      // Light Herdr pass: no minutes-long update/installs that the timeout would orphan (PAN-3956).
+      const env = { ...process.env, OVERDECK_HERDR_SYNC_LIGHT: '1' };
+      const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, { encoding: 'utf-8', timeout: 180_000, env });
       return jsonResponse({ ok: true, output: `${stdout}${stderr}`.trim() });
     } catch (error: any) {
       const detail = String(error?.stderr || error?.message || error);
@@ -371,110 +372,6 @@ const getMetricsTasksRoute = HttpRouter.add(
   }),
 );
 
-// ─── Route: POST /api/shadow/:issueId/monitor ────────────────────────────────
-
-const postShadowMonitorRoute = HttpRouter.add(
-  'POST',
-  '/api/shadow/:issueId/monitor',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = new URL(request.url, 'http://localhost');
-    const parts = url.pathname.split('/');
-    // /api/shadow/:issueId/monitor → parts[3] = issueId
-    const issueId = parts[3] || '';
-    const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-
-    return yield* Effect.promise(async () => {
-      try {
-        const projectPath = await getProjectPath(issuePrefix);
-        const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-        if (!existsSync(workspacePath)) {
-          return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
-        }
-
-        const {
-          gatherArtifacts,
-          generateBasicInference,
-          updateInferenceDocumentSync,
-        } = await import('../../../../lib/shadow-engineering/index.js');
-
-        const config = { issueId, workspacePath, projectPath };
-        const artifacts = await Effect.runPromise(gatherArtifacts(config));
-        const inference = generateBasicInference(config, artifacts);
-        updateInferenceDocumentSync(workspacePath, inference);
-
-        return jsonResponse({ success: true, inference });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse(
-          { error: 'Failed to run monitoring agent: ' + msg },
-          { status: 500 },
-        );
-      }
-    })
-  }),
-);
-
-// ─── Route: POST /api/shadow/:issueId/observe ────────────────────────────────
-
-const postShadowObserveRoute = HttpRouter.add(
-  'POST',
-  '/api/shadow/:issueId/observe',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = new URL(request.url, 'http://localhost');
-    const parts = url.pathname.split('/');
-    // /api/shadow/:issueId/observe → parts[3] = issueId
-    const issueId = parts[3] || '';
-    const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-
-    const body = yield* readJsonBody;
-    const { mode } = body as { mode?: string };
-
-    return yield* Effect.promise(async () => {
-      try {
-        const projectPath = await getProjectPath(issuePrefix);
-        const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-        if (!existsSync(workspacePath)) {
-          return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
-        }
-
-        const ghConfig = getGitHubConfigShared();
-        if (!ghConfig) {
-          return jsonResponse(
-            { error: 'GitHub not configured - Observer requires GitHub' },
-            { status: 400 },
-          );
-        }
-
-        const { runObserverCycle } = await import('../../../../lib/shadow-engineering/index.js');
-
-        const firstRepo = ghConfig.repos[0];
-        const config = {
-          issueId,
-          workspacePath,
-          projectPath,
-          repo: firstRepo ? `${firstRepo.owner}/${firstRepo.repo}` : '',
-          mode: ((mode || 'watch') as 'watch' | 'propose'),
-        };
-
-        const commentsPosted = await Effect.runPromise(runObserverCycle(config));
-        return jsonResponse({ success: true, commentsPosted });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse(
-          { error: 'Failed to run observer: ' + msg },
-          { status: 500 },
-        );
-      }
-    })
-  }),
-);
-
 // ─── Route: POST /api/dev/rebuild ──────────────────────────────────────────────
 // Dev-only: runs `npm run build` in the project root and returns when done.
 
@@ -576,8 +473,6 @@ export const metaRouteLayer = Layer.mergeAll(
   clearCacheRoute,
   getMetricsRuntimesRoute,
   getMetricsTasksRoute,
-  postShadowMonitorRoute,
-  postShadowObserveRoute,
   postDevRebuildRoute,
   postRestartDashboardRoute,
 );

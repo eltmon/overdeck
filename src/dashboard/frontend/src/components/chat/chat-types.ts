@@ -15,6 +15,10 @@ export interface ChatMessage {
   streaming?: boolean;
   sequence?: number;
   acknowledged?: boolean;
+  /** Local send identity and transcript reconciliation metadata. */
+  clientMessageId?: string;
+  echoBaselineIds?: string[];
+  deliveryState?: 'pending' | 'accepted' | 'unknown';
   /** Local-only structured result for a dashboard-intercepted `/pan` command. */
   commandResult?: ComposerCommandResult;
   /** Exact command text that produced commandResult, used for confirmations. */
@@ -31,6 +35,10 @@ export interface FailedMessage {
   error?: string;
   /** False for deterministic rejections (most 4xx) where an identical retry cannot succeed. */
   retryable?: boolean;
+  clientMessageId?: string;
+  echoBaselineIds?: string[];
+  deliveryUnknown?: boolean;
+  deliverAs?: 'steer' | 'follow_up';
 }
 
 export interface WorkLogEntry {
@@ -95,7 +103,7 @@ export interface ContextUsage {
 }
 
 export type ConversationEvent =
-  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; snapshot?: boolean; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
+  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; snapshot?: boolean; reset?: boolean; metadataSnapshot?: boolean; totalCost?: number; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
   | { kind: 'discovering' }
   | { kind: 'subagents'; subagents: SubagentSummary[] };
 

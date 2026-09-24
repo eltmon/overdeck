@@ -3,11 +3,10 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 
-import { ProcessSpawnError } from '../errors.js';
 import { isOverdeckOwnedOnlyStatus } from '../state-plane.js';
-import { readWorkspacePlan, readWorkspacePlanSync } from '../xbrief/io.js';
+import { readWorkspacePlan } from '../xbrief/io.js';
 import { subItemsOf, type XBriefDocument } from '../xbrief/types.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
 
@@ -32,12 +31,12 @@ export function evaluateIncompletePlanItems(doc: XBriefDocument | null): string[
   return incomplete.length === 0 ? [] : [`  Incomplete plan items (${incomplete.length}):`, ...incomplete];
 }
 
-export function checkIncompletePlanItemsSync(workspacePath: string): string[] {
-  return evaluateIncompletePlanItems(readWorkspacePlanSync(workspacePath));
-}
-
-export async function checkIncompletePlanItemsPromise(workspacePath: string, _issueId?: string): Promise<string[]> {
-  return evaluateIncompletePlanItems(await Effect.runPromise(readWorkspacePlan(workspacePath)));
+export async function checkIncompletePlanItems(workspacePath: string, _issueId?: string): Promise<string[]> {
+  // Rethrow the plan reader's own error (e.g. XBriefMergeConflictError with its path and
+  // fix instructions) instead of Effect.runPromise's wrapper, whose message is empty.
+  const exit = await Effect.runPromiseExit(readWorkspacePlan(workspacePath));
+  if (Exit.isFailure(exit)) throw Cause.squash(exit.cause);
+  return evaluateIncompletePlanItems(exit.value);
 }
 
 /**
@@ -61,7 +60,7 @@ export function filterUncommittedPorcelainLines(porcelain: string): string[] {
     .filter((line) => !isGeneratedHarnessStatus(line));
 }
 
-async function checkUncommittedChangesPromise(workspacePath: string): Promise<string[]> {
+async function checkUncommittedChanges(workspacePath: string): Promise<string[]> {
   if (existsSync(join(workspacePath, '.git'))) {
     try {
       // -uall: list untracked files individually instead of collapsing dirs, so
@@ -86,23 +85,11 @@ async function checkUncommittedChangesPromise(workspacePath: string): Promise<st
   return failures;
 }
 
-async function runPreflightChecksPromise(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
+/** Run the `pan done` preflight checks and return every failure line (empty when clean). */
+export async function runPreflightChecks(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
   return [
-    ...checkIncompletePlanItemsSync(workspacePath),
-    ...await checkUncommittedChangesPromise(workspacePath),
+    ...await checkIncompletePlanItems(workspacePath, issueId),
+    ...await checkUncommittedChanges(workspacePath),
     ...await Effect.runPromise(runTestRequirementCheck(workspacePath, issueId, testWaived)),
   ];
 }
-
-const processError = (op: string, cause: unknown) => new ProcessSpawnError({
-  command: 'done-preflight', args: [op], message: cause instanceof Error ? cause.message : String(cause), cause,
-});
-
-export const checkIncompletePlanItems = (workspacePath: string): Effect.Effect<string[]> =>
-  Effect.sync(() => checkIncompletePlanItemsSync(workspacePath));
-
-export const checkUncommittedChanges = (workspacePath: string): Effect.Effect<string[], ProcessSpawnError> =>
-  Effect.tryPromise({ try: () => checkUncommittedChangesPromise(workspacePath), catch: (cause) => processError('checkUncommittedChanges', cause) });
-
-export const runPreflightChecks = (workspacePath: string, issueId: string, testWaived?: string): Effect.Effect<string[], ProcessSpawnError> =>
-  Effect.tryPromise({ try: () => runPreflightChecksPromise(workspacePath, issueId, testWaived), catch: (cause) => processError('runPreflightChecks', cause) });

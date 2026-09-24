@@ -1,6 +1,6 @@
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { sessionFilePath } from './paths.js';
+import { sessionFilePath } from './runtimes/storage/claude-code.js';
 
 const DEFAULT_TAIL_BYTES = 512 * 1024;
 
@@ -121,23 +121,6 @@ export async function captureTranscriptUserRecordSnapshot(
   } catch {
     return { sessionFile, userRecordCount: 0, fileSize: 0, rangeStartByte: 0, readOffset: 0 };
   }
-}
-
-export function hasNewTranscriptUserRecord(
-  before: TranscriptUserRecordSnapshot,
-  after: TranscriptUserRecordSnapshot,
-): boolean {
-  if (before.sessionFile !== after.sessionFile) return after.userRecordCount > 0;
-
-  if (
-    before.readOffset !== undefined &&
-    after.rangeStartByte !== undefined &&
-    after.rangeStartByte === before.readOffset
-  ) {
-    return after.userRecordCount > 0;
-  }
-
-  return after.userRecordCount > before.userRecordCount;
 }
 
 export interface TranscriptWatchProbe {

@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import { useDashboardStore, selectAgents } from '../lib/store';
 import { EMERGENCY_STOP_HOTKEY_LABEL } from './EmergencyStopOverlay';
 import { fetchWithTimeout } from '../lib/apiFetch';
+import { PopoverSurface } from './shared/ContextMenu';
 
 interface CloisterStatus {
   running: boolean;
@@ -55,7 +56,6 @@ interface RestartConfigChangeItem {
   newHarness: string;
   changed: boolean;
   paused: boolean;
-  troubled: boolean;
   status: string;
 }
 
@@ -130,7 +130,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
   const [selectedForRestart, setSelectedForRestart] = useState<Set<string>>(new Set());
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{ left: number; bottom: number } | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const queryClient = useQueryClient();
 
   const { data: status, refetch } = useQuery({
@@ -187,7 +187,11 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
   const openPopover = useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      setPopoverPos({ left: rect.left, bottom: window.innerHeight - rect.top + 8 });
+      const width = 256;
+      setPopoverPos({
+        left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+        top: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 8)),
+      });
     }
     setShowRestartPopover(true);
   }, []);
@@ -379,17 +383,23 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
         <button
           ref={buttonRef}
           onClick={() => showRestartPopover ? setShowRestartPopover(false) : openPopover()}
+          aria-haspopup="dialog"
+          aria-expanded={showRestartPopover}
           className="p-1 rounded text-xs bg-popover text-foreground border border-border hover:bg-card transition-colors"
           title="Restart sessions"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${restartMutation.isPending ? 'animate-spin' : ''}`} />
         </button>
         {showRestartPopover && popoverPos && createPortal(
-          <div
+          <PopoverSurface
             ref={popoverRef}
-            style={{ position: 'fixed', zIndex: 9999, left: popoverPos.left, bottom: popoverPos.bottom, width: 256, borderRadius: 6, border: '1px solid var(--border, #333)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', backgroundColor: 'var(--card, #0c1018)' }}
+            aria-label="Restart sessions"
+            onClose={() => setShowRestartPopover(false)}
+            returnFocusRef={buttonRef}
+            className="fixed z-[1000] w-64 p-0"
+            style={{ left: popoverPos.left, top: popoverPos.top }}
           >
-              <div className="px-3 py-2 text-xs font-semibold text-foreground border-b border-border">
+              <div className="border-b border-border px-3 py-2 text-xs font-medium text-foreground">
                 Restart Sessions
               </div>
               <div className="p-2 space-y-1">
@@ -434,7 +444,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
                   {(restartMutation.error as Error).message}
                 </div>
               )}
-          </div>,
+          </PopoverSurface>,
           document.body,
         )}
 
@@ -474,7 +484,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
                           }
                           setSelectedForRestart(newSelected);
                         }}
-                        disabled={item.paused || item.troubled}
+                        disabled={item.paused}
                         className="accent-primary mt-0.5"
                       />
                       <div className="flex-1">
@@ -489,10 +499,8 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
                           {!item.changed && (
                             <div className="text-muted-foreground">No change needed</div>
                           )}
-                          {(item.paused || item.troubled) && (
-                            <div className="text-destructive">
-                              {item.paused ? 'Paused' : 'Troubled'} — cannot restart
-                            </div>
+                          {item.paused && (
+                            <div className="text-destructive">Paused — cannot restart</div>
                           )}
                         </div>
                       </div>

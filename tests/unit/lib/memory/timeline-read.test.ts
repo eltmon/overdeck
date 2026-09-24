@@ -14,7 +14,6 @@ import { memoryReadCommand, memoryTimelineCommand } from '../../../../src/cli/co
 import { getMemoryTimeline, MEMORY_TIMELINE_DEFAULT_DAYS, readMemoryFile } from '../../../../src/lib/memory/cli.js';
 import { resolveWorkspaceMemoryRoot } from '../../../../src/lib/memory/paths.js';
 import { writeObservation } from '../../../../src/lib/memory/observations.js';
-import { closeDatabase } from '../../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases } from '../../../../src/lib/memory/fts-db.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
@@ -84,7 +83,6 @@ beforeEach(() => {
 afterEach(() => {
   process.chdir(originalCwd);
   closeMemoryFtsDatabases();
-  closeDatabase();
   teardownOverdeckTestDb(odb);
   rmSync(workspaceDir, { recursive: true, force: true });
   rmSync(outsideDir, { recursive: true, force: true });

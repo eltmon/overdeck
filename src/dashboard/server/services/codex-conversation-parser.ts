@@ -33,11 +33,11 @@
  *       - `reasoning` — chain-of-thought; Codex encrypts it, so it is skipped.
  */
 
-import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation-service.js';
-import { parseCodexSessionSync } from '../../../lib/cost-parsers/codex-parser.js';
+import { createCodexSessionParser } from '../../../lib/cost-parsers/codex-parser.js';
 import { readCodexRolloutMessage } from '../../../lib/codex-rollout-message.js';
+import { createIncrementalTranscriptReader } from './incremental-transcript-reader.js';
 
 interface CodexTokenUsage {
   input_tokens?: number;
@@ -107,16 +107,9 @@ function extractCommand(name: string, args: string): string | undefined {
   return undefined;
 }
 
-/**
- * Parse a Codex rollout JSONL into the ParseResult shape the chat panel
- * consumes. Always a full read (rollouts are small enough); incremental-parse
- * state fields are returned as empty stubs, matching the Pi adapter.
- */
-export async function parseCodexConversationMessages(sessionFile: string): Promise<ParseResult> {
-  const fileStats = await stat(sessionFile);
-  const raw = await readFile(sessionFile, 'utf-8');
-
-  const lines = raw.split('\n').filter((line) => line.trim().length > 0);
+/** Incremental rollout accumulator; each JSONL record is consumed once per cached file. */
+export function createCodexConversationAccumulator(sessionFile: string) {
+  const costs = createCodexSessionParser(sessionFile);
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
   const compactBoundaries: CompactBoundary[] = [];
@@ -130,16 +123,17 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
   // message with no tool activity after it does (PAN-3770 spinner fix).
   let trailingAgentMessageAt: string | undefined;
 
-  for (const line of lines) {
+  const push = (line: string): void => {
+    costs.push(line);
     let entry: CodexEntry;
     try {
       entry = JSON.parse(line) as CodexEntry;
     } catch {
-      continue;
+      return;
     }
-    if (!entry || typeof entry !== 'object') continue;
+    if (!entry || typeof entry !== 'object') return;
     const payload = entry.payload;
-    if (!payload || typeof payload !== 'object') continue;
+    if (!payload || typeof payload !== 'object') return;
     const createdAt = entry.timestamp ?? new Date().toISOString();
     const ptype = payload.type;
 
@@ -170,7 +164,7 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
             : (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0);
         }
       }
-      continue;
+      return;
     }
 
     if (entry.type === 'response_item') {
@@ -200,7 +194,10 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
         const output = extractToolOutput(payload.output);
         const wl = callId ? toolCallsByCallId.get(callId) : undefined;
         if (wl) {
-          if (output) (wl as { result?: string }).result = output;
+          if (output) {
+            const index = workLog.indexOf(wl);
+            workLog[index] = { ...wl, result: output };
+          }
           if (callId) toolCallsByCallId.delete(callId);
         } else if (output) {
           // Output with no matching call (truncated/rotated) — stand-alone entry.
@@ -217,38 +214,43 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
       }
       // response_item 'message' (injected context) and 'reasoning' (encrypted)
       // carry nothing user-visible — intentionally skipped.
-      continue;
+      return;
     }
-  }
-
-  // Codex turns are written as complete agent_message events (not streamed
-  // token-by-token into the rollout), so there is no partial-turn state to
-  // surface — the chat panel never shows a stuck typing indicator.
-  const streaming = false;
-
-  // Cost is derived by the canonical Codex cost parser (single source of truth
-  // for rollout pricing) so the conversation list shows real spend rather than
-  // $0. token_count already gave us the cumulative throughput above.
-  const usage = parseCodexSessionSync(sessionFile);
-  const totalCost = usage?.cost_v2 ?? usage?.cost ?? 0;
-
-  return {
-    messages,
-    workLog,
-    byteOffset: fileStats.size,
-    lastTurnCompletedAt: trailingAgentMessageAt,
-    streaming,
-    totalCost,
-    totalTokens,
-    latestAssistantUsage: null,
-    contextBoundaryOffset: 0,
-    contextActiveBytes: fileStats.size,
-    pendingToolUse: new Map(),
-    unresolvedResults: new Map(),
-    lastSequence: sequence,
-    mtimeMs: fileStats.mtimeMs,
-    planToolUseIds: new Set(),
-    compactBoundaries,
-    fileEditsByAssistantId: new Map(),
   };
+
+  const result = (size: number, mtimeMs: number): ParseResult => {
+    // Codex turns are written as complete agent_message events (not streamed
+    // token-by-token into the rollout), so there is no partial-turn state to
+    // surface — the chat panel never shows a stuck typing indicator.
+    const streaming = false;
+
+    // Cost is derived by the canonical Codex cost parser (single source of truth
+    // for rollout pricing) so the conversation list shows real spend rather than
+    // $0. token_count already gave us the cumulative throughput above.
+    const usage = costs.result();
+    const totalCost = usage?.cost_v2 ?? usage?.cost ?? 0;
+
+    return {
+      messages: [...messages],
+      workLog: [...workLog],
+      byteOffset: size,
+      lastTurnCompletedAt: trailingAgentMessageAt,
+      streaming,
+      totalCost,
+      totalTokens,
+      latestAssistantUsage: null,
+      contextBoundaryOffset: 0,
+      contextActiveBytes: size,
+      pendingToolUse: new Map(),
+      unresolvedResults: new Map(),
+      lastSequence: sequence,
+      mtimeMs,
+      planToolUseIds: new Set(),
+      compactBoundaries,
+      fileEditsByAssistantId: new Map(),
+    };
+  };
+  return { push, result };
 }
+
+export const parseCodexConversationMessages = createIncrementalTranscriptReader(createCodexConversationAccumulator);

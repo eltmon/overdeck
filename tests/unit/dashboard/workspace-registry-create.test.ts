@@ -23,7 +23,6 @@ const routeMocks = vi.hoisted(() => ({
   setWorkspaceFavorite: vi.fn(),
   touchWorkspaceAccessed: vi.fn(),
   updateWorkspaceLayout: vi.fn(),
-  getReviewStatusSync: vi.fn(),
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
@@ -53,10 +52,6 @@ vi.mock('../../../src/lib/workspaces/writer.js', () => ({
 vi.mock('../../../src/lib/workspaces/create.js', () => ({
   resolveWorkspaceCreateIntent: routeMocks.resolveWorkspaceCreateIntent,
   performWorkspaceCreate: routeMocks.performWorkspaceCreate,
-}));
-
-vi.mock('../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: routeMocks.getReviewStatusSync,
 }));
 
 vi.mock('../../../src/lib/memory/rollup.js', () => ({
@@ -140,7 +135,6 @@ beforeEach(() => {
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
-  routeMocks.getReviewStatusSync.mockReturnValue(null);
   routeMocks.resolveWorkspaceCreateIntent.mockResolvedValue(resolvedIntent());
   routeMocks.performWorkspaceCreate.mockResolvedValue({ id: 'ws-new' });
 });

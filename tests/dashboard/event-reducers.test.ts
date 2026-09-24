@@ -46,7 +46,8 @@ describe('INITIAL_READ_MODEL_STATE', () => {
 
   it('starts with empty collections', () => {
     expect(INITIAL_READ_MODEL_STATE.agentsById).toEqual({})
-    expect(INITIAL_READ_MODEL_STATE.reviewStatusByIssueId).toEqual({})
+    expect(INITIAL_READ_MODEL_STATE.derivedIssueStateByIssueId).toEqual({})
+    expect(INITIAL_READ_MODEL_STATE.backendPanesById).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.agentOutputById).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.issuesRaw).toEqual([])
     expect(INITIAL_READ_MODEL_STATE.recentActivity).toEqual([])
@@ -72,7 +73,10 @@ describe('syncSnapshot', () => {
     // PAN-1048 — specialists projection retired; snapshot field kept on the
     // wire for back-compat but the reducer no longer materializes it.
     specialists: [],
-    reviewStatuses: [],
+    // PAN-3917 FR-6/FR-12 — derived pipeline state and live pane inventory
+    // replace the old reviewStatuses bootstrap field.
+    derivedIssueStates: [],
+    backendPanes: [],
     resources: { cpu: 30, memPercent: 50, memUsed: 1000, memTotal: 2000 },
     timestamp: new Date().toISOString(),
   }
@@ -96,6 +100,25 @@ describe('syncSnapshot', () => {
     const snapshotWithIssues = { ...snapshot, issues: [{ id: 'PAN-1' }, { id: 'PAN-2' }] } as any
     const state = syncSnapshot(makeState(), snapshotWithIssues)
     expect(state.issuesRaw).toHaveLength(2)
+  })
+
+  it('populates derivedIssueStateByIssueId keyed by issueId (PAN-3917 FR-6)', () => {
+    const derived = { issueId: 'PAN-1', state: 'in-review' as const }
+    const state = syncSnapshot(makeState(), { ...snapshot, derivedIssueStates: [derived] })
+    expect(state.derivedIssueStateByIssueId['PAN-1']).toEqual(derived)
+  })
+
+  it('populates backendPanesById keyed by pane id (PAN-3917 FR-12)', () => {
+    const pane = {
+      id: 'pane-1',
+      issue: 'PAN-1',
+      role: 'work' as const,
+      harness: 'claude-code',
+      model: 'claude-opus-4-6',
+      state: 'working' as const,
+    }
+    const state = syncSnapshot(makeState(), { ...snapshot, backendPanes: [pane] })
+    expect(state.backendPanesById['pane-1']).toEqual(pane)
   })
 
   it('seeds recentActivity from the snapshot', () => {
@@ -415,7 +438,7 @@ describe('applyEvent — agent.created', () => {
 })
 
 describe('applyEvent — agent.stopped', () => {
-  it('removes agent from agentsById', () => {
+  it('retains agent in agentsById with stopped status', () => {
     const state = makeState({ agentsById: { 'agent-1': baseAgent } })
     const next = applyEvent(state, {
       type: 'agent.stopped',
@@ -423,8 +446,8 @@ describe('applyEvent — agent.stopped', () => {
       timestamp: ts(),
       payload: { agentId: 'agent-1', issueId: 'PAN-1' },
     })
-    expect(next.agentsById['agent-1']).toBeUndefined()
-    expect(Object.keys(next.agentsById)).toHaveLength(0)
+    expect(next.agentsById['agent-1']).toMatchObject({ status: 'stopped', hasLiveTmuxSession: false })
+    expect(Object.keys(next.agentsById)).toHaveLength(1)
   })
 
   it('does not error when agent not found', () => {
@@ -448,7 +471,8 @@ describe('applyEvent — agent.stopped', () => {
       payload: { agentId: 'agent-1', issueId: 'PAN-1' },
     })
     expect(next.agentsById['agent-2']).toEqual(agent2)
-    expect(Object.keys(next.agentsById)).toHaveLength(1)
+    expect(next.agentsById['agent-1']?.status).toBe('stopped')
+    expect(Object.keys(next.agentsById)).toHaveLength(2)
   })
 
   it('drops stored turn diff summaries for the stopped agent', () => {
@@ -717,31 +741,53 @@ describe('applyEvent — specialist.* events (post PAN-1048)', () => {
   })
 })
 
-// ─── applyEvent — review/pipeline status ────────────────────────────────────
+// ─── applyEvent — derived issue state / backend panes (PAN-3917 FR-6/FR-12) ──
 
-describe('applyEvent — review.status_changed', () => {
-  it('updates reviewStatusByIssueId', () => {
-    const status = { review: 'passed', test: 'passed', merge: 'pending' } as any
+describe('applyEvent — issue_state.changed', () => {
+  it('updates derivedIssueStateByIssueId keyed by issueId', () => {
+    const issueState = { issueId: 'PAN-1', state: 'changes-requested' as const, attention: 'needs-you' as const }
     const state = applyEvent(makeState(), {
-      type: 'review.status_changed',
+      type: 'issue_state.changed',
       sequence: 15,
       timestamp: ts(),
-      payload: { issueId: 'PAN-1', status },
+      payload: { issueState },
     })
-    expect(state.reviewStatusByIssueId['PAN-1']).toEqual(status)
+    expect(state.derivedIssueStateByIssueId['PAN-1']).toEqual(issueState)
+    expect(state.sequence).toBe(15)
   })
 })
 
-describe('applyEvent — pipeline.status_changed', () => {
-  it('updates reviewStatusByIssueId', () => {
-    const status = { review: 'reviewing', test: 'pending', merge: 'pending' } as any
+describe('applyEvent — backend_pane.changed / backend_pane.removed', () => {
+  const pane = {
+    id: 'pane-2',
+    issue: 'PAN-2',
+    role: 'review' as const,
+    harness: 'claude-code',
+    model: 'claude-opus-4-6',
+    state: 'idle' as const,
+  }
+
+  it('adds/updates a pane in backendPanesById on backend_pane.changed', () => {
     const state = applyEvent(makeState(), {
-      type: 'pipeline.status_changed',
+      type: 'backend_pane.changed',
       sequence: 16,
       timestamp: ts(),
-      payload: { issueId: 'PAN-2', status },
+      payload: { pane },
     })
-    expect(state.reviewStatusByIssueId['PAN-2']).toEqual(status)
+    expect(state.backendPanesById['pane-2']).toEqual(pane)
+    expect(state.sequence).toBe(16)
+  })
+
+  it('removes a pane from backendPanesById on backend_pane.removed', () => {
+    const withPane = makeState({ backendPanesById: { 'pane-2': pane } })
+    const state = applyEvent(withPane, {
+      type: 'backend_pane.removed',
+      sequence: 17,
+      timestamp: ts(),
+      payload: { paneId: 'pane-2' },
+    })
+    expect(state.backendPanesById['pane-2']).toBeUndefined()
+    expect(state.sequence).toBe(17)
   })
 })
 

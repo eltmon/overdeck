@@ -9,28 +9,27 @@ import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { Effect } from 'effect';
 import type { MemoryIdentity } from '@overdeck/contracts';
-import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
-import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
-import { workspaceContextFile } from '../context-layers/layers.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { initCodexHome } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
-import { createPiFifo, piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
+import { piFifoPaths, PiNotReady, writePiCommand } from '../runtimes/pi-fifo.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { requireModelOverrideSync, shellQuoteModelIdSync } from '../model-validation.js';
+import { requireModelOverride, shellQuoteModelId } from '../model-validation.js';
 import { getOpenAIAuthStatus } from '../openai-auth.js';
-import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath } from '../paths.js';
-import { getProviderForModelSync, resolveKimiCodeModelAlias } from '../providers.js';
+import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath } from '../paths.js';
+import { getProviderForModel, resolveKimiCodeModelAlias } from '../providers.js';
 import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
-import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
+import { getAgentDir, getAgentState, type Role } from './agent-state.js';
 import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
-import { getClaudeCodeLaunchModelSync } from '../kimi-claude-routing.js';
+import { getClaudeCodeLaunchModel } from '../kimi-claude-routing.js';
+import { codexSessionsRoot } from '../runtimes/storage/codex.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -43,7 +42,7 @@ export interface RoleMcpServerDef {
 }
 
 /** Parse and flatten a role definition's mcpServers frontmatter. */
-export function parseRoleMcpServersSync(definitionPath: string): Record<string, RoleMcpServerDef> {
+export function parseRoleMcpServers(definitionPath: string): Record<string, RoleMcpServerDef> {
   const abs = resolve(definitionPath);
   if (!existsSync(abs)) return {};
 
@@ -85,108 +84,10 @@ export async function writeLauncherScriptAtomic(launcherScript: string, content:
   await renameAsync(tmp, launcherScript);
 }
 
-export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
-  const behavior = getHarnessBehavior(harness);
-  if (behavior.contextLayerKind === 'acp') {
-    return [];
-  }
-
-  const files: string[] = [];
-  const contextFile = workspaceContextFile(workspace);
-  try {
-    await statAsync(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNodeNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-
-  // PAN-1566: ohmypi also receives the rendered global context layer.
-  if (behavior.contextLayerKind === 'pi') {
-    const { piGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = piGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
-  if (behavior.contextLayerKind === 'codex') {
-    const { codexGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = codexGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  return files;
-}
+export { claudeSystemPromptFiles } from '../context-layers/launch-sources.js';
 
 function isNodeNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
-}
-
-/**
- * BFS-walk a process subtree rooted at `rootPid` looking for the active agent
- * runtime. Returns true if any process in the tree matches the expected harness,
- * false if the tree exists but no match, false on any error.
- *
- * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
- * process, which is bash for work-agent launchers (`bash launcher.sh`) but can
- * be the runtime directly for specialists (`exec claude ...` / `exec pi ...`).
- */
-export async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
-  const expectedProcessNames = new Set(getHarnessBehavior(harness).processNames);
-  const queue: string[] = [rootPid];
-  const seen = new Set<string>();
-  while (queue.length > 0) {
-    const pid = queue.shift()!;
-    if (seen.has(pid) || !/^\d+$/.test(pid)) continue;
-    seen.add(pid);
-
-    try {
-      const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
-      const name = comm.trim();
-      if (expectedProcessNames.has(name)) return true;
-    } catch {
-      continue;
-    }
-
-    try {
-      const { stdout: kids } = await execAsync(`pgrep -P ${pid}`);
-      for (const kid of kids.trim().split('\n').filter(Boolean)) {
-        queue.push(kid);
-      }
-    } catch {
-      // pgrep exits non-zero when there are no children — not an error.
-    }
-  }
-  return false;
-}
-
-export async function getPiLauncherFields(agentId: string, model: string): Promise<{
-  harness: 'ohmypi';
-  piExtensionPath: string;
-  piFifoPath: string;
-  piSessionDir: string;
-  model: string;
-}> {
-  const paths = piFifoPaths(agentId);
-  await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
-  const piExtensionPath = resolvePiExtensionPath();
-  if (!piExtensionPath) {
-    throw new Error(
-      `Pi extension not built. Run: npm run build\n(looked for dist/extensions/pi.js and packages/pi-extension/dist/index.js under ${packageRoot})`
-    );
-  }
-  // The launcher rebuilds the command, so it must receive the selected model explicitly.
-  return {
-    harness: 'ohmypi',
-    piExtensionPath,
-    piFifoPath: await Effect.runPromise(createPiFifo(agentId)),
-    piSessionDir: paths.agentDir,
-    model,
-  };
 }
 
 export async function getOhmypiLauncherFields(agentId: string, model: string, effort?: string): Promise<{
@@ -223,7 +124,7 @@ export function getAcpLauncherFields(
   _role?: Role,
   effort?: string,
 ): {
-  harness: 'acp';
+  harness: 'acp' | 'opencode';
   acpAgentId: string;
   acpProvider: string;
   acpWorkspace: string;
@@ -234,12 +135,12 @@ export function getAcpLauncherFields(
   unsetProviderEnv: true;
 } {
   return {
-    harness: 'acp',
+    harness: model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp',
     acpAgentId: agentId,
-    acpProvider: getProviderForModelSync(model).name,
+    acpProvider: getProviderForModel(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
-    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace),
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp'),
     ...(effort ? { acpEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
@@ -253,6 +154,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
   kimiCodeEffort?: string;
   model: string;
   unsetProviderEnv: true;
+  kimiContextDelivery: 'initial-message';
 } {
   const kimiCodeModel = resolveKimiCodeModelAlias(model);
   return {
@@ -262,6 +164,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
     ...(effort ? { kimiCodeEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
+    kimiContextDelivery: 'initial-message',
   };
 }
 
@@ -273,7 +176,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   codexSessionDir: string;
   model: string;
 } {
-  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
+  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
   const codexConfig = loadYamlConfig().config.codex;
   // Match conversation permissions and pre-trust the workspace to avoid onboarding prompts.
   const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
@@ -290,14 +193,14 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
-    mcpServers: role ? parseRoleMcpServersSync(roleAgentDefinitionPath(role)) : undefined,
+    mcpServers: role ? parseRoleMcpServers(roleAgentDefinitionPath(role)) : undefined,
   });
   return {
     harness: 'codex',
     codexMode: codexConfig?.transport === 'tui' ? 'work-tui' : 'app-server',
     codexEffort: effort ?? 'high',
     codexHome,
-    codexSessionDir: join(codexHome, 'sessions'),
+    codexSessionDir: codexSessionsRoot(codexHome),
     model,
   };
 }
@@ -373,7 +276,7 @@ async function waitForKimiCodeTuiReady(agentId: string, timeoutSec = 30): Promis
   while (Date.now() < deadline) {
     try {
       if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
-      const pane = await Effect.runPromise(capturePane(agentId, 80));
+      const pane = await capturePane(agentId, 80);
       const hasInputPrompt = /[│|]\s*>\s*[│|]?/.test(pane);
       const hasStatusLine = /context:\s*\d+%/.test(pane);
       if (hasInputPrompt && hasStatusLine) {
@@ -387,12 +290,28 @@ async function waitForKimiCodeTuiReady(agentId: string, timeoutSec = 30): Promis
   return false;
 }
 
+/**
+ * The TUI waiters' pane read, on the host's terminal backend (review of #3992,
+ * L1): null once the agent's pane is gone. A tmux-only probe answered "gone"
+ * for every Herdr pane, so a restart or recovery that now lands on Herdr
+ * never became ready. A probe that could not tell (a Herdr socket timeout)
+ * THROWS instead of answering "gone", so the waiter keeps polling until its
+ * own deadline (review of #4018, L4).
+ */
+async function readTuiPane(agentId: string): Promise<string | null> {
+  const { probeAgentPane, readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
+  const presence = await probeAgentPane(agentId);
+  if (presence === 'gone') return null;
+  if (presence === 'unknown') throw new Error(`could not tell whether ${agentId}'s pane is still there`);
+  return await readAgentPaneText(agentId, 80);
+}
+
 async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
     try {
-      if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
-      const pane = await Effect.runPromise(capturePane(agentId, 80));
+      const pane = await readTuiPane(agentId);
+      if (pane === null) return false;
       // The codex TUI is ready when its input prompt (a line starting with the
       // `›` glyph) AND its status line (`<model> ... · <cwd>`) are both on
       // screen. PAN-1803: the previous check keyed off the first-run
@@ -508,7 +427,11 @@ export async function waitForCodexAppServerReady(
 ): Promise<void> {
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms)));
-  const sessionExistsForAgent = deps.sessionExists ?? (async (id: string) => Effect.runPromise(sessionExists(id)));
+  // PAN-3917: existence must come from the selected terminal backend. On a
+  // Herdr host a codex/ACP agent is pane-bound (no tmux session), so the tmux
+  // probe declared it "exited before readiness" while its host was starting.
+  const sessionExistsForAgent = deps.sessionExists
+    ?? (async (id: string) => (await import('../terminal-backends/launch.js')).agentPaneExists(id));
   const readStatus = deps.readStatus ?? getCodexAppServerStatus;
   const deadline = now() + timeoutSec * 1000;
   let lastState = 'unknown';
@@ -547,7 +470,11 @@ export async function waitForAcpHostReady(
 ): Promise<void> {
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms)));
-  const sessionExistsForAgent = deps.sessionExists ?? (async (id: string) => Effect.runPromise(sessionExists(id)));
+  // PAN-3917: existence must come from the selected terminal backend. On a
+  // Herdr host a codex/ACP agent is pane-bound (no tmux session), so the tmux
+  // probe declared it "exited before readiness" while its host was starting.
+  const sessionExistsForAgent = deps.sessionExists
+    ?? (async (id: string) => (await import('../terminal-backends/launch.js')).agentPaneExists(id));
   const readText = deps.readText ?? ((path: string) => readFileSync(path, 'utf8'));
   const pathExists = deps.pathExists ?? existsSync;
   const agentDir = getAgentDir(agentId);
@@ -594,6 +521,7 @@ export async function waitForPromptReady(agentId: string, harness: RuntimeName |
     return true;
   }
   if (readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
+  if (readinessKind === 'muse-tui-prompt') return waitForMuseTuiReady(agentId, timeoutSec);
   if (readinessKind === 'kimi-session-signal') return waitForKimiCodeTuiReady(agentId, timeoutSec);
   return waitForReadySignal(agentId, timeoutSec);
 }
@@ -612,7 +540,7 @@ export function inferMemoryProjectId(workspacePath: string): string {
 async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promise<string> {
   if (!prompt.trim()) return prompt;
 
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!agentState || !agentState.workspace || !agentState.issueId) {
     return prompt;
   }
@@ -688,7 +616,7 @@ export async function writePiAgentPrompt(agentId: string, prompt: string, timeou
   try {
     // steer: Pi delivers immediately when idle and queues mid-turn; a bare
     // prompt is rejected with AgentBusyError while a run is active.
-    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt, streamingBehavior: 'steer' });
+    writePiCommand(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt, streamingBehavior: 'steer' });
   } catch (err) {
     if (err instanceof PiNotReady) {
       throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
@@ -716,7 +644,7 @@ export async function writeOhmypiAgentPrompt(agentId: string, prompt: string, ti
 }
 
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
-  const provider = getProviderForModelSync(model);
+  const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') {
     const authStatus = await Effect.runPromise(getClaudeAuthStatus());
     if (authStatus.hasAnthropicApiKey) return 'api-key';
@@ -725,7 +653,7 @@ export async function getProviderAuthMode(model: string): Promise<AuthMode | und
 
   if (provider.name === 'openai') {
     const { config } = loadYamlConfig();
-    const authStatus = await Effect.runPromise(getOpenAIAuthStatus());
+    const authStatus = await getOpenAIAuthStatus();
     return authStatus.loggedIn
       ? 'subscription'
       : (config.providerAuth?.openai ?? 'api-key');
@@ -746,7 +674,7 @@ export async function getProviderAuthMode(model: string): Promise<AuthMode | und
  * and ohmypi/Pi. When the harness uses the ohmypi RPC command, the function
  * returns `omp --mode rpc --model <model>`; the launcher generator then layers
  * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
- * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
+ * redirect on top via generateLauncherScriptSync. The `agentName` (PAN-982:
  * --name) and `agentDefinition` (PAN-982: --agent) parameters only apply to the
  * Claude Code path — ohmypi has no agent-definition system.
  */
@@ -757,8 +685,8 @@ export async function getAgentRuntimeBaseCommand(
   harness: RuntimeName = 'claude-code',
   effort?: RoleEffort,
 ): Promise<string> {
-  const validatedModel = requireModelOverrideSync(model);
-  const quotedModel = shellQuoteModelIdSync(harness === 'claude-code' ? getClaudeCodeLaunchModelSync(validatedModel) : validatedModel);
+  const validatedModel = requireModelOverride(model);
+  const quotedModel = shellQuoteModelId(harness === 'claude-code' ? getClaudeCodeLaunchModel(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return `omp --mode rpc --model ${quotedModel}`;
@@ -771,6 +699,7 @@ export async function getAgentRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'muse-tui') return 'muse';
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
@@ -783,7 +712,7 @@ export async function getAgentRuntimeBaseCommand(
     return process.env.OVERDECK_TEST_HARNESS_COMMAND;
   }
 
-  const provider = getProviderForModelSync(validatedModel);
+  const provider = getProviderForModel(validatedModel);
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
@@ -805,7 +734,7 @@ export async function getAgentRuntimeBaseCommand(
     const effortFlag = effort ? ` --effort ${effort}` : '';
     if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
       const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-      return `claude${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+      return `claude${agentFlag} --model ${shellQuoteModelId(resolvedModel)}${effortFlag}${nameFlag}`;
     }
     return `claude${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
   }
@@ -814,8 +743,8 @@ export async function getAgentRuntimeBaseCommand(
   // comes from the global permission flags; the role's hooks fire globally via
   // ~/.claude/settings.json. roleInject folds in effort when a role file is
   // present; otherwise --effort is passed directly.
-  const permissionFlags = getClaudePermissionFlagsStringSync();
-  const roleInject = defIsRoleFile ? roleSystemPromptInjectionSync(agentDefinition as string, effort) : '';
+  const permissionFlags = getClaudePermissionFlagsString();
+  const roleInject = defIsRoleFile ? roleSystemPromptInjection(agentDefinition as string, effort) : '';
   const effortFlag = (!defIsRoleFile && effort) ? ` --effort ${effort}` : '';
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
@@ -825,7 +754,7 @@ export async function getAgentRuntimeBaseCommand(
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    return `claude ${permissionFlags}${roleInject} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude ${permissionFlags}${roleInject} --model ${shellQuoteModelId(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
   return `claude ${permissionFlags}${roleInject} --model ${quotedModel}${effortFlag}${nameFlag}`;
@@ -885,7 +814,7 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
  * Returns the flags (with a leading space) to splice in place of the old
  * `--agent <file>` flag, or '' when the definition file is missing.
  */
-export function roleSystemPromptInjectionSync(definitionPath: string, explicitEffort?: RoleEffort): string {
+export function roleSystemPromptInjection(definitionPath: string, explicitEffort?: RoleEffort): string {
   const abs = resolve(definitionPath);
   if (!existsSync(abs)) return '';
   const raw = readFileSync(abs, 'utf8');
@@ -906,7 +835,7 @@ export function roleSystemPromptInjectionSync(definitionPath: string, explicitEf
   mkdirSync(dir, { recursive: true });
   const stem = basename(definitionPath).replace(/\.md$/, '');
   const outPath = join(dir, `${stem}.md`);
-  writeFileSync(outPath, body);
+  writeFileSync(outPath, `Source: ${abs}\n\n${body}`);
 
   const flags: string[] = [` --append-system-prompt-file '${outPath}'`];
 
@@ -917,7 +846,7 @@ export function roleSystemPromptInjectionSync(definitionPath: string, explicitEf
   // into one { mcpServers: { name: def } } config loaded via --mcp-config. It is
   // additive (the launcher's channels --mcp-config still applies; no
   // --strict-mcp-config), so the role keeps any project/global MCP servers too.
-  const servers = parseRoleMcpServersSync(definitionPath);
+  const servers = parseRoleMcpServers(definitionPath);
   const mcpNames = Object.keys(servers);
   if (mcpNames.length > 0) {
     const mcpPath = join(dir, `${stem}.mcp.json`);
@@ -948,11 +877,11 @@ export async function getRoleRuntimeBaseCommand(
   subRole?: string,
   effort?: RoleEffort,
 ): Promise<string> {
-  const validatedModel = requireModelOverrideSync(model);
-  const quotedModel = shellQuoteModelIdSync(harness === 'claude-code' ? getClaudeCodeLaunchModelSync(validatedModel) : validatedModel);
+  const validatedModel = requireModelOverride(model);
+  const quotedModel = shellQuoteModelId(harness === 'claude-code' ? getClaudeCodeLaunchModel(validatedModel) : validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
-    const mcpNames = Object.keys(parseRoleMcpServersSync(roleAgentDefinitionPath(role)));
+    const mcpNames = Object.keys(parseRoleMcpServers(roleAgentDefinitionPath(role)));
     if (mcpNames.length > 0) {
       console.warn(`[spawn] role '${role}' declares MCP servers (${mcpNames.join(', ')}) but harness 'ohmypi' does not provision MCP — those tools will be unavailable`);
     }
@@ -964,6 +893,7 @@ export async function getRoleRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'muse-tui') return 'muse';
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
@@ -976,7 +906,7 @@ export async function getRoleRuntimeBaseCommand(
     return process.env.OVERDECK_TEST_HARNESS_COMMAND;
   }
 
-  const provider = getProviderForModelSync(validatedModel);
+  const provider = getProviderForModel(validatedModel);
   const requestedDefinitionPath = roleAgentDefinitionPath(role, subRole);
   const definitionPath = requestedDefinitionPath && existsSync(resolve(requestedDefinitionPath))
     ? requestedDefinitionPath
@@ -989,7 +919,7 @@ export async function getRoleRuntimeBaseCommand(
   }
   // PAN-2087: inject the role body (+ effort frontmatter) as an appended system
   // prompt instead of `--agent <file>` (Claude Code dropped --agent file support).
-  const roleInject = definitionPath ? roleSystemPromptInjectionSync(definitionPath, effort) : '';
+  const roleInject = definitionPath ? roleSystemPromptInjection(definitionPath, effort) : '';
   const nameFlag = ` --name ${agentName}`;
   // PAN-3077: never omit --effort on definition-less runs (review sub-roles,
   // standing supervisor). Omission hands the choice to the harness default —
@@ -1000,7 +930,7 @@ export async function getRoleRuntimeBaseCommand(
   // permissionMode now comes from the global permission flags for EVERY role
   // (the old --agent path relied on role frontmatter, which Claude Code no longer
   // applies). This honors the user's bypass/auto setting uniformly.
-  const permissionFlags = ` ${getClaudePermissionFlagsStringSync()}`;
+  const permissionFlags = ` ${getClaudePermissionFlagsString()}`;
 
   // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions
   // (prompt delivered via tmux, completion signalled by the Stop-hook) instead
@@ -1009,8 +939,23 @@ export async function getRoleRuntimeBaseCommand(
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    return `claude${printFlag}${roleInject}${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude${printFlag}${roleInject}${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
   return `claude${printFlag}${roleInject}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
+}
+
+async function waitForMuseTuiReady(agentId: string, timeoutSec: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    try {
+      const pane = await readTuiPane(agentId);
+      if (pane === null) return false;
+      if (/^\s*⟩\s/m.test(pane) && /(?:muse-spark|Muse Code)/.test(pane)) return true;
+    } catch {
+      // A probe or read that could not answer is not an exit; keep waiting.
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return false;
 }

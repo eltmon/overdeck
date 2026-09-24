@@ -146,7 +146,7 @@ describe('TTS voice routes helpers', () => {
       },
     ];
 
-    await expect(listTtsVoices({ loadVoices: () => Effect.succeed(voices) as never })).resolves.toEqual([
+    await expect(listTtsVoices({ loadVoices: async () => voices as never })).resolves.toEqual([
       {
         id: 'voice-1',
         name: 'Narrator',
@@ -167,7 +167,7 @@ describe('TTS voice routes helpers', () => {
     const input = parseCreateTtsVoiceInput(body);
     expect(input).toEqual(body);
 
-    const addVoice = vi.fn((voice) => Effect.succeed({
+    const addVoice = vi.fn(async (voice) => ({
       ...voice,
       id: 'voice-2',
       createdAt: '2026-05-16T00:01:00.000Z',
@@ -208,7 +208,7 @@ describe('TTS voice routes helpers', () => {
   });
 
   it('deletes voices and reports unknown ids', async () => {
-    const deleteVoice = vi.fn((id: string) => Effect.succeed(id === 'voice-1'));
+    const deleteVoice = vi.fn(async (id: string) => id === 'voice-1');
 
     await expect(removeTtsVoice('voice-1', { deleteVoice: deleteVoice as never })).resolves.toBe(true);
     await expect(removeTtsVoice('missing', { deleteVoice: deleteVoice as never })).resolves.toBe(false);
@@ -217,7 +217,7 @@ describe('TTS voice routes helpers', () => {
   });
 
   it('clears all voices in one store operation', async () => {
-    const clearVoices = vi.fn(() => Effect.succeed(2));
+    const clearVoices = vi.fn(async () => 2);
 
     await expect(clearTtsVoices({ clearVoices: clearVoices as never })).resolves.toBe(2);
     expect(clearVoices).toHaveBeenCalledTimes(1);
@@ -229,7 +229,7 @@ describe('TTS speak route helpers', () => {
     expect(parseSpeakTtsInput({
       text: 'PAN-829 passed review',
       source: 'review-specialist',
-      eventType: 'reviewStatus.passed',
+      eventType: 'issueState.ready',
       issueId: 'PAN-829',
       priority: 1,
       voiceId: 'voice-1',
@@ -237,7 +237,7 @@ describe('TTS speak route helpers', () => {
     })).toEqual({
       text: 'PAN-829 passed review',
       source: 'review-specialist',
-      eventType: 'reviewStatus.passed',
+      eventType: 'issueState.ready',
       issueId: 'PAN-829',
       priority: 1,
       voiceId: 'voice-1',

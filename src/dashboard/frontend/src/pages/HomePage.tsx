@@ -3,7 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { NotificationClassBadge } from '../components/NotificationClassBadge';
 import { ActionStatusChip } from '../components/ActionStatusChip';
-import { compareIssueIds, type AgentSnapshot, type FeatureRegistryEntry, type MemoryHealthSnapshot, type MemoryObservation, type MemoryStatus, type ReviewStatusSnapshot } from '@overdeck/contracts';
+import { compareIssueIds, type AgentSnapshot, type FeatureRegistryEntry, type MemoryHealthSnapshot, type MemoryObservation, type MemoryStatus } from '@overdeck/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
 import { fetchProjects, filterSpecOnlyPlanned, type ProjectData } from '../components/CommandDeck/projectsData';
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
@@ -11,7 +11,7 @@ import { useDashboardStore, selectLatestMemoryFailure } from '../lib/store';
 import { ModeToggle } from '../components/simple/parts';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
-import type { Issue } from '../types';
+import type { DerivedIssueState, Issue } from '../types';
 
 interface FeatureRegistryResponse {
   entries: FeatureRegistryEntry[];
@@ -25,9 +25,9 @@ interface MetricsSummaryResponse {
 
 interface HomeSummaryCards {
   runningAgents: number;
-  gatedAgents: number;
-  recentMerges: number;
-  failedVerifications: number;
+  pausedAgents: number;
+  readyToMerge: number;
+  needsYou: number;
   dailyCost: number | null;
 }
 
@@ -54,7 +54,7 @@ interface HomeWorkspaceSources {
   statusByIssueId?: Record<string, MemoryStatus>;
   observationsByIssueId?: Record<string, MemoryObservation[]>;
   agentsById?: Record<string, AgentSnapshot>;
-  reviewStatusByIssueId?: Record<string, ReviewStatusSnapshot>;
+  derivedIssueStateByIssueId?: Record<string, DerivedIssueState>;
 }
 
 interface HomeWorkspaceCard {
@@ -120,7 +120,7 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
   const statusByIssueId = useDashboardStore((state) => state.statusByIssueId);
   const observationsByIssueId = useDashboardStore((state) => state.observationsByIssueId);
   const agentsById = useDashboardStore((state) => state.agentsById);
-  const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const derivedIssueStateByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
   const memoryFailure = useDashboardStore(selectLatestMemoryFailure);
   const currentTime = now ?? new Date();
   const workspaceCards = useMemo(() => buildHomeWorkspaceCards({
@@ -128,15 +128,14 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
     statusByIssueId,
     observationsByIssueId,
     agentsById,
-    reviewStatusByIssueId,
-  }), [agentsById, issuesRaw, observationsByIssueId, reviewStatusByIssueId, statusByIssueId]);
+    derivedIssueStateByIssueId,
+  }), [agentsById, issuesRaw, observationsByIssueId, derivedIssueStateByIssueId, statusByIssueId]);
   const actionObservations = useMemo(() => selectActionObservations(observationsByIssueId), [observationsByIssueId]);
   const summaryCards = useMemo(() => buildSummaryCardViews(buildHomeSummaryCards({
     agentsById,
-    reviewStatusByIssueId,
+    derivedIssueStateByIssueId,
     dailyCost: metricsQuery.data?.today?.totalCost,
-    now: currentTime,
-  })), [agentsById, currentTime, metricsQuery.data?.today?.totalCost, reviewStatusByIssueId]);
+  })), [agentsById, metricsQuery.data?.today?.totalCost, derivedIssueStateByIssueId]);
 
   return (
     <div className="h-full w-full overflow-y-auto bg-background">
@@ -425,22 +424,20 @@ function HomeActivityFeedItem({ observation, now }: { observation: MemoryObserva
 
 function buildHomeSummaryCards({
   agentsById = {},
-  reviewStatusByIssueId = {},
+  derivedIssueStateByIssueId = {},
   dailyCost,
-  now,
 }: {
   agentsById?: Record<string, AgentSnapshot>;
-  reviewStatusByIssueId?: Record<string, ReviewStatusSnapshot>;
+  derivedIssueStateByIssueId?: Record<string, DerivedIssueState>;
   dailyCost?: number;
-  now: Date;
 }): HomeSummaryCards {
   const agents = Object.values(agentsById);
-  const reviewStatuses = Object.values(reviewStatusByIssueId);
+  const derivedStates = Object.values(derivedIssueStateByIssueId);
   return {
     runningAgents: agents.filter(isRunningAgent).length,
-    gatedAgents: agents.filter(isGatedAgent).length,
-    recentMerges: reviewStatuses.filter((status) => isRecentMerge(status, now)).length,
-    failedVerifications: reviewStatuses.filter(needsVerificationAttention).length,
+    pausedAgents: agents.filter((agent) => agent.paused === true).length,
+    readyToMerge: derivedStates.filter((derived) => derived.state === 'ready').length,
+    needsYou: derivedStates.filter((derived) => derived.attention === 'needs-you').length,
     dailyCost: typeof dailyCost === 'number' && Number.isFinite(dailyCost) ? dailyCost : null,
   };
 }
@@ -454,22 +451,22 @@ function buildSummaryCardViews(summary: HomeSummaryCards): SummaryCardView[] {
       tone: summary.runningAgents > 0 ? 'text-primary' : undefined,
     },
     {
-      label: 'Paused / troubled',
-      value: String(summary.gatedAgents),
-      detail: 'Agents gated by pause or failures',
-      tone: summary.gatedAgents > 0 ? 'text-warning' : undefined,
+      label: 'Paused',
+      value: String(summary.pausedAgents),
+      detail: 'Agents an operator parked',
+      tone: summary.pausedAgents > 0 ? 'text-warning' : undefined,
     },
     {
-      label: 'Merged today',
-      value: String(summary.recentMerges),
-      detail: 'Merges in the last 24 hours',
-      tone: summary.recentMerges > 0 ? 'text-success' : undefined,
+      label: 'Ready to merge',
+      value: String(summary.readyToMerge),
+      detail: 'Approved, green, mergeable',
+      tone: summary.readyToMerge > 0 ? 'text-success' : undefined,
     },
     {
-      label: 'Needs verification',
-      value: String(summary.failedVerifications),
-      detail: 'Failed checks or merge blockers',
-      tone: summary.failedVerifications > 0 ? 'text-destructive' : undefined,
+      label: 'Needs you',
+      value: String(summary.needsYou),
+      detail: 'Waiting on an operator answer',
+      tone: summary.needsYou > 0 ? 'text-warning' : undefined,
     },
     {
       label: 'Cost today',
@@ -484,25 +481,6 @@ function isRunningAgent(agent: AgentSnapshot): boolean {
   return agent.hasLiveTmuxSession === true || agent.status === 'running' || agent.status === 'starting';
 }
 
-function isGatedAgent(agent: AgentSnapshot): boolean {
-  return agent.paused === true ||
-    agent.troubled === true ||
-    (agent.status !== 'stopped' && (agent.consecutiveFailures ?? 0) > 0);
-}
-
-function isRecentMerge(status: ReviewStatusSnapshot, now: Date): boolean {
-  if (status.mergeStatus !== 'merged' || !status.updatedAt) return false;
-  const timestamp = Date.parse(status.updatedAt);
-  return !Number.isNaN(timestamp) && now.getTime() - timestamp <= 24 * 60 * 60 * 1000;
-}
-
-function needsVerificationAttention(status: ReviewStatusSnapshot): boolean {
-  return status.verificationStatus === 'failed' ||
-    status.testStatus === 'failed' ||
-    status.uatStatus === 'failed' ||
-    (status.blockerReasons?.length ?? 0) > 0;
-}
-
 function selectActionObservations(observationsByIssueId: Record<string, MemoryObservation[]>): Array<MemoryObservation & { actionStatus: string }> {
   return Object.values(observationsByIssueId)
     .flatMap((observations) => observations)
@@ -515,7 +493,7 @@ function buildHomeWorkspaceCards({
   statusByIssueId = {},
   observationsByIssueId = {},
   agentsById = {},
-  reviewStatusByIssueId = {},
+  derivedIssueStateByIssueId = {},
 }: HomeWorkspaceSources): HomeWorkspaceCard[] {
   const issueById = new Map<string, Pick<Issue, 'identifier' | 'title' | 'description'>>();
   for (const rawIssue of issuesRaw) {
@@ -543,7 +521,7 @@ function buildHomeWorkspaceCards({
       },
       status,
       observations,
-      stats: buildWorkspaceStats(observations, reviewStatusByIssueId[issueId]),
+      stats: buildWorkspaceStats(observations, derivedIssueStateByIssueId[issueId]),
     };
   });
 }
@@ -554,13 +532,13 @@ function isActiveWorkspaceAgent(agent: AgentSnapshot): boolean {
 
 function buildWorkspaceStats(
   observations: readonly MemoryObservation[],
-  reviewStatus: ReviewStatusSnapshot | undefined,
+  derived: DerivedIssueState | undefined,
 ): WorkspaceStatusStats {
   return {
     additions: 0,
     deletions: 0,
     commits: observations.filter(hasCommitTag).length,
-    prs: reviewStatus?.prUrl ? 1 : 0,
+    prs: derived?.pr ? 1 : 0,
   };
 }
 

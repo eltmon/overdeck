@@ -5,9 +5,9 @@ import { DiffPanel } from '../components/DiffPanel';
 import { DiffWorkerPoolProvider } from '../components/DiffWorkerPoolProvider';
 import type { TurnDiffSummary } from '../components/chat/chat-types';
 import { ConversationPanel } from '../components/chat/ConversationPanel';
+import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import type { ViewMode as ConversationViewMode } from '../components/chat/ConversationPanel';
 import type { Conversation } from '../components/CommandDeck/ConversationList';
-import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import { useCodexAutoRetry } from '../hooks/useCodexAutoRetry';
 
 export function StandaloneTerminalRoute({ sessionName, token }: { sessionName: string; token?: string }) {
@@ -16,16 +16,6 @@ export function StandaloneTerminalRoute({ sessionName, token }: { sessionName: s
     <div className="h-screen overflow-hidden bg-[#0d1117]">
       <EventRouter />
       <StandaloneTerminal sessionName={sessionName} token={token} />
-    </div>
-  );
-}
-
-export function StandaloneFlywheelPopoutRoute() {
-  useCodexAutoRetry();
-  return (
-    <div className="h-screen overflow-hidden bg-background">
-      <EventRouter />
-      <FlywheelConversationPane />
     </div>
   );
 }
@@ -139,6 +129,21 @@ export function StandaloneDiffPopoutRoute() {
           />
         </DiffWorkerPoolProvider>
       )}
+    </div>
+  );
+}
+
+/**
+ * Standalone flywheel popout (/popout/flywheel-conversation, PAN-3964 FR-13):
+ * the flywheel conversation pane and its run controls, without dashboard
+ * chrome. The pane hides its own Pop out button on this path.
+ */
+export function StandaloneFlywheelPopoutRoute() {
+  useCodexAutoRetry();
+  return (
+    <div className="h-screen overflow-hidden bg-background">
+      <EventRouter />
+      <FlywheelConversationPane />
     </div>
   );
 }

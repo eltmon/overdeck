@@ -3,8 +3,7 @@
 #
 # Fires on Claude Code Stop. Emits agent.activity_changed(idle) — the reducer
 # clears currentTool / thinking / waiting on that transition, so no separate
-# waiting_cleared is needed. Still chains to specialist-stop-hook and
-# work-agent-stop-hook, and still fires the planning auto-completion call.
+# waiting_cleared is needed. Still fires the planning auto-completion call.
 
 set +e
 
@@ -125,18 +124,6 @@ if [ "$API_ERROR_DETECTED" = "true" ]; then
   fi
 fi
 
-# Chain to specialist-specific hook (auto-completion detection).
-SPECIALIST_HOOK="$HOME/.overdeck/bin/specialist-stop-hook"
-if [ -x "$SPECIALIST_HOOK" ]; then
-  "$SPECIALIST_HOOK" &
-fi
-
-# Chain to work-agent completion detection (nudges agents that forgot `pan work done`).
-WORK_AGENT_HOOK="$HOME/.overdeck/bin/work-agent-stop-hook"
-if [ -x "$WORK_AGENT_HOOK" ]; then
-  "$WORK_AGENT_HOOK" &
-fi
-
 # Auto-mark planning complete when a planning agent finishes.
 if [[ "$AGENT_ID" == planning-* ]]; then
   ISSUE_ID=$(echo "$AGENT_ID" | sed 's/^planning-//' | tr '[:lower:]' '[:upper:]')
@@ -201,6 +188,26 @@ if [[ "$AGENT_ID" =~ ^agent-(.+)-review$ ]]; then
     CONVOY_MARKER="$HOME/.overdeck/agents/$CONVOY_SESSION/reviewer-signaled"
     if [ ! -f "$CONVOY_MARKER" ]; then
       continue
+    fi
+    # PAN-3848 (FR-21): the reap is the reviewer's exit transition — write
+    # status: stopped through the CLI verb before killing the session, so no
+    # patrol has to infer the exit from the missing tmux session afterwards.
+    # PAN-3848 (F5): retry the exit write instead of swallowing the first
+    # failure — a transient state-store failure must not silently downgrade
+    # the exit to an orphan-misclassification. Cleanup still proceeds, and
+    # Deacon's orphan recovery reconciles the stopped row from session
+    # liveness on its next sweep.
+    PAN_EXIT_RECORDED=false
+    for PAN_EXIT_ATTEMPT in 1 2 3; do
+      if pan admin agents exited "$CONVOY_SESSION" --code 0 >/dev/null 2>&1; then
+        PAN_EXIT_RECORDED=true
+        break
+      fi
+      sleep 2
+    done
+    if [ "$PAN_EXIT_RECORDED" != "true" ]; then
+      echo "[$(date -Iseconds)] stop-hook: WARNING failed to record reviewer exit for $CONVOY_SESSION after 3 attempts — orphan recovery will reconcile from session liveness" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
     fi
     if tmux -L overdeck kill-session -t "$CONVOY_SESSION" 2>/dev/null; then
       KILLED_ANY=true

@@ -9,8 +9,8 @@ export const TAB_PATHS: Record<Tab, string> = {
   kanban: '/board',
   'command-deck': '/command-deck',
   agents: '/agents',
-  flywheel: '/flywheel',
   orders: '/orders',
+  flywheel: '/flywheel',
   backlog: '/backlog',
   resources: '/resources',
   knowledge: '/knowledge',
@@ -27,6 +27,7 @@ export const TAB_PATHS: Record<Tab, string> = {
   sessions: '/sessions',
   'awaiting-merge': '/awaiting-merge',
   'workspace-new': '/workspaces/new',
+  'project-new': '/projects/new',
   workspace: '/workspace',
 };
 
@@ -119,6 +120,32 @@ export function getWorkspaceRouteFromPath(path = window.location.pathname): stri
 export function getNewWorkspaceProjectFromSearch(search = window.location.search): string | null {
   const project = new URLSearchParams(search).get('project')?.trim();
   return project || null;
+}
+
+/** Preserve the optional mode preset on the routed project creation page (PAN-3836). */
+export function getNewProjectModeFromSearch(search = window.location.search): 'clone' | 'existing' | 'new' | null {
+  const mode = new URLSearchParams(search).get('mode');
+  return mode === 'clone' || mode === 'existing' || mode === 'new' ? mode : null;
+}
+
+/**
+ * Optional same-origin path to return to after a project is created from another
+ * page (the workspace page passes `returnTo=/workspaces/new`). Only a plain
+ * absolute path is accepted; protocol-relative or external values are dropped.
+ */
+export function getNewProjectReturnToFromSearch(search = window.location.search): string | null {
+  const raw = new URLSearchParams(search).get('returnTo');
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
+
+/** Where App lands after a project is created: back to the workspace page when it asked for it, else the command deck. */
+export function getProjectCreatedNavigation(projectKey: string): { tab: Extract<Tab, 'workspace-new' | 'command-deck'>; path: string; state: Record<string, unknown> } {
+  const returnTo = getNewProjectReturnToFromSearch();
+  if (returnTo?.startsWith('/workspaces/new')) {
+    return { tab: 'workspace-new', path: `/workspaces/new?project=${encodeURIComponent(projectKey)}`, state: { tab: 'workspace-new' } };
+  }
+  return { tab: 'command-deck', path: `/command-deck/${encodeURIComponent(projectKey)}`, state: { tab: 'command-deck', project: projectKey } };
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {

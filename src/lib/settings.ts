@@ -1,10 +1,9 @@
-import { Effect } from 'effect';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { getHarnessBehavior } from '@overdeck/contracts';
+import { readFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
-import { FsError } from './errors.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
   // Supported (Codex CLI catalog, 2026-09-07)
   | 'gpt-6-astra'
@@ -42,10 +41,9 @@ export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
 export type GrokModel = 'grok-build-0.1';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
-
-// Task complexity levels
-export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+export type OpenCodeModelId = `opencode/${string}` | `opencode-go/${string}`;
+export type MuseModel = 'muse-spark-1.3' | 'muse-spark-1.3-contributor';
+export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
 
 // Specialist agent types
 export interface SpecialistModels {
@@ -54,16 +52,10 @@ export interface SpecialistModels {
   merge_agent: ModelId;
 }
 
-// Complexity-based model mapping
-export type ComplexityModels = {
-  [K in ComplexityLevel]: ModelId;
-};
-
 // All model configuration
 export interface ModelsConfig {
   specialists: SpecialistModels;
   status_review: ModelId;
-  complexity: ComplexityModels;
 }
 
 // API keys for external providers
@@ -94,13 +86,6 @@ const DEFAULT_SETTINGS: SettingsConfig = {
       merge_agent: 'claude-sonnet-5',
     },
     status_review: 'claude-opus-4-6',
-    complexity: {
-      trivial: 'claude-haiku-4-5',
-      simple: 'claude-haiku-4-5',
-      medium: 'kimi-k2.5',
-      complex: 'kimi-k2.5',
-      expert: 'claude-opus-4-6',
-    },
   },
   api_keys: {},
 };
@@ -144,11 +129,11 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
  * Returns default settings if file doesn't exist or is invalid
  * Also loads API keys from environment variables as fallback
  */
-export function loadSettingsSync(): SettingsConfig {
+export function loadSettings(): SettingsConfig {
   let settings: SettingsConfig;
 
   if (!existsSync(SETTINGS_FILE)) {
-    settings = getDefaultSettingsSync();
+    settings = getDefaultSettings();
   } else {
     try {
       const content = readFileSync(SETTINGS_FILE, 'utf8');
@@ -156,7 +141,7 @@ export function loadSettingsSync(): SettingsConfig {
       settings = deepMerge(DEFAULT_SETTINGS, parsed);
     } catch (error) {
       console.error('Warning: Failed to parse settings.json, using defaults');
-      settings = getDefaultSettingsSync();
+      settings = getDefaultSettings();
     }
   }
 
@@ -184,57 +169,9 @@ export function loadSettingsSync(): SettingsConfig {
 }
 
 /**
- * Save settings to ~/.overdeck/settings.json
- * Writes with pretty formatting (2-space indent)
- */
-export function saveSettingsSync(settings: SettingsConfig): void {
-  const content = JSON.stringify(settings, null, 2);
-  writeFileSync(SETTINGS_FILE, content, 'utf8');
-}
-
-/**
- * Validate settings structure and model IDs
- * Returns error message if invalid, null if valid
- */
-export function validateSettingsSync(settings: SettingsConfig): string | null {
-  // Validate models structure
-  if (!settings.models) {
-    return 'Missing models configuration';
-  }
-
-  // Validate specialists
-  if (!settings.models.specialists) {
-    return 'Missing specialists configuration';
-  }
-  const specialists = settings.models.specialists;
-  if (!specialists.review_agent || !specialists.test_agent || !specialists.merge_agent) {
-    return 'Missing specialist agent model configuration';
-  }
-
-  // Validate complexity levels
-  if (!settings.models.complexity) {
-    return 'Missing complexity configuration';
-  }
-  const complexity = settings.models.complexity;
-  const requiredLevels: ComplexityLevel[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
-  for (const level of requiredLevels) {
-    if (!complexity[level]) {
-      return `Missing complexity level: ${level}`;
-    }
-  }
-
-  // Validate api_keys structure (optional keys)
-  if (!settings.api_keys) {
-    return 'Missing api_keys configuration';
-  }
-
-  return null;
-}
-
-/**
  * Get a deep copy of the default settings
  */
-export function getDefaultSettingsSync(): SettingsConfig {
+export function getDefaultSettings(): SettingsConfig {
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 }
 
@@ -242,7 +179,7 @@ export function getDefaultSettingsSync(): SettingsConfig {
  * Get available models for a provider based on configured API keys
  * Returns empty array if provider API key is not configured
  */
-export function getAvailableModelsSync(settings: SettingsConfig): {
+export function getAvailableModels(settings: SettingsConfig): {
   anthropic: AnthropicModel[];
   openai: OpenAIModel[];
   google: GoogleModel[];
@@ -257,6 +194,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   const anthropicModels: AnthropicModel[] = [
     'claude-fable-5-1',
     'claude-fable-5',
+    'claude-opus-5-5',
     'claude-opus-5',
     'claude-opus-4-8',
     'claude-opus-4-7',
@@ -320,7 +258,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
  * Check if a model ID is an Anthropic model
  * Anthropic models can be run directly with `claude` CLI
  */
-export function isAnthropicModelSync(modelId: ModelId | string): boolean {
+function isAnthropicModelSync(modelId: ModelId | string): boolean {
   return modelId.startsWith('claude-');
 }
 
@@ -328,7 +266,7 @@ export function isAnthropicModelSync(modelId: ModelId | string): boolean {
  * Get the Claude CLI model flag for an Anthropic model
  * Maps our model IDs to Claude's expected format
  */
-export function getClaudeModelFlagSync(modelId: ModelId | string): string {
+export function getClaudeModelFlag(modelId: ModelId | string): string {
   const modelMap: Record<string, string> = {
     // Fable has no short `claude` CLI alias (like opus/sonnet); pass the full
     // API model ID through to `--model`.
@@ -336,6 +274,7 @@ export function getClaudeModelFlagSync(modelId: ModelId | string): string {
     'claude-fable-5': 'claude-fable-5',
     // Pass the full API ID through: the CLI's short `opus` alias may still
     // resolve to Opus 4.8 depending on installed Claude Code version.
+    'claude-opus-5-5': 'claude-opus-5-5',
     'claude-opus-5': 'claude-opus-5',
     'claude-opus-4-8': 'opus',
     'claude-opus-4-7': 'opus',
@@ -353,12 +292,15 @@ export function getClaudeModelFlagSync(modelId: ModelId | string): string {
  * Always uses 'claude' CLI — non-Anthropic models work via ANTHROPIC_BASE_URL env var
  * pointing to their Anthropic-compatible endpoint.
  */
-export function getAgentCommandSync(modelId: ModelId | string): { command: string; args: string[] } {
+export function getAgentCommand(modelId: ModelId | string): { command: string; args: string[] } {
   if (isAnthropicModelSync(modelId)) {
     return {
       command: 'claude',
-      args: ['--model', getClaudeModelFlagSync(modelId)],
+      args: ['--model', getClaudeModelFlag(modelId)],
     };
+  }
+  if (modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor') {
+    return { command: getHarnessBehavior('muse').executableName, args: ['--model', modelId] };
   }
   // Non-Anthropic direct providers: use claude CLI with the model name as-is.
   // The caller must set ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN env vars.
@@ -367,51 +309,3 @@ export function getAgentCommandSync(modelId: ModelId | string): { command: strin
     args: ['--model', modelId],
   };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Sync FS wrappers (CLI-only by design); pure helpers stay Effect.sync.
-
-/** Load settings.json (returns defaults if missing). Pure-ish (logs on parse error). */
-export const loadSettings = (): Effect.Effect<SettingsConfig> =>
-  Effect.sync(() => loadSettingsSync());
-
-/** Persist settings.json; surfaces FsError on failure. */
-export const saveSettings = (
-  settings: SettingsConfig,
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveSettingsSync(settings),
-    catch: (cause) =>
-      new FsError({ path: SETTINGS_FILE, operation: 'save-settings', cause }),
-  });
-
-/** Validate a settings object; returns null when valid, error message otherwise. Pure. */
-export const validateSettings = (
-  settings: SettingsConfig,
-): Effect.Effect<string | null> => Effect.sync(() => validateSettingsSync(settings));
-
-/** Default settings template. Pure. */
-export const getDefaultSettings = (): Effect.Effect<SettingsConfig> =>
-  Effect.sync(() => getDefaultSettingsSync());
-
-/** Compute the available-model breakdown for a settings object. Pure. */
-export const getAvailableModels = (
-  settings: SettingsConfig,
-): Effect.Effect<ReturnType<typeof getAvailableModelsSync>> =>
-  Effect.sync(() => getAvailableModelsSync(settings));
-
-/** True if the model id maps to an Anthropic model. Pure. */
-export const isAnthropicModel = (
-  modelId: ModelId | string,
-): Effect.Effect<boolean> => Effect.sync(() => isAnthropicModelSync(modelId));
-
-/** Resolve the `--model` flag value for `claude` CLI. Pure. */
-export const getClaudeModelFlag = (
-  modelId: ModelId | string,
-): Effect.Effect<string> => Effect.sync(() => getClaudeModelFlagSync(modelId));
-
-/** Resolve the full spawn command + args for a model. Pure. */
-export const getAgentCommand = (
-  modelId: ModelId | string,
-): Effect.Effect<{ command: string; args: string[] }> =>
-  Effect.sync(() => getAgentCommandSync(modelId));

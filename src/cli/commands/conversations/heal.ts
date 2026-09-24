@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 
 import { exitCli } from '../../exit.js';
-import { getDashboardApiUrlSync } from '../../../lib/config.js';
+import { getDashboardApiUrl } from '../../../lib/config.js';
 import { getConversationByName, listConversations } from '../../../lib/overdeck/conversations.js';
 
 export async function healAction(query: string): Promise<void> {
@@ -20,7 +20,7 @@ export async function healAction(query: string): Promise<void> {
 
   try {
     const response = await fetch(
-      `${getDashboardApiUrlSync()}/api/conversations/${encodeURIComponent(conversation.name)}/clear-fork-state`,
+      `${getDashboardApiUrl()}/api/conversations/${encodeURIComponent(conversation.name)}/clear-fork-state`,
       { method: 'POST' },
     );
     const result = await response.json() as { error?: string };

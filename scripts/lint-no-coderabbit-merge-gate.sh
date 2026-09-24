@@ -7,9 +7,10 @@
 set -euo pipefail
 
 GATE_FILES=(
-  src/lib/review-status.ts
   src/lib/cloister/verification-runner.ts
-  src/lib/cloister/deacon-merge.ts
+  src/lib/cloister/merge-ready-set.ts
+  src/lib/cloister/pr-facts.ts
+  src/lib/cloister/merge-agent.ts
   src/lib/cloister/auto-merge-eligibility.ts
   src/lib/flywheel-merge-order.ts
 )

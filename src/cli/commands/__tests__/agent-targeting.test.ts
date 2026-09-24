@@ -1,11 +1,12 @@
+import { Effect } from 'effect';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
-  getAgentStateSync: vi.fn(),
-  setAgentPausedSync: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
-  clearAgentTroubledSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  getAgentState: vi.fn(),
+  setAgentPaused: vi.fn(),
+  clearAgentPaused: vi.fn(),
+  clearAgentTroubled: vi.fn(),
+  stopAgent: vi.fn(),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -47,9 +48,15 @@ vi.mock('../../../lib/agents.js', async (importOriginal) => {
     ...actual,
     ...agentMocks,
     isQualifiedAgentId: isQualifiedAgentIdForTest,
-    resolveAgentTargetSync: resolveAgentTargetSyncForTest,
+    resolveAgentTarget: resolveAgentTargetSyncForTest,
   };
 });
+
+// PAN-3947: pan kill/pause probe liveness through the terminal backend;
+// the fake mirrors the tmux session mock so each case sets liveness once.
+vi.mock('../../../lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: vi.fn(async (id: string) => (tmuxMocks.sessionExistsSync as (name: string) => boolean)(id)),
+}));
 
 vi.mock('../../../lib/tmux.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../lib/tmux.js')>();
@@ -107,17 +114,21 @@ vi.mock('fs', async (importOriginal) => {
 const STOPPED_STATE = { issueId: 'PAN-1723', status: 'stopped' };
 
 beforeAll(async () => {
-  ({ resolveAgentTargetSync: actualResolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js'));
+  ({ resolveAgentTarget: actualResolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js'));
 });
 
 beforeEach(() => {
+  agentMocks.setAgentPaused.mockReturnValue(Effect.succeed(null));
+  agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
+  agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed(null));
   vi.clearAllMocks();
+  agentMocks.stopAgent.mockReturnValue(Effect.void);
   FAKE_AGENTS_DIR_LISTING.entries = [];
-  agentMocks.getAgentStateSync.mockReturnValue(STOPPED_STATE);
+  agentMocks.getAgentState.mockReturnValue(STOPPED_STATE);
   tmuxMocks.sessionExistsSync.mockReturnValue(false);
 });
 
-describe('resolveAgentTargetSync (PAN-1760)', () => {
+describe('resolveAgentTarget (PAN-1760)', () => {
   it('preserves strike-/inspect- prefixed agent IDs', async () => {
     expect(actualResolveAgentTargetSync!('strike-pan-1723')).toBe('strike-pan-1723');
     expect(actualResolveAgentTargetSync!('inspect-pan-1744-workspace-flccb')).toBe('inspect-pan-1744-workspace-flccb');
@@ -141,7 +152,7 @@ describe('pauseCommand agent targeting (PAN-1760)', () => {
   it('pauses a strike session by its full agent ID', async () => {
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('strike-pan-1723', {});
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('strike-pan-1723', undefined, false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('strike-pan-1723', undefined, false);
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),
     );
@@ -150,25 +161,16 @@ describe('pauseCommand agent targeting (PAN-1760)', () => {
   it('still pauses the canonical work agent for a bare issue ID', async () => {
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('PAN-1723', { reason: 'ram' });
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('agent-pan-1723', 'ram', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1723', 'ram', false);
   });
 });
 
 describe('unpauseCommand agent targeting (PAN-1760)', () => {
   it('unpauses a strike session by its full agent ID', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ ...STOPPED_STATE, paused: true });
+    agentMocks.getAgentState.mockReturnValue({ ...STOPPED_STATE, paused: true });
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('strike-pan-1723');
-    expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('strike-pan-1723');
-  });
-});
-
-describe('untroubledCommand agent targeting (PAN-1760)', () => {
-  it('clears a troubled inspect session by its full agent ID', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ ...STOPPED_STATE, troubled: true });
-    const { untroubledCommand } = await import('../untroubled.js');
-    await untroubledCommand('inspect-pan-1744-workspace-flccb');
-    expect(agentMocks.clearAgentTroubledSync).toHaveBeenCalledWith('inspect-pan-1744-workspace-flccb');
+    expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('strike-pan-1723');
   });
 });
 
@@ -176,8 +178,8 @@ describe('killCommand agent targeting (PAN-1760)', () => {
   it('kills exactly the named agent for a fully-qualified agent ID', async () => {
     const { killCommand } = await import('../kill.js');
     await killCommand('strike-pan-1723', {});
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledTimes(1);
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledTimes(1);
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-1723', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),
     );
@@ -191,8 +193,8 @@ describe('killCommand agent targeting (PAN-1760)', () => {
     ];
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-1723', {});
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723', 'operator');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('inspect-pan-1723-task-slug', 'operator');
-    expect(agentMocks.stopAgentSync).not.toHaveBeenCalledWith('agent-pan-9999');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-1723', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('inspect-pan-1723-task-slug', 'operator');
+    expect(agentMocks.stopAgent).not.toHaveBeenCalledWith('agent-pan-9999');
   });
 });

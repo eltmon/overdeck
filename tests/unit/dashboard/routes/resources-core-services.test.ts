@@ -41,16 +41,17 @@ describe('core services resources payload', () => {
     });
   });
 
-  it('derives deacon last tick age and patrol summary count from the latest heartbeat fixture', () => {
+  it('derives deacon last tick age and last error from deacon-lite', () => {
     const rows = buildCoreServices({
       nowMs: NOW_MS,
       processInfo: dashboardFixture(),
       eventLoopSample: eventLoopFixture(),
       deaconStatus: deaconStatusFixture({
-        lastPatrol: {
-          cycle: 42,
-          timestamp: '2026-07-07T11:58:30.000Z',
-          actions: ['checked specialists', 'reaped terminal', 'checked traefik'],
+        deaconLite: {
+          running: true,
+          intervalMs: 60_000,
+          lastRunAt: '2026-07-07T11:58:30.000Z',
+          lastRunError: 'derive failed',
         },
       }),
     });
@@ -59,8 +60,7 @@ describe('core services resources payload', () => {
       id: 'deacon',
       status: 'running',
       lastTickAgeSeconds: 90,
-      patrolCycle: 42,
-      patrolSummaryCount: 3,
+      lastRunError: 'derive failed',
       pid: 1234,
     });
   });
@@ -120,18 +120,16 @@ function eventLoopFixture() {
 function deaconStatusFixture(
   overrides: Partial<CoreServicesDeaconStatus> = {},
 ): CoreServicesDeaconStatus {
+  // PAN-3917 (W4): deacon-lite keeps no patrol ledger — its in-memory
+  // running/lastRunAt/lastRunError is the whole status.
   return {
     isRunning: true,
     pid: 1234,
-    state: {
-      lastPatrol: '2026-07-07T11:59:00.000Z',
-      patrolCycle: 41,
-      stuckCount: 2,
-    },
-    lastPatrol: {
-      cycle: 41,
-      timestamp: '2026-07-07T11:59:00.000Z',
-      actions: ['checked specialists'],
+    deaconLite: {
+      running: true,
+      intervalMs: 60_000,
+      lastRunAt: '2026-07-07T11:59:00.000Z',
+      lastRunError: null,
     },
     ...overrides,
   };

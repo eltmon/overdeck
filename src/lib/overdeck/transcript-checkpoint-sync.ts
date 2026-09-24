@@ -9,7 +9,7 @@
  * - last_observation_at dropped (zero reads; overdeck-schema.ts:387)
  */
 import { randomUUID } from 'node:crypto';
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 
 export type TranscriptClaimTrigger = 'stop-hook' | 'poller' | 'reconciliation' | 'manual';
 
@@ -114,7 +114,7 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
     return { status: 'empty', reason: 'invalid-range' };
   }
 
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const nowDate = input.now ?? new Date();
   const nowMillis = toMillis(nowDate);
   const expiryMillis = toMillis(new Date(nowDate.getTime() + CLAIM_EXPIRY_MS));
@@ -202,7 +202,7 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
     return { status: 'empty', reason: 'invalid-range' };
   }
 
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const nowMillis = toMillis(input.now ?? new Date());
   const trigger = input.trigger ?? 'manual';
 
@@ -264,7 +264,7 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
 }
 
 export function releaseTranscriptRange(sessionId: string, expectedFromOffset: number, toOffset: number): void {
-  getOverdeckDatabaseSync().prepare(`
+  getOverdeckDatabase().prepare(`
     UPDATE transcript_checkpoints
     SET claim_owner = NULL,
         claim_from = NULL,
@@ -278,7 +278,7 @@ export function releaseTranscriptRange(sessionId: string, expectedFromOffset: nu
 }
 
 export function listTranscriptCheckpoints(limit = 100): TranscriptCheckpoint[] {
-  const rows = getOverdeckDatabaseSync()
+  const rows = getOverdeckDatabase()
     .prepare(`
       SELECT
         session_id, transcript_path, last_offset,
@@ -294,7 +294,7 @@ export function listTranscriptCheckpoints(limit = 100): TranscriptCheckpoint[] {
 }
 
 export function getTranscriptCheckpoint(sessionId: string): TranscriptCheckpoint | null {
-  const row = getOverdeckDatabaseSync()
+  const row = getOverdeckDatabase()
     .prepare(`
       SELECT
         session_id, transcript_path, last_offset,

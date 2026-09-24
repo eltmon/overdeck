@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  FALLBACK_GROUPS,
+  formatCost,
   PI_TOS_BLOCK_REASON,
   canUsePickerHarness,
   getProviderForPickerModel,
@@ -59,4 +61,18 @@ describe('ModelPicker harness policy', () => {
       allowed: true,
     });
   });
+});
+
+
+it('distinguishes unavailable pricing from a free model', () => {
+  expect(formatCost(null)).toBe('Pricing unavailable');
+  expect(formatCost(0)).toBe('FREE');
+});
+
+it('includes Claude Opus 5.5 in the offline fallback catalog', () => {
+  const anthropic = FALLBACK_GROUPS.find(group => group.provider === 'anthropic');
+  expect(anthropic?.models).toContainEqual(expect.objectContaining({
+    id: 'claude-opus-5-5',
+    costPer1MTokens: 12,
+  }));
 });

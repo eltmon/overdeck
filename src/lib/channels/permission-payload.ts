@@ -1,6 +1,6 @@
 import { Data, Effect } from 'effect';
 
-export const CHANNEL_PERMISSION_LIMITS = {
+const CHANNEL_PERMISSION_LIMITS = {
   requestIdBytes: 128,
   toolNameBytes: 128,
   descriptionBytes: 2 * 1024,
@@ -15,18 +15,18 @@ export interface NormalizedChannelPermissionRequestFields {
 }
 
 /** A permission request field failed validation. */
-export class PermissionPayloadValidationError extends Data.TaggedError(
+class PermissionPayloadValidationError extends Data.TaggedError(
   'PermissionPayloadValidationError',
 )<{
   readonly field: string;
   readonly message: string;
 }> {}
 
-export function utf8ByteLength(value: string): number {
+function utf8ByteLength(value: string): number {
   return Buffer.byteLength(value, 'utf8');
 }
 
-export function normalizePermissionInputPreview(value: unknown): string {
+function normalizePermissionInputPreview(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 

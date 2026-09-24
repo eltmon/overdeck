@@ -17,6 +17,7 @@ interface GitResult {
 export interface DashboardDeployment {
   readonly deployRoot: string;
   readonly serverPath: string;
+  readonly builtSha?: string;
 }
 
 export interface DashboardDeploymentActivation {
@@ -367,6 +368,7 @@ export async function buildDashboardFromOriginMain(
     const deployment = {
       deployRoot,
       serverPath: join(deployRoot, 'dist', 'dashboard', 'server.js'),
+      builtSha: originMainSha,
     };
     completed = true;
     deps.success(`✓ Built dashboard from origin/main ${originMainSha.slice(0, 12)}`);

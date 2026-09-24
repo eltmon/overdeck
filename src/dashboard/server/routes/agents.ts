@@ -16,6 +16,7 @@ import {
 import {
   getAgentOutputRoute,
   getAgentConversationRoute,
+  getAgentSubagentsRoute,
   getAgentActivityRoute,
   getAgentFilesRoute,
   getAgentTimelineRoute,
@@ -43,13 +44,13 @@ import {
   postAgentPlanChecklistRoute,
   getAgentRuntimeRoute,
 } from './agents/runtime-events.js';
+import { postAgentLifecycleRoute } from './agents/lifecycle.js';
 import {
   deleteAgentRoute,
   postAgentStopRoute,
   postAgentSuspendRoute,
   postAgentPauseRoute,
   postAgentUnpauseRoute,
-  postAgentUntroubledRoute,
 } from './agents/lifecycle-stop.js';
 import {
   postAgentResumeRoute,
@@ -90,7 +91,7 @@ export {
   agentHasResolvableWorkspace,
   UNRESOLVABLE_AGENT_GIT_INFO,
 } from './agents/listing.js';
-export { buildConversationResponse } from './agents/conversation.js';
+export { buildAgentConversationResult, buildConversationResponse } from './agents/conversation.js';
 export { validateAgentMessageOrigin } from './agents/messaging.js';
 export { createAgentStopHandler } from './agents/lifecycle-stop.js';
 export { validateAgentDeliveryMethodOrigin } from './agents/control.js';
@@ -99,6 +100,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentsRoute,
   getAgentOutputRoute,
   getAgentConversationRoute,
+  getAgentSubagentsRoute,
   postAgentMessageRoute,
   postAgentTellRoute,
   deleteAgentRoute,
@@ -111,6 +113,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentAnswerQuestionRoute,
   postAgentPlanActionRoute,
   postAgentHeartbeatRoute,
+  postAgentLifecycleRoute,
   postAgentWorkCompleteRoute,
   postAgentStuckRoute,
   postAgentClassifyCompletionRoute,
@@ -125,7 +128,6 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentSuspendRoute,
   postAgentPauseRoute,
   postAgentUnpauseRoute,
-  postAgentUntroubledRoute,
   postAgentResumeRoute,
   postAgentRecoverRoute,
   postAgentRestartRoute,

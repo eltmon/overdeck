@@ -7,17 +7,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   evaluateHealthState,
   getAgentHealth,
-  getMultipleAgentHealth,
   generateHealthSummary,
   needsAttention,
-  shouldPoke,
-  shouldKill,
   getAgentsNeedingAttention,
-  getAgentsToPoke,
-  getAgentsToKill,
   formatDuration,
-  getHealthEmoji,
-  getHealthLabel,
   type AgentHealth,
 } from '../../../src/lib/cloister/health.js';
 import { setAgentRuntimeMirror } from '../../../src/lib/agent-runtime-mirror.js';
@@ -217,43 +210,6 @@ describe('Cloister Health Evaluator', () => {
     });
   });
 
-  describe('getMultipleAgentHealth', () => {
-    let mockRuntime: MockRuntime;
-    const thresholds = {
-      stale: 5 * 60 * 1000,
-      warning: 15 * 60 * 1000,
-      stuck: 30 * 60 * 1000,
-    };
-
-    beforeEach(() => {
-      mockRuntime = new MockRuntime();
-      Effect.runSync(setAgentRuntimeMirror({}));
-    });
-
-    it('should return health for multiple agents', () => {
-      const now = new Date();
-
-      mockRuntime.setRunning('agent-1', true);
-      mockRuntime.setHeartbeat('agent-1', {
-        timestamp: new Date(now.getTime() - 2 * 60 * 1000),
-        source: 'jsonl_mtime',
-      });
-
-      mockRuntime.setRunning('agent-2', true);
-      mockRuntime.setHeartbeat('agent-2', {
-        timestamp: new Date(now.getTime() - 20 * 60 * 1000),
-        source: 'jsonl_mtime',
-      });
-
-      const healths = getMultipleAgentHealth(['agent-1', 'agent-2'], mockRuntime, thresholds);
-
-      expect(healths).toHaveLength(2);
-      expect(healths[0].agentId).toBe('agent-1');
-      expect(healths[0].state).toBe('active');
-      expect(healths[1].agentId).toBe('agent-2');
-      expect(healths[1].state).toBe('warning');
-    });
-  });
 
   describe('generateHealthSummary', () => {
     it('should generate correct summary from agent healths', () => {
@@ -379,77 +335,7 @@ describe('Cloister Health Evaluator', () => {
       ).toBe(false);
     });
 
-    it('shouldPoke should return true only for warning', () => {
-      expect(
-        shouldPoke({
-          agentId: 'agent-1',
-          state: 'warning',
-          lastActivity: null,
-          timeSinceActivity: null,
-          heartbeat: null,
-          isRunning: true,
-        })
-      ).toBe(true);
 
-      expect(
-        shouldPoke({
-          agentId: 'agent-2',
-          state: 'stuck',
-          lastActivity: null,
-          timeSinceActivity: null,
-          heartbeat: null,
-          isRunning: false,
-        })
-      ).toBe(false);
-
-      expect(
-        shouldPoke({
-          agentId: 'agent-3',
-          state: 'wedged',
-          lastActivity: null,
-          timeSinceActivity: null,
-          heartbeat: null,
-          isRunning: true,
-          contextSaturatedAt: '2026-06-05T12:00:00.000Z',
-        })
-      ).toBe(false);
-    });
-
-    it('shouldKill should return true only for stuck', () => {
-      expect(
-        shouldKill({
-          agentId: 'agent-1',
-          state: 'stuck',
-          lastActivity: null,
-          timeSinceActivity: null,
-          heartbeat: null,
-          isRunning: false,
-        })
-      ).toBe(true);
-
-      expect(
-        shouldKill({
-          agentId: 'agent-2',
-          state: 'warning',
-          lastActivity: null,
-          timeSinceActivity: null,
-          heartbeat: null,
-          isRunning: true,
-        })
-      ).toBe(false);
-
-      expect(
-        shouldKill({
-          agentId: 'agent-3',
-          state: 'wedged',
-          lastActivity: null,
-          timeSinceActivity: null,
-          heartbeat: null,
-          isRunning: true,
-          contextSaturatedAt: '2026-06-05T12:00:00.000Z',
-        })
-      ).toBe(false);
-    });
   });
 
   describe('health filtering', () => {
@@ -505,17 +391,7 @@ describe('Cloister Health Evaluator', () => {
       expect(needsAttention[2].agentId).toBe('agent-5');
     });
 
-    it('getAgentsToPoke should filter correctly', () => {
-      const toPoke = getAgentsToPoke(healths);
-      expect(toPoke).toHaveLength(1);
-      expect(toPoke[0].agentId).toBe('agent-3');
-    });
 
-    it('getAgentsToKill should filter correctly', () => {
-      const toKill = getAgentsToKill(healths);
-      expect(toKill).toHaveLength(1);
-      expect(toKill[0].agentId).toBe('agent-4');
-    });
   });
 
   describe('formatDuration', () => {
@@ -534,23 +410,5 @@ describe('Cloister Health Evaluator', () => {
     });
   });
 
-  describe('getHealthEmoji', () => {
-    it('should return correct emoji for each state', () => {
-      expect(getHealthEmoji('active')).toBe('🟢');
-      expect(getHealthEmoji('stale')).toBe('🟡');
-      expect(getHealthEmoji('warning')).toBe('🟠');
-      expect(getHealthEmoji('stuck')).toBe('🔴');
-      expect(getHealthEmoji('wedged')).toBe('🧱');
-    });
-  });
 
-  describe('getHealthLabel', () => {
-    it('should return correct label for each state', () => {
-      expect(getHealthLabel('active')).toBe('Active');
-      expect(getHealthLabel('stale')).toBe('Stale');
-      expect(getHealthLabel('warning')).toBe('Warning');
-      expect(getHealthLabel('stuck')).toBe('Stuck');
-      expect(getHealthLabel('wedged')).toBe('Wedged');
-    });
-  });
 });

@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -79,7 +78,7 @@ describe('tts daemon lifecycle state', () => {
       port: 8787,
     }), 'utf8');
 
-    const status = await Effect.runPromise(getTtsDaemonStatus(CONFIG));
+    const status = await getTtsDaemonStatus(CONFIG);
 
     expect(status).toMatchObject({ ok: false, running: false, pid: null });
     expect(existsSync(QWEN_TTS_PID_PATH)).toBe(true);
@@ -95,7 +94,7 @@ describe('tts daemon lifecycle state', () => {
     }), { status: 200 })));
     const { getTtsDaemonStatus } = await import('../tts-daemon.js');
 
-    const status = await Effect.runPromise(getTtsDaemonStatus(CONFIG));
+    const status = await getTtsDaemonStatus(CONFIG);
 
     expect(status).toMatchObject({ ok: true, running: true, managed: false, pid: 4321 });
   });
@@ -127,8 +126,8 @@ describe('tts daemon lifecycle state', () => {
     }), 'utf8');
 
     try {
-      const status = await Effect.runPromise(getTtsDaemonStatus(CONFIG));
-      const result = await Effect.runPromise(startTtsDaemon({ config: CONFIG, timeoutMs: 0 }));
+      const status = await getTtsDaemonStatus(CONFIG);
+      const result = await startTtsDaemon({ config: CONFIG, timeoutMs: 0 });
 
       expect(status).toMatchObject({ ok: false, running: true, managed: true, phase: 'starting', initializing: true, pid: 4242 });
       expect(result).toMatchObject({ ok: false, pid: 4242, alreadyRunning: true, status: { phase: 'starting', initializing: true } });
@@ -164,7 +163,7 @@ describe('tts daemon lifecycle state', () => {
       scriptPath,
       processStartTimeTicks: '12345',
     }), 'utf8');
-    const venvDir = await Effect.runPromise(getTtsDaemonVenvDir());
+    const venvDir = await getTtsDaemonVenvDir();
     const packageDir = join(venvDir, '..');
     const hadPackageDir = existsSync(packageDir);
     const hadVenvDir = existsSync(venvDir);
@@ -176,7 +175,7 @@ describe('tts daemon lifecycle state', () => {
     }
 
     try {
-      const result = await Effect.runPromise(startTtsDaemon({ config: CONFIG, waitForHealth: false }));
+      const result = await startTtsDaemon({ config: CONFIG, waitForHealth: false });
 
       expect(result).toMatchObject({ ok: true, pid: 7777, alreadyRunning: false });
       expect(killSpy).not.toHaveBeenCalledWith(4242, 'SIGTERM');
@@ -222,7 +221,7 @@ describe('tts daemon lifecycle state', () => {
       scriptPath,
       processStartTimeTicks: '12345',
     }), 'utf8');
-    const venvDir = await Effect.runPromise(getTtsDaemonVenvDir());
+    const venvDir = await getTtsDaemonVenvDir();
     const packageDir = join(venvDir, '..');
     const hadPackageDir = existsSync(packageDir);
     const hadVenvDir = existsSync(venvDir);
@@ -234,7 +233,7 @@ describe('tts daemon lifecycle state', () => {
     }
 
     try {
-      const result = await Effect.runPromise(startTtsDaemon({ config: CONFIG, waitForHealth: false }));
+      const result = await startTtsDaemon({ config: CONFIG, waitForHealth: false });
 
       expect(result).toMatchObject({ ok: true, pid: 7777, alreadyRunning: false });
       expect(killSpy).toHaveBeenCalledWith(4242, 'SIGTERM');
@@ -248,7 +247,7 @@ describe('tts daemon lifecycle state', () => {
   });
 });
 
-describe('resolveQwenTtsPackageDirPromise', () => {
+describe('resolveQwenTtsPackageDir', () => {
   const GEN_ROOT = '/home/u/.overdeck/deployments/dashboard/.pan-reload-generation-a';
   const CHECKOUT = '/home/u/Projects/overdeck';
 
@@ -257,8 +256,8 @@ describe('resolveQwenTtsPackageDirPromise', () => {
   }
 
   it('redirects a generation root to the active checkout whose venv exists', async () => {
-    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
-    const result = await resolveQwenTtsPackageDirPromise({
+    const { resolveQwenTtsPackageDir } = await import('../tts-daemon.js');
+    const result = await resolveQwenTtsPackageDir({
       pkgRoot: GEN_ROOT,
       repoRoot: () => CHECKOUT,
       exists: existsAmong([
@@ -271,8 +270,8 @@ describe('resolveQwenTtsPackageDirPromise', () => {
   });
 
   it('prefers the checkout package dir from a generation even without a venv, so installs land where they survive redeploys', async () => {
-    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
-    const result = await resolveQwenTtsPackageDirPromise({
+    const { resolveQwenTtsPackageDir } = await import('../tts-daemon.js');
+    const result = await resolveQwenTtsPackageDir({
       pkgRoot: GEN_ROOT,
       repoRoot: () => CHECKOUT,
       exists: existsAmong([
@@ -284,8 +283,8 @@ describe('resolveQwenTtsPackageDirPromise', () => {
   });
 
   it('keeps a non-generation root on its own package dir', async () => {
-    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
-    const result = await resolveQwenTtsPackageDirPromise({
+    const { resolveQwenTtsPackageDir } = await import('../tts-daemon.js');
+    const result = await resolveQwenTtsPackageDir({
       pkgRoot: CHECKOUT,
       repoRoot: () => {
         throw new Error('marker must not be read outside a generation');
@@ -299,8 +298,8 @@ describe('resolveQwenTtsPackageDirPromise', () => {
   });
 
   it('falls back to generation candidates when no active-bundle marker resolves', async () => {
-    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
-    const result = await resolveQwenTtsPackageDirPromise({
+    const { resolveQwenTtsPackageDir } = await import('../tts-daemon.js');
+    const result = await resolveQwenTtsPackageDir({
       pkgRoot: GEN_ROOT,
       repoRoot: () => null,
       exists: existsAmong([join(GEN_ROOT, 'packages', 'qwen-tts-linux-x64')]),
@@ -309,9 +308,9 @@ describe('resolveQwenTtsPackageDirPromise', () => {
   });
 
   it('creates the first candidate when nothing exists', async () => {
-    const { resolveQwenTtsPackageDirPromise } = await import('../tts-daemon.js');
+    const { resolveQwenTtsPackageDir } = await import('../tts-daemon.js');
     const made: string[] = [];
-    const result = await resolveQwenTtsPackageDirPromise({
+    const result = await resolveQwenTtsPackageDir({
       pkgRoot: GEN_ROOT,
       repoRoot: () => CHECKOUT,
       exists: async () => false,

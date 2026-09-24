@@ -1,9 +1,9 @@
 /**
  * Multi-project merge-train view tests (PAN-1696 fe-merge-train-view).
  *
- * The decoupling claim is asserted structurally: no test mocks any flywheel
+ * The decoupling claim is asserted structurally: no test mocks any deleted
  * run/state endpoint, and one test asserts the view never requests the legacy
- * per-repo endpoints or any flywheel run state, so a reintroduced dependency
+ * per-repo endpoint, so a reintroduced dependency
  * on an active run fails here rather than silently in production.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   MergeTrainView,
   MERGE_TRAIN_PROJECT_FILTER_KEY,
+  SINGLE_FEATURE_READY_LINE,
   mergeTrainSections,
 } from '../MergeTrainView';
 
@@ -99,7 +100,7 @@ function twoProjectResponses(overrides: FetchResponses = {}): FetchResponses {
       { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_ASSEMBLING_GEN, PAN_READY_GEN] },
       { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [MIN_READY_GEN] },
     ],
-    '/api/flywheel/merge-backend': { available: true, mode: 'gh-cli', detail: 'ok' },
+    '/api/merge-train/merge-backend': { available: true, mode: 'gh-cli', detail: 'ok' },
     ...overrides,
   };
 }
@@ -122,6 +123,42 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   window.localStorage.clear();
+});
+
+// ── PAN-3965 ──────────────────────────────────────────────────────────────────
+describe('single ready feature (PAN-3965)', () => {
+  it('says one ready feature merges directly instead of promising a batch', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, holdsForUat: false, queue: MIN_QUEUE }],
+      '/api/merge-train/generations': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [] }],
+    });
+    renderView();
+    const line = await screen.findByTestId('merge-train-single-feature-myn');
+    expect(line.textContent).toBe(SINGLE_FEATURE_READY_LINE);
+    expect(screen.getByTestId('merge-train-project-myn').textContent).not.toContain('A test batch assembles automatically');
+  });
+
+  it('keeps the batch copy for one ready feature in a project that holds merges for UAT', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, holdsForUat: true, queue: MIN_QUEUE }],
+      '/api/merge-train/generations': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [] }],
+    });
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+    expect(screen.queryByTestId('merge-train-single-feature-myn')).toBeNull();
+    expect(screen.getByTestId('merge-train-project-myn').textContent).toContain('A test batch assembles automatically');
+  });
+
+  it('keeps the batch copy when two features are ready', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, holdsForUat: false, queue: PAN_QUEUE }],
+      '/api/merge-train/generations': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [] }],
+    });
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.queryByTestId('merge-train-single-feature-overdeck')).toBeNull();
+    expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('A test batch assembles automatically');
+  });
 });
 
 // ── AC1 ───────────────────────────────────────────────────────────────────────
@@ -153,7 +190,7 @@ describe('one section per project (ac1)', () => {
     expect(myn.textContent).toContain('feature/min-831');
   });
 
-  it('reads only the aggregate endpoints — never legacy per-repo or flywheel-run state', async () => {
+  it('reads only the aggregate merge-train endpoints — never a deleted flywheel route', async () => {
     const fetchMock = mockFetch(twoProjectResponses());
     renderView();
     await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
@@ -161,20 +198,12 @@ describe('one section per project (ac1)', () => {
     const urls = fetchMock.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.includes('/api/merge-train/queues'))).toBe(true);
     expect(urls.some((u) => u.includes('/api/merge-train/generations'))).toBe(true);
-    for (const forbidden of [
-      '/api/flywheel/uat-generations',
-      '/api/flywheel/merge-queue',
-      '/api/flywheel/current',
-      '/api/flywheel/status',
-      '/api/flywheel/state',
-      '/api/flywheel/runs',
-    ]) {
-      expect(urls.some((u) => u.includes(forbidden)), forbidden).toBe(false);
-    }
+    // PAN-3917 deleted the whole /api/flywheel namespace.
+    expect(urls.filter((u) => u.includes('/api/flywheel/'))).toEqual([]);
   });
 
-  it('renders live generations with no flywheel run anywhere in the data (ac4)', async () => {
-    // Nothing in these payloads carries run state; the view must still show the batch.
+  it('renders live generations from the aggregate payloads alone (ac4)', async () => {
+    // Nothing here carries run state; the view must still show the batch.
     mockFetch({
       '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] }],
       '/api/merge-train/generations': [
@@ -291,7 +320,7 @@ describe('one section per project (ac1)', () => {
     expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('turned off for Overdeck');
   });
 
-  it('explains an all-empty merge train without mentioning a flywheel run', async () => {
+  it('explains an all-empty merge train without mentioning a run', async () => {
     mockFetch({
       '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] }],
       '/api/merge-train/generations': [],
@@ -302,7 +331,7 @@ describe('one section per project (ac1)', () => {
   });
 
   it('warns when the merge backend cannot merge at all', async () => {
-    mockFetch(twoProjectResponses({ '/api/flywheel/merge-backend': { available: false, mode: 'none', detail: 'no auth' } }));
+    mockFetch(twoProjectResponses({ '/api/merge-train/merge-backend': { available: false, mode: 'none', detail: 'no auth' } }));
     renderView();
     expect(await screen.findByText('Merge backend unavailable')).toBeTruthy();
   });

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
-import type { Agent } from '../../types';
+import type { Agent, BackendPane } from '../../types';
 import { StoppedAgentsBanner } from '../StoppedAgentsBanner';
 
 vi.mock('sonner', () => ({
@@ -15,7 +15,6 @@ vi.mock('sonner', () => ({
 const NOW = new Date('2026-05-23T12:00:00.000Z');
 const NOW_MS = NOW.getTime();
 const RECENT_AT = new Date(NOW_MS - 60 * 60 * 1000).toISOString();
-const OLD_AT = new Date(NOW_MS - 8 * 24 * 60 * 60 * 1000).toISOString();
 
 function agent(overrides: Partial<Agent> & Pick<Agent, 'id' | 'issueId' | 'status'>): Agent {
   return {
@@ -33,9 +32,27 @@ function agent(overrides: Partial<Agent> & Pick<Agent, 'id' | 'issueId' | 'statu
   };
 }
 
-function seedStore(agents: Agent[], issues: Array<Record<string, unknown>> = []): void {
+/**
+ * PAN-3917: "stopped" is the terminal backend's word, not a stored agent flag —
+ * the banner reads panes whose state is `exited`. Each seeded agent gets the
+ * pane the backend would report for it.
+ */
+function seedStore(
+  agents: Array<Agent & { paneState?: BackendPane['state'] }>,
+  issues: Array<Record<string, unknown>> = [],
+): void {
+  const panes: BackendPane[] = agents.map((item) => ({
+    id: item.id,
+    ...(item.issueId ? { issue: item.issueId } : {}),
+    role: (item.role === 'review' ? 'review' : 'work') as BackendPane['role'],
+    harness: 'claude-code',
+    model: item.model,
+    state: item.paneState ?? 'exited',
+  }));
   useDashboardStore.setState({
     agentsById: Object.fromEntries(agents.map((item) => [item.id, item])),
+    backendPanesById: Object.fromEntries(panes.map((pane) => [pane.id, pane])),
+    derivedIssueStateByIssueId: {},
     issuesRaw: issues,
   } as Parameters<typeof useDashboardStore.setState>[0]);
 }
@@ -54,7 +71,6 @@ function stoppedAgents(): Agent[] {
       issueId: 'PAN-1422',
       status: 'stopped',
       hasLiveTmuxSession: false,
-      troubled: true,
       consecutiveFailures: 2,
       role: 'review',
     }),
@@ -79,32 +95,10 @@ describe('StoppedAgentsBanner', () => {
   it('renders and restarts only agents classified as stopped', async () => {
     const fetchMock = vi.mocked(fetch);
     seedStore([
-      agent({
-        id: 'agent-pan-1419-running',
-        issueId: 'PAN-1419',
-        status: 'running',
-        hasLiveTmuxSession: true,
-      }),
-      agent({
-        id: 'agent-pan-1421-standby',
-        issueId: 'PAN-1421',
-        status: 'stopped',
-        hasLiveTmuxSession: true,
-      }),
-      agent({
-        id: 'agent-pan-1420-stopped',
-        issueId: 'PAN-1420',
-        status: 'stopped',
-        hasLiveTmuxSession: false,
-      }),
-      agent({
-        id: 'agent-pan-ac-1-old',
-        issueId: 'PAN-AC-1',
-        status: 'stopped',
-        hasLiveTmuxSession: false,
-        startedAt: OLD_AT,
-        lastActivity: OLD_AT,
-      }),
+      { ...agent({ id: 'agent-pan-1419-running', issueId: 'PAN-1419', status: 'running' }), paneState: 'working' as const },
+      { ...agent({ id: 'agent-pan-1421-standby', issueId: 'PAN-1421', status: 'stopped' }), paneState: 'idle' as const },
+      { ...agent({ id: 'agent-pan-1420-stopped', issueId: 'PAN-1420', status: 'stopped' }), paneState: 'exited' as const },
+      { ...agent({ id: 'agent-pan-ac-1-done', issueId: 'PAN-AC-1', status: 'stopped' }), paneState: 'done' as const },
     ]);
 
     render(<StoppedAgentsBanner />);
@@ -137,11 +131,11 @@ describe('StoppedAgentsBanner', () => {
     fireEvent.click(screen.getByTestId('stopped-agents-pill'));
 
     const popover = screen.getByTestId('stopped-agents-popover');
-    expect(within(popover).getByText('2 stopped · pipeline agents, last 7 days')).toBeInTheDocument();
+    expect(within(popover).getByText('2 stopped · panes the backend reports exited')).toBeInTheDocument();
     expect(within(popover).getByText('Known stopped issue')).toBeInTheDocument();
     expect(within(popover).getByText('paused: waiting for deploy · 1h ago')).toBeInTheDocument();
     expect(within(popover).getByText('PAN-1422')).toBeInTheDocument();
-    expect(within(popover).getByText('troubled (2 failures) · 1h ago')).toBeInTheDocument();
+    expect(within(popover).getByText('stopped cleanly · 1h ago')).toBeInTheDocument();
 
     fireEvent.click(within(popover).getByText('Known stopped issue'));
 

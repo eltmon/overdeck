@@ -23,7 +23,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { Effect } from 'effect';
 import type { SessionUsage } from './jsonl-parser.js';
-import { getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
+import { getPricing, type AIProvider, type TokenUsage } from '../cost.js';
 import { FsError } from '../errors.js';
 
 // Minimal entry shape we care about. Anything else is ignored.
@@ -127,7 +127,7 @@ function computeCostFromPricing(
   const pricingProvider = pricingProviderFor(provider, model);
   if (!pricingProvider) return { cost: 0, reason: 'unknown-provider' };
 
-  const pricing = getPricingSync(pricingProvider, model);
+  const pricing = getPricing(pricingProvider, model);
   if (!pricing) return { cost: 0, reason: 'unpriced-model' };
 
   return {

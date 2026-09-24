@@ -106,7 +106,6 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureBadge_running: 'featureBadge_running',
     featureBadge_stopped: 'featureBadge_stopped',
     featureBadge_error: 'featureBadge_error',
-    featureBadge_troubled: 'featureBadge_troubled',
     featureActivityError: 'featureActivityError',
     featureState: 'featureState',
     featureState_done: 'featureState_done',
@@ -125,6 +124,8 @@ vi.mock('../styles/command-deck.module.css', () => ({
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
+    sessionToggleSlot: 'sessionToggleSlot',
+    sessionDotSlot: 'sessionDotSlot',
     sessionIconSlot: 'sessionIconSlot',
     sessionLabel: 'sessionLabel',
     sessionModel: 'sessionModel',
@@ -181,6 +182,16 @@ function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
   };
 }
 
+/**
+ * PAN-3917: "ready to merge" is the derived issue state, so a test that wants a
+ * merge-ready row seeds the store instead of setting a flag on the feature.
+ */
+function markReady(issueId = 'PAN-821') {
+  useDashboardStore.setState({
+    derivedIssueStateByIssueId: { [issueId]: { issueId, state: 'ready' } },
+  });
+}
+
 function renderFeature(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -220,11 +231,11 @@ function stubWorkspace(workspace: Record<string, unknown>) {
 }
 
 function renderReadyForMergeFeature() {
+  markReady();
   return renderFeature(
     <FeatureItem
       feature={makeFeature({
         stateLabel: 'In Review',
-        readyForMerge: true,
         resourceSources: ['workspace'],
         resourceDetails: {
           hasWorkspace: true,
@@ -307,6 +318,7 @@ describe('FeatureItem', () => {
       tasksViewerIssueId: null,
       prdViewerIssueId: null,
       xbriefViewerIssueId: null,
+      derivedIssueStateByIssueId: {},
     });
     vi.restoreAllMocks();
     vi.mocked(refreshDashboardState).mockClear();
@@ -347,32 +359,9 @@ describe('FeatureItem', () => {
     expect(container.querySelector('[data-section="OrderBookIssueChip"]')).toBe(chip);
   });
 
-  it('shows paused badge with age + reason and fires unpause (PAN-1779)', () => {
-    const onUnpauseSession = vi.fn();
-    const view = renderFeature(
-      <FeatureItem
-        feature={makeFeature({
-          sessions: [makeSession({
-            sessionId: 'agent-pan-821',
-            status: 'stopped',
-            presence: 'ended',
-            paused: true,
-            pausedReason: 'Operator drain 2026-06-10',
-            pausedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
-          })],
-        })}
-        isSelected={false}
-        onSelect={() => {}}
-        onUnpauseSession={onUnpauseSession}
-      />,
-    );
-    const badgeGroup = screen.getByTestId('feature-paused');
-    expect(badgeGroup.textContent).toContain('Paused 2h');
-    screen.getByTestId('feature-unpause').click();
-    expect(onUnpauseSession).toHaveBeenCalledWith('agent-pan-821');
-  });
-
-  it('does not show paused badge for unpaused sessions', () => {
+  // PAN-3917: the pause gate is an agent fact, not a pane fact, so a session
+  // node no longer mirrors it and the feature row shows no paused badge.
+  it('shows no paused badge, because a session node carries no pause gate', () => {
     const view = renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()] })}
@@ -572,169 +561,6 @@ describe('FeatureItem', () => {
     expect(screen.getByText('●●● 2')).toHaveAttribute('title', 'Review pipeline sessions for this issue: 2 total. 1 active, 0 queued or starting, 1 stopped. Roles present: correctness and security.');
   });
 
-  it('shows a warning troubled badge on the parent row', () => {
-    renderFeature(
-      <FeatureItem
-        feature={makeFeature({
-          sessions: [
-            makeSession({
-              troubled: true,
-              troubledReason: 'PTY echo-confirm timed out',
-              troubledAt: '2026-07-02T18:30:00Z',
-              consecutiveFailures: 2,
-              queuedMailCount: 0,
-            }),
-          ],
-        })}
-        isSelected={false}
-        onSelect={() => {}}
-      />,
-    );
-    const badge = screen.getByTestId('feature-troubled');
-    expect(badge).toHaveTextContent('Troubled');
-    expect(badge).toHaveClass('featureBadge_troubled');
-  });
-
-  it('includes troubled details in the badge title', () => {
-    renderFeature(
-      <FeatureItem
-        feature={makeFeature({
-          sessions: [
-            makeSession({
-              sessionId: 'agent-pan-821-slot-1',
-              troubled: true,
-              troubledReason: 'PTY echo-confirm timed out',
-              troubledAt: '2026-07-02T18:30:00Z',
-              consecutiveFailures: 3,
-              queuedMailCount: 4,
-            }),
-          ],
-        })}
-        isSelected={false}
-        onSelect={() => {}}
-      />,
-    );
-    expect(screen.getByTestId('feature-troubled')).toHaveAttribute(
-      'title',
-      'Session: agent-pan-821-slot-1. Reason: PTY echo-confirm timed out. Failures: 3. Troubled at: 2026-07-02T18:30:00Z. Queued deliveries: 4.',
-    );
-  });
-
-  it('flags zero-failure troubled badges as likely spurious', () => {
-    renderFeature(
-      <FeatureItem
-        feature={makeFeature({
-          sessions: [
-            makeSession({
-              troubled: true,
-              troubledReason: 'gate was set manually',
-              troubledAt: '2026-07-02T18:30:00Z',
-              consecutiveFailures: 0,
-            }),
-          ],
-        })}
-        isSelected={false}
-        onSelect={() => {}}
-      />,
-    );
-    expect(screen.getByTestId('feature-troubled')).toHaveAttribute(
-      'title',
-      expect.stringContaining('Likely spurious: troubled with 0 failures.'),
-    );
-  });
-
-  it('shows queued delivery count on troubled badges', () => {
-    renderFeature(
-      <FeatureItem
-        feature={makeFeature({
-          sessions: [
-            makeSession({
-              troubled: true,
-              troubledReason: 'feedback queued',
-              consecutiveFailures: 1,
-              queuedMailCount: 3,
-            }),
-          ],
-        })}
-        isSelected={false}
-        onSelect={() => {}}
-      />,
-    );
-    expect(screen.getByTestId('feature-troubled')).toHaveTextContent('Troubled · 3 queued');
-  });
-
-  it('clears the specific troubled session from the badge', async () => {
-    const onSelect = vi.fn();
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ success: true }),
-    }));
-    vi.stubGlobal('fetch', fetchMock);
-    renderFeature(
-      <FeatureItem
-        feature={makeFeature({
-          sessions: [
-            makeSession({
-              sessionId: 'agent-pan-821-slot-1',
-              troubled: true,
-              troubledReason: 'feedback queued',
-              consecutiveFailures: 1,
-              queuedMailCount: 3,
-            }),
-          ],
-        })}
-        isSelected={false}
-        onSelect={onSelect}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('feature-troubled'));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-821-slot-1/untroubled', expect.objectContaining({
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-overdeck-csrf-token': 'test-csrf-token',
-        },
-        body: '{}',
-      }));
-    });
-    expect(refreshDashboardState).toHaveBeenCalled();
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(await screen.findByText('Cleared troubled state for agent-pan-821-slot-1')).toBeInTheDocument();
-  });
-
-  it('shows an error alert when clearing troubled from the badge fails', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: false,
-      text: async () => JSON.stringify({ error: 'No such agent' }),
-    }));
-    vi.stubGlobal('fetch', fetchMock);
-    renderFeature(
-      <FeatureItem
-        feature={makeFeature({
-          sessions: [
-            makeSession({
-              sessionId: 'agent-pan-821-slot-1',
-              troubled: true,
-              troubledReason: 'feedback queued',
-              consecutiveFailures: 1,
-            }),
-          ],
-        })}
-        isSelected={false}
-        onSelect={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('feature-troubled'));
-
-    expect(await screen.findByText('No such agent')).toBeInTheDocument();
-    expect(refreshDashboardState).not.toHaveBeenCalled();
-  });
-
   it('shows a review error badge when a review session failed', () => {
     renderFeature(
       <FeatureItem
@@ -773,14 +599,15 @@ describe('FeatureItem', () => {
   });
 
   it('adds contextual tooltip text to the feature state pill', () => {
+    markReady();
     renderFeature(
       <FeatureItem
-        feature={makeFeature({ stateLabel: 'In Review', readyForMerge: true })}
+        feature={makeFeature({ stateLabel: 'In Review' })}
         isSelected={false}
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('In Review')).toHaveAttribute('title', 'Implementation has moved into review/test/merge flow and is ready for human merge approval.');
+    expect(screen.getByText('In Review')).toHaveAttribute('title', 'The pull request is approved, green, and mergeable — awaiting your merge.');
   });
 
   it('adds richer progress tooltip text for rally progress pills', () => {
@@ -996,6 +823,7 @@ describe('FeatureItem', () => {
       } satisfies ProjectFeatureResourceIdentifiers),
     }));
     vi.stubGlobal('fetch', fetchMock);
+    markReady();
 
     const view = renderFeature(
       <FeatureItem
@@ -1213,12 +1041,12 @@ describe('FeatureItem', () => {
       };
     });
     vi.stubGlobal('fetch', fetchMock);
+    markReady();
 
     const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
           stateLabel: 'In Review',
-          readyForMerge: true,
           resourceSources: ['workspace'],
           resourceDetails: {
             hasWorkspace: true,
@@ -1267,11 +1095,11 @@ describe('FeatureItem', () => {
     expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBe('true');
 
     view.unmount();
+    markReady();
     renderFeature(
       <FeatureItem
         feature={makeFeature({
           stateLabel: 'In Review',
-          readyForMerge: true,
           resourceSources: ['workspace'],
           resourceDetails: {
             hasWorkspace: true,
@@ -1483,11 +1311,16 @@ describe('FeatureItem', () => {
     const activeLink = screen.getByTestId('conversation-42');
     expect(activeLink).toHaveAttribute('href', '/conv/42');
     expect(activeLink).toHaveTextContent('My conv');
-    expect(activeLink.children).toHaveLength(4);
-    expect(activeLink.children[0]).toHaveClass('sessionIconSlot');
-    expect(activeLink.children[1]).toHaveClass('sessionLabel');
-    expect(activeLink.children[2]).toHaveClass('sessionStatus');
-    expect(activeLink.children[3]).toHaveClass('sessionModel');
+    // The row shares .sessionNode's grid with agent session rows, so it must
+    // emit the same leading caret and dot slots or the label lands in the 12px
+    // dot column and the status chip paints over the id.
+    expect(activeLink.children).toHaveLength(6);
+    expect(activeLink.children[0]).toHaveClass('sessionToggleSlot');
+    expect(activeLink.children[1]).toHaveClass('sessionDotSlot');
+    expect(activeLink.children[2]).toHaveClass('sessionIconSlot');
+    expect(activeLink.children[3]).toHaveClass('sessionLabel');
+    expect(activeLink.children[4]).toHaveClass('sessionStatus');
+    expect(activeLink.children[5]).toHaveClass('sessionModel');
 
     const endedLink = screen.getByTestId('conversation-43');
     expect(endedLink).toHaveAttribute('href', '/conv/43');

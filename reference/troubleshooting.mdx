@@ -483,6 +483,8 @@ These surfaces answer different questions. `pan health` reports runtime health
 of Overdeck services, while `pan doctor` checks dependencies, installation,
 configuration, and broader system diagnostics. They overlap, but neither CLI
 command is a textual equivalent of the live Health page.
+`pan doctor` also reports a `Tiered execution` row that warns when a tier's model class does not fit the difficulties it owns.
+Its `Plan home .pan/ tracking` row warns when a registered project's plan home git-ignores `.pan/` (so planning artifacts cannot be committed), with the rule's `file:line`; Overdeck's legacy `.pan/` line is removed and committed by `pan admin migrate-plan-home <key> --commit`.
 </Tip>
 
 ### Diagnostic Information

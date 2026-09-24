@@ -130,13 +130,13 @@ export interface RiverCanvasProps {
 
 export function advanceMergeDwell(
   stage: Stage,
-  mergeStatus: string | null,
+  issueState: ConfluenceOrb['issueState'],
   remaining: number,
   dt: number,
 ): { remaining: number; shouldStart: boolean } {
   if (stage !== 'MERGE') return { remaining, shouldStart: false };
   const next = Math.max(0, remaining - dt);
-  return { remaining: next, shouldStart: next === 0 && mergeStatus === 'merging' };
+  return { remaining: next, shouldStart: next === 0 && issueState === 'merged' };
 }
 
 export function resolveMergeReconciliation(
@@ -652,7 +652,7 @@ function createEngine(
       if (orb.fading !== null) { orb.fading -= dt; if (orb.fading <= 0) { renderOrbs.delete(orb.id); continue; } }
       if (orb.merging) { orb.mergeVx += dt * 260; orb.x += orb.mergeVx * dt; burst(orb.x, orb.y, '#e8edf8', 3, 40, 0.7, 2); if (orb.x > layout.portalX - 6) finishMerge(orb); continue; }
       if (orb.state === 'active' && orb.stage === 'MERGE') {
-        const dwell = advanceMergeDwell(orb.stage, orb.mergeStatus, orb.mergeDwell, dt);
+        const dwell = advanceMergeDwell(orb.stage, orb.issueState, orb.mergeDwell, dt);
         orb.mergeDwell = dwell.remaining;
         if (dwell.shouldStart) startMerge(orb);
       }

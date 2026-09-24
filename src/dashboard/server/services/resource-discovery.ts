@@ -13,7 +13,7 @@ import {
   type TrackerIssueRecord,
 } from './resource-discovery-shared.js';
 
-import { getAgentRuntimeState } from '../../../lib/agents.js';
+import { getBackendPanes } from './backend-inventory.js';
 import {
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
@@ -28,10 +28,11 @@ import {
   type PipelineMembership,
 } from '../../../lib/pipeline-membership.js';
 import { listOpenPullRequestsSnapshot } from '../../../lib/pipeline-membership-gather.js';
-import { loadReadyForMergeFlags } from '../review-status.js';
+import type { IssueState } from '@overdeck/contracts';
+import { loadIssueStatesForProject } from './derived-issue-state.js';
 import { resolveAgentGitInfo } from './git-info.js';
 import { resolveMissingIssueTitles } from './issue-title-fallback.js';
-import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
+import { parseIssueIdFromText } from '../../../lib/resource-utils.js';
 import {
   readPipelineMembershipSnapshotsForProjects,
   refreshMembershipSnapshotsForProjects,
@@ -107,7 +108,8 @@ export interface ResourceAllocatedIssue {
   childCount?: number;
   completedCount?: number;
   inProgressCount?: number;
-  readyForMerge: boolean;
+  /** Derived issue state (FR-6); null when it could not be read. */
+  state: IssueState | null;
   rawTrackerState?: string;
   resourceSources: ResourceSource[];
   resourceDetails: ResourceDetails;
@@ -151,7 +153,7 @@ interface MutableResourceIssue {
   hasState: boolean;
   isShadow: boolean;
   agentStatus: string | null;
-  readyForMerge: boolean;
+  state: IssueState | null;
   lastActivity: number | null;
   resourceSources: Set<ResourceSource>;
   resourceDetails: InternalResourceDetails;
@@ -213,7 +215,8 @@ function deriveStateLabel(
   if (membership?.lenses.L3_issueOpen === false) {
     return hasTmux ? 'Closed' : 'Done';
   }
-  if (issue.readyForMerge) return 'In Review';
+  if (issue.state === 'ready' || issue.state === 'in-review' || issue.state === 'changes-requested') return 'In Review';
+  if (issue.state === 'merged') return hasTmux ? 'Closed' : 'Done';
   if (trackerState === 'done' || trackerState === 'closed' || trackerState === 'canceled') {
     return hasTmux ? 'Closed' : 'Done';
   }
@@ -299,7 +302,7 @@ function hasOpenPr(issue: MutableResourceIssue): boolean {
   return issue.resourceDetails.prs.some((pr) => pr.state === 'OPEN' || pr.state === 'open');
 }
 
-function shouldLoadReviewStatus(issue: MutableResourceIssue): boolean {
+function shouldDeriveIssueState(issue: MutableResourceIssue): boolean {
   return issue.resourceSources.size > 0
     && (!isTerminalTrackerState(issue.trackerState) || hasOpenPr(issue))
     && (isLiveResource(issue) || (isActiveTrackerState(issue.trackerState) && issue.branch != null));
@@ -334,7 +337,7 @@ async function loadOpenPullRequests(projects: ProjectRef[]): Promise<Map<string,
           number: row.number, title: row.title, url: row.url, state: row.state,
           isDraft: row.isDraft, headRefName: row.headRefName, baseRefName: row.baseRefName,
         };
-        const issueId = parseIssueIdFromTextSync(pr.headRefName);
+        const issueId = parseIssueIdFromText(pr.headRefName);
         if (!issueId) continue;
         const existing = pullRequests.get(issueId) ?? [];
         existing.push(pr);
@@ -501,7 +504,7 @@ async function computeResourceAllocatedIssues(
       hasState: false,
       isShadow: false,
       agentStatus: null,
-      readyForMerge: false,
+      state: null,
       lastActivity: null,
       resourceSources: new Set<ResourceSource>(),
       resourceDetails: {
@@ -542,7 +545,7 @@ async function computeResourceAllocatedIssues(
     if (!isDiscoverableAgentSession(sessionName)) {
       continue;
     }
-    const issueId = parseIssueIdFromTextSync(sessionName);
+    const issueId = parseIssueIdFromText(sessionName);
     if (!issueId) continue;
     const issue = ensureIssue(issueId);
     if (!issue) continue;
@@ -586,7 +589,7 @@ async function computeResourceAllocatedIssues(
   }
 
   for (const containerName of dockerContainers) {
-    const issueId = parseIssueIdFromTextSync(containerName.replace(/feature\//g, 'feature-'));
+    const issueId = parseIssueIdFromText(containerName.replace(/feature\//g, 'feature-'));
     if (!issueId) continue;
     const issue = ensureIssue(issueId);
     if (!issue) continue;
@@ -646,7 +649,7 @@ async function computeResourceAllocatedIssues(
       ...branches.local.map((b) => [b, 'localBranches'] as const),
       ...branches.remote.map((b) => [b, 'remoteBranches'] as const),
     ]) {
-      const issueId = parseIssueIdFromTextSync(branch);
+      const issueId = parseIssueIdFromText(branch);
       if (!issueId) continue;
       const issue = ensureIssue(issueId, project);
       if (!issue) continue;
@@ -669,38 +672,44 @@ async function computeResourceAllocatedIssues(
     issue.title = issue.title === issue.issueId && bestTitle ? bestTitle : issue.title;
   }
 
-  await Promise.all([...issueMap.values()].map(async (issue) => {
-    if (issue.resourceDetails.tmuxSessions.length === 0) return;
+  // PAN-3917 FR-12: agent liveness is the terminal backend's, read live. One
+  // inventory read answers for every issue — there is no per-session mirror to
+  // probe. A pane's id is its session name on the tmux adapter, so a strike or
+  // planning session still attributes to its issue (PAN-1682).
+  const panesById = new Map((await getBackendPanes()).map((pane) => [pane.id, pane]));
+  for (const issue of issueMap.values()) {
+    const panes = issue.resourceDetails.tmuxSessions
+      .map((sessionName) => panesById.get(sessionName))
+      .filter((pane): pane is NonNullable<typeof pane> => pane !== undefined);
+    if (panes.length === 0) continue;
 
-    // Runtime-state ids equal session names (agent-<issue>, strike-<issue>,
-    // planning-<issue>, ...). Probe every discovered session — not just
-    // agent-<issue> — so strike/planning sessions surface as live agents.
-    // PAN-1682 made these sessions discoverable but left attribution
-    // agent-only, which rendered a running strike as a lifeless node.
-    const states = (await Promise.all(
-      issue.resourceDetails.tmuxSessions.map((sessionName) =>
-        Effect.runPromise(getAgentRuntimeState(sessionName)).catch(() => null),
-      ),
-    )).filter((state): state is NonNullable<typeof state> => state !== null);
-    if (states.length === 0) return;
-
-    const best = states.find((state) => state.state === 'active')
-      ?? states.reduce((a, b) => (Date.parse(a.lastActivity) >= Date.parse(b.lastActivity) ? a : b));
+    const best = panes.find((pane) => pane.state === 'working')
+      ?? panes.reduce((a, b) => ((a.stateSince ?? 0) >= (b.stateSince ?? 0) ? a : b));
     issue.agentStatus = best.state;
 
-    const lastActivity = Math.max(
-      ...states.map((state) => Date.parse(state.lastActivity)).filter(Number.isFinite),
-    );
-    issue.lastActivity = Number.isFinite(lastActivity) ? lastActivity : null;
-  }));
+    const lastActivity = Math.max(...panes.map((pane) => pane.stateSince ?? 0));
+    issue.lastActivity = lastActivity > 0 ? lastActivity : null;
+  }
 
-  const reviewStatusIssueIds = [...issueMap.values()]
-    .filter(shouldLoadReviewStatus)
-    .map((issue) => issue.issueId);
-  if (reviewStatusIssueIds.length > 0) {
-    const readyForMergeFlags = loadReadyForMergeFlags(reviewStatusIssueIds);
-    for (const issue of issueMap.values()) {
-      issue.readyForMerge = readyForMergeFlags.get(issue.issueId) ?? false;
+  // PAN-3917 FR-6: the pipeline position is derived, one batched forge read
+  // per project. Only issues with live resources are worth the read.
+  const derivable = [...issueMap.values()].filter(shouldDeriveIssueState);
+  if (derivable.length > 0) {
+    const byProject = new Map<string, string[]>();
+    for (const issue of derivable) {
+      const projectPath = resolveProjectFromIssueSync(issue.issueId)?.projectPath;
+      if (!projectPath) continue;
+      byProject.set(projectPath, [...(byProject.get(projectPath) ?? []), issue.issueId]);
+    }
+    const loaded = await Promise.allSettled(
+      [...byProject.entries()].map(([projectPath, issueIds]) => loadIssueStatesForProject(projectPath, issueIds)),
+    );
+    for (const outcome of loaded) {
+      if (outcome.status !== 'fulfilled') continue;
+      for (const [issueId, derived] of outcome.value) {
+        const issue = issueMap.get(issueId);
+        if (issue) issue.state = derived.state;
+      }
     }
   }
 
@@ -718,7 +727,7 @@ async function computeResourceAllocatedIssues(
   await Promise.all([...issueMap.values()].map(async (issue) => {
     const project = resolveProjectRef(issue.issueId);
     if (!project) return;
-    const draft = await Effect.runPromise(findDraftPrd(project.config.path, issue.issueId)).catch(() => null);
+    const draft = await findDraftPrd(project.config.path, issue.issueId).catch(() => null);
     if (!draft) return;
     issue.resourceSources.add('prd');
     issue.resourceDetails.prdPath = draft.path;
@@ -780,7 +789,7 @@ async function computeResourceAllocatedIssues(
           childCount: trackerIssues.get(issue.issueId)?.totalChildCount,
           completedCount: trackerIssues.get(issue.issueId)?.completedChildCount,
           inProgressCount: trackerIssues.get(issue.issueId)?.inProgressChildCount,
-          readyForMerge: issue.readyForMerge,
+          state: issue.state,
           rawTrackerState: issue.rawTrackerState,
           resourceSources: new Set([...issue.resourceSources].sort()),
           resourceDetails: issue.resourceDetails,

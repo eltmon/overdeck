@@ -14,7 +14,7 @@ import {
   makeDbLive,
   CostArchiveLive,
   EventBusLive,
-  closeOverdeckDatabaseSync,
+  closeOverdeckDatabase,
 } from '../infra.js';
 import { openDatabase } from '../../database/driver.js';
 import { packageRoot } from '../../paths.js';
@@ -81,7 +81,7 @@ describe('cost reconcile multi-harness integration (PAN-2388)', () => {
   afterEach(() => {
     if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalOverdeckHome;
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
     rmSync(tempHome, { recursive: true, force: true });
   });
 

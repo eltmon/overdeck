@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
@@ -12,23 +12,18 @@ import {
 import { resolveIssueWorkModel } from '../../../../lib/agents/staffing.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
-import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
-import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
-import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
-import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
+import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
+import { canUseHarness } from '../../../../lib/harness-policy.js';
+import { emitActivityEntry } from '../../../../lib/activity-logger.js';
+import { FsError } from '../../../../lib/errors.js';
 import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
-import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
-import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
+import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
-import { validateProviderHealth } from '../../../../lib/provider-health.js';
-import { checkActiveOrderDispatch } from '../../../../lib/orders/dispatch-gate.js';
-import { OrderDispatchReservationError, withActiveOrderDispatchReservation } from '../../../../lib/orders/dispatch-reservation.js';
-import type { OrderDispatchEligibility } from '../../../../lib/orders/eligibility.js';
+import { ProviderHealthError, validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
-import { isStateMigrated } from '../../../../lib/state-home.js';
-import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
 import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
@@ -38,10 +33,6 @@ import { transitionXBriefOnMain, updatePlanStatus } from '../../../../lib/xbrief
 import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
-import {
-  claimAgentStartPlaceholderProgram,
-  rollbackAgentStartPlaceholderProgram,
-} from '../../services/agent-projection.js';
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
 import { getSystemHealthSnapshot } from '../../services/system-health-service.js';
 import { httpHandler } from '../http-handler.js';
@@ -65,23 +56,8 @@ import {
   updateRegistryForAgentStart,
   type AgentStartGateDecision,
 } from './shared.js';
-import { buildAgentStartPlaceholder, handleContainerOrchestration, handleRemoteAgentSpawn } from './spawn-helpers.js';
+import { claimAgentStart, handleContainerOrchestration, handleRemoteAgentSpawn, releaseAgentStart } from './spawn-helpers.js';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-export function orderDispatchConflict(decision: OrderDispatchEligibility): {
-  status: 409;
-  body: { error: string; code: string; conditions: OrderDispatchEligibility['conditions'] };
-} | null {
-  if (decision.eligible) return null;
-  return {
-    status: 409,
-    body: {
-      error: decision.message ?? 'Order-book dispatch is blocked.',
-      code: decision.code ?? 'order-dispatch-blocked',
-      conditions: decision.conditions,
-    },
-  };
-}
 
 /**
  * PAN-2386: emit a dashboard activity event when start-agent refuses to spawn
@@ -90,7 +66,7 @@ export function orderDispatchConflict(decision: OrderDispatchEligibility): {
  */
 export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: string): void {
   try {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'warn',
       message: `Workspace dirty — agent start refused for ${issueId}`,
@@ -139,7 +115,10 @@ export function resolveStartAgentGateForRoute(input: {
   let gate: AgentStartGateDecision | null = null;
 
   return Effect.gen(function* () {
-    const state = yield* getAgentState(input.agentSessionName);
+    const state = yield* Effect.try({
+      try: () => getAgentState(input.agentSessionName),
+      catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${input.agentSessionName}`, cause }),
+    });
     gate = evaluateAgentStartGate(input.agentSessionName, state);
     if (!gate) return null;
 
@@ -174,7 +153,10 @@ export function resolveStartAgentGateForRoute(input: {
 
     if (!cleared) return gate;
 
-    gate = evaluateAgentStartGate(input.agentSessionName, yield* getAgentState(input.agentSessionName));
+    gate = evaluateAgentStartGate(input.agentSessionName, yield* Effect.try({
+      try: () => getAgentState(input.agentSessionName),
+      catch: (cause) => new FsError({ operation: 'read', path: `agents-db:${input.agentSessionName}`, cause }),
+    }));
     return gate;
   }).pipe(
     Effect.catch((err) => {
@@ -261,7 +243,7 @@ export const postAgentsRoute = HttpRouter.add(
       );
     }
 
-    const parsedIssueId = parseIssueIdSync(String(issueId));
+    const parsedIssueId = parseIssueId(String(issueId));
     if (!parsedIssueId) {
       return jsonResponse(
         {
@@ -303,7 +285,7 @@ export const postAgentsRoute = HttpRouter.add(
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
     const clearGates = (body as any).clearGates === true;
-    const initialAgentState = yield* getAgentState(agentSessionName);
+    const initialAgentState = getAgentState(agentSessionName);
     const startGateBlock = evaluateAgentStartGate(agentSessionName, initialAgentState);
     if (startGateBlock) {
       if (!clearGates) {
@@ -320,13 +302,13 @@ export const postAgentsRoute = HttpRouter.add(
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const resolvedProject = resolveProjectFromIssueSync(String(issueId));
     const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
     const projectPath = projectConfig?.path ?? getProjectPath(projectId, issuePrefix);
-    const orderDispatch = yield* Effect.promise(() => checkActiveOrderDispatch(projectPath, issueId, { offBook }));
-    const orderConflict = orderDispatchConflict(orderDispatch.decision);
-    if (orderConflict) return jsonResponse(orderConflict.body, { status: orderConflict.status });
+    // PAN-3917 D12: the order-book dispatch gate is gone. There is no flywheel
+    // RUN to bind a book to — the flywheel skill decides what to start from the
+    // order books under .pan, so a spawn request is simply honoured.
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
@@ -334,7 +316,7 @@ export const postAgentsRoute = HttpRouter.add(
         const nodeDir = dirname(process.execPath);
         yield* Effect.promise(() => execAsync(
           `pan workspace create ${issueId} --local`,
-          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmuxSync(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
+          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmux(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
         ));
       } catch (wsErr) {
         return jsonResponse({
@@ -452,9 +434,18 @@ export const postAgentsRoute = HttpRouter.add(
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
+    // PAN-3857: forward --model to `pan start` only for an explicit body model —
+    // forwarding a resolved default would skip tier resolution and stamp record.workModel.
+    const explicitModel: string | null = (body as any).model ? spawnModel : null;
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
-      const codexAuth = yield* checkCodexAuthStatus();
+      const codexAuth = yield* Effect.tryPromise({
+        try: () => checkCodexAuthStatus(),
+        catch: (cause) => new CodexAuthCheckError({
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+      });
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({
           success: false,
@@ -468,10 +459,12 @@ export const postAgentsRoute = HttpRouter.add(
 
     // Pre-flight provider health check — detect quota/auth/network errors
     // before spawning the agent into Claude Code's opaque retry loop.
-    // validateProviderHealth returns an Effect (typed ProviderHealthError
-    // channel) — wrapping it in Effect.promise handed a non-thenable to the
-    // runtime and crashed the whole request (PAN-1768).
-    const providerHealthCheck = yield* validateProviderHealth(spawnModel).pipe(
+    // validateProviderHealth rejects only with ProviderHealthError (any other
+    // throw is re-wrapped), so every failure lands in the blocked branch below.
+    const providerHealthCheck = yield* Effect.tryPromise({
+      try: () => validateProviderHealth(spawnModel),
+      catch: (cause) => cause as ProviderHealthError,
+    }).pipe(
       Effect.match({
         onFailure: (err) => ({ _tag: 'failure' as const, err }),
         onSuccess: () => ({ _tag: 'success' as const, err: null }),
@@ -518,7 +511,7 @@ export const postAgentsRoute = HttpRouter.add(
             workspacePath,
             lastObserved: stackHealth.lastObserved,
           });
-          emitActivityEntrySync({
+          emitActivityEntry({
             source: 'dashboard',
             level: 'error',
             issueId: issueId.toUpperCase(),
@@ -550,34 +543,9 @@ export const postAgentsRoute = HttpRouter.add(
       console.warn(`[agents] agent-spawn-host-override: ${issueId.toUpperCase()} (dashboard-confirmed)`);
     }
 
-    const migratedState = projectConfig ? yield* Effect.promise(() => isStateMigrated(projectConfig)) : false;
-    if (shouldCommitLegacyWorkspaceArtifacts(migratedState) && (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir))) {
-      // Commit workspace orchestration artifacts before handing off to the work agent.
-      // The entire block is best-effort — never let git errors abort the agent start.
-      yield* Effect.gen(function* () {
-        const gitRoot = workspacePath;
-        if (existsSync(join(gitRoot, PAN_DIRNAME))) {
-          // PAN-1819: use plain git add (never -f) and exclude workspace-state/sync-target paths.
-          yield* Effect.promise(() => execAsync(`git add .pan/`, { cwd: gitRoot, encoding: 'utf-8' }));
-          yield* Effect.promise(() => execAsync(
-            `git reset HEAD -- .pan/kickoff.md .pan/continue.json .pan/handoff-*.md .pan/spec.vbrief.json`,
-            { cwd: gitRoot, encoding: 'utf-8' },
-          ));
-        }
-        // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
-        // Handle exit-1 in the Promise so it never becomes an Effect failure.
-        const diffResult = yield* Effect.promise(() =>
-          execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' })
-            .then(() => false)
-            .catch(() => true)
-        );
-        if (diffResult) {
-          yield* Effect.promise(() => execAsync(`git commit -m "chore: planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' }));
-          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-          pushChild.unref();
-        }
-      }).pipe(Effect.catch(() => Effect.void));
-    }
+    // PAN-3917: planning artifacts live in the repo's `.pan/` and are committed
+    // by the agent that changes them (FR-2). The dashboard no longer commits and
+    // pushes a workspace copy on the agent's behalf before start.
 
     let gatesCommitted = false;
     const commitClearedGates = async (): Promise<void> => {
@@ -599,30 +567,28 @@ export const postAgentsRoute = HttpRouter.add(
     const markWorkStartAccepted = async (): Promise<void> => {
       if (workStartAccepted) return;
       workStartAccepted = true;
-      await Effect.runPromise(transitionXBriefOnMain(
+      await transitionXBriefOnMain(
         projectPath,
         issueId,
         'active',
         'running',
         `chore(state): start ${issueId.toUpperCase()} xBRIEF (status=running)`,
-      ).pipe(
-        Effect.match({
-          onSuccess: (result) => {
-            if (result.moved) {
-              console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
-            }
-            if (result.statusUpdated) {
-              console.log(`[start-agent] Set plan.status=running for ${issueId}`);
-            }
-            if (result.committed) {
-              console.log(`[start-agent] Committed running transition for ${issueId}`);
-            }
-          },
-          onFailure: (err) => {
-            console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err?.message ?? err}`);
-          },
-        }),
-      ));
+      ).then(
+        (result) => {
+          if (result.moved) {
+            console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
+          }
+          if (result.statusUpdated) {
+            console.log(`[start-agent] Set plan.status=running for ${issueId}`);
+          }
+          if (result.committed) {
+            console.log(`[start-agent] Committed running transition for ${issueId}`);
+          }
+        },
+        (err: unknown) => {
+          console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+        },
+      );
 
       if (planPath.startsWith(workspacePath + sep)) {
         try {
@@ -633,31 +599,13 @@ export const postAgentsRoute = HttpRouter.add(
         }
       }
 
-      try {
-        const { appendSessionEntry, getProjectConfigFromWorkspacePath, resolveProjectForIssue } =
-          await import('../../../../lib/pan-dir/record.js');
-        const recordProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-        await appendSessionEntry(recordProject, issueId, {
-          timestamp: new Date().toISOString(),
-          reason: 'start',
-          agentModel: spawnModel,
-        });
-        console.log(`[start-agent] Wrote start session entry to record for ${issueId}`);
-      } catch (continueErr: any) {
-        console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
-      }
-
-      const pipelineStatus = getReviewStatusSync(issueId);
-      if (pipelineStatus?.stuckReason === 'planning_auto_handoff_failed') {
-        clearWorkspaceStuck(issueId);
-      }
+      // PAN-3917: the record's sessionHistory and the workspace `stuck` flag
+      // are gone. The agent.started event (emitted by the PTY supervisor when
+      // the harness process exists) is the durable record that this agent
+      // started, and a stuck agent is derived — idle with unpushed commits.
     };
     if (isRemote && workspaceMetadata) {
-      const admitted = yield* Effect.promise(() => withActiveOrderDispatchReservation(
-        projectPath,
-        issueId,
-        { offBook, recordOverride: true },
-        () => spawnAfterClearingStartGates({
+      const response = yield* Effect.promise(() => spawnAfterClearingStartGates({
           agentSessionName,
           gate: startGateBlock,
           initialState: initialAgentState,
@@ -673,11 +621,7 @@ export const postAgentsRoute = HttpRouter.add(
             lifecycle,
           })),
           isSuccessful: (remoteResponse) => remoteResponse.status >= 200 && remoteResponse.status < 300,
-        }),
-      ));
-      const admittedConflict = orderDispatchConflict(admitted.check.decision);
-      if (admittedConflict) return jsonResponse(admittedConflict.body, { status: admittedConflict.status });
-      const response = admitted.result!;
+      }));
       if (response.status < 200 || response.status >= 300) return response;
       yield* Effect.promise(commitClearedGates);
       yield* Effect.promise(markWorkStartAccepted);
@@ -693,7 +637,7 @@ export const postAgentsRoute = HttpRouter.add(
       role,
     }));
 
-    const agentLifecycle = yield* getWorkAgentLifecycleState(agentSessionName);
+    const agentLifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(agentSessionName));
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_lifecycle_evaluated', {
       issueId,
       lifecycle: agentLifecycle,
@@ -768,12 +712,12 @@ export const postAgentsRoute = HttpRouter.add(
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null =
-      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' || bodyHarness === 'acp' || bodyHarness === 'kimi-code' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null = null;
+    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null =
+      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' || bodyHarness === 'acp' || bodyHarness === 'kimi-code' || bodyHarness === 'opencode' || bodyHarness === 'muse' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
-        canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
+        canUseHarness(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
       );
       // PAN-1837 review fix (NFR-2): an explicitly requested harness that
       // policy denies must fail loudly, not silently substitute claude-code —
@@ -788,33 +732,25 @@ export const postAgentsRoute = HttpRouter.add(
 
     // Spawn pan start command
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
-      const admitted = await withActiveOrderDispatchReservation(
-        projectPath,
-        issueId,
-        { offBook, recordOverride: false },
-        () => spawnAfterClearingStartGates({
+      const output = await spawnAfterClearingStartGates({
+        agentSessionName,
+        gate: gatesCommitted ? null : startGateBlock,
+        initialState: initialAgentState,
+        spawn: () => spawnPanCommandDetached({
           agentSessionName,
-          gate: gatesCommitted ? null : startGateBlock,
-          initialState: initialAgentState,
-          spawn: () => spawnPanCommandDetached({
-            agentSessionName,
-            issueId,
-            role,
-            workspacePath,
-            args,
-            cwd,
-            env: {
-              OVERDECK_AGENT_STARTED_BY: startedBy,
-              OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED: autoSpawnConsentRequired ? '1' : '0',
-            },
-          }),
+          issueId,
+          role,
+          workspacePath,
+          args,
+          cwd,
+          env: {
+            OVERDECK_AGENT_STARTED_BY: startedBy,
+            OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED: autoSpawnConsentRequired ? '1' : '0',
+          },
         }),
-      );
-      if (!admitted.check.decision.eligible || !admitted.result) {
-        throw new OrderDispatchReservationError(admitted.check);
-      }
+      });
       await commitClearedGates();
-      return admitted.result;
+      return output;
     };
 
     // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
@@ -824,7 +760,27 @@ export const postAgentsRoute = HttpRouter.add(
       );
     };
 
-    const containerResponse = yield* handleContainerOrchestration({
+    // Claim BEFORE container orchestration (PAN-3849 W34): the claim is the
+    // no-placeholder replacement for the retired pending- rows. The direct
+    // path below releases it when the spawn settles; the container-wait
+    // background job retains it until it spawns or gives up — so concurrent
+    // requests 409 here instead of starting duplicate container waits.
+    if (!claimAgentStart(agentSessionName)) {
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_in_flight_blocked', {
+        issueId,
+        role,
+        workspacePath,
+      }));
+      return jsonResponse({
+        error: `Agent ${agentSessionName} is already starting or running.`,
+        code: 'AGENT_START_IN_FLIGHT',
+      }, { status: 409 });
+    }
+
+    // Orchestration takes the request into a background job (claim retained
+    // there). If its Effect fails instead, no background job exists to
+    // release the claim — release here and re-raise the original cause.
+    const containerExit = yield* Effect.exit(handleContainerOrchestration({
       issueId,
       workspacePath,
       devScript,
@@ -833,70 +789,38 @@ export const postAgentsRoute = HttpRouter.add(
       effectiveHarness,
       startedBy,
       allowHost,
-      spawnModel,
+      explicitModel,
       spawnGuardrails,
       projectPath,
       eventStore,
       spawnPanCommand,
       markWorkStartAccepted,
       updateIssueStatus,
-    });
+    }));
+    if (Exit.isFailure(containerExit)) {
+      releaseAgentStart(agentSessionName);
+      return yield* Effect.failCause(containerExit.cause);
+    }
+    const containerResponse = containerExit.value;
     if (containerResponse) return containerResponse;
 
-    // Containers already ready or no containers needed. Claim the spawn before
-    // launching `pan start`: two requests can pass the lifecycle read together,
-    // but only one may atomically write the starting placeholder.
-    const placeholderStartedAt = new Date().toISOString();
-    const { state: placeholderState, event: placeholderEvent } = buildAgentStartPlaceholder({
-      agentSessionName,
-      issueId,
-      workspacePath,
-      role,
-      effectiveHarness,
-      startedBy,
-      allowHost,
-      startedAt: placeholderStartedAt,
-    });
-    const hasLiveTmuxSession = yield* sessionExists(agentSessionName).pipe(
-      Effect.catch(() => Effect.succeed(true)),
-    );
-    const placeholderClaim = yield* claimAgentStartPlaceholderProgram(
-      placeholderState,
-      placeholderEvent,
-      hasLiveTmuxSession,
-    );
-    if (!placeholderClaim.claimed) {
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_blocked', {
-        issueId,
-        role,
-        workspacePath,
-        reason: placeholderClaim.reason,
-      }));
-      return jsonResponse({
-        error: `Agent ${agentSessionName} is already starting or running.`,
-        code: 'AGENT_START_IN_FLIGHT',
-      }, { status: 409 });
-    }
-
-    yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_created', {
-      issueId,
-      role,
-      workspacePath,
-      startedAt: placeholderStartedAt,
-    }));
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
       issueId,
       role,
       workspacePath,
     }));
 
-    let activityId: string;
-    try {
+    // Effect failures are values, not JS exceptions (see lifecycle-restart):
+    // a JS try/catch/finally around `yield*` never sees a spawnPanCommand
+    // rejection (Effect.promise turns it into a defect) — the mapped errors
+    // below would never render and the claim would leak. Capture the Exit so
+    // both run on every outcome.
+    const spawnExit = yield* Effect.exit(Effect.gen(function* () {
       emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent', { workspacePath });
-      activityId = yield* Effect.promise(() => spawnPanCommand(
+      const id = yield* Effect.promise(() => spawnPanCommand(
         buildPanStartArgs({
           issueId,
-          model: spawnModel,
+          model: explicitModel,
           harness: effectiveHarness,
           allowHost,
           offBook,
@@ -906,39 +830,23 @@ export const postAgentsRoute = HttpRouter.add(
       yield* Effect.promise(markWorkStartAccepted);
       emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested', {
         workspacePath,
-        activityId,
+        activityId: id,
       });
-    } catch (error: any) {
-      const initialStateIsPlaceholder = initialAgentState?.model.startsWith('pending-') === true;
-      const fallbackState: AgentState = initialAgentState && !initialStateIsPlaceholder
-        ? { ...initialAgentState }
-        : {
-            ...placeholderState,
-            model: spawnModel,
-            status: 'stopped',
-            stoppedAt: new Date().toISOString(),
-          };
-      const rolledBack = yield* rollbackAgentStartPlaceholderProgram(placeholderState, fallbackState, {
-        type: 'agent.status_changed',
-        timestamp: new Date().toISOString(),
-        payload: {
-          agentId: agentSessionName,
-          status: fallbackState.status,
-          previousStatus: 'starting',
-          hasLiveTmuxSession: false,
-        },
-      });
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_rollback', {
+      return id;
+    }));
+    releaseAgentStart(agentSessionName);
+    if (Exit.isFailure(spawnExit)) {
+      const error: any = Cause.squash(spawnExit.cause);
+      // Nothing to roll back (PAN-3849 W34): no placeholder was written, so a
+      // failed spawn leaves whatever state existed before — usually none — and
+      // a later `pan start` proceeds fresh instead of being refused by a
+      // stranded 'pending-' placeholder row (F2).
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_spawn_failed', {
         issueId,
-        rolledBack,
-        fallbackStatus: fallbackState.status,
+        message: error instanceof Error ? error.message : String(error),
       }));
       invalidateAgentsCache();
 
-      if (error instanceof OrderDispatchReservationError) {
-        const conflict = orderDispatchConflict(error.check.decision)!;
-        return jsonResponse(conflict.body, { status: conflict.status });
-      }
       const output = String(error?.output ?? error?.message ?? '');
       if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
         const failedStackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
@@ -950,7 +858,7 @@ export const postAgentsRoute = HttpRouter.add(
           workspacePath,
           activityId: error?.activityId,
         });
-        emitActivityEntrySync({
+        emitActivityEntry({
           source: 'dashboard',
           level: 'error',
           issueId: issueId.toUpperCase(),
@@ -981,6 +889,7 @@ export const postAgentsRoute = HttpRouter.add(
         activityId: error?.activityId,
       }, { status: 500 });
     }
+    const activityId = spawnExit.value;
 
     updateRegistryForAgentStart(issueId, workspacePath, agentSessionName);
     yield* Effect.promise(() => updateIssueStatus());

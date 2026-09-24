@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ensurePolyrepoWorkspaceGitignoreSync, commitPolyrepoWorkspaceGitignoreAsync } from '../create.js';
+import { ensurePolyrepoWorkspaceGitignore, commitPolyrepoWorkspaceGitignoreAsync } from '../create.js';
 
 const mockExec = vi.hoisted(() => vi.fn());
 
@@ -14,7 +14,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   };
 });
 
-describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
+describe('ensurePolyrepoWorkspaceGitignore', () => {
   let workspacePath: string;
 
   beforeEach(() => {
@@ -26,7 +26,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
   });
 
   it('creates a new .gitignore with sub-repo entries and no durable record ignore', () => {
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [
       { name: 'api' },
       { name: 'fe' },
       { name: 'docs' },
@@ -36,7 +36,6 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
     expect(result.added).toEqual(['api/', 'fe/', 'docs/', 'infra/', '.overdeck/', '.devcontainer/', 'dev']);
     expect(result.removed).toEqual([]);
     const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
-    expect(content).not.toContain('.pan/records/');
     expect(content).toContain('api/');
     expect(content).toContain('fe/');
     expect(content).toContain('docs/');
@@ -53,7 +52,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
       '',
     ].join('\n'));
 
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'api' }]);
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'api' }]);
 
     expect(result.added).toEqual(['.overdeck/', '.devcontainer/', 'dev']);
     const lines = readFileSync(join(workspacePath, '.gitignore'), 'utf-8').split('\n');
@@ -68,7 +67,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
       '',
     ].join('\n'));
 
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'api' }]);
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'api' }]);
 
     expect(result.added).toEqual(['.devcontainer/', 'dev']);
     expect(result.removed).toEqual([]);
@@ -82,7 +81,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
       '',
     ].join('\n'));
 
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [
       { name: 'api' },
       { name: 'fe' },
       { name: 'docs' },
@@ -92,7 +91,6 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
     expect(result.removed).toEqual([]);
     const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
     const lines = content.split('\n');
-    expect(lines.filter(l => l === '.pan/records/')).toHaveLength(0);
     expect(lines.filter(l => l === 'api/')).toHaveLength(1);
     expect(lines.filter(l => l === 'fe/')).toHaveLength(1);
     expect(lines.filter(l => l === 'docs/')).toHaveLength(1);
@@ -108,7 +106,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
       '',
     ].join('\n'));
 
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [
       { name: 'api' },
       { name: 'fe' },
     ]);
@@ -126,31 +124,12 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
       '',
     ].join('\n'));
 
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'api' }]);
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'api' }]);
 
     expect(result.added).toEqual([]);
     expect(result.removed).toEqual([]);
   });
 
-  it('removes stale .pan/records ignores so durable records stay trackable', () => {
-    writeFileSync(join(workspacePath, '.gitignore'), [
-      '.pan/records/',
-      'api/',
-      '.pan/records',
-      '.overdeck/',
-      '.devcontainer/',
-      'dev',
-      '',
-    ].join('\n'));
-
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'api' }]);
-
-    expect(result.added).toEqual([]);
-    expect(result.removed).toEqual(['.pan/records/', '.pan/records']);
-    const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
-    expect(content).not.toContain('.pan/records');
-    expect(content).toContain('api/');
-  });
 });
 
 describe('commitPolyrepoWorkspaceGitignoreAsync', () => {
@@ -242,7 +221,7 @@ describe('generated devcontainer harness entries (MIN-896/MIN-898)', () => {
   it('adds .devcontainer/ and dev so agents are not tempted to delete generated infrastructure', () => {
     writeFileSync(join(workspacePath, '.gitignore'), ['fe/', 'api/', '.overdeck/', ''].join('\n'));
 
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'fe' }, { name: 'api' }]);
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'fe' }, { name: 'api' }]);
 
     expect(result.added).toEqual(['.devcontainer/', 'dev']);
     const lines = readFileSync(join(workspacePath, '.gitignore'), 'utf-8').split('\n');
@@ -255,7 +234,7 @@ describe('generated devcontainer harness entries (MIN-896/MIN-898)', () => {
   it('is idempotent when harness entries already exist', () => {
     writeFileSync(join(workspacePath, '.gitignore'), ['fe/', '.overdeck/', '.devcontainer/', 'dev', ''].join('\n'));
 
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'fe' }]);
+    const result = ensurePolyrepoWorkspaceGitignore(workspacePath, [{ name: 'fe' }]);
 
     expect(result.added).toEqual([]);
     const lines = readFileSync(join(workspacePath, '.gitignore'), 'utf-8').split('\n');

@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
-
-let recordRemote: string | null = null;
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getFailedMergeBlock, mergeReadySlots, resetSwarmLoopSafetyForTests, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
@@ -71,19 +68,28 @@ function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateS
   };
 }
 
+// PAN-3917: the slot ledger lives beside the issue's continue file under the
+// plan home, so fixtures need a real `<project>/workspaces/feature-<issue>`
+// layout rather than a bare temp dir.
+let projectRoot: string;
+
+function makeWorkspace(prefix: string, issueLower: string): string {
+  projectRoot = mkdtempSync(join(tmpdir(), prefix));
+  const workspace = join(projectRoot, 'workspaces', `feature-${issueLower}`);
+  mkdirSync(workspace, { recursive: true });
+  return workspace;
+}
+
 describe('deacon-swarm ready-slot merge', () => {
   let workspacePath: string;
 
   beforeEach(() => {
     resetSwarmLoopSafetyForTests();
-    workspacePath = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-merge-'));
-    recordRemote = initGitRecordRoot(workspacePath);
+    workspacePath = makeWorkspace('pan-2203-swarm-merge-', 'pan-2203');
   });
 
-  afterEach(async () => {
-    removeGitRecordRemote(recordRemote);
-    recordRemote = null;
-    await cleanupGitRecordRoot(workspacePath);
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
   });
 
   it('marks the xBRIEF item done through the write door when a slot merges', async () => {
@@ -167,19 +173,16 @@ describe('PAN-2372 WI-4 merge clears the durable slot-completion marker (FR-6, A
 
   beforeEach(() => {
     resetSwarmLoopSafetyForTests();
-    workspacePath = mkdtempSync(join(tmpdir(), 'pan-2372-swarm-merge-clear-'));
-    recordRemote = initGitRecordRoot(workspacePath);
+    workspacePath = makeWorkspace('pan-2372-swarm-merge-clear-', 'pan-2203');
   });
 
-  afterEach(async () => {
-    removeGitRecordRemote(recordRemote);
-    recordRemote = null;
-    await cleanupGitRecordRoot(workspacePath);
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it('removes swarm.slotCompletions[slotIndex] for the merged slot and preserves siblings', async () => {
+  it('removes slotCompletions[slotIndex] for the merged slot and preserves siblings', async () => {
     const { writeSwarmSlotCompletion } = await import('../../../../src/lib/cloister/deacon-swarm-record.js');
-    const { readIssueRecordForWorkspaceSync } = await import('../../../../src/lib/pan-dir/record.js');
+    const { readSwarmSlotState } = await import('../../../../src/lib/cloister/swarm-slot-store.js');
     const fakeDeps = deps({ merged: true, conflicts: false });
     // Seed a durable marker for the slot about to merge, plus a sibling marker
     // that must survive (only the merged slot's marker is cleared).
@@ -192,8 +195,8 @@ describe('PAN-2372 WI-4 merge clears the durable slot-completion marker (FR-6, A
 
     await mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], fakeDeps);
 
-    const record = readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203');
-    expect(record?.swarm?.slotCompletions?.['1']).toBeUndefined();   // merged slot cleared
-    expect(record?.swarm?.slotCompletions?.['2']).toBeDefined();     // sibling preserved
+    const state = readSwarmSlotState(workspacePath, 'PAN-2203');
+    expect(state?.slotCompletions?.['1']).toBeUndefined();   // merged slot cleared
+    expect(state?.slotCompletions?.['2']).toBeDefined();     // sibling preserved
   });
 });

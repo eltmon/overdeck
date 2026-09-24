@@ -13,11 +13,11 @@ const TRUSTED_GIT_ENV_KEYS = [
   'XDG_CONFIG_HOME',
 ] as const;
 
-export function versionShipGitArgs(args: readonly string[]): string[] {
+function versionShipGitArgs(args: readonly string[]): string[] {
   return ['-c', 'core.hooksPath=/dev/null', ...args];
 }
 
-export function versionShipGitEnv(base: NodeJS.ProcessEnv = process.env): Record<string, string> {
+function versionShipGitEnv(base: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const env: Record<string, string> = {
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_TERMINAL_PROMPT: '0',

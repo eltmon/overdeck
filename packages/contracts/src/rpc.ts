@@ -14,10 +14,8 @@ import {
   SessionNodePresence,
   SessionsFeedFacetsSnapshot,
   SessionsFeedRowSnapshot,
-  WorkspaceDetail,
 } from "./types"
 import { EditorIdSchema, OpenInEditorInput } from "./editor"
-import { FlywheelStatus } from "./flywheel"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
 
@@ -42,14 +40,12 @@ export const WS_METHODS = {
   subscribeAgentOutput: "pan.subscribeAgentOutput",
   subscribeConversationMessages: "pan.subscribeConversationMessages",
   subscribeProjectSessionTree: "pan.subscribeProjectSessionTree",
-  subscribeFlywheelStatus: "pan.subscribeFlywheelStatus",
 
   // Snapshot / replay
   getSnapshot: "pan.getSnapshot",
   replayEvents: "pan.replayEvents",
 
   // Workspace detail (batched)
-  getWorkspaceDetail: "pan.getWorkspaceDetail",
   readWorkspaceFile: "pan.readWorkspaceFile",
 
   // Absolute-path markdown file door (PAN-3260) — read/write a single
@@ -212,6 +208,11 @@ export const ConversationEvent = Schema.Union([
     workLog: Schema.Array(WorkLogEntry),
     streaming: Schema.Boolean,
     snapshot: Schema.optional(Schema.Boolean),
+    /** Confirmed transcript replacement/truncation; replace even a shorter cached history. */
+    reset: Schema.optional(Schema.Boolean),
+    /** Metadata represents the whole parsed state, including absent plans/boundaries. */
+    metadataSnapshot: Schema.optional(Schema.Boolean),
+    totalCost: Schema.optional(Schema.Number),
     proposedPlan: Schema.optional(ProposedPlan),
     compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
     contextUsage: Schema.optional(Schema.NullOr(ContextUsage)),
@@ -310,13 +311,6 @@ export const TerminalResizeRpc = Rpc.make(WS_METHODS.terminalResize, {
 /** 9. Close a terminal session (unary) */
 export const TerminalCloseRpc = Rpc.make(WS_METHODS.terminalClose, {
   payload: Schema.Struct({ sessionName: Schema.String }),
-  error: PanRpcError,
-})
-
-/** 10. Get batched workspace detail (unary) — replaces 5 separate HTTP calls */
-export const GetWorkspaceDetailRpc = Rpc.make(WS_METHODS.getWorkspaceDetail, {
-  payload: Schema.Struct({ issueId: IssueId }),
-  success: WorkspaceDetail,
   error: PanRpcError,
 })
 
@@ -477,14 +471,6 @@ export const SubscribeConversationMessagesRpc = Rpc.make(WS_METHODS.subscribeCon
 export const SubscribeProjectSessionTreeRpc = Rpc.make(WS_METHODS.subscribeProjectSessionTree, {
   payload: Schema.Struct({ projectKey: Schema.String }),
   success: SessionTreeDelta,
-  error: PanRpcError,
-  stream: true,
-})
-
-/** 18. Subscribe to latest Flywheel status snapshots (stream) */
-export const SubscribeFlywheelStatusRpc = Rpc.make(WS_METHODS.subscribeFlywheelStatus, {
-  payload: Schema.Struct({}),
-  success: Schema.NullOr(FlywheelStatus),
   error: PanRpcError,
   stream: true,
 })
@@ -688,7 +674,6 @@ export const PanRpcGroup = RpcGroup.make(
   SubscribeAgentOutputRpc,
   GetSnapshotRpc,
   ReplayEventsRpc,
-  GetWorkspaceDetailRpc,
   ReadWorkspaceFileRpc,
   ReadFileAtPathRpc,
   WriteFileAtPathRpc,
@@ -704,7 +689,6 @@ export const PanRpcGroup = RpcGroup.make(
   ResizeTerminalRpc,
   SubscribeConversationMessagesRpc,
   SubscribeProjectSessionTreeRpc,
-  SubscribeFlywheelStatusRpc,
   ShellOpenInEditorRpc,
   GetAvailableEditorsRpc,
   ScanConversationsRpc,

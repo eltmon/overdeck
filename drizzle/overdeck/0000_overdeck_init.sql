@@ -183,8 +183,7 @@ CREATE TABLE `merge_queue` (
 	`position` integer NOT NULL,
 	`status` text DEFAULT 'queued' NOT NULL,
 	`queued_at` integer NOT NULL,
-	`started_at` integer,
-	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
+	`started_at` integer
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `merge_queue_issue_id_unique` ON `merge_queue` (`issue_id`);--> statement-breakpoint
@@ -217,8 +216,7 @@ CREATE TABLE `merge_sets` (
 	`workspace_type` text NOT NULL,
 	`status` text DEFAULT 'draft' NOT NULL,
 	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
+	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX `merge_sets_project_idx` ON `merge_sets` (`project_key`,`updated_at`);--> statement-breakpoint
@@ -229,8 +227,7 @@ CREATE TABLE `release_sets` (
 	`workspace_type` text NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
 	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
+	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX `release_sets_project_idx` ON `release_sets` (`project_key`,`updated_at`);--> statement-breakpoint
@@ -265,8 +262,7 @@ CREATE TABLE `pending_auto_merges` (
 	`merged_at` integer,
 	`failure_reason` text,
 	`cancelled_at` integer,
-	`cancelled_by` text,
-	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
+	`cancelled_by` text
 );
 --> statement-breakpoint
 CREATE INDEX `pending_auto_merges_issue_idx` ON `pending_auto_merges` (`issue_id`);--> statement-breakpoint
@@ -356,7 +352,8 @@ CREATE TABLE `review_status` (
 	`strike_landing_attempts` text,
 	`review_cycle_history` text,
 	`retired_at` integer,
-	`conflicts_since` text
+	`conflicts_since` text,
+	`review_stale_since` text
 );
 --> statement-breakpoint
 CREATE INDEX `review_status_updated_idx` ON `review_status` (`updated_at`);--> statement-breakpoint
@@ -417,8 +414,7 @@ CREATE TABLE `uat_generation_members` (
 	`pr_url` text,
 	`reason` text,
 	PRIMARY KEY(`uat_name`, `issue_id`),
-	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE TABLE `uat_generation_resolutions` (
@@ -471,8 +467,7 @@ CREATE TABLE `uat_generation_member_repos` (
 	`head_sha` text NOT NULL,
 	`merge_order_in_repo` integer DEFAULT 0 NOT NULL,
 	PRIMARY KEY(`uat_name`, `issue_id`, `repo_key`),
-	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `uat_generation_member_repos_uat_idx` ON `uat_generation_member_repos` (`uat_name`,`issue_id`);--> statement-breakpoint

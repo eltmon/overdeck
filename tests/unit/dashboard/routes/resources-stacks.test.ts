@@ -4,6 +4,42 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSpawn = vi.hoisted(() => vi.fn());
 
+vi.mock('../../../../src/dashboard/server/services/dashboard-poll-snapshots.js', () => ({
+  getAgentCostStatsSnapshot: async () => [],
+}));
+
+// PAN-3917: derived state is read from its owners. Stub the door so the
+// grouping assertions stay offline.
+const derivedStates = vi.hoisted(() => new Map<string, { issueId: string; state: string }>());
+vi.mock('../../../../src/dashboard/server/services/derived-issue-state.js', () => ({
+  loadIssueStatesForProject: async (_projectPath: string, issueIds: readonly string[]) =>
+    new Map(issueIds.map((id) => [id, derivedStates.get(id) ?? { issueId: id, state: 'working' }])),
+  getDerivedIssueState: async (issueId: string) =>
+    derivedStates.get(issueId) ?? { issueId, state: 'working' },
+  listReadyIssuesForProject: async () => [],
+}));
+
+// PAN-3917 W6: the backend inventory replaces the persisted agent mirror.
+// PAN-3917 (W6): the stack's state is derived per project, so the issue must
+// resolve to one. The real registry has no MIN project in this environment.
+vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/projects.js')>();
+  return {
+    ...actual,
+    resolveProjectFromIssueSync: (issueId: string) => (
+      issueId.toUpperCase().startsWith('MIN-')
+        ? { projectKey: 'myn', projectPath: '/repos/myn' }
+        : actual.resolveProjectFromIssueSync(issueId)
+    ),
+  };
+});
+
+vi.mock('../../../../src/dashboard/server/services/backend-inventory.js', () => ({
+  getBackendPanes: async () => [],
+  getBackendPanesForIssue: async () => [],
+  hasLiveBackendPane: async () => false,
+}));
+
 vi.mock('node:child_process', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:child_process')>()),
   spawn: mockSpawn,
@@ -13,28 +49,22 @@ import {
   buildResourceStacks,
   getResourcesEffect,
   resetCurrentDockerStatsReaderForTests,
-  resetResourceStackReviewStatusReaderForTests,
   resetSpawnGateHealthEvidenceReaderForTests,
   setCurrentDockerStatsReaderForTests,
-  setResourceStackReviewStatusReaderForTests,
   setSpawnGateHealthEvidenceReaderForTests,
   type ResourceStack,
   type StackContainerResource,
 } from '../../../../src/dashboard/server/routes/resources.js';
-import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { SystemHealthSnapshot } from '../../../../src/dashboard/server/services/system-health-service.js';
 
 afterEach(() => {
   resetCurrentDockerStatsReaderForTests();
-  resetResourceStackReviewStatusReaderForTests();
   resetSpawnGateHealthEvidenceReaderForTests();
   vi.restoreAllMocks();
 });
 
 beforeEach(() => {
-  // Default to a non-DB reader so tests that do not explicitly configure
-  // review status do not fail when the SQLite schema is not initialized.
-  setResourceStackReviewStatusReaderForTests(() => null);
+  derivedStates.clear();
 });
 
 describe('resources stack payload', () => {
@@ -58,17 +88,20 @@ describe('resources stack payload', () => {
     });
   });
 
-  it('attaches merged phase from the review-status read door', async () => {
+  it('attaches the derived issue state to the stack', async () => {
     setCurrentDockerStatsReaderForTests(() => [container('api')]);
-    setResourceStackReviewStatusReaderForTests((issueId) => issueId === 'MIN-857'
-      ? reviewStatus({ issueId, mergeStatus: 'merged' })
-      : null);
+    derivedStates.set('MIN-857', { issueId: 'MIN-857', state: 'merged' });
 
     const body = await getResourcesJson();
 
-    expect(findStack(body.stacks, 'MIN-857')).toMatchObject({
-      phase: 'merged',
-    });
+    expect(findStack(body.stacks, 'MIN-857')).toMatchObject({ state: 'merged' });
+  });
+
+  it('reports a stack with no issue as stateless rather than guessing', () => {
+    const stacks = buildResourceStacks([
+      { id: 'loose', name: 'redis', cpuPercent: 1, memoryUsage: 50, status: 'running' },
+    ]);
+    expect(findStack(stacks, 'unassigned')).toMatchObject({ state: null });
   });
 
   it('keeps unmapped containers in an unassigned pseudo-stack without losing services', () => {
@@ -234,18 +267,6 @@ function container(service: string, overrides: Partial<StackContainerResource> =
       'com.docker.compose.project': 'myn-feature-min-857',
       'com.docker.compose.service': service,
     },
-    ...overrides,
-  };
-}
-
-function reviewStatus(overrides: Partial<ReviewStatus>): ReviewStatus {
-  return {
-    issueId: 'MIN-857',
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    updatedAt: '2026-07-07T12:00:00.000Z',
-    readyForMerge: false,
     ...overrides,
   };
 }

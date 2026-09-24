@@ -52,15 +52,17 @@ function renderMenu(ui: React.ReactElement) {
   );
 }
 
-function mockStore({ currentIssue = issue(), currentAgent, reviewStatus = {} as Record<string, unknown> }: {
+function mockStore({ currentIssue = issue(), currentAgent, derived = {} as Record<string, unknown>, panes = {} as Record<string, unknown> }: {
   currentIssue?: Issue;
   currentAgent?: Agent;
-  reviewStatus?: Record<string, unknown>;
+  derived?: Record<string, unknown>;
+  panes?: Record<string, unknown>;
 } = {}) {
   useDashboardStore.setState({
     issuesRaw: [currentIssue],
     agentsById: currentAgent ? { [currentAgent.id]: currentAgent } : {},
-    reviewStatusByIssueId: reviewStatus,
+    derivedIssueStateByIssueId: derived,
+    backendPanesById: panes,
     drawer: { issueId: null, tab: 'overview' },
   } as Parameters<typeof useDashboardStore.setState>[0]);
 }
@@ -103,18 +105,16 @@ describe('IssueActionMenu', () => {
     expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
   });
 
-  it('enables Close out as the primary action for post-merge limbo membership', async () => {
+  it('enables Close out as the primary action once the PR has merged', async () => {
     mockStore({
-      currentIssue: issue({
-        status: 'In Progress',
-        state: 'in_progress',
-        pipelineMembership: {
-          available: true,
-          inPipeline: true,
-          bucket: 'post_merge_limbo',
-          labelDrift: null,
+      currentIssue: issue({ status: 'In Progress', state: 'in_progress' }),
+      derived: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          state: 'merged',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
-      }),
+      },
     });
 
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" />);
@@ -141,7 +141,7 @@ describe('IssueActionMenu', () => {
   });
 
   it('renders only agent-control actions when agentScopeOnly is enabled', () => {
-    mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'running', paused: true, troubled: true }) });
+    mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'running', paused: true }) });
 
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" agentScopeOnly />);
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
@@ -149,7 +149,6 @@ describe('IssueActionMenu', () => {
     const menu = screen.getByTestId('issue-action-overflow-menu');
     for (const label of [
       'Tell agent',
-      'Clear troubled gate',
       'Recover agent',
       'Resume session',
     ]) {
@@ -167,7 +166,6 @@ describe('IssueActionMenu', () => {
     expect(within(menu).queryByTestId('issue-action-destroyWorkspace')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-reopen')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-syncMain')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-inspectTask')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-open')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
   });
@@ -263,15 +261,11 @@ describe('IssueActionMenu', () => {
   it('pins registry actions and declared components after a flex spacer', () => {
     mockStore({
       currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }),
-      reviewStatus: {
+      derived: {
         'PAN-1': {
           issueId: 'PAN-1',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          mergeStatus: 'pending',
-          readyForMerge: true,
-          prUrl: 'https://example.test/pr/1',
-          updatedAt: '2026-05-23T00:00:00.000Z',
+          state: 'ready',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     });
@@ -387,27 +381,6 @@ describe('IssueActionMenu', () => {
     });
   });
 
-  it('runs the safe post-planning reset through its distinct endpoint', async () => {
-    const fetchMock = mockFetch();
-    vi.stubGlobal('fetch', fetchMock);
-    mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }) });
-    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
-
-    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
-    fireEvent.click(screen.getByTestId('issue-action-resetToPlanned'));
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('clears task progress and claims');
-
-    const confirmButton = screen.getByRole('button', { name: 'Reset to planned' });
-    fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Reset to planned' } });
-    fireEvent.click(confirmButton);
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      '/api/issues/PAN-1/reset-to-planned',
-      expect.objectContaining({ method: 'POST' }),
-    ));
-  });
-
   it('renders disabled actions with a tooltip reason', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="inline" />);
 
@@ -496,31 +469,4 @@ describe('IssueActionMenu', () => {
     });
   });
 
-  it('opens the inspect task dialog and posts the selected task id', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf-token' });
-      if (url === '/api/issues/PAN-1/tasks' && !init?.method) {
-        return Response.json({ tasks: [{ id: 'task-1', title: 'First task', status: 'open' }], count: 1, workspacePath: '/tmp/pan-1' });
-      }
-      return Response.json({ success: true });
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    mockStore({ currentIssue: issue({ hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'stopped' }) });
-    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
-
-    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByTestId('issue-action-inspectTask'));
-
-    expect(await screen.findByRole('dialog', { name: 'Inspect task' })).toBeInTheDocument();
-    expect(await screen.findByLabelText('Task to inspect')).toHaveValue('task-1');
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect task' }));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/tasks/task-1/inspect', expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ deep: false }),
-      }));
-    });
-  });
 });

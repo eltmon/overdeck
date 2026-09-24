@@ -1,10 +1,10 @@
 import chalk from 'chalk';
 import {
-  getAgentCVSync,
-  getAgentRankingsSync,
-  formatCVSync,
-  startWorkSync,
-  completeWorkSync,
+  getAgentCV,
+  getAgentRankings,
+  formatCV,
+  startWork,
+  completeWork,
 } from '../../lib/cv.js';
 import { normalizeAgentId } from '../../lib/agents.js';
 
@@ -16,7 +16,7 @@ interface CVOptions {
 export async function cvCommand(agentId?: string, options: CVOptions = {}): Promise<void> {
   // Show rankings
   if (options.rankings || !agentId) {
-    const rankings = getAgentRankingsSync();
+    const rankings = getAgentRankings();
 
     if (options.json) {
       console.log(JSON.stringify(rankings, null, 2));
@@ -57,7 +57,7 @@ export async function cvCommand(agentId?: string, options: CVOptions = {}): Prom
 
   // Show specific agent CV
   const normalizedId = normalizeAgentId(agentId);
-  const cv = getAgentCVSync(normalizedId);
+  const cv = getAgentCV(normalizedId);
 
   if (options.json) {
     console.log(JSON.stringify(cv, null, 2));
@@ -65,8 +65,8 @@ export async function cvCommand(agentId?: string, options: CVOptions = {}): Prom
   }
 
   console.log('');
-  console.log(formatCVSync(cv));
+  console.log(formatCV(cv));
 }
 
 // Export helper functions for integration
-export { startWorkSync, completeWorkSync };
+export { startWork, completeWork };

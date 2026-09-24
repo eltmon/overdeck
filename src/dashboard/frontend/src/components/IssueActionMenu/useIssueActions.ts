@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { OrderBook } from '@overdeck/contracts';
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { useAlert, useConfirm } from '../DialogProvider';
@@ -17,7 +17,7 @@ import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
-import { selectAgents, selectIssues, selectReviewStatus, useDashboardStore } from '../../lib/store';
+import { selectAgents, selectBackendPanes, selectDerivedIssueState, selectIssues, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
 
@@ -68,8 +68,6 @@ type PostActionInput = {
   selectedTaskId?: string | null;
 };
 
-type AlertFn = ReturnType<typeof useAlert>;
-
 function activeAgentForIssue(agents: Agent[], issueId: string) {
   const issueAgents = agents.filter((agent) => agent.issueId?.toLowerCase() === issueId.toLowerCase());
   const live = issueAgents.find((agent) => !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(agent.status));
@@ -97,38 +95,11 @@ function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | u
     .replace(':taskId', encodeURIComponent(selectedTaskId ?? state.selectedTaskId ?? ''));
 }
 
-const untroubledAction = ISSUE_ACTIONS.find((action) => action.key === 'untroubled');
-
 const REVIEW_MODE_SUBMENU_OPTIONS = [
   { mode: 'full', label: 'Full — 4-reviewer convoy' },
   { mode: 'quick', label: 'Quick — single pass (default)' },
   { mode: 'none', label: 'None — skip AI review' },
 ] as const;
-
-export async function clearTroubledGateForAgent(
-  agentId: string,
-  queryClient: QueryClient,
-  alert: AlertFn,
-): Promise<void> {
-  if (!untroubledAction?.endpoint) {
-    throw new Error('Clear troubled gate action is not registered');
-  }
-
-  const response = await fetch(untroubledAction.endpoint.replace(':agentId', encodeURIComponent(agentId)), {
-    method: 'POST',
-    credentials: 'include',
-    headers: await dashboardMutationJsonHeaders(),
-    body: '{}',
-  });
-  if (!response.ok) {
-    const message = await responseError(response, `Failed to run ${untroubledAction.label}`);
-    void alert({ message, variant: 'error' });
-    throw new Error(message);
-  }
-
-  await refreshDashboardState(queryClient);
-  void alert({ message: `Cleared troubled state for ${agentId}`, variant: 'success' });
-}
 
 function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue | undefined) {
   switch (action.key) {
@@ -147,8 +118,6 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { wipeWorkspace: true };
     case 'completeWorkReset':
       return { spawn: false };
-    case 'inspectTask':
-      return { deep: false };
     case 'doneWork':
       return { message: `If implementation is complete, run: pan done ${issueId} -c "Implementation complete". If work remains, continue the current task.` };
     default:
@@ -178,10 +147,6 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'Review can be requested after workspace work is idle and not already in review.';
     case 'restartReview':
       return 'Re-run review is available while review, test, or merge work is active or failed.';
-    case 'recoverReview':
-      return 'Reset stalled review state is available only when the review pipeline is blocked or failed.';
-    case 'inspectTask':
-      return 'Select a task before requesting inspection.';
     case 'viewPr':
       return 'No pull request URL is available yet.';
     case 'addToOrderBook':
@@ -210,8 +175,6 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'Reopen is available only for done or canceled issues.';
     case 'unpause':
       return 'This agent is not paused.';
-    case 'untroubled':
-      return 'This agent is not troubled.';
     default:
       return `${action.label} is unavailable in the current issue state.`;
   }
@@ -222,7 +185,6 @@ const dialogActionKeys = new Set<IssueActionKey>([
   'autoPlan',
   'startSkipPlanning',
   'tell',
-  'inspectTask',
   'open',
   'upload',
 ]);
@@ -232,7 +194,6 @@ const artifactTabs: Partial<Record<IssueActionKey, string>> = {
   inference: 'inference',
   discussions: 'discussions',
   transcripts: 'conversation',
-  statusReview: 'overview',
 };
 
 function destructiveMessage(action: IssueActionEntry, issueId: string) {
@@ -245,8 +206,6 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
       return `Destroy the workspace for ${issueId}?\n\nThis removes workspace resources but leaves the issue record intact.`;
     case 'resetIssue':
       return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears tasks and xBRIEF state, and moves the issue back to Todo.`;
-    case 'resetToPlanned':
-      return `Reset ${issueId} to planned?\n\nThis stops issue agents and clears task progress and claims, saved sessions, completion markers, pipeline verdicts, retries, and merge-queue state. It preserves the workspace, branch, commits, and finalized xBRIEF, returns the issue to open + planned, and does not start an agent.`;
     case 'cancel':
       return `Cancel ${issueId}?\n\nThis cancels the issue and wipes the workspace state for the abandoned run.`;
     case 'resetSession':
@@ -256,8 +215,6 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
       return `Restart work for ${issueId}?\n\nThis stops the current agent path and starts a replacement run from existing context.`;
     case 'completeWorkReset':
       return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, xBRIEF, tasks, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
-    case 'purgeReview':
-      return `Remove review sessions and reset ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
     default:
       return `${action.label} for ${issueId}?`;
   }
@@ -269,7 +226,8 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const alert = useAlert();
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agents = useDashboardStore(selectAgents) as Agent[];
-  const reviewStatus = useDashboardStore(selectReviewStatus(issueId));
+  const derived = useDashboardStore(selectDerivedIssueState(issueId));
+  const panes = useDashboardStore(selectBackendPanes(issueId));
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [activeDialog, setActiveDialog] = useState<IssueActionDialogState>(null);
   const [pendingKey, setPendingKey] = useState<IssueActionKey | null>(null);
@@ -323,7 +281,8 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const state: IssueActionState = useMemo(() => {
     const workspaceInfo = workspace ?? { exists: false, issueId, path: undefined };
     return {
-      reviewStatus: reviewStatus ?? null,
+      derived: derived ?? null,
+      panes,
       agent: agent ?? null,
       lifecycle: lifecycle ?? agent?.lifecycle ?? null,
       workspace: workspaceInfo,
@@ -333,14 +292,14 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       hasTranscripts: false,
       hasDiscussions: false,
       issueCanonicalState: issue?.state ?? STATUS_LABELS[issue?.status ?? ''] ?? issue?.status ?? null,
-      isMerged: reviewStatus?.mergeStatus === 'merged' || issue?.mergeStatus === 'merged' || issue?.pipelineMembership?.bucket === 'post_merge_limbo',
-      hasPr: Boolean(reviewStatus?.readyForMerge || reviewStatus?.prUrl),
-      prUrl: reviewStatus?.prUrl ?? null,
+      isMerged: derived?.state === 'merged' || issue?.pipelineMembership?.bucket === 'post_merge_limbo',
+      hasPr: Boolean(derived?.pr?.url),
+      prUrl: derived?.pr?.url ?? null,
       hasPendingInput: agent?.hasPendingQuestion === true,
       orderBooksLoaded: orderBooksQuery.isSuccess,
       isInActiveOrderBook,
     };
-  }, [agent, isInActiveOrderBook, issue, issueId, lifecycle, orderBooksQuery.isSuccess, reviewStatus, workspace]);
+  }, [agent, derived, isInActiveOrderBook, issue, issueId, lifecycle, orderBooksQuery.isSuccess, panes, workspace]);
 
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 

@@ -6,11 +6,11 @@ const mocks = vi.hoisted(() => ({
   spawnRun: vi.fn(),
   saveAgentStateProgram: vi.fn(),
   getAgentStateProgram: vi.fn(),
-  getAgentStateSync: vi.fn(),
+  getAgentState: vi.fn(),
   getAgentStateFileSync: vi.fn(),
-  listAgentIdsByPrefixSync: vi.fn(),
+  listAgentIdsByPrefix: vi.fn(),
   removeAgent: vi.fn(),
-  getLatestSessionIdSync: vi.fn(),
+  getLatestSessionId: vi.fn(),
   resumeAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(),
   listSessionNames: vi.fn(),
@@ -18,17 +18,13 @@ const mocks = vi.hoisted(() => ({
   killSession: vi.fn(),
   killSessionSync: vi.fn(),
   emitActivityEntry: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
-  getReviewStatus: vi.fn(),
-  getReviewStatusSync: vi.fn(),
   setReviewStatus: vi.fn(),
   setReviewStatusSync: vi.fn(),
   buildReviewContext: vi.fn(),
   formatTier1Summary: vi.fn(),
-  archiveFeedbackFiles: vi.fn(),
+  clearFeedbackFiles: vi.fn(),
   convergeRowFromVerdictOfRecord: vi.fn(),
   notifyPipeline: vi.fn(),
-  notifyPipelineSync: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -40,21 +36,20 @@ vi.mock('../../agents.js', () => ({
   spawnRun: mocks.spawnRun,
   saveAgentState: mocks.saveAgentStateProgram,
   saveAgentStateProgram: mocks.saveAgentStateProgram,
-  getAgentState: mocks.getAgentStateProgram,
   getAgentStateProgram: mocks.getAgentStateProgram,
-  getAgentStateSync: mocks.getAgentStateSync,
-  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
+  getAgentState: mocks.getAgentState,
+  getLatestSessionId: mocks.getLatestSessionId,
   resumeAgent: mocks.resumeAgent,
   wipeAgentStateDirs: mocks.wipeAgentStateDirs,
   messageAgent: vi.fn(),
 }));
 
 vi.mock('../../agents/agent-state.js', () => ({
-  getAgentStateSync: mocks.getAgentStateFileSync,
+  getAgentState: mocks.getAgentStateFileSync,
 }));
 
 vi.mock('../../overdeck/agents.js', () => ({
-  listAgentIdsByPrefixSync: mocks.listAgentIdsByPrefixSync,
+  listAgentIdsByPrefix: mocks.listAgentIdsByPrefix,
 }));
 
 vi.mock('../../agents/removal.js', () => ({
@@ -70,18 +65,19 @@ vi.mock('../../tmux.js', () => ({
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: mocks.emitActivityEntry,
-  emitActivityEntrySync: mocks.emitActivityEntry,
 }));
 
-vi.mock('../../review-status.js', () => ({
-  getReviewStatus: mocks.getReviewStatus,
-  getReviewStatusSync: mocks.getReviewStatus,
-  setReviewStatus: mocks.setReviewStatus,
-  setReviewStatusSync: mocks.setReviewStatus,
+// PAN-3917: the conflict gate asks the forge; keep the subprocess out of the test.
+vi.mock('../pr-facts.js', () => ({
+  getPrFacts: async (issueId: string) => ({
+    issueId, forge: 'github', url: null, number: null, exists: true, open: true,
+    merged: false, closed: false, draft: false, headSha: null, headBranch: null,
+    reviewDecision: null, approved: false, changesRequested: false,
+    mergeable: true, mergeableState: 'clean', checks: 'green',
+  }),
 }));
 
 vi.mock('../../config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: vi.fn(() => ({ config: {} })),
   resolveModel: vi.fn(() => 'sonnet'),
 }));
@@ -96,7 +92,7 @@ vi.mock('../review-monitor.js', () => ({
 }));
 
 vi.mock('../feedback-writer.js', () => ({
-  archiveFeedbackFiles: mocks.archiveFeedbackFiles,
+  clearFeedbackFiles: mocks.clearFeedbackFiles,
 }));
 
 vi.mock('../merge-verification.js', () => ({
@@ -112,7 +108,7 @@ vi.mock('../../pipeline-notifier.js', () => ({
   notifyPipeline: mocks.notifyPipeline,
 }));
 
-import { purgeReviewAgentsForIssue, spawnReviewRoleForIssue } from '../review-agent.js';
+import { buildReviewRolePrompt, purgeReviewAgentsForIssue, spawnReviewRoleForIssue } from '../review-agent.js';
 
 describe('spawnReviewRoleForIssue', () => {
   beforeEach(() => {
@@ -134,22 +130,55 @@ describe('spawnReviewRoleForIssue', () => {
       startedAt: '2026-05-18T00:00:00.000Z',
     }));
     mocks.saveAgentStateProgram.mockReturnValue(Effect.void);
-    mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
+    mocks.getAgentState.mockImplementation((id: string) => (id === 'agent-pan-1194' ? { hostOverride: true } : undefined));
     mocks.getAgentStateFileSync.mockReturnValue(undefined);
     mocks.getAgentStateFileSync.mockReturnValue(undefined);
-    mocks.listAgentIdsByPrefixSync.mockReturnValue([]);
+    mocks.listAgentIdsByPrefix.mockReturnValue([]);
     mocks.removeAgent.mockResolvedValue({ removedDir: false, preservedTranscripts: 1 });
-    mocks.getLatestSessionIdSync.mockReturnValue(undefined);
+    mocks.getLatestSessionId.mockReturnValue(undefined);
     mocks.resumeAgent.mockResolvedValue({ success: false, reason: 'no session' });
     mocks.wipeAgentStateDirs.mockResolvedValue(undefined);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.isPaneDead.mockReturnValue(Effect.succeed(false));
     mocks.killSession.mockReturnValue(Effect.void);
-    mocks.getReviewStatus.mockReturnValue(undefined);
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
-    mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
+    mocks.clearFeedbackFiles.mockResolvedValue(undefined);
     mocks.convergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
+  });
+
+  it('dispatches quick review without convoy wait instructions', async () => {
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-quick-contract',
+      branch: 'feature/pan-1194',
+    }));
+    expect(result.success).toBe(true);
+    const options = mocks.spawnRun.mock.calls[0][2];
+    const prompt = options.prompt;
+    expect(prompt).toContain('sole reviewer');
+    expect(prompt).toContain('second coverage pass');
+    expect(prompt).toContain('AC evidence');
+    expect(prompt).not.toContain('STANDBY');
+    expect(prompt).not.toContain('REVIEWER_READY');
+    expect(prompt).not.toContain('synthesis.md');
+  });
+
+  it('keeps convoy wait, failure, and report obligations in the full dispatch', () => {
+    const prompt = buildReviewRolePrompt({
+      issueId: 'PAN-1194', workspace: '/tmp/full', branch: 'feature/pan-1194',
+      runId: 'run-full', reviewDir: '/tmp/full/review', contextManifestPath: '/tmp/context.json',
+    });
+    expect(prompt).toContain('STANDBY');
+    expect(prompt).toContain('REVIEWER_READY');
+    expect(prompt).toContain('REVIEWER_FAILED');
+    expect(prompt).toContain('REVIEWER_TIMEOUT');
+    expect(prompt).toContain('block approval');
+    expect(prompt).toContain('Operator-requested early reads');
+    expect(prompt).toContain('STALE-SIGNAL GUARD');
+    expect(prompt).toContain('synthesis.md');
+    expect(prompt).toContain('--run-id "run-full"');
+    expect(prompt).not.toContain('sole reviewer');
   });
 
   it('inherits host override from the completed work agent for the review spawn', async () => {
@@ -160,7 +189,7 @@ describe('spawnReviewRoleForIssue', () => {
     }));
 
     expect(result.success).toBe(true);
-    expect(mocks.getAgentStateProgram).toHaveBeenCalledWith('agent-pan-1194');
+    expect(mocks.getAgentState).toHaveBeenCalledWith('agent-pan-1194');
     expect(mocks.spawnRun).toHaveBeenCalledWith(
       'PAN-1194',
       'review',
@@ -168,30 +197,6 @@ describe('spawnReviewRoleForIssue', () => {
     );
   });
 
-  it('clears a superseded review-infrastructure failure when a fresh cycle dispatches', async () => {
-    mocks.getReviewStatus.mockReturnValue({
-      reviewStatus: 'pending',
-      verificationStatus: 'passed',
-      stuck: true,
-      stuckReason: 'review_infrastructure_failure',
-      stuckAt: '2026-08-01T02:44:56.000Z',
-    });
-
-    const result = await Effect.runPromise(spawnReviewRoleForIssue({
-      issueId: 'PAN-3377',
-      workspace: '/tmp/pan-review-fresh-cycle',
-      branch: 'feature/pan-3377',
-    }));
-
-    expect(result.success).toBe(true);
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3377', expect.objectContaining({
-      reviewStatus: 'reviewing',
-      stuck: false,
-      stuckReason: undefined,
-      stuckAt: undefined,
-      stuckDetails: undefined,
-    }));
-  });
 
   it('threads explicit model and harness overrides to the review spawn', async () => {
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
@@ -225,7 +230,44 @@ describe('spawnReviewRoleForIssue', () => {
     expect(mocks.spawnRun).toHaveBeenCalled();
   });
 
-  it('keeps a live review session whose run identity matches current HEAD', async () => {
+  it('aborts force replacement when a live review session cannot be stopped', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
+    mocks.killSession.mockReturnValue(Effect.fail(new Error('tmux refused')));
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-stop-failed',
+      branch: 'feature/pan-1194',
+      force: true,
+    }));
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Review replacement aborted — could not stop agent-pan-1194-review',
+      error: 'Review sessions still live: agent-pan-1194-review',
+    });
+    expect(mocks.wipeAgentStateDirs).not.toHaveBeenCalled();
+    expect(mocks.spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('aborts force replacement when live review sessions cannot be enumerated', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.fail(new Error('tmux unavailable')));
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-list-failed',
+      branch: 'feature/pan-1194',
+      force: true,
+    }));
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('agent-pan-1194-review');
+    expect(mocks.wipeAgentStateDirs).not.toHaveBeenCalled();
+    expect(mocks.spawnRun).not.toHaveBeenCalled();
+  });
+
+
+  it('does not clear pending feedback when the dispatch is skipped as already running (PR #3870 finding 4)', async () => {
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
     mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
 
@@ -235,42 +277,24 @@ describe('spawnReviewRoleForIssue', () => {
       branch: 'feature/pan-1194',
     }));
 
-    expect(result).toEqual({
-      success: false,
-      message: 'Review dispatch skipped — already running: agent-pan-1194-review',
-    });
-    expect(mocks.convergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1194', {
-      runId: 'agent-pan-1194-review-abc12345',
-      workspacePath: '/tmp/pan-review-current',
-      writer: 'dispatch-converge',
-    });
-    expect(mocks.killSession).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('already running');
+    // A duplicate dispatch must not delete feedback the skipped cycle still owns.
+    expect(mocks.clearFeedbackFiles).not.toHaveBeenCalled();
     expect(mocks.spawnRun).not.toHaveBeenCalled();
   });
 
-  it('converges a current-run verdict artifact before treating a live parent as active', async () => {
-    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
-    mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
-    mocks.convergeRowFromVerdictOfRecord.mockResolvedValue({ converged: true });
-
+  it('clears previous-cycle feedback once a real dispatch passes the checks', async () => {
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
-      workspace: '/tmp/pan-review-current-verdict',
+      workspace: '/tmp/pan-review-fresh',
       branch: 'feature/pan-1194',
     }));
 
-    expect(result).toEqual({
-      success: true,
-      message: 'Review dispatch converged from the verdict of record: PAN-1194',
-    });
-    expect(mocks.convergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1194', {
-      runId: 'agent-pan-1194-review-abc12345',
-      workspacePath: '/tmp/pan-review-current-verdict',
-      writer: 'dispatch-converge',
-    });
-    expect(mocks.killSession).not.toHaveBeenCalled();
-    expect(mocks.spawnRun).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    expect(mocks.clearFeedbackFiles).toHaveBeenCalledWith('/tmp/pan-review-fresh');
   });
+
 
   it('re-dispatches a finished convoy when synthesis exists and a newer request is pending', async () => {
     const workspace = '/tmp/pan-review-finished-convoy';
@@ -280,12 +304,7 @@ describe('spawnReviewRoleForIssue', () => {
     await writeFile(`${reviewDir}/synthesis.md`, '# Review complete\n');
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
     mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
-    mocks.getReviewStatus.mockReturnValue({
-      reviewStatus: 'pending',
-      reviewRequestedAt: '2026-07-15T19:00:00.000Z',
-      reviewSpawnedAt: '2026-07-15T18:00:00.000Z',
-    });
-    mocks.listAgentIdsByPrefixSync.mockReturnValue(['agent-pan-1194-review']);
+    mocks.listAgentIdsByPrefix.mockReturnValue(['agent-pan-1194-review']);
     mocks.getAgentStateFileSync.mockReturnValue({
       id: 'agent-pan-1194-review',
       issueId: 'PAN-1194',
@@ -306,7 +325,7 @@ describe('spawnReviewRoleForIssue', () => {
   });
 
   it('purges every reviewer through canonical transcript-preserving removal', async () => {
-    mocks.listAgentIdsByPrefixSync.mockReturnValue([
+    mocks.listAgentIdsByPrefix.mockReturnValue([
       'agent-pan-1194-review',
       'agent-pan-1194-review-correctness',
     ]);

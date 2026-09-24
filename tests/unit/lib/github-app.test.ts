@@ -38,14 +38,12 @@ vi.mock('child_process', async (importOriginal) => {
 import {
   getCiCheckRunsState,
   getIssueState,
-  getIssueStatePromise,
   getMergeBackendStatus,
   getPullRequestState,
   isIntegrationPermissionError,
   listOpenIssuesWithLabels,
-  listOpenIssuesWithLabelsPromise,
   listPullRequestsForHead,
-  listPullRequestsForHeadPromise,
+  postOverdeckTestsStatus,
   verifyAppCanMerge,
 } from '../../../src/lib/github-app.js';
 
@@ -114,7 +112,7 @@ describe('getCiCheckRunsState', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'token', expires_at: '2026-06-10T00:00:00Z' }), { status: 201 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ check_runs: checkRuns }), { status: 200 }));
 
-    return Effect.runPromise(getCiCheckRunsState('eltmon', 'overdeck', 'abc123'));
+    return getCiCheckRunsState('eltmon', 'overdeck', 'abc123');
   }
 
   it('returns green from check-runs only when at least one run succeeded and none are pending or failed', async () => {
@@ -188,7 +186,7 @@ describe('getCiCheckRunsState', () => {
         { status: 200 },
       ));
 
-    const state = await Effect.runPromise(getCiCheckRunsState('eltmon', 'overdeck', 'abc123'));
+    const state = await getCiCheckRunsState('eltmon', 'overdeck', 'abc123');
 
     expect(state).toMatchObject({
       verdict: 'pending',
@@ -237,7 +235,7 @@ describe('getPullRequestState', () => {
           mergeable: true,
           mergeable_state: 'unstable',
           draft: false,
-          head: { sha: 'abc123' },
+          head: { sha: 'abc123', ref: 'feature/pan-42' },
           base: { ref: 'main' },
         }), { status: 200 });
       }
@@ -257,8 +255,8 @@ describe('getPullRequestState', () => {
       { context: 'CodeRabbit', state: 'failure' },
     ]);
 
-    await expect(Effect.runPromise(getPullRequestState('eltmon', 'overdeck', 42)))
-      .resolves.toMatchObject({ checksPending: false, checksFailed: false });
+    await expect(getPullRequestState('eltmon', 'overdeck', 42))
+      .resolves.toMatchObject({ headRef: 'feature/pan-42', checksPending: false, checksFailed: false });
   });
 
   it('still fails when a real commit status fails', async () => {
@@ -267,7 +265,7 @@ describe('getPullRequestState', () => {
       { context: 'CodeRabbit', state: 'failure' },
     ]);
 
-    await expect(Effect.runPromise(getPullRequestState('eltmon', 'overdeck', 42)))
+    await expect(getPullRequestState('eltmon', 'overdeck', 42))
       .resolves.toMatchObject({ checksFailed: true });
   });
 });
@@ -302,7 +300,7 @@ describe('App REST shared helpers', () => {
         },
       ]), { status: 200 }));
 
-    const result = await listPullRequestsForHeadPromise('eltmon', 'overdeck', 'feature/pan-2265', 'all');
+    const result = await listPullRequestsForHead('eltmon', 'overdeck', 'feature/pan-2265', 'all');
 
     expect(result).toEqual([{
       number: 123,
@@ -323,7 +321,7 @@ describe('App REST shared helpers', () => {
       .mockResolvedValueOnce(tokenResponse())
       .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'closed' }), { status: 200 }));
 
-    await expect(getIssueStatePromise('eltmon', 'overdeck', 2265)).resolves.toEqual({ state: 'closed' });
+    await expect(getIssueState('eltmon', 'overdeck', 2265)).resolves.toEqual({ state: 'closed' });
 
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
       'https://api.github.com/app/installations/67890/access_tokens',
@@ -357,7 +355,7 @@ describe('App REST shared helpers', () => {
         },
       ]), { status: 200 }));
 
-    const result = await listOpenIssuesWithLabelsPromise('eltmon', 'overdeck');
+    const result = await listOpenIssuesWithLabels('eltmon', 'overdeck');
 
     expect(result).toEqual([
       { number: 1, labels: ['pan-2265', 'backend'] },
@@ -383,11 +381,11 @@ describe('App REST shared helpers', () => {
         { number: 5, labels: [{ name: 'ready' }] },
       ]), { status: 200 }));
 
-    await expect(Effect.runPromise(listPullRequestsForHead('eltmon', 'overdeck', 'feature/pan-2265', 'open')))
+    await expect(listPullRequestsForHead('eltmon', 'overdeck', 'feature/pan-2265', 'open'))
       .resolves.toMatchObject([{ number: 4, state: 'open', merged: false }]);
-    await expect(Effect.runPromise(getIssueState('eltmon', 'overdeck', 2265)))
+    await expect(getIssueState('eltmon', 'overdeck', 2265))
       .resolves.toEqual({ state: 'open' });
-    await expect(Effect.runPromise(listOpenIssuesWithLabels('eltmon', 'overdeck')))
+    await expect(listOpenIssuesWithLabels('eltmon', 'overdeck'))
       .resolves.toEqual([{ number: 5, labels: ['ready'] }]);
   });
 });
@@ -472,4 +470,45 @@ describe('isIntegrationPermissionError', () => {
     expect(isIntegrationPermissionError('GitHub merge failed: 422 {"message":"Required status check"}')).toBe(false);
     expect(isIntegrationPermissionError('GitHub merge failed: 405 Method Not Allowed')).toBe(false);
   });
+});
+
+describe('postOverdeckTestsStatus sha binding (PAN-3847)', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+    execFileMock.mockClear();
+    fetchMock.mockImplementation((input: unknown) => {
+      const url = String(input);
+      if (url.includes('/access_tokens')) {
+        return Promise.resolve(new Response(JSON.stringify({ token: 'token', expires_at: '2026-09-18T00:00:00Z' }), { status: 201 }));
+      }
+      return Promise.resolve(new Response('{}', { status: 201 }));
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('posts to /statuses/<sha> with the caller-provided sha and never shells out to git', async () => {
+    const testedSha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+
+    await postOverdeckTestsStatus(
+      '/workspaces/feature-pan-3847',
+      'eltmon',
+      'overdeck',
+      'success',
+      'Verification gate passed (changed-file scope)',
+      testedSha,
+    );
+
+    const statusCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/statuses/'));
+    expect(statusCall).toBeDefined();
+    expect(String(statusCall![0])).toBe(`https://api.github.com/repos/eltmon/overdeck/statuses/${testedSha}`);
+    expect(execFileMock.mock.calls.some((call) => String(call[1]).includes('rev-parse'))).toBe(false);
+    expect(execFileMock.mock.calls.some((call) => String(call[0]).includes('rev-parse'))).toBe(false);
+  });
+
 });

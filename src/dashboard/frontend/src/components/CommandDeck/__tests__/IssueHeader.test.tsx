@@ -2,6 +2,7 @@ import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
+import { useDashboardStore } from '../../../lib/store';
 
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
@@ -32,23 +33,9 @@ const activityResult = vi.hoisted(() => ({
   isLoading: false,
 }));
 
-const reviewStatusResult = vi.hoisted(() => ({
-  data: {
-    issueId: 'PAN-895',
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    verificationStatus: 'pending',
-    readyForMerge: false,
-    updatedAt: '2026-04-28T00:00:00Z',
-  },
-  isLoading: false,
-}));
-
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningSummaryWithOverridesQuery: () => planningSummaryResult,
   useActivityQuery: () => activityResult,
-  useReviewStatusQuery: () => reviewStatusResult,
 }));
 
 import { IssueHeader } from '../SessionView/IssueHeader';
@@ -72,7 +59,8 @@ describe('IssueHeader', () => {
       if (url === '/api/issues/PAN-895/staffing') return Response.json({});
       if (url === '/api/issues/PAN-895/swarm-policy') return Response.json({});
       if (url === '/api/settings/available-models') return Response.json({ models: [] });
-      if (url === '/api/flywheel/config') return Response.json({});
+      if (url === '/api/merge-train/config') return Response.json({});
+      if (url === '/api/merge-train/auto-merge') return Response.json({ issues: [] });
       return undefined;
     });
     planningSummaryResult.data = {
@@ -85,15 +73,9 @@ describe('IssueHeader', () => {
       stashCount: 0,
     };
     activityResult.data = { issueId: 'PAN-895', sections: [], resolvedTotalCost: 4.2 };
-    reviewStatusResult.data = {
-      issueId: 'PAN-895',
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      verificationStatus: 'pending',
-      readyForMerge: false,
-      updatedAt: '2026-04-28T00:00:00Z',
-    };
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-895': { issueId: 'PAN-895', state: 'working' } },
+    });
   });
 
   afterEach(async () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 
-import { bareKimiModel, parseKimiSessionSync } from '../kimi-parser.js';
-import { getPricingSync } from '../../cost.js';
+import { bareKimiModel, parseKimiSession } from '../kimi-parser.js';
+import { getPricing } from '../../cost.js';
 
 const FIXTURE_PATH = join(
   import.meta.dirname,
@@ -17,16 +17,16 @@ describe('bareKimiModel', () => {
   });
 });
 
-describe('parseKimiSessionSync (PAN-1837 wi8b, against the pinned wi-fixture)', () => {
+describe('parseKimiSession (PAN-1837 wi8b, against the pinned wi-fixture)', () => {
   it('ac1: produces a non-empty normalized summary whose turn count matches the fixture (2 turns)', () => {
-    const usage = parseKimiSessionSync(FIXTURE_PATH);
+    const usage = parseKimiSession(FIXTURE_PATH);
 
     expect(usage).not.toBeNull();
     expect(usage?.messageCount).toBe(2);
   });
 
   it('ac2: returns token usage with non-zero cache-read accounting, summed across every usage.record', () => {
-    const usage = parseKimiSessionSync(FIXTURE_PATH);
+    const usage = parseKimiSession(FIXTURE_PATH);
 
     expect(usage?.usage).toEqual({
       inputTokens: 10788,
@@ -37,8 +37,8 @@ describe('parseKimiSessionSync (PAN-1837 wi8b, against the pinned wi-fixture)', 
   });
 
   it('ac3: computes a non-zero session cost using the k3 custom-provider pricing row', () => {
-    const usage = parseKimiSessionSync(FIXTURE_PATH);
-    const pricing = getPricingSync('custom', 'k3');
+    const usage = parseKimiSession(FIXTURE_PATH);
+    const pricing = getPricing('custom', 'k3');
 
     expect(pricing).not.toBeNull();
     const expectedCost = (10788 / 1000) * pricing!.inputPer1k
@@ -51,7 +51,7 @@ describe('parseKimiSessionSync (PAN-1837 wi8b, against the pinned wi-fixture)', 
   });
 
   it('resolves the bare model id and session id from the fixture path shape', () => {
-    const usage = parseKimiSessionSync(FIXTURE_PATH);
+    const usage = parseKimiSession(FIXTURE_PATH);
 
     expect(usage?.model).toBe('k3');
     expect(usage?.sessionFile).toBe(FIXTURE_PATH);
@@ -67,17 +67,17 @@ describe('parseKimiSessionSync (PAN-1837 wi8b, against the pinned wi-fixture)', 
       'agents', 'main', 'wire.jsonl',
     );
 
-    const usage = parseKimiSessionSync(nestedFixture);
+    const usage = parseKimiSession(nestedFixture);
 
     expect(usage?.sessionId).toBe('session_1fc830f7-151f-477c-ae4a-571dfee57723');
   });
 
   it('returns null for a missing or unreadable file', () => {
-    expect(parseKimiSessionSync('/tmp/does-not-exist-kimi-wire.jsonl')).toBeNull();
+    expect(parseKimiSession('/tmp/does-not-exist-kimi-wire.jsonl')).toBeNull();
   });
 
   it('returns null when the file has no usage.record entries', () => {
     // Any real fixture line set without usage.record — the metadata-only prefix.
-    expect(parseKimiSessionSync(join(import.meta.dirname, '..', '..', '..', '..', 'tests', 'fixtures', 'kimi', 'README.md'))).toBeNull();
+    expect(parseKimiSession(join(import.meta.dirname, '..', '..', '..', '..', 'tests', 'fixtures', 'kimi', 'README.md'))).toBeNull();
   });
 });

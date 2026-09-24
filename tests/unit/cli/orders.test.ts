@@ -19,25 +19,25 @@ import {
 import { addItems, createBook } from '../../../src/lib/orders/writer.js';
 import type { ProjectConfig } from '../../../src/lib/projects.js';
 
-const { mockGetProjectSync, mockResolveStateReadHomeSync, mockStartFlywheelRun } = vi.hoisted(() => ({
+const { mockGetProjectSync, mockGetProjectPanPaths, mockStartFlywheelRun } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
-  mockResolveStateReadHomeSync: vi.fn(),
+  mockGetProjectPanPaths: vi.fn(),
   mockStartFlywheelRun: vi.fn(),
 }));
+
+vi.mock('../../../src/lib/pan-dir/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/pan-dir/paths.js')>();
+  return {
+    ...actual,
+    getProjectPanPaths: (root: string) => mockGetProjectPanPaths(root) ?? actual.getProjectPanPaths(root),
+  };
+});
 
 vi.mock('../../../src/lib/projects.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/projects.js')>();
   return {
     ...actual,
     getProjectSync: mockGetProjectSync,
-  };
-});
-
-vi.mock('../../../src/lib/state-read-home.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../src/lib/state-read-home.js')>();
-  return {
-    ...actual,
-    resolveStateReadHomeSync: mockResolveStateReadHomeSync,
   };
 });
 
@@ -60,19 +60,19 @@ function gitFixture(): string {
   git(['init'], root);
   git(['config', 'user.name', 'Orders CLI Test'], root);
   git(['config', 'user.email', 'orders-cli@example.com'], root);
-  writeFileSync(join(root, 'migration-complete.json'), JSON.stringify({ seededAt: at }), 'utf8');
-  git(['add', 'migration-complete.json'], root);
+  writeFileSync(join(root, 'README.md'), 'orders cli fixture\n', 'utf8');
+  git(['add', 'README.md'], root);
   git(['commit', '-m', 'seed'], root);
-  git(['branch', '-M', 'overdeck-state'], root);
+  git(['branch', '-M', 'main'], root);
   execFileSync('git', ['init', '--bare', origin], { encoding: 'utf8' });
   git(['remote', 'add', 'origin', origin], root);
-  git(['push', '-u', 'origin', 'overdeck-state'], root);
-  return root;
+  git(['push', '-u', 'origin', 'main'], root);
+  return join(root, '.pan');
 }
 
 beforeEach(() => {
   mockGetProjectSync.mockReset().mockReturnValue(null);
-  mockResolveStateReadHomeSync.mockReset();
+  mockGetProjectPanPaths.mockReset().mockReturnValue(undefined);
   mockStartFlywheelRun.mockReset();
 });
 
@@ -84,9 +84,9 @@ afterEach(() => {
 
 describe('pan orders commands', () => {
   it('creates, adds after an anchor, shows, moves, removes, lists, and starts a book', async () => {
-    const stateRoot = gitFixture();
+    const panDir = gitFixture();
     const deps = {
-      stateRoot,
+      panDir,
       now: () => new Date(at),
       actor: 'operator',
     };
@@ -106,7 +106,7 @@ describe('pan orders commands', () => {
       { issue: 'PAN-3', lane: 'B', order: 3, reVerify: false },
     ]);
 
-    const shown = runOrdersShow(created.id, deps);
+    const shown = await runOrdersShow(created.id, deps);
     expect(formatBook(shown)).toContain('"issue": "PAN-2"');
     expect(formatBookList(runOrdersList(deps))).toContain('2026-07-18-refactor-campaign');
 
@@ -124,10 +124,10 @@ describe('pan orders commands', () => {
   });
 
   it('rejects duplicate membership and names the owning non-complete book', async () => {
-    const stateRoot = gitFixture();
-    await createBook(stateRoot, { id: '2026-07-18-first', name: 'First', createdAt: at });
-    await createBook(stateRoot, { id: '2026-07-18-second', name: 'Second', createdAt: at });
-    await addItems(stateRoot, '2026-07-18-first', [{
+    const panDir = gitFixture();
+    await createBook(panDir, { id: '2026-07-18-first', name: 'First', createdAt: at });
+    await createBook(panDir, { id: '2026-07-18-second', name: 'Second', createdAt: at });
+    await addItems(panDir, '2026-07-18-first', [{
       issue: 'PAN-7',
       lane: 'A',
       order: 1,
@@ -135,7 +135,7 @@ describe('pan orders commands', () => {
       reVerify: false,
     }], 'operator', at);
 
-    await expect(runOrdersAdd('2026-07-18-second', ['PAN-7'], {}, { stateRoot, actor: 'operator' }))
+    await expect(runOrdersAdd('2026-07-18-second', ['PAN-7'], {}, { panDir, actor: 'operator' }))
       .rejects.toThrow('Issue PAN-7 already belongs to non-complete order book 2026-07-18-first');
   });
 
@@ -164,7 +164,7 @@ describe('pan orders commands', () => {
     const otherRoot = gitFixture();
     const otherProject = { path: '/fake/other-project' } as ProjectConfig;
     mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
-    mockResolveStateReadHomeSync.mockImplementation(() => ({ root: otherRoot, migrated: true }));
+    mockGetProjectPanPaths.mockImplementation(() => ({ panDir: otherRoot }));
 
     const created = await runOrdersCreate('Cross Project', {
       projectKey: 'other-project',
@@ -189,19 +189,19 @@ describe('pan orders commands', () => {
   });
 
   it('queues a draft book to ready through the write door', async () => {
-    const stateRoot = gitFixture();
-    const deps = { stateRoot, now: () => new Date(at) };
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
     const created = await runOrdersCreate('Queueable', deps);
     expect(created.status).toBe('draft');
 
     const queued = await runOrdersQueue(created.id, deps);
     expect(queued.status).toBe('ready');
-    expect(runOrdersShow(created.id, deps).status).toBe('ready');
+    expect((await runOrdersShow(created.id, deps)).status).toBe('ready');
   });
 
   it('rejects queueing a non-draft book', async () => {
-    const stateRoot = gitFixture();
-    const deps = { stateRoot, now: () => new Date(at) };
+    const panDir = gitFixture();
+    const deps = { panDir, now: () => new Date(at) };
     const created = await runOrdersCreate('Already queued', deps);
     await runOrdersQueue(created.id, deps);
 
@@ -213,7 +213,7 @@ describe('pan orders commands', () => {
     const otherRoot = gitFixture();
     const otherProject = { path: '/fake/other-project' } as ProjectConfig;
     mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
-    mockResolveStateReadHomeSync.mockImplementation(() => ({ root: otherRoot, migrated: true }));
+    mockGetProjectPanPaths.mockImplementation(() => ({ panDir: otherRoot }));
 
     const created = await runOrdersCreate('Cross Queue', {
       projectKey: 'other-project',
@@ -221,14 +221,14 @@ describe('pan orders commands', () => {
     });
     const queued = await runOrdersQueue(created.id, { projectKey: 'other-project' });
     expect(queued.status).toBe('ready');
-    expect(runOrdersShow(created.id, { projectKey: 'other-project' }).status).toBe('ready');
+    expect((await runOrdersShow(created.id, { projectKey: 'other-project' })).status).toBe('ready');
   });
 
   it('starts the Flywheel with cwd set to the selected --project, not the caller cwd', async () => {
     const otherRoot = gitFixture();
     const otherProject = { path: '/fake/other-project' } as ProjectConfig;
     mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
-    mockResolveStateReadHomeSync.mockImplementation(() => ({ root: otherRoot, migrated: true }));
+    mockGetProjectPanPaths.mockImplementation(() => ({ panDir: otherRoot }));
     mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-CLI-CROSS' });
 
     const created = await runOrdersCreate('Cross Start', {

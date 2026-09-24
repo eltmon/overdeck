@@ -54,7 +54,7 @@ function stubFetch(rows: WorkspaceRegistryRow[] = REGISTRY) {
     if (url.startsWith('/api/palette/search')) {
       return Response.json({ issues: [], conversations: [], memory: [] });
     }
-    if (url === '/api/conversations' || url === '/api/registered-projects' || url === '/api/flywheel/runs?limit=10') {
+    if (url === '/api/conversations' || url === '/api/registered-projects') {
       return Response.json([]);
     }
     return Response.json({});

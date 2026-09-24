@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from 'effect';
-import { getHarnessBehavior, WS_METHODS } from '@overdeck/contracts';
+import { getHarnessBehavior, isAgentSessionName, WS_METHODS } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -100,7 +100,7 @@ export function applyConversationMessagesEvent(
   // already have; merge instead, preserving history while still adopting any
   // new records the snapshot carries.
   const snapshotShrinks =
-    isSnapshot && event.messages.length < (previous?.messages.length ?? 0);
+    isSnapshot && !event.reset && event.messages.length < (previous?.messages.length ?? 0);
   const replaceFromSnapshot = isSnapshot && !snapshotShrinks;
   return {
     ...previous,
@@ -111,8 +111,9 @@ export function applyConversationMessagesEvent(
       ? event.workLog
       : mergeById(previous?.workLog ?? [], event.workLog),
     streaming: event.streaming,
-    proposedPlan: event.proposedPlan ?? previous?.proposedPlan,
-    compactBoundaries: replaceFromSnapshot
+    totalCost: event.totalCost ?? previous?.totalCost,
+    proposedPlan: event.metadataSnapshot ? event.proposedPlan : event.proposedPlan ?? previous?.proposedPlan,
+    compactBoundaries: event.metadataSnapshot || replaceFromSnapshot
       ? event.compactBoundaries
       : mergeById(previous?.compactBoundaries ?? [], event.compactBoundaries ?? []),
     contextUsage: 'contextUsage' in event ? event.contextUsage : previous?.contextUsage,
@@ -130,7 +131,7 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   // transcript appears, then emits the full snapshot), so subscribing early is safe
   // and self-heals the view the instant the runtime writes — no reload. Ended
   // conversations stay on the one-shot HTTP path (historical view; no live tail).
-  // Claude Code uses the incremental JSONL stream; pi/codex use full snapshot
+  // Claude Code uses the incremental JSONL stream; pi/codex use snapshot + delta
   // streams — polling those every 2s is visibly stale during fast turns.
   if (conversation.id !== undefined && conversation.id >= 0) {
     if (conversation.endedAt) return false;
@@ -138,21 +139,21 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
     const behavior = getHarnessBehavior(conversation.harness);
     return behavior.supportsConversationStreaming || behavior.supportsPatchProjection;
   }
-  // Synthetic agent sessions (id < 0 — work/planning/specialist SessionPanels)
-  // have no conversations-table row and only stream while their session is live.
-  // Only pi/codex stream here (PAN-1908): the server tails their transcript and
-  // pushes snapshots. Claude work agents stay on the existing HTTP-poll path,
-  // which already works — no need to add a server watcher for them.
+  // Synthetic agent sessions have no conversations-table row, but the RPC
+  // stream resolves them from durable agent state and tails every supported
+  // harness while live. Historical reads remain one-shot HTTP.
   if (!conversation.sessionAlive) return false;
-  const name = conversation.name ?? '';
-  const isAgentSession = /^(agent-|planning-|specialist-)/.test(name);
-  const streamable = getHarnessBehavior(conversation.harness).supportsConversationStreaming;
-  return isAgentSession && streamable;
+  const behavior = getHarnessBehavior(conversation.harness);
+  const streamable = behavior.supportsConversationStreaming || behavior.supportsPatchProjection;
+  return isAgentSessionName(conversation.name ?? '') && streamable;
 }
 
-export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): { enabled: boolean; receivedFirstPayload: boolean } {
+export function useConversationMessagesStream(
+  conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null },
+  disabled = false,
+): { enabled: boolean; receivedFirstPayload: boolean } {
   const queryClient = useQueryClient();
-  const enabled = shouldStreamConversationMessages(conversation);
+  const enabled = !disabled && shouldStreamConversationMessages(conversation);
   const streamIdentity = `${enabled ? 'enabled' : 'disabled'}:${conversation.name}`;
   const [firstPayloadIdentity, setFirstPayloadIdentity] = useState<string | null>(null);
   const receivedFirstPayload = firstPayloadIdentity === streamIdentity;

@@ -21,7 +21,9 @@ import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.
 import { resolveMissingIssue } from './issue-title-fallback.js';
 import type { Issue as TrackerIssue } from '../../../lib/tracker/interface.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
-import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
+import type { DerivedIssueState } from '@overdeck/contracts';
+import { loadIssueStatesForProject } from '../../../lib/overdeck/derived-issue-state.js';
+import { getBackendPanes } from './backend-inventory.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/xbrief/io.js';
 import type { XBriefDocument } from '../../../lib/xbrief/types.js';
@@ -293,14 +295,20 @@ export class IssueDataService {
   /** In-memory snapshot of shadow states, refreshed asynchronously. The hot
    * path (`getIssues`) reads from this map — no disk I/O on every request. */
   private shadowStatesCache: Map<string, any> = new Map();
-  private reviewStatusesCache: Record<string, ReviewStatus> = {};
+  /**
+   * PAN-3917 FR-6/FR-12: the derived pipeline state per issue, refreshed
+   * asynchronously off the tracker poll. This is a read-through cache of a
+   * computed value, never a stored status — nothing here is written back.
+   */
+  private derivedStatesCache: Record<string, DerivedIssueState> = {};
   private _onIssuesChanged: ((issues: unknown[]) => void) | null = null;
+  private _onDerivedStatesChanged: ((changed: readonly DerivedIssueState[]) => void) | null = null;
   private planningSnapshotQueued = false;
   private planningRefreshQueue: string[] = [];
   private planningRefreshQueued = new Set<string>();
   private planningRefreshActive = 0;
-  private reviewStatusRefreshQueued = false;
-  private reviewStatusRefreshIssueIds = new Set<string>();
+  private derivedRefreshQueued = false;
+  private derivedRefreshIssueIds = new Set<string>();
   private getIssuesCache = new Map<string, GetIssuesCacheEntry>();
   /** Issues resolved on demand after aging out of the tracker sync window
    * (PAN-3659). Keyed by uppercase identifier; merged into computeIssues and
@@ -527,25 +535,29 @@ export class IssueDataService {
     }
     // cycle === 'all': no additional filtering, show everything
 
-    // Augment with mergeStatus from the asynchronous review-status cache.
+    // Augment with the derived pipeline state (PAN-3917 FR-6). `pipelineState`
+    // replaces the six status fields; `attention`, `pr`, and `branch` come
+    // along so a row can render without a second request.
     allIssues = allIssues.map(issue => {
       const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
       const key = issue.identifier?.toUpperCase();
-      const rs = key ? this.reviewStatusesCache[key] : null;
-      if (rs?.mergeStatus) {
-        const issueWithMerge = { ...issue, mergeStatus: rs.mergeStatus };
-        if (canonical === 'done' && issueWithMerge.mergeStatus !== 'merged') {
-          return { ...issueWithMerge, mergeStatus: 'merged' };
-        }
-        if (rs.mergeStatus === 'merged' && canonical !== 'done' && canonical !== 'canceled') {
-          return { ...issueWithMerge, status: 'Verifying', canonicalStatus: 'verifying_on_main', state: 'verifying_on_main' };
-        }
-        return issueWithMerge;
+      const derived = key ? this.derivedStatesCache[key] : null;
+      if (!derived) return issue;
+
+      const enriched = {
+        ...issue,
+        pipelineState: derived.state,
+        ...(derived.attention ? { attention: derived.attention } : {}),
+        ...(derived.pr ? { pr: derived.pr } : {}),
+        ...(derived.branch ? { branch: derived.branch } : {}),
+      };
+      // A merged PR on an issue the tracker has not closed yet is
+      // "verifying on main" — the same projection the merge-status cache used
+      // to make, now sourced from the forge.
+      if (derived.state === 'merged' && canonical !== 'done' && canonical !== 'canceled') {
+        return { ...enriched, status: 'Verifying', canonicalStatus: 'verifying_on_main', state: 'verifying_on_main' };
       }
-      if (canonical === 'done' && issue.mergeStatus && issue.mergeStatus !== 'merged') {
-        return { ...issue, mergeStatus: 'merged' };
-      }
-      return issue;
+      return enriched;
     });
 
     // Enrich with cached planning-state only. Refresh work is scheduled by tracker updates.
@@ -785,7 +797,7 @@ export class IssueDataService {
     }
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
-    this.scheduleReviewStatusRefreshForIssues(cachedIssues);
+    this.scheduleDerivedStateRefreshForIssues(cachedIssues);
   }
 
   private pushSnapshot(): void {
@@ -798,7 +810,7 @@ export class IssueDataService {
     this.pruneBackfilledIssues();
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
-    this.scheduleReviewStatusRefreshForIssues(cachedIssues);
+    this.scheduleDerivedStateRefreshForIssues(cachedIssues);
     this._onIssuesChanged?.(this.getIssues());
   }
 
@@ -956,27 +968,91 @@ export class IssueDataService {
     }, 50);
   }
 
-  private scheduleReviewStatusRefreshForIssues(issues: any[]): void {
+  /**
+   * Refresh the derived pipeline state for the issues a tracker poll touched.
+   * Grouped by project so each repo costs one cached forge listing and one
+   * backend-inventory read, never one `gh` invocation per issue.
+   */
+  private scheduleDerivedStateRefreshForIssues(issues: any[]): void {
     for (const issue of issues) {
       const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
-      if (identifier) this.reviewStatusRefreshIssueIds.add(identifier);
+      if (identifier) this.derivedRefreshIssueIds.add(identifier);
     }
-    if (this.reviewStatusRefreshQueued || this.reviewStatusRefreshIssueIds.size === 0) return;
-    this.reviewStatusRefreshQueued = true;
+    if (this.derivedRefreshQueued || this.derivedRefreshIssueIds.size === 0) return;
+    this.derivedRefreshQueued = true;
     setImmediate(() => {
-      this.reviewStatusRefreshQueued = false;
-      const issueIds = [...this.reviewStatusRefreshIssueIds];
-      this.reviewStatusRefreshIssueIds.clear();
-      try {
-        this.reviewStatusesCache = {
-          ...this.reviewStatusesCache,
-          ...loadReviewStatusesForIssues(issueIds),
-        };
-        if (this.started) this.pushSnapshot();
-      } catch {
-        // review-status store may not exist yet
-      }
+      this.derivedRefreshQueued = false;
+      const issueIds = [...this.derivedRefreshIssueIds];
+      this.derivedRefreshIssueIds.clear();
+      void this.refreshDerivedStates(issueIds);
     });
+  }
+
+  private async refreshDerivedStates(issueIds: readonly string[]): Promise<void> {
+    const byProject = new Map<string, string[]>();
+    const issues: Record<string, { open: boolean; labels: readonly string[] } | null> = {};
+    for (const raw of issueIds) {
+      const issueId = raw.toUpperCase();
+      const project = resolveProjectFromIssueSync(issueId);
+      if (!project) continue;
+      byProject.set(project.projectPath, [...(byProject.get(project.projectPath) ?? []), issueId]);
+      issues[issueId] = this.getTrackerIssue(issueId);
+    }
+
+    let changed = false;
+    const changedStates: DerivedIssueState[] = [];
+    for (const [projectPath, ids] of byProject) {
+      try {
+        const states = await loadIssueStatesForProject(projectPath, ids, { issues, panes: await getBackendPanes() });
+        for (const [issueId, state] of states) {
+          const previous = this.derivedStatesCache[issueId];
+          this.derivedStatesCache[issueId] = state;
+          if (previous && JSON.stringify(previous) === JSON.stringify(state)) continue;
+          changedStates.push(state);
+          changed = true;
+        }
+      } catch {
+        // A forge or git read failed for this project — keep the previous
+        // answer rather than blanking every row.
+      }
+    }
+    if (changedStates.length > 0) this._onDerivedStatesChanged?.(changedStates);
+    if (changed && this.started) this.pushSnapshot();
+  }
+
+  /** The cached tracker row the FR-6 derivation reads; null = no tracker has it (unknown, never "open"). */
+  getTrackerIssue(identifier: string): { open: boolean; labels: readonly string[] } | null {
+    const issue = this.findIssueByIdentifier(identifier.toUpperCase());
+    if (!issue) return null;
+    const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
+    const raw: any[] = Array.isArray(issue.labels) ? issue.labels : [];
+    return { open: canonical !== 'done' && canonical !== 'canceled', labels: raw.map((l) => (typeof l === 'string' ? l : l?.name)).filter(Boolean) };
+  }
+
+  /** The cached tracker row for an identifier, across every tracker. */
+  private findIssueByIdentifier(uppercaseIdentifier: string): any | null {
+    for (const state of Object.values(this.trackers)) {
+      const found = state.lastFetchedIssues.find(
+        (issue: any) => (issue?.identifier ?? '').toUpperCase() === uppercaseIdentifier,
+      );
+      if (found) return found;
+    }
+    return this.backfilledIssues.get(uppercaseIdentifier) ?? null;
+  }
+
+  /** The derived pipeline state for one issue, or null before the first refresh. */
+  getDerivedState(identifier: string): DerivedIssueState | null {
+    return this.derivedStatesCache[identifier.toUpperCase()] ?? null;
+  }
+
+  /** Every derived pipeline state computed so far. Seeds the dashboard snapshot. */
+  listDerivedStates(): DerivedIssueState[] {
+    return Object.values(this.derivedStatesCache);
+  }
+
+  /** Called with the rows whose derived state actually changed (PAN-3917 FR-6). */
+  onDerivedStatesChanged(fn: (changed: readonly DerivedIssueState[]) => void): void {
+    this._onDerivedStatesChanged = fn;
   }
 
   private pushMeta(): void {

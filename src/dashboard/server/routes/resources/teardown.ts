@@ -4,12 +4,12 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { emitActivityEntrySync, type EmitActivityOptions } from '../../../../lib/activity-logger.js';
+import { emitActivityEntry, type EmitActivityOptions } from '../../../../lib/activity-logger.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { httpHandler } from '../http-handler.js';
 import { getCurrentDockerStats } from './shared.js';
-import { getResourceStacks, type ResourceStack } from './stacks.js';
+import { buildResourceStacks, type ResourceStack } from './stacks.js';
 
 const execFileAsync = promisify(execFile);
 const CONFIRM_TOKEN_TTL_MS = 5 * 60 * 1000;
@@ -38,7 +38,7 @@ export interface StackTeardownInput {
 
 let dockerTeardownExec: DockerTeardownExec = execFileAsync;
 let teardownTokenGenerator: () => string = () => `td-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-let activityEmitter: (options: EmitActivityOptions) => void = emitActivityEntrySync;
+let activityEmitter: (options: EmitActivityOptions) => void = emitActivityEntry;
 const teardownTokens = new Map<string, StackTeardownToken>();
 
 export function setStackTeardownDockerExecForTests(execImpl: DockerTeardownExec): void {
@@ -56,7 +56,7 @@ export function setStackTeardownActivityEmitterForTests(emitter: (options: EmitA
 export function resetStackTeardownForTests(): void {
   dockerTeardownExec = execFileAsync;
   teardownTokenGenerator = () => `td-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  activityEmitter = emitActivityEntrySync;
+  activityEmitter = emitActivityEntry;
   teardownTokens.clear();
 }
 
@@ -215,8 +215,10 @@ function runDockerStackTeardown(stack: ResourceStack): Effect.Effect<{
   });
 }
 
+// Grouping only: a docker verb acts on a stack's containers and never needs
+// the issue's derived state, so this stays off the forge.
 function findStack(issueId: string): ResourceStack | undefined {
-  return getResourceStacks(getCurrentDockerStats() as Parameters<typeof getResourceStacks>[0])
+  return buildResourceStacks(getCurrentDockerStats() as Parameters<typeof buildResourceStacks>[0])
     .find((stack) => stack.issueId?.toUpperCase() === issueId);
 }
 

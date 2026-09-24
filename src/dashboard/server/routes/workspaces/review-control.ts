@@ -1,183 +1,47 @@
 /**
  * Review-control route module — extracted from routes/workspaces.ts (B / wave 2, seam 3b).
  *
- * Operator control endpoints over the review/worker lifecycle:
- *   POST   /api/review/:issueId/reset
+ * Operator control endpoints over the review fleet:
  *   POST   /api/review/:issueId/purge
  *   POST   /api/review/:issueId/abort
  *   DELETE /api/review/:issueId/pending
- *   POST   /api/workspaces/:issueId/unstick
- *   POST   /api/workspaces/:issueId/deacon-ignore
- *   POST   /api/workspaces/:issueId/auto-merge
  *
  * The dispatch routes (trigger, request) live in review-pipeline.ts. Shared
- * singletons (review-status wrapper, project path, readJsonBody, workspace info)
- * stay owned by ../workspaces.js.
+ * singletons (project path, readJsonBody, workspace info) stay owned by
+ * ../workspaces.js.
+ *
+ * PAN-3917: what survives here is the set of controls that do something real —
+ * kill reviewer sessions, remove reviewer agents, clear the in-memory pending
+ * operation. Every control whose whole effect was rewriting a status row is
+ * deleted: `reset` and `resync` edited the review-status row, `unstick`
+ * cleared its `stuck` field (stuck is a derived attention state now, and it
+ * clears itself when the agent pushes), `deacon-ignore` set `deaconIgnored`
+ * (deacon-lite has four routines and no per-issue ignore list, FR-11),
+ * `auto-merge` set the per-issue `autoMerge` key (the merge train gates on
+ * project default plus the global require-UAT flag, D3), and
+ * `GET/POST /config` read and wrote the record's `reviewMode`/`reviewModel`
+ * overrides (review mode and model resolve from project and global config).
  */
 
-import { exec } from 'node:child_process';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter } from 'effect/unstable/http';
 
-import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
+import { parseIssueId } from '../../../../lib/issue-id.js';
 import { findWorkspacePath } from '../../../../lib/lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import {
-  getReviewStatusSync,
-  setReviewStatusSync as setReviewStatusBase,
-  clearWorkspaceStuck,
-  markWorkspaceStuck,
-  setDeaconIgnored,
-  setAutoMerge,
-} from '../../../../lib/review-status.js';
-import { getAgentRuntimeStateSync } from '../../../../lib/agents.js';
-import { normalizeModelOverrideSync } from '../../../../lib/model-validation.js';
-import { resolveModel } from '../../../../lib/config-yaml.js';
-import { notifyPipelineSync } from '../../../../lib/pipeline-notifier.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
-  getProjectPath,
-  readJsonBody,
+  clearPendingOperation,
   getWorkspaceInfoForIssue,
-  setReviewStatus,
-  requireTrustedMutationOrigin,
 } from '../workspaces.js';
 
-const execAsync = promisify(exec);
-
-function resolveConfiguredReviewModel(): string | null {
-  try {
-    return resolveModel('review');
-  } catch {
-    return null;
-  }
-}
-
-export type ResetReviewResult =
-  | { httpStatus: 400; body: { success: false; error: string } }
-  | {
-      httpStatus: 200;
-      body: {
-        success: true;
-        /** Work-agent runtime state observed before the reset — informational, logged for debugging. */
-        preservedResolution?: { agentId: string; resolution?: string; resolutionCount?: number };
-      };
-    };
-
-export type ResyncReviewResult =
-  | { httpStatus: 404; body: { ok: false; error: string } }
-  | { httpStatus: 200; body: { ok: true; status: NonNullable<ReturnType<typeof getReviewStatusSync>> } };
-
 /**
- * Read and re-emit canonical review status without mutating it. This is the
- * operator escape hatch for PAN-2988-style lost review.status_changed events.
- */
-export function processResyncReviewStatus(issueId: string): ResyncReviewResult {
-  const status = getReviewStatusSync(issueId);
-  if (!status) {
-    return {
-      httpStatus: 404,
-      body: { ok: false, error: `no review status found for ${issueId}` },
-    };
-  }
-
-  notifyPipelineSync({ type: 'status_changed', issueId, status });
-  return { httpStatus: 200, body: { ok: true, status } };
-}
-
-/**
- * Core logic for POST /api/review/:issueId/reset (synchronous, testable).
- *
- * Resets the specialist pipeline state (review / test / merge / verification) for
- * a workspace. Writes ONE setReviewStatus() call, reads the work-agent's runtime
- * state purely for logging, and returns a structured result that the route
- * handler maps to an HTTP response.
- *
- * CRITICAL — resolution preservation:
- * This function deliberately does NOT mutate the work-agent's runtime state
- * (resolution / resolutionCount / activity). `resolution` tracks the WORK
- * agent's own lifecycle (working/done/unclear/stuck/needs_input) and is written
- * exclusively by `work-agent-stop-hook` based on the agent's tail. The pipeline
- * reset is about specialist state — wiping resolution here previously erased
- * legitimate unclear/stuck counts when `pan done`'s self-heal path triggered a
- * reset, which prevented the deacon from noticing genuinely confused agents.
- * (Root cause of PAN-805 never escalating to stuck.)
- *
- * Regression test: tests/unit/dashboard/server/routes/reset-review-route.test.ts
- *
- * Exported so a unit test can assert the sync mutation set is exactly
- * {reset review status} — nothing else.
- */
-export function processResetReviewPipeline(
-  issueId: string,
-  workspaceExists: boolean,
-): ResetReviewResult {
-  if (!workspaceExists) {
-    return {
-      httpStatus: 400,
-      body: { success: false, error: 'Workspace does not exist' },
-    };
-  }
-
-  const agentId = `agent-${issueId.toLowerCase()}`;
-  const priorRuntime = getAgentRuntimeStateSync(agentId);
-
-  console.log(
-    `[reset-review] Human-initiated pipeline reset for ${issueId} ` +
-      `(work-agent ${agentId} resolution=${priorRuntime?.resolution ?? 'none'}/` +
-      `${priorRuntime?.resolutionCount ?? 0} — preserved, not reset)`
-  );
-
-  setReviewStatus(issueId, {
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    reviewNotes: undefined,
-    testNotes: undefined,
-    mergeNotes: undefined,
-    readyForMerge: false,
-    autoRequeueCount: 0,
-    verificationStatus: 'pending',
-    verificationNotes: undefined,
-    verificationCycleCount: 0,
-    // A human-initiated reset is an explicit circuit-breaker override: clear
-    // the stuck marker and the review/test retry counters too. Without this,
-    // a workspace stuck on review_infrastructure_failure (or with exhausted
-    // retry budgets) is reset to `pending` but immediately re-skipped by the
-    // deacon's stuck guard / retry-budget checks — the "override" is a no-op.
-    stuck: false,
-    stuckReason: undefined,
-    stuckAt: undefined,
-    stuckDetails: undefined,
-    reviewRetryCount: 0,
-    testRetryCount: 0,
-    mergeRetryCount: 0,
-    recoveryStartedAt: undefined,
-  });
-
-  return {
-    httpStatus: 200,
-    body: {
-      success: true,
-      preservedResolution: priorRuntime
-        ? {
-            agentId,
-            resolution: priorRuntime.resolution,
-            resolutionCount: priorRuntime.resolutionCount,
-          }
-        : undefined,
-    },
-  };
-}
-
-/**
- * Resolve whether a workspace exists for the reset endpoint, including
- * strike workspaces (feature-<id>-strike) that getWorkspaceInfoForIssue does
- * not yet know about. PAN-2270 regression test hook.
+ * Resolve whether a workspace exists for the review-control endpoints,
+ * including strike workspaces (feature-<id>-strike) that
+ * getWorkspaceInfoForIssue does not yet know about. PAN-2270 regression hook.
  */
 export function resolveResetWorkspace(
   issueId: string,
@@ -193,9 +57,9 @@ export function resolveResetWorkspace(
 }
 
 /**
- * Build the workspace/branch pair for a review re-dispatch, handling
- * strike workspaces (feature-<id>-strike -> strike/<id>) and preserving the
- * existing feature/<numeric> convention for non-strike workspaces.
+ * Build the workspace/branch pair for a review re-dispatch, handling strike
+ * workspaces (feature-<id>-strike -> strike/<id>) and preserving the existing
+ * feature/<numeric> convention for non-strike workspaces.
  * PAN-2270 regression test hook.
  */
 export function buildReviewRedispatchArgs(
@@ -217,244 +81,18 @@ export function buildReviewRedispatchArgs(
     : `feature/${numericSuffix}`;
   return { workspace: wsPath, branch: branchName };
 }
-export type UnstickResult =
-  | { httpStatus: 404; body: { success: false; error: string } }
-  | { httpStatus: 400; body: { success: false; error: string } }
-  | { httpStatus: 409; body: { success: false; error: string } }
-  | { httpStatus: 200; body: { success: true; issueId: string; previousReason?: string } };
-
-export type UnstickGitRepairState =
-  | { safe: true }
-  | { safe: false; advice: string };
-
-/**
- * Core logic for POST /api/workspaces/:issueId/unstick.
- *
- * Active workspaces must exist and have repaired git state before the stuck
- * marker is cleared and stale review/test results are invalidated. A merged row
- * is already terminal, so its stale stuck marker is cleared without requiring a
- * workspace and without changing lifecycle verdicts.
- *
- * The active recovery path changes the project's main-branch state by
- * committing, pushing, fast-forwarding, or otherwise reconciling it. Keeping
- * reviewStatus=passed after that would let the UI present a stale approval.
- * One atomic setReviewStatus() call clears stuck state and resets the active
- * lifecycle in a single DB write and a single notifyPipeline event.
- *
- * gitRepairState must be pre-verified by the caller (async git check). An
- * unsafe result returns 409 with recovery instructions before any DB mutation.
- *
- * Exported for unit testing — the route handler calls this and maps the result
- * directly to an HTTP response.
- */
-export function processUnstickRequest(
-  issueId: string,
-  workspaceExists: boolean,
-  currentStatus: ReturnType<typeof getReviewStatusSync>,
-  gitRepairState: UnstickGitRepairState,
-): UnstickResult {
-  const isMerged = currentStatus?.mergeStatus === 'merged';
-  if (!workspaceExists && !isMerged) {
-    return { httpStatus: 404, body: { success: false, error: 'Workspace does not exist' } };
-  }
-  if (!currentStatus?.stuck) {
-    return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
-  }
-  if (isMerged) {
-    clearWorkspaceStuck(issueId);
-    console.log(`[unstick] Cleared stale stuck flag for merged issue ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
-    return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
-  }
-  // Enforce that the operator has actually repaired the git state before we
-  // clear the stuck flag. If project main still has local-only commits, remote
-  // commits, or uncommitted changes, Deacon would immediately re-enter the same
-  // broken approve/merge path.
-  if (!gitRepairState.safe) {
-    return {
-      httpStatus: 409,
-      body: {
-        success: false,
-        error: `Workspace git state is not yet repaired. ${gitRepairState.advice} Then retry Unstick.`,
-      },
-    };
-  }
-  // Single atomic write: clear stuck fields and reset lifecycle to pending.
-  // PAN-3151: for review-not-converging gate, also reset cycle history.
-  const isConvergenceGate = currentStatus.stuckReason === 'review-not-converging';
-  setReviewStatusBase(issueId, {
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    readyForMerge: false,
-    stuck: undefined,
-    stuckReason: undefined,
-    stuckAt: undefined,
-    stuckDetails: undefined,
-    reviewedAtCommit: undefined,
-    // PAN-794: unstick opens a fresh recovery cycle — arm the breaker budget
-    // again so legitimate transient failures don't inherit prior cycle counts.
-    reviewRetryCount: 0,
-    recoveryStartedAt: undefined,
-    // PAN-3151: clear cycle history when unsticking review-not-converging gate
-    ...(isConvergenceGate && { reviewCycleHistory: undefined }),
-  });
-  console.log(`[unstick] Cleared stuck flag and reset lifecycle for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
-  return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
-}
-
-function buildUnstickRepairAdvice(aheadCount: number, behindCount: number, dirty: boolean): string | null {
-  const steps: string[] = [];
-  if (dirty) {
-    steps.push('commit the project repo changes that should be preserved, or explicitly discard only changes known to be disposable');
-  }
-  if (aheadCount > 0 && behindCount > 0) {
-    steps.push(`reconcile local main with origin/main while preserving the ${aheadCount} local commit(s), then push the reconciled main`);
-  } else if (aheadCount > 0) {
-    steps.push(`push the ${aheadCount} local main commit(s) to origin/main`);
-  } else if (behindCount > 0) {
-    steps.push(`fast-forward local main from origin/main (${behindCount} commit(s) behind)`);
-  }
-  return steps.length > 0 ? `In the project repo, ${steps.join('; ')}.` : null;
-}
-
-/**
- * Check whether the project repo's local main branch matches origin/main and
- * has no uncommitted changes. Unsafe states return recoverable instructions:
- * push local-only commits, commit dirty work, fast-forward behind branches, or
- * reconcile a true divergence. Never prescribe destructive reset.
- *
- * Returns safe for any git error so a transient failure doesn't permanently
- * block unstick.
- */
-async function checkProjectGitRepairState(projectPath: string): Promise<UnstickGitRepairState> {
-  try {
-    const [divergence, status] = await Promise.all([
-      execAsync(
-        'git rev-list --left-right --count main...origin/main',
-        { cwd: projectPath, encoding: 'utf-8', timeout: 5000 }
-      ),
-      execAsync(
-        'git status --porcelain',
-        { cwd: projectPath, encoding: 'utf-8', timeout: 5000 }
-      ),
-    ]);
-    const [aheadRaw = '0', behindRaw = '0'] = divergence.stdout.trim().split(/\s+/);
-    const aheadCount = parseInt(aheadRaw, 10) || 0;
-    const behindCount = parseInt(behindRaw, 10) || 0;
-    const dirty = status.stdout.trim().length > 0;
-    const advice = buildUnstickRepairAdvice(aheadCount, behindCount, dirty);
-    return advice ? { safe: false, advice } : { safe: true };
-  } catch {
-    // If we can't check (no git repo, no origin/main), don't block the operator.
-    return { safe: true };
-  }
-}
-
-export const __testInternals = {
-  buildUnstickRepairAdvice,
-};
-const postWorkspaceResetReviewRoute = HttpRouter.add(
-  'POST',
-  '/api/review/:issueId/reset',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-    const body = yield* readJsonBody;
-
-    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const resolved = resolveProjectFromIssueSync(issueId);
-    const resetWorkspace = resolveResetWorkspace(issueId, workspaceInfo, resolved);
-    const result = processResetReviewPipeline(issueId, resetWorkspace.exists);
-    if (result.httpStatus !== 200) {
-      return jsonResponse(result.body, { status: result.httpStatus });
-    }
-
-    try {
-      const { resetPostMergeState } = yield* Effect.promise(() => import(
-        '../../../../lib/cloister/merge-agent.js'
-      ));
-      resetPostMergeState(issueId);
-    } catch (err) {
-      console.warn(`[reset-review] resetPostMergeState best-effort failed for ${issueId}:`, err);
-    }
-
-    console.log(
-      `[reset-review] Pipeline state reset for ${issueId} — awaiting agent to request review`
-    );
-
-    const rerun = (body as { rerun?: unknown })?.rerun === true;
-    if (rerun) {
-      try {
-        yield* Effect.promise(async () => {
-          const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
-          const dispatchArgs = buildReviewRedispatchArgs(issueId, resetWorkspace, workspaceInfo, resolved);
-          if (dispatchArgs) {
-            const result = await Effect.runPromise(spawnReviewRoleForIssue({
-              issueId,
-              workspace: dispatchArgs.workspace,
-              branch: dispatchArgs.branch,
-              prUrl: getReviewStatusSync(issueId)?.prUrl,
-            }));
-
-            if (result.success) {
-              // spawnReviewRoleForIssue already set 'reviewing' + reviewSpawnedAt.
-              // PAN-2578: no bare 'reviewing' repeat — it can clobber a fast verdict.
-              console.log(`[reset-review] Re-dispatched review for ${issueId}`);
-            } else {
-              console.warn(
-                `[reset-review] Re-dispatch failed for ${issueId}: ${result.message || result.error}`
-              );
-              setReviewStatus(issueId, { reviewStatus: 'pending' });
-            }
-          } else {
-            console.warn(
-              `[reset-review] Could not resolve project for ${issueId}, skipping re-dispatch`
-            );
-          }
-        });
-      } catch (rerunErr) {
-        console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${rerunErr}`);
-        setReviewStatus(issueId, { reviewStatus: 'pending' });
-      }
-    }
-
-    return jsonResponse({
-      success: true,
-      message: rerun
-        ? `Pipeline reset and review re-dispatched for ${issueId}.`
-        : `Review cycles reset for ${issueId}. Agent can now request review when ready.`,
-      rerun,
-    });
-  }))
-);
-
-const postReviewResyncRoute = HttpRouter.add(
-  'POST',
-  '/api/review/:issueId/resync',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
-    }
-
-    const result = processResyncReviewStatus(issueId.toUpperCase());
-    return jsonResponse(result.body, { status: result.httpStatus });
-  })),
-);
 
 // ─── Route: POST /api/review/:issueId/purge ────────────────────────────────
 //
-// COMPLETE review reset. Tears down the issue's entire review fleet — the
-// agent-<id>-review parent PLUS any leftover extended-review (convoy) sub-reviewers
-// (-correctness/-security/-performance/-requirements) — by killing their tmux sessions
-// and removing each agent through the transcript-preserving removal path, then resets
-// review_status (the pipeline verdict block re-derives
-// from it). Use this to clear stale review ghosts left by a prior cycle so a fresh
-// review runs clean. Destructive to review-agent state only; confirmed via a dialog.
+// Tears down the issue's entire review fleet — the agent-<id>-review parent
+// PLUS any leftover extended-review (convoy) sub-reviewers
+// (-correctness/-security/-performance/-requirements) — by killing their tmux
+// sessions and removing each agent through the transcript-preserving removal
+// path. Use this to clear stale review ghosts left by a prior cycle so a fresh
+// review runs clean. Destructive to review-agent sessions only; confirmed via a
+// dialog. PAN-3917: there is no status row to reset afterwards — the PR's
+// review state is the verdict, and re-review is requested through
+// `/api/review/:issueId/request`.
 
 const postWorkspaceReviewPurgeRoute = HttpRouter.add(
   'POST',
@@ -462,7 +100,7 @@ const postWorkspaceReviewPurgeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
 
@@ -472,18 +110,9 @@ const postWorkspaceReviewPurgeRoute = HttpRouter.add(
     const projectKey = resolveProjectFromIssueSync(issueId)?.projectKey;
     const purge = yield* Effect.promise(() => purgeReviewAgentsForIssue(projectKey, issueId));
 
-    // Reset review_status (pipeline verdict block re-derives from it). Only meaningful
-    // when the workspace still exists; ghost removal above runs regardless.
-    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    let reviewStatusReset = false;
-    if (workspaceInfo.exists) {
-      processResetReviewPipeline(issueId, true);
-      reviewStatusReset = true;
-    }
-
     console.log(
       `[review-purge] ${issueId}: removed=[${purge.removed.join(', ')}] ` +
-        `killed=[${purge.killed.join(', ')}] reviewStatusReset=${reviewStatusReset}`,
+        `killed=[${purge.killed.join(', ')}]`,
     );
 
     return jsonResponse({
@@ -491,16 +120,16 @@ const postWorkspaceReviewPurgeRoute = HttpRouter.add(
       issueId,
       removed: purge.removed,
       killed: purge.killed,
-      reviewStatusReset,
       message: `Purged ${purge.removed.length} review agent(s) for ${issueId}.`,
     });
   })),
 );
 // ─── Route: POST /api/review/:issueId/abort ────────────────────────────────
 //
-// Kill all running reviewer tmux sessions for an issue and reset reviewStatus
-// to 'pending'. Does NOT message the work agent — leaves the worker idle.
-// Use this to stop a runaway or stuck review without triggering a resubmit.
+// Kill all running reviewer tmux sessions for an issue. Does NOT message the
+// work agent — leaves the worker idle. Use this to stop a runaway or stuck
+// review without triggering a resubmit. PAN-3917: killing the sessions is the
+// whole effect; the PR keeps whatever review state the forge holds.
 
 const postWorkspaceAbortReviewRoute = HttpRouter.add(
   'POST',
@@ -508,7 +137,7 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     if (!issueId) {
@@ -527,13 +156,7 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       import('../../../../lib/cloister/review-agent.js'),
     );
     const resolved = resolveProjectFromIssueSync(issueId);
-    const { killed, failed } = yield* killAllReviewerSessions(resolved?.projectKey, issueId);
-
-    // Reset only reviewStatus — leave test/merge/verification untouched
-    setReviewStatus(issueId, {
-      reviewStatus: 'pending',
-      reviewNotes: undefined,
-    });
+    const { killed, failed } = yield* Effect.promise(() => killAllReviewerSessions(resolved?.projectKey, issueId));
 
     console.log(
       `[abort-review] Aborted ${killed.length} reviewer session(s) for ${issueId}` +
@@ -548,99 +171,6 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
     });
   }))
 );
-const postWorkspaceUnstickRoute = HttpRouter.add(
-  'POST',
-  '/api/workspaces/:issueId/unstick',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-
-    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const current = getReviewStatusSync(issueId);
-
-    // Pre-verify git state before mutating stuck flag.
-    // For main_diverged: check that local main is not ahead of origin/main.
-    // PAN-794: review_infrastructure_failure is unrelated to git divergence —
-    // skip the git safe-state check so operators can unstick review-infra
-    // workspaces without touching the project's main branch.
-    const skipGitCheck = current?.mergeStatus === 'merged'
-      || current?.stuckReason === 'review_infrastructure_failure';
-    const gitRepairState = skipGitCheck
-      ? { safe: true } as const
-      : yield* Effect.promise(() => {
-          const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-          return checkProjectGitRepairState(getProjectPath(undefined, issuePrefix));
-        });
-
-    const result = processUnstickRequest(issueId, workspaceInfo.exists, current, gitRepairState);
-    return jsonResponse(result.body, result.httpStatus !== 200 ? { status: result.httpStatus } : undefined);
-  }))
-);
-const postWorkspaceDeaconIgnoreRoute = HttpRouter.add(
-  'POST',
-  '/api/workspaces/:issueId/deacon-ignore',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = (params['issueId'] ?? '').toUpperCase();
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-    if (!issueId) {
-      return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
-    }
-
-    const body = (yield* readJsonBody) as { ignored?: unknown; reason?: unknown };
-    if (typeof body.ignored !== 'boolean') {
-      return jsonResponse(
-        { success: false, error: 'Body must include { ignored: boolean }' },
-        { status: 400 },
-      );
-    }
-    const reason = typeof body.reason === 'string' && body.reason.trim().length > 0
-      ? body.reason.trim()
-      : undefined;
-
-    setDeaconIgnored(issueId, body.ignored, reason);
-    const updated = getReviewStatusSync(issueId);
-    return jsonResponse({
-      success: true,
-      issueId,
-      deaconIgnored: updated?.deaconIgnored ?? body.ignored,
-      deaconIgnoredAt: updated?.deaconIgnoredAt,
-      deaconIgnoredReason: updated?.deaconIgnoredReason,
-    });
-  }))
-);
-const postWorkspaceAutoMergeRoute = HttpRouter.add(
-  'POST',
-  '/api/workspaces/:issueId/auto-merge',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = (params['issueId'] ?? '').toUpperCase();
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-
-    const body = (yield* readJsonBody) as { autoMerge?: unknown };
-    if (typeof body.autoMerge !== 'boolean' && body.autoMerge !== null) {
-      return jsonResponse(
-        { success: false, error: 'Body must include { autoMerge: boolean | null }' },
-        { status: 400 },
-      );
-    }
-
-    setAutoMerge(issueId, body.autoMerge);
-    const updated = getReviewStatusSync(issueId);
-    return jsonResponse({
-      success: true,
-      issueId,
-      autoMerge: updated?.autoMerge ?? null,
-    });
-  }))
-);
 // ─── Route: DELETE /api/review/:issueId/pending ──────────────────────────
 
 const deleteWorkspacePendingRoute = HttpRouter.add(
@@ -649,7 +179,7 @@ const deleteWorkspacePendingRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     clearPendingOperation(issueId);
@@ -658,99 +188,10 @@ const deleteWorkspacePendingRoute = HttpRouter.add(
 );
 
 
-// ─── Route: GET/POST /api/review/:issueId/config ───────────────────────────
-//
-// Per-issue review configuration override: reviewMode (quick|full|none) and
-// reviewModel. Resolution order for review mode is per-issue record → project
-// roles.review → global config. Passing null clears an override back to config
-// resolution.
-const getReviewConfigRoute = HttpRouter.add(
-  'GET',
-  '/api/review/:issueId/config',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = (params['issueId'] ?? '').toUpperCase();
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-    const result = yield* Effect.promise(async () => {
-      const { readIssueRecordSync, resolveProjectForIssue } = await import('../../../../lib/pan-dir/record.js');
-      const { resolveReviewMode } = await import('../../../../lib/cloister/review-agent.js');
-      const project = resolveProjectForIssue(issueId);
-      const record = project ? readIssueRecordSync(project, issueId) : null;
-      return {
-        issueId,
-        override: { reviewMode: record?.reviewMode ?? null, reviewModel: record?.reviewModel ?? null },
-        resolved: { reviewMode: resolveReviewMode(issueId), reviewModel: record?.reviewModel ?? resolveConfiguredReviewModel() },
-      };
-    });
-    return jsonResponse(result);
-  }))
-);
-
-const postReviewConfigRoute = HttpRouter.add(
-  'POST',
-  '/api/review/:issueId/config',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = (params['issueId'] ?? '').toUpperCase();
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-    const body = (yield* readJsonBody) as { reviewMode?: string | null; reviewModel?: string | null };
-    const hasMode = Object.prototype.hasOwnProperty.call(body ?? {}, 'reviewMode');
-    const hasModel = Object.prototype.hasOwnProperty.call(body ?? {}, 'reviewModel');
-    if (!hasMode && !hasModel) {
-      return jsonResponse({ error: 'Provide reviewMode and/or reviewModel (null clears the override)' }, { status: 400 });
-    }
-    if (hasMode && body.reviewMode !== null && body.reviewMode !== 'quick' && body.reviewMode !== 'full' && body.reviewMode !== 'none') {
-      return jsonResponse({ error: "reviewMode must be quick, full, none, or null" }, { status: 400 });
-    }
-    let reviewModel: string | undefined;
-    if (hasModel && body.reviewModel !== null) {
-      try {
-        reviewModel = normalizeModelOverrideSync(body.reviewModel);
-      } catch (error) {
-        return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
-      }
-    }
-    const result = yield* Effect.promise(async () => {
-      const { resolveProjectForIssue } = await import('../../../../lib/pan-dir/record.js');
-      const { updateIssueRecord } = await import('../../../../lib/pan-dir/record-update.js');
-      const { resolveReviewMode } = await import('../../../../lib/cloister/review-agent.js');
-      const project = resolveProjectForIssue(issueId);
-      const record = await updateIssueRecord(project, issueId, (current) => {
-        if (hasMode) {
-          if (body.reviewMode === null) delete current.reviewMode;
-          else current.reviewMode = body.reviewMode as 'quick' | 'full' | 'none';
-        }
-        if (hasModel) {
-          if (body.reviewModel === null) delete current.reviewModel;
-          else current.reviewModel = reviewModel;
-        }
-      });
-      return {
-        success: true,
-        issueId,
-        override: { reviewMode: record.reviewMode ?? null, reviewModel: record.reviewModel ?? null },
-        resolved: { reviewMode: resolveReviewMode(issueId), reviewModel: record.reviewModel ?? resolveConfiguredReviewModel() },
-      };
-    });
-    return jsonResponse(result);
-  }))
-);
-
 export const reviewControlRouteLayer = Layer.mergeAll(
-  postWorkspaceResetReviewRoute,
-  postReviewResyncRoute,
   postWorkspaceReviewPurgeRoute,
   postWorkspaceAbortReviewRoute,
-  postWorkspaceUnstickRoute,
-  postWorkspaceDeaconIgnoreRoute,
-  postWorkspaceAutoMergeRoute,
   deleteWorkspacePendingRoute,
-  getReviewConfigRoute,
-  postReviewConfigRoute,
 );
 
 export default reviewControlRouteLayer;

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -1215,6 +1215,89 @@ describe('watchConversation', () => {
 
     releaseFirstCallback();
     await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(2));
+    handle.stop();
+  });
+});
+
+describe('watchConversation safety nets (missed fs.watch events)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mockStat.mockImplementation(async () => {
+      const buf = await mockReadFile();
+      return { mtimeMs: Date.now() - 1_000, birthtimeMs: Date.now() - 1_000, size: buf.length };
+    });
+    mockOpen.mockImplementation(async () => {
+      const buffer = await mockReadFile();
+      return {
+        read: (buf: Buffer, offset: number, length: number, position: number) => {
+          const toCopy = Math.min(length, Math.max(0, buffer.length - position));
+          if (toCopy > 0) {
+            buffer.copy(buf, offset, position, position + toCopy);
+          }
+          return Promise.resolve({ bytesRead: toCopy, buffer: buf });
+        },
+        close: () => Promise.resolve(),
+      };
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const userLine = (uuid: string, text: string) => makeJsonlLine({
+    type: 'user',
+    uuid,
+    timestamp: '2024-01-01T00:00:00.000Z',
+    message: { content: [{ type: 'text', text }] },
+  });
+
+  it('re-parses an append that fs.watch never reported via the periodic size reconcile', async () => {
+    const firstLine = userLine('u-1', 'First');
+    let buffer = Buffer.from(`${firstLine}\n`);
+    mockReadFile.mockImplementation(async () => buffer);
+    // fs.watch stays open but never yields an event.
+    mockWatch.mockImplementationOnce(() => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) }));
+
+    const callback = vi.fn(async () => {});
+    const { watchConversation, RECONCILE_INTERVAL_MS } = await import('../conversation-service.js');
+    const handle = watchConversation('/fake/session.jsonl', callback, {
+      byteOffset: buffer.length,
+      priorState: { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+    });
+
+    await vi.advanceTimersByTimeAsync(RECONCILE_INTERVAL_MS + 10);
+    expect(callback).not.toHaveBeenCalled();
+
+    buffer = Buffer.from(`${firstLine}\n${userLine('u-2', 'Second')}\n`);
+    await vi.advanceTimersByTimeAsync(RECONCILE_INTERVAL_MS + 10);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0]![0].messages.map((m: { id: string }) => m.id)).toEqual(['u-2']);
+
+    handle.stop();
+  });
+
+  it('falls back to polling when the fs.watch iterator ends without throwing', async () => {
+    const firstLine = userLine('u-1', 'First');
+    let buffer = Buffer.from(`${firstLine}\n`);
+    mockReadFile.mockImplementation(async () => buffer);
+    mockWatch.mockImplementationOnce(() => ({
+      [Symbol.asyncIterator]: async function* () { /* closes immediately */ },
+    }));
+
+    const callback = vi.fn(async () => {});
+    const { watchConversation } = await import('../conversation-service.js');
+    const handle = watchConversation('/fake/session.jsonl', callback, {
+      byteOffset: buffer.length,
+      priorState: { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+    });
+
+    buffer = Buffer.from(`${firstLine}\n${userLine('u-2', 'Second')}\n`);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0]![0].messages.map((m: { id: string }) => m.id)).toEqual(['u-2']);
+
     handle.stop();
   });
 });

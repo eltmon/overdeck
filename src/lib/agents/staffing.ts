@@ -22,11 +22,11 @@ import type { XBriefItem } from '../xbrief/types.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { NormalizedConfig } from '../config-yaml/schema.js';
 import { resolveModel } from '../config-yaml/roles.js';
-import { requireModelOverrideSync } from '../model-validation.js';
-import { readIssueRecordSync } from '../pan-dir/record.js';
-import { getBuiltInDefaultHarness, getProviderForModelSync } from '../providers.js';
-import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { requireModelOverride } from '../model-validation.js';
+import { getBuiltInDefaultHarness, getProviderForModel } from '../providers.js';
 import { fmix32, fnv1a32 } from '../config-yaml/percent.js';
+import type { TierOverridesMap } from '../xbrief/io.js';
+import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { resolveTier } from './resolve-tier.js';
 import { resolveTieredExecutionEnabled, type TierDistributionEntry } from './tier-table.js';
 
@@ -53,34 +53,44 @@ export interface ResolveStaffingOptions {
   config?: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'providerHarnesses'>;
   /** Issue whose durable work-model override should be applied. */
   issueId?: string;
-}
-
-/** Per-issue work-model override from the issue record, or undefined. */
-export function resolveIssueWorkModel(issueId: string): string | undefined {
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (!resolved) return undefined;
-  const project = getProjectSync(resolved.projectKey);
-  if (!project) return undefined;
-  return readIssueRecordSync(project, issueId)?.workModel || undefined;
+  /**
+   * Recorded tier promotions for the workspace (`readTierOverrides`). Applied
+   * to the item's difficulty before `resolveTier` so a promoted item staffs at
+   * its promoted tier (PAN-3858: promotions must reach live staffing).
+   */
+  tierOverrides?: TierOverridesMap;
 }
 
 /** Provider-default harness for a model (PAN-1984: harness is derived from the
  * model's provider — per-provider setting else built-in default). */
-export function providerDefaultHarnessSync(
+function providerDefaultHarnessSync(
   model: string,
   config: Pick<NormalizedConfig, 'providerHarnesses'>,
 ): RuntimeName {
-  const provider = getProviderForModelSync(model).name;
+  const provider = getProviderForModel(model).name;
   return config.providerHarnesses?.[provider] ?? getBuiltInDefaultHarness(provider);
 }
 
 /** The implicit tier: roles.work resolution as a Staffing. Fails loudly when
  * the work role is unresolvable — never a hardcoded fallback. */
+/**
+ * PAN-3917: the per-issue work-model override lived only on the deleted
+ * pipeline record (Appendix A.2) with no live-derivable replacement — an
+ * operator-set override, not something git/tracker/PR/liveness can
+ * reconstruct. Always undefined now; kept exported (not deleted) because
+ * src/dashboard/server/routes/agents/spawn.ts (W6, out of this fix's scope)
+ * still imports it as a fallback before the role default. A one-off model
+ * for a single session is passed at spawn time instead (`pan start --model`).
+ */
+export function resolveIssueWorkModel(_issueId: string): string | undefined {
+  return undefined;
+}
+
 export function resolveImplicitStaffing(
   config: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'providerHarnesses'>,
   spawnKey?: string,
 ): Staffing {
-  const model = requireModelOverrideSync(resolveModel('work', undefined, config, spawnKey));
+  const model = requireModelOverride(resolveModel('work', undefined, config, spawnKey));
   return {
     tierName: IMPLICIT_TIER_NAME,
     model,
@@ -99,21 +109,19 @@ export function resolveStaffing(
   options: ResolveStaffingOptions = {},
 ): Staffing {
   const config = options.config ?? loadYamlConfig().config;
-  const issueModel = options.issueId ? resolveIssueWorkModel(options.issueId) : undefined;
-  if (issueModel) {
-    const model = requireModelOverrideSync(issueModel);
-    return {
-      tierName: 'issue-override',
-      model,
-      harness: providerDefaultHarnessSync(model, config),
-      implicit: false,
-    };
-  }
+  // PAN-3917: the per-issue work-model override lived only on the deleted
+  // pipeline record (Appendix A.2) with no live-derivable replacement — an
+  // operator-set override, not something git/tracker/PR/liveness can
+  // reconstruct. A one-off model for a single session is passed at spawn
+  // time instead (`pan start --model`), which flows in via metadata.model.
   const tiered = config.tieredExecution;
 
   if (tiered && resolveTieredExecutionEnabled(tiered, options.planMetadata)) {
     try {
-      const tier = resolveTier(item, tiered);
+      const effectiveItem = options.tierOverrides
+        ? applyEffectiveDifficulty(item, options.tierOverrides)
+        : item;
+      const tier = resolveTier(effectiveItem, tiered);
       // PAN-2391: a distribution tier spreads beads across weighted
       // model+harness entries. Selection is deterministic per bead so
       // replay/re-resolution always lands on the same entry. A per-bead

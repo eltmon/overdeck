@@ -45,12 +45,10 @@ vi.mock('../../xbrief/io.js', () => ({
   readPlanProgram: (...args: unknown[]) => mockReadPlan(...args),
 }));
 vi.mock('../../xbrief/lifecycle-io.js', () => ({
-  findXBriefByIssue: vi.fn(() => null),
   findXBriefByIssueSync: vi.fn(() => null),
 }));
 vi.mock('../../config.js', () => ({
   getDevrootPath: vi.fn(() => null),
-  getDevrootPathSync: vi.fn(() => null),
 }));
 
 // ── stub-ui scanner mock ───────────────────────────────────────────────────
@@ -95,9 +93,9 @@ describe('buildReviewContext', () => {
   it('throws when workspace does not exist', async () => {
     mockExistsSync.mockReturnValue(false);
 
-    await expect(Effect.runPromise(buildReviewContext({ runId, issueId, workspace }))).rejects.toMatchObject({
-      cause: expect.objectContaining({ message: expect.stringContaining('Workspace directory does not exist') }),
-    });
+    await expect(buildReviewContext({ runId, issueId, workspace })).rejects.toThrow(
+      'Workspace directory does not exist',
+    );
   });
 
   it('runs git commands and writes manifest to correct path', async () => {
@@ -112,7 +110,7 @@ describe('buildReviewContext', () => {
       'git diff "deadbeef"...HEAD': { stdout: '+some diff content\n' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(mockMkdir).toHaveBeenCalledWith(
       join(workspace, '.pan', 'review', runId),
@@ -156,7 +154,7 @@ describe('buildReviewContext', () => {
       'diff --stat': { stdout: '' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.nonGoals).toEqual([
       'Do not add a new dashboard route',
@@ -194,7 +192,7 @@ describe('buildReviewContext', () => {
       'diff --stat': { stdout: '' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.traces).toEqual([
       { itemId: 'wire-command', title: 'Wire command', traces: ['FR-1', 'NFR-2'] },
@@ -220,7 +218,7 @@ describe('buildReviewContext', () => {
       'git diff "base"...HEAD': { stdout: '' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.changedFiles[0].path).toBe('src/auth/token.ts');   // HIGH=5
     expect(manifest.changedFiles[1].path).toBe('src/api/routes.ts');   // MED=3
@@ -237,7 +235,7 @@ describe('buildReviewContext', () => {
       'diff --stat': { stdout: '2 files changed, 200 insertions(+), 0 deletions(-)\n' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.diff.truncated).toBe(true);
     expect(manifest.diff.stat).toContain('2 files changed');
@@ -247,7 +245,7 @@ describe('buildReviewContext', () => {
     mockExecAsync.mockRejectedValue(new Error('not a git repo'));
     mockExistsSync.mockImplementation((p: string) => p === workspace);
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.changedFiles).toEqual([]);
     expect(manifest.headSha).toBe('unknown');
@@ -274,7 +272,7 @@ describe('buildReviewContext', () => {
       'diff --stat': { stdout: '' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.stubUiFindings).toHaveLength(1);
     expect(manifest.stubUiFindings[0]?.patternId).toBe('empty-array-return');
@@ -293,7 +291,7 @@ describe('buildReviewContext', () => {
       'diff --stat': { stdout: '' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.stubUiFindings).toEqual([]);
     const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
@@ -343,7 +341,7 @@ describe('riskScore (via buildReviewContext file ranking)', () => {
         return { stdout: '', stderr: '' };
       });
 
-      const manifest = await Effect.runPromise(buildReviewContext({ runId: 'r', issueId: 'X-1', workspace }));
+      const manifest = await buildReviewContext({ runId: 'r', issueId: 'X-1', workspace });
       expect(manifest.changedFiles[0]?.riskScore).toBe(5);
     });
   }
@@ -358,7 +356,7 @@ describe('riskScore (via buildReviewContext file ranking)', () => {
         return { stdout: '', stderr: '' };
       });
 
-      const manifest = await Effect.runPromise(buildReviewContext({ runId: 'r', issueId: 'X-1', workspace }));
+      const manifest = await buildReviewContext({ runId: 'r', issueId: 'X-1', workspace });
       expect(manifest.changedFiles[0]?.riskScore).toBe(1);
     });
   }
@@ -448,7 +446,7 @@ describe('CodeRabbit findings integration', () => {
       'diff --stat': { stdout: '' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.codeRabbitFindings).toEqual(findings);
     expect(mockFetchCodeRabbitFindings).toHaveBeenCalledWith({ workspace, branch: 'feature-pan-2374' });
@@ -467,7 +465,7 @@ describe('CodeRabbit findings integration', () => {
       'diff --stat': { stdout: '' },
     });
 
-    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+    const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.codeRabbitFindings).toEqual([]);
   });

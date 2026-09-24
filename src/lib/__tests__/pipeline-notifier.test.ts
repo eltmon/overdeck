@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../internal-token.js', () => ({
   INTERNAL_TOKEN_HEADER: 'x-overdeck-internal-token',
   getInternalToken: vi.fn(() => 'test-token'),
-  getInternalTokenSync: vi.fn(() => 'test-token'),
 }));
 
 const originalFetch = globalThis.fetch;
@@ -42,9 +41,9 @@ afterEach(() => {
 
 describe('notifyPipeline', () => {
   it('forwards lifecycle events across the process boundary', async () => {
-    const { notifyPipelineSync } = await import('../pipeline-notifier.js');
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
 
-    notifyPipelineSync({ type: 'review.approved', issueId: 'PAN-1381' });
+    notifyPipeline({ type: 'review.approved', issueId: 'PAN-1381' });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       'http://dashboard.test/api/internal/pipeline/notify',

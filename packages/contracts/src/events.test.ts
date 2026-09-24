@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { AgentContextSaturationChangedEvent, DomainEvent, OperatorInterventionEvent, PipelineStatusChangedEvent, SubstrateBugFiledEvent, SweepScanEvent, SystemHeartbeatEvent, WorkCompletedEvent } from "./events"
+import { AgentContextSaturationChangedEvent, BackendPaneChangedEvent, DomainEvent, IssueStateChangedEvent, OperatorInterventionEvent, SubstrateBugFiledEvent, SweepScanEvent, SystemHeartbeatEvent, WorkCompletedEvent } from "./events"
 import { AgentSnapshot } from "./types"
 import { INITIAL_READ_MODEL_STATE, applyEvent } from "./event-reducers"
 
@@ -173,26 +173,34 @@ describe("events-workspaceid (PAN-1990 ac2)", () => {
     expect(decodeDomainEvent(withoutWorkspaceOrIssue)).toEqual(withoutWorkspaceOrIssue)
   })
 
-  it("PipelineStatusChangedEvent (nested ReviewStatusSnapshot payload) decodes with and without workspaceId", () => {
-    const decodeEvent = Schema.decodeUnknownSync(PipelineStatusChangedEvent)
-    const status = { issueId: "PAN-1990", reviewStatus: "passed" as const }
-    const withWorkspace = {
-      type: "pipeline.status_changed",
+  it("IssueStateChangedEvent carries the derived state and decodes through DomainEvent", () => {
+    const decodeEvent = Schema.decodeUnknownSync(IssueStateChangedEvent)
+    const event = {
+      type: "issue_state.changed",
       sequence: 1,
       timestamp: "2026-07-29T00:00:00.000Z",
-      payload: { issueId: "PAN-1990", workspaceId: "ws-pan-1990", status },
+      payload: {
+        issueState: {
+          issueId: "PAN-1990",
+          state: "ready",
+          pr: { url: "https://github.com/o/r/pull/7", number: 7, reviewState: "approved", checks: "green", mergeable: true },
+        },
+      },
     }
-    const withoutWorkspace = {
-      type: "pipeline.status_changed",
+    expect(decodeEvent(event)).toEqual(event)
+    expect(decodeDomainEvent(event)).toEqual(event)
+  })
+
+  it("BackendPaneChangedEvent carries the pane and decodes through DomainEvent", () => {
+    const decodeEvent = Schema.decodeUnknownSync(BackendPaneChangedEvent)
+    const event = {
+      type: "backend_pane.changed",
       sequence: 2,
       timestamp: "2026-07-29T00:01:00.000Z",
-      payload: { issueId: "PAN-1990", status },
+      payload: { pane: { id: "w1:p1", issue: "PAN-1990", role: "review", harness: "claude-code", model: "opus", state: "working" } },
     }
-
-    expect(decodeEvent(withWorkspace)).toEqual(withWorkspace)
-    expect(decodeDomainEvent(withWorkspace)).toEqual(withWorkspace)
-    expect(decodeEvent(withoutWorkspace)).toEqual(withoutWorkspace)
-    expect(decodeDomainEvent(withoutWorkspace)).toEqual(withoutWorkspace)
+    expect(decodeEvent(event)).toEqual(event)
+    expect(decodeDomainEvent(event)).toEqual(event)
   })
 })
 
@@ -434,7 +442,7 @@ describe("Agent lifecycle events", () => {
   })
 
   describe("agent.stopped", () => {
-    it("removes the agent from the read model", () => {
+    it("retains the stopped agent in the read model", () => {
       const agent = baseAgentSnapshot({ status: "running" })
       const started = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({
         type: "agent.started" as const,
@@ -449,7 +457,10 @@ describe("Agent lifecycle events", () => {
         payload: { agentId: "agent-pan-1908", issueId: "PAN-1908" },
       }))
 
-      expect(stopped.agentsById["agent-pan-1908"]).toBeUndefined()
+      expect(stopped.agentsById["agent-pan-1908"]).toMatchObject({
+        status: "stopped",
+        hasLiveTmuxSession: false,
+      })
     })
   })
 

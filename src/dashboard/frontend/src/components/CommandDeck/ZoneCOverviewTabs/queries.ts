@@ -12,11 +12,8 @@ import {
   type UseQueryOptions,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { StatusHistoryEntry } from '../../../lib/workspace-types';
 import type { SettingsConfig } from '../../Settings/types';
 import type { XBriefDocument } from '../../xbrief/types';
-
-export type { StatusHistoryEntry };
 
 export interface PlanningSummaryResponse {
   hasPrd: boolean;
@@ -202,129 +199,6 @@ export function useActivityQuery(issueId: string): UseQueryResult<ActivityRespon
         (s) => s.status === 'running' || s.status === 'active',
       );
       return hasActive ? 5_000 : 30_000;
-    },
-  });
-}
-
-export interface ReviewStatusData {
-  issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
-  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  verificationNotes?: string;
-  verificationCycleCount?: number;
-  verificationMaxCycles?: number;
-  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
-  testNotes?: string;
-  reviewNotes?: string;
-  mergeNotes?: string;
-  mergeRetryCount?: number;
-  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
-  releaseNotes?: string;
-  readyForMerge: boolean;
-  updatedAt: string;
-  /** PAN-653: stuck flag and reason */
-  stuck?: boolean;
-  stuckReason?: string;
-  stuckAt?: string;
-  stuckDetails?: string;
-  /** PAN-3151: review cycle history for convergence detection */
-  reviewCycleHistory?: Array<{ cycle: number; runId: string; atCommit?: string; blockingCount: number; recordedAt: string }>;
-  /** PAN-905: GitHub-native merge blocker reasons */
-  blockerReasons?: BlockerReason[];
-  /** PAN-366: Queue position — null = not queued, 0 = active, 1+ = position */
-  queuePosition?: number | null;
-  /** PAN-366: Which specialist is active or will handle this issue */
-  activeSpecialist?: 'review' | 'test' | 'merge' | null;
-  /** Chronological review/test/merge/verify/release status transitions (S3 History tab). */
-  history?: StatusHistoryEntry[];
-}
-
-export interface ReleaseComponentState {
-  componentKey: string;
-  provider?: string;
-  trigger: 'auto' | 'manual' | 'skip';
-  releaseOrder: number;
-  required: boolean;
-  status: 'pending' | 'releasing' | 'passed' | 'failed' | 'skipped' | 'blocked' | 'rolled_back';
-  healthStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  versionStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  smokeStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  rollbackStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'rolled_back';
-  notes?: string;
-}
-
-export interface ReleaseSetData {
-  issueId: string;
-  projectKey: string;
-  projectPath: string;
-  workspaceType: 'monorepo' | 'polyrepo';
-  status: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
-  createdAt: string;
-  updatedAt: string;
-  components: ReleaseComponentState[];
-}
-
-export function useReleaseSetQuery(
-  issueId: string,
-  options?: Omit<UseQueryOptions<ReleaseSetData | null>, 'queryKey' | 'queryFn'>,
-): UseQueryResult<ReleaseSetData | null> {
-  return useQuery({
-    queryKey: ['release-set', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/release`);
-      if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — /api/workspaces/${issueId}/release`);
-      return res.json() as Promise<ReleaseSetData>;
-    },
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === 'releasing' ? 5_000 : 30_000;
-    },
-    ...options,
-  });
-}
-
-export interface BlockerReason {
-  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable' | 'unmerged_sibling_repo';
-  summary: string;
-  details?: string;
-  detectedAt: string;
-}
-
-export function useReviewStatusQuery(issueId: string): UseQueryResult<ReviewStatusData> {
-  return useQuery({
-    queryKey: ['review-status', issueId],
-    queryFn: () => fetchJson<ReviewStatusData>(`/api/review/${issueId}/status`),
-    refetchInterval: 30_000,
-  });
-}
-
-export interface ShipLogEntry {
-  ts: string;
-  line: string;
-}
-
-export interface ShipLogData {
-  issueId: string;
-  mergeStatus: string | null;
-  mergeStep: string | null;
-  log: {
-    startedAt: string;
-    updatedAt: string;
-    step?: string;
-    lines: ShipLogEntry[];
-  } | null;
-}
-
-export function useShipLogQuery(issueId: string): UseQueryResult<ShipLogData> {
-  return useQuery({
-    queryKey: ['ship-log', issueId],
-    queryFn: () => fetchJson<ShipLogData>(`/api/issues/${issueId}/ship-log`),
-    refetchInterval: (query) => {
-      const s = query.state.data?.mergeStatus;
-      return s === 'merging' || s === 'verifying' ? 2_000 : 15_000;
     },
   });
 }

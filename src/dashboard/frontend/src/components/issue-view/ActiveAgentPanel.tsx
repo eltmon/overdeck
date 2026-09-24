@@ -39,7 +39,7 @@ function verbBadgeForAgent(
   agent: AgentSnapshot,
   pendingPermissionAgentIds?: ReadonlySet<string>,
 ): VerbBadgeProps {
-  if (agent.troubled || agent.status === 'error' || isTerminalStatus(agent.status)) {
+  if (agent.status === 'error' || isTerminalStatus(agent.status)) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, new Date()), className: 'text-[9px]' };
   }
   if (isAwaitingInput(agent, pendingPermissionAgentIds)) return { variant: 'INPUT', className: 'text-[9px]' };

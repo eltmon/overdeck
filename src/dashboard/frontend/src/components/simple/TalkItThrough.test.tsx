@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts';
 import { DialogProvider } from '../DialogProvider';
 import { SimpleHomePage } from './SimpleHomePage';
-import { seedDiscussPrompt } from './TalkItThrough';
+import { seedDiscussPrompt, TalkItThrough } from './TalkItThrough';
+import { applyDefaultConversationModel } from '../chat/defaultConversationModel';
 import { useDashboardStore } from '../../lib/store';
 import { useUiMode } from '../../lib/simple/uiMode';
 import type { Issue } from '../../types';
@@ -32,7 +33,8 @@ function seed(issues: Issue[]) {
     ...INITIAL_READ_MODEL_STATE,
     issuesRaw: issues,
     agentsById: {},
-    reviewStatusByIssueId: {},
+    derivedIssueStateByIssueId: {},
+    backendPanesById: {},
   } as never);
 }
 
@@ -43,6 +45,7 @@ function renderWithProviders(ui: React.ReactElement) {
 
 describe('TalkItThrough flow (C-SIMPLE)', () => {
   beforeEach(() => {
+    applyDefaultConversationModel('claude-opus-4-6');
     useUiMode.setState({ mode: 'simple', simpleIssueId: null });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -98,5 +101,60 @@ describe('TalkItThrough flow (C-SIMPLE)', () => {
     expect(screen.getByText('Filed ten minutes ago')).toBeInTheDocument();
     expect(screen.queryByText('Filed last week')).toBeNull();
     expect(screen.getByRole('button', { name: 'Start planning' })).toBeInTheDocument();
+  });
+
+  it('shows a failed launch and preserves the draft for retry', async () => {
+    const fetchMock = vi.mocked(fetch);
+    const originalFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input) === '/api/conversations' && init?.method === 'POST') {
+        return Response.json({ error: 'Conversation service unavailable' }, { status: 503 });
+      }
+      return originalFetch(input, init);
+    });
+    renderWithProviders(<TalkItThrough />);
+    const input = screen.getByTestId('talk-it-through-input');
+    const button = screen.getByRole('button', { name: 'Talk it through' });
+    expect(button).toBeDisabled();
+    fireEvent.change(input, { target: { value: 'Discuss the weekly digest' } });
+    fireEvent.click(button);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Conversation service unavailable');
+    expect(input).toHaveValue('Discuss the weekly digest');
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => url === '/api/conversations')).toHaveLength(2));
+  });
+
+  it('ignores Enter while a launch is pending', async () => {
+    const fetchMock = vi.mocked(fetch);
+    const originalFetch = fetchMock.getMockImplementation()!;
+    let finish!: (response: Response) => void;
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input) === '/api/conversations' && init?.method === 'POST') {
+        return new Promise<Response>((resolve) => { finish = resolve; });
+      }
+      return originalFetch(input, init);
+    });
+    renderWithProviders(<TalkItThrough />);
+    const input = screen.getByTestId('talk-it-through-input');
+    fireEvent.change(input, { target: { value: 'Discuss the weekly digest' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Starting…' })).toBeDisabled());
+    fireEvent.keyDown(input, { key: 'Enter' });
+    finish(Response.json({ error: 'Try again' }, { status: 503 }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Talk it through' })).toBeEnabled());
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/conversations')).toHaveLength(1);
+  });
+
+  it('requires a model instead of launching a hardcoded fallback', async () => {
+    applyDefaultConversationModel('');
+    renderWithProviders(<TalkItThrough />);
+    await screen.findByTestId('talk-it-through-project');
+    const input = screen.getByTestId('talk-it-through-input');
+    fireEvent.change(input, { target: { value: 'Discuss the weekly digest' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByText('Choose a model to start the conversation.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Talk it through' })).toBeDisabled();
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/conversations')).toHaveLength(0);
   });
 });

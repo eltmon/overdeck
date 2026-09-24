@@ -1,0 +1,195 @@
+{
+  "version": "1",
+  "issueId": "PAN-3959",
+  "created": "2026-09-20T22:53:20.505Z",
+  "updated": "2026-09-21T00:06:21.886Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-index-path-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T22:53:20.505Z",
+      "doneAt": "2026-09-20T22:59:19.728Z"
+    },
+    "w2-claude-hooks-record-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:03:41.763Z",
+      "doneAt": "2026-09-20T23:08:19.389Z"
+    },
+    "w3-resolver-path-fast-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:08:24.042Z",
+      "doneAt": "2026-09-20T23:14:28.153Z"
+    },
+    "w4-codex-writers-record-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:14:34.108Z",
+      "doneAt": "2026-09-20T23:20:17.873Z"
+    },
+    "w5-kimi-capture-records-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:20:26.843Z",
+      "doneAt": "2026-09-20T23:25:50.183Z"
+    },
+    "w6-pi-ohmypi-extensions-record-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:25:54.807Z",
+      "doneAt": "2026-09-20T23:31:55.209Z"
+    },
+    "w7-acp-muse-writers-record-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:31:59.924Z",
+      "doneAt": "2026-09-20T23:39:37.693Z"
+    },
+    "w8-drop-guessing-extras": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:40:18.168Z",
+      "doneAt": "2026-09-20T23:50:10.053Z"
+    },
+    "w9-docs-transcript-path-index": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:50:15.732Z",
+      "doneAt": "2026-09-20T23:51:40.163Z"
+    },
+    "w1-index-path-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T23:58:41.171Z"
+    },
+    "w1-index-path-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-20T23:59:02.904Z"
+    },
+    "w1-index-path-field.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T23:59:12.410Z"
+    },
+    "w1-index-path-field.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-20T23:59:21.848Z"
+    },
+    "w2-claude-hooks-record-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:00:05.519Z"
+    },
+    "w2-claude-hooks-record-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:00:14.996Z"
+    },
+    "w2-claude-hooks-record-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:00:24.039Z"
+    },
+    "w2-claude-hooks-record-path.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:00:32.920Z"
+    },
+    "w3-resolver-path-fast-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:00:58.282Z"
+    },
+    "w3-resolver-path-fast-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:01:07.588Z"
+    },
+    "w3-resolver-path-fast-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:01:16.805Z"
+    },
+    "w3-resolver-path-fast-path.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:01:26.721Z"
+    },
+    "w4-codex-writers-record-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:01:52.009Z"
+    },
+    "w4-codex-writers-record-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:02:01.022Z"
+    },
+    "w4-codex-writers-record-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:02:09.895Z"
+    },
+    "w5-kimi-capture-records-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:02:34.085Z"
+    },
+    "w5-kimi-capture-records-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:02:43.613Z"
+    },
+    "w5-kimi-capture-records-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:02:53.192Z"
+    },
+    "w6-pi-ohmypi-extensions-record-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:03:17.974Z"
+    },
+    "w6-pi-ohmypi-extensions-record-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:03:28.021Z"
+    },
+    "w6-pi-ohmypi-extensions-record-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:03:37.358Z"
+    },
+    "w6-pi-ohmypi-extensions-record-path.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:03:47.058Z"
+    },
+    "w7-acp-muse-writers-record-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:04:11.772Z"
+    },
+    "w7-acp-muse-writers-record-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:04:22.979Z"
+    },
+    "w7-acp-muse-writers-record-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:04:32.950Z"
+    },
+    "w8-drop-guessing-extras.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:05:02.733Z"
+    },
+    "w8-drop-guessing-extras.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:05:13.197Z"
+    },
+    "w8-drop-guessing-extras.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:05:23.637Z"
+    },
+    "w8-drop-guessing-extras.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:05:33.929Z"
+    },
+    "w9-docs-transcript-path-index.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:06:00.629Z"
+    },
+    "w9-docs-transcript-path-index.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:06:11.163Z"
+    },
+    "w9-docs-transcript-path-index.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:06:21.886Z"
+    }
+  }
+}

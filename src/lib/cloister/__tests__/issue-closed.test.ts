@@ -6,9 +6,9 @@ const mocks = vi.hoisted(() => ({
   getIssueState: vi.fn(),
   isGitHubAppConfigured: vi.fn(),
   getShadowState: vi.fn(),
-  resolveGitHubIssueSync: vi.fn(),
+  resolveGitHubIssue: vi.fn(),
   // Linear branch
-  resolveTrackerTypeSync: vi.fn(),
+  resolveTrackerType: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   createTracker: vi.fn(),
   getLinearApiKey: vi.fn(),
@@ -29,8 +29,8 @@ vi.mock('../../../lib/shadow-state.js', () => ({
 }));
 
 vi.mock('../../../lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: mocks.resolveGitHubIssueSync,
-  resolveTrackerTypeSync: mocks.resolveTrackerTypeSync,
+  resolveGitHubIssue: mocks.resolveGitHubIssue,
+  resolveTrackerType: mocks.resolveTrackerType,
 }));
 
 vi.mock('../../../lib/github-app.js', () => ({
@@ -65,15 +65,15 @@ describe('issue closed detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearIssueClosedCache();
-    mocks.getShadowState.mockReturnValue(Effect.succeed(null));
-    mocks.resolveGitHubIssueSync.mockReturnValue({
+    mocks.getShadowState.mockResolvedValue(null);
+    mocks.resolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
       repo: 'overdeck',
       number: 1613,
     });
     mocks.isGitHubAppConfigured.mockReturnValue(false);
-    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'open' }));
+    mocks.getIssueState.mockResolvedValue({ state: 'open' });
     mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ state: 'OPEN' }), stderr: '' });
   });
 
@@ -83,7 +83,7 @@ describe('issue closed detection', () => {
     ['done canonical state', { targetCanonicalState: 'done' }],
     ['canceled canonical state', { targetCanonicalState: 'canceled' }],
   ])('returns true for closed shadow state via %s', async (_label, shadowState) => {
-    mocks.getShadowState.mockReturnValue(Effect.succeed(shadowState));
+    mocks.getShadowState.mockResolvedValue(shadowState);
 
     await expect(isIssueClosed('PAN-1613')).resolves.toBe(true);
     expect(mocks.execFileAsync).not.toHaveBeenCalled();
@@ -106,7 +106,7 @@ describe('issue closed detection', () => {
 
   it('returns true through the GitHub App REST tracker fallback when configured', async () => {
     mocks.isGitHubAppConfigured.mockReturnValue(true);
-    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'closed' }));
+    mocks.getIssueState.mockResolvedValue({ state: 'closed' });
 
     await expect(isIssueClosed('PAN-1613')).resolves.toBe(true);
 
@@ -131,7 +131,7 @@ describe('issue closed detection', () => {
 
   it('uses the 5-minute tracker cache for App REST results', async () => {
     mocks.isGitHubAppConfigured.mockReturnValue(true);
-    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'closed' }));
+    mocks.getIssueState.mockResolvedValue({ state: 'closed' });
 
     await expect(isTrackerIssueClosed('PAN-1613')).resolves.toBe(true);
     await expect(isTrackerIssueClosed('PAN-1613')).resolves.toBe(true);
@@ -145,10 +145,10 @@ describe('linear closed detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearIssueClosedCache();
-    mocks.getShadowState.mockReturnValue(Effect.succeed(null));
+    mocks.getShadowState.mockResolvedValue(null);
     // Non-GitHub resolution so the Linear branch runs.
-    mocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
-    mocks.resolveTrackerTypeSync.mockReturnValue('linear');
+    mocks.resolveGitHubIssue.mockReturnValue({ isGitHub: false });
+    mocks.resolveTrackerType.mockReturnValue('linear');
     mocks.resolveProjectFromIssueSync.mockReturnValue({
       projectKey: 'myn',
       projectName: 'Mind Your Now',
@@ -182,7 +182,7 @@ describe('linear closed detection', () => {
   });
 
   it('returns false without building a Linear client for non-linear tracker types (FR-3)', async () => {
-    mocks.resolveTrackerTypeSync.mockReturnValue('rally');
+    mocks.resolveTrackerType.mockReturnValue('rally');
 
     await expect(isTrackerIssueClosed('FOO-1')).resolves.toBe(false);
     expect(mocks.createTracker).not.toHaveBeenCalled();

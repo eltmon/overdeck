@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { ensureCompatibleNode } from './node-preflight.js'; import { drainPendingDurableWrites } from './durable-write-drain.js';
+import { ensureCompatibleNode } from './node-preflight.js';
 
 // Relaunch under a compatible Node (>=22) before anything else runs. If the
 // current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
@@ -47,6 +47,7 @@ import {
   contextDiffCommand,
   contextValidateCommand,
   contextMigrateCommand,
+  contextDetachCommand,
   contextLayersHelp,
 } from './commands/context-layers.js';
 import { restoreCommand } from './commands/restore.js';
@@ -60,10 +61,9 @@ import { tellCommand } from './commands/tell.js';
 import { answerCommand } from './commands/answer.js';
 import { registerMonitorCommands } from './commands/monitor.js';
 import { killCommand } from './commands/kill.js';
-import { registerResetToPlannedCommand } from './commands/reset-to-planned.js'; import { registerResetSessionCommand } from './commands/reset-session.js';
+import { registerResetSessionCommand } from './commands/reset-session.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
-import { untroubledCommand } from './commands/untroubled.js'; import { registerUnstickCommand } from './commands/unstick.js';
 import { forkCommand } from './commands/fork.js';
 import { handoffCommand } from './commands/handoff.js';
 import { unarchiveConversationCommand } from './commands/unarchive-conversation.js';
@@ -71,7 +71,6 @@ import { resumeCommand } from './commands/resume.js';
 import { recoverCommand } from './commands/recover.js';
 import { syncMainCommand } from './commands/sync-main.js';
 import { doneCommand } from './commands/done.js';
-import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
 import { registerCloseCommand } from './commands/close.js';
@@ -93,7 +92,6 @@ import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
 import { reloadCommand } from './commands/reload.js';
-import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { createMemoryCommand } from './commands/memory.js';
 import { createBriefingCommand } from './commands/briefing.js';
@@ -102,19 +100,21 @@ import { createRegistryCommand } from './commands/registry.js'; import { createO
 import { createParkedCommand } from './commands/parked.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
-import { strikeCommand } from './commands/strike.js'; import { registerStrikeReadyCommand } from './commands/strike-ready.js';
+import { strikeCommand } from './commands/strike.js';
 import { configureKnowledgeCommand } from './commands/knowledge.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 import { registerRolloutCommands } from './commands/rollout.js';
-import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
+import { isNoResumeCliOptionEnabled } from '../lib/boot-no-resume.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
 import { getManagedTmuxSocketName } from '../lib/tmux.js';
 import { registerResourceCommands } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
+import { registerSpawnCommand } from './commands/spawn.js';
+import { registerWorkerCommands } from './commands/worker.js';
 import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
@@ -210,7 +210,7 @@ program
 
 program
   .command('sync')
-  .description('Sync skills/agents to ~/.claude/ and render the context layers')
+  .description('Sync skills and render managed launch context')
   .option('--dry-run', 'Show what would be synced')
   .option('--force', 'Overwrite files modified since Overdeck installed them')
   .option('--diff', 'Show diff for modified files')
@@ -238,7 +238,7 @@ context
 
 context
   .command('sync')
-  .description('Render the context layers into harness CLAUDE.md files')
+  .description('Refresh Overdeck-managed session context artifacts')
   .action(contextSyncCommand);
 
 context
@@ -257,6 +257,13 @@ context
   .description('One-shot migration from the deprecated sync.devroot model')
   .option('--yes', 'Register every discovered project without prompting')
   .action(contextMigrateCommand);
+
+context
+  .command('detach')
+  .description('Explicitly remove historical Overdeck managed regions from native instruction files')
+  .option('--dry-run', 'Preview exact files and managed blocks without changing anything')
+  .option('--apply', 'Back up each file and remove only an unambiguous managed block')
+  .action(contextDetachCommand);
 
 context.action(contextLayersHelp);
 
@@ -295,7 +302,6 @@ program
   .option('--json', 'Output as JSON')
   .option('--tracker <type>', 'Query specific tracker (linear/github/gitlab)')
   .option('--all-trackers', 'Query all configured trackers')
-  .option('--shadow-only', 'Show only shadowed issues')
   .option('--triage', 'Show triage queue')
   .action((options) => {
     if (options.triage) {
@@ -308,8 +314,7 @@ program
 // pan show <id> — unified observation
 program
   .command('show <id>')
-  .description('Unified lens: shadow state, CV, context, health for one issue')
-  .option('--shadow', 'Shadow state details only')
+  .description('Unified lens: derived issue state, CV, context, health for one issue')
   .option('--cv', 'Agent work history only')
   .option('--context', 'Context engineering state only')
   .option('--health', 'Health + heartbeat only')
@@ -325,7 +330,7 @@ program
 
 registerReviewCommands(program);
 
-program.command('staffing <id>').description('Show or set per-issue work-model and swarm overrides').option('--model <model>', 'Set the work model, or default to clear the override').option('--swarm <mode>', 'Set swarm mode (off, auto, always), or default to clear the override').action(staffingCommand);
+program.command('staffing <id>').description('Show the work model and swarm policy in effect for an issue').action(staffingCommand);
 
 // pan backlog — sequence writer surface
 const backlog = program
@@ -334,7 +339,7 @@ const backlog = program
 
 backlog
   .command('write-sequence <file>')
-  .description('Validate a SequenceDoc JSON file and write it to .pan/backlog/sequence.md (triggers auto-commit)')
+  .description('Validate a SequenceDoc JSON file, write it to .pan/backlog/sequence.md, and commit it')
   .option('--project-root <path>', 'Project root (default: cwd)')
   .action(async (file: string, opts: { projectRoot?: string }) => {
     const { readFileSync } = await import('node:fs');
@@ -354,7 +359,18 @@ backlog
       return exitCli(1);
     }
     writeSequenceMd(projectRoot, result.doc);
+    // Whoever writes a .pan/ artifact commits it — no daemon does it for you.
+    const { commitPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
+    const { resolvePlanHome } = await import('../lib/pan-dir/paths.js');
+    const commit = await commitPlanArtifacts({
+      cwd: resolvePlanHome(projectRoot),
+      paths: ['.pan/backlog'],
+      message: 'chore(workspace): backlog sequence',
+    });
     console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
+    if (!commit.committed && commit.reason !== 'nothing to commit') {
+      console.error(chalk.yellow(`  ⚠ Could not commit the sequence: ${commit.reason}`));
+    }
   });
 
 // pan plan finalize <id>
@@ -366,7 +382,7 @@ const planCmd = program
   .option('--auto-start', '[deprecated: use pan start <id>] After planning completes, automatically start the work agent — used by autonomous orchestrators')
   .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code (defaults to role/provider settings)')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
   .option('--effort <level>', 'Planning effort: low | medium | high')
   .option('--remote', 'Use remote planning workspace (Fly.io)')
   .option('--local', 'Use local planning workspace')
@@ -403,7 +419,7 @@ program
   .description('Stop one qualified agent, or all agents when given an issue ID (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
-registerResetToPlannedCommand(program); registerResetSessionCommand(program);
+registerResetSessionCommand(program);
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')
@@ -415,11 +431,6 @@ program
   .description('Clear an agent pause gate without spawning it')
   .action(unpauseCommand);
 
-program
-  .command('untroubled <id>')
-  .description('Clear an agent troubled gate without spawning it')
-  .action(untroubledCommand);
-registerUnstickCommand(program);
 program
   .command('fork [conv]')
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
@@ -475,14 +486,8 @@ program
   .option('-c, --comment <message>', 'Comment for the tracker')
   .option('--force', 'Skip pre-flight completion checks')
   .option('--test-waived <reason>', 'Skip the test-requirement gate; reason must include rationale and SHA of an existing test that covers the requirement')
-  .option('--strike', 'Strike-agent shape: skip review-pipeline dispatch (used by `pan strike` agents that merged directly to main)')
-  .option('--json', 'Output as JSON')
+  .option('--strike', 'Strike shape: verify the strike branch is contained in origin/main; no PR is opened')
   .action(doneCommand);
-
-program
-  .command('approve <id>')
-  .description('[REMOVED] Use dashboard MERGE button instead')
-  .action(approveCommand);
 
 program
   .command('reopen <id>')
@@ -503,6 +508,7 @@ program
   .description('Alias for workspace destroy: remove the issue workspace worktree and branch')
   .option('--force', 'Force removal even with uncommitted changes')
   .option('--project <path>', 'Explicit project path (overrides registry)')
+  .option('--shape <shape>', 'Limit to one shape: base|strike|slot|all (default: all)')
   .action(destroyWorkspaceCommand);
 
 registerCloseCommand(program);
@@ -510,13 +516,11 @@ registerCloseCommand(program);
 program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
-  .option('--model <model>', 'Work model to use and persist for later respawns (defaults to Cloister config)').option('--swarm <mode>', 'Per-issue swarm policy: off | auto | always').option('--review-mode <mode>', 'Per-issue review mode: quick | full | none').option('--review-model <model>', 'Per-issue review model override')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code (defaults to role/provider settings)')
+  .option('--model <model>', 'Work model for this session (defaults to Cloister config)')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
   .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
   .option('--dry-run', 'Show what would be created')
-  .option('--shadow', 'Enable shadow mode')
-  .option('--no-shadow', 'Disable shadow mode')
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
@@ -525,18 +529,19 @@ program
   .option('--force', 'Clear paused and pending-operator-decision gates and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
-  .option('--yes', 'Confirm --host in non-interactive contexts').option('--off-book', 'Allow one work-agent dispatch outside the active order book and log the override')
+  .option('--yes', 'Confirm --host in non-interactive contexts')
+  .option('--skip-freshness', 'Bypass the plan-freshness preflight and spawn even if the plan names files that no longer exist')
   .action(startCommand);
 
 program
   .command('strike <ids...>')
-  .description('Spawn strike agent(s) — implement and push a strike branch for Deacon to land through the verified merge door. Bypasses plan/review/test/ship.')
+  .description('Spawn strike agent(s) — implement a fix on a strike branch and open a PR against main for the operator to merge. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code (defaults to role/provider settings)')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')
   .option('--dry-run', 'Print what would happen without spawning')
   .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
-registerStrikeReadyCommand(program); configureKnowledgeCommand(program);
+configureKnowledgeCommand(program);
 registerSwarmCommands(program); registerTaskCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);
@@ -565,12 +570,11 @@ registerOhmypiAuthCommands(program);
 // Register install command
 registerInstallCommand(program);
 
-// Register inspect command (pan inspect <issueId> --item <itemId>)
-registerInspectCommand(program);
-
 // Register caveman commands (pan caveman-compress)
 registerCavemanCommands(program);
 registerScopeCommands(program);
+registerSpawnCommand(program);
+registerWorkerCommands(program);
 registerFlywheelCommands(program);
 registerMergeCommands(program);
 registerArtifactCommands(program);
@@ -663,8 +667,8 @@ program
     }
     console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
 
-    // Startup context sync (skills, agents, hooks, MCP config, rendered
-    // ~/.claude/CLAUDE.md + per-project CLAUDE.md) is DEFERRED to run in the
+    // Startup sync (skills, agents, hooks, MCP config, and Overdeck-owned
+    // launch context artifacts) is DEFERRED to run in the
     // background AFTER the dashboard is listening — see startPostLaunchSidecars
     // below. Running it here cost ~22s on every `overdeck up`, blocking the
     // server from even spawning, and the dashboard does not depend on synced
@@ -701,23 +705,23 @@ program
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {
-        const { generateOverdeckTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } = await import('../lib/traefik.js');
+        const { generateOverdeckTraefikConfig, ensureProjectCerts, generateTlsConfig, cleanupStaleTlsSections } = await import('../lib/traefik.js');
 
         // Clean stale tls: sections from older config files
-        cleanupStaleTlsSectionsSync();
+        cleanupStaleTlsSections();
 
-        if (generateOverdeckTraefikConfigSync()) {
+        if (generateOverdeckTraefikConfig()) {
           console.log(chalk.dim('  Regenerated Traefik config from template'));
         }
 
         // Generate missing certs for registered projects
-        const generatedDomains = ensureProjectCertsSync();
+        const generatedDomains = ensureProjectCerts();
         for (const domain of generatedDomains) {
           console.log(chalk.dim(`  Generated wildcard cert for *.${domain}`));
         }
 
         // Generate tls.yml from all discovered certs
-        if (generateTlsConfigSync()) {
+        if (generateTlsConfig()) {
           console.log(chalk.dim('  Generated TLS config (tls.yml)'));
         }
       } catch {
@@ -856,8 +860,9 @@ program
       return candidates.find((p) => existsSync(p)) ?? null;
     })();
 
-    const { startPostLaunchSidecars } = await import('./up-sidecars.js');
+    const { startPostLaunchSidecars, ensureHerdrBeforeDashboard } = await import('./up-sidecars.js');
     const startUpSidecars = () => startPostLaunchSidecars({ selfCli: fileURLToPath(import.meta.url), projectRoot: process.cwd() });
+    await ensureHerdrBeforeDashboard(); // PAN-3956: before the dashboard, so its pane feed finds a server
 
     async function openDashboardInBrowser(url: string): Promise<void> {
       if (options.open === false) return;
@@ -910,15 +915,15 @@ program
       }
     }
 
-    const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
-    const platformConfig = readPlatformConfigSync();
-    await Effect.runPromise(stopDashboard({
+    const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+    const platformConfig = readPlatformConfig();
+    await stopDashboard({
       ...platformConfig,
       dashboardPort,
       dashboardApiPort,
       traefikEnabled,
       traefikDomain,
-    }));
+    });
 
     // Start dashboard
     if (isProduction) {
@@ -1098,9 +1103,9 @@ program
 
     // Stop smee-client webhook relay
     try {
-      const { stopSmeeProcessSync } = await import('../lib/smee.js');
+      const { stopSmeeProcess } = await import('../lib/smee.js');
       console.log(chalk.dim('Stopping smee-client webhook relay...'));
-      stopSmeeProcessSync();
+      stopSmeeProcess();
       console.log(chalk.green('✓ smee-client stopped'));
     } catch {
       console.log(chalk.dim('  smee-client not running'));
@@ -1108,14 +1113,14 @@ program
 
     // Stop the supervisor sidecar
     try {
-      const { stopSupervisorProcessSync, isSupervisorRunningSync } = await import('../lib/supervisor.js');
+      const { stopSupervisorProcess, isSupervisorRunning } = await import('../lib/supervisor.js');
       const { stopSupervisorUnitIfActive } = await import('../lib/systemd.js');
       if (await stopSupervisorUnitIfActive()) {
         console.log(chalk.dim('Stopping supervisor sidecar...'));
         console.log(chalk.green('✓ Supervisor unit stopped'));
-      } else if (isSupervisorRunningSync()) {
+      } else if (isSupervisorRunning()) {
         console.log(chalk.dim('Stopping supervisor sidecar...'));
-        stopSupervisorProcessSync();
+        stopSupervisorProcess();
         console.log(chalk.green('✓ Supervisor stopped'));
       }
     } catch {
@@ -1145,10 +1150,10 @@ program
     // have identical teardown semantics.
     console.log(chalk.dim('Stopping dashboard...'));
     try {
-      const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
-      const platformConfig = readPlatformConfigSync();
+      const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+      const platformConfig = readPlatformConfig();
       // Respect whatever ports this block already parsed out of config.toml.
-      await Effect.runPromise(stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort }));
+      await stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort });
       console.log(chalk.green('✓ Dashboard stopped'));
     } catch {
       console.log(chalk.dim('  No dashboard processes found'));
@@ -1159,7 +1164,7 @@ program
     console.log(chalk.dim('Stopping review sessions...'));
     try {
       const { killAllReviewSessions } = await import('../lib/cloister/review-agent.js');
-      const { killed, failed } = await Effect.runPromise(killAllReviewSessions());
+      const { killed, failed } = await killAllReviewSessions();
       if (killed.length > 0) {
         console.log(chalk.green(`✓ Stopped ${killed.length} review session(s)`));
       }
@@ -1192,10 +1197,10 @@ program
 
     // Stop CLIProxyAPI sidecar
     try {
-      const { stopCliproxySync, isCliproxyRunningSync } = await import('../lib/cliproxy.js');
-      if (isCliproxyRunningSync()) {
+      const { stopCliproxy, isCliproxyRunning } = await import('../lib/cliproxy.js');
+      if (await isCliproxyRunning()) {
         console.log(chalk.dim('Stopping CLIProxyAPI sidecar...'));
-        stopCliproxySync();
+        await stopCliproxy();
         console.log(chalk.green('✓ CLIProxyAPI stopped'));
       }
     } catch {
@@ -1204,7 +1209,7 @@ program
 
     // Stop TLDR daemon on project root
     try {
-      const { getTldrDaemonServiceSync } = await import('../lib/tldr-daemon.js');
+      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
       const { exec } = await import('child_process');
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
@@ -1214,7 +1219,7 @@ program
 
       if (existsSync(venvPath)) {
         console.log(chalk.dim('\nStopping TLDR daemon...'));
-        const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
+        const tldrService = getTldrDaemonService(projectRoot, venvPath);
         await tldrService.stop();
         console.log(chalk.green('✓ TLDR daemon stopped'));
       }
@@ -1368,4 +1373,7 @@ if (process.argv.length === 2) {
 }
 
 // Short-lived commands must drain durable state writes before exit (PAN-2692).
-await runCliWithTelemetry(() => program.parseAsync(process.argv, { from: 'node' }), drainPendingDurableWrites);
+// PAN-3917: durable-write-drain.ts (journal writes plus the state worktree's
+// commit flush) is gone with the state layer — there is nothing left to drain
+// before exit, so runCliWithTelemetry's drain hook is a no-op.
+await runCliWithTelemetry(() => program.parseAsync(process.argv, { from: 'node' }), async () => {});

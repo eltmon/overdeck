@@ -1,4 +1,5 @@
 import type { ResourceStack } from '../../types';
+import { PHASE_BY_DERIVED_STATE } from '../../lib/pipeline-state';
 import { pipelineChipFor, type BucketedFeature } from '../CommandDeck/pipeline-helpers';
 import { ActionButton, type ServiceAction, type StackAction } from './StackActions';
 
@@ -25,30 +26,29 @@ export function StackCard({
   onServiceTerminal,
   onTeardown,
 }: StackCardProps) {
+  // PAN-3917: the stack carries the issue's derived state; the lane it renders
+  // in is that state through the one mapping every surface shares.
+  const stackPhase = stack.state ? PHASE_BY_DERIVED_STATE[stack.state] : 'todo';
   const feature: BucketedFeature['feature'] = {
     issueId: stack.issueId ?? stack.id,
     title: stack.issueTitle,
     projectName: '',
     branch: '',
-    status: stack.phase === 'merged' ? 'closed' : stack.phase,
-    stateLabel: stack.phase,
+    status: stack.state === 'merged' || stack.state === 'closed' ? 'closed' : stackPhase,
+    stateLabel: stack.state ?? 'no issue',
     agentStatus: null,
     hasPlanning: false,
     hasPrd: false,
     hasState: false,
     isShadow: false,
   };
-  const reviewStatus: BucketedFeature['reviewStatus'] = stack.phase === 'merged'
-    ? { issueId: stack.issueId ?? stack.id, mergeStatus: 'merged' }
+  const derived: BucketedFeature['derived'] = stack.issueId && stack.state
+    ? { issueId: stack.issueId, state: stack.state }
     : undefined;
-  const chip = pipelineChipFor({
-    phase: stack.phase === 'merged' ? 'ship' : stack.phase,
-    feature,
-    reviewStatus,
-  });
+  const chip = pipelineChipFor({ phase: stackPhase, feature, derived });
   const idleHint = shouldShowIdleHint(stack);
   const atLimit = stack.services.some((service) => (service.memPercentOfLimit ?? 0) >= 95);
-  const dimmed = stack.phase === 'merged' && stack.services.every((service) => service.status === 'stopped');
+  const dimmed = stack.state === 'merged' && stack.services.every((service) => service.status === 'stopped');
 
   return (
     <article className={`border border-border bg-background ${dimmed ? 'opacity-70' : ''}`} data-testid="stack-card">

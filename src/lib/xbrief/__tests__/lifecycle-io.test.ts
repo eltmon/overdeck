@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
@@ -7,17 +6,14 @@ import { tmpdir } from 'os';
 
 import {
   findXBriefByIssueSync,
-  moveXBrief,
-  promoteXBriefToProposed,
   transitionXBriefOnMain,
   updatePlanStatus,
 } from '../lifecycle-io.js';
 import {
-  ensureXBriefDirsSync,
+  ensureXBriefDirs,
   generateXBriefFilename,
   resolveXBriefDir,
 } from '../lifecycle.js';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
 import type { XBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -68,7 +64,7 @@ afterEach(() => {
 
 describe('findXBriefByIssue', () => {
   it('finds an xBRIEF in proposed/', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-946', 'foo', '2026-05-03');
     writePlan(resolveXBriefDir(TEST_DIR, 'proposed'), filename, makePlan('PAN-946', 'foo'));
     const found = findXBriefByIssueSync(TEST_DIR, 'PAN-946');
@@ -80,7 +76,7 @@ describe('findXBriefByIssue', () => {
   });
 
   it('finds an xBRIEF in active/', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     writePlan(
       resolveXBriefDir(TEST_DIR, 'active'),
       generateXBriefFilename('PAN-100', 'bar', '2026-05-03'),
@@ -91,12 +87,12 @@ describe('findXBriefByIssue', () => {
   });
 
   it('returns null when no xBRIEF exists', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     expect(findXBriefByIssueSync(TEST_DIR, 'PAN-999')).toBeNull();
   });
 
   it('prefers proposed/ over active/ when both contain a match', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
       generateXBriefFilename('PAN-1', 'foo', '2026-05-03'),
@@ -112,7 +108,7 @@ describe('findXBriefByIssue', () => {
   });
 
   it('ignores files that do not match the canonical naming convention', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     writeFileSync(
       join(resolveXBriefDir(TEST_DIR, 'proposed'), 'plan.vbrief.json'),
       JSON.stringify(makePlan('PAN-1', 'foo')),
@@ -121,7 +117,7 @@ describe('findXBriefByIssue', () => {
   });
 
   it('skips corrupt files matching the naming convention', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     writeFileSync(
       join(resolveXBriefDir(TEST_DIR, 'proposed'), generateXBriefFilename('PAN-1', 'corrupt', '2026-05-03')),
       'not valid json',
@@ -139,7 +135,7 @@ describe('findXBriefByIssue', () => {
 
 describe('updatePlanStatus', () => {
   it('updates plan.status, increments sequence, refreshes timestamps', async () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const path = writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -156,7 +152,7 @@ describe('updatePlanStatus', () => {
   });
 
   it('writes atomically (no .tmp left behind)', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const path = writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -168,157 +164,11 @@ describe('updatePlanStatus', () => {
   });
 });
 
-describe('moveXBrief (with durable git write-through)', () => {
-  it('moves and commits through the canonical state writer', async () => {
-    initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
-    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
-    writePlan(
-      resolveXBriefDir(TEST_DIR, 'proposed'),
-      filename,
-      makePlan('PAN-1', 'foo', 'proposed'),
-    );
-    // First commit the proposed/ file so git knows about the source
-    execSync('git add vbrief/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "add proposed"', { cwd: TEST_DIR });
-
-    const result = await Effect.runPromise(moveXBrief(TEST_DIR, 'PAN-1', 'active'));
-    expect(existsSync(result.toPath)).toBe(true);
-
-    // The move is committed atomically; no staged residue remains.
-    const status = execSync('git status --porcelain', { cwd: TEST_DIR, encoding: 'utf-8' });
-    expect(status).toBe('');
-    expect(execSync('git show --name-only --format= HEAD', { cwd: TEST_DIR, encoding: 'utf-8' }))
-      .toContain('.pan/specs/');
-  });
-
-  it('throws when issue has no xBRIEF', async () => {
-    initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
-    await expect(Effect.runPromise(moveXBrief(TEST_DIR, 'PAN-999', 'active'))).rejects.toThrow();
-  });
-});
-
-describe('promoteXBriefToProposed', () => {
-  function createWorkspace(workspacePath: string, plan: XBriefDocument): void {
-    const panDir = join(workspacePath, PAN_DIRNAME);
-    mkdirSync(panDir, { recursive: true });
-    writeFileSync(
-      join(panDir, PAN_SPEC_FILENAME),
-      JSON.stringify(plan, null, 2),
-      'utf-8',
-    );
-  }
-
-  it('throws when workspace plan is missing', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-1');
-    mkdirSync(workspacePath, { recursive: true });
-    expect(() => promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-1')).toThrow(
-      /No workspace spec found/,
-    );
-  });
-
-  it('canonicalizes a legacy stamped filename while promoting xBRIEF', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-1');
-    const plan = makePlan('PAN-1', 'foo');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-1-foo.vbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-1');
-
-    expect(result.canonicalFilename).toBe('2026-05-03-PAN-1-foo.xbrief.json');
-    expect(result.destXBrief).toBe(
-      join(TEST_DIR, '.pan', 'specs', '2026-05-03-PAN-1-foo.xbrief.json'),
-    );
-    expect(result.destContinue).toBeNull();
-    expect(existsSync(result.destXBrief)).toBe(true);
-    const copied = JSON.parse(readFileSync(result.destXBrief, 'utf-8')) as XBriefDocument & { status: string };
-    expect(copied.plan.id).toBe('pan-1');
-    expect(copied.status).toBe('proposed');
-  });
-
-  it('generates canonical filename from plan title when metadata is absent', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-2');
-    const plan = makePlan('PAN-2', 'fallback');
-    plan.plan.title = 'Adopt deft xBRIEF Lifecycle Model';
-    // No metadata.canonicalFilename
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-2');
-
-    expect(result.canonicalFilename).toMatch(
-      /^\d{4}-\d{2}-\d{2}-PAN-2-adopt-deft-xbrief-lifecycle-model\.xbrief\.json$/,
-    );
-    expect(existsSync(result.destXBrief)).toBe(true);
-  });
-
-  it('uppercases issue ID for filename even when caller passes lowercase', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-3');
-    const plan = makePlan('PAN-3', 'lowercase-test');
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'pan-3');
-
-    // generateXBriefFilename rejects lowercase issueId in its regex, so we verify
-    // the filename has uppercase PAN-3.
-    expect(result.canonicalFilename).toMatch(/PAN-3/);
-  });
-
-  it('always returns destContinue null (continue promotion retired in PAN-1919)', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-4');
-    const plan = makePlan('PAN-4', 'with-continue');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-4-with-continue.xbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-4');
-
-    expect(result.destContinue).toBeNull();
-    expect(existsSync(result.destXBrief)).toBe(true);
-  });
-
-  it('creates canonical .pan/specs storage if it does not exist yet', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-6');
-    const plan = makePlan('PAN-6', 'first-promotion');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-6-first-promotion.xbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    expect(existsSync(join(TEST_DIR, '.pan', 'specs'))).toBe(false);
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(false);
-
-    promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-6');
-
-    expect(existsSync(join(TEST_DIR, '.pan', 'specs'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, '.pan', 'specs', '2026-05-03-PAN-6-first-promotion.xbrief.json'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(false);
-  });
-
-  it('overwrites existing destination file (idempotent re-runs)', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-7');
-    const plan = makePlan('PAN-7', 'overwrite-test');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-7-overwrite-test.xbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
-
-    // Modify the workspace plan and re-run promotion
-    plan.plan.title = 'Updated title';
-    writeFileSync(
-      join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME),
-      JSON.stringify(plan, null, 2),
-      'utf-8',
-    );
-
-    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
-
-    const copied = JSON.parse(readFileSync(result.destXBrief, 'utf-8'));
-    expect(copied.plan.title).toBe('Updated title');
-  });
-});
 
 describe('transitionXBriefOnMain', () => {
-  it('moves xBRIEF between dirs, updates status, and commits on main', async () => {
+  it('moves xBRIEF between dirs and updates status, without committing', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -328,28 +178,26 @@ describe('transitionXBriefOnMain', () => {
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "add proposed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     expect(result.fromDir).toBe('proposed');
     expect(result.toDir).toBe('active');
     expect(result.moved).toBe(true);
     expect(result.statusUpdated).toBe(true);
-    expect(result.committed).toBe(true);
+    // PAN-3917: the door never commits — the agent does, on its feature branch.
+    expect(result.committed).toBe(false);
     expect(existsSync(result.toPath)).toBe(true);
     expect(existsSync(join(resolveXBriefDir(TEST_DIR, 'proposed'), filename))).toBe(false);
 
     const updatedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument;
     expect(updatedDoc.plan.status).toBe('approved');
     expect(updatedDoc.plan.sequence).toBe(2);
-
-    const log = execSync('git log -1 --pretty=%s', { cwd: TEST_DIR, encoding: 'utf-8' }).trim();
-    expect(log).toBe('scope: approve PAN-1 xBRIEF');
   });
 
   it('is idempotent once the issue already lives in .pan/specs with the target lifecycle and status', async () => {
@@ -368,13 +216,13 @@ describe('transitionXBriefOnMain', () => {
     execSync('git add .pan/specs/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed pan spec"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     expect(result.moved).toBe(false);
     expect(result.statusUpdated).toBe(false);
@@ -387,7 +235,7 @@ describe('transitionXBriefOnMain', () => {
 
   it('updates status only when already in target dir but status differs', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'active'),
@@ -397,17 +245,17 @@ describe('transitionXBriefOnMain', () => {
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed active proposed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     expect(result.moved).toBe(false);
     expect(result.statusUpdated).toBe(true);
-    expect(result.committed).toBe(true);
+    expect(result.committed).toBe(false);
 
     const doc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument;
     expect(doc.plan.status).toBe('approved');
@@ -415,7 +263,7 @@ describe('transitionXBriefOnMain', () => {
 
   it('leaves continue file at canonical path during lifecycle transitions', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -425,30 +273,28 @@ describe('transitionXBriefOnMain', () => {
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     expect(result.moved).toBe(true);
     expect(result.statusUpdated).toBe(true);
-    expect(result.committed).toBe(true);
+    expect(result.committed).toBe(false);
   });
 
   it('throws when no xBRIEF exists for the issue', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
-    await expect(Effect.runPromise(
-      transitionXBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 xBRIEF'),
-    )).rejects.toThrow();
+    ensureXBriefDirs(TEST_DIR);
+    await expect(transitionXBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 xBRIEF')).rejects.toThrow();
   });
 
   it('does NOT commit when projectRoot is not on main', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -459,13 +305,13 @@ describe('transitionXBriefOnMain', () => {
     execSync('git -c commit.gpgsign=false commit -q -m "seed proposed"', { cwd: TEST_DIR });
     execSync('git checkout -q -b feature/test', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     // The on-disk move + status update happens regardless of branch.
     expect(result.moved).toBe(true);

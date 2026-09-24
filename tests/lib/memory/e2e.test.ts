@@ -3,7 +3,6 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryIdentity, MemoryObservation, MemoryStatus, PendingTurn } from '@overdeck/contracts';
-import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 import { createResetMarker, searchMemory as searchMemoryCli } from '../../../src/lib/memory/cli.js';
 import { closeMemoryFtsDatabases } from '../../../src/lib/memory/fts-db.js';
@@ -21,7 +20,6 @@ let odb: OverdeckTestDb;
 
 beforeEach(async () => {
   originalHome = process.env.OVERDECK_HOME;
-  resetDatabase();
   // setupOverdeckTestDb creates a fresh OVERDECK_HOME with overdeck.db and sets the env var.
   // Use odb.home as tempDir so memory files and overdeck DB share the same root.
   odb = setupOverdeckTestDb();
@@ -48,7 +46,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   closeMemoryFtsDatabases();
-  closeDatabase();
   teardownOverdeckTestDb(odb);
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;

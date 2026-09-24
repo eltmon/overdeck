@@ -5,7 +5,7 @@
  * of the legacy panopticon.db surface (PAN-399).
  */
 
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 import type { ReleaseComponentState, ReleaseSet } from '../release-set-types.js';
 
 // overdeck stores INTEGER milliseconds; ReleaseSet uses ISO strings.
@@ -77,7 +77,7 @@ function rowToReleaseComponent(row: OverdeckReleaseComponentRow): ReleaseCompone
 }
 
 function loadComponentsForReleaseSet(
-  db: ReturnType<typeof getOverdeckDatabaseSync>,
+  db: ReturnType<typeof getOverdeckDatabase>,
   issueId: string,
 ): ReleaseComponentState[] {
   const rows = db.prepare(`
@@ -92,7 +92,7 @@ function loadComponentsForReleaseSet(
 
 /** Insert or replace a release set and its component rows. */
 export function upsertReleaseSet(releaseSet: ReleaseSet): void {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const createdAtMs = millisFromIso(releaseSet.createdAt) ?? nowMillis();
   const updatedAtMs = millisFromIso(releaseSet.updatedAt) ?? nowMillis();
 
@@ -150,7 +150,7 @@ export function upsertReleaseSet(releaseSet: ReleaseSet): void {
 
 /** Fetch a release set by issue id, or null if none exists. */
 export function getReleaseSetFromDb(issueId: string): ReleaseSet | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db.prepare(`
     SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at
     FROM release_sets
@@ -158,32 +158,4 @@ export function getReleaseSetFromDb(issueId: string): ReleaseSet | null {
   `).get(issueId) as OverdeckReleaseSetRow | undefined;
   if (!row) return null;
   return rowToReleaseSet(row, loadComponentsForReleaseSet(db, issueId));
-}
-
-/** List release sets, optionally filtered by project key. */
-export function getAllReleaseSetsFromDb(projectKey?: string): ReleaseSet[] {
-  const db = getOverdeckDatabaseSync();
-  const rows = (
-    projectKey
-      ? db.prepare(`
-          SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at
-          FROM release_sets
-          WHERE project_key = ?
-          ORDER BY updated_at DESC
-        `).all(projectKey)
-      : db.prepare(`
-          SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at
-          FROM release_sets
-          ORDER BY updated_at DESC
-        `).all()
-  ) as OverdeckReleaseSetRow[];
-
-  return rows.map(row => rowToReleaseSet(row, loadComponentsForReleaseSet(db, row.issue_id)));
-}
-
-/** Delete a release set and its component rows. */
-export function deleteReleaseSet(issueId: string): void {
-  const db = getOverdeckDatabaseSync();
-  // Components are deleted via ON DELETE CASCADE; delete the parent explicitly.
-  db.prepare('DELETE FROM release_sets WHERE issue_id = ?').run(issueId);
 }

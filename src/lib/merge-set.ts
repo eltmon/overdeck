@@ -1,17 +1,11 @@
-import { Effect } from 'effect';
 import {
-  deleteMergeSet as dbDelete,
-  getAllMergeSetsFromDb,
   getMergeSetFromDb,
-  patchMergeSetRepo as dbPatchRepo,
-  patchMergeSetRepos as dbPatchRepos,
-  type MergeSetRepoPatch,
   upsertMergeSet as dbUpsert,
 } from './overdeck/merge-sync.js';
 import type { ForgeType } from './forge.js';
 import { resolveProjectFromIssueSync } from './projects.js';
-import { resolveProjectReposFromResolvedIssueSync } from './project-repos.js';
-import { resolveIssueIdSync } from './issue-id.js';
+import { resolveProjectReposFromResolvedIssue } from './project-repos.js';
+import { resolveIssueId } from './issue-id.js';
 
 export type MergeSetStatus = 'draft' | 'reviewing' | 'ready' | 'merging' | 'merged' | 'failed';
 export type MergeSetGateStatus = 'pending' | 'running' | 'passed' | 'failed' | 'blocked' | 'skipped';
@@ -26,11 +20,11 @@ export interface MergeSetRepoState {
   targetBranch: string;
   artifactUrl?: string;
   artifactId?: string;
-  reviewStatus: MergeSetGateStatus;
-  testStatus: MergeSetGateStatus;
+  repoReview: MergeSetGateStatus;
+  repoTests: MergeSetGateStatus;
   rebaseStatus: MergeSetRebaseStatus;
-  verificationStatus: MergeSetGateStatus;
-  mergeStatus: MergeSetRepoMergeStatus;
+  repoVerification: MergeSetGateStatus;
+  repoMerge: MergeSetRepoMergeStatus;
   mergeOrder: number;
   required: boolean;
 }
@@ -46,27 +40,20 @@ export interface MergeSet {
   repos: MergeSetRepoState[];
 }
 
-export function upsertMergeSetSync(mergeSet: MergeSet): void {
-  dbUpsert({ ...mergeSet, issueId: resolveIssueIdSync(mergeSet.issueId) });
+export function upsertMergeSet(mergeSet: MergeSet): void {
+  dbUpsert({ ...mergeSet, issueId: resolveIssueId(mergeSet.issueId) });
 }
 
-export function getMergeSetSync(issueId: string): MergeSet | null {
-  return getMergeSetFromDb(resolveIssueIdSync(issueId));
+/** Fetch a merge-set by issue id; throws on a merge-set DB failure. */
+export function getMergeSet(issueId: string): MergeSet | null {
+  return getMergeSetFromDb(resolveIssueId(issueId));
 }
 
-export function getAllMergeSetsSync(projectKey?: string): MergeSet[] {
-  return getAllMergeSetsFromDb(projectKey);
-}
-
-export function deleteMergeSetSync(issueId: string): void {
-  dbDelete(resolveIssueIdSync(issueId));
-}
-
-export function buildMergeSetForIssueSync(issueId: string, labels: string[] = []): MergeSet | null {
+export function buildMergeSetForIssue(issueId: string, labels: string[] = []): MergeSet | null {
   const resolved = resolveProjectFromIssueSync(issueId, labels);
   if (!resolved) return null;
 
-  const repos = resolveProjectReposFromResolvedIssueSync(issueId, resolved);
+  const repos = resolveProjectReposFromResolvedIssue(issueId, resolved);
   if (!repos) return null;
 
   const now = new Date().toISOString();
@@ -84,29 +71,29 @@ export function buildMergeSetForIssueSync(issueId: string, labels: string[] = []
       forge: repo.forge,
       sourceBranch: repo.sourceBranch,
       targetBranch: repo.targetBranch,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
+      repoReview: 'pending',
+      repoTests: 'pending',
       rebaseStatus: 'pending',
-      verificationStatus: 'pending',
-      mergeStatus: 'pending',
+      repoVerification: 'pending',
+      repoMerge: 'pending',
       mergeOrder: repo.mergeOrder,
       required: repo.required,
     })),
   };
 }
 
-export function ensureMergeSetForIssueSync(issueId: string, labels: string[] = []): MergeSet | null {
-  const existing = getMergeSetSync(issueId);
+export function ensureMergeSetForIssue(issueId: string, labels: string[] = []): MergeSet | null {
+  const existing = getMergeSet(issueId);
   if (existing) return existing;
 
-  const built = buildMergeSetForIssueSync(issueId, labels);
+  const built = buildMergeSetForIssue(issueId, labels);
   if (built) {
-    upsertMergeSetSync(built);
+    upsertMergeSet(built);
   }
   return built;
 }
 
-export function withRepoArtifactUrlSync(
+export function withRepoArtifactUrl(
   mergeSet: MergeSet,
   repoKey: string,
   artifactUrl: string,
@@ -123,7 +110,7 @@ export function withRepoArtifactUrlSync(
   };
 }
 
-export function withRepoStateSync(
+export function withRepoState(
   mergeSet: MergeSet,
   repoKey: string,
   patch: Partial<MergeSetRepoState>
@@ -138,83 +125,3 @@ export function withRepoStateSync(
     )),
   };
 }
-
-export function patchMergeSetRepoSync(
-  issueId: string,
-  repoKey: string,
-  expected: Pick<MergeSetRepoState, 'sourceBranch' | 'targetBranch' | 'artifactUrl' | 'artifactId'>,
-  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'mergeStatus'>>,
-): boolean {
-  return dbPatchRepo(resolveIssueIdSync(issueId), repoKey, expected, patch);
-}
-
-export function patchMergeSetReposSync(issueId: string, patches: MergeSetRepoPatch[]): boolean {
-  return dbPatchRepos(resolveIssueIdSync(issueId), patches);
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// All operations delegate to the SQLite-backed merge-set DB. The underlying
-// merge-set-db is synchronous; these wrappers preserve the contract
-// and route exceptions through Effect.try so callers in Effect graphs get a
-// typed error channel instead of an unchecked throw.
-
-/** Insert-or-update a merge-set in the DB. */
-export const upsertMergeSet = (mergeSet: MergeSet): Effect.Effect<void, Error> =>
-  Effect.try({
-    try: () => upsertMergeSetSync(mergeSet),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-/** Fetch a merge-set by issue id. */
-export const getMergeSet = (issueId: string): Effect.Effect<MergeSet | null, Error> =>
-  Effect.try({
-    try: () => getMergeSetSync(issueId),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-/** List all merge-sets (optionally filtered by project). */
-export const getAllMergeSets = (projectKey?: string): Effect.Effect<MergeSet[], Error> =>
-  Effect.try({
-    try: () => getAllMergeSetsSync(projectKey),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-/** Delete a merge-set by issue id. */
-export const deleteMergeSet = (issueId: string): Effect.Effect<void, Error> =>
-  Effect.try({
-    try: () => deleteMergeSetSync(issueId),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-/** Build a new merge-set from an issue id + labels (no DB write). Pure. */
-export const buildMergeSetForIssue = (
-  issueId: string,
-  labels: string[] = [],
-): Effect.Effect<MergeSet | null> =>
-  Effect.sync(() => buildMergeSetForIssueSync(issueId, labels));
-
-/** Build-or-fetch a merge-set; persists when newly built. */
-export const ensureMergeSetForIssue = (
-  issueId: string,
-  labels: string[] = [],
-): Effect.Effect<MergeSet | null, Error> =>
-  Effect.try({
-    try: () => ensureMergeSetForIssueSync(issueId, labels),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-/** Immutably attach an artifact URL/id to a repo entry. Pure. */
-export const withRepoArtifactUrl = (
-  mergeSet: MergeSet,
-  repoKey: string,
-  artifactUrl: string,
-  artifactId?: string,
-): Effect.Effect<MergeSet> =>
-  Effect.sync(() => withRepoArtifactUrlSync(mergeSet, repoKey, artifactUrl, artifactId));
-
-/** Immutably patch a repo state entry. Pure. */
-export const withRepoState = (
-  mergeSet: MergeSet,
-  repoKey: string,
-  patch: Partial<MergeSetRepoState>,
-): Effect.Effect<MergeSet> => Effect.sync(() => withRepoStateSync(mergeSet, repoKey, patch));

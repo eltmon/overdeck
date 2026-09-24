@@ -19,7 +19,7 @@ vi.mock('../../../../lib/agents.js', () => ({
 }));
 
 import { resolveStartAgentGateForRoute, spawnAfterClearingStartGates } from '../agents/spawn.js';
-import { buildAgentStartPlaceholder, buildContainerStartState, requestWorkStartAfterContainers } from '../agents/spawn-helpers.js';
+import { requestWorkStartAfterContainers } from '../agents/spawn-helpers.js';
 import type { AgentState } from '../../../../lib/agents.js';
 
 function makeState(overrides: Partial<AgentState> & { id: string; issueId: string }): AgentState {
@@ -34,48 +34,6 @@ function makeState(overrides: Partial<AgentState> & { id: string; issueId: strin
     ...overrides,
   } as AgentState;
 }
-
-describe('buildAgentStartPlaceholder', () => {
-  it('preserves accepted provenance in starting, event, and failure states', () => {
-    const { state, event } = buildAgentStartPlaceholder({
-      agentSessionName: 'agent-pan-3111',
-      issueId: 'PAN-3111',
-      workspacePath: '/tmp/workspace',
-      role: 'work',
-      effectiveHarness: 'claude-code',
-      startedBy: 'planning-auto-handoff',
-      allowHost: false,
-      startedAt: '2026-07-26T00:00:00.000Z',
-    });
-    const failedState = { ...state, model: 'gpt-5.5', status: 'stopped' as const };
-
-    expect(state.startedBy).toBe('planning-auto-handoff');
-    expect(event.payload.agent.startedBy).toBe('planning-auto-handoff');
-    expect(failedState.startedBy).toBe('planning-auto-handoff');
-  });
-});
-
-describe('buildContainerStartState', () => {
-  it.each(['starting', 'error'] as const)('preserves accepted provenance in %s container-wait state', (status) => {
-    const state = buildContainerStartState({
-      agentSessionName: 'agent-pan-3111',
-      issueId: 'PAN-3111',
-      workspacePath: '/tmp/workspace',
-      role: 'work',
-      effectiveHarness: 'claude-code',
-      startedBy: 'planning-auto-handoff',
-      allowHost: false,
-      status,
-      startedAt: '2026-07-26T00:00:00.000Z',
-    });
-
-    expect(state).toMatchObject({
-      status,
-      startedBy: 'planning-auto-handoff',
-      harness: 'claude-code',
-    });
-  });
-});
 
 describe('requestWorkStartAfterContainers', () => {
   it('consumes consent only after the work start command succeeds', async () => {
@@ -115,7 +73,7 @@ describe('resolveStartAgentGateForRoute', () => {
   });
 
   it('returns null when no persistent gate is set', async () => {
-    mockGetAgentState.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
+    mockGetAgentState.mockReturnValue(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' }));
 
     const result = await Effect.runPromise(
       resolveStartAgentGateForRoute({
@@ -132,9 +90,7 @@ describe('resolveStartAgentGateForRoute', () => {
   });
 
   it('returns the paused gate reason when clearGates is false', async () => {
-    mockGetAgentState.mockReturnValue(
-      Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' })),
-    );
+    mockGetAgentState.mockReturnValue(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' }));
 
     const result = await Effect.runPromise(
       resolveStartAgentGateForRoute({
@@ -158,9 +114,7 @@ describe('resolveStartAgentGateForRoute', () => {
   });
 
   it('returns the troubled gate reason when clearGates is false', async () => {
-    mockGetAgentState.mockReturnValue(
-      Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', troubled: true, consecutiveFailures: 3 })),
-    );
+    mockGetAgentState.mockReturnValue(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', troubled: true, consecutiveFailures: 3 }));
 
     const result = await Effect.runPromise(
       resolveStartAgentGateForRoute({
@@ -184,8 +138,8 @@ describe('resolveStartAgentGateForRoute', () => {
 
   it('clears a paused gate and emits an operator intervention when clearGates is true', async () => {
     mockGetAgentState
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' })))
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' }))
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' }));
     mockClearAgentPaused.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
 
     const result = await Effect.runPromise(
@@ -208,8 +162,8 @@ describe('resolveStartAgentGateForRoute', () => {
 
   it('clears a troubled gate and emits an operator intervention when clearGates is true', async () => {
     mockGetAgentState
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', troubled: true, consecutiveFailures: 3 })))
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', troubled: true, consecutiveFailures: 3 }))
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' }));
     mockClearAgentTroubled.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
 
     const result = await Effect.runPromise(
@@ -233,11 +187,9 @@ describe('resolveStartAgentGateForRoute', () => {
   it('clears both gates when an agent is paused and has failure tracking', async () => {
     mockGetAgentState
       .mockReturnValueOnce(
-        Effect.succeed(
-          makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'yielded', troubled: false, consecutiveFailures: 2 }),
-        ),
+        makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'yielded', troubled: false, consecutiveFailures: 2 }),
       )
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' }));
     mockClearAgentPaused.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
     mockClearAgentTroubled.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
 
@@ -257,9 +209,7 @@ describe('resolveStartAgentGateForRoute', () => {
   });
 
   it('ignores clearGates when the request origin is not trusted', async () => {
-    mockGetAgentState.mockReturnValue(
-      Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' })),
-    );
+    mockGetAgentState.mockReturnValue(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' }));
 
     const result = await Effect.runPromise(
       resolveStartAgentGateForRoute({
@@ -278,8 +228,8 @@ describe('resolveStartAgentGateForRoute', () => {
   it('re-evaluates the gate after clearing and returns it if the agent is still blocked', async () => {
     // First read: paused; clearing function succeeds but second read still sees paused.
     mockGetAgentState
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' })))
-      .mockReturnValueOnce(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'still paused' })));
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'manual inspection' }))
+      .mockReturnValueOnce(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true, pausedReason: 'still paused' }));
     mockClearAgentPaused.mockReturnValue(Effect.succeed(makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234' })));
 
     const result = await Effect.runPromise(

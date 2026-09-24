@@ -10,7 +10,7 @@ import type { WorkspaceRepoRoot } from '../../../../src/lib/project-repos.js';
 const roots = vi.hoisted(() => ({ value: [] as WorkspaceRepoRoot[] }));
 vi.mock('../../../../src/lib/project-repos.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../src/lib/project-repos.js')>()),
-  resolveWorkspaceRepoRootsSync: () => roots.value,
+  resolveWorkspaceRepoRoots: () => roots.value,
 }));
 
 import {

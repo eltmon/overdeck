@@ -3,11 +3,12 @@ import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, writeFileS
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout, findLatestRollout, toCodexSandboxValue } from '../codex.js'
+import { CodexRuntimeSync, writeThreadId, recordCodexRolloutSession, initCodexHome, toCodexSandboxValue } from '../codex.js'
+import { findRolloutPath, extractThreadIdFromRollout, findLatestRollout } from '../storage/codex.js'
+import { readSessionIndex } from '../../session-history.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
-import { createClaudeCodeRuntimeSync } from '../claude-code.js'
-import { createPiRuntimeSync } from '../pi.js'
-import { createCodexRuntimeSync } from '../codex.js'
+import { createClaudeCodeRuntime } from '../claude-code.js'
+import { createCodexRuntime } from '../codex.js'
 
 function withFakeCodexHome(): { codexHome: string; agentsHome: string; sharedSkills: string; cleanup: () => void } {
   const base = mkdtempSync(join(tmpdir(), 'pan-codex-runtime-'))
@@ -77,6 +78,24 @@ describe('CodexRuntimeSync — session path resolution', () => {
     const rt = new CodexRuntimeSync()
     expect(rt.getSessionPath('agent-test-02')).toBeNull()
   })
+
+  it('recordCodexRolloutSession writes both the thread-id file and the session index entry', () => {
+    const threadId = 'record-rollout-thread'
+    const agentDir = join(ctx.agentsHome, 'agent-test-03')
+    mkdirSync(agentDir, { recursive: true })
+    const dayDir = join(agentDir, 'codex-home', 'sessions', '2025', '06', '01')
+    mkdirSync(dayDir, { recursive: true })
+    const rolloutPath = join(dayDir, `rollout-some-uuid-${threadId}.jsonl`)
+    writeFileSync(rolloutPath, '{"type":"message"}\n')
+
+    recordCodexRolloutSession('agent-test-03', threadId, rolloutPath)
+
+    const rt = new CodexRuntimeSync()
+    expect(rt.getSessionPath('agent-test-03')).toBe(rolloutPath)
+    expect(readSessionIndex('agent-test-03')).toEqual([
+      expect.objectContaining({ sessionId: threadId, source: 'capture', harness: 'codex', path: rolloutPath }),
+    ])
+  })
 })
 
 describe('findRolloutPath', () => {
@@ -122,6 +141,19 @@ describe('initCodexHome', () => {
     initCodexHome(codexDir)
     const { existsSync: existsNode } = require('node:fs')
     expect(existsNode(join(codexDir, 'sessions'))).toBe(true)
+  })
+
+  it('preserves historical native instructions while opening a clean config home with the same transcripts', () => {
+    const agent = join(ctx.codexHome, 'agent-context');
+    const oldHome = join(agent, 'codex-home');
+    const newHome = join(agent, 'codex-home-v2');
+    mkdirSync(join(oldHome, 'sessions'), { recursive: true });
+    writeFileSync(join(oldHome, 'AGENTS.md'), 'Historical user or generated content');
+    writeFileSync(join(oldHome, 'sessions', 'retained.jsonl'), 'retained');
+    initCodexHome(newHome);
+    expect(existsSync(join(newHome, 'AGENTS.md'))).toBe(false);
+    expect(readFileSync(join(oldHome, 'AGENTS.md'), 'utf8')).toBe('Historical user or generated content');
+    expect(readFileSync(join(newHome, 'sessions', 'retained.jsonl'), 'utf8')).toBe('retained');
   })
 
   it('writes config.toml with flat top-level Codex keys', () => {
@@ -599,9 +631,8 @@ describe('CodexRuntimeSync.getTokenUsage + getSessionCost', () => {
 describe('getRuntimeForAgent — codex dispatch', () => {
   it('returns the Codex runtime for an agent whose state has harness=codex', () => {
     const registry = new RuntimeRegistry()
-    registry.register(createClaudeCodeRuntimeSync())
-    registry.register(createPiRuntimeSync())
-    registry.register(createCodexRuntimeSync())
+    registry.register(createClaudeCodeRuntime())
+    registry.register(createCodexRuntime())
     setGlobalRegistry(registry)
 
     // The registry dispatches by harness from agent state. We verify the

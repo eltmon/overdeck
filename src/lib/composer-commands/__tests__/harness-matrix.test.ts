@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { KNOWN_HARNESSES } from '@overdeck/contracts';
 import type { RuntimeName } from '../../runtimes/types.js';
@@ -38,13 +37,16 @@ vi.mock('../../../dashboard/server/services/conversation-eaten-message-watcher.j
   watchForEatenConversationMessage: vi.fn(),
 }));
 vi.mock('../../model-capabilities.js', () => ({
-  modelSupportsImagesSync: vi.fn(() => true),
+  modelSupportsImages: vi.fn(() => true),
 }));
 vi.mock('../../runtimes/behavior.js', () => ({
   getHarnessBehavior: vi.fn(() => ({
     injectsPromptTimeMemory: false,
     transcriptKind: 'claude-jsonl',
   })),
+}));
+vi.mock('../../runtimes/kimi-context-envelope.js', () => ({
+  waitForManagedKimiSessionId: vi.fn(async () => 'session-matrix'),
 }));
 vi.mock('../../transcript-landing.js', () => ({
   captureTranscriptUserRecordSnapshot: vi.fn(),
@@ -119,7 +121,7 @@ function decodeJsonResponse(response: { body: unknown }) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getConversationByName.mockImplementation(() => conversation(mocks.activeHarness as RuntimeName));
-  mocks.getAgentState.mockImplementation(() => Effect.succeed({
+  mocks.getAgentState.mockImplementation(() => ({
     harness: mocks.activeHarness,
     workspace: `/tmp/agent-${mocks.activeHarness}`,
     issueId: 'PAN-999',
@@ -158,11 +160,11 @@ describe('composer command harness interception matrix (all KNOWN_HARNESSES)', (
     const results = [];
     for (const harness of HARNESSES) {
       mocks.activeHarness = harness;
-      mocks.getAgentState.mockReturnValue(Effect.succeed({
+      mocks.getAgentState.mockReturnValue({
         harness,
         workspace: `/tmp/agent-${harness}`,
         issueId: 'PAN-999',
-      }));
+      });
 
       const response = await handleAgentMessage(
         `agent-matrix-${harness}`,
@@ -204,6 +206,7 @@ describe('composer command harness interception matrix (all KNOWN_HARNESSES)', (
           message,
           'conversation-message',
           'auto',
+          ...(harness === 'kimi-code' ? [{ kimiContext: { workspace: `/tmp/matrix-${harness}`, sessionId: 'session-matrix' } }] : []),
         );
         expect(mocks.deliverControl).not.toHaveBeenCalled();
       }

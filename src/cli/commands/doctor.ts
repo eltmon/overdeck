@@ -1,12 +1,12 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { Effect } from 'effect';
 import type { AgentStatus } from '@overdeck/contracts';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
+import { listPatrolBudgetRows } from '../../lib/cloister/patrol-budget.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -18,9 +18,9 @@ import {
   ohmypiExtensionCandidates,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
-import { normalizeAgentId, getAgentStateSync } from '../../lib/agents.js';
+import { normalizeAgentId, getAgentState } from '../../lib/agents.js';
 import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
@@ -33,9 +33,10 @@ import {
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
-import { checkStateDivergence } from './doctor-state-divergence.js';
-import { checkStateWorktrees } from './doctor-state-worktree.js';
+import { checkHerdr } from './doctor-herdr.js';
+import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
+import { checkPlanHomePanIgnore } from './doctor-plan-home-ignore.js';
 import {
   assessBridgePoolPressure,
   bridgePoolLimitFromPools,
@@ -335,6 +336,25 @@ function countItems(path: string): number {
   }
 }
 
+/**
+ * PAN-3850 (W39, FR-26): print each patrol's action tally for the current UTC
+ * day against its budget. A suspended patrol is a needs-you the operator
+ * already got; this table is where they see the whole picture.
+ */
+export function printPatrolBudgetTable(): void {
+  console.log(chalk.bold('Patrol firing budgets (current UTC day):'));
+  const rows = listPatrolBudgetRows();
+  if (rows.length === 0) {
+    console.log(chalk.dim('  (no patrol actions recorded today)'));
+    return;
+  }
+  for (const row of rows) {
+    const budgetText = row.budget === 'exempt' ? '(exempt)' : `of ${row.budget}`;
+    const line = `  ${row.patrol}: ${row.actions} ${budgetText}${row.suspended ? ` — SUSPENDED (${row.suspendedReason ?? 'budget exceeded'})` : ''}`;
+    console.log(row.suspended ? chalk.red(line) : line);
+  }
+}
+
 function getCachedIssueRowsForDoctor(): unknown[] {
   try {
     const cache = new CacheService();
@@ -393,11 +413,11 @@ export async function checkClosedIssueOrphanAgentDirs(
   issues: unknown[],
   agentsDir: string = AGENTS_DIR,
 ): Promise<CheckResult> {
-  const result = await Effect.runPromise(cleanupClosedIssueAgentDirectories({
+  const result = await cleanupClosedIssueAgentDirectories({
     issues,
     agentsDir,
     dryRun: true,
-  }));
+  });
 
   if (result.totalCandidates === 0) {
     return {
@@ -458,7 +478,7 @@ function readDoctorAgentStates(agentsDir: string): DoctorAgentState[] {
   for (const dir of readdirSync(agentsDir, { withFileTypes: true })) {
     if (!dir.isDirectory()) continue;
     try {
-      const state = getAgentStateSync(dir.name);
+      const state = getAgentState(dir.name);
       if (state) states.push(state);
     } catch {
       // Ignore unreadable agent state; other doctor checks surface broader FS health.
@@ -469,7 +489,7 @@ function readDoctorAgentStates(agentsDir: string): DoctorAgentState[] {
 
 async function getDashboardAgentRowsForDoctor(): Promise<DoctorDashboardAgent[] | null> {
   try {
-    const response = await fetch(`${getDashboardApiUrlSync().replace(/\/$/, '')}/api/agents`, {
+    const response = await fetch(`${getDashboardApiUrl().replace(/\/$/, '')}/api/agents`, {
       signal: AbortSignal.timeout(1000),
     });
     if (!response.ok) return null;
@@ -595,7 +615,7 @@ function hasInFlightAgent(issueId: string, _agentsDir: string, tmuxSessionNames:
   const agentId = `agent-${issueId.toLowerCase()}`;
   if (tmuxSessionNames.includes(agentId)) return true;
 
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   return state?.status === 'starting' || state?.status === 'running';
 }
 
@@ -748,6 +768,11 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+  try {
+    for (const c of await checkHerdr()) checks.push(c); // PAN-3956: terminal backend + Herdr
+  } catch (error) {
+    checks.push({ name: 'Terminal backend', status: 'warn', message: `Herdr checks failed: ${error instanceof Error ? error.message : String(error)}` });
+  }
 
   // Check Overdeck directories
   const directories = [
@@ -840,11 +865,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       message: `${agentSessions} agent sessions`,
     });
   } catch {
-    checks.push({
-      name: 'Running Agents',
-      status: 'ok',
-      message: '0 agent sessions',
-    });
+    checks.push({ name: 'Running Agents', status: 'ok', message: '0 agent sessions' });
   }
 
   checks.push(await checkClosedIssueOrphanAgentDirs(getCachedIssueRowsForDoctor()));
@@ -853,11 +874,11 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));
   checks.push(checkOrphanProposedSpecs());
+  checks.push(checkTierFitnessConfig()); // PAN-3842
   checks.push(...await checkMainDivergence());
-  checks.push(...await checkStateWorktrees());
-  checks.push(...await checkStateDivergence());
+  checks.push(await checkPlanHomePanIgnore()); // PAN-3996
   try {
-    const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
+    const { isSmeeProcessRunning } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');
     if (!existsSync(smeeUrlPath)) {
       checks.push({
@@ -866,7 +887,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
         message: 'Not configured (optional)',
         fix: 'Create ~/.overdeck/github-app/smee-url with your smee.io channel URL',
       });
-    } else if (isSmeeProcessRunningSync()) {
+    } else if (isSmeeProcessRunning()) {
       checks.push({
         name: 'smee-client Webhook Relay',
         status: 'ok',
@@ -985,6 +1006,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     if (check.status === 'error') hasErrors = true;
     if (check.status === 'warn') hasWarnings = true;
   }
+
+  // PAN-3850 (W39): the per-patrol firing-budget table — today's action tally
+  // against each patrol's budget, with suspended patrols named in red.
+  printPatrolBudgetTable();
 
   console.log('');
 
