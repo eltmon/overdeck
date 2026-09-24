@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   sendPatrolNow: vi.fn(() => true),
   reloadDeaconConfig: vi.fn(() => true),
   isChildRunning: vi.fn(() => true),
-  lastPatrolReport: vi.fn(() => ({ at: '2026-07-03T00:00:00.000Z', error: null })),
+  lastPatrolReport: vi.fn((): { at: string; error: string | null } | null => ({ at: '2026-07-03T00:00:00.000Z', error: null })),
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
@@ -79,7 +79,7 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
     mocks.isCloisterSpawnsPaused.mockReturnValue(true);
   });
 
-  it('composes status from the pid file and deacon-lite\'s in-memory status', async () => {
+  it('composes status from the pid file and the deacon child\'s relayed patrol report', async () => {
     const status = await readDurableCloisterStatus();
 
     expect(status.running).toBe(true);
@@ -128,5 +128,42 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
       deaconLite: { running: true, intervalMs: 60_000 },
     });
     expect(readDurableDeaconLogs(5)).toEqual([]);
+  });
+
+  describe('relayed deacon-lite status (PAN-3922)', () => {
+    it('composes deaconLite and lastCheck from the report the deacon child relayed', async () => {
+      mocks.lastPatrolReport.mockReturnValue({ at: '2026-07-03T00:05:00.000Z', error: 'tracker down' });
+      const expected = {
+        running: true,
+        intervalMs: 60_000,
+        lastRunAt: '2026-07-03T00:05:00.000Z',
+        lastRunError: 'tracker down',
+      };
+
+      expect(readDurableDeaconStatus().deaconLite).toEqual(expected);
+      const status = await readDurableCloisterStatus();
+      expect(status.patrol).toEqual(expected);
+      expect(status.lastCheck?.toISOString()).toBe('2026-07-03T00:05:00.000Z');
+    });
+
+    it('reports not running with null fields when there is no child and no report', async () => {
+      mocks.isChildRunning.mockReturnValue(false);
+      mocks.lastPatrolReport.mockReturnValue(null);
+      const expected = { running: false, intervalMs: 60_000, lastRunAt: null, lastRunError: null };
+
+      expect(readDurableDeaconStatus().deaconLite).toEqual(expected);
+      const status = await readDurableCloisterStatus();
+      expect(status.patrol).toEqual(expected);
+      expect(status.lastCheck).toBeNull();
+    });
+
+    it('prefers an injected readDeaconLiteStatus and never reads the relayed report', async () => {
+      const injected = { running: true, intervalMs: 5_000, lastRunAt: '2026-01-01T00:00:00.000Z', lastRunError: null };
+      const readDeaconLiteStatus = () => injected;
+
+      expect(readDurableDeaconStatus({ readDeaconLiteStatus }).deaconLite).toEqual(injected);
+      expect((await readDurableCloisterStatus({ readDeaconLiteStatus })).patrol).toEqual(injected);
+      expect(mocks.lastPatrolReport).not.toHaveBeenCalled();
+    });
   });
 });

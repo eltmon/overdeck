@@ -340,7 +340,7 @@ describe('deacon-lite', () => {
     });
 
     it('still reports while globally paused, without running any routine', async () => {
-      mocks.isDeaconGloballyPausedSync.mockReturnValue(true);
+      mocks.isDeaconGloballyPaused.mockReturnValue(true);
       mocks.listAgentStates.mockReturnValue([workAgent()]);
       const observer = vi.fn();
       setPatrolRunObserver(observer);
