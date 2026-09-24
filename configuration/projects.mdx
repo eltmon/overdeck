@@ -242,6 +242,25 @@ Keep both credentials available: Overdeck uses the Linear API for issue state an
 
 See [Issue Tracker Integration](/configuration/issue-trackers#tracker-and-code-host-can-differ) for troubleshooting and additional examples.
 
+### Repositories a conversation can link pull requests from
+
+A conversation can be [linked to a pull request](/features/conversations#linking-a-pull-request-by-hand)
+only when the PR's repository is configured for the conversation's project.
+The conversation's project is its explicit project (set with `pan conv move`)
+or else the registered project whose `path` contains its working directory.
+These repositories count as configured:
+
+- `github_repo` (on the host of the project's GitHub `origin` remote, or `github.com`)
+- `gitlab_repo` (on the host of the project's GitLab `origin` remote, or `gitlab.com`)
+- every `workspace.repos[].remote` written as a URL, for polyrepo projects (a
+  bare forge name such as `remote: github` names no repository)
+- the `origin` remote of the project checkout and of the conversation's working
+  directory
+
+`#42` refers to PR 42 in the first of these: `github_repo`, then `gitlab_repo`,
+then the `origin` remotes. A link to any other repository is refused, and
+nothing is stored.
+
 ## Release Configuration
 
 The optional `release:` section tells Overdeck how to coordinate a project's post-merge rollout across multiple components. Overdeck resolves a release plan, waits for each component to become healthy, runs verification commands, halts the plan on failure, and runs a rollback hook when one is configured.
