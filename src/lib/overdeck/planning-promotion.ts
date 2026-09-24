@@ -327,6 +327,9 @@ export async function recordPlanningAutoHandoffFailure(options: {
     workAgentSkipReason: skipReason,
     workAgentError: error,
   };
+  // PAN-3977: say it in dashboard.log too. The event store alone left the
+  // failure invisible there, and the issue was misdiagnosed from the log.
+  console.error(`[complete-planning] ${options.issueId} auto-handoff failed (${skipReason}): ${error}`);
 
   await Effect.runPromise(options.eventStore.append({
     type: 'planning.failed',
@@ -374,11 +377,17 @@ export async function completePlanningAutoSpawn(options: {
         origin: dashboardOrigin,
         ...internalTokenHeaders,
       },
+      // PAN-3977: the operator consented to the work agent when they launched
+      // planning with auto-start, and `pan start` itself runs no advisory
+      // health-warning gate. Without the acknowledgement every finalize under
+      // an advisory warning (tight RAM, many agents) got a 409 and no work
+      // agent. Hard guardrail blocks (`blocked: true`) still refuse the spawn.
       body: JSON.stringify({
         issueId: options.issueId,
         role: 'work',
         startedBy: 'planning-auto-handoff',
         autoSpawnConsentRequired: true,
+        guardrailAcknowledged: true,
       }),
     });
 
