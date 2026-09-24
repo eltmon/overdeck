@@ -19,6 +19,14 @@ function data(overrides: {
     memUsed: 8,
     memTotal: 16,
     summary: { swapUsedPercent: 12, loadAverage1m: 2.5 },
+    host: {
+      metrics: {
+        memoryPressureSomeAvg10: 0.4,
+        memoryPressureFullAvg10: 0,
+        swapActivityBytesPerMinute: 900_000,
+        swapUsedPercent: 12,
+      },
+    },
   } : overrides.system;
   return {
     orbs: [],
@@ -94,7 +102,9 @@ describe('God View enriched top bar', () => {
     }
     expect(container.querySelector('[data-label="CPU"]')).toHaveTextContent('CPU 24%');
     expect(container.querySelector('[data-label="MEM"]')).toHaveTextContent('MEM 61%');
-    expect(container.querySelector('[data-label="SWAP"]')).toHaveTextContent('SWAP 12%');
+    expect(container.querySelector('[data-label="SWAP"]')).toBeNull();
+    expect(container.querySelector('[data-label="PSI"]')).toHaveTextContent('PSI 0.4');
+    expect(container.querySelector('[data-label="PSI"]')).toHaveAttribute('data-level', 'calm');
     const ecg = screen.getByLabelText('Events per minute ECG');
     expect(ecg).toHaveAttribute('width', '130');
     expect(ecg).toHaveAttribute('height', '30');
@@ -112,7 +122,7 @@ describe('God View enriched top bar', () => {
         onFullscreenToggle={vi.fn()}
       />,
     );
-    for (const label of ['CPU', 'MEM', 'SWAP']) {
+    for (const label of ['CPU', 'MEM', 'PSI']) {
       expect(container.querySelector(`[data-label="${label}"]`)).toHaveTextContent(`${label} —`);
     }
     for (const label of ['LOAD', 'WIP', 'BLOCKED', 'READY', '$/MIN', 'TOKENS']) {
@@ -150,10 +160,71 @@ describe('God View enriched top bar', () => {
     expect(samples.at(-1)).toBe(199);
   });
 
-  it('renders CPU, MEM, and SWAP gauges in the sidebar', () => {
+  it('renders CPU, MEM, and PSI gauges in the sidebar', () => {
     useGodViewStore.setState({ systemHealth: data().meta.system });
     render(<InfraGauges />);
-    for (const label of ['CPU', 'MEM', 'SWAP']) expect(screen.getByText(label)).toBeInTheDocument();
-    for (const value of ['24%', '61%', '12%']) expect(screen.getByText(value)).toBeInTheDocument();
+    for (const label of ['CPU', 'MEM', 'PSI']) expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.queryByText('SWAP')).toBeNull();
+    for (const value of ['24%', '61%', '0.4']) expect(screen.getByText(value)).toBeInTheDocument();
+    expect(screen.getByTestId('gv-psi-gauge')).toHaveAttribute('data-level', 'calm');
+  });
+
+  // PAN-3540: a full swap of cold pages is not pressure. The memory signal
+  // follows PSI and swap in/out; swap occupancy alone can never raise it.
+  function pressureSystem(metrics: Record<string, number | null>, swapUsedPercent = 100, admission = 'open') {
+    return {
+      admission: { state: admission },
+      cpu: 24,
+      memPercent: 61,
+      memUsed: 8,
+      memTotal: 16,
+      summary: { swapUsedPercent, loadAverage1m: 2.5 },
+      host: {
+        metrics: {
+          memoryPressureSomeAvg10: 0,
+          memoryPressureFullAvg10: 0,
+          swapActivityBytesPerMinute: 0,
+          swapUsedPercent,
+          ...metrics,
+        },
+      },
+    };
+  }
+
+  function psiMeter(system: Record<string, unknown>): HTMLElement {
+    const { container } = render(
+      <GodViewTopBar data={data({ system })} onHelpToggle={vi.fn()} onFullscreenToggle={vi.fn()} />,
+    );
+    return container.querySelector<HTMLElement>('[data-label="PSI"]')!;
+  }
+
+  it('keeps the memory signal calm when swap is 100% full but PSI and swap traffic are zero', () => {
+    const meter = psiMeter(pressureSystem({}));
+    expect(meter).toHaveAttribute('data-level', 'calm');
+    expect(meter).toHaveTextContent('PSI 0.0');
+    expect(meter.getAttribute('title')).toContain('swap occupancy 100% (context, not pressure)');
+  });
+
+  it('raises the memory signal from PSI and swap in/out, not from occupancy', () => {
+    expect(psiMeter(pressureSystem({ memoryPressureSomeAvg10: 6 }, 10))).toHaveAttribute('data-level', 'warning');
+    expect(psiMeter(pressureSystem({ memoryPressureFullAvg10: 1.5 }, 10))).toHaveAttribute('data-level', 'critical');
+    expect(psiMeter(pressureSystem({ swapActivityBytesPerMinute: 80 * 1024 ** 2 }, 10, 'soft'))).toHaveAttribute('data-level', 'warning');
+    expect(psiMeter(pressureSystem({ swapActivityBytesPerMinute: 300 * 1024 ** 2 }, 10, 'blocked'))).toHaveAttribute('data-level', 'critical');
+  });
+
+  it('keeps swap traffic calm while admission is open (memory to spare), as the host evaluator does', () => {
+    const meter = psiMeter(pressureSystem({ swapActivityBytesPerMinute: 300 * 1024 ** 2 }, 100, 'open'));
+    expect(meter).toHaveAttribute('data-level', 'calm');
+    expect(meter.getAttribute('title')).toContain('swap in/out 300.0 MB/min');
+  });
+
+  it('reads unknown, not calm, when the host reports no pressure signal', () => {
+    const meter = psiMeter(pressureSystem({
+      memoryPressureSomeAvg10: null,
+      memoryPressureFullAvg10: null,
+      swapActivityBytesPerMinute: null,
+    }));
+    expect(meter).toHaveAttribute('data-level', 'unknown');
+    expect(meter).toHaveTextContent('PSI —');
   });
 });

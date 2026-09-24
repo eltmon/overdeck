@@ -1,10 +1,9 @@
 import { existsSync } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Effect, Layer, Option, Stream } from 'effect';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { Effect, Layer } from 'effect';
+import { HttpRouter } from 'effect/unstable/http';
 
 import { getClaudePermissionFlagsString } from '../../../../lib/claude-permissions.js';
 import { normalizeModelName } from '../../../../lib/cost-parsers/jsonl-parser.js';
@@ -113,153 +112,6 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
 // Replacement: drive role spawns via lifecycle.transitionTo() and the
 // reactive scheduler in src/lib/cloister/service.ts.
 
-// ─── Route: GET /api/specialists/:project/:type/runs ──────────────────────────
-
-const getProjectSpecialistRunsRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:project/:type/runs',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const urlOpt = HttpServerRequest.toURL(request);
-
-    let limit: number | undefined;
-    let offset = 0;
-
-    if (Option.isSome(urlOpt)) {
-      const sp = urlOpt.value.searchParams;
-      const limitParam = sp.get('limit');
-      const offsetParam = sp.get('offset');
-      if (limitParam) limit = parseInt(limitParam, 10);
-      if (offsetParam) offset = parseInt(offsetParam, 10);
-    }
-
-    const { listRunLogs } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-    const runs = listRunLogs(project, type, { limit, offset });
-    return jsonResponse(runs);
-  })),
-);
-
-// ─── Route: GET /api/specialists/:project/:type/runs/:runId/stream ────────────
-// NOTE: Must be registered before /:project/:type/runs/:runId to avoid route conflict.
-
-const getProjectSpecialistRunStreamRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:project/:type/runs/:runId/stream',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-    const runId = params['runId'] as string;
-
-    const { getRunLogPath, isRunLogActive } =
-      yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-
-        const logPath = getRunLogPath(project, type, runId);
-
-        if (!existsSync(logPath)) {
-          return jsonResponse({ error: 'Run log not found' }, { status: 404 });
-        }
-
-        // Build an SSE stream using Effect Stream + Node ReadableStream
-        const encoder = new TextEncoder();
-
-        const nodeStream = new ReadableStream({
-          async start(controller) {
-            // Send initial content
-            const content = await readFile(logPath, 'utf-8').catch(() => '');
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ type: 'content', data: content })}\n\n`,
-              ),
-            );
-            let lastSize = content.length;
-
-            // Poll for updates
-            const poll = async () => {
-              if (!isRunLogActive(project, type, runId)) {
-                // Log completed — send final update and close
-                try {
-                  const finalContent = await readFile(logPath, 'utf-8');
-                  if (finalContent.length > lastSize) {
-                    const newContent = finalContent.substring(lastSize);
-                    controller.enqueue(
-                      encoder.encode(
-                        `data: ${JSON.stringify({ type: 'append', data: newContent })}\n\n`,
-                      ),
-                    );
-                  }
-                } catch {}
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ type: 'complete' })}\n\n`),
-                );
-                controller.close();
-                return;
-              }
-
-              try {
-                const currentContent = await readFile(logPath, 'utf-8');
-                if (currentContent.length > lastSize) {
-                  const newContent = currentContent.substring(lastSize);
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({ type: 'append', data: newContent })}\n\n`,
-                    ),
-                  );
-                  lastSize = currentContent.length;
-                }
-              } catch {}
-
-              await new Promise((r) => setTimeout(r, 1000));
-              await poll();
-            };
-
-            await new Promise((r) => setTimeout(r, 1000));
-            await poll();
-          },
-        });
-
-        const effectStream = Stream.fromReadableStream<Uint8Array, unknown>({
-          evaluate: () => nodeStream,
-          onError: (err) => err,
-        });
-
-        return HttpServerResponse.stream(effectStream, {
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            Connection: 'keep-alive',
-          },
-        });
-  })),
-);
-
-// ─── Route: GET /api/specialists/:project/:type/runs/:runId ───────────────────
-
-const getProjectSpecialistRunRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:project/:type/runs/:runId',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-    const runId = params['runId'] as string;
-
-    const { getRunLog, parseLogMetadata } =
-      yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-    const content = getRunLog(project, type, runId);
-
-    if (!content) {
-      return jsonResponse({ error: 'Run log not found' }, { status: 404 });
-    }
-
-    const metadata = parseLogMetadata(content);
-    return jsonResponse({ runId, content, metadata });
-  })),
-);
-
 // ─── Route: POST /api/specialists/:project/:type/runs/:runId/terminate ────────
 
 const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
@@ -280,53 +132,6 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
     const { terminateSpecialist } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
     yield* Effect.promise(() => terminateSpecialist(project, type));
     return jsonResponse({ success: true, message: 'Specialist terminated' });
-  })),
-);
-
-// ─── Route: GET /api/specialists/:project/:type/context ──────────────────────
-
-const getProjectSpecialistContextRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:project/:type/context',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    const { loadContextDigest } =
-      yield* Effect.promise(() => import('../../../../lib/cloister/specialist-context.js'));
-    const digest = loadContextDigest(project, type);
-
-    if (digest) {
-      return jsonResponse({ digest });
-    } else {
-      return jsonResponse({ error: 'No context digest found' }, { status: 404 });
-    }
-  })),
-);
-
-// ─── Route: POST /api/specialists/:project/:type/context/regenerate ───────────
-
-const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/context/regenerate',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    const { regenerateContextDigest } =
-      yield* Effect.promise(() => import('../../../../lib/cloister/specialist-context.js'));
-    const digest = yield* Effect.promise(() => regenerateContextDigest(project, type));
-
-    if (digest) {
-      return jsonResponse({ digest, message: 'Context digest regenerated' });
-    } else {
-      return jsonResponse(
-        { error: 'Failed to generate context digest' },
-        { status: 500 },
-      );
-    }
   })),
 );
 
@@ -362,63 +167,6 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
     return jsonResponse({
       success: true,
       message: 'Specialist completion signaled, grace period started',
-    });
-  })),
-);
-
-// ─── Route: GET /api/specialists/:project/:type/latest-log ───────────────────
-
-const getProjectSpecialistLatestLogRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:project/:type/latest-log',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    const runsDir = join(homedir(), '.overdeck', 'specialists', project, type, 'runs');
-    if (!existsSync(runsDir)) {
-      return jsonResponse({ log: null, message: 'No runs found' });
-    }
-
-    const files = (yield* Effect.promise(() => readdir(runsDir)))
-      .filter((f) => f.endsWith('.log'))
-      .sort()
-      .reverse();
-
-    if (files.length === 0) {
-      return jsonResponse({ log: null, message: 'No run logs found' });
-    }
-
-    const latestLog = yield* Effect.promise(() => readFile(join(runsDir, files[0]), 'utf-8'));
-    return jsonResponse({
-      log: latestLog,
-      file: files[0],
-      totalRuns: files.length,
-    });
-  })),
-);
-
-// ─── Route: POST /api/specialists/:project/:type/logs/cleanup ────────────────
-
-const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/logs/cleanup',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    const { cleanupOldLogs } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-    const { getSpecialistRetention } = yield* Effect.promise(() => import('../../../../lib/projects.js'));
-
-    const retention = getSpecialistRetention(project);
-    const deleted = cleanupOldLogs(project, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
-
-    return jsonResponse({
-      success: true,
-      deleted,
-      message: `Cleaned up ${deleted} old logs`,
     });
   })),
 );
@@ -650,8 +398,6 @@ const getModelsResolveRoute = HttpRouter.add(
     const routes = [
       { key: 'role:plan', role: 'plan' },
       { key: 'role:work', role: 'work' },
-      { key: 'role:work.inspect', role: 'work', subRole: 'inspect' },
-      { key: 'role:work.inspect-deep', role: 'work', subRole: 'inspect-deep' },
       { key: 'role:strike', role: 'strike' },
       { key: 'role:review', role: 'review' },
       { key: 'role:review.correctness', role: 'review', subRole: 'correctness' },
@@ -679,15 +425,8 @@ export const specialistsProjectRouteLayer = Layer.mergeAll(
   // PAN-1048 R1: postProjectSpecialistSpawnRoute removed (see above).
   getProjectSpecialistStatusRoute,
   postProjectSpecialistKillRoute,
-  getProjectSpecialistRunsRoute,
-  getProjectSpecialistRunStreamRoute,       // /runs/:runId/stream — before /runs/:runId
-  getProjectSpecialistRunRoute,             // /runs/:runId
   postProjectSpecialistRunTerminateRoute,   // /runs/:runId/terminate
-  getProjectSpecialistContextRoute,         // /context
-  postProjectSpecialistContextRegenerateRoute, // /context/regenerate
   postProjectSpecialistCompleteRoute,       // /complete
-  getProjectSpecialistLatestLogRoute,       // /latest-log
-  postProjectSpecialistLogsCleanupRoute,    // /logs/cleanup
   postProjectSpecialistResetSessionRoute,  // /reset-session
   postProjectReviewRestartRoute,           // /:project/:issueId/review/restart
   postProjectReviewerRoleRestartRoute,     // /:project/:issueId/reviewer/:role/restart

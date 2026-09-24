@@ -98,6 +98,13 @@ export interface Agent {
   pid?: number;
   startedAt: string;
   lastActivity?: string;
+  /** `GET /api/agents`: the agent has a live pane on its terminal backend (Herdr or tmux). */
+  hasLivePane?: boolean;
+  /**
+   * @deprecated Misnamed: true for a live pane on either backend, not only a
+   * tmux session. `GET /api/agents` sends it as an alias of `hasLivePane`
+   * (#4105); read-model snapshots still carry only this name.
+   */
   hasLiveTmuxSession?: boolean;
   stoppedByUser?: boolean;
   paused?: boolean;

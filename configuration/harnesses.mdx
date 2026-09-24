@@ -529,8 +529,8 @@ looks wrong, report the case and continue in the fresh fallback session.
 Pipeline-spawned roles do **not** prompt at runtime. They read per-role
 harness + model defaults from the dashboard Settings page. A `harness` selector
 sits next to each role's model dropdown to mix and match. Sub-roles such as
-`work.inspect` and `review.security` inherit from the parent role unless
-configured more specifically.
+`review.security` inherit from the parent role unless configured more
+specifically.
 
 <ThemedImage
   light="/images/dashboard/settings-light.png"
@@ -592,6 +592,12 @@ stale Settings selection cannot bypass it. When the pipeline routes a role run
 into the blocked cell, it falls back to `claude-code` and emits a `console.warn`
 rather than failing the whole pipeline.
 
+The gate is exhaustive over harnesses. Every runtime needs an explicit rule in
+`canUseHarness`, and the decision map served to the pickers is typed over every
+runtime name, so adding a harness without a policy entry is a type error. A
+harness the gate does not recognise is denied, never allowed by default, and a
+raw legacy `pi` value gets the `ohmypi` rules.
+
 The same gate enforces Kimi id-space correctness: a `kimi-code/*`
 native-catalog id is blocked on every harness except `kimi-code` and `acp`, so
 a stale role pin fails loudly instead of launching a session whose first turn
@@ -610,6 +616,10 @@ the spawn entry points, so the blocked combination is caught before you click
   option is `disabled` (non-clickable) and renders the decision reason as
   visible inline text — not only in the tooltip — so the block is readable
   without hover.
+
+Once a model's decisions have loaded, a harness missing from them is disabled
+with a "No harness-policy decision" reason. Before the decisions load, the
+options stay selectable and the server gate decides at spawn.
 
 The inline reason names the restriction as a **Claude Code subscription Terms of
 Service** rule, and tells you how to proceed: switch Anthropic to API-key auth,

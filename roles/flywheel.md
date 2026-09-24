@@ -82,7 +82,9 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    `inPipeline === true`; `clean_terminal` rows are audit-only and excluded. An object with
    `status: 'unavailable'` is a typed blind spot, not an empty pipeline: emit an `investigate`
    suggestion naming its `projectKey`, `reason`, and `message`, and NEVER reconstruct membership
-   from tracker, agent, tmux, workspace, or review-status state. Preserve each included row's
+   from tracker, agent, tmux, workspace, or review-status state. HTTP 503 with
+   `code: 'snapshot_loading'` is neither: a restarted server has not gathered that project yet,
+   so re-read it after the `Retry-After` seconds instead of reporting a blind spot. Preserve each included row's
    bucket — `in_flight`, `zombie_pr`, `post_merge_limbo`, or `planned_backlog` — and use those
    other state sources only as annotations on resolver verdicts.
 4. **Fix at the root, every revolution.** When a Overdeck command, route, gate, or role is
@@ -423,10 +425,10 @@ telling you the review machinery (verdict delivery, recording, convoy synthesis,
 resolver) is broken. Go to the code per Mission #4's deep-dive rule and fix that, or every next
 issue cycles the same way.
 
-- **Merge-blockers (PAN-1620):** `pan flywheel merge-blockers --json` each tick. `merge_conflict`
+- **Merge-blockers (PAN-1620):** `GET /api/merge-train/merge-blockers` each tick. `merge_conflict`
   on a stopped branch → resync/restart decision; `failing_checks` → resume/restart the agent.
 - **Auto-merge problems** (only when auto-merge is active — `require_uat_before_merge=false`):
-  `GET /api/flywheel/auto-merge/problems` → emit `investigate` for each `failed`/`blocked`. HTTP-only
+  `GET /api/merge-train/auto-merge/problems` → emit `investigate` for each `failed`/`blocked`. HTTP-only
   (no CLI surface); skip if your harness sandboxes localhost — it is moot while UAT-before-merge is
   on (the default).
 - **Stalled review convoy:** `pan review restart <id>` (re-dispatch), or `pan review
@@ -503,7 +505,7 @@ prior context — and then propose a default, never an open question. Record dec
   merges. The merge train assembles UAT generations autonomously; observe them through `GET
   /api/merge-train/generations` and report the ready set so the operator ships a batch. `POST
   /api/merge-train/assemble` is the manual reconciliation route, not a per-tick action. With it
-  `false`, schedule via `POST /api/flywheel/auto-merge/schedule`. These UAT/auto-merge endpoints
+  `false`, schedule via `POST /api/merge-train/auto-merge/schedule`. These UAT/auto-merge endpoints
   are HTTP-only (no CLI surface yet) — fine from a non-sandboxed harness; if yours sandboxes
   localhost, surface the merge-ready set in `suggestions[]` and let the operator assemble/ship
   from the dashboard (UAT + merge are operator-gated regardless). Operator-named merges use `gh

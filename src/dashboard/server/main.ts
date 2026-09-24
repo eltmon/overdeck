@@ -34,6 +34,7 @@ import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { initRestartGate } from './services/restart-gate.js';
+import { initDeployProgress } from './services/deploy-progress.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { ensureInternalToken } from '../../lib/internal-token.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
@@ -228,9 +229,10 @@ if (isPeerDashboard) {
 }
 
 // Start background enrichment poller — emits agent.enrichment_changed events
-// for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
+// for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount.
+// PAN-3931: in a peer dashboard those events stay in memory (emitOnly).
 startAgentEnrichmentService();
-console.log('[overdeck] AgentEnrichmentService started');
+console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (peer: in-memory events only)' : ''}`);
 
 // Enable demand-driven agent output capture. The poller starts only while an
 // RPC or public SSE subscriber has expressed output interest.
@@ -498,8 +500,12 @@ console.log('[overdeck] Agent stopped/status notifiers → domain events wired')
 // list is derived on read, so it has nothing to be reminded about.
 
 // Start background conversation lifecycle polling (10s interval)
-startConversationLifecycleService();
-console.log('[overdeck] ConversationLifecycleService started');
+// PAN-3931: a peer dashboard writes no conversation rows — the primary owns them.
+if (startConversationLifecycleService()) {
+  console.log('[overdeck] ConversationLifecycleService started');
+} else {
+  console.log('[overdeck] ConversationLifecycleService SKIPPED — peer dashboard writes no conversation rows');
+}
 
 // PAN-3920 W20: register Codex-plugin jobs as external agents the first time
 // they are seen (the plugin deletes its job records when the parent session
@@ -729,8 +735,12 @@ process.once('SIGHUP', () => void handleShutdownSignal('SIGHUP'));
 // Announce dashboard restarts (supervisor watchdog / pan reload / pan restart)
 // in the Awareness activity feed. Polls restart-status.json because the writer
 // processes can't reach this server's event store — see restart-announcer.ts.
-startRestartAnnouncer();
-console.log('[overdeck] Restart announcer started');
+// PAN-3931: a peer dashboard would mark the primary's restarts as announced.
+if (startRestartAnnouncer()) {
+  console.log('[overdeck] Restart announcer started');
+} else {
+  console.log('[overdeck] Restart announcer SKIPPED — peer dashboard writes no restart state');
+}
 
 // PAN-3917: the four boot repairs that lived here — clearing a stuck merge
 // status (PAN-490), restoring merge readiness, restoring a review status
@@ -756,7 +766,10 @@ setTimeout(() => {
 // long-running dashboard showing an indefinitely stale CI state. The Effect
 // layer marks readiness only after event-store events can reach the read model;
 // starting earlier can persist the fill while silently missing its projection.
-await startProjectCiRefillAfterProjectionReady(15 * 60 * 1000);
+// PAN-3931: a peer dashboard appends no CI events; the primary runs the refill.
+if (await startProjectCiRefillAfterProjectionReady(15 * 60 * 1000) === null) {
+  console.log('[overdeck] Project CI refill SKIPPED — peer dashboard appends no CI events');
+}
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
@@ -799,6 +812,12 @@ if (isPeerDashboard) {
 // requests so the approval banner clears itself.
 await initRestartGate().catch((err: unknown) => {
   console.warn(`[overdeck] Restart gate init failed: ${err instanceof Error ? err.message : String(err)}`);
+});
+
+// Deploy progress (PAN-3751): derive the in-flight `pan reload` from the restart
+// lock, gate and status journal, and publish it on the owning project's row.
+await initDeployProgress().catch((err: unknown) => {
+  console.warn(`[overdeck] Deploy progress init failed: ${err instanceof Error ? err.message : String(err)}`);
 });
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches

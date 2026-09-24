@@ -141,7 +141,7 @@ A well-sized task has all of these properties:
 - One snapshot test = one task.
 - One doc migration = one task (per doc or per logical doc cluster, not one task for "update all docs").
 
-**When in doubt, split.** The cost of too-small xBRIEF tasks is mild (more rows to track); the cost of too-large xBRIEF tasks is severe (reviewers can't reason about them, work agents deliver partial results, downstream roles can't pinpoint which acceptance criterion failed, and the `work.inspect` gate can't verify mid-implementation). Err on the side of more xBRIEF tasks.
+**When in doubt, split.** The cost of too-small xBRIEF tasks is mild (more rows to track); the cost of too-large xBRIEF tasks is severe (reviewers can't reason about them, work agents deliver partial results, downstream roles can't pinpoint which acceptance criterion failed, and one item's `Item:` commit can't be checked on its own). Err on the side of more xBRIEF tasks.
 
 **What this does NOT mean:**
 - It does NOT mean ship partial features. CLAUDE.md's "Deliver Complete Features" rule still applies: every task's acceptance criteria must be fully met before it's marked done, and every task in the plan must ship before the issue itself is marked done. Decomposition is about *reviewability and verifiability*, not about scope reduction.
@@ -181,17 +181,19 @@ For each sub-task, estimate difficulty using this rubric:
 
 ### Inspection Requirement — `metadata.requiresInspection`
 
-**For every task, decide whether it needs the work.inspect gate before subsequent xBRIEF tasks can start.** This is a deliberate, per-task decision — not a default-on, not a default-off. The decision is recorded as `metadata.requiresInspection: true|false` on each plan item.
+**For every task, decide whether its commit should get a second look before later xBRIEF tasks build on it.** This is a deliberate, per-task decision — not a default-on, not a default-off. The decision is recorded as `metadata.requiresInspection: true|false` on each plan item.
 
-**Why this exists:** PAN-382 introduced the work.inspect gate after MIN-796, where an agent built `KaiaRuntime.ts` on the wrong foundation (React state machine instead of HTTP/SSE service). That single wrong foundation infected 7 subsequent xBRIEF tasks — about 5,800 lines that all had to be redone. Task-level inspection is Overdeck's Jidoka gate: stop the line at each step, never pass a foundation defect downstream.
+**What the flag does:** nothing blocks between tasks. Each task lands as its own commit with an `Item: <item-id>` trailer, `pan task done` checks that trailer on the pushed commit, and code review runs from the PR after the work is done. When tiered execution runs a standing supervisor with the `flagged` subscription policy, `requiresInspection: true` subscribes that supervisor to the task's commit, so a foundation task gets reviewed while later tasks are still being built.
 
-**But it's not free.** Per-task inspection adds wall-clock time and cost to every step. Applying it indiscriminately turns a 12-task refactor into a 12-step interview. Apply it only where its absence would let a structural defect cascade.
+**Why this exists:** in MIN-796 an agent built `KaiaRuntime.ts` on the wrong foundation (React state machine instead of HTTP/SSE service). That single wrong foundation infected 7 subsequent xBRIEF tasks — about 5,800 lines that all had to be redone. The flag marks the tasks where a defect like that would cascade.
+
+**But it's not free.** Every flagged task costs a supervisor review. Flagging indiscriminately spends that on mechanical steps. Flag a task only where its absence would let a structural defect cascade.
 
 **Set `requiresInspection: true` when ANY of the following are true for this task:**
 
 1. **Foundation for downstream xBRIEF tasks.** Subsequent xBRIEF tasks depend on this task's interfaces, types, file layout, or module boundaries. A wrong choice here is *recoverable only* by redoing the dependent xBRIEF tasks. (e.g., "create the runtime layer that all message handling sits on top of," "introduce the new state machine other components will subscribe to.")
 2. **Architectural decision crystallizing in code.** The task encodes a decision the team would want to second-guess at a checkpoint — naming a public API, choosing a library boundary, picking an event shape that other xBRIEF tasks will produce or consume.
-3. **Spec ambiguity risk.** The task's description is broad enough that the agent could plausibly produce two very different diffs that both look "done" — the inspector earns its keep by pinning down which one matches the spec.
+3. **Spec ambiguity risk.** The task's description is broad enough that the agent could plausibly produce two very different diffs that both look "done" — a supervisor review earns its keep by pinning down which one matches the spec.
 4. **Security/permission/auth surface.** The task touches a security boundary, sandbox, or trust gate. Defects propagating into later xBRIEF tasks are expensive to unwind once dependent code assumes the security posture.
 5. **Cross-cutting protocol or schema.** Wire format, database schema migration, RPC contract, event payload — anything where the *next* task encodes assumptions about *this* task's output.
 
@@ -203,13 +205,13 @@ For each sub-task, estimate difficulty using this rubric:
 - A wrong implementation would surface immediately at typecheck, lint, the verification gate, or end-of-MR review — not as silent foundation rot.
 - The task is part of a parallel batch of mechanically identical operations (10 provider flips, 12 doc renames) where each one's correctness is independently obvious.
 
-**Heuristic shortcut:** if you would expect the work.inspect gate to read a 15-line diff and respond "yes that matches the task description" with no judgment call, set `requiresInspection: false`. Inspection's value is in catching the *judgment-call* defects, not in rubber-stamping mechanical ones.
+**Heuristic shortcut:** if you would expect a reviewer to read the task's 15-line diff and respond "yes that matches the task description" with no judgment call, set `requiresInspection: false`. A per-task review's value is in catching the *judgment-call* defects, not in rubber-stamping mechanical ones.
 
-**You MUST set this field explicitly on every task.** Omitting it is a planning error — the work prompt requires it. Default to `false` for the typical mechanical task; flip to `true` only when one of the criteria above genuinely applies. Most plans will have 0–2 xBRIEF tasks with `requiresInspection: true`. If a plan has more than 3, ask yourself whether you've under-decomposed — large xBRIEF tasks are more often the actual problem.
+**You MUST set this field explicitly on every task.** Omitting it is a planning error — the plan quality lint requires it. Default to `false` for the typical mechanical task; flip to `true` only when one of the criteria above genuinely applies. Most plans will have 0–2 xBRIEF tasks with `requiresInspection: true`. If a plan has more than 3, ask yourself whether you've under-decomposed — large xBRIEF tasks are more often the actual problem.
 
 When `requiresInspection: true`, you MUST also populate `metadata.foundationFor: [<taskId>, …]` listing the downstream xBRIEF tasks that depend on this one. The list answers the question "if this task were implemented wrong, which other xBRIEF tasks would have to be redone?" If you cannot name at least one dependent task, the inspection criterion has not actually been met — flip `requiresInspection` back to `false`. Criteria 2-5 above (architectural decision, spec ambiguity, security boundary, cross-cutting protocol) still qualify; in those cases list the xBRIEF tasks that *encode assumptions about this task's output*. An empty `foundationFor` on a `requiresInspection: true` task is a planning error.
 
-When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` unless the task needs a broader architecture/safety review. Use `"deep"` only for high-risk foundation, security, schema, or cross-cutting protocol xBRIEF tasks where the inspector should answer "was this done correctly?" rather than only "was the deed done?"
+When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` unless the task needs a broader architecture/safety review. Use `"deep"` only for high-risk foundation, security, schema, or cross-cutting protocol xBRIEF tasks where the reviewer should answer "was this done correctly?" rather than only "was the deed done?"
 
 ### Phase 3: Generate Artifacts (NO CODE!)
 **Before running `pan plan finalize`, audit your own plan — fix anything that fails:**

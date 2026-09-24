@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { listRunningAgentsSync, getAgentDir, type AgentState } from '../../lib/agents.js';
+import { isAlive, type LivenessVerdict } from '../../lib/agents/liveness.js';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { isNoResumeValueEnabled } from '../../lib/boot-no-resume.js';
 import { getTldrMetrics, getTldrDaemonService } from '../../lib/tldr-daemon.js';
@@ -105,8 +106,47 @@ async function isBootNoResumeModeActive(): Promise<boolean> {
   }
 }
 
-function formatGatingReason(agent: AgentState & { tmuxActive: boolean }, noResumeModeActive: boolean): string {
-  if (agent.tmuxActive) return '';
+/**
+ * One agent as `pan status` reports it. `alive` is the backend-neutral answer
+ * from `liveness.ts` (Herdr or tmux, whichever hosts the agent); `livenessReason`
+ * says why it is not alive (`runtime-indeterminate` = the probe failed, not a
+ * death).
+ */
+export type StatusAgent = AgentState & {
+  /**
+   * @deprecated tmux session presence on the `overdeck` socket only: always
+   * false for a Herdr agent. Kept for JSON consumers; read `alive`.
+   */
+  tmuxActive: boolean;
+  alive: boolean;
+  livenessReason?: Extract<LivenessVerdict, { alive: false }>['reason'];
+};
+
+/** Concurrent liveness probes; each is a Herdr socket call or a few tmux execs. */
+const LIVENESS_PROBE_CONCURRENCY = 32;
+
+async function withLiveness(agents: readonly (AgentState & { tmuxActive: boolean })[]): Promise<StatusAgent[]> {
+  const verdicts: LivenessVerdict[] = new Array(agents.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < agents.length) {
+      const index = next++;
+      verdicts[index] = await isAlive(agents[index]!.id).catch(
+        (): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }),
+      );
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(LIVENESS_PROBE_CONCURRENCY, agents.length) }, worker));
+  return agents.map((agent, index) => {
+    const verdict = verdicts[index]!;
+    return verdict.alive
+      ? { ...agent, alive: true }
+      : { ...agent, alive: false, livenessReason: verdict.reason };
+  });
+}
+
+function formatGatingReason(agent: StatusAgent, noResumeModeActive: boolean): string {
+  if (agent.alive) return '';
   if (agent.paused === true) return agent.pausedReason ? `Paused (${agent.pausedReason})` : 'Paused';
   if (agent.troubled === true) {
     const failureCount = agent.consecutiveFailures ?? 0;
@@ -139,9 +179,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const [restartStatus, restartEvents] = await Promise.all([readRestartStatus(), readRestartEvents()]);
 
   // Filter out invalid agent states (missing required fields)
-  const agents = listRunningAgentsSync().filter(agent =>
+  const agents = await withLiveness(listRunningAgentsSync().filter(agent =>
     agent.id && agent.issueId && agent.workspace
-  );
+  ));
   const noResumeModeActive = await isBootNoResumeModeActive();
   const dockerContainers = await Effect.runPromise(collectDockerContainerLifecycleSnapshot());
   const issueIds = new Map<string, string>();
@@ -197,8 +237,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   }
 
   for (const agent of agents) {
-    const statusColor = agent.tmuxActive ? chalk.green : chalk.red;
-    const status = agent.tmuxActive ? 'running' : 'stopped';
+    const indeterminate = agent.livenessReason === 'runtime-indeterminate';
+    const statusColor = agent.alive ? chalk.green : indeterminate ? chalk.yellow : chalk.red;
+    const status = agent.alive ? 'running' : indeterminate ? 'unknown' : 'stopped';
 
     const startedAt = new Date(agent.startedAt);
     const duration = Math.floor((Date.now() - startedAt.getTime()) / 1000 / 60);

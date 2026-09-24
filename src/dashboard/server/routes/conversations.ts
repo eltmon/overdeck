@@ -1,3 +1,4 @@
+import { conversationSubagentInputRoutes } from './conversation-subagent-input.js';
 import { jsonResponse } from "../http-helpers.js";
 import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
 import { getClaudePermissionFlagsString, resolvePermissionMode, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
@@ -498,7 +499,7 @@ const getConversationMessageLocatorRoute = HttpRouter.add(
       return jsonResponse({ error: 'byteOffset must be a non-negative integer' }, { status: 400 });
     }
     return yield* Effect.promise(async () => {
-      const response = await getConversationMessageLocator(name, byteOffset, conversationReadDependencies);
+      const response = await getConversationMessageLocator(name, byteOffset, conversationReadDependencies, url.searchParams.get('agentId') ?? undefined);
       return conversationReadJson(response);
     });
   }),
@@ -1052,6 +1053,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationUploadImageRoute,
   postConversationDeleteImageRoute,
   postConversationMessageRoute,
+  conversationSubagentInputRoutes,
   postConversationCodexApprovalRoute,
   postConversationPaneChoiceRoute,
   postConversationPiAskAnswerRoute,

@@ -36,7 +36,12 @@ reconciliation. Restart with `pan admin cloister start` to re-engage it.
 ## When to use each subcommand
 
 - **`status`** — first stop for diagnosing why an idle agent wasn't nudged,
-  or why the dashboard's liveness view looks stale.
+  or why the dashboard's liveness view looks stale. The `Deacon loop:` line
+  shows the last patrol the deacon child relayed to the dashboard
+  (`lastRunAt`, plus `lastRunError` when the run failed). `waiting for first
+  run` means the child is up but has not finished a patrol yet. A last run
+  older than three intervals (three minutes) prints red. The `pan up`
+  supervisor watchdog restarts the dashboard on that same condition.
 - **`start`** — after a host reboot, after `stop`, or when `pan status` shows
   no watchdog process.
 - **`stop`** — when debugging the watchdog itself, or when you want to make

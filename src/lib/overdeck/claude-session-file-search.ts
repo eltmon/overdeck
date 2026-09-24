@@ -5,10 +5,8 @@
  * renamed (e.g. Projects/panopticon-cli → Projects/overdeck) a conversation's
  * recorded cwd goes stale and the deterministic sessionFilePath(cwd, id)
  * points at a dir that no longer exists, while the JSONL itself lives under
- * the new encoded dir. A by-id search recovers it. The conversation-search
- * indexer also catalogs subagent transcripts
- * (<session-dir>/subagents/agent-<id>.jsonl), so palette hits arrive carrying
- * bare agent ids that only a one-level-deeper sweep can resolve.
+ * the new encoded dir. A by-id search recovers it. It also resolves palette
+ * hits on indexed Claude sessions that have no conversation row (PAN-3982).
  */
 import { existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';

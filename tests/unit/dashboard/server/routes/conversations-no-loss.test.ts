@@ -17,6 +17,7 @@ const CONVERSATIONS_ROUTE_FILE = join(
 
 const CONVERSATION_ROUTE_SURFACE_FILES = [
   CONVERSATIONS_ROUTE_FILE,
+  join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'conversation-subagent-input.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-archive.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-delivery.ts'),
   join(WORKSPACE_ROOT, 'src', 'lib', 'overdeck', 'conversation-diffs.ts'),
@@ -27,6 +28,8 @@ const CONVERSATION_ROUTE_SURFACE_FILES = [
 ] as const;
 
 const EXPECTED_CONVERSATION_ROUTES = [
+  'GET /api/conversations/:name/subagents/:agentId/input',
+  'POST /api/conversations/:name/subagents/:agentId/input',
   'GET /api/conversations',
   'GET /api/conversations/pending-input',
   'GET /api/conversations/archived',
@@ -95,7 +98,7 @@ describe('PAN-2145 conversations route no-loss audit', () => {
     expect(source).toMatch(/export\s+const\s+conversationsRouteLayer\s*=/);
   });
 
-  it('keeps all 38 conversationsRouteLayer method/path registrations', () => {
+  it('keeps all 40 conversationsRouteLayer method/path registrations', () => {
     const liveRoutes = enumerateConversationRoutes();
     const expectedRoutes = new Set(EXPECTED_CONVERSATION_ROUTES);
 
@@ -118,6 +121,6 @@ describe('PAN-2145 conversations route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(38);
+    expect(liveRoutes.size).toBe(40);
   });
 });

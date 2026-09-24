@@ -177,7 +177,6 @@ export interface TieredExecutionConfig {
     model: ModelId;
     harness: Harness;
     subscribe: 'all' | 'flagged' | 'sampled';
-    owns_inspection?: boolean;
   };
   by_kind?: Partial<Record<XBriefItemKind, string>>;
   byKind?: Partial<Record<XBriefItemKind, string>>;

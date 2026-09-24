@@ -144,8 +144,10 @@ pan tts voices list
 pan tts voices show "Vivian Voice"
 pan tts voices play "Vivian Voice"
 pan tts voices set-default "Vivian Voice"
-pan tts voices map reviewStatus.passed "Vivian Voice"
+pan tts voices map workAgent.finished "Vivian Voice"
 ```
+
+Voice-map keys are `activity.tts` `eventType` values; the lifecycle keys are `planning.started`, `planning.finalized`, `workAgent.started`, and `workAgent.finished`.
 
 `pan tts test` reads `tts.voice` from `~/.overdeck/config.yaml`, resolves it in `~/.overdeck/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). On a fresh install with no saved system voice, the smoke test uses the daemon's default preset (`Vivian`, override via `QWEN_TTS_VOICE`) so the audio path can be verified before creating a voice library.
 

@@ -16,6 +16,7 @@ import {
   getGlobalConfigPath,
   clearConfigCache,
   mergeConfigs,
+  RETIRED_SUB_ROLES,
   type YamlConfig,
   type ModelRef,
   type RoleConfig,
@@ -313,7 +314,6 @@ function builtInProviderHarnesses(): BuiltInProviderHarnessesConfig {
 }
 
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
-  work: ['inspect', 'inspect-deep'],
   review: ['security', 'performance', 'correctness', 'requirements', 'synthesis'],
 };
 function seededWorkhorses(config: Pick<ReturnType<typeof loadConfigSync>['config'], 'workhorses'>): WorkhorsesConfig {
@@ -626,7 +626,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
           if (!isRecord(rawRoleConfig.sub)) {
             errors.push(`roles.${role}.sub must be an object`);
           } else {
-            const allowedSubRoles = ALLOWED_SUB_ROLES[role] ?? [];
+            const allowedSubRoles = [...(ALLOWED_SUB_ROLES[role] ?? []), ...(RETIRED_SUB_ROLES[role] ?? [])];
             for (const [subRole, rawSubConfig] of Object.entries(rawRoleConfig.sub)) {
               if (!allowedSubRoles.includes(subRole)) {
                 errors.push(`Unknown sub-role "${subRole}" for role "${role}"`);

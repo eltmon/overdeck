@@ -148,21 +148,22 @@ describe('concurrency governor — config + counting', () => {
     };
     const stopCalls: Array<[string, string | undefined]> = [];
     const idle = new Set(['agent-c', 'agent-d']);
+    mockLiveAgents(['agent-a', 'agent-b', 'agent-c', 'agent-d']);
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
-        { id: 'agent-a', role: 'work', tmuxActive: true, lastActivity: '2026-01-01T00:00:00Z' }, // active
-        { id: 'agent-b', role: 'work', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' }, // active
-        { id: 'agent-c', role: 'work', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' }, // idle
-        { id: 'agent-d', role: 'work', tmuxActive: true, lastActivity: '2026-01-04T00:00:00Z' }, // idle
+        { id: 'agent-a', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-01T00:00:00Z' }, // active
+        { id: 'agent-b', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' }, // active
+        { id: 'agent-c', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' }, // idle
+        { id: 'agent-d', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-04T00:00:00Z' }, // idle
       ],
-      stopAgentSync: (id: string, cause?: string) => { stopCalls.push([id, cause]); },
+      stopAgent: (id: string, cause?: string) => Effect.sync(() => { stopCalls.push([id, cause]); }),
       getAgentState: (id: string) => states[id],
       saveAgentStateSync: () => {},
       getAgentRuntimeStateSync: (id: string) => ({ state: idle.has(id) ? 'idle' : 'active' }),
     }));
     const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
 
-    const result = emergencyBrake();
+    const result = await emergencyBrake();
 
     // 4 running, cap 2 → stop the 2 idle ones first.
     expect(result.before).toBe(4);
@@ -179,15 +180,16 @@ describe('concurrency governor — config + counting', () => {
     vi.doMock('../../../src/lib/cloister/config.js', () => ({
       loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 6, reserved_advancing_slots: 3 } }),
     }));
+    mockLiveAgents(['agent-a']);
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [{ id: 'agent-a', role: 'work', tmuxActive: true }],
-      stopAgentSync: () => { throw new Error('should not stop anything'); },
+      listRunningAgentsSync: () => [{ id: 'agent-a', role: 'work', status: 'running', tmuxActive: true }],
+      stopAgent: () => { throw new Error('should not stop anything'); },
       getAgentState: () => null,
       saveAgentStateSync: () => {},
       getAgentRuntimeStateSync: () => null,
     }));
     const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
-    expect(emergencyBrake()).toEqual({ before: 1, cap: 6, stopped: [], remaining: 1 });
+    await expect(emergencyBrake()).resolves.toEqual({ before: 1, cap: 6, stopped: [], remaining: 1 });
   });
 
   it('emergency brake skips operator-started agents when exemptOperatorStarted is true (PAN-1812)', async () => {
@@ -200,23 +202,75 @@ describe('concurrency governor — config + counting', () => {
       'agent-op-b': { id: 'agent-op-b' },
       'agent-op-c': { id: 'agent-op-c' },
     };
+    mockLiveAgents(['agent-fly-a', 'agent-op-b', 'agent-op-c']);
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
-        { id: 'agent-fly-a', role: 'work', tmuxActive: true, flywheelRunId: 'RUN-1', lastActivity: '2026-01-01T00:00:00Z' },
-        { id: 'agent-op-b', role: 'work', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' },
-        { id: 'agent-op-c', role: 'work', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' },
+        { id: 'agent-fly-a', role: 'work', status: 'running', tmuxActive: true, flywheelRunId: 'RUN-1', lastActivity: '2026-01-01T00:00:00Z' },
+        { id: 'agent-op-b', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' },
+        { id: 'agent-op-c', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' },
       ],
-      stopAgentSync: (id: string) => { states[id].stoppedByUser = true; },
+      stopAgent: (id: string) => Effect.sync(() => { states[id].stoppedByUser = true; }),
       getAgentState: (id: string) => states[id],
       saveAgentStateSync: (s: { id: string }) => { states[s.id] = states[s.id]; },
       getAgentRuntimeStateSync: (id: string) => ({ state: 'active' }),
     }));
     const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
 
-    const result = emergencyBrake();
+    const result = await emergencyBrake();
 
     expect(result.before).toBe(3);
     expect(result.stopped).toEqual(['agent-fly-a']);
     expect(result.remaining).toBe(2);
+  });
+
+  it('emergency brake sees Herdr work agents (no tmux session) through the backend inventory (PAN-3926)', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 1, reserved_advancing_slots: 1, exempt_operator_started: false } }),
+    }));
+    // Herdr agents have no tmux session: tmuxActive is false for every one of
+    // them. The inventory is what says they are alive; agent-gone is a stale row.
+    mockLiveAgents(['agent-h1', 'agent-h2']);
+    const stopped: string[] = [];
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-h1', role: 'work', status: 'running', tmuxActive: false, lastActivity: '2026-01-02T00:00:00Z' },
+        { id: 'agent-h2', role: 'work', status: 'running', tmuxActive: false, lastActivity: '2026-01-01T00:00:00Z' },
+        { id: 'agent-gone', role: 'work', status: 'running', tmuxActive: false, lastActivity: '2026-01-01T00:00:00Z' },
+      ],
+      stopAgent: (id: string) => Effect.sync(() => { stopped.push(id); }),
+      getAgentState: () => null,
+      saveAgentStateSync: () => {},
+      getAgentRuntimeStateSync: () => ({ state: 'active' }),
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+
+    const result = await emergencyBrake();
+
+    expect(result.before).toBe(2);
+    expect(result.stopped).toEqual(['agent-h2']);
+    expect(stopped).toEqual(['agent-h2']);
+    expect(result.remaining).toBe(1);
+  });
+
+  it('emergency brake fails open on an unreadable inventory: every running work row counts', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 6, reserved_advancing_slots: 1 } }),
+    }));
+    mockLiveAgents(null);
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-a', role: 'work', status: 'running', tmuxActive: false },
+        { id: 'agent-b', role: 'work', status: 'stopped', tmuxActive: false },
+      ],
+      stopAgent: () => { throw new Error('should not stop anything'); },
+      getAgentState: () => null,
+      saveAgentStateSync: () => {},
+      getAgentRuntimeStateSync: () => null,
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+
+    await expect(emergencyBrake()).resolves.toEqual({ before: 1, cap: 6, stopped: [], remaining: 1 });
   });
 });

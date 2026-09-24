@@ -15,6 +15,13 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `src/dashboard/server/services/*.ts` — domain services (cache, agent enrichment, TTS runtime/playback, etc.)
 - `src/dashboard/server/event-store.ts`, `read-model.ts` — event store and in-memory read model, at the server root
 
+**Deacon child process** (PAN-3922):
+- The dashboard forks `dist/dashboard/deacon.js` (`src/dashboard/server/deacon-main.ts`) through `services/deacon-supervisor.ts`. Cloister and deacon-lite run only in that child, never in the dashboard process.
+- IPC, parent to child: `{type:'patrol'}` (run one patrol now) and `{type:'reload-config'}`. Child to parent: `{type:'patrol-done', at, error}` after every completed deacon-lite tick, scheduled or manual.
+- The supervisor keeps the latest `patrol-done` report in memory, across child restarts. Nothing is written to disk.
+- `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
+- The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
+
 **Two WebSocket endpoints:**
 - `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
 - `/ws/terminal?session=<name>` — Raw WebSocket: live PTY terminal streaming via `ws` library.
@@ -47,8 +54,33 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
+- The snapshot's agent `status` is derived when it is served, not copied from the stored
+  record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
+  backend inventory (matched by terminal id, pane id or the `agentId` token, the way
+  `GET /api/agents` matches) is served `stopped`. Before the inventory has answered even
+  once (Herdr not up at dashboard boot), such rows are served `unknown`, never dead; after
+  that, a failed read keeps the last-good panes. Stored `stopped`/`error` and the `paused`
+  / `stoppedByUser` intent fields pass through unchanged. Only `agent-`, `planning-` and
+  `strike-` ids are derived, the set the inventory answers for
+  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`).
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
+- The Command Deck project list (`command-deck-projects`), project registry
+  (`registered-projects`) and conversation list (`conversations`) still load over
+  REST. `lib/queryRecovery.ts` (PAN-3527) retries any failure of them with
+  backoff (1s, 2s, 4s, 8s, 16s) and, when EventRouter re-bootstraps after a
+  `/ws/rpc` reconnect, cancels in-flight fetches and refetches them, so a failed
+  or hung fetch during a dashboard restart does not leave the sidebar empty.
+- The Command Deck's pipeline-membership banner (`ProjectMembershipBoundary`,
+  PAN-3527) tells a temporary outage from a settled answer. While a restarted
+  server's snapshot warms, `GET /api/pipeline/membership` returns 503 with
+  `{ status: 'loading', code: 'snapshot_loading' }` and `Retry-After: 5`. That
+  503, a failed or timed-out request, and a proxy 502/503/504 are transient:
+  the banner keeps retrying them (backoff capped at 30s, never sooner than
+  `Retry-After`), shows "retrying automatically" instead of the error alert, and
+  keeps its last good result meanwhile. A typed `status: 'unavailable'` body or
+  another HTTP error is a settled answer and shows the alert with its Retry
+  button. The membership query also joins the reconnect refetch above.
 
 **Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
 starts a discuss-first conversation through `POST /api/conversations` and opens
@@ -208,8 +240,12 @@ door that does not exist; a real record read door would be a separate change.
   exist yet) is retried on the next event fired by a surviving watcher — there is no
   timer or poll. If every watch attempt fails, the stream stays in `discovering`
   until an operator or later launch creates one of the watched roots.
-- `GET /api/conversations/:name/messages` serves registered conversations only. It
-  never scans agent directories or global session UUIDs to resolve an agent-backed row.
+- `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
+  rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
+  indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
+  lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
+  names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
+  subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
@@ -250,6 +286,8 @@ components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
 marker so the no-loss gate proves that no existing surface disappeared.
 
 **God View:** `/god-view` centers the Confluence production canvas from [PAN-3447](https://github.com/eltmon/overdeck/issues/3447); its deliberate style-guide exemption and live-data contract are documented in `docs/GOD-VIEW.md`.
+
+**Derived issue state on board routes (PAN-3925):** routes that derive many issues go through the server adapter's batch doors in `services/derived-issue-state.ts`: `loadIssueStatesForProject` for one project, and `loadIssueStatesForIssues` for ids from many projects (one batch per project, the projects in parallel). A batch costs one `gh pr list` per repo, two `git for-each-ref` calls, and no per-issue spawn. The server batch doors read the PR listing stale-while-revalidate (`listRepoPullRequestsStaleOk`): a busy repo's listing takes ~11s, so once the 30s TTL passes, reads get the last listing immediately while a single refresh runs. A read waits for the forge only when no listing is younger than two minutes. Gates that act on readiness (merge scheduling, the ready set) keep the strict `listRepoPullRequests`. Route code must not call `getDerivedIssueState` in a loop.
 
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.

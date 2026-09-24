@@ -7,6 +7,13 @@ vi.mock('../../../lib/agents.js', () => ({
   listRunningAgentsSync: vi.fn(),
   getAgentDir: vi.fn(() => '/tmp/nonexistent'),
 }))
+// Liveness is the backend's answer (Herdr or tmux); script it per test.
+const liveIds = new Set<string>()
+vi.mock('../../../lib/agents/liveness.js', () => ({
+  isAlive: vi.fn(async (id: string) => (liveIds.has(id)
+    ? { alive: true, paneAlive: true }
+    : { alive: false, reason: 'no-session' })),
+}))
 vi.mock('../../../lib/shadow-state.js', () => ({
   isShadowed: vi.fn(async () => false),
   getShadowState: vi.fn(async () => null),
@@ -45,6 +52,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
 
   beforeEach(() => {
     originalNoResume = process.env.OVERDECK_NO_RESUME
+    liveIds.clear()
     delete process.env.OVERDECK_NO_RESUME
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })))
@@ -242,6 +250,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
         tmuxActive: true,
       },
     ])
+    liveIds.add('agent-running')
 
     await statusCommand({} as any)
 
@@ -274,5 +283,32 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
 
     const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
     expect(out).toContain('Gate:     Boot --no-resume')
+  })
+
+  it('reports a live Herdr agent as alive and running although tmuxActive is false (#4097)', async () => {
+    const herdrAgent = {
+      id: 'agent-herdr-1',
+      issueId: 'PAN-4097',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      workspace: '/tmp/herdr',
+      startedAt: new Date().toISOString(),
+      tmuxActive: false,
+    }
+    const goneAgent = { ...herdrAgent, id: 'agent-gone-1', issueId: 'PAN-4098', workspace: '/tmp/gone' }
+    ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([herdrAgent, goneAgent])
+    liveIds.add('agent-herdr-1')
+
+    await statusCommand({ json: true } as any)
+    const payload = JSON.parse(String(logSpy.mock.calls[0]![0]))
+    expect(payload[0]).toMatchObject({ id: 'agent-herdr-1', alive: true, tmuxActive: false })
+    expect(payload[0].livenessReason).toBeUndefined()
+    expect(payload[1]).toMatchObject({ id: 'agent-gone-1', alive: false, livenessReason: 'no-session', tmuxActive: false })
+
+    logSpy.mockClear()
+    await statusCommand({} as any)
+    const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(out).toMatch(/agent-herdr-1[\s\S]*?Status:\s+\S*running/)
+    expect(out).toMatch(/agent-gone-1[\s\S]*?Status:\s+\S*stopped/)
   })
 })

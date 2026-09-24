@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mergeConfigs } from '../../config-yaml.js';
+import { tieredExecutionConfigForSave } from '../../settings-api-tiered-execution.js';
 import {
   TieredExecutionConfigError,
   resolveTieredExecutionBlock,
@@ -208,22 +209,22 @@ describe('tiered execution tier table', () => {
       model: 'claude-opus-4-8',
       harness: 'claude-code',
       subscribe: 'flagged',
-      owns_inspection: true,
     });
     expect(result.byKind).toEqual({});
   });
 
-  it('preserves supervisor ownership of inspection when configured', () => {
+  it('drops the retired supervisor.owns_inspection key a config.yaml may still carry', () => {
     const result = validateTieredExecutionConfig(validConfig({
       supervisor: {
         model: 'claude-opus-4-8',
         harness: 'claude-code',
         subscribe: 'all',
-        owns_inspection: true,
-      },
+        owns_inspection: false,
+      } as TieredExecutionConfig['supervisor'],
     }));
 
-    expect(result.supervisor?.owns_inspection).toBe(true);
+    expect(result.supervisor).toEqual({ model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'all' });
+    expect(tieredExecutionConfigForSave(result, undefined)?.supervisor).not.toHaveProperty('owns_inspection');
   });
 
   it('validates by_kind item kinds and tier references', () => {

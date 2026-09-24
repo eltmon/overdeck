@@ -489,7 +489,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
       'Pipeline membership determines which issues appear here. It could not be loaded for test-project, so this issue list may be incomplete.',
     );
     expect(alert).toHaveTextContent('Pipeline membership snapshot failed to load');
-    expect(fetch).toHaveBeenCalledWith('/api/pipeline/membership?project=test-key');
+    expect(fetch).toHaveBeenCalledWith('/api/pipeline/membership?project=test-key', expect.anything());
 
     pipelineMembershipResponse = { ok: true, body: [] };
     fireEvent.click(screen.getByRole('button', { name: 'Retry membership' }));

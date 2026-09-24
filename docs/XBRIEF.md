@@ -46,7 +46,7 @@ Every project's plan artifacts (drafts, specs, continues, orders, notes, backlog
 
 #### Canonical plan state (`.pan/`)
 
-`.pan/` lives in the project repo (or the configured plan-home repo for polyrepo projects), committed on the feature branch by the agent that writes it:
+`.pan/` lives in the project repo (or the configured plan-home repo for polyrepo projects), committed by whoever writes it. Per-issue artifacts (specs, continues, drafts) are committed on the feature branch. Project-level artifacts (orders, notes, the backlog sequence) are committed on `main` in the plan home, and `pan backlog write-sequence` and the `pan orders` write verbs also push their commit so local `main` does not drift ahead of origin (PAN-3923, #4108). When origin has moved, the push replays only the `.pan/` commits onto it and pushes. It never forces, and it warns instead of pushing when local `main` holds unpushed commits outside `.pan/`.
 
 ```
 .pan/

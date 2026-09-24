@@ -43,10 +43,6 @@ vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
   makeSpecialistRegistryKey: vi.fn(() => 'review-agent:PAN-4035'),
 }));
 
-vi.mock('../../../../../src/lib/cloister/specialist-handoff-logger.js', () => ({
-  updateSpecialistHandoffStatus: vi.fn(async () => false),
-}));
-
 const eventStoreLayer = Layer.succeed(EventStoreService, {
   append: () => Effect.succeed(1),
   appendAsync: () => Effect.succeed(1),

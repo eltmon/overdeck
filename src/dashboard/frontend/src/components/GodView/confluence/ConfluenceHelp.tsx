@@ -111,11 +111,11 @@ export function ConfluenceHelp({ eventsPerMin, onClose }: ConfluenceHelpProps) {
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Top Bar</h4>
-            <p>Clock · <b>events/s</b> (pulses on change) · an <b>ECG of events/min</b> · CPU/MEM/SWAP meters · load · beads <b>WIP/BLOCKED/READY</b> · merge queue depth · <b>$/min spend</b> · merges today · tokens today · ❄ stale count · oldest-idle · active-agents pill · <b>? HELP</b> · fullscreen <b>⛶</b>.</p>
+            <p>Clock · <b>events/s</b> (pulses on change) · an <b>ECG of events/min</b> · CPU/MEM meters · a <b>PSI</b> memory-pressure meter (amber/red only on real stalls or swap traffic; swap fill is hover detail) · load · beads <b>WIP/BLOCKED/READY</b> · merge queue depth · <b>$/min spend</b> · merges today · tokens today · ❄ stale count · oldest-idle · active-agents pill · <b>? HELP</b> · fullscreen <b>⛶</b>.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Sidebar</h4>
-            <p>The activity feed narrates events as they fire (dot color = source kind). <b>Hovering a feed row flashes the matching orb</b> on stage and shows the full message; clicking it opens that issue&apos;s rail. The donut is the live role mix; gauges are host CPU/MEM/SWAP.</p>
+            <p>The activity feed narrates events as they fire (dot color = source kind). <b>Hovering a feed row flashes the matching orb</b> on stage and shows the full message; clicking it opens that issue&apos;s rail. The donut is the live role mix; gauges are host CPU/MEM and memory PSI. The donut and role counts include only agents the terminal backend actually hosts.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-amber)' }}>Data Honesty</h4>

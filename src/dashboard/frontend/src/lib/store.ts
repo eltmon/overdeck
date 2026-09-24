@@ -19,6 +19,7 @@ import type {
   MemoryObservation,
   MemoryStatus,
   ProjectCiSnapshot,
+  ProjectDeploySnapshot,
   ResetMarker,
   ResourceStats,
   RestartGateSnapshot,
@@ -638,6 +639,10 @@ export const selectScanProgress = (s: DashboardState) => s.scanProgress
 
 export const selectProjectCi = (projectKey: string) =>
   (s: DashboardState): ProjectCiSnapshot | undefined => s.ciByProjectKey[projectKey]
+
+/** PAN-3751 — the project's in-flight deploy, pushed by `project.deploy_changed`. */
+export const selectProjectDeploy = (projectKey: string) =>
+  (s: DashboardState): ProjectDeploySnapshot | undefined => s.deployByProjectKey[projectKey]
 
 /**
  * PAN-3729 — the voluntary-restart approval gate, delivered by the snapshot on

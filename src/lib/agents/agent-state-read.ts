@@ -147,6 +147,12 @@ export interface AgentState {
   backend?: TerminalBackendName;
   paneId?: string;
   /**
+   * Backend-native terminal handle of that pane (Herdr `term_…`). Herdr's
+   * `terminal attach` takes it for every agent, including pane-bound harnesses
+   * that have no Herdr agent record (PAN-3928). Absent on pre-PAN-3928 agents.
+   */
+  terminalId?: string;
+  /**
    * Delivery method for agent messages. 'auto' tries supervisor, then channels,
    * then tmux; explicit socket methods are strict (throw on failure); 'tmux'
    * bypasses socket transports entirely.
@@ -241,6 +247,7 @@ export function cleanAgentState(raw: AgentState): AgentState {
     supervisorEnabled: raw.supervisorEnabled,
     backend: raw.backend,
     paneId: raw.paneId,
+    terminalId: raw.terminalId,
     deliveryMethod: raw.deliveryMethod,
     reviewSubRole: raw.reviewSubRole,
     reviewRunId: raw.reviewRunId,

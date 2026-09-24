@@ -280,11 +280,21 @@ export function EventRouter() {
 
     // ── Event handler ─────────────────────────────────────────────────────────
     function handleEvent(event: DomainEvent) {
-      reconnectAttempt = 0
       stalenessStrikes = 0
-      stopScheduledReconnect()
       resetStalenessWatchdog()
-      if (!reconnecting) hideOverlay()
+      if (reconnecting) {
+        // A live event proves the stream is back, but the banner only clears
+        // after a successful snapshot bootstrap. Never cancel the pending
+        // recovery here: heartbeats arrive every 15s, so cancelling it left
+        // `reconnecting` latched with nothing scheduled to clear it, and the
+        // tab showed "Connection lost — reconnecting…" forever after a
+        // dashboard restart. With nothing scheduled or in flight, bootstrap now.
+        if (!reconnectTimeout && !bootstrapInFlight) bootstrapWithReconnectRetry()
+      } else {
+        reconnectAttempt = 0
+        stopScheduledReconnect()
+        hideOverlay()
+      }
       if (!isSequencedDomainEvent(event)) return
 
       const classification = coordinator.classifyDomainEvent(event.sequence)
