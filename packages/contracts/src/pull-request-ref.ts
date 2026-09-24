@@ -6,10 +6,11 @@
  *
  * The URL shape decides the forge, not the host, so self-hosted GitLab and
  * GitHub Enterprise both parse. Host and repository are lower-cased; the stored
- * URL is always rebuilt from the key, never the pasted text.
+ * URL is always rebuilt from the key, never the pasted text. Shared by the
+ * server (link commands, the pipeline) and the dashboard (transcript links).
  */
 
-import type { PullRequestKey } from '@overdeck/contracts';
+import type { PullRequestKey } from './pull-request-links';
 
 export type PullRequestForge = 'github' | 'gitlab';
 

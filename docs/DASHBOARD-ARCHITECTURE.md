@@ -253,7 +253,7 @@ door that does not exist; a real record read door would be a separate change.
   `resolveEffectivePullRequest`) and `pullRequestCount`, read with one SQL query per
   page. The door is `src/lib/overdeck/conversation-pull-requests.ts`. Explicit links
   go through `conversation-pull-request-commands.ts`, which parses the ref
-  (`pull-request-ref.ts`: PR/MR URL, `#42`, `owner/repo#42`) and refuses a
+  (`packages/contracts/src/pull-request-ref.ts`, shared with the dashboard: PR/MR URL, `#42`, `owner/repo#42`) and refuses a
   repository not configured for the conversation's project
   (`foreign_repository`). The dashboard routes
   (`GET/POST/DELETE /api/conversations/:name/pull-requests`, the DELETE takes

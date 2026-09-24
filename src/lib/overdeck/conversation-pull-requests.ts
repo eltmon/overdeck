@@ -18,12 +18,12 @@ import {
   type PullRequestLinkSource,
   type PullRequestSnapshot,
   type PullRequestState,
+  parsePullRequestRef,
 } from '@overdeck/contracts';
 
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { isAgentConversationName } from './conversations.js';
 import { getOverdeckDatabase } from './infra.js';
-import { parsePullRequestRef } from './pull-request-ref.js';
 
 interface LinkRow {
   conversation_name: string;

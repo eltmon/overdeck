@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import { INITIAL_READ_MODEL_STATE, applyEvent } from "./event-reducers"
-import { resolveEffectivePullRequest, type PullRequestLink, type PullRequestSnapshot } from "./pull-request-links"
+import { INITIAL_READ_MODEL_STATE, applyEvent } from "../event-reducers"
+import { resolveEffectivePullRequest, type PullRequestLink, type PullRequestSnapshot } from "../pull-request-links"
 
 function snapshot(state: PullRequestSnapshot["state"], updatedAt: string | null = null): PullRequestSnapshot {
   return {

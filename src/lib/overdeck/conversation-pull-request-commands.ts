@@ -13,8 +13,13 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import {
+  isConfiguredPullRequestRepo,
+  parsePullRequestRef,
+  repoFromRemoteUrl,
   resolveEffectivePullRequest,
   type ConversationPullRequests,
+  type ParsedPullRequestRef,
+  type PullRequestRepo,
   type PullRequestLink,
   type PullRequestLinkedConversation,
   type PullRequestLinkListing,
@@ -32,13 +37,6 @@ import {
   type ExplicitPullRequestLinkSource,
 } from './conversation-pull-requests.js';
 import { getConversationByName } from './conversations.js';
-import {
-  isConfiguredPullRequestRepo,
-  parsePullRequestRef,
-  repoFromRemoteUrl,
-  type ParsedPullRequestRef,
-  type PullRequestRepo,
-} from './pull-request-ref.js';
 
 const execFileAsync = promisify(execFile);
 

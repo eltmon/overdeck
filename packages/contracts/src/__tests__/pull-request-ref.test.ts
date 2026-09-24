@@ -6,7 +6,7 @@ import {
   parsePullRequestRef,
   repoFromRemoteUrl,
   type PullRequestRepo,
-} from '../pull-request-ref.js';
+} from '../pull-request-ref';
 
 const GITHUB_REPO: PullRequestRepo = { host: 'github.com', repository: 'eltmon/overdeck', forge: 'github' };
 const GITLAB_REPO: PullRequestRepo = { host: 'gitlab.example.com', repository: 'group/sub/app', forge: 'gitlab' };
