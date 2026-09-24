@@ -56,6 +56,13 @@ numeric diagnostic code. Numeric codes are unsafe: `floatingEffect` renders as
 TypeScript errors still belong to their owning typecheck gates and do not count as
 Effect-ratchet findings.
 
+Some messages span several lines. `unknownInEffectCatch`, for example, puts
+`file(line,col)` on the header line and the marker on an indented continuation line.
+Before it matches the marker, the ratchet joins each diagnostic's continuation lines
+onto its header. As a result, each finding is one row in
+`scripts/effect-diagnostics-baseline.txt`, and the `NEW:` per-file report names the
+right file (PAN-4149).
+
 ## Ratchet operations
 
 Run the gate directly with:

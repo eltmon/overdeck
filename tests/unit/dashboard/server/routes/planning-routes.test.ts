@@ -11,7 +11,8 @@
  *
  * Every terminal and liveness call is mocked; nothing touches tmux or Herdr.
  */
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -26,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   closeAgentPaneDetailed: vi.fn(),
   launchAgentPane: vi.fn(),
   deliverAgentMessage: vi.fn(),
+  resolveModel: vi.fn(),
   appended: [] as Record<string, unknown>[],
 }));
 
@@ -86,7 +88,7 @@ vi.mock('../../../../../src/lib/settings.js', async (importOriginal) => {
 
 vi.mock('../../../../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../src/lib/config-yaml.js')>();
-  return { ...actual, loadConfigSync: () => ({ config: {} }), resolveModel: () => 'claude-sonnet-5' };
+  return { ...actual, loadConfigSync: () => ({ config: {} }), resolveModel: mocks.resolveModel };
 });
 
 vi.mock('../../../../../src/lib/launcher-generator.js', () => ({
@@ -147,6 +149,7 @@ beforeEach(async () => {
     backend: 'herdr', workspaceId: 'w1', paneId: 'w1:p2', terminalId: 'term-2', agentName: PLANNER,
   });
   mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
+  mocks.resolveModel.mockReturnValue('claude-sonnet-5');
 });
 
 afterEach(async () => {
@@ -287,6 +290,48 @@ describe('POST /api/planning/:issueId/message (M1)', () => {
     expect(mocks.deliverAgentMessage).toHaveBeenCalled();
     expect(mocks.closeAgentPane).not.toHaveBeenCalled();
     expect(mocks.launchAgentPane).not.toHaveBeenCalled();
+  });
+});
+
+// PAN-4160: the relaunch uses the configured plan model, and fails loudly when
+// it cannot be resolved; it never falls back to a literal model ID.
+describe('POST /api/planning/:issueId/message: plan model resolution (PAN-4160)', () => {
+  it('launches the planner on the configured plan model', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
+    mocks.resolveModel.mockReturnValue('claude-opus-5-5');
+
+    const response = await call('POST', `/api/planning/${ISSUE}/message`, { message: 'continue' });
+
+    expect(response.status).toBe(200);
+    expect(mocks.resolveModel).toHaveBeenCalledWith('plan', undefined, expect.anything());
+    expect(mocks.launchAgentPane).toHaveBeenCalledWith(expect.objectContaining({
+      tokens: expect.objectContaining({ model: 'claude-opus-5-5' }),
+    }));
+    expect(getAgentState(PLANNER)?.model).toBe('claude-opus-5-5');
+  });
+
+  it('returns a "No default model configured" error and touches nothing when the plan model cannot be resolved', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
+    mocks.resolveModel.mockImplementation(() => {
+      throw new Error('config.yaml: roles.plan.model references workhorse:plan but workhorses.plan is not defined');
+    });
+    const planningDir = join(mocks.projectPath, 'workspaces', 'feature-pan-3960', '.pan');
+    const outputFile = join(planningDir, 'output.jsonl');
+    await writeFile(outputFile, '{}\n');
+
+    const response = await call('POST', `/api/planning/${ISSUE}/message`, { message: 'continue' });
+
+    expect(response.status).toBe(500);
+    expect(response.body.success).toBe(false);
+    expect(String(response.body.error)).toContain('No default model configured for the plan role');
+    expect(String(response.body.error)).toContain('workhorses.plan is not defined');
+    expect(mocks.closeAgentPane).not.toHaveBeenCalled();
+    expect(mocks.launchAgentPane).not.toHaveBeenCalled();
+    expect(getAgentState(PLANNER)).toBeNull();
+    // The conversation log is not moved aside, so a retry after fixing the
+    // config still rebuilds the continuation prompt from it.
+    expect(existsSync(outputFile)).toBe(true);
+    expect(existsSync(join(planningDir, 'CONTINUATION_PROMPT.md'))).toBe(false);
   });
 });
 

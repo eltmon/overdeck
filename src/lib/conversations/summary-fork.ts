@@ -508,15 +508,16 @@ export async function generateSummaryForFork(
   summaryHarness: RuntimeName = 'claude-code',
   sourceHarness?: RuntimeName,
 ): Promise<{ summary: string; summaryModel: string | null }> {
+  const { config } = loadConfigSync();
+  // PAN-4160: no request-level model → the configured
+  // `conversations.fork_summary_model` (default in config-yaml/defaults.ts).
+  summaryModel ||= config.conversations.forkSummaryModel;
   if (!summaryModel) {
-    // Fork summaries serialize the entire conversation in one shot. Sonnet 4.6's
-    // 1M-token context handles large sessions that would overflow Haiku's 200k.
-    summaryModel = 'claude-sonnet-4-6';
+    throw new Error('No fork summary model configured: set conversations.fork_summary_model in ~/.overdeck/config.yaml or pass summaryModel.');
   }
 
   console.log(`[claude-invoke] purpose=summary-fork | model=${summaryModel} | summaryHarness=${summaryHarness} | sourceHarness=${sourceHarness ?? 'claude-code'} | source=summary-fork.ts:generateSummaryForFork | jsonl=${jsonlPath}`);
 
-  const { config } = loadConfigSync();
   const richMode = config.conversations.richCompaction;
 
   // The source harness selects which transcript adapter parses/serializes the

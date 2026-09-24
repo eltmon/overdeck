@@ -243,7 +243,7 @@ These are defaults. Projects can add custom classification labels — they just 
 | `planned` | Planning state removed from kanban |
 | `done` | Redundant — closing the issue IS marking it done |
 | `review-ready` | Redundant — In Review state already signals this |
-| `Review Ready` (Linear) | Redundant — `readyForMerge` on the SQLite-backed `review_status` row tracks runtime merge readiness; durable verdicts live in the permanent record's `pipeline` block. In Review column signals stakeholder involvement |
+| `Review Ready` (Linear) | Redundant — merge readiness is derived, not stored: the issue's `ready` state (`packages/contracts/src/derived-issue-state.ts`) comes from an approved, mergeable PR with green checks (`src/lib/overdeck/derived-issue-state.ts`), and verdicts live on the PR as reviews. In Review column signals stakeholder involvement |
 | `wontfix` | Optional GitHub convention, not Overdeck-managed |
 | `pan:*` prefix | Over-engineered fallback strategy; direct labels are simpler |
 

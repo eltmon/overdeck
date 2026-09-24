@@ -15,7 +15,8 @@
 # checked, including test files: no test may construct an IssueRecord either.
 #
 # A second pass scans the Markdown that SHIPS TO AGENTS — the runtime prompts
-# under src/lib/cloister/prompts/ and everything under sync-sources/ (rules,
+# under src/lib/cloister/prompts/, the role prompts under roles/ (PAN-3934),
+# and everything under sync-sources/ (rules,
 # skills, agent definitions). A prompt telling an agent to write a
 # statusOverride or push to overdeck-state resurrects the mirror just as surely
 # as code does, and the code pass never saw those files (PAN-3917 finding 17).
@@ -135,7 +136,7 @@ done < <(find "$scan_root" -type f \
 # Markdown that ships to agents. Only scanned when the caller did not narrow the
 # code scan root, so `guard-no-state-layer.sh <some-dir>` stays a code-only scan.
 if [[ $# -eq 0 ]]; then
-  for md_root in src/lib/cloister/prompts sync-sources; do
+  for md_root in src/lib/cloister/prompts sync-sources roles; do
     [[ -d "$md_root" ]] || continue
     while IFS= read -r -d '' file; do
       report_md_hits "$file"
