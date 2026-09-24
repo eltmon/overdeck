@@ -147,6 +147,11 @@ door that does not exist; a real record read door would be a separate change.
   bootstrap that registers `tsx`'s resolver and then imports `dashboard-db-worker.ts`
   (PAN-3930). Bun runs the `.ts` worker directly. Tests that boot the real worker call
   `__testInternals.terminateWorkers()` in `afterEach`.
+- That bootstrap is `spawnModuleWorker` in `src/lib/module-worker.ts`; start any new
+  worker thread through it. The memory checkpoint worker uses it too:
+  `src/lib/memory/checkpoint-client.ts` resolves `dist/dashboard/checkpoint-worker.js`
+  from dashboard chunks and `dist/lib/memory/checkpoint-worker.js` (a root
+  `tsdown.config.ts` entry) from CLI chunks such as `pan memory backfill`.
 - Jobs that wait or run for more than one second emit
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.
