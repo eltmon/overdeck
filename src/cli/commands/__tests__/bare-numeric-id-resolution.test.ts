@@ -293,7 +293,7 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
     await pauseCommand('9999', { reason: 'operator' });
 
     expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
-    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-9999', 'operator', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-9999', 'operator', false, true);
   });
 
   it('resolves bare numeric input before pan unpause clears the pause gate', async () => {
